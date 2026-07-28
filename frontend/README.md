@@ -1,73 +1,35 @@
-# frontend
+# NA-WA Frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+Vue 3와 TypeScript로 구성한 NA-WA의 모바일 우선 PWA입니다.
 
-## Recommended IDE Setup
+## 기술 구성
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- Vue 3, Vite, TypeScript
+- Vue Router, Pinia
+- TanStack Vue Query
+- Axios
+- Vue I18n
+- Tailwind CSS v4
+- vite-plugin-pwa
+- Vitest, Playwright
+- ESLint, Prettier
 
-## Recommended Browser Setup
+## 소스 구조
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+- `src/app`: 앱 진입 구성, Router, 전역 Provider, I18n, 전역 스타일
+- `src/features`: 도메인 단위 기능
+- `src/shared`: 공통 API 클라이언트와 재사용 모듈
 
-## Type Support for `.vue` Imports in TS
+의존 방향은 `app → features → shared`를 따릅니다.
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+- 서버 상태: TanStack Vue Query
+- 클라이언트 상태: Pinia
+- HTTP 통신: `src/shared/api/httpClient.ts`
 
-## Customize configuration
+현재 Axios 인스턴스에는 `baseURL`, timeout, `withCredentials`만 구성되어 있습니다. 인증 인터셉터와 실제 API 연동은 포함하지 않습니다.
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## PWA 정책
 
-## Project Setup
+서비스 워커는 앱 셸과 정적 자원만 사전 캐시합니다. API 응답에 대한 런타임 캐시는 사용하지 않습니다.
 
-```sh
-pnpm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
-pnpm dev
-```
-
-### Type-Check, Compile and Minify for Production
-
-```sh
-pnpm build
-```
-
-### Run Unit Tests with [Vitest](https://vitest.dev/)
-
-```sh
-pnpm test:unit
-```
-
-### Run End-to-End Tests with [Playwright](https://playwright.dev)
-
-```sh
-# Install browsers for the first run
-npx playwright install
-
-# When testing on CI, must build the project first
-pnpm build
-
-# Runs the end-to-end tests
-pnpm test:e2e
-# Runs the tests only on Chromium
-pnpm test:e2e --project=chromium
-# Runs the tests of a specific file
-pnpm test:e2e tests/example.spec.ts
-# Runs the tests in debug mode
-pnpm test:e2e --debug
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-pnpm lint
-```
+설치, 실행, 환경변수와 검증 명령은 저장소 루트의 [README](../README.md)를 참고합니다.

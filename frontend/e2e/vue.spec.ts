@@ -1,8 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
-// See here how to get started:
-// https://playwright.dev/docs/intro
-test('visits the app root url', async ({ page }) => {
+test('renders the NA-WA app shell', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('h1')).toHaveText('You did it!')
+
+  await expect(page).toHaveTitle('NA-WA')
+  await expect(page.getByRole('heading', { name: 'NA-WA' })).toBeVisible()
+  await expect(page.getByText('함께 만드는 여행의 시작')).toBeVisible()
 })
