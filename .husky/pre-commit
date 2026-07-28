@@ -1,0 +1,27 @@
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+# GUI IDEs do not always inherit the interactive fish/fnm environment.
+if ! command -v node >/dev/null 2>&1 && [ -f "$repo_root/.node-version" ]; then
+  IFS= read -r node_version < "$repo_root/.node-version"
+  node_version=${node_version#v}
+  fnm_node_bin="${XDG_DATA_HOME:-$HOME/.local/share}/fnm/node-versions/v${node_version}/installation/bin"
+
+  if [ -x "$fnm_node_bin/node" ]; then
+    PATH="$fnm_node_bin:$PATH"
+    export PATH
+  fi
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "Node.js를 찾을 수 없습니다. 프로젝트의 .node-version 환경을 확인해 주세요."
+  exit 1
+fi
+
+lint_staged_bin="$repo_root/node_modules/.bin/lint-staged"
+
+if [ ! -x "$lint_staged_bin" ]; then
+  echo "lint-staged가 설치되지 않았습니다. 저장소 루트에서 pnpm install을 실행해 주세요."
+  exit 1
+fi
+
+"$lint_staged_bin"

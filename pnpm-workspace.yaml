@@ -1,0 +1,4 @@
+packages:
+  - frontend
+allowBuilds:
+  vue-demi: true
