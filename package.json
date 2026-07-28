@@ -1,8 +1,25 @@
 {
   "name": "na-wa",
   "private": true,
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@11.17.0",
   "engines": {
     "node": ">=24.18.0 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @na-wa/frontend dev",
+    "build": "pnpm --filter @na-wa/frontend build",
+    "type-check": "pnpm --filter @na-wa/frontend type-check",
+    "lint": "pnpm --filter @na-wa/frontend lint",
+    "lint:fix": "pnpm --filter @na-wa/frontend lint:fix",
+    "format": "pnpm --filter @na-wa/frontend format",
+    "format:check": "pnpm --filter @na-wa/frontend format:check",
+    "lint:staged": "lint-staged",
+    "prepare": "husky",
+    "test:unit": "pnpm --filter @na-wa/frontend test:unit",
+    "test:e2e": "pnpm --filter @na-wa/frontend test:e2e"
+  },
+  "devDependencies": {
+    "husky": "9.1.7",
+    "lint-staged": "17.2.0"
   }
 }

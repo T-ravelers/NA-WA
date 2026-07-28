@@ -123,6 +123,9 @@ build/Release
 # TypeScript cache
 *.tsbuildinfo
 
+# ESLint cache
+.eslintcache
+
 # Framework build output and caches
 .cache
 .parcel-cache
