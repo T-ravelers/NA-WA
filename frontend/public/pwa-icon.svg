@@ -1,0 +1,39 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  role="img"
+  aria-labelledby="title"
+>
+  <title id="title">NA-WA</title>
+  <rect
+    width="512"
+    height="512"
+    fill="#F3F1EC"
+  />
+  <rect
+    x="128"
+    y="148"
+    width="56"
+    height="216"
+    rx="28"
+    fill="#1C1917"
+  />
+  <path
+    d="m143 188 38-42 194 176-38 42Z"
+    fill="#1C1917"
+  />
+  <rect
+    x="328"
+    y="148"
+    width="56"
+    height="216"
+    rx="28"
+    fill="#1C1917"
+  />
+  <circle
+    cx="356"
+    cy="164"
+    r="28"
+    fill="#B45309"
+  />
+</svg>
