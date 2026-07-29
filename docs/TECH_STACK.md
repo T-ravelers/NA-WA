@@ -81,19 +81,18 @@ PWA는 필수 기능이지만 오프라인 동작 범위는 의도적으로 제�
 | ------------------- | -------------- | ---------------------------------------------------- |
 | Backend CI          | 구현됨         | `main` PR/push에서 Gradle 빌드·테스트                |
 | Backend CD          | 구현됨         | CI 성공 후 Docker Hub push와 EC2 Docker Compose 배포 |
-| Frontend CI         | 후속 작업      | format, lint, type-check, unit test, build 검증      |
+| Frontend CI         | 구현됨         | `main` PR/push에서 의존성 설치와 품질·빌드 검증      |
 | Frontend Preview    | 운영 방향 확정 | Vercel PR Preview                                    |
 | Frontend Production | 운영 방향 확정 | Vercel `main` Production                             |
 
-Vercel은 프론트엔드 배포를 담당하고 GitHub Actions는 품질 검증을 담당합니다. 같은
-프론트엔드 배포를 두 시스템에서 중복 실행하지 않습니다.
+Frontend CI는 고정된 잠금 파일로 의존성을 설치한 뒤 format, lint, type-check, unit
+test, build를 수행합니다. Vercel은 프론트엔드 배포를 담당하고 GitHub Actions는 품질
+검증을 담당합니다. 같은 프론트엔드 배포를 두 시스템에서 중복 실행하지 않습니다.
 
 ## 6. 현재 범위와 알려진 정리 항목
 
 - 제품 범위에는 채팅과 WebSocket/STOMP 기능이 없습니다.
 - 현재 Nginx에는 WebSocket upgrade 설정이 남아 있으나 프론트엔드 기능 계약이
   아닙니다. 인프라 후속 작업에서 제거 여부를 결정합니다.
-- `@tabler/icons-vue`는 프론트엔드 사용 의존성이므로 루트가 아닌
-  `frontend/package.json`에서 관리하도록 후속 정리합니다.
 - Router의 실제 route, 공통 API 오류 모델, Query Key factory, 공통 UI와 앱 셸은 아직
   구현 전입니다.
