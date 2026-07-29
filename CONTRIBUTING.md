@@ -1,0 +1,133 @@
+# NA-WA 공통 협업 가이드
+
+프론트엔드와 백엔드가 함께 사용하는 Issue, Branch, Commit, Pull Request 규칙입니다.
+영역별 구현 규칙은 각 개발 컨벤션을 함께 따릅니다.
+
+- [프론트엔드 개발 컨벤션](./frontend/docs/DEVELOPMENT_CONVENTION.md)
+- [백엔드 개발 컨벤션](./backend/docs/DEVELOPMENT_CONVENTION.md)
+
+## 1. 작업 시작
+
+1. 작업 목적과 완료 조건이 명확한 Issue를 먼저 생성합니다.
+2. 한 Issue에는 하나의 주요 목적만 둡니다.
+3. 기준 브랜치를 최신 상태로 맞춘 뒤 작업 브랜치를 생성합니다.
+4. API, 환경 변수, 배포 또는 공통 계약이 바뀌면 같은 PR에서 관련 문서도 수정합니다.
+
+현재 PR 기준 브랜치는 `main`입니다. `develop` 도입과 기본 브랜치 변경은 브랜치 보호
+정책을 정한 뒤 별도 작업으로 반영합니다.
+
+## 2. Issue 규칙
+
+제목은 `[Type] 한글 설명` 형식을 사용합니다.
+
+```text
+[Feat] 여행 일정 등록 기능 구현
+[Fix] 로그인 실패 예외 응답 수정
+[Docs] 프론트엔드 개발 규칙 정리
+```
+
+Issue 본문에는 최소한 다음 내용을 작성합니다.
+
+- 개발 목적
+- 구현 범위와 제외 범위
+- 완료 조건
+- API·화면·인프라 등 다른 영역에 미치는 영향
+
+## 3. Branch 규칙
+
+브랜치 이름은 `<type>/#<issue-number>-<short-description>` 형식을 사용합니다.
+설명은 영문 kebab-case로 짧게 작성합니다.
+
+| Type       | 용도                            |
+| ---------- | ------------------------------- |
+| `feat`     | 기능 추가                       |
+| `fix`      | 버그 수정                       |
+| `refactor` | 동작을 유지하는 구조 개선       |
+| `chore`    | 설정, 의존성, 빌드, 인프라 작업 |
+| `test`     | 테스트 추가 또는 수정           |
+| `docs`     | 문서만 변경                     |
+
+```text
+feat/#12-create-travel-plan
+fix/#27-login-error-response
+docs/#31-frontend-convention
+```
+
+`main`에 직접 push하지 않고 Pull Request를 통해 병합합니다.
+
+## 4. Commit 규칙
+
+커밋 메시지는 `<type>(<scope>): <한글 요약> (#이슈번호)` 형식을 사용합니다.
+`scope`가 불필요하면 생략할 수 있습니다.
+
+```text
+feat(frontend): 여행 일정 등록 폼 추가 (#12)
+fix(backend): 로그인 실패 예외 응답 수정 (#27)
+docs: 프론트엔드 개발 규칙 정리 (#31)
+```
+
+- 하나의 커밋에는 함께 검토할 수 있는 변경만 담습니다.
+- 의미 없는 중간 메시지와 포맷 변경만 섞인 커밋을 남기지 않습니다.
+- 민감정보, 빌드 산출물, 개인 IDE 설정을 커밋하지 않습니다.
+
+## 5. Pull Request 규칙
+
+PR 제목은 Issue와 같은 `[Type] 한글 설명` 형식을 사용하고 조직 공통 PR 템플릿을
+빠짐없이 작성합니다.
+
+- 작업 목적과 핵심 변경을 요약합니다.
+- 수행한 자동 테스트와 수동 확인 결과를 구체적으로 남깁니다.
+- 프론트엔드·백엔드·인프라 영향과 후속 작업을 구분합니다.
+- 리뷰가 필요한 결정이나 알려진 제약을 숨기지 않습니다.
+
+기본 브랜치를 대상으로 하는 PR은 `Closes #<issue-number>`를 사용합니다. 기본 브랜치가
+아닌 통합 브랜치를 대상으로 할 때는 조기 종료를 피하기 위해 `Refs #<issue-number>`를
+사용하고, 최종 기본 브랜치 PR에서 Issue를 종료합니다.
+
+## 6. 검증 기준
+
+변경한 영역에 해당하는 검증을 모두 수행합니다.
+
+### Frontend
+
+```shell
+pnpm format:check
+pnpm lint
+pnpm type-check
+pnpm --filter @na-wa/frontend test:unit --run
+pnpm build
+```
+
+사용자 흐름이 바뀌면 관련 Playwright 테스트도 실행합니다.
+
+```shell
+pnpm test:e2e
+```
+
+### Backend
+
+```shell
+cd backend
+./gradlew build --no-daemon
+```
+
+API 변경은 단위·통합 테스트 또는 Swagger/Postman 확인 결과를 PR에 남깁니다.
+
+문서만 변경한 경우에도 링크, 명령, 코드 예시와 Markdown 포맷을 확인합니다.
+
+## 7. 리뷰와 병합
+
+- 작성자는 PR을 열기 전에 변경 파일과 비밀정보 포함 여부를 직접 확인합니다.
+- 리뷰 피드백은 수정하거나, 반영하지 않는 이유를 대화에 남깁니다.
+- 필수 검증이 실패한 상태로 병합하지 않습니다.
+- 서로 무관한 프론트엔드와 백엔드 변경을 하나의 PR에 섞지 않습니다.
+- 공통 API 계약이나 배포 변경처럼 함께 검토할 이유가 있는 경우에만 여러 영역을
+  하나의 PR에서 다룹니다.
+
+## 8. 보안과 환경 변수
+
+- 토큰, 비밀번호, OAuth secret, DB 접속정보, 개인 식별정보를 코드와 로그에 남기지
+  않습니다.
+- 브라우저에 전달되는 `VITE_*` 환경 변수에는 공개 가능한 값만 사용합니다.
+- GitHub Actions와 배포 비밀값은 GitHub Secrets 또는 배포 환경에서 주입합니다.
+- 인증 토큰을 `localStorage` 또는 `sessionStorage`에 저장하지 않습니다.

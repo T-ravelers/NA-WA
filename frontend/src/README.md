@@ -5,3 +5,6 @@
 - `shared`: 특정 도메인에 의존하지 않는 공통 모듈을 구성합니다.
 
 의존 방향은 `app → features → shared`를 따르며 역방향 의존을 만들지 않습니다.
+
+상세한 폴더 구성, 상태 소유권, Query Key, API, Router, i18n과 테스트 규칙은
+[프론트엔드 개발 컨벤션](../docs/DEVELOPMENT_CONVENTION.md)을 참고합니다.
