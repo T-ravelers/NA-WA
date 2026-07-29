@@ -6,7 +6,7 @@
 ._*
 
 # Custom folder icons
-Icon
+Icon
 
 # Volume root files
 .DocumentRevisions-V100
@@ -137,6 +137,9 @@ out/
 .env
 .env.local
 .env.*.local
+
+# Claude Code local context file
+CLAUDE.md
 
 # npm cache directory
 .npm
