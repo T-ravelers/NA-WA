@@ -13,16 +13,22 @@ docker compose pull
 echo "[deploy] 컨테이너 재기동 (변경된 서비스만 재생성)"
 docker compose up -d
 
+# bind mount라 파일은 갱신돼도 nginx 프로세스는 재시작 전까지 기존 설정을 계속 씀
+echo "[deploy] nginx 설정 검증 및 반영"
+docker compose exec -T nginx nginx -t
+docker compose exec -T nginx nginx -s reload
+
 echo "[deploy] 헬스 체크"
 healthy=false
 for i in $(seq 1 10); do
   code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost/ || true)
-  if [ "$code" != "000" ]; then
+  # 000(무응답)과 5xx(서버 오류)는 실패로 간주 - 2xx/3xx/4xx만 정상 응답으로 취급
+  if [[ "$code" =~ ^[234][0-9]{2}$ ]]; then
     echo "[deploy] 응답 확인됨 (HTTP $code, ${i}번째 시도)"
     healthy=true
     break
   fi
-  echo "[deploy] 아직 응답 없음, 3초 대기 (${i}/10)"
+  echo "[deploy] 정상 응답 아님 (HTTP $code), 3초 대기 (${i}/10)"
   sleep 3
 done
 
