@@ -21,8 +21,5 @@
   "devDependencies": {
     "husky": "9.1.7",
     "lint-staged": "17.2.0"
-  },
-  "dependencies": {
-    "@tabler/icons-vue": "^3.45.0"
   }
 }
