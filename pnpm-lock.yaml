@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@tabler/icons-vue':
-        specifier: ^3.45.0
-        version: 3.45.0(vue@3.5.40(typescript@6.0.3))
     devDependencies:
       husky:
         specifier: 9.1.7
@@ -21,6 +17,9 @@ importers:
 
   frontend:
     dependencies:
+      '@tabler/icons-vue':
+        specifier: ^3.45.0
+        version: 3.45.0(vue@3.5.40(typescript@6.0.3))
       '@tanstack/vue-query':
         specifier: ^5.101.4
         version: 5.101.4(vue@3.5.40(typescript@6.0.3))

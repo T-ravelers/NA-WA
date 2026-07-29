@@ -82,8 +82,10 @@ pnpm test:e2e
 - 백엔드: `main` 대상 PR과 `main` push에서 Gradle 빌드·테스트를 수행합니다.
 - 백엔드 배포: `main` 테스트 성공 후 Docker 이미지를 빌드하고 EC2의 Docker Compose
   환경에 배포합니다.
-- 프론트엔드: Vercel이 Preview·Production 배포를 담당한다는 운영 방침을 사용합니다.
-  Vercel 연결과 프론트엔드 GitHub Actions 검증은 후속 작업입니다.
+- 프론트엔드: `main` 대상 PR과 `main` push에서 잠금 파일 기반 설치, 포맷, 린트,
+  타입, 단위 테스트, 프로덕션 빌드를 검증합니다.
+- 프론트엔드 배포: Vercel이 Preview·Production 배포를 담당한다는 운영 방침을
+  사용하며, Vercel 연결은 GitHub Actions 품질 검증과 분리해 진행합니다.
 
 현재 제품 범위에는 채팅과 WebSocket/STOMP 기능이 없습니다. 병합된 Nginx 설정의
 WebSocket upgrade 처리는 프론트엔드 기능 계약으로 간주하지 않습니다.
