@@ -41,6 +41,10 @@ dependencies {
     implementation 'com.mysql:mysql-connector-j:9.7.0'
     implementation 'com.zaxxer:HikariCP:7.1.0'
 
+    // Flyway (DB 마이그레이션)
+    implementation 'org.flywaydb:flyway-core:10.20.1'
+    implementation 'org.flywaydb:flyway-mysql:10.20.1'
+
     implementation "org.springframework:spring-tx:${springVersion}"
     implementation "org.springframework:spring-jdbc:${springVersion}"
 
