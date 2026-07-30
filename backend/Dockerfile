@@ -14,7 +14,7 @@ COPY src src
 RUN ./gradlew war --no-daemon -x test
 
 # ---- Runtime stage ----
-FROM tomcat:9.0-jdk17-temurin
+FROM tomcat:9.0-jre17-temurin
 
 RUN rm -rf /usr/local/tomcat/webapps/*
 COPY --from=build /workspace/build/libs/*.war /usr/local/tomcat/webapps/ROOT.war
