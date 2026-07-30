@@ -3,6 +3,7 @@ package me.nawa.config;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.flywaydb.core.Flyway;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,8 +54,23 @@ public class RootConfig {
      * SQL SessionFactory 빈 등록
      * - MyBatis 팩토리 객체를 스프링 컨테이너에 등록
      */
+    /*
+     * 앱 시작 시 DB 마이그레이션 자동 적용
+     * - src/main/resources/db/migration 안의 V{n}__*.sql을 버전 순서대로 실행
+     * - sqlSessionFactory가 이 빈을 파라미터로 받아 스키마 적용 이후에 뜨도록 강제함
+     */
     @Bean
-    public SqlSessionFactory sqlSessionFactory(DataSource dataSource) throws Exception {
+    public Flyway flyway(DataSource dataSource) {
+        Flyway flyway = Flyway.configure()
+                .dataSource(dataSource)
+                .locations("classpath:db/migration")
+                .load();
+        flyway.migrate();
+        return flyway;
+    }
+
+    @Bean
+    public SqlSessionFactory sqlSessionFactory(DataSource dataSource, Flyway flyway) throws Exception {
         SqlSessionFactoryBean sqlSessionFactory = new SqlSessionFactoryBean();
 
         // MyBatis global 설정
