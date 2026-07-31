@@ -50,6 +50,7 @@ dependencies {
     implementation 'io.springfox:springfox-swagger-ui:2.9.2'
 
     // Spring Security
+    implementation 'org.springframework.security:spring-security-core'
     implementation 'org.springframework.security:spring-security-web'
     implementation 'org.springframework.security:spring-security-config'
 
