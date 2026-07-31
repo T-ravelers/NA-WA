@@ -52,8 +52,6 @@ dependencies {
     // Spring Security
     implementation 'org.springframework.security:spring-security-web'
     implementation 'org.springframework.security:spring-security-config'
-    implementation 'org.springframework.security:spring-security-core'
-    implementation 'org.springframework.security:spring-security-taglibs'
 
     // DB
     implementation 'com.mysql:mysql-connector-j:9.7.0'
@@ -73,26 +71,15 @@ dependencies {
     implementation ('org.springframework:spring-context')
             { exclude group: 'commons-logging', module: 'commons-logging' }
     implementation 'org.springframework:spring-webmvc'
-    implementation 'javax.inject:javax.inject:1'
 
-    // AOP
-    implementation 'org.aspectj:aspectjrt:1.9.25.1'
-    implementation 'org.aspectj:aspectjweaver:1.9.25.1'
-
-    // JSP, Servlet, JSTL
+    // Servlet
     compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
     testImplementation 'javax.servlet:javax.servlet-api:4.0.1'
-    compileOnly 'javax.servlet.jsp:javax.servlet.jsp-api:2.3.3'
-    implementation 'javax.servlet:jstl:1.2'
 
     // Logging
     implementation 'org.apache.logging.log4j:log4j-api'
     runtimeOnly 'org.apache.logging.log4j:log4j-core'
     runtimeOnly 'org.apache.logging.log4j:log4j-slf4j2-impl'
-    implementation 'org.bgee.log4jdbc-log4j2:log4jdbc-log4j2-jdbc4:1.16'
-
-    // Xerces XML 파서
-    implementation 'xerces:xercesImpl:2.12.2'
 
     // Lombok
     compileOnly "org.projectlombok:lombok:${lombokVersion}"

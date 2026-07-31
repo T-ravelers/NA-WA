@@ -16,15 +16,5 @@
         <Logger name="org.springframework" level="INFO" additivity="false">
             <AppenderRef ref="console"/>
         </Logger>
-
-        <!-- JDBC 관련 로그 -->
-        <Logger name="jdbc" level="WARN" additivity="false">
-            <AppenderRef ref="console"/>
-        </Logger>
-
-        <!-- SQL만 INFO 레벨로 출력 -->
-        <Logger name="jdbc.sqlonly" level="INFO" additivity="false">
-            <AppenderRef ref="console"/>
-        </Logger>
     </Loggers>
 </Configuration>
