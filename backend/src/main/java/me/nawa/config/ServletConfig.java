@@ -8,12 +8,15 @@ import org.springframework.web.servlet.config.annotation.*;
 @EnableWebMvc
 @ComponentScan(basePackages = {
     "me.nawa.common.exception",
-//    "me.nawa.auth.controller",
-//    "me.nawa.member.controller",
-//    "me.nawa.event.controller",
-//    "me.nawa.journey.controller",
-//    "me.nawa.map.controller",
-//    "me.nawa.wallet.controller"
+    "me.nawa.auth.controller",
+    "me.nawa.member.controller",
+    "me.nawa.event.controller",
+    "me.nawa.journey.controller",
+    "me.nawa.map.controller",
+    "me.nawa.wallet.controller",
+    "me.nawa.settlement.controller",
+    "me.nawa.deposit.controller"
+
 })
 public class ServletConfig implements WebMvcConfigurer {
     @Override

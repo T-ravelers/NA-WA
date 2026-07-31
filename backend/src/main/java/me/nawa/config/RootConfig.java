@@ -26,13 +26,15 @@ import javax.sql.DataSource;
         "me.nawa.journey.mapper",
         "me.nawa.map.mapper",
         "me.nawa.member.mapper",
-        "me.nawa.wallet.mapper"})
+        "me.nawa.wallet.mapper",
+        "me.nawa.settlement.mapper"})
 @ComponentScan(basePackages = {"me.nawa.auth.service",
         "me.nawa.event.service",
         "me.nawa.journey.service",
         "me.nawa.map.service",
         "me.nawa.member.service",
-        "me.nawa.wallet.service"})
+        "me.nawa.wallet.service",
+        "me.nawa.settlement.service"})
 @EnableTransactionManagement
 public class RootConfig {
     @Value("${jdbc.driver}")
