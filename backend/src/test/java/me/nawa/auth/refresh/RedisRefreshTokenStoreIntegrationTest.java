@@ -18,6 +18,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -118,5 +123,183 @@ class RedisRefreshTokenStoreIntegrationTest {
         refreshTokenStore.deleteBySessionId(sessionId);
 
         assertTrue(refreshTokenStore.findBySessionId(sessionId).isEmpty());
+    }
+
+    @Test
+    void rotate_matchingHash_replacesSessionAtomically() {
+        RefreshTokenProvider provider = createProvider();
+        RefreshToken currentToken = provider.issueRefreshToken();
+        sessionId = currentToken.getSessionId();
+        RefreshTokenSession currentSession = toSession(
+                42L,
+                currentToken,
+                provider
+        );
+        refreshTokenStore.save(currentSession);
+        RefreshToken replacementToken =
+                provider.issueRefreshToken(sessionId);
+        RefreshTokenSession replacementSession = toSession(
+                42L,
+                replacementToken,
+                provider
+        );
+
+        RefreshTokenRotationResult result = refreshTokenStore.rotate(
+                sessionId,
+                currentSession.getTokenHash(),
+                replacementSession
+        );
+
+        assertEquals(RefreshTokenRotationResult.ROTATED, result);
+        RefreshTokenSession stored = refreshTokenStore
+                .findBySessionId(sessionId)
+                .orElseThrow();
+        assertEquals(replacementSession.getTokenHash(), stored.getTokenHash());
+        assertEquals(replacementSession.getExpiresAt(), stored.getExpiresAt());
+    }
+
+    @Test
+    void rotate_reusedHash_revokesCurrentSessionAtomically() {
+        RefreshTokenProvider provider = createProvider();
+        RefreshToken originalToken = provider.issueRefreshToken();
+        sessionId = originalToken.getSessionId();
+        RefreshTokenSession originalSession = toSession(
+                42L,
+                originalToken,
+                provider
+        );
+        refreshTokenStore.save(originalSession);
+        RefreshToken replacementToken =
+                provider.issueRefreshToken(sessionId);
+        RefreshTokenSession replacementSession = toSession(
+                42L,
+                replacementToken,
+                provider
+        );
+        assertEquals(
+                RefreshTokenRotationResult.ROTATED,
+                refreshTokenStore.rotate(
+                        sessionId,
+                        originalSession.getTokenHash(),
+                        replacementSession
+                )
+        );
+        RefreshToken anotherReplacement =
+                provider.issueRefreshToken(sessionId);
+
+        RefreshTokenRotationResult result = refreshTokenStore.rotate(
+                sessionId,
+                originalSession.getTokenHash(),
+                toSession(42L, anotherReplacement, provider)
+        );
+
+        assertEquals(RefreshTokenRotationResult.REUSE_DETECTED, result);
+        assertTrue(refreshTokenStore.findBySessionId(sessionId).isEmpty());
+    }
+
+    @Test
+    void rotate_concurrentRequests_allowsOneAndRevokesSession() throws Exception {
+        RefreshTokenProvider provider = createProvider();
+        RefreshToken originalToken = provider.issueRefreshToken();
+        sessionId = originalToken.getSessionId();
+        RefreshTokenSession originalSession = toSession(
+                42L,
+                originalToken,
+                provider
+        );
+        refreshTokenStore.save(originalSession);
+        RefreshTokenSession firstReplacement = toSession(
+                42L,
+                provider.issueRefreshToken(sessionId),
+                provider
+        );
+        RefreshTokenSession secondReplacement = toSession(
+                42L,
+                provider.issueRefreshToken(sessionId),
+                provider
+        );
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<RefreshTokenRotationResult> first = executor.submit(
+                    rotationTask(
+                            ready,
+                            start,
+                            originalSession.getTokenHash(),
+                            firstReplacement
+                    )
+            );
+            Future<RefreshTokenRotationResult> second = executor.submit(
+                    rotationTask(
+                            ready,
+                            start,
+                            originalSession.getTokenHash(),
+                            secondReplacement
+                    )
+            );
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+
+            RefreshTokenRotationResult firstResult =
+                    first.get(5, TimeUnit.SECONDS);
+            RefreshTokenRotationResult secondResult =
+                    second.get(5, TimeUnit.SECONDS);
+
+            assertTrue(
+                    firstResult == RefreshTokenRotationResult.ROTATED
+                            || secondResult == RefreshTokenRotationResult.ROTATED
+            );
+            assertTrue(
+                    firstResult == RefreshTokenRotationResult.REUSE_DETECTED
+                            || secondResult
+                            == RefreshTokenRotationResult.REUSE_DETECTED
+            );
+            assertTrue(refreshTokenStore.findBySessionId(sessionId).isEmpty());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private RefreshTokenProvider createProvider() {
+        return new RefreshTokenProvider(
+                60,
+                Clock.systemUTC(),
+                new SecureRandom()
+        );
+    }
+
+    private RefreshTokenSession toSession(
+            long memberId,
+            RefreshToken token,
+            RefreshTokenProvider provider) {
+        return new RefreshTokenSession(
+                token.getSessionId(),
+                memberId,
+                provider.hashToken(token.getValue()),
+                token.getIssuedAt(),
+                token.getExpiresAt()
+        );
+    }
+
+    private Callable<RefreshTokenRotationResult> rotationTask(
+            CountDownLatch ready,
+            CountDownLatch start,
+            String currentTokenHash,
+            RefreshTokenSession replacementSession) {
+        return () -> {
+            ready.countDown();
+            if (!start.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException(
+                        "Timed out waiting to start rotation"
+                );
+            }
+            return refreshTokenStore.rotate(
+                    sessionId,
+                    currentTokenHash,
+                    replacementSession
+            );
+        };
     }
 }

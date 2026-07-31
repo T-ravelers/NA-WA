@@ -36,6 +36,24 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
                     Long.class
             );
 
+    private static final DefaultRedisScript<Long> ROTATE_SCRIPT =
+            new DefaultRedisScript<>(
+                    "local currentHash = redis.call('HGET', KEYS[1], 'tokenHash'); "
+                            + "if not currentHash then return 0; end; "
+                            + "if currentHash ~= ARGV[1] then "
+                            + "redis.call('DEL', KEYS[1]); "
+                            + "return -1; "
+                            + "end; "
+                            + "redis.call('HSET', KEYS[1], "
+                            + "'memberId', ARGV[2], "
+                            + "'tokenHash', ARGV[3], "
+                            + "'issuedAt', ARGV[4], "
+                            + "'expiresAt', ARGV[5]); "
+                            + "redis.call('PEXPIRE', KEYS[1], ARGV[6]); "
+                            + "return 1;",
+                    Long.class
+            );
+
     private final StringRedisTemplate redisTemplate;
     private final String redisKeyPrefix;
     private final Clock clock;
@@ -69,13 +87,7 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
     @Override
     public void save(RefreshTokenSession session) {
         Objects.requireNonNull(session, "Refresh token session is required");
-        Duration ttl = Duration.between(clock.instant(), session.getExpiresAt());
-        long ttlMillis = ttl.toMillis();
-        if (ttlMillis <= 0) {
-            throw new IllegalArgumentException(
-                    "Cannot store an expired refresh token session"
-            );
-        }
+        long ttlMillis = remainingTtlMillis(session);
 
         Long result = redisTemplate.execute(
                 SAVE_SCRIPT,
@@ -90,6 +102,56 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
         if (result == null || result.longValue() != 1L) {
             throw new IllegalStateException("Failed to store refresh token session");
         }
+    }
+
+    @Override
+    public RefreshTokenRotationResult rotate(
+            UUID sessionId,
+            String currentTokenHash,
+            RefreshTokenSession replacementSession) {
+        Objects.requireNonNull(sessionId, "Session ID is required");
+        if (!StringUtils.hasText(currentTokenHash)) {
+            throw new IllegalArgumentException(
+                    "Current refresh token hash must not be blank"
+            );
+        }
+        Objects.requireNonNull(
+                replacementSession,
+                "Replacement refresh token session is required"
+        );
+        if (!sessionId.equals(replacementSession.getSessionId())) {
+            throw new IllegalArgumentException(
+                    "Replacement session ID must match the current session ID"
+            );
+        }
+
+        long ttlMillis = remainingTtlMillis(replacementSession);
+        Long result = redisTemplate.execute(
+                ROTATE_SCRIPT,
+                List.of(key(sessionId)),
+                currentTokenHash,
+                Long.toString(replacementSession.getMemberId()),
+                replacementSession.getTokenHash(),
+                Long.toString(replacementSession.getIssuedAt().getEpochSecond()),
+                Long.toString(replacementSession.getExpiresAt().getEpochSecond()),
+                Long.toString(ttlMillis)
+        );
+
+        if (result == null) {
+            throw new IllegalStateException("Failed to rotate refresh token session");
+        }
+        if (result.longValue() == 1L) {
+            return RefreshTokenRotationResult.ROTATED;
+        }
+        if (result.longValue() == 0L) {
+            return RefreshTokenRotationResult.NOT_FOUND;
+        }
+        if (result.longValue() == -1L) {
+            return RefreshTokenRotationResult.REUSE_DETECTED;
+        }
+        throw new IllegalStateException(
+                "Unexpected refresh token rotation result: " + result
+        );
     }
 
     @Override
@@ -141,5 +203,16 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
             );
         }
         return value.toString();
+    }
+
+    private long remainingTtlMillis(RefreshTokenSession session) {
+        Duration ttl = Duration.between(clock.instant(), session.getExpiresAt());
+        long ttlMillis = ttl.toMillis();
+        if (ttlMillis <= 0) {
+            throw new IllegalArgumentException(
+                    "Cannot store an expired refresh token session"
+            );
+        }
+        return ttlMillis;
     }
 }

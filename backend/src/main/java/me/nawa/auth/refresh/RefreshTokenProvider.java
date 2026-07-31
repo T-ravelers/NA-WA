@@ -54,9 +54,13 @@ public class RefreshTokenProvider {
     }
 
     public RefreshToken issueRefreshToken() {
+        return issueRefreshToken(UUID.randomUUID());
+    }
+
+    RefreshToken issueRefreshToken(UUID sessionId) {
+        Objects.requireNonNull(sessionId, "Session ID is required");
         Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         Instant expiresAt = issuedAt.plus(refreshTokenTtl);
-        UUID sessionId = UUID.randomUUID();
 
         byte[] secret = new byte[SECRET_BYTE_LENGTH];
         secureRandom.nextBytes(secret);

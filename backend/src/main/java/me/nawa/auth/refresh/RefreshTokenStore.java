@@ -8,5 +8,10 @@ public interface RefreshTokenStore {
 
     Optional<RefreshTokenSession> findBySessionId(UUID sessionId);
 
+    RefreshTokenRotationResult rotate(
+            UUID sessionId,
+            String currentTokenHash,
+            RefreshTokenSession replacementSession);
+
     void deleteBySessionId(UUID sessionId);
 }
