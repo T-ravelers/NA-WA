@@ -227,6 +227,7 @@ public MemberResponse createMember(MemberCreateRequest request) {
 
 ## 10. 예외 처리 규칙
 
+- REST API에서 발생한 예외는 `@RestControllerAdvice` 기반의 전역 예외 처리기로 관리합니다.
 - 공통 예외는 전역 예외 처리에서 관리합니다.
 - 서버 내부 예외 메시지를 그대로 응답하지 않습니다.
 - 클라이언트에는 정해진 오류 형식으로 응답합니다.
@@ -309,11 +310,13 @@ log.error("회원 조회 중 오류가 발생했습니다. memberId={}",memberId
 
 ## 16. Frontend 연동 규칙
 
-Vue.js와 연동되는 API는 요청/응답 형식을 명확히 유지합니다.
+Vue.js와 연동되는 API는 요청 및 응답 계약을 일관되게 유지합니다.
 
-- 응답 필드명은 camelCase를 사용합니다.
-- 오류 응답 형식은 일관되게 유지합니다.
-- API 변경 시 프론트엔드 영향 여부를 PR에 작성합니다.
+- API 응답 필드명은 camelCase를 사용합니다.
+- 프론트엔드는 오류 메시지가 아닌 오류 코드를 기준으로 분기합니다.
+- 기존 API의 응답 필드, 상태 코드 또는 오류 코드를 변경하면 PR에 프론트엔드 영향을 작성합니다.
+- 공통 응답 및 오류 처리 방식은
+  [API 공통 응답 및 오류 코드 컨벤션](API_RESPONSE_CONVENTION.md)을 따릅니다.
 - Tailwind CSS 클래스나 화면 구조에 의존하는 값을 Backend에서 만들지 않습니다.
 
 ---
