@@ -12,13 +12,14 @@ import org.springframework.web.servlet.view.JstlView;
 @Configuration
 @EnableWebMvc
 @ComponentScan(basePackages = {
-        "me.nawa.auth.exception",
-        "me.nawa.common.exception",
-        "me.nawa.event.exception",
-        "me.nawa.journey.exception",
-        "me.nawa.map.exception",
-        "me.nawa.member.exception",
-        "me.nawa.wallet.exception"})
+    "me.nawa.common.exception",
+//    "me.nawa.auth.controller",
+//    "me.nawa.member.controller",
+//    "me.nawa.event.controller",
+//    "me.nawa.journey.controller",
+//    "me.nawa.map.controller",
+//    "me.nawa.wallet.controller"
+})
 public class ServletConfig implements WebMvcConfigurer {
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
