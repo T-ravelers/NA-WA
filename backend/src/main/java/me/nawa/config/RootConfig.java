@@ -31,6 +31,7 @@ import javax.sql.DataSource;
         "me.nawa.wallet.mapper",
         "me.nawa.settlement.mapper"})
 @ComponentScan(basePackages = {"me.nawa.auth.service",
+        "me.nawa.auth.jwt",
         "me.nawa.event.service",
         "me.nawa.journey.service",
         "me.nawa.map.service",
