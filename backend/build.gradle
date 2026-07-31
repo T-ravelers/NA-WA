@@ -17,8 +17,15 @@ ext {
     springSecurityVersion = '5.8.16'
 }
 
-tasks.withType(JavaCompile) {
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+    options.release = 17
 }
 
 dependencies {
@@ -62,7 +69,8 @@ dependencies {
     implementation 'org.aspectj:aspectjweaver:1.9.25.1'
 
     // JSP, Servlet, JSTL
-    implementation('javax.servlet:javax.servlet-api:4.0.1')
+    compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
+    testImplementation 'javax.servlet:javax.servlet-api:4.0.1'
     compileOnly 'javax.servlet.jsp:javax.servlet.jsp-api:2.3.3'
     implementation 'javax.servlet:jstl:1.2'
 
