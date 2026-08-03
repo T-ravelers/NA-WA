@@ -1,4 +1,4 @@
-package me.nawa.event.mapper;
+package me.nawa.explore.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 
