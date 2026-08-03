@@ -5,11 +5,16 @@ import me.nawa.auth.jwt.AccessToken;
 import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.oauth.callback.OAuthCallbackResult;
 import me.nawa.auth.oauth.callback.OAuthCallbackService;
+import me.nawa.auth.profile.AuthMemberProfile;
+import me.nawa.auth.profile.AuthMeResponse;
+import me.nawa.auth.profile.AuthMeService;
 import me.nawa.auth.refresh.RefreshToken;
+import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.ErrorCode;
+import me.nawa.common.response.ApiResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -36,6 +41,8 @@ class AuthControllerTest {
     private FakeAuthTokenService authTokenService;
     private FakeOAuthAuthorizationService oauthAuthorizationService;
     private FakeOAuthCallbackService oauthCallbackService;
+    private FakeAuthMeService authMeService;
+    private AuthController controller;
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -43,6 +50,7 @@ class AuthControllerTest {
         authTokenService = new FakeAuthTokenService();
         oauthAuthorizationService = new FakeOAuthAuthorizationService();
         oauthCallbackService = new FakeOAuthCallbackService();
+        authMeService = new FakeAuthMeService();
         AuthCookieManager authCookieManager = new AuthCookieManager(
                 "access_token",
                 "refresh_token",
@@ -50,11 +58,12 @@ class AuthControllerTest {
                 "Lax",
                 ""
         );
-        AuthController controller = new AuthController(
+        controller = new AuthController(
                 authTokenService,
                 authCookieManager,
                 oauthAuthorizationService,
-                oauthCallbackService
+                oauthCallbackService,
+                authMeService
         );
         AuthExceptionHandler exceptionHandler = new AuthExceptionHandler(
                 authCookieManager
@@ -62,6 +71,20 @@ class AuthControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(exceptionHandler)
                 .build();
+    }
+
+    @Test
+    void me_authenticatedMember_returnsCurrentMemberProfile() {
+        AuthMemberProfile profile = AuthMemberProfile.active(42L, false);
+        authMeService.response = new AuthMeResponse(profile);
+
+        ApiResponse<AuthMeResponse> response =
+                controller.me(new AuthenticatedMember(42L));
+
+        assertTrue(response.isSuccess());
+        assertEquals(42L, authMeService.memberId);
+        assertEquals(42L, response.getData().getMemberId());
+        assertTrue(response.getData().isOnboardingRequired());
     }
 
     @Test
@@ -376,6 +399,17 @@ class AuthControllerTest {
         @Override
         public URI createFailureRedirectUri(ErrorCode errorCode) {
             return failureUri;
+        }
+    }
+
+    private static final class FakeAuthMeService implements AuthMeService {
+        private long memberId;
+        private AuthMeResponse response;
+
+        @Override
+        public AuthMeResponse getCurrentMember(long memberId) {
+            this.memberId = memberId;
+            return response;
         }
     }
 }

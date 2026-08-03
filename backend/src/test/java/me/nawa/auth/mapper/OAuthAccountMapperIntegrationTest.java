@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import me.nawa.auth.oauth.account.OAuthLoginAccount;
 import me.nawa.auth.oauth.account.OAuthMemberInsert;
+import me.nawa.auth.profile.AuthMemberProfile;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OAuthAccountMapperIntegrationTest {
     private static HikariDataSource dataSource;
     private static OAuthAccountMapper mapper;
+    private static AuthMapper authMapper;
     private static TransactionTemplate transactionTemplate;
 
     @BeforeAll
@@ -53,9 +55,14 @@ class OAuthAccountMapperIntegrationTest {
         sqlSessionFactory.getConfiguration().addMapper(
                 OAuthAccountMapper.class
         );
-        mapper = new SqlSessionTemplate(sqlSessionFactory).getMapper(
+        sqlSessionFactory.getConfiguration().addMapper(AuthMapper.class);
+        SqlSessionTemplate sqlSessionTemplate = new SqlSessionTemplate(
+                sqlSessionFactory
+        );
+        mapper = sqlSessionTemplate.getMapper(
                 OAuthAccountMapper.class
         );
+        authMapper = sqlSessionTemplate.getMapper(AuthMapper.class);
         transactionTemplate = new TransactionTemplate(
                 new DataSourceTransactionManager(dataSource)
         );
@@ -99,6 +106,14 @@ class OAuthAccountMapperIntegrationTest {
             assertEquals("ACTIVE", account.getMemberStatus());
             assertFalse(account.isMemberDeleted());
             assertFalse(account.isSocialAccountDeleted());
+            AuthMemberProfile profile = authMapper.findMemberProfile(
+                    member.getMemberId()
+            );
+            assertEquals(member.getMemberId(), profile.getMemberId());
+            assertEquals("LINE Traveler", profile.getDisplayName());
+            assertEquals("en", profile.getPreferredLanguage());
+            assertFalse(profile.isOnboardingCompleted());
+            assertFalse(profile.isDeleted());
             assertNull(mapper.findLoginAccount(
                     "google",
                     providerUserId
