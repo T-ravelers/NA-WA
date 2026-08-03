@@ -12,6 +12,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
@@ -21,6 +22,7 @@ import javax.sql.DataSource;
 
 @Configuration
 @PropertySource("classpath:/application.properties")
+@Import({RedisConfig.class, SecurityConfig.class})
 @MapperScan(basePackages = {"me.nawa.auth.mapper",
         "me.nawa.event.mapper",
         "me.nawa.journey.mapper",
@@ -29,6 +31,13 @@ import javax.sql.DataSource;
         "me.nawa.wallet.mapper",
         "me.nawa.settlement.mapper"})
 @ComponentScan(basePackages = {"me.nawa.auth.service",
+        "me.nawa.auth.jwt",
+        "me.nawa.auth.oauth",
+        "me.nawa.auth.profile",
+        "me.nawa.auth.refresh",
+        "me.nawa.auth.token",
+        "me.nawa.auth.cookie",
+        "me.nawa.auth.security",
         "me.nawa.event.service",
         "me.nawa.journey.service",
         "me.nawa.map.service",

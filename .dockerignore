@@ -1,0 +1,16 @@
+**/node_modules
+.git
+
+backend/build
+backend/.gradle
+backend/docs
+
+frontend/dist
+frontend/dist-ssr
+frontend/coverage
+frontend/test-results
+frontend/playwright-report
+frontend/docs
+
+.idea
+.vscode

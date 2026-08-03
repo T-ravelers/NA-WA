@@ -10,7 +10,15 @@ NA-WA 백엔드는 Java 17과 Spring MVC로 구성한 WAR 애플리케이션입�
 | Issue, 브랜치, 커밋과 PR 규칙 확인     | [공통 협업 가이드](../CONTRIBUTING.md)                          |
 | Java, Spring, MyBatis와 보안 규칙 확인 | [백엔드 개발 컨벤션](docs/DEVELOPMENT_CONVENTION.md)            |
 | API 성공·실패 응답 계약 확인           | [API 응답 및 오류 코드 컨벤션](docs/API_RESPONSE_CONVENTION.md) |
+| 소셜 로그인 설정과 검증 방법 확인      | [소셜 로그인 운영 가이드](docs/AUTHENTICATION.md)               |
 | 프로젝트 전체 기술 경계 확인           | [기술 스택과 운영 경계](../docs/TECH_STACK.md)                  |
+
+## 로컬 실행
+
+IDE 없이 로컬에서 백엔드를 띄우려면 저장소 루트에서 `docker compose up`을
+실행하세요. MySQL, Redis, 프론트엔드까지 함께 뜹니다. 자세한 내용은
+[저장소 루트 안내](../README.md#로컬-전체-스택-한-번에-실행하기)를
+참고하세요.
 
 ## 변경 사항 검증
 
@@ -28,4 +36,5 @@ API 계약을 변경했다면 단위·통합 테스트와 Swagger 또는 Postman
 
 API별 요청 파라미터와 응답 데이터 구조는 Swagger에서 확인할 수 있습니다.
 
-- 로컬 Swagger UI: `http://localhost:{port}/swagger-ui/index.html`
+- 로컬 Swagger UI: `http://localhost:{port}/swagger-ui.html`
+- Swagger JSON: `http://localhost:{port}/v2/api-docs`

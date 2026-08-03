@@ -1,0 +1,32 @@
+# 로컬 개발 전용 설정. docker-compose.yml(운영 배포용)과 자동으로 합쳐져
+# `docker compose up`만으로 백엔드/프론트엔드/MySQL/Redis를 모두 띄운다.
+# 이 파일은 EC2로 배포되지 않는다 (.github/workflows/deploy.yml 참고).
+services:
+  backend:
+    ports:
+      - "8080:8080"
+
+  mysql:
+    ports:
+      - "3306:3306"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  # 운영에서만 쓰는 리버스 프록시. 로컬은 프론트엔드가 8080 백엔드로 직접 요청한다.
+  nginx:
+    profiles:
+      - prod
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+    depends_on:
+      - backend

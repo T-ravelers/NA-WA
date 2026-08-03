@@ -17,9 +17,40 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_DRIVER: com.mysql.cj.jdbc.Driver
-      DATABASE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&serverTimezone=Asia/Seoul
+      DATABASE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
       DATABASE_USERNAME: ${MYSQL_USER}
       DATABASE_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USERNAME: ${REDIS_USERNAME:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_SSL_ENABLED: ${REDIS_SSL_ENABLED:-false}
+      REDIS_TIMEOUT_MILLIS: ${REDIS_TIMEOUT_MILLIS:-2000}
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-nawa:}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-nawa}
+      JWT_ACCESS_TOKEN_TTL_SECONDS: ${JWT_ACCESS_TOKEN_TTL_SECONDS:-900}
+      REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-1209600}
+      OAUTH_STATE_TTL_SECONDS: ${OAUTH_STATE_TTL_SECONDS:-600}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
+      AUTH_COOKIE_SAME_SITE: ${AUTH_COOKIE_SAME_SITE:-Lax}
+      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
+      AUTH_ACCESS_COOKIE_NAME: ${AUTH_ACCESS_COOKIE_NAME:-access_token}
+      AUTH_REFRESH_COOKIE_NAME: ${AUTH_REFRESH_COOKIE_NAME:-refresh_token}
+      AUTH_FRONTEND_SUCCESS_URL: ${AUTH_FRONTEND_SUCCESS_URL}
+      AUTH_FRONTEND_FAILURE_URL: ${AUTH_FRONTEND_FAILURE_URL}
+      AUTH_FRONTEND_ALLOWED_RETURN_PATHS: ${AUTH_FRONTEND_ALLOWED_RETURN_PATHS:-/}
+      AUTH_ALLOWED_ORIGINS: ${AUTH_ALLOWED_ORIGINS}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI}
+      GOOGLE_OAUTH_SCOPES: ${GOOGLE_OAUTH_SCOPES:-openid,profile,email}
+      LINE_OAUTH_CLIENT_ID: ${LINE_OAUTH_CLIENT_ID}
+      LINE_OAUTH_CLIENT_SECRET: ${LINE_OAUTH_CLIENT_SECRET}
+      LINE_OAUTH_REDIRECT_URI: ${LINE_OAUTH_REDIRECT_URI}
+      LINE_OAUTH_SCOPES: ${LINE_OAUTH_SCOPES:-openid,profile}
+      OAUTH_HTTP_CONNECT_TIMEOUT_MILLIS: ${OAUTH_HTTP_CONNECT_TIMEOUT_MILLIS:-3000}
+      OAUTH_HTTP_READ_TIMEOUT_MILLIS: ${OAUTH_HTTP_READ_TIMEOUT_MILLIS:-5000}
     depends_on:
       mysql:
         condition: service_healthy
@@ -38,7 +69,8 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test:
+        ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 10
