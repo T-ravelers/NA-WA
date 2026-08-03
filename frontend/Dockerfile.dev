@@ -1,0 +1,19 @@
+# 로컬 개발 전용 이미지. 운영 배포에는 사용하지 않으며 Vercel이 프로덕션 빌드를 담당한다.
+FROM node:24.18.0-alpine
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@11.17.0 --activate
+
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY frontend/package.json frontend/package.json
+
+RUN pnpm install --frozen-lockfile
+
+COPY frontend frontend
+
+WORKDIR /app/frontend
+
+EXPOSE 5173
+
+CMD ["pnpm", "exec", "vite", "--host", "0.0.0.0"]
