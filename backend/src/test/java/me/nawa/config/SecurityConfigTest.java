@@ -303,11 +303,25 @@ class SecurityConfigTest {
                 )
                 .andReturn()
                 .getResponse();
+        MockHttpServletResponse authorizationResponse = mockMvc.perform(
+                        get(
+                                "/api/v1/auth/oauth2/authorization/google"
+                        )
+                )
+                .andReturn()
+                .getResponse();
+        MockHttpServletResponse callbackResponse = mockMvc.perform(
+                        get("/api/v1/auth/oauth2/callback/google")
+                )
+                .andReturn()
+                .getResponse();
 
         assertEquals(200, refreshResponse.getStatus());
         assertEquals("refresh", refreshResponse.getContentAsString());
         assertEquals(200, logoutResponse.getStatus());
         assertEquals("logout", logoutResponse.getContentAsString());
+        assertEquals(200, authorizationResponse.getStatus());
+        assertEquals(200, callbackResponse.getStatus());
     }
 
     @Test
@@ -562,6 +576,16 @@ class SecurityConfigTest {
                     CsrfToken.class.getName()
             );
             return csrfToken.getToken();
+        }
+
+        @GetMapping("/api/v1/auth/oauth2/authorization/google")
+        String authorize() {
+            return "authorize";
+        }
+
+        @GetMapping("/api/v1/auth/oauth2/callback/google")
+        String callback() {
+            return "callback";
         }
 
         @GetMapping({

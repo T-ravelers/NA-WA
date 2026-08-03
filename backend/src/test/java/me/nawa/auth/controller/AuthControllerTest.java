@@ -2,6 +2,7 @@ package me.nawa.auth.controller;
 
 import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.jwt.AccessToken;
+import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.refresh.RefreshToken;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import javax.servlet.http.Cookie;
+import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -27,11 +29,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 class AuthControllerTest {
     private FakeAuthTokenService authTokenService;
+    private FakeOAuthAuthorizationService oauthAuthorizationService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         authTokenService = new FakeAuthTokenService();
+        oauthAuthorizationService = new FakeOAuthAuthorizationService();
         AuthCookieManager authCookieManager = new AuthCookieManager(
                 "access_token",
                 "refresh_token",
@@ -41,7 +45,8 @@ class AuthControllerTest {
         );
         AuthController controller = new AuthController(
                 authTokenService,
-                authCookieManager
+                authCookieManager,
+                oauthAuthorizationService
         );
         AuthExceptionHandler exceptionHandler = new AuthExceptionHandler(
                 authCookieManager
@@ -49,6 +54,29 @@ class AuthControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(exceptionHandler)
                 .build();
+    }
+
+    @Test
+    void authorize_validProvider_redirectsToProviderAuthorizationUri()
+            throws Exception {
+        oauthAuthorizationService.authorizationUri = URI.create(
+                "https://accounts.google.com/o/oauth2/v2/auth?state=value"
+        );
+
+        MockHttpServletResponse response = mockMvc.perform(
+                        get("/api/v1/auth/oauth2/authorization/google")
+                                .param("returnPath", "/journeys")
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(302, response.getStatus());
+        assertEquals(
+                oauthAuthorizationService.authorizationUri.toString(),
+                response.getHeader(HttpHeaders.LOCATION)
+        );
+        assertEquals("google", oauthAuthorizationService.provider);
+        assertEquals("/journeys", oauthAuthorizationService.returnPath);
     }
 
     @Test
@@ -194,6 +222,22 @@ class AuthControllerTest {
         @Override
         public void revokeRefreshToken(String refreshToken) {
             revokedValue = refreshToken;
+        }
+    }
+
+    private static final class FakeOAuthAuthorizationService
+            implements OAuthAuthorizationService {
+        private URI authorizationUri;
+        private String provider;
+        private String returnPath;
+
+        @Override
+        public URI createAuthorizationUri(
+                String provider,
+                String returnPath) {
+            this.provider = provider;
+            this.returnPath = returnPath;
+            return authorizationUri;
         }
     }
 }

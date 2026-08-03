@@ -42,6 +42,24 @@ public enum AuthErrorCode implements ErrorCode {
             HttpStatus.FORBIDDEN,
             "AUTH-006",
             "허용되지 않은 요청 출처입니다."
+    ),
+
+    UNSUPPORTED_OAUTH_PROVIDER(
+            HttpStatus.BAD_REQUEST,
+            "AUTH-007",
+            "지원하지 않는 소셜 로그인 제공자입니다."
+    ),
+
+    INVALID_OAUTH_RETURN_PATH(
+            HttpStatus.BAD_REQUEST,
+            "AUTH-008",
+            "허용되지 않은 로그인 복귀 경로입니다."
+    ),
+
+    OAUTH_PROVIDER_NOT_CONFIGURED(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "AUTH-009",
+            "소셜 로그인 설정이 완료되지 않았습니다."
     );
 
     private final HttpStatus status;

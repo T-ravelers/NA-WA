@@ -3,6 +3,7 @@ package me.nawa.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import me.nawa.auth.cookie.AuthCookieManager;
+import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 import springfox.documentation.spring.web.plugins.Docket;
+
+import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -121,6 +124,13 @@ class SwaggerConfigTest {
                     false,
                     "Lax",
                     ""
+            );
+        }
+
+        @Bean
+        OAuthAuthorizationService oauthAuthorizationService() {
+            return (provider, returnPath) -> URI.create(
+                    "https://accounts.google.com/o/oauth2/v2/auth"
             );
         }
     }

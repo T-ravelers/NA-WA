@@ -3,20 +3,25 @@ package me.nawa.auth.controller;
 import lombok.RequiredArgsConstructor;
 import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.exception.AuthErrorCode;
+import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.response.ApiResponse;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import javax.servlet.http.HttpServletRequest;
+import java.net.URI;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -24,6 +29,21 @@ import javax.servlet.http.HttpServletRequest;
 public class AuthController {
     private final AuthTokenService authTokenService;
     private final AuthCookieManager authCookieManager;
+    private final OAuthAuthorizationService oauthAuthorizationService;
+
+    @GetMapping("/oauth2/authorization/{provider}")
+    public ResponseEntity<Void> authorize(
+            @PathVariable("provider") String provider,
+            @RequestParam(name = "returnPath", required = false)
+            String returnPath) {
+        URI authorizationUri = oauthAuthorizationService
+                .createAuthorizationUri(provider, returnPath);
+
+        return ResponseEntity
+                .status(HttpStatus.FOUND)
+                .location(authorizationUri)
+                .build();
+    }
 
     @GetMapping("/csrf")
     public ApiResponse<CsrfTokenResponse> csrf(

@@ -102,6 +102,12 @@ public class SecurityConfig {
                                 antMatcher("/api/v1/auth/csrf"),
                                 antMatcher("/api/v1/auth/refresh"),
                                 antMatcher("/api/v1/auth/logout"),
+                                antMatcher(
+                                        "/api/v1/auth/oauth2/authorization/**"
+                                ),
+                                antMatcher(
+                                        "/api/v1/auth/oauth2/callback/**"
+                                ),
                                 antMatcher("/swagger-ui.html"),
                                 antMatcher("/swagger-resources"),
                                 antMatcher("/swagger-resources/**"),
