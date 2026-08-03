@@ -78,6 +78,12 @@ public enum AuthErrorCode implements ErrorCode {
             HttpStatus.BAD_GATEWAY,
             "AUTH-012",
             "소셜 로그인 제공자의 응답을 확인할 수 없습니다."
+    ),
+
+    INVALID_OAUTH_ID_TOKEN(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH-013",
+            "소셜 로그인 사용자 정보를 확인할 수 없습니다. 다시 시도해주세요."
     );
 
     private final HttpStatus status;
