@@ -30,6 +30,49 @@ NA-WA/
 프론트엔드는 pnpm workspace로 관리합니다. 프론트엔드 명령은 저장소 루트에서
 실행하세요.
 
+## 로컬 전체 스택 한 번에 실행하기
+
+Docker와 Docker Compose만 있으면 IDE나 로컬 Node/Java 설치 없이 프론트엔드,
+백엔드, MySQL, Redis를 한 번에 띄울 수 있습니다.
+
+```shell
+docker compose up
+```
+
+`docker-compose.yml`(운영 배포용)과 `docker-compose.override.yml`(로컬 개발
+전용)이 자동으로 합쳐져 아래 서비스가 뜹니다.
+
+| 서비스   | 접속 주소               |
+| -------- | ------------------------ |
+| frontend | http://localhost:5173    |
+| backend  | http://localhost:8080    |
+| mysql    | localhost:3306           |
+| redis    | localhost:6379           |
+
+- `docker-compose.override.yml`은 로컬 전용이며 EC2로는 배포되지 않습니다
+  (`.github/workflows/deploy.yml`이 `docker-compose.yml`, `nginx/nginx.conf`,
+  `deploy/deploy.sh`만 전송합니다). 운영에만 필요한 `nginx` 서비스는 로컬에서
+  기본적으로 실행되지 않습니다.
+- 프론트엔드는 `frontend/` 디렉터리를 컨테이너에 바인드 마운트하므로 소스를
+  고치면 Vite가 자동으로 반영합니다.
+- 백엔드는 Spring Legacy WAR라 소스를 바꾸면 다시 빌드해야 반영됩니다.
+
+```shell
+docker compose up -d --build backend
+```
+
+- 루트 `.env` 파일에 `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`,
+  `MYSQL_PASSWORD`, `DOCKERHUB_USERNAME`을 설정해야 합니다. `.env`는 Git에
+  커밋하지 않습니다.
+- 로컬 3306/8080 포트를 다른 프로세스(네이티브 MySQL, IDE에서 띄운 Tomcat
+  등)가 이미 쓰고 있다면 포트 충돌이 발생하니 먼저 정리하세요.
+
+컨테이너는 다음 명령으로 종료합니다.
+
+```shell
+docker compose down
+```
+
 ## 프론트엔드 실행하기
 
 ### 실행 환경 준비

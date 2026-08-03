@@ -12,6 +12,13 @@ NA-WA 백엔드는 Java 17과 Spring MVC로 구성한 WAR 애플리케이션입�
 | API 성공·실패 응답 계약 확인           | [API 응답 및 오류 코드 컨벤션](docs/API_RESPONSE_CONVENTION.md) |
 | 프로젝트 전체 기술 경계 확인           | [기술 스택과 운영 경계](../docs/TECH_STACK.md)                  |
 
+## 로컬 실행
+
+IDE 없이 로컬에서 백엔드를 띄우려면 저장소 루트에서 `docker compose up`을
+실행하세요. MySQL, Redis, 프론트엔드까지 함께 뜹니다. 자세한 내용은
+[저장소 루트 안내](../README.md#로컬-전체-스택-한-번에-실행하기)를
+참고하세요.
+
 ## 변경 사항 검증
 
 백엔드 디렉터리에서 Gradle 빌드와 테스트를 실행하세요.
