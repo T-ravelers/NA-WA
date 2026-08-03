@@ -9,6 +9,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -20,6 +22,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 class AuthControllerTest {
@@ -46,6 +49,33 @@ class AuthControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(exceptionHandler)
                 .build();
+    }
+
+    @Test
+    void csrf_securityToken_returnsTokenAndHeaderName() throws Exception {
+        CsrfToken csrfToken = new DefaultCsrfToken(
+                "X-XSRF-TOKEN",
+                "_csrf",
+                "csrf-value"
+        );
+
+        MockHttpServletResponse response = mockMvc.perform(
+                        get("/api/auth/csrf")
+                                .requestAttr(
+                                        CsrfToken.class.getName(),
+                                        csrfToken
+                                )
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(200, response.getStatus());
+        assertEquals(
+                "{\"success\":true,\"data\":{"
+                        + "\"token\":\"csrf-value\","
+                        + "\"headerName\":\"X-XSRF-TOKEN\"}}",
+                response.getContentAsString()
+        );
     }
 
     @Test

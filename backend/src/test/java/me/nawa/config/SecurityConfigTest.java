@@ -5,9 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.jwt.AccessToken;
 import me.nawa.auth.jwt.JwtTokenProvider;
+import me.nawa.auth.security.AllowedOriginPolicy;
+import me.nawa.auth.security.AuthAccessDeniedHandler;
 import me.nawa.auth.security.AuthAuthenticationEntryPoint;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.auth.security.JwtAuthenticationFilter;
+import me.nawa.auth.security.OriginValidationFilter;
 import me.nawa.auth.security.SecurityErrorResponseWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,10 +18,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,23 +36,32 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 @ExtendWith(SpringExtension.class)
 @WebAppConfiguration
+@TestPropertySource(properties = {
+        "auth.cookie.secure=false",
+        "auth.cookie.domain="
+})
 @ContextConfiguration(classes = {
         SecurityConfig.class,
         SecurityConfigTest.TestWebConfig.class
 })
 class SecurityConfigTest {
+    private static final String ALLOWED_ORIGIN = "http://localhost:5173";
     private static final String SECRET = Base64.getEncoder().encodeToString(
             "test-signing-key-that-is-at-least-32-bytes"
                     .getBytes(StandardCharsets.UTF_8)
@@ -115,16 +130,25 @@ class SecurityConfigTest {
     }
 
     @Test
-    void protectedPost_validAccessToken_remainsAccessibleWithoutCsrfForNow()
+    void protectedPost_validAccessTokenCsrfAndOrigin_returnsOk()
             throws Exception {
         AccessToken token = jwtTokenProvider.issueAccessToken(42L);
+        CsrfCredentials csrfCredentials = issueCsrfToken();
 
         MockHttpServletResponse response = mockMvc.perform(
                         post("/api/security-test")
-                                .cookie(new Cookie(
-                                        "access_token",
-                                        token.getValue()
-                                ))
+                                .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                                .header(
+                                        "X-XSRF-TOKEN",
+                                        csrfCredentials.token
+                                )
+                                .cookie(
+                                        new Cookie(
+                                                "access_token",
+                                                token.getValue()
+                                        ),
+                                        csrfCredentials.cookie
+                                )
                 )
                 .andReturn()
                 .getResponse();
@@ -133,14 +157,149 @@ class SecurityConfigTest {
     }
 
     @Test
+    void protectedPost_missingOrigin_returnsOriginNotAllowed()
+            throws Exception {
+        AccessToken token = jwtTokenProvider.issueAccessToken(42L);
+        CsrfCredentials csrfCredentials = issueCsrfToken();
+
+        MockHttpServletResponse response = mockMvc.perform(
+                        post("/api/security-test")
+                                .header(
+                                        "X-XSRF-TOKEN",
+                                        csrfCredentials.token
+                                )
+                                .cookie(
+                                        new Cookie(
+                                                "access_token",
+                                                token.getValue()
+                                        ),
+                                        csrfCredentials.cookie
+                                )
+                )
+                .andReturn()
+                .getResponse();
+
+        assertForbidden(response, "AUTH-006");
+    }
+
+    @Test
+    void protectedPost_disallowedOrigin_returnsOriginNotAllowed()
+            throws Exception {
+        AccessToken token = jwtTokenProvider.issueAccessToken(42L);
+        CsrfCredentials csrfCredentials = issueCsrfToken();
+
+        MockHttpServletResponse response = mockMvc.perform(
+                        post("/api/security-test")
+                                .header(
+                                        HttpHeaders.ORIGIN,
+                                        "http://localhost:5174"
+                                )
+                                .header(
+                                        "X-XSRF-TOKEN",
+                                        csrfCredentials.token
+                                )
+                                .cookie(
+                                        new Cookie(
+                                                "access_token",
+                                                token.getValue()
+                                        ),
+                                        csrfCredentials.cookie
+                                )
+                )
+                .andReturn()
+                .getResponse();
+
+        assertForbidden(response, "AUTH-006");
+    }
+
+    @Test
+    void protectedPost_missingCsrfToken_returnsCsrfFailure()
+            throws Exception {
+        AccessToken token = jwtTokenProvider.issueAccessToken(42L);
+
+        MockHttpServletResponse response = mockMvc.perform(
+                        post("/api/security-test")
+                                .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                                .cookie(new Cookie(
+                                        "access_token",
+                                        token.getValue()
+                                ))
+                )
+                .andReturn()
+                .getResponse();
+
+        assertForbidden(response, "AUTH-005");
+    }
+
+    @Test
+    void protectedPost_invalidCsrfToken_returnsCsrfFailure()
+            throws Exception {
+        AccessToken token = jwtTokenProvider.issueAccessToken(42L);
+        CsrfCredentials csrfCredentials = issueCsrfToken();
+
+        MockHttpServletResponse response = mockMvc.perform(
+                        post("/api/security-test")
+                                .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                                .header("X-XSRF-TOKEN", "invalid-token")
+                                .cookie(
+                                        new Cookie(
+                                                "access_token",
+                                                token.getValue()
+                                        ),
+                                        csrfCredentials.cookie
+                                )
+                )
+                .andReturn()
+                .getResponse();
+
+        assertForbidden(response, "AUTH-005");
+    }
+
+    @Test
+    void csrfEndpoint_withoutAccessToken_returnsTokenAndHttpOnlyCookie()
+            throws Exception {
+        MockHttpServletResponse response = mockMvc.perform(
+                        get("/api/auth/csrf")
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(200, response.getStatus());
+        Cookie csrfCookie = response.getCookie("XSRF-TOKEN");
+        assertNotNull(csrfCookie);
+        assertEquals("/", csrfCookie.getPath());
+        assertTrue(csrfCookie.isHttpOnly());
+        assertFalse(csrfCookie.getSecure());
+
+        assertEquals(
+                csrfCookie.getValue(),
+                response.getContentAsString()
+        );
+    }
+
+    @Test
     void authEndpoints_withoutAccessToken_remainPublic() throws Exception {
+        CsrfCredentials csrfCredentials = issueCsrfToken();
+
         MockHttpServletResponse refreshResponse = mockMvc.perform(
                         post("/api/auth/refresh")
+                                .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                                .header(
+                                        "X-XSRF-TOKEN",
+                                        csrfCredentials.token
+                                )
+                                .cookie(csrfCredentials.cookie)
                 )
                 .andReturn()
                 .getResponse();
         MockHttpServletResponse logoutResponse = mockMvc.perform(
                         post("/api/auth/logout")
+                                .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                                .header(
+                                        "X-XSRF-TOKEN",
+                                        csrfCredentials.token
+                                )
+                                .cookie(csrfCredentials.cookie)
                 )
                 .andReturn()
                 .getResponse();
@@ -149,6 +308,57 @@ class SecurityConfigTest {
         assertEquals("refresh", refreshResponse.getContentAsString());
         assertEquals(200, logoutResponse.getStatus());
         assertEquals("logout", logoutResponse.getContentAsString());
+    }
+
+    @Test
+    void corsPreflight_allowedOrigin_returnsCorsHeaders() throws Exception {
+        MockHttpServletResponse response = mockMvc.perform(
+                        options("/api/auth/refresh")
+                                .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                                .header(
+                                        HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD,
+                                        "POST"
+                                )
+                                .header(
+                                        HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
+                                        "X-XSRF-TOKEN"
+                                )
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(200, response.getStatus());
+        assertEquals(
+                ALLOWED_ORIGIN,
+                response.getHeader(
+                        HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
+                )
+        );
+        assertEquals(
+                "true",
+                response.getHeader(
+                        HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS
+                )
+        );
+    }
+
+    @Test
+    void corsPreflight_disallowedOrigin_returnsForbidden() throws Exception {
+        MockHttpServletResponse response = mockMvc.perform(
+                        options("/api/auth/refresh")
+                                .header(
+                                        HttpHeaders.ORIGIN,
+                                        "http://localhost:5174"
+                                )
+                                .header(
+                                        HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD,
+                                        "POST"
+                                )
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(403, response.getStatus());
     }
 
     @Test
@@ -212,6 +422,43 @@ class SecurityConfigTest {
         );
     }
 
+    private CsrfCredentials issueCsrfToken() throws Exception {
+        MockHttpServletResponse response = mockMvc.perform(
+                        get("/api/auth/csrf")
+                )
+                .andReturn()
+                .getResponse();
+        Cookie cookie = response.getCookie("XSRF-TOKEN");
+        assertNotNull(cookie);
+        return new CsrfCredentials(
+                cookie,
+                response.getContentAsString()
+        );
+    }
+
+    private void assertForbidden(
+            MockHttpServletResponse response,
+            String code) throws Exception {
+        assertEquals(403, response.getStatus());
+        assertEquals("application/json;charset=UTF-8", response.getContentType());
+
+        JsonNode body = new ObjectMapper().readTree(
+                response.getContentAsString()
+        );
+        assertFalse(body.path("success").asBoolean());
+        assertEquals(code, body.path("error").path("code").asText());
+    }
+
+    private static final class CsrfCredentials {
+        private final Cookie cookie;
+        private final String token;
+
+        private CsrfCredentials(Cookie cookie, String token) {
+            this.cookie = cookie;
+            this.token = token;
+        }
+    }
+
     @Configuration
     @EnableWebMvc
     static class TestWebConfig {
@@ -245,6 +492,27 @@ class SecurityConfigTest {
         @Bean
         SecurityErrorResponseWriter securityErrorResponseWriter() {
             return new SecurityErrorResponseWriter();
+        }
+
+        @Bean
+        AllowedOriginPolicy allowedOriginPolicy() {
+            return new AllowedOriginPolicy(ALLOWED_ORIGIN);
+        }
+
+        @Bean
+        OriginValidationFilter originValidationFilter(
+                AllowedOriginPolicy allowedOriginPolicy,
+                SecurityErrorResponseWriter errorResponseWriter) {
+            return new OriginValidationFilter(
+                    allowedOriginPolicy,
+                    errorResponseWriter
+            );
+        }
+
+        @Bean
+        AuthAccessDeniedHandler authAccessDeniedHandler(
+                SecurityErrorResponseWriter errorResponseWriter) {
+            return new AuthAccessDeniedHandler(errorResponseWriter);
         }
 
         @Bean
@@ -286,6 +554,14 @@ class SecurityConfigTest {
         @PostMapping("/api/auth/logout")
         String logout() {
             return "logout";
+        }
+
+        @GetMapping("/api/auth/csrf")
+        String csrf(HttpServletRequest request) {
+            CsrfToken csrfToken = (CsrfToken) request.getAttribute(
+                    CsrfToken.class.getName()
+            );
+            return csrfToken.getToken();
         }
 
         @GetMapping({

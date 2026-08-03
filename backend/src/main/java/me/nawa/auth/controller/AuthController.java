@@ -10,6 +10,8 @@ import me.nawa.common.response.ApiResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +24,21 @@ import javax.servlet.http.HttpServletRequest;
 public class AuthController {
     private final AuthTokenService authTokenService;
     private final AuthCookieManager authCookieManager;
+
+    @GetMapping("/csrf")
+    public ApiResponse<CsrfTokenResponse> csrf(
+            HttpServletRequest request) {
+        CsrfToken csrfToken = (CsrfToken) request.getAttribute(
+                CsrfToken.class.getName()
+        );
+
+        return ApiResponse.success(
+                new CsrfTokenResponse(
+                        csrfToken.getToken(),
+                        csrfToken.getHeaderName()
+                )
+        );
+    }
 
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<Void>> refresh(

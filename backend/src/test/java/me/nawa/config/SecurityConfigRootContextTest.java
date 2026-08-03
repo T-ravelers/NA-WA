@@ -2,8 +2,11 @@ package me.nawa.config;
 
 import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.jwt.JwtTokenProvider;
+import me.nawa.auth.security.AllowedOriginPolicy;
+import me.nawa.auth.security.AuthAccessDeniedHandler;
 import me.nawa.auth.security.AuthAuthenticationEntryPoint;
 import me.nawa.auth.security.JwtAuthenticationFilter;
+import me.nawa.auth.security.OriginValidationFilter;
 import me.nawa.auth.security.SecurityErrorResponseWriter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +17,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.web.WebAppConfiguration;
 
 import java.nio.charset.StandardCharsets;
@@ -24,6 +28,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @ExtendWith(SpringExtension.class)
 @WebAppConfiguration
+@TestPropertySource(properties = {
+        "auth.cookie.secure=false",
+        "auth.cookie.domain="
+})
 @ContextConfiguration(classes = {
         SecurityConfig.class,
         SecurityConfigRootContextTest.TestSecurityBeans.class
@@ -78,6 +86,27 @@ class SecurityConfigRootContextTest {
         @Bean
         SecurityErrorResponseWriter securityErrorResponseWriter() {
             return new SecurityErrorResponseWriter();
+        }
+
+        @Bean
+        AllowedOriginPolicy allowedOriginPolicy() {
+            return new AllowedOriginPolicy("http://localhost:5173");
+        }
+
+        @Bean
+        OriginValidationFilter originValidationFilter(
+                AllowedOriginPolicy allowedOriginPolicy,
+                SecurityErrorResponseWriter errorResponseWriter) {
+            return new OriginValidationFilter(
+                    allowedOriginPolicy,
+                    errorResponseWriter
+            );
+        }
+
+        @Bean
+        AuthAccessDeniedHandler authAccessDeniedHandler(
+                SecurityErrorResponseWriter errorResponseWriter) {
+            return new AuthAccessDeniedHandler(errorResponseWriter);
         }
 
         @Bean

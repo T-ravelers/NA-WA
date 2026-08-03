@@ -24,6 +24,24 @@ public enum AuthErrorCode implements ErrorCode {
             HttpStatus.UNAUTHORIZED,
             "AUTH-003",
             "로그인이 필요합니다."
+    ),
+
+    ACCESS_DENIED(
+            HttpStatus.FORBIDDEN,
+            "AUTH-004",
+            "접근 권한이 없습니다."
+    ),
+
+    INVALID_CSRF_TOKEN(
+            HttpStatus.FORBIDDEN,
+            "AUTH-005",
+            "요청의 CSRF 토큰이 유효하지 않습니다."
+    ),
+
+    ORIGIN_NOT_ALLOWED(
+            HttpStatus.FORBIDDEN,
+            "AUTH-006",
+            "허용되지 않은 요청 출처입니다."
     );
 
     private final HttpStatus status;
