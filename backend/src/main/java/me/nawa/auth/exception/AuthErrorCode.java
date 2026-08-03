@@ -18,6 +18,12 @@ public enum AuthErrorCode implements ErrorCode {
             HttpStatus.UNAUTHORIZED,
             "AUTH-002",
             "인증 세션이 만료되었습니다. 다시 로그인해주세요."
+    ),
+
+    AUTHENTICATION_REQUIRED(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH-003",
+            "로그인이 필요합니다."
     );
 
     private final HttpStatus status;
