@@ -89,6 +89,25 @@ class AuthCookieManagerTest {
     }
 
     @Test
+    void findAccessToken_matchingCookie_returnsValue() {
+        AuthCookieManager manager = createManager(false, "Lax", "");
+        Cookie[] cookies = {
+                new Cookie("refresh_token", "ignored"),
+                new Cookie("access_token", "access-value")
+        };
+
+        assertEquals(
+                "access-value",
+                manager.findAccessToken(cookies).orElseThrow()
+        );
+        assertFalse(
+                manager.findAccessToken(
+                        new Cookie[]{new Cookie("access_token", "")}
+                ).isPresent()
+        );
+    }
+
+    @Test
     void constructor_sameSiteNoneWithoutSecure_throwsException() {
         assertThrows(
                 IllegalArgumentException.class,

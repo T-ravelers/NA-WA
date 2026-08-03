@@ -107,12 +107,22 @@ public class AuthCookieManager {
     }
 
     public Optional<String> findRefreshToken(Cookie[] cookies) {
+        return findCookieValue(cookies, refreshTokenName);
+    }
+
+    public Optional<String> findAccessToken(Cookie[] cookies) {
+        return findCookieValue(cookies, accessTokenName);
+    }
+
+    private Optional<String> findCookieValue(
+            Cookie[] cookies,
+            String cookieName) {
         if (cookies == null) {
             return Optional.empty();
         }
 
         for (Cookie cookie : cookies) {
-            if (refreshTokenName.equals(cookie.getName())
+            if (cookieName.equals(cookie.getName())
                     && StringUtils.hasText(cookie.getValue())) {
                 return Optional.of(cookie.getValue());
             }

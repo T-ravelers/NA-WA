@@ -99,6 +99,7 @@ dependencies {
 
     // Test
     testImplementation 'org.springframework:spring-test'
+    testImplementation 'org.springframework.security:spring-security-test'
 
     testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
     testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
