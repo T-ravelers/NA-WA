@@ -63,9 +63,11 @@ class RefreshTokenServiceTest {
     void rotateRefreshToken_validToken_replacesCurrentToken() {
         RefreshToken current = refreshTokenService.issueRefreshToken(42L);
 
-        RefreshToken replacement =
+        RotatedRefreshToken rotated =
                 refreshTokenService.rotateRefreshToken(current.getValue());
+        RefreshToken replacement = rotated.getToken();
 
+        assertEquals(42L, rotated.getMemberId());
         assertEquals(current.getSessionId(), replacement.getSessionId());
         assertNotEquals(current.getValue(), replacement.getValue());
         RefreshTokenSession stored = refreshTokenStore
@@ -132,6 +134,22 @@ class RefreshTokenServiceTest {
                 AuthErrorCode.INVALID_REFRESH_TOKEN,
                 exception.getErrorCode()
         );
+    }
+
+    @Test
+    void revokeRefreshToken_validToken_deletesSession() {
+        RefreshToken token = refreshTokenService.issueRefreshToken(42L);
+
+        refreshTokenService.revokeRefreshToken(token.getValue());
+
+        assertTrue(
+                refreshTokenStore.findBySessionId(token.getSessionId()).isEmpty()
+        );
+    }
+
+    @Test
+    void revokeRefreshToken_malformedToken_doesNotThrow() {
+        refreshTokenService.revokeRefreshToken("malformed");
     }
 
     private static final class InMemoryRefreshTokenStore

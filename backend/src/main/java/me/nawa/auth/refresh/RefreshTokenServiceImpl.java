@@ -21,7 +21,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     @Override
-    public RefreshToken rotateRefreshToken(String currentToken) {
+    public RotatedRefreshToken rotateRefreshToken(String currentToken) {
         UUID sessionId = extractSessionId(currentToken);
         RefreshTokenSession currentSession = refreshTokenStore
                 .findBySessionId(sessionId)
@@ -44,7 +44,10 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         );
 
         if (result == RefreshTokenRotationResult.ROTATED) {
-            return replacementToken;
+            return new RotatedRefreshToken(
+                    replacementToken,
+                    currentSession.getMemberId()
+            );
         }
         if (result == RefreshTokenRotationResult.REUSE_DETECTED) {
             throw new BusinessException(
@@ -52,6 +55,16 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             );
         }
         throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    @Override
+    public void revokeRefreshToken(String token) {
+        try {
+            UUID sessionId = refreshTokenProvider.extractSessionId(token);
+            refreshTokenStore.deleteBySessionId(sessionId);
+        } catch (IllegalArgumentException ignored) {
+            // 로그아웃은 멱등성을 유지하기 위해 잘못된 토큰도 폐기 완료로 처리합니다.
+        }
     }
 
     private UUID extractSessionId(String token) {

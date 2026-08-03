@@ -3,5 +3,7 @@ package me.nawa.auth.refresh;
 public interface RefreshTokenService {
     RefreshToken issueRefreshToken(long memberId);
 
-    RefreshToken rotateRefreshToken(String currentToken);
+    RotatedRefreshToken rotateRefreshToken(String currentToken);
+
+    void revokeRefreshToken(String token);
 }
