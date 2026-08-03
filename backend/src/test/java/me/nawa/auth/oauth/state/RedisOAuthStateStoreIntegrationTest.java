@@ -130,6 +130,7 @@ class RedisOAuthStateStoreIntegrationTest {
         OAuthStateSession consumed = first.orElseThrow();
         assertEquals(session.getProvider(), consumed.getProvider());
         assertEquals(session.getNonce(), consumed.getNonce());
+        assertEquals(session.getCodeVerifier(), consumed.getCodeVerifier());
         assertEquals(session.getReturnPath(), consumed.getReturnPath());
         assertEquals(session.getIssuedAt(), consumed.getIssuedAt());
         assertEquals(session.getExpiresAt(), consumed.getExpiresAt());
@@ -180,7 +181,7 @@ class RedisOAuthStateStoreIntegrationTest {
                 newState(),
                 OAuthProvider.GOOGLE,
                 "nonce",
-                null,
+                "verifier-" + UUID.randomUUID(),
                 "/",
                 now.minusSeconds(60),
                 now.minusSeconds(1)

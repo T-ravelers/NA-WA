@@ -56,7 +56,7 @@ class OAuthStateServiceTest {
     }
 
     @Test
-    void issue_google_generatesStateAndNonceWithoutPkce() {
+    void issue_google_generatesStateNonceAndPkce() throws Exception {
         FakeOAuthStateStore store = new FakeOAuthStateStore();
         OAuthStateServiceImpl service = createService(store);
 
@@ -68,9 +68,13 @@ class OAuthStateServiceTest {
         OAuthStateSession stored = store.savedSessions.get(0);
         assertUrlSafeRandomValue(issued.getState());
         assertUrlSafeRandomValue(issued.getNonce());
-        assertNull(issued.getCodeChallenge());
-        assertNull(issued.getCodeChallengeMethod());
-        assertNull(stored.getCodeVerifier());
+        assertUrlSafeRandomValue(stored.getCodeVerifier());
+        assertEquals("S256", issued.getCodeChallengeMethod());
+        assertEquals(
+                createCodeChallenge(stored.getCodeVerifier()),
+                issued.getCodeChallenge()
+        );
+        assertEquals(OAuthProvider.GOOGLE, stored.getProvider());
         assertEquals("/", stored.getReturnPath());
     }
 

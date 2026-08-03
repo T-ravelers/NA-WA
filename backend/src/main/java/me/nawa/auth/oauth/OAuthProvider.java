@@ -8,7 +8,7 @@ import java.util.Arrays;
 @Getter
 @RequiredArgsConstructor
 public enum OAuthProvider {
-    GOOGLE("google", false),
+    GOOGLE("google", true),
     LINE("line", true);
 
     private final String registrationId;
