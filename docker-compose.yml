@@ -17,7 +17,7 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_DRIVER: com.mysql.cj.jdbc.Driver
-      DATABASE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&serverTimezone=Asia/Seoul
+      DATABASE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
       DATABASE_USERNAME: ${MYSQL_USER}
       DATABASE_PASSWORD: ${MYSQL_PASSWORD}
     depends_on:
