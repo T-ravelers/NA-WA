@@ -51,7 +51,7 @@ class AuthCookieManagerTest {
 
         assertEquals("refresh_token", refreshCookie.getName());
         assertEquals("refresh-value", refreshCookie.getValue());
-        assertEquals("/api/auth", refreshCookie.getPath());
+        assertEquals("/api/v1/auth", refreshCookie.getPath());
         assertEquals(1_209_600, refreshCookie.getMaxAge().getSeconds());
         assertTrue(refreshCookie.isHttpOnly());
         assertTrue(refreshCookie.isSecure());
@@ -69,7 +69,7 @@ class AuthCookieManagerTest {
         assertEquals("/", accessCookie.getPath());
         assertEquals("example.com", accessCookie.getDomain());
         assertEquals(0, refreshCookie.getMaxAge().getSeconds());
-        assertEquals("/api/auth", refreshCookie.getPath());
+        assertEquals("/api/v1/auth", refreshCookie.getPath());
         assertEquals("example.com", refreshCookie.getDomain());
     }
 

@@ -60,7 +60,7 @@ class AuthControllerTest {
         );
 
         MockHttpServletResponse response = mockMvc.perform(
-                        get("/api/auth/csrf")
+                        get("/api/v1/auth/csrf")
                                 .requestAttr(
                                         CsrfToken.class.getName(),
                                         csrfToken
@@ -83,7 +83,7 @@ class AuthControllerTest {
         authTokenService.refreshedTokens = createAuthTokens();
 
         MockHttpServletResponse response = mockMvc.perform(
-                        post("/api/auth/refresh")
+                        post("/api/v1/auth/refresh")
                                 .cookie(new Cookie(
                                         "refresh_token",
                                         "current-refresh"
@@ -102,14 +102,14 @@ class AuthControllerTest {
         assertTrue(setCookies.get(0).contains("Path=/"));
         assertTrue(setCookies.get(1).contains("refresh_token=refresh-value"));
         assertTrue(setCookies.get(1).contains("HttpOnly"));
-        assertTrue(setCookies.get(1).contains("Path=/api/auth"));
+        assertTrue(setCookies.get(1).contains("Path=/api/v1/auth"));
     }
 
     @Test
     void refresh_missingCookie_returnsUnauthorizedAndDeletesCookies()
             throws Exception {
         MockHttpServletResponse response = mockMvc.perform(
-                        post("/api/auth/refresh")
+                        post("/api/v1/auth/refresh")
                 )
                 .andReturn()
                 .getResponse();
@@ -122,7 +122,7 @@ class AuthControllerTest {
     @Test
     void logout_withCookie_revokesSessionAndDeletesCookies() throws Exception {
         MockHttpServletResponse response = mockMvc.perform(
-                        post("/api/auth/logout")
+                        post("/api/v1/auth/logout")
                                 .cookie(new Cookie(
                                         "refresh_token",
                                         "refresh-value"
@@ -140,7 +140,7 @@ class AuthControllerTest {
     @Test
     void logout_withoutCookie_isIdempotent() throws Exception {
         MockHttpServletResponse response = mockMvc.perform(
-                        post("/api/auth/logout")
+                        post("/api/v1/auth/logout")
                 )
                 .andReturn()
                 .getResponse();

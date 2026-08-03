@@ -99,9 +99,9 @@ public class SecurityConfig {
                                 antMatcher(HttpMethod.OPTIONS, "/**")
                         ).permitAll()
                         .requestMatchers(
-                                antMatcher("/api/auth/csrf"),
-                                antMatcher("/api/auth/refresh"),
-                                antMatcher("/api/auth/logout"),
+                                antMatcher("/api/v1/auth/csrf"),
+                                antMatcher("/api/v1/auth/refresh"),
+                                antMatcher("/api/v1/auth/logout"),
                                 antMatcher("/swagger-ui.html"),
                                 antMatcher("/swagger-resources"),
                                 antMatcher("/swagger-resources/**"),

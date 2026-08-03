@@ -19,7 +19,7 @@ import java.util.Optional;
 @Component
 public class AuthCookieManager {
     private static final String ACCESS_TOKEN_PATH = "/";
-    private static final String REFRESH_TOKEN_PATH = "/api/auth";
+    private static final String REFRESH_TOKEN_PATH = "/api/v1/auth";
 
     private final String accessTokenName;
     private final String refreshTokenName;

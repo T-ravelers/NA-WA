@@ -259,7 +259,7 @@ class SecurityConfigTest {
     void csrfEndpoint_withoutAccessToken_returnsTokenAndHttpOnlyCookie()
             throws Exception {
         MockHttpServletResponse response = mockMvc.perform(
-                        get("/api/auth/csrf")
+                        get("/api/v1/auth/csrf")
                 )
                 .andReturn()
                 .getResponse();
@@ -282,7 +282,7 @@ class SecurityConfigTest {
         CsrfCredentials csrfCredentials = issueCsrfToken();
 
         MockHttpServletResponse refreshResponse = mockMvc.perform(
-                        post("/api/auth/refresh")
+                        post("/api/v1/auth/refresh")
                                 .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
                                 .header(
                                         "X-XSRF-TOKEN",
@@ -293,7 +293,7 @@ class SecurityConfigTest {
                 .andReturn()
                 .getResponse();
         MockHttpServletResponse logoutResponse = mockMvc.perform(
-                        post("/api/auth/logout")
+                        post("/api/v1/auth/logout")
                                 .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
                                 .header(
                                         "X-XSRF-TOKEN",
@@ -313,7 +313,7 @@ class SecurityConfigTest {
     @Test
     void corsPreflight_allowedOrigin_returnsCorsHeaders() throws Exception {
         MockHttpServletResponse response = mockMvc.perform(
-                        options("/api/auth/refresh")
+                        options("/api/v1/auth/refresh")
                                 .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
                                 .header(
                                         HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD,
@@ -345,7 +345,7 @@ class SecurityConfigTest {
     @Test
     void corsPreflight_disallowedOrigin_returnsForbidden() throws Exception {
         MockHttpServletResponse response = mockMvc.perform(
-                        options("/api/auth/refresh")
+                        options("/api/v1/auth/refresh")
                                 .header(
                                         HttpHeaders.ORIGIN,
                                         "http://localhost:5174"
@@ -424,7 +424,7 @@ class SecurityConfigTest {
 
     private CsrfCredentials issueCsrfToken() throws Exception {
         MockHttpServletResponse response = mockMvc.perform(
-                        get("/api/auth/csrf")
+                        get("/api/v1/auth/csrf")
                 )
                 .andReturn()
                 .getResponse();
@@ -546,17 +546,17 @@ class SecurityConfigTest {
         void postWithoutCsrf() {
         }
 
-        @PostMapping("/api/auth/refresh")
+        @PostMapping("/api/v1/auth/refresh")
         String refresh() {
             return "refresh";
         }
 
-        @PostMapping("/api/auth/logout")
+        @PostMapping("/api/v1/auth/logout")
         String logout() {
             return "logout";
         }
 
-        @GetMapping("/api/auth/csrf")
+        @GetMapping("/api/v1/auth/csrf")
         String csrf(HttpServletRequest request) {
             CsrfToken csrfToken = (CsrfToken) request.getAttribute(
                     CsrfToken.class.getName()
