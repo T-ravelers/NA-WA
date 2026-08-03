@@ -86,6 +86,18 @@ public enum AuthErrorCode implements ErrorCode {
             "소셜 로그인 사용자 정보를 확인할 수 없습니다. 다시 시도해주세요."
     ),
 
+    INVALID_OAUTH_CALLBACK_STATE(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH-014",
+            "소셜 로그인 요청이 만료되었거나 유효하지 않습니다. 다시 시도해주세요."
+    ),
+
+    OAUTH_AUTHORIZATION_FAILED(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH-015",
+            "소셜 로그인 승인이 완료되지 않았습니다. 다시 시도해주세요."
+    ),
+
     OAUTH_MEMBER_SUSPENDED(
             HttpStatus.FORBIDDEN,
             "AUTH-016",

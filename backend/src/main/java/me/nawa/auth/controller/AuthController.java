@@ -1,12 +1,17 @@
 package me.nawa.auth.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
+import me.nawa.auth.oauth.callback.OAuthCallbackResult;
+import me.nawa.auth.oauth.callback.OAuthCallbackService;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.common.exception.CommonErrorCode;
+import me.nawa.common.exception.ErrorCode;
 import me.nawa.common.response.ApiResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -26,10 +31,12 @@ import java.net.URI;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
+@Log4j2
 public class AuthController {
     private final AuthTokenService authTokenService;
     private final AuthCookieManager authCookieManager;
     private final OAuthAuthorizationService oauthAuthorizationService;
+    private final OAuthCallbackService oauthCallbackService;
 
     @GetMapping("/oauth2/authorization/{provider}")
     public ResponseEntity<Void> authorize(
@@ -42,6 +49,75 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.FOUND)
                 .location(authorizationUri)
+                .build();
+    }
+
+    @GetMapping("/oauth2/callback/{provider}")
+    public ResponseEntity<Void> callback(
+            @PathVariable("provider") String provider,
+            @RequestParam(name = "state", required = false) String state,
+            @RequestParam(name = "code", required = false) String code,
+            @RequestParam(name = "error", required = false) String error) {
+        try {
+            OAuthCallbackResult result = oauthCallbackService.handle(
+                    provider,
+                    state,
+                    code,
+                    error
+            );
+            AuthTokens tokens = result.getTokens();
+            return ResponseEntity
+                    .status(HttpStatus.FOUND)
+                    .location(result.getRedirectUri())
+                    .header(
+                            HttpHeaders.SET_COOKIE,
+                            authCookieManager
+                                    .createAccessTokenCookie(
+                                            tokens.getAccessToken()
+                                    )
+                                    .toString(),
+                            authCookieManager
+                                    .createRefreshTokenCookie(
+                                            tokens.getRefreshToken()
+                                    )
+                                    .toString()
+                    )
+                    .build();
+        } catch (BusinessException exception) {
+            log.warn(
+                    "[OAuthCallbackFailure] code={}",
+                    exception.getErrorCode().getCode()
+            );
+            return createCallbackFailureResponse(
+                    exception.getErrorCode()
+            );
+        } catch (RuntimeException exception) {
+            log.error(
+                    "[OAuthCallbackUnexpectedFailure] type={}",
+                    exception.getClass().getName()
+            );
+            return createCallbackFailureResponse(
+                    CommonErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    private ResponseEntity<Void> createCallbackFailureResponse(
+            ErrorCode errorCode) {
+        return ResponseEntity
+                .status(HttpStatus.FOUND)
+                .location(oauthCallbackService.createFailureRedirectUri(
+                        errorCode
+                ))
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        authCookieManager
+                                .deleteAccessTokenCookie()
+                                .toString(),
+                        authCookieManager
+                                .deleteRefreshTokenCookie()
+                                .toString()
+                )
                 .build();
     }
 

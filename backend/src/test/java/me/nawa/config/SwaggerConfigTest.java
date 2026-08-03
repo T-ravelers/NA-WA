@@ -4,8 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
+import me.nawa.auth.oauth.callback.OAuthCallbackResult;
+import me.nawa.auth.oauth.callback.OAuthCallbackService;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
+import me.nawa.common.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -132,6 +135,27 @@ class SwaggerConfigTest {
             return (provider, returnPath) -> URI.create(
                     "https://accounts.google.com/o/oauth2/v2/auth"
             );
+        }
+
+        @Bean
+        OAuthCallbackService oauthCallbackService() {
+            return new OAuthCallbackService() {
+                @Override
+                public OAuthCallbackResult handle(
+                        String provider,
+                        String state,
+                        String authorizationCode,
+                        String authorizationError) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public URI createFailureRedirectUri(ErrorCode errorCode) {
+                    return URI.create(
+                            "http://localhost:5173/auth/callback"
+                    );
+                }
+            };
         }
     }
 
