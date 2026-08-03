@@ -2,10 +2,22 @@ package me.nawa.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import me.nawa.auth.cookie.AuthCookieManager;
+import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
+import me.nawa.auth.oauth.callback.OAuthCallbackResult;
+import me.nawa.auth.oauth.callback.OAuthCallbackService;
+import me.nawa.auth.profile.AuthMeResponse;
+import me.nawa.auth.profile.AuthMeService;
+import me.nawa.auth.profile.AuthMemberProfile;
+import me.nawa.auth.token.AuthTokenService;
+import me.nawa.auth.token.AuthTokens;
+import me.nawa.common.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -16,6 +28,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 import springfox.documentation.spring.web.plugins.Docket;
+
+import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,6 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ContextConfiguration(classes = {
         ServletConfig.class,
         SwaggerConfig.class,
+        SwaggerConfigTest.AuthTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -97,6 +112,79 @@ class SwaggerConfigTest {
                 .getContentAsByteArray();
 
         assertTrue(responseBody.length > 0);
+    }
+
+    @Configuration
+    static class AuthTestConfig {
+
+        @Bean
+        AuthTokenService authTokenService() {
+            return new NoOpAuthTokenService();
+        }
+
+        @Bean
+        AuthCookieManager authCookieManager() {
+            return new AuthCookieManager(
+                    "access_token",
+                    "refresh_token",
+                    false,
+                    "Lax",
+                    ""
+            );
+        }
+
+        @Bean
+        OAuthAuthorizationService oauthAuthorizationService() {
+            return (provider, returnPath) -> URI.create(
+                    "https://accounts.google.com/o/oauth2/v2/auth"
+            );
+        }
+
+        @Bean
+        OAuthCallbackService oauthCallbackService() {
+            return new OAuthCallbackService() {
+                @Override
+                public OAuthCallbackResult handle(
+                        String provider,
+                        String state,
+                        String authorizationCode,
+                        String authorizationError) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public URI createFailureRedirectUri(ErrorCode errorCode) {
+                    return URI.create(
+                            "http://localhost:5173/auth/callback"
+                    );
+                }
+            };
+        }
+
+        @Bean
+        AuthMeService authMeService() {
+            return memberId -> new AuthMeResponse(
+                    AuthMemberProfile.active(memberId, false)
+            );
+        }
+    }
+
+    private static final class NoOpAuthTokenService
+            implements AuthTokenService {
+
+        @Override
+        public AuthTokens issueTokens(long memberId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public AuthTokens refreshTokens(String currentRefreshToken) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void revokeRefreshToken(String refreshToken) {
+        }
     }
 
     @RestController

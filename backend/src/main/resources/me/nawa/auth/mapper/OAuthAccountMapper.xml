@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.auth.mapper.OAuthAccountMapper">
+    <select id="findLoginAccount"
+            resultType="me.nawa.auth.oauth.account.OAuthLoginAccount">
+        SELECT
+            m.member_id,
+            m.member_status,
+            (m.deleted_at IS NOT NULL) AS member_deleted,
+            (sa.deleted_at IS NOT NULL) AS social_account_deleted
+        FROM social_accounts sa
+        JOIN members m
+          ON m.member_id = sa.member_id
+        WHERE sa.provider = #{provider}
+          AND sa.provider_user_id = #{providerUserId}
+        LIMIT 1
+    </select>
+
+    <insert id="insertMember"
+            useGeneratedKeys="true"
+            keyProperty="memberId"
+            keyColumn="member_id">
+        INSERT INTO members (
+            display_name,
+            profile_image_url
+        ) VALUES (
+            #{displayName},
+            #{profileImageUrl}
+        )
+    </insert>
+
+    <insert id="insertSocialAccount">
+        INSERT INTO social_accounts (
+            member_id,
+            provider,
+            provider_user_id,
+            provider_email
+        ) VALUES (
+            #{memberId},
+            #{provider},
+            #{providerUserId},
+            #{providerEmail}
+        )
+    </insert>
+</mapper>
