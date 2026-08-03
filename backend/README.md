@@ -28,4 +28,5 @@ API 계약을 변경했다면 단위·통합 테스트와 Swagger 또는 Postman
 
 API별 요청 파라미터와 응답 데이터 구조는 Swagger에서 확인할 수 있습니다.
 
-- 로컬 Swagger UI: `http://localhost:{port}/swagger-ui/index.html`
+- 로컬 Swagger UI: `http://localhost:{port}/swagger-ui.html`
+- Swagger JSON: `http://localhost:{port}/v2/api-docs`
