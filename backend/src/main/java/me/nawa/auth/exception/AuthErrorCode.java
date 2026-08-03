@@ -84,6 +84,24 @@ public enum AuthErrorCode implements ErrorCode {
             HttpStatus.UNAUTHORIZED,
             "AUTH-013",
             "소셜 로그인 사용자 정보를 확인할 수 없습니다. 다시 시도해주세요."
+    ),
+
+    OAUTH_MEMBER_SUSPENDED(
+            HttpStatus.FORBIDDEN,
+            "AUTH-016",
+            "정지된 회원 계정입니다."
+    ),
+
+    OAUTH_MEMBER_WITHDRAWN(
+            HttpStatus.FORBIDDEN,
+            "AUTH-017",
+            "탈퇴했거나 연결이 해제된 회원 계정입니다."
+    ),
+
+    OAUTH_ACCOUNT_PROVISION_FAILED(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "AUTH-018",
+            "회원 계정을 준비할 수 없습니다. 잠시 후 다시 시도해주세요."
     );
 
     private final HttpStatus status;
