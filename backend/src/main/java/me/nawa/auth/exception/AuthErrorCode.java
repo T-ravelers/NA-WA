@@ -60,6 +60,24 @@ public enum AuthErrorCode implements ErrorCode {
             HttpStatus.SERVICE_UNAVAILABLE,
             "AUTH-009",
             "소셜 로그인 설정이 완료되지 않았습니다."
+    ),
+
+    OAUTH_TOKEN_EXCHANGE_FAILED(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH-010",
+            "소셜 로그인 인증에 실패했습니다. 다시 시도해주세요."
+    ),
+
+    OAUTH_PROVIDER_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "AUTH-011",
+            "소셜 로그인 제공자와 통신할 수 없습니다. 잠시 후 다시 시도해주세요."
+    ),
+
+    INVALID_OAUTH_TOKEN_RESPONSE(
+            HttpStatus.BAD_GATEWAY,
+            "AUTH-012",
+            "소셜 로그인 제공자의 응답을 확인할 수 없습니다."
     );
 
     private final HttpStatus status;
