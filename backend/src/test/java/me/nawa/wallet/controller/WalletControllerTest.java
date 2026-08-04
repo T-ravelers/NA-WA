@@ -11,23 +11,34 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
+import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.wallet.dto.response.TransactionSummaryResponse;
 import me.nawa.wallet.dto.response.WalletHomeResponse;
 import me.nawa.wallet.exception.WalletErrorCode;
 import me.nawa.wallet.service.WalletService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
 class WalletControllerTest {
+
+    private static final Authentication AUTHENTICATION = new UsernamePasswordAuthenticationToken(
+        new AuthenticatedMember(1L), null, Collections.emptyList()
+    );
 
     @Mock
     private WalletService walletService;
@@ -40,11 +51,19 @@ class WalletControllerTest {
         WalletController walletController = new WalletController(walletService);
         mockMvc = MockMvcBuilders.standaloneSetup(walletController)
             .setControllerAdvice(new GlobalExceptionHandler())
+            .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
             .build();
+
+        SecurityContextHolder.getContext().setAuthentication(AUTHENTICATION);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
-    void getWalletHome_returns200WithWalletData_whenHeaderPresent() throws Exception {
+    void getWalletHome_returns200WithWalletData_whenAuthenticated() throws Exception {
         WalletHomeResponse response = WalletHomeResponse.of(
             BigDecimal.valueOf(50000),
             "ACTIVE",
@@ -54,7 +73,7 @@ class WalletControllerTest {
         );
         when(walletService.getWalletHome(1L)).thenReturn(response);
 
-        String responseBody = mockMvc.perform(get("/api/v1/wallet").header("X-Member-Id", 1L))
+        String responseBody = mockMvc.perform(get("/api/v1/wallet"))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -74,7 +93,7 @@ class WalletControllerTest {
         when(walletService.getWalletHome(1L))
             .thenThrow(new BusinessException(WalletErrorCode.WALLET_NOT_FOUND));
 
-        String responseBody = mockMvc.perform(get("/api/v1/wallet").header("X-Member-Id", 1L))
+        String responseBody = mockMvc.perform(get("/api/v1/wallet"))
             .andExpect(status().isNotFound())
             .andReturn()
             .getResponse()
@@ -85,18 +104,5 @@ class WalletControllerTest {
         assertFalse(body.path("success").asBoolean());
         assertEquals("WALLET-001", body.path("error").path("code").asText());
         assertEquals("지갑 정보를 찾을 수 없습니다.", body.path("error").path("message").asText());
-    }
-
-    @Test
-    void getWalletHome_returns500_whenMemberIdHeaderMissing() throws Exception {
-        String responseBody = mockMvc.perform(get("/api/v1/wallet"))
-            .andExpect(status().isInternalServerError())
-            .andReturn()
-            .getResponse()
-            .getContentAsString(StandardCharsets.UTF_8);
-
-        JsonNode body = objectMapper.readTree(responseBody);
-
-        assertEquals("COMMON-999", body.path("error").path("code").asText());
     }
 }
