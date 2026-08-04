@@ -13,6 +13,24 @@ public enum WalletErrorCode implements ErrorCode {
       HttpStatus.NOT_FOUND,
       "WALLET-001",
         "지갑 정보를 찾을 수 없습니다."
+    ),
+
+    TOPUP_METHOD_NOT_SUPPORTED(
+        HttpStatus.BAD_REQUEST,
+          "WALLET-002",
+              "지원하지 않는 충전 수단입니다."
+    ),
+
+    UNSUPPORTED_CURRENCY(
+        HttpStatus.BAD_REQUEST,
+          "WALLET-003",
+              "지원하지 않는 통화입니다."
+    ),
+
+    INVALID_TOPUP_AMOUNT(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-004",
+            "충전 금액은 0보다 커야 합니다."
     );
 
     private final HttpStatus status;

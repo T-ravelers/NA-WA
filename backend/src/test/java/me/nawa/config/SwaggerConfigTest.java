@@ -12,6 +12,9 @@ import me.nawa.auth.profile.AuthMemberProfile;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.ErrorCode;
+import me.nawa.wallet.dto.request.TopupPreviewRequest;
+import me.nawa.wallet.dto.response.TopupMethodsResponse;
+import me.nawa.wallet.dto.response.TopupPreviewResponse;
 import me.nawa.wallet.service.TopupService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
@@ -191,8 +194,16 @@ class SwaggerConfigTest {
 
         @Bean
         TopupService topupService() {
-            return () -> {
-                throw new UnsupportedOperationException();
+            return new TopupService() {
+                @Override
+                public TopupMethodsResponse getAvailableTopupMethods() {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public TopupPreviewResponse previewTopup(Long memberId, TopupPreviewRequest request) {
+                    throw new UnsupportedOperationException();
+                }
             };
         }
     }
