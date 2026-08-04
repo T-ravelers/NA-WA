@@ -1,5 +1,28 @@
 package me.nawa.explore.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class EventSummaryResponse {
 
+    private Long itemId;
+    private String title;
+    private String subtitle;
+    private String thumbnailUrl;
+    private String region1;
+    private String region2;
+    private String region3;
+    private BigDecimal latitude;
+    private BigDecimal longitude;
+    private LocalDate startDate;
+    private LocalDate endDate;
 }

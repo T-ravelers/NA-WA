@@ -1,8 +1,113 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="me.nawa.explore.mapper.EventMapper">
+
+    <sql id="eventListWhere">
+        ei.item_type = 'EVENT'
+        AND ei.approval_status = 'APPROVED'
+        AND ei.visibility_status = 'VISIBLE'
+        AND ei.deleted_at IS NULL
+        AND e.deleted_at IS NULL
+        AND e.status IN ('SCHEDULED', 'ONGOING')
+
+        <if test="request.region1 != null and request.region1 != ''">
+            AND e.region1 = #{request.region1}
+        </if>
+        <if test="request.region2 != null and request.region2 != ''">
+            AND e.region2 = #{request.region2}
+        </if>
+        <if test="request.region3 != null and request.region3 != ''">
+            AND e.region3 = #{request.region3}
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            AND (
+            e.title LIKE CONCAT('%', #{request.keyword}, '%')
+            OR e.subtitle LIKE CONCAT('%', #{request.keyword}, '%')
+            OR e.description LIKE CONCAT('%', #{request.keyword}, '%')
+            )
+        </if>
+        <if test="request.sectorIds != null and request.sectorIds.size() > 0">
+            AND EXISTS (
+            SELECT 1
+            FROM event_activity filter_ea
+            JOIN activity filter_a
+            ON filter_a.activity_id = filter_ea.activity_id
+            WHERE filter_ea.event_id = e.event_id
+            AND filter_ea.deleted_at IS NULL
+            AND filter_a.deleted_at IS NULL
+            AND filter_a.sector_id IN
+            <foreach collection="request.sectorIds"
+                     item="sectorId"
+                     open="("
+                     separator=","
+                     close=")">
+                #{sectorId}
+            </foreach>
+            )
+        </if>
+        <if test="request.activityIds != null and request.activityIds.size() > 0">
+            AND EXISTS (
+            SELECT 1
+            FROM event_activity filter_ea
+            WHERE filter_ea.event_id = e.event_id
+            AND filter_ea.deleted_at IS NULL
+            AND filter_ea.activity_id IN
+            <foreach collection="request.activityIds"
+                     item="activityId"
+                     open="("
+                     separator=","
+                     close=")">
+                #{activityId}
+            </foreach>
+            )
+        </if>
+    </sql>
+
+    <select id="searchEvents"
+            resultType="me.nawa.explore.dto.EventSummaryResponse">
+        SELECT
+        e.event_id AS item_id,
+        COALESCE(t.title, e.title) AS title,
+        COALESCE(t.subtitle, e.subtitle) AS subtitle,
+        e.thumbnail_url,
+        e.region1,
+        e.region2,
+        e.region3,
+        e.latitude,
+        e.longitude,
+        e.start_date,
+        e.end_date
+        FROM explore_items ei
+        JOIN event e
+        ON e.event_id = ei.item_id
+        LEFT JOIN event_translations t
+        ON t.event_id = e.event_id
+        AND t.language_code = #{request.language}
+        AND t.deleted_at IS NULL
+        WHERE
+        <include refid="eventListWhere"/>
+        <choose>
+            <when test="request.sort == 'POPULAR'">
+                ORDER BY ei.popularity_score DESC, e.event_id DESC
+            </when>
+            <otherwise>
+                ORDER BY e.created_at DESC, e.event_id DESC
+            </otherwise>
+        </choose>
+        LIMIT #{request.size}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countEvents" resultType="long">
+        SELECT COUNT(*)
+        FROM explore_items ei
+        JOIN event e
+        ON e.event_id = ei.item_id
+        WHERE
+        <include refid="eventListWhere"/>
+    </select>
 
 </mapper>
