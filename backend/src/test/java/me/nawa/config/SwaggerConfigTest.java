@@ -16,6 +16,7 @@ import me.nawa.wallet.dto.request.TopupPreviewRequest;
 import me.nawa.wallet.dto.response.TopupMethodsResponse;
 import me.nawa.wallet.dto.response.TopupPreviewResponse;
 import me.nawa.wallet.service.TopupService;
+import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +56,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.WalletTestConfig.class,
         SwaggerConfigTest.ExploreTestConfig.class,
         SwaggerConfigTest.TopupTestConfig.class,
+        SwaggerConfigTest.TransactionTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -204,6 +206,17 @@ class SwaggerConfigTest {
                 public TopupPreviewResponse previewTopup(Long memberId, TopupPreviewRequest request) {
                     throw new UnsupportedOperationException();
                 }
+            };
+        }
+    }
+
+    @Configuration
+    static class TransactionTestConfig {
+
+        @Bean
+        TransactionService transactionService() {
+            return (memberId, condition) -> {
+                throw new UnsupportedOperationException();
             };
         }
     }

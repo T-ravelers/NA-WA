@@ -4,6 +4,7 @@ import lombok.extern.log4j.Log4j2;
 import me.nawa.common.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -57,6 +58,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiResponse<Void>> handleMethodNotAllowed() {
         return createErrorResponse(CommonErrorCode.METHOD_NOT_ALLOWED);
+    }
+
+    /**
+     * 쿼리 파라미터 바인딩에 실패했을 때(예: 존재하지 않는 enum 값) 처리합니다.
+     */
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBindException() {
+        return createErrorResponse(CommonErrorCode.INVALID_INPUT);
     }
 
     /**

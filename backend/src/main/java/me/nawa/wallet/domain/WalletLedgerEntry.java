@@ -20,4 +20,5 @@ public class WalletLedgerEntry {
     private BigDecimal balanceAfter;
     private String memo;
     private LocalDateTime createdAt;
+    private Long ledgerEntryId;
 }

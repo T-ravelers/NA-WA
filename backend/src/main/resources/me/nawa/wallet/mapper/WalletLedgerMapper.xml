@@ -22,4 +22,37 @@
         LIMIT #{limit}
     </select>
 
+    <select id="findByWalletIdWithCursor" resultType="me.nawa.wallet.domain.WalletLedgerEntry">
+        SELECT
+        e.ledger_entry_id,
+              e.transfer_id,
+              t.transfer_type,
+              e.entry_type,
+              e.amount,
+              e.balance_after,
+              t.memo,
+              e.created_at
+          FROM wallet_ledger_entries e
+          JOIN wallet_transfers t ON t.transfer_id = e.transfer_id
+          WHERE e.wallet_id = #{walletId}
+        AND e.deleted_at IS NULL
+        <if test="cursor != null">
+            AND e.ledger_entry_id &lt; #{cursor}
+        </if>
+        <if test="type != null">
+            AND t.transfer_type = #{type}
+        </if>
+        <if test="status != null">
+            AND t.transfer_status = #{status}
+        </if>
+        <if test="from != null">
+            AND e.created_at &gt;= #{from}
+        </if>
+        <if test="to != null">
+            AND e.created_at &lt; #{to}
+        </if>
+        ORDER BY e.ledger_entry_id DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>
