@@ -29,7 +29,7 @@ class FlywayMigrationIntegrationTest {
 
         MigrationInfo current = flyway.info().current();
         assertNotNull(current);
-        assertEquals("4", current.getVersion().getVersion());
+        assertEquals("5", current.getVersion().getVersion());
         assertTrue(current.getState().isApplied());
     }
 
