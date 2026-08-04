@@ -1,12 +1,12 @@
-# 여정 이벤트 ERD
+# 여정·일정·리포트 ERD
 
-이 문서는 여정에 이벤트를 추가하고 그룹 약속과 연결하는 DB 구조를 설명합니다.
-Flyway V5 적용 후의 테이블 관계와 DB가 보장하는 규칙을 확인할 수 있습니다.
+개인 여정과 방문 지역, 이벤트 일정, 지출 연결, 리포트의 관계를 보여줍니다.
 
 ## 여정 이벤트 관계
 
 ```mermaid
 erDiagram
+    MEMBERS ||--o{ TRIPS : owns
     TRIPS ||--o{ TRIP_EVENTS : contains
     EXPLORE_ITEMS ||--o| EVENT : specializes
     EXPLORE_ITEMS ||--o{ APPOINTMENTS : schedules
@@ -14,6 +14,20 @@ erDiagram
     APPOINTMENTS o|--o{ TRIP_EVENTS : confirms
     APPOINTMENTS ||--o{ APPOINTMENT_MEMBERS : has
     TRIPS o|--o{ APPOINTMENT_MEMBERS : linked_to
+    TRIPS ||--o{ TRIP_REGIONS : visits
+    TRIPS ||--o{ REPORTS : generates
+    TRIPS ||--o{ TRIP_EXPENSE_LINKS : includes
+    WALLET_LEDGER_ENTRIES ||--o| TRIP_EXPENSE_LINKS : links
+    APPOINTMENT_MEMBERS o|--o{ TRIP_EXPENSE_LINKS : attributes
+
+    MEMBERS {
+        BIGINT member_id PK
+    }
+
+    EXPLORE_ITEMS {
+        BIGINT item_id PK
+        ENUM item_type
+    }
 
     TRIPS {
         BIGINT trip_id PK
@@ -23,7 +37,7 @@ erDiagram
     }
 
     EVENT {
-        BIGINT event_id PK,FK
+        BIGINT event_id PK, FK
         DATE start_date
         DATE end_date
         ENUM status
@@ -56,17 +70,46 @@ erDiagram
         VARCHAR note
         DATETIME confirmed_at
     }
+
+    TRIP_REGIONS {
+        BIGINT trip_id PK, FK
+        VARCHAR region_code PK
+        VARCHAR region_name
+        SMALLINT display_order
+    }
+
+    REPORTS {
+        BIGINT report_id PK
+        BIGINT trip_id FK
+        ENUM generation_status
+        JSON report_content
+    }
+
+    TRIP_EXPENSE_LINKS {
+        BIGINT trip_id PK, FK
+        BIGINT ledger_entry_id PK, FK
+        BIGINT appointment_member_id FK
+    }
+
+    WALLET_LEDGER_ENTRIES {
+        BIGINT ledger_entry_id PK
+        BIGINT transfer_id FK
+        BIGINT wallet_id FK
+    }
 ```
 
 `trip_events`는 여행 전체가 아닌 개별 이벤트 일정의 상태를 저장합니다. 한 여정에
 추가한 이벤트마다 상태가 다를 수 있기 때문입니다.
 
+`trip_regions`는 방문 지역 순서를 관리합니다. `trip_expense_links`는 지갑 원장과
+여정을 연결하고, `reports`는 여정 기준 생성 결과를 보존합니다.
+
 ## 상태별 저장 규칙
 
-| 상태        | 의미                            | `appointment_id` | `confirmed_at` |
-| ----------- | ------------------------------- | ---------------- | -------------- |
-| `ADDED`     | 방문 날짜만 선택한 일정         | `NULL`           | `NULL`         |
-| `CONFIRMED` | 그룹 약속까지 확정된 일정       | 필수             | 필수           |
+| 상태        | 의미                      | `appointment_id` | `confirmed_at` |
+| ----------- | ------------------------- | ---------------- | -------------- |
+| `ADDED`     | 방문 날짜만 선택한 일정   | `NULL`           | `NULL`         |
+| `CONFIRMED` | 그룹 약속까지 확정된 일정 | 필수             | 필수           |
 
 `ADDED`는 `visit_date`만으로 타임라인의 날짜를 정합니다. `CONFIRMED`의 정확한
 시간은 `appointments.activity_start_at`과 `appointments.activity_end_at`에서
