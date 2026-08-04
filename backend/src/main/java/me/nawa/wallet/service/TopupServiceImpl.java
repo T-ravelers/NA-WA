@@ -19,13 +19,11 @@ public class TopupServiceImpl implements TopupService {
 
     @Override
     public TopupMethodsResponse getAvailableTopupMethods() {
-        //enabled TopupMethodType > TopupMethodResponse
         List<TopupMethodResponse> methods = Arrays.stream(TopupMethodType.values())
             .filter(TopupMethodType::isEnabled)
             .map(TopupMethodType::toResponse)
             .collect(Collectors.toList());
 
-        //TopupMethodResponse를 담은 list와 가이드 메시를 포함하는 TopupMethodsResponse 리턴
         return new TopupMethodsResponse(methods, GUIDE_MESSAGE);
     }
 }

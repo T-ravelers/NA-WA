@@ -4,5 +4,5 @@ import me.nawa.wallet.dto.response.TopupMethodsResponse;
 
 public interface TopupService {
 
-    public TopupMethodsResponse getAvailableTopupMethods();
+    TopupMethodsResponse getAvailableTopupMethods();
 }

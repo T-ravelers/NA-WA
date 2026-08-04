@@ -12,6 +12,7 @@ import me.nawa.auth.profile.AuthMemberProfile;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.ErrorCode;
+import me.nawa.wallet.service.TopupService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.AuthTestConfig.class,
         SwaggerConfigTest.WalletTestConfig.class,
         SwaggerConfigTest.ExploreTestConfig.class,
+        SwaggerConfigTest.TopupTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -179,6 +181,17 @@ class SwaggerConfigTest {
         @Bean
         WalletService walletService() {
             return memberId -> {
+                throw new UnsupportedOperationException();
+            };
+        }
+    }
+
+    @Configuration
+    static class TopupTestConfig {
+
+        @Bean
+        TopupService topupService() {
+            return () -> {
                 throw new UnsupportedOperationException();
             };
         }
