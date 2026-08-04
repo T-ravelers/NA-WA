@@ -2,9 +2,11 @@ package me.nawa.wallet.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.wallet.dto.response.WalletHomeResponse;
 import me.nawa.wallet.service.WalletService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,12 +20,11 @@ public class WalletController {
 
     private final WalletService walletService;
 
-    // TODO: 인증 연동되면 X-Member_Id 헤더 대신 SecurityContext에서 memberId 추출하도록 교체
     @GetMapping
     public ApiResponse<WalletHomeResponse> getWalletHome(
-        @RequestHeader("X-Member-Id") Long memberId
+       @AuthenticationPrincipal AuthenticatedMember member
     ){
-        return ApiResponse.success(walletService.getWalletHome(memberId));
+        return ApiResponse.success(walletService.getWalletHome(member.getMemberId()));
     }
 }
 
