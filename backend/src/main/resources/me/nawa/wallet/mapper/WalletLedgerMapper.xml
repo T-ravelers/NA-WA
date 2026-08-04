@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.wallet.mapper.WalletLedgerMapper">
+
+    <select id="findRecentByWalletId" resultType="me.nawa.wallet.domain.WalletLedgerEntry">
+        SELECT
+            e.transfer_id,
+            t.transfer_type,
+            e.entry_type,
+            e.amount,
+            e.balance_after,
+            t.memo,
+            e.created_at
+        FROM wallet_ledger_entries e
+        JOIN wallet_transfers t ON t.transfer_id = e.transfer_id
+        WHERE e.wallet_id = #{walletId}
+            AND e.deleted_at IS NULL
+        ORDER BY e.created_at DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>
