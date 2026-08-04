@@ -5,4 +5,16 @@
 
 <mapper namespace="me.nawa.wallet.mapper.WalletMapper">
 
+    <select id="findByMemberId" resultType="me.nawa.wallet.domain.Wallet">
+        SELECT
+            w.wallet_id,
+            w.currency_code,
+            w.available_balance,
+            w.wallet_status
+        FROM wallets w
+        JOIN wallet_owners o ON o.wallet_owner_id = w.wallet_owner_id
+        WHERE o.member_id = #{memberId}
+            AND o.deleted_at IS NULL
+            AND w.deleted_at IS NULL
+    </select>
 </mapper>

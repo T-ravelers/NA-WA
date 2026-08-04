@@ -2,10 +2,12 @@ package me.nawa.config;
 
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.web.servlet.config.annotation.*;
 
 @Configuration
 @EnableWebMvc
+@PropertySource("classpath:/application.properties")
 @ComponentScan(basePackages = {
     "me.nawa.common.exception",
     "me.nawa.auth.controller",
@@ -33,14 +35,5 @@ public class ServletConfig implements WebMvcConfigurer {
         registry
                 .addResourceHandler("/webjars/**")
                 .addResourceLocations("classpath:/META-INF/resources/webjars/");
-    }
-
-    @Override
-    public void addCorsMappings(CorsRegistry registry){
-        registry.addMapping("/**")
-            .allowedOrigins("http://localhost:5173")
-            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-            .allowedHeaders("Authorization", "Content-Type")
-            .allowCredentials(true);
     }
 }
