@@ -12,9 +12,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import me.nawa.common.exception.GlobalExceptionHandler;
-import me.nawa.explore.dto.EventListResponse;
-import me.nawa.explore.dto.EventSearchRequest;
-import me.nawa.explore.dto.EventSummaryResponse;
+import me.nawa.explore.dto.response.EventDetailResponse;
+import me.nawa.explore.dto.response.EventListResponse;
+import me.nawa.explore.dto.request.EventSearchRequest;
+import me.nawa.explore.dto.response.EventSummaryResponse;
 import me.nawa.explore.service.EventService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,5 +78,39 @@ class EventControllerTest {
             body.path("data").path("content").get(0).path("itemId").asLong()
         );
         assertEquals(1L, body.path("data").path("totalElements").asLong());
+    }
+
+    @Test
+    void getEventDetail_returnsSuccessResponse() throws Exception {
+        EventDetailResponse response = EventDetailResponse.builder()
+            .eventId(990001L)
+            .eventType("OFFICIAL")
+            .title("서울 야시장 푸드 팝업(테스트)")
+            .activities(List.of())
+            .build();
+
+        when(eventService.getEventDetail(990001L, "ko"))
+            .thenReturn(response);
+
+        String responseBody = mockMvc.perform(
+                get("/api/v1/explore/events/990001")
+                    .param("language", "ko")
+            )
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+
+        assertTrue(body.path("success").asBoolean());
+        assertEquals(
+            990001L,
+            body.path("data").path("eventId").asLong()
+        );
+        assertEquals(
+            "서울 야시장 푸드 팝업(테스트)",
+            body.path("data").path("title").asText()
+        );
     }
 }
