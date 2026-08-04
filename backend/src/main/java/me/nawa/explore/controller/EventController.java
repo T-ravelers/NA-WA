@@ -1,6 +1,5 @@
 package me.nawa.explore.controller;
 
-import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
