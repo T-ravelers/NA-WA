@@ -1,7 +1,9 @@
 package me.nawa.explore.mapper;
 
-import me.nawa.explore.dto.EventSearchRequest;
-import me.nawa.explore.dto.EventSummaryResponse;
+import me.nawa.explore.dto.request.EventSearchRequest;
+import me.nawa.explore.dto.response.EventActivityResponse;
+import me.nawa.explore.dto.response.EventDetailResponse;
+import me.nawa.explore.dto.response.EventSummaryResponse;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -17,5 +19,15 @@ public interface EventMapper {
 
     long countEvents(
         @Param("request") EventSearchRequest request
+    );
+
+    EventDetailResponse findEventDetail(
+        @Param("eventId") Long eventId,
+        @Param("language") String language
+    );
+
+    List<EventActivityResponse> findEventActivities(
+        @Param("eventId") Long eventId,
+        @Param("language") String language
     );
 }

@@ -4,6 +4,84 @@
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="me.nawa.explore.mapper.EventMapper">
+    <select id="findEventDetail"
+            resultType="me.nawa.explore.dto.response.EventDetailResponse">
+        SELECT
+            e.event_id,
+            e.event_type,
+            COALESCE(t.title, e.title) AS title,
+            COALESCE(t.subtitle, e.subtitle) AS subtitle,
+            COALESCE(t.description, e.description) AS description,
+            COALESCE(t.program_text, e.program_text) AS program_text,
+            e.thumbnail_url,
+            e.status,
+            e.is_permanent,
+            e.start_date,
+            e.end_date,
+            e.operating_hours,
+            e.open_days,
+            e.open_weekend,
+            e.opens_late,
+            COALESCE(t.venue_name, e.venue_name) AS venue_name,
+            e.region1,
+            e.region2,
+            e.region3,
+            e.address_road,
+            e.latitude,
+            e.longitude,
+            e.has_photo_zone,
+            e.is_experience,
+            COALESCE(t.age_limit, e.age_limit) AS age_limit,
+            e.is_free,
+            COALESCE(t.price_text, e.price_text) AS price_text,
+            e.has_benefit,
+            e.reservable
+        FROM explore_items ei
+                 JOIN event e
+                      ON e.event_id = ei.item_id
+                 LEFT JOIN event_translations t
+                           ON t.event_id = e.event_id
+                               AND t.language_code = #{language}
+                               AND t.deleted_at IS NULL
+        WHERE ei.item_type = 'EVENT'
+          AND ei.item_id = #{eventId}
+          AND ei.approval_status = 'APPROVED'
+          AND ei.visibility_status = 'VISIBLE'
+          AND ei.deleted_at IS NULL
+          AND e.deleted_at IS NULL
+          AND e.status IN ('SCHEDULED', 'ONGOING')
+    </select>
+
+    <select id="findEventActivities"
+            resultType="me.nawa.explore.dto.response.EventActivityResponse">
+        SELECT
+            a.activity_id,
+            a.activity_code,
+            CASE
+                WHEN #{language} = 'en' THEN a.label_en
+                ELSE a.label_ko
+                END AS activity_name,
+            s.sector_id,
+            s.sector_code,
+            CASE
+                WHEN #{language} = 'en' THEN s.label_en
+                ELSE s.label_ko
+                END AS sector_name,
+            ea.is_primary
+        FROM event_activity ea
+                 JOIN activity a
+                      ON a.activity_id = ea.activity_id
+                 JOIN sector s
+                      ON s.sector_id = a.sector_id
+        WHERE ea.event_id = #{eventId}
+          AND ea.deleted_at IS NULL
+          AND a.deleted_at IS NULL
+          AND s.deleted_at IS NULL
+        ORDER BY ea.is_primary DESC,
+                 s.display_order,
+                 a.display_order,
+                 a.activity_id
+    </select>
 
     <sql id="eventListWhere">
         ei.item_type = 'EVENT'
@@ -67,7 +145,7 @@
     </sql>
 
     <select id="searchEvents"
-            resultType="me.nawa.explore.dto.EventSummaryResponse">
+            resultType="me.nawa.explore.dto.response.EventSummaryResponse">
         SELECT
         e.event_id AS item_id,
         COALESCE(t.title, e.title) AS title,
