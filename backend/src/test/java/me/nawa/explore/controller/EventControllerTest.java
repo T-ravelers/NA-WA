@@ -1,10 +1,8 @@
 package me.nawa.explore.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -65,8 +63,7 @@ class EventControllerTest {
         when(eventService.searchEvents(any(EventSearchRequest.class)))
             .thenReturn(response);
 
-        String responseBody = mockMvc.perform(get("/api/v1/explore")
-                .param("itemType", "EVENT"))
+        String responseBody = mockMvc.perform(get("/api/v1/explore/events"))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -80,22 +77,5 @@ class EventControllerTest {
             body.path("data").path("content").get(0).path("itemId").asLong()
         );
         assertEquals(1L, body.path("data").path("totalElements").asLong());
-    }
-
-    @Test
-    void searchEvents_returnsBadRequest_whenItemTypeIsNotEvent() throws Exception {
-        String responseBody = mockMvc.perform(get("/api/v1/explore")
-                .param("itemType", "PLACE"))
-            .andExpect(status().isBadRequest())
-            .andReturn()
-            .getResponse()
-            .getContentAsString(StandardCharsets.UTF_8);
-
-        JsonNode body = objectMapper.readTree(responseBody);
-
-        assertFalse(body.path("success").asBoolean());
-        assertEquals("COMMON-001", body.path("error").path("code").asText());
-
-        verifyNoInteractions(eventService);
     }
 }
