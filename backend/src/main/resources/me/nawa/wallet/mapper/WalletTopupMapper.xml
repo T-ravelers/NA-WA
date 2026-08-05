@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.wallet.mapper.WalletTopupMapper">
+
+    <select id="findFxByTransferId" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT source_amount, source_currency_code, exchange_rate_krw_per_unit, quoted_at
+        FROM wallet_topups
+        WHERE transfer_id = #{transferId}
+          AND deleted_at IS NULL
+    </select>
+
+</mapper>

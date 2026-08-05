@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import lombok.Getter;
 
-public record WalletHomeResponse(
+public record  WalletHomeResponse(
     BigDecimal balance,
     String availabilityStatus,
     List<TransactionSummaryResponse> recentTransactions

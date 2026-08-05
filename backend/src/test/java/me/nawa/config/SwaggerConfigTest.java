@@ -13,8 +13,11 @@ import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.ErrorCode;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
+import me.nawa.wallet.dto.request.TransactionSearchCondition;
 import me.nawa.wallet.dto.response.TopupMethodsResponse;
 import me.nawa.wallet.dto.response.TopupPreviewResponse;
+import me.nawa.wallet.dto.response.TransactionDetailResponse;
+import me.nawa.wallet.dto.response.TransactionListResponse;
 import me.nawa.wallet.service.TopupService;
 import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
@@ -215,8 +218,16 @@ class SwaggerConfigTest {
 
         @Bean
         TransactionService transactionService() {
-            return (memberId, condition) -> {
-                throw new UnsupportedOperationException();
+            return new TransactionService() {
+                @Override
+                public TransactionListResponse getTransactions(Long memberId, TransactionSearchCondition condition) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public TransactionDetailResponse getTransactionDetail(Long memberId, Long transferId) {
+                    throw new UnsupportedOperationException();
+                }
             };
         }
     }

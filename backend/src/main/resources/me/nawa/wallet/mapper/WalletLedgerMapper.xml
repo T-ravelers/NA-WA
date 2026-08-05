@@ -55,4 +55,26 @@
         LIMIT #{limit}
     </select>
 
+    <select id="findByTransferIdAndWalletId" resultType="me.nawa.wallet.domain.WalletLedgerEntry">
+        SELECT e.ledger_entry_id, e.transfer_id, t.transfer_type, e.entry_type,
+               e.amount, e.balance_after, t.memo, e.created_at
+        FROM wallet_ledger_entries e
+                 JOIN wallet_transfers t ON t.transfer_id = e.transfer_id
+        WHERE e.transfer_id = #{transferId}
+          AND e.wallet_id = #{walletId}
+          AND e.deleted_at IS NULL
+    </select>
+
+    <select id="findCounterpartyByTransferId" resultType="me.nawa.wallet.domain.TransactionCounterparty">
+        SELECT wo.owner_type, m.display_name, wo.system_code
+        FROM wallet_ledger_entries e
+        JOIN wallets w ON w.wallet_id = e.wallet_id
+        JOIN wallet_owners wo ON wo.wallet_owner_id = w.wallet_owner_id
+        LEFT JOIN members m ON m.member_id = wo.member_id
+        WHERE e.transfer_id = #{transferId}
+            AND e.wallet_id != #{walletId}
+            AND e.deleted_at IS NULL
+        LIMIT 1
+    </select>
+
 </mapper>
