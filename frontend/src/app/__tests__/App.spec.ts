@@ -13,6 +13,6 @@ describe('App', () => {
     })
 
     expect(wrapper.get('h1').text()).toBe('NA-WA')
-    expect(wrapper.text()).toContain('함께 만드는 여행의 시작')
+    expect(wrapper.text()).toContain('Plan, travel and settle up together')
   })
 })

@@ -5,5 +5,5 @@ test('renders the NA-WA app shell', async ({ page }) => {
 
   await expect(page).toHaveTitle('NA-WA')
   await expect(page.getByRole('heading', { name: 'NA-WA' })).toBeVisible()
-  await expect(page.getByText('함께 만드는 여행의 시작')).toBeVisible()
+  await expect(page.getByText('Plan, travel and settle up together')).toBeVisible()
 })
