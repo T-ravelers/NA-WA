@@ -39,9 +39,31 @@ features/journey/
 ├── api/          요청 함수와 DTO
 ├── components/   journey 전용 컴포넌트
 ├── composables/  journey 전용 조합 로직
+├── i18n/         locale별 문구 (en.ts, ja.ts, …)
 ├── model/        Query Key, 상태와 도메인 타입
-└── schemas/      입력 검증 스키마
+├── schemas/      입력 검증 스키마
+├── views/        route가 가리키는 화면 컴포넌트
+└── routes.ts     이 feature의 route 정의
 ```
+
+### 도메인별 소유 폴더
+
+여러 명이 동시에 작업하므로 담당 경계를 폴더로 나눕니다. 담당이 아닌 feature 폴더를
+수정하지 않습니다.
+
+| 폴더                   | 소유                            |
+| ---------------------- | ------------------------------- |
+| `features/auth/`       | 인증·온보딩 담당                |
+| `features/explore/`    | 탐색 담당                       |
+| `features/journey/`    | 여정 담당                       |
+| `features/wallet/`     | 지갑 담당                       |
+| `features/settlement/` | 정산 담당                       |
+| `features/report/`     | 리포트 담당                     |
+| `app/`, `shared/`      | 공통. 변경 전 합의가 필요합니다 |
+
+`routes.ts`, `i18n/`, 디자인 토큰은 각각 자동 수집되거나 단일 파일로 고정되어 있어
+feature를 추가할 때 공용 파일을 수정할 일이 없습니다. 공용 파일을 고쳐야 한다면 먼저
+그 방법이 맞는지 확인하세요.
 
 ## 파일과 이름 정하기
 
@@ -148,42 +170,97 @@ export const journeyKeys = {
 - 인증 토큰을 `localStorage` 또는 `sessionStorage`에 저장하지 않습니다.
 - 서버 오류는 화면에서 사용하기 전에 공통 오류 모델로 정규화합니다.
 
-현재 공통 오류 정규화와 인증 인터셉터는 구현 전입니다. feature마다 임시 오류 형식을
-추가하지 마세요.
+공통 인터셉터가 다음을 처리하므로 feature에서 다시 구현하지 않습니다.
+
+- `ApiResponse<T>` 봉투를 벗깁니다. 요청 함수는 `response.data`에서 바로 `data`를
+  받습니다. `success` 여부를 직접 확인하지 않습니다.
+- 모든 실패를 `NormalizedApiError`로 통일합니다. `code`, `status`, `messageKey`를
+  가지며 화면은 `messageKey`로 문구를 만듭니다.
+- 변경 요청에 CSRF 헤더를 붙입니다.
+- 401을 받으면 갱신을 1회 시도하고 원 요청을 재시도합니다. 동시에 여러 요청이 401을
+  받아도 갱신은 한 번만 실행합니다. feature에서 별도로 재시도 로직을 만들면 백엔드의
+  refresh token 재사용 감지에 걸리므로 만들지 마세요.
+
+세션이 완전히 끊겼을 때의 화면 이동은 `src/main.ts`가 `setSessionExpiredHandler`로
+주입합니다. `shared`는 router와 feature를 import하지 않습니다.
 
 Axios 인스턴스가 `withCredentials: true`를 사용하므로 서버 CORS는 실제 프론트엔드
 Origin과 credentials를 함께 허용해야 합니다.
 
 ## Router 구성하기
 
-- route는 `src/app/router`에서 정의합니다.
+route는 feature마다 `features/<domain>/routes.ts`에서 정의하고
+`RouteRecordRaw[]`를 default export합니다. `src/app/router/index.ts`가 이를 자동으로
+수집하므로 **화면을 추가할 때 라우터 공용 파일을 수정하지 않습니다.**
+
+```ts
+// features/journey/routes.ts
+import type { RouteRecordRaw } from 'vue-router'
+
+const routes: RouteRecordRaw[] = [
+  {
+    path: '/journeys',
+    name: 'journey-list',
+    component: () => import('./views/JourneyListView.vue'),
+    meta: { requiresAuth: true },
+  },
+]
+
+export default routes
+```
+
 - 화면 route는 기본적으로 lazy import합니다.
-- route name은 상수 또는 타입이 있는 공개 API로 관리합니다.
-- 인증 route는 meta와 전역 guard를 사용하는 하나의 정책으로 처리합니다.
-- 앱 셸을 구현할 때 404 route와 오류 복구 동선을 포함합니다.
+- route name은 `<domain>-<screen>` 형식으로 feature 사이에 겹치지 않게 짓습니다.
+- 인증은 `meta.requiresAuth`와 `meta.guestOnly`를 읽는 전역 guard 하나로 처리합니다.
+  화면 컴포넌트에서 개별적으로 인증을 확인하지 않습니다.
+- 도메인에 속하지 않는 route와 404는 `app/router/appRoutes.ts`에 둡니다.
+- 여러 feature가 함께 참조하는 경로는 `shared/config/routePaths.ts`에 상수로 둡니다.
+  `/auth/callback`은 백엔드 `AUTH_FRONTEND_SUCCESS_URL`과 일치해야 하므로 백엔드 설정을
+  함께 바꾸지 않고 변경하지 않습니다.
 - 새로고침하거나 공유해도 유지할 필터와 탭은 query param으로 표현합니다.
 
 ## 다국어 문구 작성하기
 
-- 사용자에게 보이는 문자열은 Vue I18n message key로 관리합니다.
-- 기본 locale과 fallback locale은 `ko`입니다.
-- key에는 문장 자체가 아니라 의미와 화면 계층을 담습니다.
+NA-WA는 방한 외국인을 대상으로 하므로 **한국어는 서비스 locale이 아닙니다.**
+지원 locale은 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이고 기본 locale과 fallback locale은
+모두 `en`입니다. 문구는 `en`을 원본으로 작성하고, 번역되지 않은 key는 `en`으로
+폴백하므로 화면에 raw key가 노출되지 않습니다.
 
-```text
-journey.detail.joinButton
-settlement.summary.totalAmount
-common.error.retry
+문구 파일은 `shared/i18n/<locale>.ts`와 `features/<domain>/i18n/<locale>.ts`에 두면
+자동으로 수집됩니다. **문구를 추가할 때 공용 파일을 수정하지 않습니다.**
+
+```ts
+// features/journey/i18n/en.ts
+export default {
+  journey: {
+    detail: { joinButton: 'Join this journey' },
+  },
+}
 ```
 
+- 파일 하나는 자기 feature 이름을 최상위 네임스페이스로 갖습니다. 다른 feature와
+  겹치지 않게 합니다.
+- key에는 문장 자체가 아니라 의미와 화면 계층을 담습니다.
 - 날짜, 숫자와 통화는 locale 기반 formatter를 사용합니다.
-- 서버 오류 메시지를 그대로 노출하지 않습니다.
-- 오류 코드에 대응하는 번역 문구를 사용합니다.
+- 서버 오류 메시지를 그대로 노출하지 않습니다. `NormalizedApiError.messageKey`가
+  가리키는 번역 문구를 사용합니다.
+- 오류 코드 문구는 `<domain>.errorCode.<CODE>`에 둡니다. `AUTH-001`은
+  `auth.errorCode.AUTH-001`로 해석됩니다. 대응 문구가 없으면 `error.unknown`으로
+  폴백합니다.
 
 ## 스타일과 접근성 확인하기
 
 - Tailwind utility를 기본으로 사용합니다.
-- 반복되는 의미 값은 디자인 토큰으로 승격합니다.
+- 색, 라운드, 간격, 그림자, 타이포 스케일은 `src/app/styles/tokens.css`에 정의된
+  토큰만 사용합니다. **컴포넌트에 HEX 색상을 직접 쓰지 않습니다.**
+- 디자인 시안이 바뀌면 `tokens.css`의 값만 교체하고 컴포넌트는 수정하지 않습니다.
+  이 구조를 유지하려면 토큰을 우회하는 임의 색상이 없어야 합니다.
+- `src/app/styles/index.css`는 Tailwind import, `@font-face`, 최소한의 base 레이어만
+  담습니다. 화면별 스타일을 여기에 추가하지 않습니다.
 - 화면마다 임의 색상과 z-index를 추가하지 않습니다.
+- 폰트는 `public/fonts`의 woff2를 `@font-face`로 등록합니다. CJK 폰트는 원본이 크므로
+  서브셋한 뒤 locale별로 필요한 것만 불러옵니다. 자세한 내용은
+  `public/fonts/README.md`를 보세요.
 - 모바일 viewport에서는 `dvh`와 safe-area를 고려합니다.
 - 터치 대상을 충분한 크기로 만들고 hover에만 의존하지 않습니다.
 - icon-only button에 접근 가능한 이름을 제공합니다.
@@ -196,6 +273,9 @@ common.error.retry
 - 서비스 워커는 앱 셸과 정적 자원만 사전 캐시합니다.
 - 인증, 개인정보, 비용·정산, mutation 응답과 지도 타일을 runtime cache에 넣지
   않습니다.
+- **폰트를 precache에 넣지 않습니다.** `vite.config.ts`의 `workbox.globPatterns`가
+  `js`, `css`, `html`만 포함하므로 woff2는 사전 캐시되지 않습니다. CJK 폰트까지
+  포함하면 사전 캐시가 수십 MB로 커지므로 이 패턴을 넓히지 않습니다.
 - 오프라인 읽기 기능을 추가하기 전에 데이터 종류, 만료 시간과 로그아웃 시 제거
   방법을 정합니다.
 - 서비스 워커를 변경하면 새 버전 업데이트와 기존 캐시 제거 동작을 확인합니다.
