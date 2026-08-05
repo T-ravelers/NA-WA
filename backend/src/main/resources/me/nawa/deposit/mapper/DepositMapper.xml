@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.deposit.mapper.DepositMapper">
+
+    <resultMap id="depositResultMap"
+               type="me.nawa.deposit.domain.Deposit">
+        <id column="deposit_id"
+            property="depositId"/>
+        <result column="appointment_member_id"
+                property="appointmentMemberId"/>
+        <result column="held_transfer_id"
+                property="heldTransferId"/>
+        <result column="amount"
+                property="amount"/>
+        <result column="deposit_status"
+                property="depositStatus"/>
+        <result column="held_at"
+                property="heldAt"/>
+        <result column="resolved_at"
+                property="resolvedAt"/>
+        <result column="created_at"
+                property="createdAt"/>
+        <result column="updated_at"
+                property="updatedAt"/>
+        <result column="deleted_at"
+                property="deletedAt"/>
+    </resultMap>
+
+    <sql id="depositColumns">
+        deposit_id,
+        appointment_member_id,
+        held_transfer_id,
+        amount,
+        deposit_status,
+        held_at,
+        resolved_at,
+        created_at,
+        updated_at,
+        deleted_at
+    </sql>
+
+    <select id="findById"
+            resultMap="depositResultMap">
+        SELECT
+        <include refid="depositColumns"/>
+        FROM deposits
+        WHERE deposit_id = #{depositId}
+        AND deleted_at IS NULL
+    </select>
+
+    <select id="findByIdForUpdate"
+            resultMap="depositResultMap">
+        SELECT
+        <include refid="depositColumns"/>
+        FROM deposits
+        WHERE deposit_id = #{depositId}
+        AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="findByAppointmentMemberId"
+            resultMap="depositResultMap">
+        SELECT
+        <include refid="depositColumns"/>
+        FROM deposits
+        WHERE appointment_member_id = #{appointmentMemberId}
+        AND deleted_at IS NULL
+        LIMIT 1
+    </select>
+
+    <insert id="insert"
+            parameterType="me.nawa.deposit.domain.Deposit"
+            useGeneratedKeys="true"
+            keyProperty="depositId"
+            keyColumn="deposit_id">
+        INSERT INTO deposits (appointment_member_id,
+                              held_transfer_id,
+                              amount,
+                              deposit_status,
+                              held_at,
+                              resolved_at)
+        VALUES (#{appointmentMemberId},
+                #{heldTransferId},
+                #{amount},
+                #{depositStatus},
+                #{heldAt},
+                #{resolvedAt})
+    </insert>
+
+    <update id="markHeld">
+        UPDATE deposits
+        SET held_transfer_id = #{transferId},
+            held_at          = #{heldAt},
+            deposit_status   = 'HELD',
+            updated_at       = CURRENT_TIMESTAMP
+        WHERE deposit_id = #{depositId}
+          AND deposit_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markCancelled">
+        UPDATE deposits
+        SET held_transfer_id = NULL,
+            held_at          = NULL,
+            resolved_at      = #{resolvedAt},
+            deposit_status   = 'CANCELLED',
+            updated_at       = CURRENT_TIMESTAMP
+        WHERE deposit_id = #{depositId}
+          AND deposit_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markRefunded">
+        UPDATE deposits
+        SET resolved_at    = #{resolvedAt},
+            deposit_status = 'REFUNDED',
+            updated_at     = CURRENT_TIMESTAMP
+        WHERE deposit_id = #{depositId}
+          AND deposit_status = 'HELD'
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markDistributed">
+        UPDATE deposits
+        SET resolved_at    = #{resolvedAt},
+            deposit_status = 'DISTRIBUTED',
+            updated_at     = CURRENT_TIMESTAMP
+        WHERE deposit_id = #{depositId}
+          AND deposit_status = 'HELD'
+          AND deleted_at IS NULL
+    </update>
+
+</mapper>
