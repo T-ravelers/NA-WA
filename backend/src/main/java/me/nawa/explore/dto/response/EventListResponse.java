@@ -1,4 +1,4 @@
-package me.nawa.explore.dto;
+package me.nawa.explore.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

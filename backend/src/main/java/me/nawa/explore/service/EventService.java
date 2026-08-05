@@ -3,9 +3,12 @@ package me.nawa.explore.service;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
-import me.nawa.explore.dto.EventListResponse;
-import me.nawa.explore.dto.EventSearchRequest;
-import me.nawa.explore.dto.EventSummaryResponse;
+import me.nawa.explore.dto.request.EventSearchRequest;
+import me.nawa.explore.dto.response.EventActivityResponse;
+import me.nawa.explore.dto.response.EventDetailResponse;
+import me.nawa.explore.dto.response.EventListResponse;
+import me.nawa.explore.dto.response.EventSummaryResponse;
+import me.nawa.explore.exception.ExploreErrorCode;
 import me.nawa.explore.mapper.EventMapper;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -82,5 +85,34 @@ public class EventService {
             return 0;
         }
         return (int) ((totalElements + size - 1) / size);
+    }
+
+    @Transactional(readOnly = true)
+    public EventDetailResponse getEventDetail(Long eventId, String language) {
+        if (eventId == null || eventId <= 0) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
+        String normalizedLanguage = StringUtils.hasText(language)
+            ? language.toLowerCase(Locale.ROOT)
+            // TODO(국제화 후속 이슈): 크롤링 원본 국제화 전까지 ko를 임시 fallback으로 사용한다.
+            : "ko";
+
+        EventDetailResponse event = eventMapper.findEventDetail(
+            eventId,
+            normalizedLanguage
+        );
+
+        if (event == null) {
+            throw new BusinessException(ExploreErrorCode.EVENT_NOT_FOUND);
+        }
+
+        List<EventActivityResponse> activities = eventMapper.findEventActivities(
+            eventId,
+            normalizedLanguage
+        );
+
+        event.setActivities(activities == null ? List.of() : activities);
+        return event;
     }
 }
