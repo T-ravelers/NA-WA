@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
  * 보증금 정산 배치 도메인
  *
  * 하나의 약속에 대한 보증금 정산을 묶어 관리하고,
- * 정산 상태 전이와 정산 금액의 합게 규칙을 검증합니다.
+ * 정산 상태 전이와 정산 금액의 합계 규칙을 검증합니다.
  */
 @Getter
 @NoArgsConstructor
