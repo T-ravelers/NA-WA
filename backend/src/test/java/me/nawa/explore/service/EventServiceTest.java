@@ -10,10 +10,11 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.explore.dto.request.EventSearchRequest;
 import me.nawa.explore.dto.response.EventDetailResponse;
 import me.nawa.explore.dto.response.EventListResponse;
-import me.nawa.explore.dto.request.EventSearchRequest;
 import me.nawa.explore.dto.response.EventSummaryResponse;
+import me.nawa.explore.exception.ExploreErrorCode;
 import me.nawa.explore.mapper.EventMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -141,5 +142,43 @@ class EventServiceTest {
             () -> eventService.getEventDetail(0L, "ko")
         );
         verifyNoInteractions(eventMapper);
+    }
+
+    @Test
+    void getEventDetail_throwsEventNotFound_whenMapperReturnsNull() {
+        when(eventMapper.findEventDetail(990001L, "ko"))
+            .thenReturn(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> eventService.getEventDetail(990001L, "ko")
+        );
+
+        assertEquals(
+            ExploreErrorCode.EVENT_NOT_FOUND,
+            exception.getErrorCode()
+        );
+        verify(eventMapper).findEventDetail(990001L, "ko");
+    }
+
+    @Test
+    void getEventDetail_normalizesNullActivitiesToEmptyList() {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .title("서울 야시장 푸드 팝업(테스트)")
+            .build();
+
+        when(eventMapper.findEventDetail(990001L, "ko"))
+            .thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ko"))
+            .thenReturn(null);
+
+        EventDetailResponse result = eventService.getEventDetail(
+            990001L,
+            "ko"
+        );
+
+        assertEquals(List.of(), result.getActivities());
+        verify(eventMapper).findEventActivities(990001L, "ko");
     }
 }

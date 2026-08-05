@@ -3,15 +3,15 @@ package me.nawa.explore.service;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
-import me.nawa.explore.dto.response.EventListResponse;
 import me.nawa.explore.dto.request.EventSearchRequest;
+import me.nawa.explore.dto.response.EventActivityResponse;
+import me.nawa.explore.dto.response.EventDetailResponse;
+import me.nawa.explore.dto.response.EventListResponse;
 import me.nawa.explore.dto.response.EventSummaryResponse;
+import me.nawa.explore.exception.ExploreErrorCode;
 import me.nawa.explore.mapper.EventMapper;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import me.nawa.explore.dto.response.EventActivityResponse;
-import me.nawa.explore.dto.response.EventDetailResponse;
-import me.nawa.explore.exception.ExploreErrorCode;
 
 import java.util.List;
 import java.util.Locale;
@@ -111,37 +111,7 @@ public class EventService {
             normalizedLanguage
         );
 
-        return EventDetailResponse.builder()
-            .eventId(event.getEventId())
-            .eventType(event.getEventType())
-            .title(event.getTitle())
-            .subtitle(event.getSubtitle())
-            .description(event.getDescription())
-            .programText(event.getProgramText())
-            .thumbnailUrl(event.getThumbnailUrl())
-            .status(event.getStatus())
-            .isPermanent(event.getIsPermanent())
-            .startDate(event.getStartDate())
-            .endDate(event.getEndDate())
-            .operatingHours(event.getOperatingHours())
-            .openDays(event.getOpenDays())
-            .openWeekend(event.getOpenWeekend())
-            .opensLate(event.getOpensLate())
-            .venueName(event.getVenueName())
-            .region1(event.getRegion1())
-            .region2(event.getRegion2())
-            .region3(event.getRegion3())
-            .addressRoad(event.getAddressRoad())
-            .latitude(event.getLatitude())
-            .longitude(event.getLongitude())
-            .hasPhotoZone(event.getHasPhotoZone())
-            .isExperience(event.getIsExperience())
-            .ageLimit(event.getAgeLimit())
-            .isFree(event.getIsFree())
-            .priceText(event.getPriceText())
-            .hasBenefit(event.getHasBenefit())
-            .reservable(event.getReservable())
-            .activities(activities == null ? List.of() : activities)
-            .build();
+        event.setActivities(activities == null ? List.of() : activities);
+        return event;
     }
 }
