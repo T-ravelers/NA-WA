@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.explore.dto.EventListResponse;
@@ -53,9 +54,10 @@ class EventControllerTest {
             "명동",
             null,
             null,
-            null,
-            null
+            LocalDate.of(2026, 8, 5),
+            LocalDate.of(2026, 8, 31)
         );
+
         EventListResponse response = new EventListResponse(
             List.of(event), 0, 20, 1L, 1, false
         );
@@ -75,6 +77,14 @@ class EventControllerTest {
         assertEquals(
             990001L,
             body.path("data").path("content").get(0).path("itemId").asLong()
+        );
+        assertEquals(
+            "2026-08-05",
+            body.path("data").path("content").get(0).path("startDate").asText()
+        );
+        assertEquals(
+            "2026-08-31",
+            body.path("data").path("content").get(0).path("endDate").asText()
         );
         assertEquals(1L, body.path("data").path("totalElements").asLong());
     }
