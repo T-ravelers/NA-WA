@@ -87,6 +87,23 @@ class DepositPayoutTest {
     }
 
     @Test
+    void cancellationRefund_throwsExceptionWhenAttendanceSnapshotsDiffer() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> DepositPayout.cancellationRefund(
+                10L,
+                20L,
+                20L,
+                30L,
+                40L,
+                AttendanceStatus.PENDING,
+                AttendanceStatus.ATTENDED,
+                BigDecimal.valueOf(10_000)
+            )
+        );
+    }
+
+    @Test
     void selfRefund_throwsExceptionWhenMembersAreDifferent() {
         assertThrows(
             IllegalArgumentException.class,

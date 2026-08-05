@@ -51,7 +51,6 @@ class DepositPayoutBatchTest {
             BigDecimal.valueOf(10_000),
             BigDecimal.valueOf(10_000),
             BigDecimal.valueOf(10_000),
-            BigDecimal.ZERO,
             99L,
             RESOLVED_AT
         );
@@ -98,7 +97,23 @@ class DepositPayoutBatchTest {
                 BigDecimal.valueOf(9_000),
                 BigDecimal.valueOf(10_000),
                 BigDecimal.valueOf(10_000),
-                BigDecimal.ZERO,
+                null,
+                RESOLVED_AT
+            )
+        );
+    }
+
+    @Test
+    void complete_throwsExceptionWhenDistributedAmountDoesNotMatchNoShowAmount() {
+        DepositPayoutBatch batch = pendingBatch();
+        batch.startProcessing();
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> batch.complete(
+                BigDecimal.valueOf(10_000),
+                BigDecimal.valueOf(10_000),
+                BigDecimal.valueOf(9_000),
                 null,
                 RESOLVED_AT
             )
@@ -113,7 +128,6 @@ class DepositPayoutBatchTest {
             IllegalStateException.class,
             () -> batch.complete(
                 BigDecimal.valueOf(20_000),
-                BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 null,
@@ -139,7 +153,6 @@ class DepositPayoutBatchTest {
                 BigDecimal.valueOf(10_000),
                 BigDecimal.valueOf(10_000),
                 BigDecimal.valueOf(10_000),
-                BigDecimal.ZERO,
                 null,
                 RESOLVED_AT
             )

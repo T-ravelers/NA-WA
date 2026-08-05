@@ -76,6 +76,7 @@ public class DepositPayout {
             );
         this.amount = validateAmount(amount);
 
+        validateCancellationRefundAttendanceSnapshots();
         validateAllocationRule(
             sourceAppointmentMemberId,
             recipientAppointmentMemberId
@@ -140,7 +141,7 @@ public class DepositPayout {
      * 약속 취소 보증금 환급
      *
      * 약속이 취소된 경우 원천 회원에게 보증금을 환급합니다.
-     * 출석 상태는 당시 스냅샷을 보관하며 별도로 제한하지 않습니다.
+     * 출석 상태는 당시 스냅샷을 보관하며 두 스냅샷은 동일해야 합니다.
      */
     public static DepositPayout cancellationRefund(
         Long sourceDepositId,
@@ -190,6 +191,22 @@ public class DepositPayout {
      */
     public boolean isCancellationRefund() {
         return allocationType == AllocationType.CANCELLATION_REFUND;
+    }
+
+    /**
+     * 약속 취소 환급 출석 상태 스냅샷 검증
+     *
+     * 약속 취소 환급의 원천 출석 상태와 수취 출석 상태 스냅샷이
+     * 동일한지 확인합니다.
+     */
+    private void validateCancellationRefundAttendanceSnapshots() {
+        if (allocationType == AllocationType.CANCELLATION_REFUND
+            && sourceAttendanceStatusSnapshot
+            != recipientAttendanceStatusSnapshot) {
+            throw new IllegalArgumentException(
+                "약속 취소 환급의 출석 상태 스냅샷은 동일해야 합니다."
+            );
+        }
     }
 
     /**

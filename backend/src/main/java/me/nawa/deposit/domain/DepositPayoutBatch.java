@@ -50,7 +50,6 @@ public class DepositPayoutBatch {
     private BigDecimal totalRefundedAmount;
     private BigDecimal totalNoShowAmount;
     private BigDecimal totalNoShowDistributedAmount;
-    private BigDecimal totalEscrowRetainedAmount;
 
     private LocalDateTime attendanceSnapshotAt;
     private String idempotencyKey;
@@ -94,7 +93,6 @@ public class DepositPayoutBatch {
         this.totalRefundedAmount = ZERO;
         this.totalNoShowAmount = ZERO;
         this.totalNoShowDistributedAmount = ZERO;
-        this.totalEscrowRetainedAmount = ZERO;
     }
 
     /**
@@ -133,13 +131,12 @@ public class DepositPayoutBatch {
      *
      * 정산 처리 중인 배치를 완료 상태로 변경하고 처리 결과를 기록합니다.
      * 총 환급 금액과 총 노쇼 금액의 합은 총 예치 금액과 같아야 하며,
-     * 총 노쇼 분배 금액과 에스크로 보유 금액의 합은 총 노쇼 금액과 같아야 합니다.
+     * 총 노쇼 분배 금액은 총 노쇼 금액과 같아야 합니다.
      */
     public void complete(
         BigDecimal totalRefundedAmount,
         BigDecimal totalNoShowAmount,
         BigDecimal totalNoShowDistributedAmount,
-        BigDecimal totalEscrowRetainedAmount,
         Long resolvedByMemberId,
         LocalDateTime resolvedAt
     ) {
@@ -157,16 +154,11 @@ public class DepositPayoutBatch {
             totalNoShowDistributedAmount,
             "총 노쇼 분배 금액"
         );
-        BigDecimal retained = validateAmount(
-            totalEscrowRetainedAmount,
-            "총 에스크로 보유 금액"
-        );
 
         validateCompletedTotals(
             refunded,
             noShow,
-            distributed,
-            retained
+            distributed
         );
 
         if (resolvedByMemberId != null && resolvedByMemberId <= 0) {
@@ -184,7 +176,6 @@ public class DepositPayoutBatch {
         this.totalRefundedAmount = refunded;
         this.totalNoShowAmount = noShow;
         this.totalNoShowDistributedAmount = distributed;
-        this.totalEscrowRetainedAmount = retained;
         this.resolvedByMemberId = resolvedByMemberId;
         this.resolvedAt = resolvedAt;
         this.resolutionStatus = ResolutionStatus.COMPLETED;
@@ -245,8 +236,7 @@ public class DepositPayoutBatch {
     private void validateCompletedTotals(
         BigDecimal refunded,
         BigDecimal noShow,
-        BigDecimal distributed,
-        BigDecimal retained
+        BigDecimal distributed
     ) {
         if (refunded.add(noShow).compareTo(totalHeldAmount) != 0) {
             throw new IllegalArgumentException(
@@ -254,18 +244,17 @@ public class DepositPayoutBatch {
             );
         }
 
-        if (distributed.add(retained).compareTo(noShow) != 0) {
+        if (distributed.compareTo(noShow) != 0) {
             throw new IllegalArgumentException(
-                "총 노쇼 분배 금액과 에스크로 보유 금액의 합은 총 노쇼 금액과 같아야 합니다."
+                "총 노쇼 분배 금액은 총 노쇼 금액과 같아야 합니다."
             );
         }
 
         if (resolutionReason == ResolutionReason.APPOINTMENT_CANCELLED
             && (noShow.signum() != 0
-            || distributed.signum() != 0
-            || retained.signum() != 0)) {
+            || distributed.signum() != 0)) {
             throw new IllegalArgumentException(
-                "약속 취소 정산에는 노쇼 금액, 분배 금액 또는 에스크로 보유 금액이 포함될 수 없습니다."
+                "약속 취소 정산에는 노쇼 금액 또는 노쇼 분배 금액이 포함될 수 없습니다."
             );
         }
     }
