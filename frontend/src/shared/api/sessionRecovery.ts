@@ -4,8 +4,26 @@ import { clearCsrfToken } from './csrf'
 
 const REFRESH_ENDPOINT = '/api/v1/auth/refresh'
 
-/** 갱신을 시도하지 않는 경로. 갱신 자체와 세션 조회는 재시도 대상이 아니다. */
-const NON_RECOVERABLE_PATHS = [REFRESH_ENDPOINT, '/api/v1/auth/logout', '/api/v1/auth/me']
+/**
+ * 갱신을 시도하지 않는 경로.
+ *
+ * 갱신 자체와 로그아웃만 제외한다. 세션 조회(`/auth/me`)는 제외하지 않는다. access token
+ * TTL이 15분이라 만료 직후 `/auth/me`가 401을 받는 것이 가장 흔한 갱신 시점이고, 여기서
+ * 갱신하지 않으면 유효한 refresh 쿠키가 있어도 사용자가 로그인 화면으로 밀려난다.
+ */
+const NON_RECOVERABLE_PATHS = [REFRESH_ENDPOINT, '/api/v1/auth/logout']
+
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /**
+     * 갱신에 실패해도 세션 만료 처리를 실행하지 않는다.
+     *
+     * 라우터 guard의 세션 확인처럼 화면 이동을 호출자가 직접 결정하는 요청에 쓴다.
+     * 갱신 시도와 재시도는 그대로 수행한다.
+     */
+    suppressSessionExpiredRedirect?: boolean
+  }
+}
 
 type RetriableConfig = InternalAxiosRequestConfig & { __sessionRetried?: boolean }
 
@@ -71,6 +89,7 @@ export function resetSessionRecovery(): void {
  * 401을 받은 요청을 갱신 후 재시도한다.
  *
  * 갱신에 실패하면 세션 만료 처리를 실행하고 원래 오류를 그대로 올려보낸다.
+ * 다만 `suppressSessionExpiredRedirect`가 켜진 요청은 만료 처리를 호출자에게 맡긴다.
  * 재시도 대상이 아니면 `null`을 돌려준다.
  */
 export async function recoverAndRetry(
@@ -85,7 +104,10 @@ export async function recoverAndRetry(
 
   if (!refreshed) {
     clearCsrfToken()
-    onSessionExpired()
+
+    if (config.suppressSessionExpiredRedirect !== true) {
+      onSessionExpired()
+    }
 
     return null
   }
