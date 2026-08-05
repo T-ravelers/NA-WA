@@ -188,6 +188,53 @@ describe('httpClient', () => {
     expect(onExpired).toHaveBeenCalledTimes(1)
   })
 
+  // 회귀: /auth/me가 복구 대상에서 빠져 있으면 access token 만료마다 로그아웃된다.
+  it('refreshes and retries the session probe when it returns 401', async () => {
+    const { httpClient, calls } = await loadClient({
+      'get /api/v1/auth/me': [
+        { status: 401, body: authRequired },
+        { status: 200, body: { success: true, data: { memberId: 1 } } },
+      ],
+      'post /api/v1/auth/refresh': [{ status: 200, body: { success: true } }],
+    })
+
+    const response = await httpClient.get('/api/v1/auth/me')
+
+    expect(response.data).toEqual({ memberId: 1 })
+    expect(countCalls(calls, 'post', '/api/v1/auth/refresh')).toBe(1)
+    expect(countCalls(calls, 'get', '/api/v1/auth/me')).toBe(2)
+  })
+
+  it('leaves the redirect to the caller when the request suppresses it', async () => {
+    const { httpClient, sessionRecovery } = await loadClient({
+      'get /api/v1/auth/me': [{ status: 401, body: authRequired }],
+      'post /api/v1/auth/refresh': [{ status: 401 }],
+    })
+    const onExpired = vi.fn()
+
+    sessionRecovery.setSessionExpiredHandler(onExpired)
+
+    await expect(
+      httpClient.get('/api/v1/auth/me', { suppressSessionExpiredRedirect: true }),
+    ).rejects.toMatchObject({ code: 'AUTH-003' })
+
+    // 갱신은 시도하되 화면 이동은 라우터 guard가 결정한다.
+    expect(onExpired).not.toHaveBeenCalled()
+  })
+
+  it('still runs the redirect for requests that do not suppress it', async () => {
+    const { httpClient, sessionRecovery } = await loadClient({
+      'get /api/v1/auth/me': [{ status: 401, body: authRequired }],
+      'post /api/v1/auth/refresh': [{ status: 401 }],
+    })
+    const onExpired = vi.fn()
+
+    sessionRecovery.setSessionExpiredHandler(onExpired)
+
+    await expect(httpClient.get('/api/v1/auth/me')).rejects.toMatchObject({ code: 'AUTH-003' })
+    expect(onExpired).toHaveBeenCalledTimes(1)
+  })
+
   it('does not try to recover the refresh endpoint itself', async () => {
     const { httpClient, calls } = await loadClient({
       'post /api/v1/auth/refresh': [{ status: 401 }],

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { consumeReturnPath, storeReturnPath } from '../returnPath'
+import { consumeReturnPath, peekReturnPath, storeReturnPath } from '../returnPath'
 
 describe('returnPath', () => {
   beforeEach(() => {
@@ -42,6 +42,26 @@ describe('returnPath', () => {
     storeReturnPath(['/wallet'])
 
     expect(consumeReturnPath()).toBeNull()
+  })
+
+  // 회귀: 로그인 실패 후 재시도해도 원래 목적지가 남아 있어야 한다.
+  it('reads without consuming so a failed sign-in can be retried', () => {
+    storeReturnPath('/wallet')
+
+    expect(peekReturnPath()).toBe('/wallet')
+    expect(peekReturnPath()).toBe('/wallet')
+    expect(consumeReturnPath()).toBe('/wallet')
+  })
+
+  it('applies the same validation when peeking', () => {
+    storeReturnPath('/wallet')
+    sessionStorage.setItem('nawa.auth.returnPath', '//evil.example.com')
+
+    expect(peekReturnPath()).toBeNull()
+  })
+
+  it('returns null from peek when nothing is stored', () => {
+    expect(peekReturnPath()).toBeNull()
   })
 
   it('discards a stored value that is no longer valid', () => {
