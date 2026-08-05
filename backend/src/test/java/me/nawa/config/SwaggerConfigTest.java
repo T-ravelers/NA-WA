@@ -13,6 +13,7 @@ import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.ErrorCode;
 import me.nawa.wallet.service.WalletService;
+import me.nawa.explore.service.EventService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfig.class,
         SwaggerConfigTest.AuthTestConfig.class,
         SwaggerConfigTest.WalletTestConfig.class,
+        SwaggerConfigTest.ExploreTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -197,6 +199,15 @@ class SwaggerConfigTest {
 
         @Override
         public void revokeRefreshToken(String refreshToken) {
+        }
+    }
+
+    @Configuration
+    static class ExploreTestConfig {
+
+        @Bean
+        EventService eventService() {
+            return new EventService(null);
         }
     }
 

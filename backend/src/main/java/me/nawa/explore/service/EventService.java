@@ -1,0 +1,86 @@
+package me.nawa.explore.service;
+
+import lombok.RequiredArgsConstructor;
+import me.nawa.common.exception.BusinessException;
+import me.nawa.common.exception.CommonErrorCode;
+import me.nawa.explore.dto.EventListResponse;
+import me.nawa.explore.dto.EventSearchRequest;
+import me.nawa.explore.dto.EventSummaryResponse;
+import me.nawa.explore.mapper.EventMapper;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.util.List;
+import java.util.Locale;
+
+@org.springframework.stereotype.Service
+@RequiredArgsConstructor
+public class EventService {
+
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
+
+    private final EventMapper eventMapper;
+
+    @Transactional(readOnly = true)
+    public EventListResponse searchEvents(EventSearchRequest request) {
+        normalizeAndValidate(request);
+
+        long offsetLong = (long) request.getPage() * request.getSize();
+        if (offsetLong > Integer.MAX_VALUE) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
+        int offset = (int) offsetLong;
+        List<EventSummaryResponse> content = eventMapper.searchEvents(request, offset);
+        long totalElements = eventMapper.countEvents(request);
+        int totalPages = calculateTotalPages(totalElements, request.getSize());
+
+        return new EventListResponse(
+            content,
+            request.getPage(),
+            request.getSize(),
+            totalElements,
+            totalPages,
+            request.getPage() + 1 < totalPages
+        );
+    }
+
+    private void normalizeAndValidate(EventSearchRequest request) {
+        if (request == null) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
+        if (request.getPage() < 0) {
+            request.setPage(DEFAULT_PAGE);
+        }
+
+        if (request.getSize() <= 0) {
+            request.setSize(DEFAULT_SIZE);
+        }
+
+        if (request.getSize() > MAX_SIZE) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
+        String sort = StringUtils.hasText(request.getSort())
+            ? request.getSort().toUpperCase(Locale.ROOT)
+            : "LATEST";
+        if (!"LATEST".equals(sort) && !"POPULAR".equals(sort)) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        request.setSort(sort);
+
+        if (!StringUtils.hasText(request.getLanguage())) {
+            request.setLanguage("ko");
+        }
+    }
+
+    private int calculateTotalPages(long totalElements, int size) {
+        if (totalElements == 0) {
+            return 0;
+        }
+        return (int) ((totalElements + size - 1) / size);
+    }
+}
