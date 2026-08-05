@@ -1,1 +1,55 @@
 @import 'tailwindcss';
+@import './tokens.css';
+
+/**
+ * 폰트.
+ *
+ * 서브셋 범위는 Latin + Latin Extended + Vietnamese다. CJK 로케일(ja, zh-CN, zh-TW)
+ * 폰트는 원본 합계가 39MB라 서브셋 후 로케일별 동적 로드로 별도 추가한다.
+ *
+ * Service Worker precache는 vite.config.ts의 globPatterns가 js/css/html만 포함하므로
+ * woff2는 사전 캐시되지 않는다. 폰트를 precache에 넣지 않는다.
+ */
+@font-face {
+  font-family: 'Noto Sans';
+  src: url('/fonts/NotoSans.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sztos';
+  src: url('/fonts/Sztos-BoldCondensed.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sztos';
+  src: url('/fonts/Sztos-ExtraBoldCondensed.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-canvas);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    /* 금액과 날짜의 자릿수가 흔들리지 않게 한다. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+}

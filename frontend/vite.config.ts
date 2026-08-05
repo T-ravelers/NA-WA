@@ -18,13 +18,13 @@ export default defineConfig({
         id: '/',
         name: 'NA-WA',
         short_name: 'NA-WA',
-        description: '함께 만드는 여행의 시작',
-        lang: 'ko',
+        description: 'Plan, travel and settle up together',
+        lang: 'en',
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        background_color: '#F3F1EC',
-        theme_color: '#F3F1EC',
+        background_color: '#171717',
+        theme_color: '#171717',
         icons: [
           {
             src: '/pwa-192x192.png',
