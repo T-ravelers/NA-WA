@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.deposit.mapper.DepositPayoutBatchMapper">
+
+    <resultMap id="depositPayoutBatchResultMap"
+               type="me.nawa.deposit.domain.DepositPayoutBatch">
+        <id column="deposit_payout_batch_id"
+            property="depositPayoutBatchId"/>
+        <result column="appointment_id"
+                property="appointmentId"/>
+        <result column="resolved_by_member_id"
+                property="resolvedByMemberId"/>
+        <result column="resolution_reason"
+                property="resolutionReason"/>
+        <result column="resolution_status"
+                property="resolutionStatus"/>
+        <result column="total_held_amount"
+                property="totalHeldAmount"/>
+        <result column="total_refunded_amount"
+                property="totalRefundedAmount"/>
+        <result column="total_no_show_amount"
+                property="totalNoShowAmount"/>
+        <result column="total_no_show_distributed_amount"
+                property="totalNoShowDistributedAmount"/>
+        <result column="attendance_snapshot_at"
+                property="attendanceSnapshotAt"/>
+        <result column="idempotency_key"
+                property="idempotencyKey"/>
+        <result column="resolved_at"
+                property="resolvedAt"/>
+        <result column="created_at"
+                property="createdAt"/>
+        <result column="updated_at"
+                property="updatedAt"/>
+        <result column="deleted_at"
+                property="deletedAt"/>
+    </resultMap>
+
+    <sql id="depositPayoutBatchColumns">
+        deposit_payout_batch_id,
+        appointment_id,
+        resolved_by_member_id,
+        resolution_reason,
+        resolution_status,
+        total_held_amount,
+        total_refunded_amount,
+        total_no_show_amount,
+        total_no_show_distributed_amount,
+        attendance_snapshot_at,
+        idempotency_key,
+        resolved_at,
+        created_at,
+        updated_at,
+        deleted_at
+    </sql>
+
+    <select id="findById"
+            resultMap="depositPayoutBatchResultMap">
+        SELECT
+        <include refid="depositPayoutBatchColumns"/>
+        FROM deposit_payout_batches
+        WHERE deposit_payout_batch_id = #{depositPayoutBatchId}
+        AND deleted_at IS NULL
+    </select>
+
+    <select id="findByIdForUpdate"
+            resultMap="depositPayoutBatchResultMap">
+        SELECT
+        <include refid="depositPayoutBatchColumns"/>
+        FROM deposit_payout_batches
+        WHERE deposit_payout_batch_id = #{depositPayoutBatchId}
+        AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="findByAppointmentId"
+            resultMap="depositPayoutBatchResultMap">
+        SELECT
+        <include refid="depositPayoutBatchColumns"/>
+        FROM deposit_payout_batches
+        WHERE appointment_id = #{appointmentId}
+        AND deleted_at IS NULL
+        LIMIT 1
+    </select>
+
+    <select id="findByIdempotencyKey"
+            resultMap="depositPayoutBatchResultMap">
+        SELECT
+        <include refid="depositPayoutBatchColumns"/>
+        FROM deposit_payout_batches
+        WHERE idempotency_key = #{idempotencyKey}
+        AND deleted_at IS NULL
+        LIMIT 1
+    </select>
+
+    <insert id="insert"
+            parameterType="me.nawa.deposit.domain.DepositPayoutBatch"
+            useGeneratedKeys="true"
+            keyProperty="depositPayoutBatchId"
+            keyColumn="deposit_payout_batch_id">
+        INSERT INTO deposit_payout_batches (appointment_id,
+                                            resolved_by_member_id,
+                                            resolution_reason,
+                                            resolution_status,
+                                            total_held_amount,
+                                            total_refunded_amount,
+                                            total_no_show_amount,
+                                            total_no_show_distributed_amount,
+                                            attendance_snapshot_at,
+                                            idempotency_key)
+        VALUES (#{appointmentId},
+                #{resolvedByMemberId},
+                #{resolutionReason},
+                #{resolutionStatus},
+                #{totalHeldAmount},
+                #{totalRefundedAmount},
+                #{totalNoShowAmount},
+                #{totalNoShowDistributedAmount},
+                #{attendanceSnapshotAt},
+                #{idempotencyKey})
+    </insert>
+
+    <update id="markProcessing">
+        UPDATE deposit_payout_batches
+        SET resolution_status = 'PROCESSING',
+            updated_at        = CURRENT_TIMESTAMP
+        WHERE deposit_payout_batch_id = #{depositPayoutBatchId}
+          AND resolution_status IN ('PENDING', 'FAILED')
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markCompleted"
+            parameterType="me.nawa.deposit.domain.DepositPayoutBatch">
+        UPDATE deposit_payout_batches
+        SET resolved_by_member_id            = #{resolvedByMemberId},
+            total_refunded_amount            = #{totalRefundedAmount},
+            total_no_show_amount             = #{totalNoShowAmount},
+            total_no_show_distributed_amount =
+                #{totalNoShowDistributedAmount},
+            resolved_at                      = #{resolvedAt},
+            resolution_status                = 'COMPLETED',
+            updated_at                       = CURRENT_TIMESTAMP
+        WHERE deposit_payout_batch_id = #{depositPayoutBatchId}
+          AND resolution_status = 'PROCESSING'
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markFailed">
+        UPDATE deposit_payout_batches
+        SET resolution_status = 'FAILED',
+            updated_at        = CURRENT_TIMESTAMP
+        WHERE deposit_payout_batch_id = #{depositPayoutBatchId}
+          AND resolution_status = 'PROCESSING'
+          AND deleted_at IS NULL
+    </update>
+
+</mapper>

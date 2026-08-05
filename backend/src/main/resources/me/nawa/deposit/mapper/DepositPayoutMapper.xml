@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.deposit.mapper.DepositPayoutMapper">
+
+    <resultMap id="depositPayoutResultMap"
+               type="me.nawa.deposit.domain.DepositPayout">
+        <id column="deposit_payout_id"
+            property="depositPayoutId"/>
+        <result column="source_deposit_id"
+                property="sourceDepositId"/>
+        <result column="recipient_appointment_member_id"
+                property="recipientAppointmentMemberId"/>
+        <result column="transfer_id"
+                property="transferId"/>
+        <result column="deposit_payout_batch_id"
+                property="depositPayoutBatchId"/>
+        <result column="allocation_type"
+                property="allocationType"/>
+        <result column="source_attendance_status_snapshot"
+                property="sourceAttendanceStatusSnapshot"/>
+        <result column="recipient_attendance_status_snapshot"
+                property="recipientAttendanceStatusSnapshot"/>
+        <result column="amount"
+                property="amount"/>
+        <result column="created_at"
+                property="createdAt"/>
+        <result column="updated_at"
+                property="updatedAt"/>
+        <result column="deleted_at"
+                property="deletedAt"/>
+    </resultMap>
+
+    <sql id="depositPayoutColumns">
+        deposit_payout_id,
+        source_deposit_id,
+        recipient_appointment_member_id,
+        transfer_id,
+        deposit_payout_batch_id,
+        allocation_type,
+        source_attendance_status_snapshot,
+        recipient_attendance_status_snapshot,
+        amount,
+        created_at,
+        updated_at,
+        deleted_at
+    </sql>
+
+    <select id="findById"
+            resultMap="depositPayoutResultMap">
+        SELECT
+        <include refid="depositPayoutColumns"/>
+        FROM deposit_payouts
+        WHERE deposit_payout_id = #{depositPayoutId}
+        AND deleted_at IS NULL
+    </select>
+
+    <select id="findByTransferId"
+            resultMap="depositPayoutResultMap">
+        SELECT
+        <include refid="depositPayoutColumns"/>
+        FROM deposit_payouts
+        WHERE transfer_id = #{transferId}
+        AND deleted_at IS NULL
+        LIMIT 1
+    </select>
+
+    <select id="findByBatchId"
+            resultMap="depositPayoutResultMap">
+        SELECT
+        <include refid="depositPayoutColumns"/>
+        FROM deposit_payouts
+        WHERE deposit_payout_batch_id = #{depositPayoutBatchId}
+        AND deleted_at IS NULL
+        ORDER BY deposit_payout_id ASC
+    </select>
+
+    <select id="findBySourceDepositId"
+            resultMap="depositPayoutResultMap">
+        SELECT
+        <include refid="depositPayoutColumns"/>
+        FROM deposit_payouts
+        WHERE source_deposit_id = #{sourceDepositId}
+        AND deleted_at IS NULL
+        ORDER BY deposit_payout_id ASC
+    </select>
+
+    <select id="countByAllocation"
+            resultType="int">
+        SELECT COUNT(*)
+        FROM deposit_payouts
+        WHERE source_deposit_id = #{sourceDepositId}
+          AND recipient_appointment_member_id =
+              #{recipientAppointmentMemberId}
+          AND allocation_type = #{allocationType}
+          AND deleted_at IS NULL
+    </select>
+
+    <insert id="insert"
+            parameterType="me.nawa.deposit.domain.DepositPayout"
+            useGeneratedKeys="true"
+            keyProperty="depositPayoutId"
+            keyColumn="deposit_payout_id">
+        INSERT INTO deposit_payouts (source_deposit_id,
+                                     recipient_appointment_member_id,
+                                     transfer_id,
+                                     deposit_payout_batch_id,
+                                     allocation_type,
+                                     source_attendance_status_snapshot,
+                                     recipient_attendance_status_snapshot,
+                                     amount)
+        VALUES (#{sourceDepositId},
+                #{recipientAppointmentMemberId},
+                #{transferId},
+                #{depositPayoutBatchId},
+                #{allocationType},
+                #{sourceAttendanceStatusSnapshot},
+                #{recipientAttendanceStatusSnapshot},
+                #{amount})
+    </insert>
+
+</mapper>
