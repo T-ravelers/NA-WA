@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import { AUTHENTICATED_HOME_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
@@ -8,7 +8,7 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { clearAuthSession, ensureAuthSession } from '../model/authQueries'
-import { consumeReturnPath } from '../model/returnPath'
+import { consumeReturnPath, peekReturnPath } from '../model/returnPath'
 
 const i18n = useI18n()
 const { t } = i18n
@@ -34,10 +34,24 @@ const errorMessage = computed(() => {
   return i18n.te(key) ? t(key) : t('error.unknown')
 })
 
+/**
+ * 로그인을 다시 시도할 위치.
+ *
+ * 저장된 복귀 경로를 소비하지 않고 query로 넘긴다. `SignInView`가 이 query를 다시
+ * 저장하므로 저장소의 기록자는 여전히 하나다. 여기서 소비해 버리면 로그인에 실패한
+ * 사용자가 재시도한 뒤 원래 가려던 화면으로 돌아가지 못한다.
+ */
+const signInLocation = computed<RouteLocationRaw>(() => {
+  const returnPath = peekReturnPath()
+
+  return returnPath === null
+    ? { path: SIGN_IN_PATH }
+    : { path: SIGN_IN_PATH, query: { returnPath } }
+})
+
 onMounted(async () => {
   if (errorCode.value !== null) {
     clearAuthSession()
-    consumeReturnPath()
     return
   }
 
@@ -45,14 +59,14 @@ onMounted(async () => {
   clearAuthSession()
 
   const session = await ensureAuthSession()
-  const returnPath = consumeReturnPath()
 
   if (session === null) {
-    await router.replace(SIGN_IN_PATH)
+    // 복귀 경로는 소비하지 않는다. 재시도 후에도 원래 목적지로 돌아가야 한다.
+    await router.replace(signInLocation.value)
     return
   }
 
-  await router.replace(returnPath ?? AUTHENTICATED_HOME_PATH)
+  await router.replace(consumeReturnPath() ?? AUTHENTICATED_HOME_PATH)
 })
 </script>
 
@@ -63,7 +77,7 @@ onMounted(async () => {
       :title="t('auth.callback.failed')"
       :description="errorMessage"
       :action-label="t('auth.signIn.google')"
-      @retry="router.replace(SIGN_IN_PATH)"
+      @retry="router.replace(signInLocation)"
     />
     <StateLoading
       v-else

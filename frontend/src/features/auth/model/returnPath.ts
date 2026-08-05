@@ -30,11 +30,27 @@ export function storeReturnPath(value: unknown): void {
   sessionStorage.setItem(STORAGE_KEY, value)
 }
 
+function readReturnPath(): string | null {
+  const stored = sessionStorage.getItem(STORAGE_KEY)
+
+  return stored !== null && isInAppPath(stored) ? stored : null
+}
+
+/**
+ * 저장된 경로를 지우지 않고 읽는다.
+ *
+ * 로그인이 실패해 다시 시도해야 하는 상황에서 쓴다. 이때 값을 소비해 버리면 재시도
+ * 후에 원래 가려던 화면으로 돌아갈 수 없다.
+ */
+export function peekReturnPath(): string | null {
+  return readReturnPath()
+}
+
 /** 저장된 경로를 한 번만 돌려주고 지운다. 없거나 유효하지 않으면 `null`이다. */
 export function consumeReturnPath(): string | null {
-  const stored = sessionStorage.getItem(STORAGE_KEY)
+  const stored = readReturnPath()
 
   sessionStorage.removeItem(STORAGE_KEY)
 
-  return stored !== null && isInAppPath(stored) ? stored : null
+  return stored
 }
