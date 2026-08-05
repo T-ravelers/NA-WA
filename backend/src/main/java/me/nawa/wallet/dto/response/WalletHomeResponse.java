@@ -5,9 +5,9 @@ import java.util.List;
 import lombok.Getter;
 
 public record  WalletHomeResponse(
-    BigDecimal balance,
-    String availabilityStatus,
-    List<TransactionSummaryResponse> recentTransactions
+    BigDecimal balance,                          // 현재 사용 가능 잔액
+    String availabilityStatus,                   // 지갑 상태
+    List<TransactionSummaryResponse> recentTransactions // 최근 거래 5건
 ) {
     public static WalletHomeResponse of(
         BigDecimal balance,

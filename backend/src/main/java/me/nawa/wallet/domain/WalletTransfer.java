@@ -13,13 +13,13 @@ import lombok.Setter;
 @AllArgsConstructor
 public class WalletTransfer {
 
-    private Long transferId;
-    private String transferNumber;
-    private String transferType;
-    private String transferStatus;
-    private BigDecimal amount;
-    private String memo;
-    private String spendingCategory;
-    private LocalDateTime completedAt;
-    private LocalDateTime createdAt;
+    private Long transferId;             // 거래 PK
+    private String transferNumber;       // 사용자 조회·CS·감사용 거래 번호
+    private String transferType;         // 거래 종류 (TOPUP | QR_PAYMENT | SETTLEMENT | ...)
+    private String transferStatus;       // 거래 상태 (PENDING | COMPLETED | FAILED | CANCELLED | REVERSED)
+    private BigDecimal amount;           // 거래 금액
+    private String memo;                 // 거래 메모
+    private String spendingCategory;     // 지출 카테고리
+    private LocalDateTime completedAt;   // 거래 완료 시각 (완료 전이면 null)
+    private LocalDateTime createdAt;     // 거래 생성 시각
 }

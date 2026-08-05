@@ -11,7 +11,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class TransactionCounterparty {
 
-    private String ownerType;   // MEMBER | SYSTEM
-    private String displayName;
-    private String systemCode;
+    private String ownerType;    // 상대방 지갑 소유자 타입 (MEMBER | SYSTEM)
+    private String displayName;  // ownerType=MEMBER일 때 상대 회원 이름
+    private String systemCode;   // ownerType=SYSTEM일 때 시스템 지갑 코드
 }
