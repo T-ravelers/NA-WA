@@ -235,7 +235,8 @@ class TransactionServiceImplTest {
         LocalDateTime completedAt = LocalDateTime.of(2026, 8, 4, 10, 0);
         WalletTransfer transfer = transfer(482L, "TOPUP", "COMPLETED", completedAt, completedAt.minusMinutes(5));
         WalletTopup topup = new WalletTopup(
-            BigDecimal.valueOf(10000), "USD", BigDecimal.valueOf(1350.5), LocalDateTime.of(2026, 8, 4, 9, 59)
+            BigDecimal.valueOf(10000), "USD", BigDecimal.valueOf(1350.5), LocalDateTime.of(2026, 8, 4, 9, 59),
+            900L, "COMPLETED", BigDecimal.valueOf(13505000), completedAt, completedAt.minusMinutes(5)
         );
 
         when(walletMapper.findByMemberId(1L)).thenReturn(wallet());

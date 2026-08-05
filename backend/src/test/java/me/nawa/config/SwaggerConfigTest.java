@@ -14,6 +14,7 @@ import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.ErrorCode;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
 import me.nawa.wallet.dto.request.TransactionSearchCondition;
+import me.nawa.wallet.dto.response.TopupListResponse;
 import me.nawa.wallet.dto.response.TopupMethodsResponse;
 import me.nawa.wallet.dto.response.TopupPreviewResponse;
 import me.nawa.wallet.dto.response.TransactionDetailResponse;
@@ -207,6 +208,11 @@ class SwaggerConfigTest {
 
                 @Override
                 public TopupPreviewResponse previewTopup(Long memberId, TopupPreviewRequest request) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public TopupListResponse getTopups(Long memberId, Long cursor, Integer size) {
                     throw new UnsupportedOperationException();
                 }
             };

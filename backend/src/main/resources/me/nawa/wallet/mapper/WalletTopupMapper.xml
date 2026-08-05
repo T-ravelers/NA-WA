@@ -12,4 +12,18 @@
           AND deleted_at IS NULL
     </select>
 
+    <select id="findByWalletIdWithCursor" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT
+            topup_id, topup_status, source_amount, source_currency_code,
+            exchange_rate_krw_per_unit, krw_amount, quoted_at, completed_at, created_at
+        FROM wallet_topups
+        WHERE wallet_id = #{walletId}
+            AND deleted_at IS NULL
+            <if test="cursor != null">
+                AND topup_id &lt; #{cursor}
+            </if>
+        ORDER BY topup_id DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

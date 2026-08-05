@@ -5,6 +5,7 @@ import lombok.extern.log4j.Log4j2;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
+import me.nawa.wallet.dto.response.TopupListResponse;
 import me.nawa.wallet.dto.response.TopupMethodsResponse;
 import me.nawa.wallet.dto.response.TopupPreviewResponse;
 import me.nawa.wallet.service.TopupService;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -34,5 +36,14 @@ public class TopupController {
         @RequestBody TopupPreviewRequest request
     ){
         return ApiResponse.success(topupService.previewTopup(member.getMemberId(), request));
+    }
+
+    @GetMapping
+    public ApiResponse<TopupListResponse> getTopups(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @RequestParam(required = false) Long cursor,
+        @RequestParam(required = false) Integer size
+    ){
+        return ApiResponse.success(topupService.getTopups(member.getMemberId(), cursor, size));
     }
 }

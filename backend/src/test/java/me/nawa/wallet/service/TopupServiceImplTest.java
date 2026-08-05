@@ -5,13 +5,22 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.wallet.domain.Wallet;
+import me.nawa.wallet.domain.WalletTopup;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
+import me.nawa.wallet.dto.response.TopupListResponse;
 import me.nawa.wallet.dto.response.TopupMethodsResponse;
 import me.nawa.wallet.dto.response.TopupPreviewResponse;
 import me.nawa.wallet.exception.WalletErrorCode;
@@ -159,5 +168,64 @@ class TopupServiceImplTest {
 
         assertEquals(WalletErrorCode.TOPUP_METHOD_NOT_SUPPORTED, exception.getErrorCode());
         verifyNoInteractions(walletMapper);
+    }
+
+    private WalletTopup topup(long topupId) {
+        return new WalletTopup(
+            BigDecimal.valueOf(10000), "USD", BigDecimal.valueOf(1350.5), LocalDateTime.now(),
+            topupId, "COMPLETED", BigDecimal.valueOf(13505000), LocalDateTime.now(), LocalDateTime.now()
+        );
+    }
+
+    @Test
+    void getTopups_returnsPageWithoutNextCursor_whenTopupsWithinSize() {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+        when(walletTopupMapper.findByWalletIdWithCursor(eq(100L), isNull(), eq(21)))
+            .thenReturn(List.of(topup(10L), topup(9L)));
+
+        TopupListResponse response = topupService.getTopups(1L, null, null);
+
+        assertEquals(2, response.topups().size());
+        assertNull(response.nextCursor());
+    }
+
+    @Test
+    void getTopups_returnsNextCursor_whenMoreTopupsExistThanSize() {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+        when(walletTopupMapper.findByWalletIdWithCursor(eq(100L), isNull(), eq(3)))
+            .thenReturn(List.of(topup(12L), topup(11L), topup(10L)));
+
+        TopupListResponse response = topupService.getTopups(1L, null, 2);
+
+        assertEquals(2, response.topups().size());
+        assertEquals("11", response.nextCursor());
+    }
+
+    @Test
+    void getTopups_throwsBusinessException_whenWalletNotFound() {
+        when(walletMapper.findByMemberId(1L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.getTopups(1L, null, null)
+        );
+
+        assertEquals(WalletErrorCode.WALLET_NOT_FOUND, exception.getErrorCode());
+        verifyNoInteractions(walletTopupMapper);
+    }
+
+    @Test
+    void getTopups_appliesDefaultAndMaxSize() {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+        when(walletTopupMapper.findByWalletIdWithCursor(any(), any(), anyInt())).thenReturn(List.of());
+
+        topupService.getTopups(1L, null, null);
+        verify(walletTopupMapper).findByWalletIdWithCursor(eq(100L), isNull(), eq(21));
+
+        topupService.getTopups(1L, null, 500);
+        verify(walletTopupMapper).findByWalletIdWithCursor(eq(100L), isNull(), eq(51));
     }
 }
