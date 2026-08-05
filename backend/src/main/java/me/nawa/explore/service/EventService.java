@@ -95,6 +95,7 @@ public class EventService {
 
         String normalizedLanguage = StringUtils.hasText(language)
             ? language.toLowerCase(Locale.ROOT)
+            // TODO(국제화 후속 이슈): 크롤링 원본 국제화 전까지 ko를 임시 fallback으로 사용한다.
             : "ko";
 
         EventDetailResponse event = eventMapper.findEventDetail(
