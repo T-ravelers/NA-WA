@@ -157,6 +157,29 @@ describe('httpClient', () => {
     expect(countCalls(calls, 'get', '/api/v1/wallet')).toBe(2)
   })
 
+  // 회귀: refresh는 POST라 CSRF 헤더가 없으면 백엔드가 403 AUTH-005로 거부한다.
+  it('sends the CSRF header with the refresh request', async () => {
+    const { httpClient, calls } = await loadClient({
+      'get /api/v1/auth/csrf': [
+        {
+          status: 200,
+          body: { success: true, data: { token: 'csrf-token', headerName: 'X-CSRF-TOKEN' } },
+        },
+      ],
+      'get /api/v1/wallet': [
+        { status: 401, body: authRequired },
+        { status: 200, body: { success: true, data: {} } },
+      ],
+      'post /api/v1/auth/refresh': [{ status: 200, body: { success: true } }],
+    })
+
+    await httpClient.get('/api/v1/wallet')
+
+    const refresh = calls.find((call) => call.url === '/api/v1/auth/refresh')
+
+    expect(refresh?.csrfHeader).toBe('csrf-token')
+  })
+
   it('refreshes only once when several requests fail with 401 at the same time', async () => {
     const { httpClient, calls } = await loadClient({
       'get /api/v1/wallet': [

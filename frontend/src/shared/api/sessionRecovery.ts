@@ -61,13 +61,14 @@ function isRecoverable(config: RetriableConfig | undefined): config is Retriable
  * 여러 요청이 동시에 401을 받아도 갱신은 한 번만 실행하고 결과를 공유한다.
  * 이 단일 비행이 없으면 화면 진입 시 동시에 뜬 요청 수만큼 refresh가 실행되고,
  * 백엔드의 refresh token 회전·재사용 감지(AUTH-002)에 걸려 세션이 폐기된다.
+ *
+ * 이 요청은 POST이므로 CSRF 헤더가 필요하다. 헤더를 생략하면 백엔드가 403 AUTH-005로
+ * 거부해 갱신이 항상 실패한다. 토큰 조회 요청 자체는 GET이라 재진입이 일어나지 않는다.
  */
 async function refreshOnce(client: AxiosInstance): Promise<boolean> {
   refreshInFlight ??= (async () => {
     try {
-      await client.post(REFRESH_ENDPOINT, undefined, {
-        headers: { 'X-Skip-Csrf': 'true' },
-      })
+      await client.post(REFRESH_ENDPOINT)
 
       return true
     } catch {
