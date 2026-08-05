@@ -3,17 +3,16 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import { buildAuthorizationUrl } from '../api/authApi'
+import { storeReturnPath } from '../model/returnPath'
 
 const { t } = useI18n()
 const route = useRoute()
 
 function signInWith(provider: 'google' | 'line'): void {
-  const returnPath = route.query.returnPath
+  // 전체 페이지가 이동하므로 복귀 위치를 브라우저에 맡긴다. 백엔드에는 넘기지 않는다.
+  storeReturnPath(route.query.returnPath)
 
-  // 백엔드가 302로 provider 인증 페이지에 보내므로 전체 페이지를 이동시킨다.
-  window.location.assign(
-    buildAuthorizationUrl(provider, typeof returnPath === 'string' ? returnPath : undefined),
-  )
+  window.location.assign(buildAuthorizationUrl(provider))
 }
 </script>
 

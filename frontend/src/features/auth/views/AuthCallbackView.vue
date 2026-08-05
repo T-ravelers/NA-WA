@@ -8,6 +8,7 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { clearAuthSession, ensureAuthSession } from '../model/authQueries'
+import { consumeReturnPath } from '../model/returnPath'
 
 const i18n = useI18n()
 const { t } = i18n
@@ -36,6 +37,7 @@ const errorMessage = computed(() => {
 onMounted(async () => {
   if (errorCode.value !== null) {
     clearAuthSession()
+    consumeReturnPath()
     return
   }
 
@@ -43,19 +45,14 @@ onMounted(async () => {
   clearAuthSession()
 
   const session = await ensureAuthSession()
+  const returnPath = consumeReturnPath()
 
   if (session === null) {
     await router.replace(SIGN_IN_PATH)
     return
   }
 
-  const returnPath = route.query.returnPath
-
-  await router.replace(
-    typeof returnPath === 'string' && returnPath.startsWith('/')
-      ? returnPath
-      : AUTHENTICATED_HOME_PATH,
-  )
+  await router.replace(returnPath ?? AUTHENTICATED_HOME_PATH)
 })
 </script>
 
