@@ -9,10 +9,10 @@
         SELECT
             e.event_id,
             e.event_type,
-            COALESCE(t.title, e.title) AS title,
-            COALESCE(t.subtitle, e.subtitle) AS subtitle,
-            COALESCE(t.description, e.description) AS description,
-            COALESCE(t.program_text, e.program_text) AS program_text,
+            e.title,
+            e.subtitle,
+            e.description,
+            e.program_text,
             e.thumbnail_url,
             e.status,
             e.is_permanent,
@@ -22,7 +22,7 @@
             e.open_days,
             e.open_weekend,
             e.opens_late,
-            COALESCE(t.venue_name, e.venue_name) AS venue_name,
+            e.venue_name,
             e.region1,
             e.region2,
             e.region3,
@@ -31,19 +31,14 @@
             e.longitude,
             e.has_photo_zone,
             e.is_experience,
-            COALESCE(t.age_limit, e.age_limit) AS age_limit,
+            e.age_limit,
             e.is_free,
-            COALESCE(t.price_text, e.price_text) AS price_text,
+            e.price_text,
             e.has_benefit,
             e.reservable
         FROM explore_items ei
                  JOIN event e
                       ON e.event_id = ei.item_id
-                 <!-- language=ko uses the base event columns; event_translations excludes ko. -->
-                 LEFT JOIN event_translations t
-                           ON t.event_id = e.event_id
-                               AND t.language_code = #{language}
-                               AND t.deleted_at IS NULL
         WHERE ei.item_type = 'EVENT'
           AND ei.item_id = #{eventId}
           AND ei.approval_status = 'APPROVED'
@@ -150,8 +145,8 @@
             resultType="me.nawa.explore.dto.response.EventSummaryResponse">
         SELECT
         e.event_id AS item_id,
-        COALESCE(t.title, e.title) AS title,
-        COALESCE(t.subtitle, e.subtitle) AS subtitle,
+        e.title,
+        e.subtitle,
         e.thumbnail_url,
         e.region1,
         e.region2,
@@ -163,10 +158,6 @@
         FROM explore_items ei
         JOIN event e
         ON e.event_id = ei.item_id
-        LEFT JOIN event_translations t
-        ON t.event_id = e.event_id
-        AND t.language_code = #{request.language}
-        AND t.deleted_at IS NULL
         WHERE
         <include refid="eventListWhere"/>
         <choose>
