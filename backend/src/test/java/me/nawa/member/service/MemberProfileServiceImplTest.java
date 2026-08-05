@@ -3,6 +3,7 @@ package me.nawa.member.service;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.member.domain.MemberProfile;
 import me.nawa.member.dto.MemberProfileResponse;
+import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.mapper.MemberMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +15,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -90,5 +98,64 @@ class MemberProfileServiceImplTest {
         );
 
         assertEquals("AUTH-016", exception.getErrorCode().getCode());
+    }
+
+    @Test
+    void updateProfile_updatesLanguage_andReturnsRefreshedProfile() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+
+        MemberProfileResponse response = service.updateProfile(
+                1L,
+                new UpdateMemberProfileRequest("ja", null)
+        );
+
+        verify(memberMapper).updateProfile(1L, "ja", null);
+        assertEquals(1L, response.getMemberId());
+    }
+
+    @Test
+    void updateProfile_throwsUnsupportedLanguage_whenLanguageNotInAllowList() {
+        // 언어 검사는 회원 조회보다 먼저 일어나므로 findProfile을 stub하지 않는다.
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.updateProfile(1L, new UpdateMemberProfileRequest("ko", null))
+        );
+
+        assertEquals("MEMBER-002", exception.getErrorCode().getCode());
+    }
+
+    @Test
+    void updateProfile_acceptsEverySupportedLanguage() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+
+        for (String language : new String[] {"en", "ja", "zh-CN", "zh-TW", "vi"}) {
+            service.updateProfile(1L, new UpdateMemberProfileRequest(language, null));
+        }
+
+        verify(memberMapper, times(5)).updateProfile(eq(1L), anyString(), isNull());
+    }
+
+    @Test
+    void updateProfile_throwsUnsupportedCurrency_whenCurrencyInactiveOrMissing() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.existsActiveCurrency("XXX")).thenReturn(false);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.updateProfile(1L, new UpdateMemberProfileRequest(null, "XXX"))
+        );
+
+        assertEquals("MEMBER-003", exception.getErrorCode().getCode());
+    }
+
+    @Test
+    void updateProfile_throwsNoUpdatableField_whenBothFieldsAbsent() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.updateProfile(1L, new UpdateMemberProfileRequest(null, null))
+        );
+
+        assertEquals("MEMBER-004", exception.getErrorCode().getCode());
+        verify(memberMapper, never()).updateProfile(anyLong(), anyString(), anyString());
     }
 }

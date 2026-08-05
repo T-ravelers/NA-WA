@@ -31,4 +31,19 @@
         )
     </select>
 
+    <update id="updateProfile">
+        UPDATE members
+        <set>
+            <if test="preferredLanguage != null">
+                preferred_language = #{preferredLanguage},
+            </if>
+            <if test="preferredCurrencyCode != null">
+                preferred_currency_code = #{preferredCurrencyCode},
+            </if>
+            updated_at = CURRENT_TIMESTAMP
+        </set>
+        WHERE member_id = #{memberId}
+          AND deleted_at IS NULL
+    </update>
+
 </mapper>

@@ -10,4 +10,10 @@ public interface MemberMapper {
     MemberProfile findProfile(@Param("memberId") long memberId);
 
     boolean existsActiveCurrency(@Param("currencyCode") String currencyCode);
+
+    int updateProfile(
+            @Param("memberId") long memberId,
+            @Param("preferredLanguage") String preferredLanguage,
+            @Param("preferredCurrencyCode") String preferredCurrencyCode
+    );
 }

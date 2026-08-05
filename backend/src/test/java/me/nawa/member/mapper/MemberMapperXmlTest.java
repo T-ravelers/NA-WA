@@ -41,4 +41,11 @@ class MemberMapperXmlTest {
                 "me.nawa.member.mapper.MemberMapper.existsActiveCurrency"
         ));
     }
+
+    @Test
+    void mapperXml_parsesUpdateProfileStatement() throws Exception {
+        assertTrue(parsedConfiguration().hasStatement(
+                "me.nawa.member.mapper.MemberMapper.updateProfile"
+        ));
+    }
 }
