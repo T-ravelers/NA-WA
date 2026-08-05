@@ -12,6 +12,9 @@ import me.nawa.auth.profile.AuthMemberProfile;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.ErrorCode;
+import me.nawa.member.dto.MemberProfileResponse;
+import me.nawa.member.dto.UpdateMemberProfileRequest;
+import me.nawa.member.service.MemberProfileService;
 import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
 import me.nawa.wallet.dto.request.TransactionSearchCondition;
@@ -67,6 +70,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.JourneyTestConfig.class,
         SwaggerConfigTest.TopupTestConfig.class,
         SwaggerConfigTest.TransactionTestConfig.class,
+        SwaggerConfigTest.MemberTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -255,6 +259,26 @@ class SwaggerConfigTest {
 
                 @Override
                 public TransactionDetailResponse getTransactionDetail(Long memberId, Long transferId) {
+                    throw new UnsupportedOperationException();
+                }
+            };
+        }
+    }
+
+    @Configuration
+    static class MemberTestConfig {
+
+        @Bean
+        MemberProfileService memberProfileService() {
+            return new MemberProfileService() {
+                @Override
+                public MemberProfileResponse getProfile(long memberId) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public MemberProfileResponse updateProfile(
+                        long memberId, UpdateMemberProfileRequest request) {
                     throw new UnsupportedOperationException();
                 }
             };
