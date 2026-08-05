@@ -24,7 +24,7 @@ import javax.sql.DataSource;
 @PropertySource("classpath:/application.properties")
 @Import({RedisConfig.class, SecurityConfig.class})
 @MapperScan(basePackages = {"me.nawa.auth.mapper",
-        "me.nawa.event.mapper",
+        "me.nawa.explore.mapper",
         "me.nawa.journey.mapper",
         "me.nawa.map.mapper",
         "me.nawa.member.mapper",
@@ -38,7 +38,7 @@ import javax.sql.DataSource;
         "me.nawa.auth.token",
         "me.nawa.auth.cookie",
         "me.nawa.auth.security",
-        "me.nawa.event.service",
+        "me.nawa.explore.service",
         "me.nawa.journey.service",
         "me.nawa.map.service",
         "me.nawa.member.service",
