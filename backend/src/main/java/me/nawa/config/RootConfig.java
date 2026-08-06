@@ -44,6 +44,8 @@ import javax.sql.DataSource;
     "me.nawa.map.service",
     "me.nawa.member.service",
     "me.nawa.wallet.service",
+    "me.nawa.wallet.external.stripe",
+    "me.nawa.wallet.util",
     "me.nawa.settlement.service",
     "me.nawa.deposit.service"})
 @EnableTransactionManagement

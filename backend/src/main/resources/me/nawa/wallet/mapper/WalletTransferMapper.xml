@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.wallet.mapper.WalletTransferMapper">
+    <select id="findByTransferId" resultType="me.nawa.wallet.domain.WalletTransfer">
+        SELECT
+            transfer_id, transfer_number, transfer_type, transfer_status,
+            amount, memo, spending_category, completed_at, created_at
+        FROM wallet_transfers
+        WHERE transfer_id = #{transferId}
+          AND deleted_at IS NULL
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="transferId">
+        INSERT INTO wallet_transfers
+            (currency_code, initiator_member_id, transfer_number, transfer_type, transfer_status,
+             amount, memo, spending_category, completed_at, idempotency_key)
+        VALUES
+            ('KRW', #{initiatorMemberId}, #{transferNumber}, #{transferType}, #{transferStatus},
+             #{amount}, #{memo}, #{spendingCategory}, #{completedAt}, #{idempotencyKey})
+    </insert>
+</mapper>

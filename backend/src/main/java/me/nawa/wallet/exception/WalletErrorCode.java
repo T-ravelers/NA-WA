@@ -13,6 +13,78 @@ public enum WalletErrorCode implements ErrorCode {
       HttpStatus.NOT_FOUND,
       "WALLET-001",
         "지갑 정보를 찾을 수 없습니다."
+    ),
+
+    TOPUP_METHOD_NOT_SUPPORTED(
+        HttpStatus.BAD_REQUEST,
+          "WALLET-002",
+              "지원하지 않는 충전 수단입니다."
+    ),
+
+    UNSUPPORTED_CURRENCY(
+        HttpStatus.BAD_REQUEST,
+          "WALLET-003",
+              "지원하지 않는 통화입니다."
+    ),
+
+    INVALID_TOPUP_AMOUNT(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-004",
+            "충전 금액은 0보다 커야 합니다."
+    ),
+
+    TRANSACTION_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+    "WALLET-005",
+        "거래 내역을 찾을 수 없습니다."
+    ),
+
+    TRANSACTION_FORBIDDEN(
+        HttpStatus.FORBIDDEN,
+    "WALLET-006",
+        "본인의 거래만 조회할 수 있습니다."
+    ),
+
+    IDEMPOTENCY_KEY_REQUIRED(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-007",
+        "Idempotency-Key 헤더가 필요합니다."
+    ),
+
+    STRIPE_WALLET_NOT_ACTIVE(
+        HttpStatus.FORBIDDEN,
+        "WALLET-008",
+        "지갑 상태에서는 충전할 수 없습니다."
+    ),
+
+    IDEMPOTENCY_KEY_CONFLICT(
+        HttpStatus.CONFLICT,
+        "WALLET-009",
+        "동일한 Idempotency-Key로 다른 요청이 이미 처리되었습니다."
+    ),
+
+    STRIPE_UNAVAILABLE(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "WALLET-010",
+        "결제 서비스에 일시적으로 연결할 수 없습니다."
+    ),
+
+    TOPUP_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "WALLET-011",
+        "충전 내역을 찾을 수 없습니다."
+    ),
+
+    TOPUP_FORBIDDEN(
+        HttpStatus.FORBIDDEN,
+        "WALLET-012",
+        "본인의 충전 내역만 조회할 수 있습니다."
+    ),
+
+    STRIPE_INVALID_SIGNATURE(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-013",
+        "Webhook 서명 검증에 실패했습니다."
     );
 
     private final HttpStatus status;

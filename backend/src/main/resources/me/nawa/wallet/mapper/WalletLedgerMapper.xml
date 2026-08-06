@@ -5,6 +5,11 @@
 
 <mapper namespace="me.nawa.wallet.mapper.WalletLedgerMapper">
 
+    <insert id="insert">
+        INSERT INTO wallet_ledger_entries (transfer_id, wallet_id, entry_type, amount, balance_after)
+        VALUES (#{transferId}, #{walletId}, #{entryType}, #{amount}, #{balanceAfter})
+    </insert>
+
     <select id="findRecentByWalletId" resultType="me.nawa.wallet.domain.WalletLedgerEntry">
         SELECT
             e.transfer_id,
@@ -20,6 +25,61 @@
             AND e.deleted_at IS NULL
         ORDER BY e.created_at DESC
         LIMIT #{limit}
+    </select>
+
+    <select id="findByWalletIdWithCursor" resultType="me.nawa.wallet.domain.WalletLedgerEntry">
+        SELECT
+        e.ledger_entry_id,
+              e.transfer_id,
+              t.transfer_type,
+              e.entry_type,
+              e.amount,
+              e.balance_after,
+              t.memo,
+              e.created_at
+          FROM wallet_ledger_entries e
+          JOIN wallet_transfers t ON t.transfer_id = e.transfer_id
+          WHERE e.wallet_id = #{walletId}
+        AND e.deleted_at IS NULL
+        <if test="cursor != null">
+            AND e.ledger_entry_id &lt; #{cursor}
+        </if>
+        <if test="type != null">
+            AND t.transfer_type = #{type}
+        </if>
+        <if test="status != null">
+            AND t.transfer_status = #{status}
+        </if>
+        <if test="from != null">
+            AND e.created_at &gt;= #{from}
+        </if>
+        <if test="to != null">
+            AND e.created_at &lt; #{to}
+        </if>
+        ORDER BY e.ledger_entry_id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findByTransferIdAndWalletId" resultType="me.nawa.wallet.domain.WalletLedgerEntry">
+        SELECT e.ledger_entry_id, e.transfer_id, t.transfer_type, e.entry_type,
+               e.amount, e.balance_after, t.memo, e.created_at
+        FROM wallet_ledger_entries e
+                 JOIN wallet_transfers t ON t.transfer_id = e.transfer_id
+        WHERE e.transfer_id = #{transferId}
+          AND e.wallet_id = #{walletId}
+          AND e.deleted_at IS NULL
+    </select>
+
+    <select id="findCounterpartyByTransferId" resultType="me.nawa.wallet.domain.TransactionCounterparty">
+        SELECT wo.owner_type, m.display_name, wo.system_code
+        FROM wallet_ledger_entries e
+        JOIN wallets w ON w.wallet_id = e.wallet_id
+        JOIN wallet_owners wo ON wo.wallet_owner_id = w.wallet_owner_id
+        LEFT JOIN members m ON m.member_id = wo.member_id
+        WHERE e.transfer_id = #{transferId}
+            AND e.wallet_id != #{walletId}
+            AND e.deleted_at IS NULL
+        LIMIT 1
     </select>
 
 </mapper>

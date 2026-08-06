@@ -42,7 +42,7 @@ class WalletServiceImplTest {
     void getWalletHome_returnsBalanceStatusAndRecentTransactions_whenWalletExists() {
         Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
         WalletLedgerEntry entry = new WalletLedgerEntry(
-            10L, "TOPUP", "CREDIT", BigDecimal.valueOf(10000), BigDecimal.valueOf(50000), "충전", LocalDateTime.now()
+            10L, "TOPUP", "CREDIT", BigDecimal.valueOf(10000), BigDecimal.valueOf(50000), "충전", LocalDateTime.now(), 1L
         );
 
         when(walletMapper.findByMemberId(1L)).thenReturn(wallet);

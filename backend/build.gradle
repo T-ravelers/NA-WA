@@ -85,6 +85,9 @@ dependencies {
     compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
     testImplementation 'javax.servlet:javax.servlet-api:4.0.1'
 
+    // JSR-250 (@PostConstruct 등, JDK 11부터 javax.annotation이 제거되어 별도 의존성 필요)
+    implementation 'javax.annotation:javax.annotation-api:1.3.2'
+
     // Logging
     implementation 'org.apache.logging.log4j:log4j-api'
     runtimeOnly 'org.apache.logging.log4j:log4j-core'
@@ -110,6 +113,10 @@ dependencies {
     testImplementation platform("org.junit:junit-bom:${junitVersion}")
     testImplementation "org.junit.jupiter:junit-jupiter"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+    // Stripe
+    // 구현 시점에 최신 안정 버전 확인
+    implementation 'com.stripe:stripe-java:29.0.0'
 }
 
 test {
