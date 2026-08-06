@@ -145,6 +145,8 @@
             resultType="me.nawa.explore.dto.response.EventSummaryResponse">
         SELECT
         e.event_id AS item_id,
+        e.event_kind,
+        e.status,
         e.title,
         e.subtitle,
         e.thumbnail_url,

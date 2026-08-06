@@ -16,6 +16,8 @@ import java.time.LocalDate;
 public class EventSummaryResponse {
 
     private Long itemId;
+    private String eventKind;
+    private String status;
     private String title;
     private String subtitle;
     private String thumbnailUrl;

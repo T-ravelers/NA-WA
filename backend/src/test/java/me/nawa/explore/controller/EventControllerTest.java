@@ -50,6 +50,8 @@ class EventControllerTest {
     void searchEvents_returnsSuccessResponse_whenItemTypeIsEvent() throws Exception {
         EventSummaryResponse event = new EventSummaryResponse(
             990001L,
+            "FESTIVAL",
+            "SCHEDULED",
             "서울 야시장 푸드 팝업(테스트)",
             "목록 테스트",
             null,
@@ -81,6 +83,14 @@ class EventControllerTest {
         assertEquals(
             990001L,
             body.path("data").path("content").get(0).path("itemId").asLong()
+        );
+        assertEquals(
+            "FESTIVAL",
+            body.path("data").path("content").get(0).path("eventKind").asText()
+        );
+        assertEquals(
+            "SCHEDULED",
+            body.path("data").path("content").get(0).path("status").asText()
         );
         assertEquals(
             "2026-08-05",

@@ -20,6 +20,7 @@ public class EventDetailResponse {
 
     private Long eventId;
     private String eventType;
+    private String eventKind;
 
     private String title;
     private String subtitle;
@@ -56,6 +57,8 @@ public class EventDetailResponse {
     private String priceText;
     private Boolean hasBenefit;
     private Boolean reservable;
+    private String contact;
+    private String organizer;
 
     private List<EventActivityResponse> activities;
 }

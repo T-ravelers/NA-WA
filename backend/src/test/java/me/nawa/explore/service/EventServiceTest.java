@@ -40,6 +40,8 @@ class EventServiceTest {
 
         EventSummaryResponse event = new EventSummaryResponse(
             990001L,
+            "FESTIVAL",
+            "SCHEDULED",
             "서울 야시장 푸드 팝업(테스트)",
             "목록 테스트",
             null,
@@ -66,6 +68,14 @@ class EventServiceTest {
         assertEquals(2, result.getTotalPages());
         assertEquals(false, result.isHasNext());
         assertEquals(990001L, result.getContent().get(0).getItemId());
+        assertEquals(
+            "FESTIVAL",
+            result.getContent().get(0).getEventKind()
+        );
+        assertEquals(
+            "SCHEDULED",
+            result.getContent().get(0).getStatus()
+        );
     }
 
     @Test
