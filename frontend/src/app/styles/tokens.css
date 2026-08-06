@@ -64,6 +64,9 @@
   /* 예산 게이지 진행. 트랙은 hairline-strong. */
   --color-gauge: #5aa3dd;
 
+  /* 하단 탭 컨테이너. 화면 위에 떠 있어 반투명 밝은 면을 쓴다. */
+  --color-nav-surface: rgb(217 217 217 / 0.2);
+
   /* 모달 백드롭. 60% 불투명도로 쓴다. */
   --color-scrim: #000000;
 
