@@ -24,26 +24,28 @@ import javax.sql.DataSource;
 @PropertySource("classpath:/application.properties")
 @Import({RedisConfig.class, SecurityConfig.class})
 @MapperScan(basePackages = {"me.nawa.auth.mapper",
-        "me.nawa.explore.mapper",
-        "me.nawa.journey.mapper",
-        "me.nawa.map.mapper",
-        "me.nawa.member.mapper",
-        "me.nawa.wallet.mapper",
-        "me.nawa.settlement.mapper"})
+    "me.nawa.explore.mapper",
+    "me.nawa.journey.mapper",
+    "me.nawa.map.mapper",
+    "me.nawa.member.mapper",
+    "me.nawa.wallet.mapper",
+    "me.nawa.settlement.mapper",
+    "me.nawa.deposit.mapper"})
 @ComponentScan(basePackages = {"me.nawa.auth.service",
-        "me.nawa.auth.jwt",
-        "me.nawa.auth.oauth",
-        "me.nawa.auth.profile",
-        "me.nawa.auth.refresh",
-        "me.nawa.auth.token",
-        "me.nawa.auth.cookie",
-        "me.nawa.auth.security",
-        "me.nawa.explore.service",
-        "me.nawa.journey.service",
-        "me.nawa.map.service",
-        "me.nawa.member.service",
-        "me.nawa.wallet.service",
-        "me.nawa.settlement.service"})
+    "me.nawa.auth.jwt",
+    "me.nawa.auth.oauth",
+    "me.nawa.auth.profile",
+    "me.nawa.auth.refresh",
+    "me.nawa.auth.token",
+    "me.nawa.auth.cookie",
+    "me.nawa.auth.security",
+    "me.nawa.explore.service",
+    "me.nawa.journey.service",
+    "me.nawa.map.service",
+    "me.nawa.member.service",
+    "me.nawa.wallet.service",
+    "me.nawa.settlement.service",
+    "me.nawa.deposit.service"})
 @EnableTransactionManagement
 public class RootConfig {
     @Value("${jdbc.driver}")
@@ -73,9 +75,9 @@ public class RootConfig {
     @Bean
     public Flyway flyway(DataSource dataSource) {
         Flyway flyway = Flyway.configure()
-                .dataSource(dataSource)
-                .locations("classpath:db/migration")
-                .load();
+            .dataSource(dataSource)
+            .locations("classpath:db/migration")
+            .load();
         flyway.migrate();
         return flyway;
     }
@@ -86,10 +88,16 @@ public class RootConfig {
 
         // MyBatis global 설정
         sqlSessionFactory.setConfigLocation(applicationContext
-                .getResource("classpath:/mybatis-config.xml"));
+            .getResource("classpath:/mybatis-config.xml"));
 
         // DB 연결 설정
         sqlSessionFactory.setDataSource(dataSource);
+
+        sqlSessionFactory.setMapperLocations(
+            applicationContext.getResources(
+                "classpath*:me/nawa/**/mapper/*Mapper.xml"
+            )
+        );
 
         return sqlSessionFactory.getObject();
     }
