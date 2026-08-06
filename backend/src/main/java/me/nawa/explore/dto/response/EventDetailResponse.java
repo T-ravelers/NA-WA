@@ -1,5 +1,6 @@
 package me.nawa.explore.dto.response;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,6 +28,10 @@ public class EventDetailResponse {
     private String description;
     private String programText;
     private String thumbnailUrl;
+    private JsonNode imageUrls;
+    private JsonNode links;
+    private String reservationUrl;
+    private JsonNode preReservation;
 
     private String status;
     private Boolean isPermanent;
@@ -37,8 +42,8 @@ public class EventDetailResponse {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate endDate;
 
-    private String operatingHours;
-    private String openDays;
+    private JsonNode operatingHours;
+    private JsonNode openDays;
     private Boolean openWeekend;
     private Boolean opensLate;
 

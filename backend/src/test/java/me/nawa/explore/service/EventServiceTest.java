@@ -125,6 +125,7 @@ class EventServiceTest {
     void getEventDetail_returnsEventWithActivities() {
         EventDetailResponse event = EventDetailResponse.builder()
             .eventId(990001L)
+            .eventKind("FESTIVAL")
             .title("서울 야시장 푸드 팝업(테스트)")
             .build();
 
@@ -139,6 +140,7 @@ class EventServiceTest {
         );
 
         assertEquals(990001L, result.getEventId());
+        assertEquals("FESTIVAL", result.getEventKind());
         assertEquals("서울 야시장 푸드 팝업(테스트)", result.getTitle());
         assertEquals(0, result.getActivities().size());
         verify(eventMapper).findEventDetail(990001L, "ko");

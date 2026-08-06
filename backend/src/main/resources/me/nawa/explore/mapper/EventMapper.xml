@@ -4,16 +4,41 @@
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="me.nawa.explore.mapper.EventMapper">
+    <resultMap id="eventDetailResultMap"
+               type="me.nawa.explore.dto.response.EventDetailResponse"
+               autoMapping="true">
+        <result property="imageUrls"
+                column="image_urls"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+        <result property="links"
+                column="links"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+        <result property="preReservation"
+                column="pre_reservation"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+        <result property="operatingHours"
+                column="operating_hours"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+        <result property="openDays"
+                column="open_days"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+    </resultMap>
+
     <select id="findEventDetail"
-            resultType="me.nawa.explore.dto.response.EventDetailResponse">
+            resultMap="eventDetailResultMap">
         SELECT
             e.event_id,
             e.event_type,
+            e.event_kind,
             e.title,
             e.subtitle,
             e.description,
             e.program_text,
             e.thumbnail_url,
+            e.image_urls,
+            e.links,
+            e.reservation_url,
+            e.pre_reservation,
             e.status,
             e.is_permanent,
             e.start_date,
@@ -35,7 +60,9 @@
             e.is_free,
             e.price_text,
             e.has_benefit,
-            e.reservable
+            e.reservable,
+            e.contact,
+            e.organizer
         FROM explore_items ei
                  JOIN event e
                       ON e.event_id = ei.item_id

@@ -107,7 +107,10 @@ class EventControllerTest {
     void getEventDetail_returnsSuccessResponse() throws Exception {
         EventDetailResponse response = EventDetailResponse.builder()
             .eventId(990001L)
+            .eventKind("FESTIVAL")
             .title("서울 야시장 푸드 팝업")
+            .contact("02-1234-5678")
+            .organizer("NA-WA 테스트 운영팀")
             .startDate(LocalDate.of(2026, 8, 5))
             .endDate(LocalDate.of(2026, 8, 31))
             .activities(List.of())
@@ -128,6 +131,10 @@ class EventControllerTest {
         JsonNode json = objectMapper.readTree(body);
 
         assertTrue(json.path("success").asBoolean());
+        assertEquals(
+            "FESTIVAL",
+            json.path("data").path("eventKind").asText()
+        );
         assertEquals(
             "2026-08-05",
             json.path("data").path("startDate").asText()
