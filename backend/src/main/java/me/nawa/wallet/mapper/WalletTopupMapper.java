@@ -41,4 +41,6 @@ public interface WalletTopupMapper {
     void markFailed(@Param("topupId") Long topupId, @Param("providerStatus") String providerStatus);
 
     void markCancelled(@Param("topupId") Long topupId, @Param("providerStatus") String providerStatus);
+
+    void resetToQuoted(@Param("topupId") Long topupId);
 }

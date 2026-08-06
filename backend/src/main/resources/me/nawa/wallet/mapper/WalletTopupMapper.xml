@@ -79,6 +79,11 @@
         WHERE topup_id = #{topupId}
     </update>
 
+    <update id="resetToQuoted">
+        UPDATE wallet_topups SET topup_status = 'QUOTED'
+        WHERE topup_id = #{topupId}
+    </update>
+
     <select id="findFxByTransferId" resultType="me.nawa.wallet.domain.WalletTopup">
         SELECT source_amount, source_currency_code, exchange_rate_krw_per_unit, quoted_at
         FROM wallet_topups

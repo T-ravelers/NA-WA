@@ -158,18 +158,25 @@ public class TopupServiceImpl implements TopupService {
         //4. 같은 Idempotency key로 이미 처리한 요청이 있으면 Stripe를 새로 부르지 않고 그 결과를 재사용
         WalletTopup existing = walletTopupMapper.findByIdempotencyKey(idempotencyKdy);
 
-        // [오류 수정] idempotency key는 요청 헤더로 클라이언트가 직접 전달하기 때문에
-        // 사용자가 같은 key와 amount로 요청을 보내면 다름 사용자의 intent와 client secret을 재사용하게 됨
-        // wallet id도 같이 확인하여 idempotency key의 소유권을 확인해야함
-        if (!existing.getWalletId().equals(wallet.getWalletId())) {
-            throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
-        }
 
         if (existing != null) {
             // 같은 키인데 금액이 다르면 재시도가 아니라 키 재사용 실수이므로 막는다
             if (existing.getSourceAmount().compareTo(request.amount()) != 0) {
                 throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
             }
+
+            // [오류 수정] idempotency key는 요청 헤더로 클라이언트가 직접 전달하기 때문에
+            // 사용자가 같은 key와 amount로 요청을 보내면 다름 사용자의 intent와 client secret을 재사용하게 됨
+            // wallet id도 같이 확인하여 idempotency key의 소유권을 확인해야함
+            if (!existing.getWalletId().equals(wallet.getWalletId())) {
+                throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
+            }
+
+            // topup의 status가 FAILED일 때는 재요청을 위해서 상태를 다시 QUOTED로 바꿔줘야 함
+            if(existing.getTopupStatus().equals("FAILED")){
+                walletTopupMapper.resetToQuoted(existing.getTopupId());
+            }
+
             // client_secret은 DB에 저장하지 않으므로, 재요청 시엔 Stripe에서 다시 받아온다
             StripePaymentIntent refreshed = retrieveOrThrow(existing.getProviderPaymentId());
             return toStripeIntentResponse(existing, refreshed.getClientSecret());
