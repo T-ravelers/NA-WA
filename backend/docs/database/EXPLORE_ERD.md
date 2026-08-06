@@ -54,7 +54,16 @@ erDiagram
         VARCHAR source_item_id
         ENUM event_type
         ENUM event_kind
+        JSON operating_hours
+        JSON open_days
+        BOOLEAN open_weekend
+        BOOLEAN opens_late
         JSON image_urls
+        JSON links
+        VARCHAR reservation_url
+        JSON pre_reservation
+        VARCHAR contact
+        VARCHAR organizer
         DATE start_date
         DATE end_date
         ENUM status
@@ -102,3 +111,7 @@ erDiagram
 - Event·Place의 표시 콘텐츠는 현재 각 기본 테이블에 저장합니다.
 - `source`와 `source_item_id` 조합으로 외부 원본 중복을 방지합니다.
 - 활동 분류는 이벤트·장소별 연결 테이블로 분리합니다.
+- Event 상세 API는 `image_urls`, `operating_hours`, `open_days`를 배열·객체 JSON으로
+  반환하며, `links`와 `pre_reservation`도 객체 JSON으로 반환합니다.
+- `source`, `source_item_id`, `pipeline_id`와 생성·수정 시각은 운영·동기화용이며
+  탐색 화면의 표시 응답에는 포함하지 않습니다.

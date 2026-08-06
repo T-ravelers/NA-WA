@@ -109,6 +109,21 @@ class EventControllerTest {
             .eventId(990001L)
             .eventKind("FESTIVAL")
             .title("서울 야시장 푸드 팝업")
+            .imageUrls(objectMapper.readTree(
+                "[\"https://example.com/event-990001.jpg\"]"
+            ))
+            .links(objectMapper.readTree(
+                "{\"homepage_url\":\"https://example.com\"}"
+            ))
+            .preReservation(objectMapper.readTree(
+                "{\"has\":true,\"link\":\"https://example.com/reserve\"}"
+            ))
+            .operatingHours(objectMapper.readTree(
+                "{\"raw\":\"10:00-20:00\"}"
+            ))
+            .openDays(objectMapper.readTree(
+                "[\"mon\",\"tue\"]"
+            ))
             .contact("02-1234-5678")
             .organizer("NA-WA 테스트 운영팀")
             .startDate(LocalDate.of(2026, 8, 5))
@@ -134,6 +149,25 @@ class EventControllerTest {
         assertEquals(
             "FESTIVAL",
             json.path("data").path("eventKind").asText()
+        );
+        assertEquals(
+            "https://example.com/event-990001.jpg",
+            json.path("data").path("imageUrls").get(0).asText()
+        );
+        assertEquals(
+            "https://example.com",
+            json.path("data").path("links").path("homepage_url").asText()
+        );
+        assertTrue(
+            json.path("data").path("preReservation").path("has").asBoolean()
+        );
+        assertEquals(
+            "10:00-20:00",
+            json.path("data").path("operatingHours").path("raw").asText()
+        );
+        assertEquals(
+            "mon",
+            json.path("data").path("openDays").get(0).asText()
         );
         assertEquals(
             "2026-08-05",
