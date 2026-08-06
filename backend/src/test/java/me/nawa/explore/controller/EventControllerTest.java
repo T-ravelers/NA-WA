@@ -3,8 +3,10 @@ package me.nawa.explore.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -105,6 +107,47 @@ class EventControllerTest {
             body.path("data").path("content").get(0).path("endDate").asText()
         );
         assertEquals(1L, body.path("data").path("totalElements").asLong());
+    }
+
+    @Test
+    void searchEvents_bindsMultiValueFilters() throws Exception {
+        when(eventService.searchEvents(
+            any(EventSearchRequest.class),
+            isNull(Long.class)
+        )).thenReturn(new EventListResponse(
+            List.of(), 0, 20, 0L, 0, false
+        ));
+
+        mockMvc.perform(
+                get("/api/v1/explore/events")
+                    .param("eventKinds", "POPUP", "CONCERT")
+                    .param("region1", "서울", "경기")
+                    .param("region2", "성수", "홍대")
+                    .param("startDate", "2026-08-01")
+                    .param("endDate", "2026-08-31")
+                    .param("freeOnly", "true")
+            )
+            .andExpect(status().isOk());
+
+        var requestCaptor = forClass(EventSearchRequest.class);
+        verify(eventService).searchEvents(
+            requestCaptor.capture(),
+            isNull(Long.class)
+        );
+
+        EventSearchRequest request = requestCaptor.getValue();
+        assertEquals(List.of("POPUP", "CONCERT"), request.getEventKinds());
+        assertEquals(List.of("서울", "경기"), request.getRegion1());
+        assertEquals(List.of("성수", "홍대"), request.getRegion2());
+        assertEquals(
+            LocalDate.of(2026, 8, 1),
+            request.getStartDate()
+        );
+        assertEquals(
+            LocalDate.of(2026, 8, 31),
+            request.getEndDate()
+        );
+        assertEquals(true, request.getFreeOnly());
     }
 
     @Test

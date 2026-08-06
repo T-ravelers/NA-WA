@@ -2,6 +2,7 @@ package me.nawa.explore.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDate;
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.explore.dto.request.EventSearchRequest;
@@ -125,6 +127,92 @@ class EventServiceTest {
     void searchEvents_throwsInvalidInput_whenSizeExceedsMaximum() {
         EventSearchRequest request = new EventSearchRequest();
         request.setSize(101);
+
+        assertThrows(
+            BusinessException.class,
+            () -> eventService.searchEvents(request)
+        );
+        verifyNoInteractions(eventMapper);
+    }
+
+    @Test
+    void searchEvents_normalizesMultiValueFilters_beforeMapperCall() {
+        EventSearchRequest request = new EventSearchRequest();
+        request.setEventKinds(List.of(" popup ", "CONCERT", "popup"));
+        request.setRegion1(List.of("서울", " 서울 ", "경기"));
+        request.setRegion2(List.of("성수", " 홍대 "));
+        request.setDatePreset("opening_soon");
+        request.setSort("ending_soon");
+        request.setFreeOnly(true);
+        request.setOpenWeekendOnly(true);
+        request.setOpensLateOnly(true);
+        request.setPreReservationOnly(true);
+        request.setExperienceOnly(true);
+        request.setPhotoZoneOnly(true);
+
+        when(eventMapper.searchEvents(
+            any(EventSearchRequest.class),
+            eq(0),
+            isNull(Long.class)
+        )).thenReturn(List.of());
+        when(eventMapper.countEvents(
+            any(EventSearchRequest.class),
+            isNull(Long.class)
+        )).thenReturn(0L);
+
+        eventService.searchEvents(request);
+
+        var requestCaptor = forClass(EventSearchRequest.class);
+        verify(eventMapper).searchEvents(
+            requestCaptor.capture(),
+            eq(0),
+            isNull(Long.class)
+        );
+
+        EventSearchRequest normalized = requestCaptor.getValue();
+        assertEquals(List.of("POPUP", "CONCERT"), normalized.getEventKinds());
+        assertEquals(List.of("서울", "경기"), normalized.getRegion1());
+        assertEquals(List.of("성수", "홍대"), normalized.getRegion2());
+        assertEquals("OPENING_SOON", normalized.getDatePreset());
+        assertEquals("ENDING_SOON", normalized.getSort());
+        assertEquals(true, normalized.getFreeOnly());
+        assertEquals(true, normalized.getOpenWeekendOnly());
+        assertEquals(true, normalized.getOpensLateOnly());
+        assertEquals(true, normalized.getPreReservationOnly());
+        assertEquals(true, normalized.getExperienceOnly());
+        assertEquals(true, normalized.getPhotoZoneOnly());
+    }
+
+    @Test
+    void searchEvents_throwsInvalidInput_whenDatePresetAndDateRangeAreCombined() {
+        EventSearchRequest request = new EventSearchRequest();
+        request.setDatePreset("ONGOING");
+        request.setStartDate(LocalDate.of(2026, 8, 1));
+
+        assertThrows(
+            BusinessException.class,
+            () -> eventService.searchEvents(request)
+        );
+        verifyNoInteractions(eventMapper);
+    }
+
+    @Test
+    void searchEvents_throwsInvalidInput_whenDateRangeIsReversed() {
+        EventSearchRequest request = new EventSearchRequest();
+        request.setStartDate(LocalDate.of(2026, 8, 31));
+        request.setEndDate(LocalDate.of(2026, 8, 1));
+
+        assertThrows(
+            BusinessException.class,
+            () -> eventService.searchEvents(request)
+        );
+        verifyNoInteractions(eventMapper);
+    }
+
+    @Test
+    void searchEvents_throwsInvalidInput_whenEventKindIsUnsupported() {
+        EventSearchRequest request = new EventSearchRequest();
+        request.setEventKinds(List.of("STORE"));
 
         assertThrows(
             BusinessException.class,
