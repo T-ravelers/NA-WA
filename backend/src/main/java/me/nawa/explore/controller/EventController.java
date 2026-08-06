@@ -33,8 +33,8 @@ public class EventController {
     @ApiOperation("탐색 Event 상세 조회")
     public ApiResponse<EventDetailResponse> getEventDetail(
         @PathVariable Long eventId,
-        // TODO(국제화 후속 이슈): 크롤링 원본 국제화 전까지 ko를 임시 기본 언어로 사용한다.
-        @RequestParam(name = "language", defaultValue = "ko") String language
+        // TODO(국제화 후속 이슈): 크롤링 원본 국제화 전까지 en을 기본 언어로 사용한다.
+        @RequestParam(name = "language", defaultValue = "en") String language
     ) {
         return ApiResponse.success(
             eventService.getEventDetail(eventId, language)

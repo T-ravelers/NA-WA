@@ -15,10 +15,11 @@ import java.time.LocalDate;
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
-import me.nawa.explore.dto.response.EventDetailResponse;
 import me.nawa.explore.dto.request.EventSearchRequest;
+import me.nawa.explore.dto.response.EventDetailResponse;
 import me.nawa.explore.dto.response.EventListResponse;
 import me.nawa.explore.dto.response.EventSummaryResponse;
+import me.nawa.explore.domain.EventStatus;
 import me.nawa.explore.exception.ExploreErrorCode;
 import me.nawa.explore.service.EventService;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,21 +49,18 @@ class EventControllerTest {
 
     @Test
     void searchEvents_returnsSuccessResponse_whenItemTypeIsEvent() throws Exception {
-        EventSummaryResponse event = new EventSummaryResponse(
-            990001L,
-            "FESTIVAL",
-            "SCHEDULED",
-            "서울 야시장 푸드 팝업(테스트)",
-            "목록 테스트",
-            null,
-            "서울",
-            "중구",
-            "명동",
-            null,
-            null,
-            LocalDate.of(2026, 8, 5),
-            LocalDate.of(2026, 8, 31)
-        );
+        EventSummaryResponse event = EventSummaryResponse.builder()
+            .itemId(990001L)
+            .eventKind("FESTIVAL")
+            .status(EventStatus.SCHEDULED)
+            .title("서울 야시장 푸드 팝업(테스트)")
+            .subtitle("목록 테스트")
+            .region1("서울")
+            .region2("중구")
+            .region3("명동")
+            .startDate(LocalDate.of(2026, 8, 5))
+            .endDate(LocalDate.of(2026, 8, 31))
+            .build();
 
         EventListResponse response = new EventListResponse(
             List.of(event), 0, 20, 1L, 1, false
@@ -113,10 +111,11 @@ class EventControllerTest {
                 "[\"https://example.com/event-990001.jpg\"]"
             ))
             .links(objectMapper.readTree(
-                "{\"homepage_url\":\"https://example.com\"}"
+                "{\"homepageUrl\":\"https://example.com\"}"
             ))
             .preReservation(objectMapper.readTree(
-                "{\"has\":true,\"link\":\"https://example.com/reserve\"}"
+                "{\"has\":true,\"link\":\"https://example.com/reserve\","
+                    + "\"startAt\":\"2026-08-01T09:00:00\"}"
             ))
             .operatingHours(objectMapper.readTree(
                 "{\"raw\":\"10:00-20:00\"}"
@@ -156,10 +155,17 @@ class EventControllerTest {
         );
         assertEquals(
             "https://example.com",
-            json.path("data").path("links").path("homepage_url").asText()
+            json.path("data").path("links").path("homepageUrl").asText()
         );
         assertTrue(
             json.path("data").path("preReservation").path("has").asBoolean()
+        );
+        assertEquals(
+            "2026-08-01T09:00:00",
+            json.path("data")
+                .path("preReservation")
+                .path("startAt")
+                .asText()
         );
         assertEquals(
             "10:00-20:00",

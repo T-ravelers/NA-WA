@@ -11,6 +11,7 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import me.nawa.explore.domain.EventStatus;
 
 @Getter
 @Setter
@@ -33,7 +34,7 @@ public class EventDetailResponse {
     private String reservationUrl;
     private JsonNode preReservation;
 
-    private String status;
+    private EventStatus status;
     private Boolean isPermanent;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")

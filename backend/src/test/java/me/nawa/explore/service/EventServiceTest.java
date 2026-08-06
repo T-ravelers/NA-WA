@@ -8,12 +8,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.explore.dto.request.EventSearchRequest;
 import me.nawa.explore.dto.response.EventDetailResponse;
 import me.nawa.explore.dto.response.EventListResponse;
 import me.nawa.explore.dto.response.EventSummaryResponse;
+import me.nawa.explore.domain.EventStatus;
 import me.nawa.explore.exception.ExploreErrorCode;
 import me.nawa.explore.mapper.EventMapper;
 import org.junit.jupiter.api.Test;
@@ -38,21 +40,16 @@ class EventServiceTest {
         request.setSize(2);
         request.setSort("POPULAR");
 
-        EventSummaryResponse event = new EventSummaryResponse(
-            990001L,
-            "FESTIVAL",
-            "SCHEDULED",
-            "서울 야시장 푸드 팝업(테스트)",
-            "목록 테스트",
-            null,
-            "서울",
-            "중구",
-            "명동",
-            null,
-            null,
-            null,
-            null
-        );
+        EventSummaryResponse event = EventSummaryResponse.builder()
+            .itemId(990001L)
+            .eventKind("FESTIVAL")
+            .status(EventStatus.SCHEDULED)
+            .title("서울 야시장 푸드 팝업(테스트)")
+            .subtitle("목록 테스트")
+            .region1("서울")
+            .region2("중구")
+            .region3("명동")
+            .build();
 
         when(eventMapper.searchEvents(any(EventSearchRequest.class), eq(2)))
             .thenReturn(List.of(event));
@@ -73,7 +70,7 @@ class EventServiceTest {
             result.getContent().get(0).getEventKind()
         );
         assertEquals(
-            "SCHEDULED",
+            EventStatus.SCHEDULED,
             result.getContent().get(0).getStatus()
         );
     }
@@ -192,5 +189,148 @@ class EventServiceTest {
 
         assertEquals(List.of(), result.getActivities());
         verify(eventMapper).findEventActivities(990001L, "ko");
+    }
+
+    @Test
+    void getEventDetail_normalizesJsonKeysToCamelCase() throws Exception {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .links(new ObjectMapper().readTree(
+                "{\"homepage_url\":\"https://example.com\","
+                    + "\"reservation_url\":\"https://example.com/book\"}"
+            ))
+            .preReservation(new ObjectMapper().readTree(
+                "{\"has\":true,\"start_at\":\"2026-08-01T09:00:00\","
+                    + "\"end_at\":\"2026-08-01T18:00:00\"}"
+            ))
+            .operatingHours(new ObjectMapper().readTree(
+                "\"10:00-20:00\""
+            ))
+            .build();
+
+        when(eventMapper.findEventDetail(990001L, "en"))
+            .thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "en"))
+            .thenReturn(List.of());
+
+        EventDetailResponse result = eventService.getEventDetail(
+            990001L,
+            "en"
+        );
+
+        assertEquals(
+            "https://example.com",
+            result.getLinks().path("homepageUrl").asText()
+        );
+        assertEquals(
+            "2026-08-01T09:00:00",
+            result.getPreReservation().path("startAt").asText()
+        );
+        assertEquals(
+            "2026-08-01T18:00:00",
+            result.getPreReservation().path("endAt").asText()
+        );
+        assertEquals(
+            "10:00-20:00",
+            result.getOperatingHours().path("raw").asText()
+        );
+        assertEquals(
+            "https://example.com/book",
+            result.getReservationUrl()
+        );
+    }
+
+    @Test
+    void getEventDetail_prefersPreReservationLink() throws Exception {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .reservationUrl("https://example.com/reservation")
+            .preReservation(new ObjectMapper().readTree(
+                "{\"has\":true,\"link\":\"https://example.com/pre-reservation\"}"
+            ))
+            .build();
+
+        when(eventMapper.findEventDetail(990001L, "ko"))
+            .thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ko"))
+            .thenReturn(List.of());
+
+        EventDetailResponse result = eventService.getEventDetail(
+            990001L,
+            "ko"
+        );
+
+        assertEquals(
+            "https://example.com/pre-reservation",
+            result.getReservationUrl()
+        );
+    }
+
+    @Test
+    void getEventDetail_fallsBackToReservationColumn() throws Exception {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .reservationUrl("https://example.com/reservation")
+            .preReservation(new ObjectMapper().readTree(
+                "{\"has\":false,\"link\":null}"
+            ))
+            .build();
+
+        when(eventMapper.findEventDetail(990001L, "ko"))
+            .thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ko"))
+            .thenReturn(List.of());
+
+        EventDetailResponse result = eventService.getEventDetail(
+            990001L,
+            "ko"
+        );
+
+        assertEquals(
+            "https://example.com/reservation",
+            result.getReservationUrl()
+        );
+    }
+
+    @Test
+    void getEventDetail_fallsBackToLinksReservationUrl() throws Exception {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .links(new ObjectMapper().readTree(
+                "{\"reservation_url\":\"https://example.com/links-reservation\"}"
+            ))
+            .build();
+
+        when(eventMapper.findEventDetail(990001L, "ko"))
+            .thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ko"))
+            .thenReturn(List.of());
+
+        EventDetailResponse result = eventService.getEventDetail(
+            990001L,
+            "ko"
+        );
+
+        assertEquals(
+            "https://example.com/links-reservation",
+            result.getReservationUrl()
+        );
+    }
+
+    @Test
+    void getEventDetail_usesEnglishAsDefaultLanguage() {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .build();
+
+        when(eventMapper.findEventDetail(990001L, "en"))
+            .thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "en"))
+            .thenReturn(List.of());
+
+        eventService.getEventDetail(990001L, null);
+
+        verify(eventMapper).findEventDetail(990001L, "en");
+        verify(eventMapper).findEventActivities(990001L, "en");
     }
 }

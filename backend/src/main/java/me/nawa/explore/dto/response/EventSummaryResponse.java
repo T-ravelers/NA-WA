@@ -2,14 +2,17 @@ package me.nawa.explore.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import me.nawa.explore.domain.EventStatus;
 
 @Getter
+@Builder
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
@@ -17,7 +20,7 @@ public class EventSummaryResponse {
 
     private Long itemId;
     private String eventKind;
-    private String status;
+    private EventStatus status;
     private String title;
     private String subtitle;
     private String thumbnailUrl;
