@@ -1,44 +1,53 @@
 /**
  * NA-WA 디자인 토큰.
  *
- * 시안이 확정되면 이 파일의 값만 교체한다. 컴포넌트는 수정하지 않는다.
- * 컴포넌트에서 HEX 값을 직접 쓰지 않고 여기에서 생성된 Tailwind 토큰 키만 사용한다.
+ * 값의 출처는 2026-08-06 확정 시안(`Trip-Report App` / `DESIGN_v4.md` v4.0)이다.
+ * 시안이 문서 본문과 다를 때는 시안을 따른다. 각 토큰의 주석에 시안에서 몇 번 쓰였는지를
+ * 남겨 두었다. 근거 없이 값을 바꾸지 않기 위한 것이다.
  *
- * 출처: 디자인 시스템 v4 초안과 Figma Reconcile 실측값.
- * 최종 시안 전달 시 docs/DESIGN_v4.md와 함께 갱신한다.
+ * 컴포넌트에서 HEX를 직접 쓰지 않는다. 여기에서 생성된 Tailwind 토큰 키만 사용한다.
+ * 디자인이 바뀌면 이 파일의 값만 교체하고 컴포넌트는 건드리지 않는다.
  */
 
 @theme {
-  /* ── 베이스 ── */
-  --color-canvas: #171717;
-  --color-surface-1: #1b1b19;
-  --color-surface-2: #262626;
-  --color-surface-3: #404040;
-  --color-hairline: #404040;
-  --color-hairline-strong: #858380;
+  /* ── 면 ──
+   * 시안은 #171717보다 어두운 #0E0E0C를 앱 배경으로 쓴다. surface-1만 그대로 남았고
+   * 나머지 단차는 따뜻한 중성으로 이동했다. */
+  --color-canvas: #0e0e0c; /* 앱 배경 (시안 27회) */
+  --color-surface-1: #1b1b19; /* 카드·컨테이너 (45회) */
+  --color-surface-2: #262624; /* 입력·세그먼트 트랙 (26회) */
+  --color-surface-3: #33322f; /* 최상단 면 (11회) */
 
-  /* ── 텍스트 ── */
-  --color-ink: #f4f2ed;
-  --color-ink-2: #dbd9d3;
-  --color-ink-3: #ababa5;
-  --color-on-color: #101828;
+  /* ── 구분선 ──
+   * 이전 #404040은 시안에서 한 번도 쓰이지 않는다. */
+  --color-hairline: #2e2e2b; /* 기본 구분선 (33회) */
+  --color-hairline-2: #454541; /* 강한 구분선 (17회) */
+  --color-hairline-strong: #858380; /* 보조 버튼 보더·게이지 트랙 (21회) */
 
-  /* ── 주요색(카드·티켓 바탕) ── */
-  --color-paper: #f1efe8;
+  /* ── 텍스트 ──
+   * 주 텍스트가 #F4F2ED에서 순백으로 바뀌었다. #F4F2ED는 텍스트가 아니라 밝은 면
+   * 채움 역할로 남아 `paper-fill`이 되었다. */
+  --color-ink: #ffffff; /* 본문·UI 기본 (182회) */
+  --color-ink-2: #b6b6b0; /* 보조 (97회) */
+  --color-ink-3: #7e7e78; /* 흐림·비활성 (123회) */
+  --color-ink-display: #fbfaf8; /* 워드마크·디스플레이 헤드라인 전용 (67회) */
 
-  /* ── 소비영역 4색 ── */
-  --color-beauty: #ff7878;
-  --color-beauty-soft: #fbd5d5;
-  --color-beauty-on: #6e1616;
-  --color-shopping: #318cd5;
-  --color-shopping-soft: #cfe3f5;
-  --color-shopping-on: #0e3e63;
-  --color-show: #ed3423;
-  --color-show-soft: #ffcfc9;
-  --color-show-on: #6e1109;
-  --color-food: #ff6d1a;
-  --color-food-soft: #fbdcc2;
-  --color-food-on: #6e3306;
+  /* 비활성 아이콘 전용. 텍스트에는 ink-3을 쓴다. */
+  --color-icon-muted: #64665d;
+
+  /* ── 밝은 면과 그 위 텍스트 ── */
+  --color-paper: #f1efe8; /* 카드·티켓 바탕 (13회) */
+  --color-paper-fill: #f4f2ed; /* primary 버튼·선택 세그먼트 채움 (17회) */
+  --color-on-color: #101828; /* 종이톤 위 제목·칩 (22회) */
+  --color-on-paper: #0e0e0c; /* 카테고리 코어색 위 텍스트 (59회) */
+
+  /* ── 소비영역 4색 ──
+   * 소프트필(`*-soft` / `*-on`) 8색은 제거했다. Category Ticket 배경이 소프트필에서
+   * 코어색 포화로 바뀌어 시안에서 한 번도 쓰이지 않는다. 코어색 위 텍스트는 on-paper다. */
+  --color-beauty: #ff7878; /* (21회) */
+  --color-shopping: #318cd5; /* (28회) */
+  --color-show: #ff3825; /* 전시·공연 (30회). 크롤러 sector 색과 일치한다 */
+  --color-food: #ff6d1a; /* (38회) */
 
   /* ── 기능색 ── */
   --color-matching: #097e56;
@@ -48,12 +57,15 @@
   --color-danger: #ed3423;
   --color-info: #318cd5;
 
-  /* 다크 이미지 위 진행 상태 전용 예외 */
+  /* 다크 이미지 위 진행 상태 전용 */
   --color-status-ongoing: #3bbe7a;
   --color-status-scheduled: #ffb700;
 
-  /* 비활성 아이콘 전용. 텍스트에는 ink-3을 쓴다. */
-  --color-icon-muted: #64665d;
+  /* 예산 게이지 진행. 트랙은 hairline-strong. */
+  --color-gauge: #5aa3dd;
+
+  /* 모달 백드롭. 60% 불투명도로 쓴다. */
+  --color-scrim: #000000;
 
   /* ── 라운드 ── */
   --radius-xs: 8px;
@@ -62,6 +74,7 @@
   --radius-lg: 20px;
   --radius-card: 20px;
   --radius-ticket: 20px;
+  --radius-pill: 999px;
 
   /* ── 간격 ── */
   --spacing-screen: 20px;
@@ -72,11 +85,9 @@
   --shadow-sheet: 0 -8px 32px rgb(0 0 0 / 0.55);
 
   /* ── 폰트 ──
-   * Display는 로케일별로 달라진다. en·vi는 Sztos를 쓰고 CJK Display 3종은
-   * 아직 번들에 없으므로 Body 폰트로 폴백한다.
-   * Ria Sans는 런타임 폰트로 배포하지 않는다. 로고는 벡터 자산이 확보될 때까지
-   * Sztos로 폴백한다.
-   */
+   * Display는 로케일별로 달라진다. en·vi는 Sztos를 쓰고 CJK Display 3종
+   * (Smiley Sans·Taipei Sans TC Beta·M PLUS 1)은 아직 번들에 없으므로 Body 폰트로
+   * 폴백한다. 로고용 Ria Sans도 번들이 없어 Sztos로 폴백한다. */
   --font-display: 'Sztos', 'Noto Sans', sans-serif;
   --font-body: 'Noto Sans', sans-serif;
 
@@ -89,6 +100,21 @@
   --text-section-header: 22px;
   --text-section-header--line-height: 1.15;
   --text-section-header--font-weight: 700;
+
+  /* 여정 티켓 제목. 1줄, 초과 시 말줄임. */
+  --text-trip-ticket-title: 24px;
+  --text-trip-ticket-title--line-height: 1.15;
+  --text-trip-ticket-title--font-weight: 800;
+
+  /* 카테고리 티켓 제목. */
+  --text-category-ticket-title: 18px;
+  --text-category-ticket-title--line-height: 1.25;
+  --text-category-ticket-title--font-weight: 500;
+
+  /* `# Food` 형태 라벨. 기본 opacity 75%로 쓴다. */
+  --text-display-label: 13px;
+  --text-display-label--line-height: 1.3;
+  --text-display-label--font-weight: 300;
 
   --text-title: 18px;
   --text-title--line-height: 1.25;
