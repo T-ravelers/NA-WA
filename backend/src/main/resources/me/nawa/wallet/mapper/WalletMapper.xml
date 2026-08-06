@@ -17,4 +17,17 @@
             AND o.deleted_at IS NULL
             AND w.deleted_at IS NULL
     </select>
+
+    <select id="findByWalletIdForUpdate" resultType="me.nawa.wallet.domain.Wallet">
+        SELECT wallet_id, currency_code, available_balance, wallet_status
+        FROM wallets
+        WHERE wallet_id = #{walletId} AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <update id="updateBalance">
+        UPDATE wallets
+        SET available_balance = #{availableBalance}
+        WHERE wallet_id = #{walletId}
+    </update>
 </mapper>

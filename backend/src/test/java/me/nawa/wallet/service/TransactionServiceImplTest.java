@@ -75,7 +75,7 @@ class TransactionServiceImplTest {
         return new WalletTransfer(
             transferId, "TXN-20260805-0001", transferType, transferStatus,
             BigDecimal.valueOf(10000), "카드 충전", "FOOD",
-            completedAt, createdAt
+            completedAt, createdAt, null, null
         );
     }
 
@@ -236,7 +236,8 @@ class TransactionServiceImplTest {
         WalletTransfer transfer = transfer(482L, "TOPUP", "COMPLETED", completedAt, completedAt.minusMinutes(5));
         WalletTopup topup = new WalletTopup(
             BigDecimal.valueOf(10000), "USD", BigDecimal.valueOf(1350.5), LocalDateTime.of(2026, 8, 4, 9, 59),
-            900L, "COMPLETED", BigDecimal.valueOf(13505000), completedAt, completedAt.minusMinutes(5)
+            900L, "COMPLETED", BigDecimal.valueOf(13505000), completedAt, completedAt.minusMinutes(5),
+            100L, "stripe", "pi_test_900", "succeeded", "idem-test-900", 482L
         );
 
         when(walletMapper.findByMemberId(1L)).thenReturn(wallet());

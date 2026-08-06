@@ -1,6 +1,9 @@
 package me.nawa.wallet.service;
 
+import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
+import com.stripe.model.Event;
+import com.stripe.model.PaymentIntent;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -11,10 +14,13 @@ import lombok.extern.log4j.Log4j2;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.wallet.domain.Wallet;
 import me.nawa.wallet.domain.WalletTopup;
+import me.nawa.wallet.domain.WalletTransfer;
 import me.nawa.wallet.domain.enums.TopupMethodType;
 import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
 import me.nawa.wallet.dto.response.StripeIntentResponse;
+import me.nawa.wallet.dto.response.StripeTopupStatusResponse;
+import me.nawa.wallet.dto.response.StripeWebhookResponse;
 import me.nawa.wallet.dto.response.TopupListResponse;
 import me.nawa.wallet.dto.response.TopupMethodResponse;
 import me.nawa.wallet.dto.response.TopupMethodsResponse;
@@ -23,12 +29,15 @@ import me.nawa.wallet.dto.response.TopupSummaryResponse;
 import me.nawa.wallet.exception.WalletErrorCode;
 import me.nawa.wallet.external.stripe.StripeClient;
 import me.nawa.wallet.external.stripe.StripePaymentIntent;
+import me.nawa.wallet.mapper.WalletLedgerMapper;
 import me.nawa.wallet.mapper.WalletMapper;
 import me.nawa.wallet.mapper.WalletTopupMapper;
+import me.nawa.wallet.mapper.WalletTransferMapper;
+import me.nawa.wallet.util.TransactionNumberGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// 충전 수단 조회 / 충전 미리보기 / 충전 내역 목록 / Stripe PaymentIntent 생성을 담당한다.
+// 충전 수단 조회 / 충전 미리보기 / 충전 내역 목록 / Stripe PaymentIntent 생성·상태조회를 담당한다.
 @Service
 @RequiredArgsConstructor
 @Log4j2
@@ -41,7 +50,10 @@ public class TopupServiceImpl implements TopupService {
 
     private final WalletMapper walletMapper;
     private final WalletTopupMapper walletTopupMapper;
+    private final WalletTransferMapper walletTransferMapper;
+    private final WalletLedgerMapper walletLedgerMapper;
     private final StripeClient stripeClient;
+    private final TransactionNumberGenerator transactionNumberGenerator;
 
     // GET /api/v1/topups/methods — 활성화된(enabled=true) 충전 수단 목록 + 안내 문구 반환
     @Override
@@ -175,6 +187,167 @@ public class TopupServiceImpl implements TopupService {
 
         //7. 응답 조립 (생성 직후라 status는 항상 READY)
         return toStripeIntentResponse(topup, intent.getClientSecret());
+    }
+
+    // GET /api/v1/topups/stripe/{topupId} — 아직 진행 중인 건이면 Stripe에서 최신 상태를 가져와 반영(성공이면 여기서 실제로 잔액도 적립)한 뒤 조회한다.
+    @Override
+    @Transactional
+    public StripeTopupStatusResponse getStripeTopupStatus(long memberId, Long topupId) {
+        //1. 본인 지갑 조회
+        Wallet wallet = walletMapper.findByMemberId(memberId);
+        if (wallet == null) {
+            throw new BusinessException(WalletErrorCode.WALLET_NOT_FOUND);
+        }
+
+        //2. 충전 건 조회
+        WalletTopup topup = walletTopupMapper.findByTopupId(topupId);
+        if (topup == null) {
+            throw new BusinessException(WalletErrorCode.TOPUP_NOT_FOUND);
+        }
+
+        //3. 본인 소유가 아니면 403
+        if (!topup.getWalletId().equals(wallet.getWalletId())) {
+            throw new BusinessException(WalletErrorCode.TOPUP_FORBIDDEN);
+        }
+
+        //4. 아직 최종 상태가 아니면 Stripe에서 최신 상태를 가져와 반영한다.
+        //   succeeded로 확인되면 이 안에서 실제로 지갑 잔액 적립까지 같이 처리된다 (applyProviderUpdate -> creditWallet).
+        if (!isTerminal(topup.getTopupStatus())) {
+            StripePaymentIntent latest = retrieveOrThrow(topup.getProviderPaymentId());
+            // 폴링은 Stripe의 "현재 상태"를 그대로 읽어오는 거라 실패 이벤트라는 개념이 없다 (isFailureEvent=false)
+            topup = applyProviderUpdate(topup, latest.getStatus(), false);
+        }
+
+        //5. 표시 상태 계산 + 응답 조립 (크레딧이 방금 반영됐을 수 있어 잔액은 다시 조회)
+        String displayStatus = toDisplayStatus(topup.getTopupStatus(), topup.getProviderStatus());
+        Wallet latestWallet = walletMapper.findByMemberId(memberId);
+
+        return new StripeTopupStatusResponse(
+            topup.getTopupId(),
+            topup.getTransferId(),
+            displayStatus,
+            topup.getProviderStatus(),
+            "FAILED".equals(displayStatus),
+            latestWallet.getAvailableBalance()
+        );
+    }
+
+    // POST /api/v1/stripe/webhook — Stripe가 결제 상태 변화를 알려줄 때 호출한다.
+    @Override
+    @Transactional
+    public StripeWebhookResponse applyStripeWebhookEvent(String payload, String signatureHeader) {
+        //1. 서명 검증 — Stripe가 보낸 요청이 맞는지 확인 (이게 곧 이 엔드포인트의 인증 역할을 한다)
+        Event event;
+        try {
+            event = stripeClient.constructWebhookEvent(payload, signatureHeader);
+        } catch (SignatureVerificationException e) {
+            log.warn("[Stripe Webhook] 서명 검증 실패", e);
+            throw new BusinessException(WalletErrorCode.STRIPE_INVALID_SIGNATURE);
+        }
+
+        //2. payment_intent 관련 이벤트가 아니면 볼 것도 없이 수신만 확인
+        PaymentIntent paymentIntent = extractPaymentIntent(event);
+        if (paymentIntent == null) {
+            return new StripeWebhookResponse(true, false);
+        }
+
+        //3. 우리 DB에서 이 PaymentIntent에 연결된 충전 건 조회 — 모르는 결제면 에러 없이 수신만 확인 (Stripe가 무한 재시도하지 않도록)
+        WalletTopup topup = walletTopupMapper.findByProviderPaymentId(paymentIntent.getId());
+        if (topup == null) {
+            log.warn("[Stripe Webhook] 알 수 없는 PaymentIntent: {}", paymentIntent.getId());
+            return new StripeWebhookResponse(true, false);
+        }
+
+        //4. 이미 최종 상태로 처리된 건이면 재처리하지 않고 "이미 처리됨"만 알려준다 (이벤트 재전송/중복 방지)
+        if (isTerminal(topup.getTopupStatus())) {
+            return new StripeWebhookResponse(true, true);
+        }
+
+        //5. payment_intent.payment_failed 이벤트는 Stripe 원문 status와 무관하게 실패로 취급한다
+        //   (Stripe는 결제 실패 후에도 PaymentIntent 자체 상태를 requires_payment_method로 되돌리기 때문에,
+        //    상태 문자열만으로는 "방금 실패했다"는 걸 알 수 없다 — 이벤트 타입으로 판단해야 한다)
+        boolean isFailureEvent = "payment_intent.payment_failed".equals(event.getType());
+        applyProviderUpdate(topup, paymentIntent.getStatus(), isFailureEvent);
+
+        return new StripeWebhookResponse(true, false);
+    }
+
+    // 이벤트 payload에서 PaymentIntent 객체를 꺼낸다. payment_intent.* 이벤트가 아니거나 역직렬화에 실패하면 null
+    // (역직렬화 실패는 보통 Stripe API 버전 불일치 때문인데, 웹훅 자체를 에러로 만들지 않고 그냥 처리를 건너뛴다 — 폴링이 기준 경로라 안전하다).
+    private PaymentIntent extractPaymentIntent(Event event) {
+        if (event.getType() == null || !event.getType().startsWith("payment_intent.")) {
+            return null;
+        }
+        return event.getDataObjectDeserializer()
+            .getObject()
+            .map(stripeObject -> (PaymentIntent) stripeObject)
+            .orElseGet(() -> {
+                try {
+                    return (PaymentIntent) event.getDataObjectDeserializer().deserializeUnsafe();
+                } catch (Exception e) {
+                    log.warn("[Stripe Webhook] PaymentIntent 역직렬화 실패, eventId={}", event.getId(), e);
+                    return null;
+                }
+            });
+    }
+
+    private boolean isTerminal(String topupStatus) {
+        return "COMPLETED".equals(topupStatus) || "FAILED".equals(topupStatus) || "CANCELLED".equals(topupStatus);
+    }
+
+    // 구현 전 확정 사항 3번 매핑표: DB 내부 상태(topupStatus) + Stripe 원문 상태(providerStatus)를 조합해서 화면 표시용 상태를 계산한다.
+    private String toDisplayStatus(String topupStatus, String providerStatus) {
+        if ("COMPLETED".equals(topupStatus)) {
+            return "SUCCESS";
+        }
+        if ("FAILED".equals(topupStatus)) {
+            return "FAILED";
+        }
+        if ("CANCELLED".equals(topupStatus)) {
+            return "CANCELLED";
+        }
+        // 아직 QUOTED인데, Stripe가 처리 중/추가 인증 요구 상태면 PENDING, 그 외(카드 입력 대기 등)는 READY
+        if ("requires_action".equals(providerStatus) || "processing".equals(providerStatus)) {
+            return "PENDING";
+        }
+        return "READY";
+    }
+
+    // Stripe 최신 상태를 반영한다. succeeded면 실제 크레딧까지 수행하고, 실패 이벤트면 FAILED로, 그 외엔 상태만 갱신한다.
+    // isFailureEvent는 웹훅의 payment_intent.payment_failed처럼 "원문 status만으론 알 수 없는 실패"를 표시하는 용도다 (폴링에서는 항상 false).
+    private WalletTopup applyProviderUpdate(WalletTopup topup, String rawStatus, boolean isFailureEvent) {
+        if (isFailureEvent) {
+            walletTopupMapper.markFailed(topup.getTopupId(), rawStatus);
+        } else if ("succeeded".equals(rawStatus)) {
+            creditWallet(topup);
+        } else if ("canceled".equals(rawStatus)) {
+            walletTopupMapper.markCancelled(topup.getTopupId(), rawStatus);
+        } else {
+            walletTopupMapper.updateProviderStatus(topup.getTopupId(), rawStatus);
+        }
+        return walletTopupMapper.findByTopupId(topup.getTopupId());
+    }
+
+    // 지갑 잠금 -> 잔액 적립 -> 거래/원장 기록 -> 충전 건 COMPLETED 처리까지 한 트랜잭션으로 수행한다.
+    private void creditWallet(WalletTopup topup) {
+        Wallet wallet = walletMapper.findByWalletIdForUpdate(topup.getWalletId());
+        BigDecimal newBalance = wallet.getAvailableBalance().add(topup.getKrwAmount());
+        walletMapper.updateBalance(wallet.getWalletId(), newBalance);
+
+        // 충전은 회원이 직접 시작한 거래지만, 이 크레딧 자체는 Stripe 상태 확인(폴링/웹훅)이 트리거하는
+        // 시스템 자동 처리라 initiatorMemberId는 null로 둔다 (DB 코멘트: "시스템 자동 이체는 NULL").
+        WalletTransfer transfer = new WalletTransfer(
+            null, transactionNumberGenerator.generate(), "TOPUP", "COMPLETED",
+            topup.getKrwAmount(), null, null, LocalDateTime.now(), LocalDateTime.now(),
+            null, topup.getIdempotencyKey()
+        );
+        walletTransferMapper.insert(transfer);
+
+        walletLedgerMapper.insert(
+            transfer.getTransferId(), wallet.getWalletId(), "CREDIT", topup.getKrwAmount(), newBalance
+        );
+
+        walletTopupMapper.markCompleted(topup.getTopupId(), transfer.getTransferId(), "succeeded", LocalDateTime.now());
     }
 
     private StripePaymentIntent retrieveOrThrow(String providerPaymentId) {

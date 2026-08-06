@@ -5,6 +5,11 @@
 
 <mapper namespace="me.nawa.wallet.mapper.WalletLedgerMapper">
 
+    <insert id="insert">
+        INSERT INTO wallet_ledger_entries (transfer_id, wallet_id, entry_type, amount, balance_after)
+        VALUES (#{transferId}, #{walletId}, #{entryType}, #{amount}, #{balanceAfter})
+    </insert>
+
     <select id="findRecentByWalletId" resultType="me.nawa.wallet.domain.WalletLedgerEntry">
         SELECT
             e.transfer_id,

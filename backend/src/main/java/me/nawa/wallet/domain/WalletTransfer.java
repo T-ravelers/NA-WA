@@ -22,4 +22,6 @@ public class WalletTransfer {
     private String spendingCategory;     // 지출 카테고리
     private LocalDateTime completedAt;   // 거래 완료 시각 (완료 전이면 null)
     private LocalDateTime createdAt;     // 거래 생성 시각
+    private Long initiatorMemberId;      // 거래를 시작한 회원 (시스템 자동 이체는 null)
+    private String idempotencyKey;       // 중복 처리 방지 키
 }

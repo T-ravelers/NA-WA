@@ -47,7 +47,7 @@ public class StripeClient {
     }
 
     // wallet_topups.provider_payment_id로 저장해둔 ID로 Stripe 쪽 최신 상태를 다시 조회한다.
-    // 동일한 요청 재요청 시,
+    // 동일한 요청 재요청 시(client secret 가져오기 위함), 충전 상태를 조회할 때 사용(최신 충전 상태 반영)
     public StripePaymentIntent retrievePaymentIntent(String providerPaymentId) throws StripeException {
         PaymentIntent intent = PaymentIntent.retrieve(providerPaymentId);
         return new StripePaymentIntent(intent.getId(), intent.getClientSecret(), intent.getStatus());

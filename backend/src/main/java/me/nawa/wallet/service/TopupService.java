@@ -3,6 +3,8 @@ package me.nawa.wallet.service;
 import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
 import me.nawa.wallet.dto.response.StripeIntentResponse;
+import me.nawa.wallet.dto.response.StripeTopupStatusResponse;
+import me.nawa.wallet.dto.response.StripeWebhookResponse;
 import me.nawa.wallet.dto.response.TopupListResponse;
 import me.nawa.wallet.dto.response.TopupMethodsResponse;
 import me.nawa.wallet.dto.response.TopupPreviewResponse;
@@ -16,4 +18,8 @@ public interface TopupService {
     TopupListResponse getTopups(Long memberId, Long cursor, Integer size);
 
     StripeIntentResponse createStripeIntent(long memberId, String idempotencyKdy, StripeIntentCreateRequest request);
+
+    StripeTopupStatusResponse getStripeTopupStatus(long memberId, Long topupId);
+
+    StripeWebhookResponse applyStripeWebhookEvent(String payload, String signatureHeader);
 }

@@ -67,6 +67,24 @@ public enum WalletErrorCode implements ErrorCode {
         HttpStatus.SERVICE_UNAVAILABLE,
         "WALLET-010",
         "결제 서비스에 일시적으로 연결할 수 없습니다."
+    ),
+
+    TOPUP_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "WALLET-011",
+        "충전 내역을 찾을 수 없습니다."
+    ),
+
+    TOPUP_FORBIDDEN(
+        HttpStatus.FORBIDDEN,
+        "WALLET-012",
+        "본인의 충전 내역만 조회할 수 있습니다."
+    ),
+
+    STRIPE_INVALID_SIGNATURE(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-013",
+        "Webhook 서명 검증에 실패했습니다."
     );
 
     private final HttpStatus status;

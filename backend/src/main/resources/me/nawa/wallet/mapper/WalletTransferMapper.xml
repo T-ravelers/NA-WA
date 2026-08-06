@@ -12,4 +12,13 @@
         WHERE transfer_id = #{transferId}
           AND deleted_at IS NULL
     </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="transferId">
+        INSERT INTO wallet_transfers
+            (currency_code, initiator_member_id, transfer_number, transfer_type, transfer_status,
+             amount, memo, spending_category, completed_at, idempotency_key)
+        VALUES
+            ('KRW', #{initiatorMemberId}, #{transferNumber}, #{transferType}, #{transferStatus},
+             #{amount}, #{memo}, #{spendingCategory}, #{completedAt}, #{idempotencyKey})
+    </insert>
 </mapper>

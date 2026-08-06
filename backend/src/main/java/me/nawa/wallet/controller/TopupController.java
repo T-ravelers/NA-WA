@@ -7,6 +7,7 @@ import me.nawa.common.response.ApiResponse;
 import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
 import me.nawa.wallet.dto.response.StripeIntentResponse;
+import me.nawa.wallet.dto.response.StripeTopupStatusResponse;
 import me.nawa.wallet.dto.response.TopupListResponse;
 import me.nawa.wallet.dto.response.TopupMethodsResponse;
 import me.nawa.wallet.dto.response.TopupPreviewResponse;
@@ -14,6 +15,7 @@ import me.nawa.wallet.service.TopupService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -61,4 +63,13 @@ public class TopupController {
         ){
         return ApiResponse.success(topupService.createStripeIntent(member.getMemberId(), idempotencyKdy, request));
     }
+
+    @GetMapping("/stripe/{topupId}")
+    public ApiResponse<StripeTopupStatusResponse> getStripeTopupStatus(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long topupId
+    ){
+        return ApiResponse.success(topupService.getStripeTopupStatus(member.getMemberId(), topupId));
+    }
+
 }

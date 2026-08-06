@@ -16,6 +16,8 @@ import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
 import me.nawa.wallet.dto.request.TransactionSearchCondition;
 import me.nawa.wallet.dto.response.StripeIntentResponse;
+import me.nawa.wallet.dto.response.StripeTopupStatusResponse;
+import me.nawa.wallet.dto.response.StripeWebhookResponse;
 import me.nawa.wallet.dto.response.TopupListResponse;
 import me.nawa.wallet.dto.response.TopupMethodsResponse;
 import me.nawa.wallet.dto.response.TopupPreviewResponse;
@@ -222,6 +224,16 @@ class SwaggerConfigTest {
                 public StripeIntentResponse createStripeIntent(
                     long memberId, String idempotencyKey, StripeIntentCreateRequest request
                 ) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public StripeTopupStatusResponse getStripeTopupStatus(long memberId, Long topupId) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public StripeWebhookResponse applyStripeWebhookEvent(String payload, String signatureHeader) {
                     throw new UnsupportedOperationException();
                 }
             };
