@@ -1,4 +1,4 @@
-import { storeLocale } from '@/shared/i18n/localePreference'
+import { resolveInitialLocale, storeLocale } from '@/shared/i18n/localePreference'
 import type { AppLocale } from '@/shared/i18n/locales'
 
 import { i18n } from './index'
@@ -26,4 +26,17 @@ export function applyLocale(locale: AppLocale, options: ApplyLocaleOptions = {})
   if (options.persist === true) {
     storeLocale(locale)
   }
+}
+
+/**
+ * 앱 시작 시 로케일을 적용한다.
+ *
+ * `createI18n`은 vue-i18n의 locale만 정하므로, `index.html`에 박혀 있는
+ * `<html lang="en">`은 그대로 남는다. 저장된 로케일이 `en`이 아닌 사용자는 새로고침
+ * 이후 화면 언어와 `lang`이 어긋나 스크린 리더 발음과 브라우저 번역 제안이 틀어진다.
+ *
+ * 감지 결과일 수 있으므로 저장하지 않는다.
+ */
+export function bootstrapLocale(): void {
+  applyLocale(resolveInitialLocale())
 }

@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { applyLocale } from '../applyLocale'
+import { applyLocale, bootstrapLocale } from '../applyLocale'
 import { i18n } from '../index'
 
 describe('applyLocale', () => {
@@ -38,5 +38,44 @@ describe('applyLocale', () => {
     applyLocale('zh-TW', { persist: true })
 
     expect(localStorage.getItem('nawa.locale')).toBe('zh-TW')
+  })
+})
+
+describe('bootstrapLocale', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    i18n.global.locale.value = 'en'
+    // index.html이 박아 둔 초기값. 부팅이 이 값을 갱신하는지 본다.
+    document.documentElement.lang = 'en'
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('applies the stored choice to both the app and the document', () => {
+    localStorage.setItem('nawa.locale', 'ja')
+
+    bootstrapLocale()
+
+    expect(i18n.global.locale.value).toBe('ja')
+    expect(document.documentElement.lang).toBe('ja')
+  })
+
+  it('applies the detected browser language to the document', () => {
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['vi'])
+
+    bootstrapLocale()
+
+    expect(document.documentElement.lang).toBe('vi')
+  })
+
+  // 감지 결과를 저장하면 "키의 존재 = 명시 선택" 규약이 깨진다.
+  it('does not persist the locale it resolved', () => {
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['vi'])
+
+    bootstrapLocale()
+
+    expect(localStorage.getItem('nawa.locale')).toBeNull()
   })
 })
