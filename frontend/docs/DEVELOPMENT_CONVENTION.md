@@ -311,6 +311,13 @@ pnpm test:e2e
 확인할 수 없는 것이 있습니다. 폰트 폴백이 깨져 CJK가 두부(□□□)로 나와도 DOM assertion은
 통과하고, 여백과 대비는 클래스 이름만 봐서는 알 수 없습니다.
 
+스냅샷은 Chromium으로 찍으므로 브라우저를 최초 1회 내려받아야 합니다. E2E 테스트를 이미
+실행해 봤다면 준비돼 있습니다.
+
+```shell
+pnpm --filter @na-wa/frontend exec playwright install chromium
+```
+
 개발 서버를 띄운 뒤 실행합니다.
 
 ```shell

@@ -8,6 +8,7 @@
  * 나와도 DOM 단언은 통과하고, 여백과 대비는 클래스 이름을 봐서는 알 수 없다.
  *
  * 사용법:
+ *   0) pnpm --filter @na-wa/frontend exec playwright install chromium  (최초 1회)
  *   1) pnpm dev
  *   2) pnpm --filter @na-wa/frontend screenshot
  *   3) 생긴 PNG를 PR 본문에 끌어다 놓는다
@@ -72,10 +73,25 @@ async function assertServerIsUp() {
   }
 }
 
+async function launchBrowser() {
+  try {
+    return await chromium.launch()
+  } catch (error) {
+    // Playwright가 안내하는 `npx playwright install`은 이 워크스페이스에서 맞지 않는다.
+    console.error(
+      `Chromium을 띄우지 못했다.\n` +
+        '  브라우저가 없다면 최초 1회 설치한다.\n' +
+        '  pnpm --filter @na-wa/frontend exec playwright install chromium\n' +
+        `  원본 오류: ${error.message}`,
+    )
+    process.exit(1)
+  }
+}
+
 await assertServerIsUp()
 await mkdir(OUT, { recursive: true })
 
-const browser = await chromium.launch()
+const browser = await launchBrowser()
 const context = await browser.newContext({
   viewport: VIEWPORT,
   deviceScaleFactor: SCALE,
