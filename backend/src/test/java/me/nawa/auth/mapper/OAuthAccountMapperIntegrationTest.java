@@ -4,7 +4,8 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import me.nawa.auth.oauth.account.OAuthLoginAccount;
 import me.nawa.auth.oauth.account.OAuthMemberInsert;
-import me.nawa.auth.profile.AuthMemberProfile;
+import me.nawa.member.domain.MemberProfile;
+import me.nawa.member.mapper.MemberMapper;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -30,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OAuthAccountMapperIntegrationTest {
     private static HikariDataSource dataSource;
     private static OAuthAccountMapper mapper;
-    private static AuthMapper authMapper;
+    private static MemberMapper memberMapper;
     private static TransactionTemplate transactionTemplate;
 
     @BeforeAll
@@ -55,14 +56,14 @@ class OAuthAccountMapperIntegrationTest {
         sqlSessionFactory.getConfiguration().addMapper(
                 OAuthAccountMapper.class
         );
-        sqlSessionFactory.getConfiguration().addMapper(AuthMapper.class);
+        sqlSessionFactory.getConfiguration().addMapper(MemberMapper.class);
         SqlSessionTemplate sqlSessionTemplate = new SqlSessionTemplate(
                 sqlSessionFactory
         );
         mapper = sqlSessionTemplate.getMapper(
                 OAuthAccountMapper.class
         );
-        authMapper = sqlSessionTemplate.getMapper(AuthMapper.class);
+        memberMapper = sqlSessionTemplate.getMapper(MemberMapper.class);
         transactionTemplate = new TransactionTemplate(
                 new DataSourceTransactionManager(dataSource)
         );
@@ -106,7 +107,7 @@ class OAuthAccountMapperIntegrationTest {
             assertEquals("ACTIVE", account.getMemberStatus());
             assertFalse(account.isMemberDeleted());
             assertFalse(account.isSocialAccountDeleted());
-            AuthMemberProfile profile = authMapper.findMemberProfile(
+            MemberProfile profile = memberMapper.findProfile(
                     member.getMemberId()
             );
             assertEquals(member.getMemberId(), profile.getMemberId());

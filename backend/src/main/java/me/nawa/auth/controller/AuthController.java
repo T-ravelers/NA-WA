@@ -7,9 +7,6 @@ import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.oauth.callback.OAuthCallbackResult;
 import me.nawa.auth.oauth.callback.OAuthCallbackService;
-import me.nawa.auth.profile.AuthMeResponse;
-import me.nawa.auth.profile.AuthMeService;
-import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.BusinessException;
@@ -20,7 +17,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,15 +37,6 @@ public class AuthController {
     private final AuthCookieManager authCookieManager;
     private final OAuthAuthorizationService oauthAuthorizationService;
     private final OAuthCallbackService oauthCallbackService;
-    private final AuthMeService authMeService;
-
-    @GetMapping("/me")
-    public ApiResponse<AuthMeResponse> me(
-            @AuthenticationPrincipal AuthenticatedMember member) {
-        return ApiResponse.success(
-                authMeService.getCurrentMember(member.getMemberId())
-        );
-    }
 
     @GetMapping("/oauth2/authorization/{provider}")
     public ResponseEntity<Void> authorize(

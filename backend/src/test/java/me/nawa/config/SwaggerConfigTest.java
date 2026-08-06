@@ -6,9 +6,6 @@ import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.oauth.callback.OAuthCallbackResult;
 import me.nawa.auth.oauth.callback.OAuthCallbackService;
-import me.nawa.auth.profile.AuthMeResponse;
-import me.nawa.auth.profile.AuthMeService;
-import me.nawa.auth.profile.AuthMemberProfile;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.ErrorCode;
@@ -184,13 +181,6 @@ class SwaggerConfigTest {
                     );
                 }
             };
-        }
-
-        @Bean
-        AuthMeService authMeService() {
-            return memberId -> new AuthMeResponse(
-                    AuthMemberProfile.active(memberId, false)
-            );
         }
     }
 
