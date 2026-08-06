@@ -26,6 +26,13 @@ public class OriginValidationFilter extends OncePerRequestFilter {
     private final AllowedOriginPolicy allowedOriginPolicy;
     private final SecurityErrorResponseWriter errorResponseWriter;
 
+    // Stripe 등 외부 서버가 서버-투-서버로 호출하는 webhook은 브라우저가 아니라 Origin 헤더가 없다.
+    // 이 경로는 Stripe-Signature 검증이 인증을 대신하므로 Origin 체크 대상에서 제외한다.
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return "/api/v1/stripe/webhook".equals(request.getRequestURI());
+    }
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,

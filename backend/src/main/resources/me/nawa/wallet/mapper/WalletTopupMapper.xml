@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.wallet.mapper.WalletTopupMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="topupId">
+        INSERT INTO wallet_topups
+        (wallet_id, source_currency_code, topup_status, source_amount,
+         exchange_rate_krw_per_unit, krw_amount, quoted_at,
+         provider, provider_payment_id, provider_status, idempotency_key)
+        VALUES
+            (#{walletId}, #{sourceCurrencyCode}, 'QUOTED', #{sourceAmount},
+             #{exchangeRateKrwPerUnit}, #{krwAmount}, #{quotedAt},
+             #{provider}, #{providerPaymentId}, #{providerStatus}, #{idempotencyKey})
+    </insert>
+
+    <select id="findByTopupId" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT topup_id, wallet_id, topup_status, source_amount, source_currency_code,
+               exchange_rate_krw_per_unit, krw_amount, quoted_at, completed_at, created_at,
+               provider, provider_payment_id, provider_status, idempotency_key, transfer_id
+        FROM wallet_topups
+        WHERE topup_id = #{topupId} AND deleted_at IS NULL
+    </select>
+
+    <select id="findByTopupIdForUpdate" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT topup_id, wallet_id, topup_status, source_amount, source_currency_code,
+               exchange_rate_krw_per_unit, krw_amount, quoted_at, completed_at, created_at,
+               provider, provider_payment_id, provider_status, idempotency_key, transfer_id
+        FROM wallet_topups
+        WHERE topup_id = #{topupId} AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="findByIdempotencyKey" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT topup_id, wallet_id, topup_status, source_amount, source_currency_code,
+               exchange_rate_krw_per_unit, krw_amount, quoted_at, completed_at, created_at,
+               provider, provider_payment_id, provider_status, idempotency_key, transfer_id
+        FROM wallet_topups
+        WHERE idempotency_key = #{idempotencyKey} AND deleted_at IS NULL
+    </select>
+
+    <select id="findByProviderPaymentId" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT topup_id, wallet_id, topup_status, source_amount, source_currency_code,
+               exchange_rate_krw_per_unit, krw_amount, quoted_at, completed_at, created_at,
+               provider, provider_payment_id, provider_status, idempotency_key, transfer_id
+        FROM wallet_topups
+        WHERE provider_payment_id = #{providerPaymentId} AND deleted_at IS NULL
+    </select>
+
+    <select id="findByProviderPaymentIdForUpdate" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT topup_id, wallet_id, topup_status, source_amount, source_currency_code,
+               exchange_rate_krw_per_unit, krw_amount, quoted_at, completed_at, created_at,
+               provider, provider_payment_id, provider_status, idempotency_key, transfer_id
+        FROM wallet_topups
+        WHERE provider_payment_id = #{providerPaymentId} AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <update id="updateProviderStatus">
+        UPDATE wallet_topups SET provider_status = #{providerStatus} WHERE topup_id = #{topupId}
+    </update>
+
+    <update id="markCompleted">
+        UPDATE wallet_topups
+        SET topup_status = 'COMPLETED', transfer_id = #{transferId},
+            provider_status = #{providerStatus}, completed_at = #{completedAt}
+        WHERE topup_id = #{topupId}
+    </update>
+
+    <update id="markFailed">
+        UPDATE wallet_topups SET topup_status = 'FAILED', provider_status = #{providerStatus}
+        WHERE topup_id = #{topupId}
+    </update>
+
+    <update id="markCancelled">
+        UPDATE wallet_topups SET topup_status = 'CANCELLED', provider_status = #{providerStatus}
+        WHERE topup_id = #{topupId}
+    </update>
+
+    <update id="resetToQuoted">
+        UPDATE wallet_topups SET topup_status = 'QUOTED'
+        WHERE topup_id = #{topupId}
+    </update>
+
+    <select id="findFxByTransferId" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT source_amount, source_currency_code, exchange_rate_krw_per_unit, quoted_at
+        FROM wallet_topups
+        WHERE transfer_id = #{transferId}
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="findByWalletIdWithCursor" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT
+            topup_id, topup_status, source_amount, source_currency_code,
+            exchange_rate_krw_per_unit, krw_amount, quoted_at, completed_at, created_at
+        FROM wallet_topups
+        WHERE wallet_id = #{walletId}
+            AND deleted_at IS NULL
+            <if test="cursor != null">
+                AND topup_id &lt; #{cursor}
+            </if>
+        ORDER BY topup_id DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

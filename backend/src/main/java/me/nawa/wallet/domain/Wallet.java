@@ -12,8 +12,8 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Wallet {
 
-    private Long walletId;
-    private String currencyCode;
-    private BigDecimal availableBalance;
-    private String walletStatus;
+    private Long walletId;              // 지갑 PK
+    private String currencyCode;        // 지갑 통화 (현재 KRW 고정)
+    private BigDecimal availableBalance; // 사용 가능 잔액
+    private String walletStatus;        // 지갑 상태 (ACTIVE | SUSPENDED | CLOSED)
 }

@@ -12,6 +12,19 @@ import me.nawa.auth.profile.AuthMemberProfile;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.ErrorCode;
+import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
+import me.nawa.wallet.dto.request.TopupPreviewRequest;
+import me.nawa.wallet.dto.request.TransactionSearchCondition;
+import me.nawa.wallet.dto.response.StripeIntentResponse;
+import me.nawa.wallet.dto.response.StripeTopupStatusResponse;
+import me.nawa.wallet.dto.response.StripeWebhookResponse;
+import me.nawa.wallet.dto.response.TopupListResponse;
+import me.nawa.wallet.dto.response.TopupMethodsResponse;
+import me.nawa.wallet.dto.response.TopupPreviewResponse;
+import me.nawa.wallet.dto.response.TransactionDetailResponse;
+import me.nawa.wallet.dto.response.TransactionListResponse;
+import me.nawa.wallet.service.TopupService;
+import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +63,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.AuthTestConfig.class,
         SwaggerConfigTest.WalletTestConfig.class,
         SwaggerConfigTest.ExploreTestConfig.class,
+        SwaggerConfigTest.TopupTestConfig.class,
+        SwaggerConfigTest.TransactionTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -180,6 +195,66 @@ class SwaggerConfigTest {
         WalletService walletService() {
             return memberId -> {
                 throw new UnsupportedOperationException();
+            };
+        }
+    }
+
+    @Configuration
+    static class TopupTestConfig {
+
+        @Bean
+        TopupService topupService() {
+            return new TopupService() {
+                @Override
+                public TopupMethodsResponse getAvailableTopupMethods() {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public TopupPreviewResponse previewTopup(Long memberId, TopupPreviewRequest request) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public TopupListResponse getTopups(Long memberId, Long cursor, Integer size) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public StripeIntentResponse createStripeIntent(
+                    long memberId, String idempotencyKey, StripeIntentCreateRequest request
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public StripeTopupStatusResponse getStripeTopupStatus(long memberId, Long topupId) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public StripeWebhookResponse applyStripeWebhookEvent(String payload, String signatureHeader) {
+                    throw new UnsupportedOperationException();
+                }
+            };
+        }
+    }
+
+    @Configuration
+    static class TransactionTestConfig {
+
+        @Bean
+        TransactionService transactionService() {
+            return new TransactionService() {
+                @Override
+                public TransactionListResponse getTransactions(Long memberId, TransactionSearchCondition condition) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public TransactionDetailResponse getTransactionDetail(Long memberId, Long transferId) {
+                    throw new UnsupportedOperationException();
+                }
             };
         }
     }

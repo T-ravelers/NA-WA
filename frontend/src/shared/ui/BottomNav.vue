@@ -36,11 +36,11 @@ function isActive(item: NavItem): boolean {
 
 <template>
   <nav
-    class="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[430px] px-4 pb-[env(safe-area-inset-bottom)]"
+    class="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[390px] px-4 pb-[env(safe-area-inset-bottom)]"
     :aria-label="t('nav.label')"
   >
     <ul
-      class="mb-4 flex h-14 items-center justify-around rounded-[999px] bg-surface-1 shadow-raised"
+      class="mb-4 flex h-14 items-center justify-around rounded-pill bg-nav-surface shadow-raised"
     >
       <li
         v-for="item in items"
@@ -55,7 +55,7 @@ function isActive(item: NavItem): boolean {
         >
           <component
             :is="item.icon"
-            :size="26"
+            :size="32"
             :stroke-width="1.75"
             :class="isActive(item) ? 'text-ink' : 'text-icon-muted'"
           />
@@ -68,7 +68,7 @@ function isActive(item: NavItem): boolean {
         >
           <component
             :is="item.icon"
-            :size="26"
+            :size="32"
             :stroke-width="1.75"
             class="text-icon-muted"
           />

@@ -83,7 +83,8 @@ public class SecurityConfig {
             throws Exception {
         http
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(csrfTokenRepository))
+                    .csrfTokenRepository(csrfTokenRepository)
+                    .ignoringRequestMatchers(antMatcher("/api/v1/stripe/webhook")))
                 .cors(cors -> cors
                         .configurationSource(corsConfigurationSource))
                 .formLogin(formLogin -> formLogin.disable())
@@ -113,7 +114,8 @@ public class SecurityConfig {
                                 antMatcher("/swagger-resources/**"),
                                 antMatcher("/v2/api-docs"),
                                 antMatcher("/v2/api-docs/**"),
-                                antMatcher("/webjars/**")
+                                antMatcher("/webjars/**"),
+                                antMatcher("/api/v1/stripe/webhook")
                         ).permitAll()
                         .requestMatchers(antMatcher("/api/**")).authenticated()
                         .anyRequest().permitAll())
