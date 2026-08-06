@@ -1,6 +1,6 @@
 # 탐색·이벤트·장소 ERD
 
-탐색 공통 항목과 이벤트·장소 하위 타입, 분류·번역·사용자 반응의 관계를
+탐색 공통 항목과 이벤트·장소 하위 타입, 분류·사용자 반응의 관계를
 보여줍니다.
 
 ```mermaid
@@ -16,11 +16,9 @@ erDiagram
     EXPLORE_ITEMS ||--o{ EXPLORE_ITEM_LIKES : receives
     EXPLORE_ITEMS ||--o{ EXPLORE_ITEM_VIEWS : receives
 
-    EVENT ||--o{ EVENT_TRANSLATIONS : translates
     EVENT ||--o{ EVENT_ACTIVITY : classified_as
     ACTIVITY ||--o{ EVENT_ACTIVITY : classifies
 
-    PLACE ||--o{ PLACE_TRANSLATIONS : translates
     PLACE ||--o{ PLACE_ACTIVITY : classified_as
     ACTIVITY ||--o{ PLACE_ACTIVITY : classifies
 
@@ -52,7 +50,11 @@ erDiagram
 
     EVENT {
         BIGINT event_id PK, FK
+        VARCHAR source
+        VARCHAR source_item_id
         ENUM event_type
+        ENUM event_kind
+        JSON image_urls
         DATE start_date
         DATE end_date
         ENUM status
@@ -60,20 +62,14 @@ erDiagram
 
     PLACE {
         BIGINT place_id PK, FK
+        VARCHAR source
+        VARCHAR source_item_id
         VARCHAR name
+        VARCHAR source_url
+        JSON image_urls
+        VARCHAR address_detail
+        TEXT menu_summary
         BOOLEAN is_active
-    }
-
-    EVENT_TRANSLATIONS {
-        BIGINT event_id PK, FK
-        VARCHAR language_code PK
-        VARCHAR title
-    }
-
-    PLACE_TRANSLATIONS {
-        BIGINT place_id PK, FK
-        VARCHAR language_code PK
-        VARCHAR name
     }
 
     EVENT_ACTIVITY {
@@ -103,4 +99,6 @@ erDiagram
 
 - `explore_items`가 검수·공개 상태와 공통 통계를 관리합니다.
 - `event`와 `place`는 같은 `item_id`를 PK·FK로 사용하는 하위 타입입니다.
-- 활동 분류와 번역은 이벤트·장소별 연결 테이블로 분리합니다.
+- Event·Place의 표시 콘텐츠는 현재 각 기본 테이블에 저장합니다.
+- `source`와 `source_item_id` 조합으로 외부 원본 중복을 방지합니다.
+- 활동 분류는 이벤트·장소별 연결 테이블로 분리합니다.
