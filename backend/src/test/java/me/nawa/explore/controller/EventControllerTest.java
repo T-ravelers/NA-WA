@@ -151,6 +151,27 @@ class EventControllerTest {
     }
 
     @Test
+    void searchEvents_returnsBadRequest_whenDateFormatIsInvalid()
+        throws Exception {
+        String responseBody = mockMvc.perform(
+                get("/api/v1/explore/events")
+                    .param("startDate", "not-a-date")
+            )
+            .andExpect(status().isBadRequest())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+
+        assertFalse(body.path("success").asBoolean());
+        assertEquals(
+            "COMMON-001",
+            body.path("error").path("code").asText()
+        );
+    }
+
+    @Test
     void getEventDetail_returnsSuccessResponse() throws Exception {
         EventDetailResponse response = EventDetailResponse.builder()
             .eventId(990001L)
