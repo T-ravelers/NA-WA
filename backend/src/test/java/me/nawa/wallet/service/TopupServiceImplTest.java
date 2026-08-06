@@ -9,25 +9,33 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.stripe.exception.StripeException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.wallet.domain.Wallet;
 import me.nawa.wallet.domain.WalletTopup;
+import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
+import me.nawa.wallet.dto.response.StripeIntentResponse;
 import me.nawa.wallet.dto.response.TopupListResponse;
 import me.nawa.wallet.dto.response.TopupMethodsResponse;
 import me.nawa.wallet.dto.response.TopupPreviewResponse;
 import me.nawa.wallet.exception.WalletErrorCode;
+import me.nawa.wallet.external.stripe.StripeClient;
+import me.nawa.wallet.external.stripe.StripePaymentIntent;
 import me.nawa.wallet.mapper.WalletMapper;
 import me.nawa.wallet.mapper.WalletTopupMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,6 +48,9 @@ class TopupServiceImplTest {
 
     @Mock
     private WalletTopupMapper walletTopupMapper;
+
+    @Mock
+    private StripeClient stripeClient;
 
     @InjectMocks
     private TopupServiceImpl topupService;
@@ -173,7 +184,8 @@ class TopupServiceImplTest {
     private WalletTopup topup(long topupId) {
         return new WalletTopup(
             BigDecimal.valueOf(10000), "USD", BigDecimal.valueOf(1350.5), LocalDateTime.now(),
-            topupId, "COMPLETED", BigDecimal.valueOf(13505000), LocalDateTime.now(), LocalDateTime.now()
+            topupId, "COMPLETED", BigDecimal.valueOf(13505000), LocalDateTime.now(), LocalDateTime.now(),
+            100L, "stripe", "pi_test_" + topupId, "succeeded", "idem-test-" + topupId, null
         );
     }
 
@@ -227,5 +239,190 @@ class TopupServiceImplTest {
 
         topupService.getTopups(1L, null, 500);
         verify(walletTopupMapper).findByWalletIdWithCursor(eq(100L), isNull(), eq(51));
+    }
+
+    // ===== createStripeIntent (Stripe PaymentIntent 생성) =====
+
+    private StripeIntentCreateRequest intentRequest() {
+        return new StripeIntentCreateRequest(BigDecimal.valueOf(10000), "KRW");
+    }
+
+    @Test
+    void createStripeIntent_throwsBusinessException_whenIdempotencyKeyMissing() {
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, null, intentRequest())
+        );
+
+        assertEquals(WalletErrorCode.IDEMPOTENCY_KEY_REQUIRED, exception.getErrorCode());
+        verifyNoInteractions(walletMapper);
+        verifyNoInteractions(stripeClient);
+    }
+
+    @Test
+    void createStripeIntent_throwsBusinessException_whenIdempotencyKeyBlank() {
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, "   ", intentRequest())
+        );
+
+        assertEquals(WalletErrorCode.IDEMPOTENCY_KEY_REQUIRED, exception.getErrorCode());
+    }
+
+    @Test
+    void createStripeIntent_throwsBusinessException_whenAmountInvalid() {
+        StripeIntentCreateRequest request = new StripeIntentCreateRequest(BigDecimal.ZERO, "KRW");
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, "key-1", request)
+        );
+
+        assertEquals(WalletErrorCode.INVALID_TOPUP_AMOUNT, exception.getErrorCode());
+        verifyNoInteractions(walletMapper);
+    }
+
+    @Test
+    void createStripeIntent_throwsBusinessException_whenCurrencyUnsupported() {
+        StripeIntentCreateRequest request = new StripeIntentCreateRequest(BigDecimal.valueOf(10000), "USD");
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, "key-1", request)
+        );
+
+        assertEquals(WalletErrorCode.UNSUPPORTED_CURRENCY, exception.getErrorCode());
+        verifyNoInteractions(walletMapper);
+    }
+
+    @Test
+    void createStripeIntent_throwsBusinessException_whenWalletNotFound() {
+        when(walletMapper.findByMemberId(1L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, "key-1", intentRequest())
+        );
+
+        assertEquals(WalletErrorCode.WALLET_NOT_FOUND, exception.getErrorCode());
+        verifyNoInteractions(stripeClient);
+    }
+
+    @Test
+    void createStripeIntent_throwsBusinessException_whenWalletNotActive() {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "SUSPENDED");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, "key-1", intentRequest())
+        );
+
+        assertEquals(WalletErrorCode.STRIPE_WALLET_NOT_ACTIVE, exception.getErrorCode());
+        verifyNoInteractions(stripeClient);
+    }
+
+    @Test
+    void createStripeIntent_createsNewIntentAndSavesTopup_whenIdempotencyKeyIsNew() throws StripeException {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+        when(walletTopupMapper.findByIdempotencyKey("key-1")).thenReturn(null);
+
+        StripePaymentIntent intent = new StripePaymentIntent("pi_123", "pi_123_secret_abc", "requires_payment_method");
+        when(stripeClient.createPaymentIntent(eq(BigDecimal.valueOf(10000)), eq("key-1"))).thenReturn(intent);
+
+        StripeIntentResponse response = topupService.createStripeIntent(1L, "key-1", intentRequest());
+
+        assertEquals("pi_123_secret_abc", response.clientSecret());
+        assertEquals("pi_123", response.providerPaymentId());
+        assertEquals(0, BigDecimal.valueOf(10000).compareTo(response.amount()));
+        assertEquals("KRW", response.currency());
+        assertEquals("READY", response.status());
+        assertEquals("SANDBOX", response.paymentMode());
+
+        ArgumentCaptor<WalletTopup> captor = ArgumentCaptor.forClass(WalletTopup.class);
+        verify(walletTopupMapper).insert(captor.capture());
+        WalletTopup saved = captor.getValue();
+        assertEquals(100L, saved.getWalletId());
+        assertEquals("stripe", saved.getProvider());
+        assertEquals("pi_123", saved.getProviderPaymentId());
+        assertEquals("requires_payment_method", saved.getProviderStatus());
+        assertEquals("key-1", saved.getIdempotencyKey());
+        assertEquals("QUOTED", saved.getTopupStatus());
+        assertNull(saved.getTransferId());
+    }
+
+    @Test
+    void createStripeIntent_throwsUnavailable_whenStripeCreateFails() throws StripeException {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+        when(walletTopupMapper.findByIdempotencyKey("key-1")).thenReturn(null);
+        when(stripeClient.createPaymentIntent(any(), any())).thenThrow(mock(StripeException.class));
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, "key-1", intentRequest())
+        );
+
+        assertEquals(WalletErrorCode.STRIPE_UNAVAILABLE, exception.getErrorCode());
+        verify(walletTopupMapper, never()).insert(any());
+    }
+
+    @Test
+    void createStripeIntent_returnsExistingResult_whenIdempotencyKeyAlreadyUsedWithSameAmount() throws StripeException {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+
+        WalletTopup existing = topup(55L); // topup() 헬퍼는 sourceAmount = 10000으로 고정됨 (intentRequest()와 동일 금액)
+        when(walletTopupMapper.findByIdempotencyKey("key-1")).thenReturn(existing);
+
+        StripePaymentIntent refreshed = new StripePaymentIntent(
+            existing.getProviderPaymentId(), "refreshed_secret", existing.getProviderStatus()
+        );
+        when(stripeClient.retrievePaymentIntent(existing.getProviderPaymentId())).thenReturn(refreshed);
+
+        StripeIntentResponse response = topupService.createStripeIntent(1L, "key-1", intentRequest());
+
+        assertEquals("refreshed_secret", response.clientSecret());
+        assertEquals(existing.getProviderPaymentId(), response.providerPaymentId());
+        verify(stripeClient, never()).createPaymentIntent(any(), any());
+        verify(walletTopupMapper, never()).insert(any());
+    }
+
+    @Test
+    void createStripeIntent_throwsConflict_whenIdempotencyKeyReusedWithDifferentAmount() {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+
+        WalletTopup existing = topup(55L); // sourceAmount = 10000
+        when(walletTopupMapper.findByIdempotencyKey("key-1")).thenReturn(existing);
+
+        StripeIntentCreateRequest differentAmountRequest =
+            new StripeIntentCreateRequest(BigDecimal.valueOf(99999), "KRW");
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, "key-1", differentAmountRequest)
+        );
+
+        assertEquals(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT, exception.getErrorCode());
+        verifyNoInteractions(stripeClient);
+    }
+
+    @Test
+    void createStripeIntent_throwsUnavailable_whenRetrievingExistingIntentFails() throws StripeException {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+
+        WalletTopup existing = topup(55L);
+        when(walletTopupMapper.findByIdempotencyKey("key-1")).thenReturn(existing);
+        when(stripeClient.retrievePaymentIntent(existing.getProviderPaymentId())).thenThrow(mock(StripeException.class));
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, "key-1", intentRequest())
+        );
+
+        assertEquals(WalletErrorCode.STRIPE_UNAVAILABLE, exception.getErrorCode());
     }
 }

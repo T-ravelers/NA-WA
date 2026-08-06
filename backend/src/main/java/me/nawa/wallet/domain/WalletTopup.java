@@ -22,4 +22,10 @@ public class WalletTopup {
     private BigDecimal krwAmount;                // 환전 후 KRW 충전 금액
     private LocalDateTime completedAt;          // 충전 완료 시각 (완료 전이면 null)
     private LocalDateTime createdAt;            // 충전 요청 생성 시각
+    private Long walletId;             // 이 충전의 소유 지갑 — 본인 확인(403)에 사용
+    private String provider;           // "stripe" 고정
+    private String providerPaymentId;  // Stripe PaymentIntent ID
+    private String providerStatus;     // Stripe 원문 상태
+    private String idempotencyKey;
+    private Long transferId;           // 완료된 원화 충전 이체 (완료 전이면 null)
 }

@@ -43,6 +43,30 @@ public enum WalletErrorCode implements ErrorCode {
         HttpStatus.FORBIDDEN,
     "WALLET-006",
         "본인의 거래만 조회할 수 있습니다."
+    ),
+
+    IDEMPOTENCY_KEY_REQUIRED(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-007",
+        "Idempotency-Key 헤더가 필요합니다."
+    ),
+
+    STRIPE_WALLET_NOT_ACTIVE(
+        HttpStatus.FORBIDDEN,
+        "WALLET-008",
+        "지갑 상태에서는 충전할 수 없습니다."
+    ),
+
+    IDEMPOTENCY_KEY_CONFLICT(
+        HttpStatus.CONFLICT,
+        "WALLET-009",
+        "동일한 Idempotency-Key로 다른 요청이 이미 처리되었습니다."
+    ),
+
+    STRIPE_UNAVAILABLE(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "WALLET-010",
+        "결제 서비스에 일시적으로 연결할 수 없습니다."
     );
 
     private final HttpStatus status;
