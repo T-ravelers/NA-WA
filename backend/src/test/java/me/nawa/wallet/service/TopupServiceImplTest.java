@@ -448,6 +448,47 @@ class TopupServiceImplTest {
         assertEquals(WalletErrorCode.STRIPE_UNAVAILABLE, exception.getErrorCode());
     }
 
+    @Test
+    void createStripeIntent_throwsConflict_whenIdempotencyKeyBelongsToDifferentWallet() {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+
+        // 다른 지갑(999L) 소유의 topup — 같은 키/금액이라도 소유자가 다르면 재사용해선 안 됨
+        WalletTopup existing = topupWithStatus(55L, 999L, "QUOTED", "requires_payment_method", null);
+        when(walletTopupMapper.findByIdempotencyKey("key-1")).thenReturn(existing);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, "key-1", intentRequest())
+        );
+
+        assertEquals(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT, exception.getErrorCode());
+        verifyNoInteractions(stripeClient);
+        verify(walletTopupMapper, never()).resetToQuoted(any());
+    }
+
+    @Test
+    void createStripeIntent_resetsToQuotedAndReturnsRefreshedIntent_whenExistingTopupFailed() throws StripeException {
+        Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
+
+        WalletTopup existing = topupWithStatus(55L, 100L, "FAILED", "requires_payment_method", null);
+        when(walletTopupMapper.findByIdempotencyKey("key-1")).thenReturn(existing);
+
+        StripePaymentIntent refreshed = new StripePaymentIntent(
+            existing.getProviderPaymentId(), "refreshed_secret", existing.getProviderStatus()
+        );
+        when(stripeClient.retrievePaymentIntent(existing.getProviderPaymentId())).thenReturn(refreshed);
+
+        StripeIntentResponse response = topupService.createStripeIntent(1L, "key-1", intentRequest());
+
+        assertEquals("refreshed_secret", response.clientSecret());
+        assertEquals(existing.getProviderPaymentId(), response.providerPaymentId());
+        verify(walletTopupMapper).resetToQuoted(55L);
+        verify(stripeClient, never()).createPaymentIntent(any(), any());
+        verify(walletTopupMapper, never()).insert(any());
+    }
+
     // ===== getStripeTopupStatus (Stripe 충전 상태 조회) =====
 
     private WalletTopup topupWithStatus(
