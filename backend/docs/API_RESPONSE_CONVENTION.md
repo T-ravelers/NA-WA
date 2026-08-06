@@ -209,6 +209,8 @@ me.nawa.wallet.exception.WalletErrorCode
 미리 만들지 마세요.
 
 회원 도메인 오류 코드는 다음과 같이 구현할 수 있습니다.
+(`DUPLICATE_EMAIL`/`MEMBER-005`는 형식을 보여주기 위한 예시일 뿐 실제 구현된 코드가
+아닙니다. 실제 코드는 아래 표의 `MEMBER-001`~`MEMBER-004`를 참고하세요.)
 
 ```java
 package me.nawa.member.exception;

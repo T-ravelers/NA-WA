@@ -2,9 +2,11 @@ package me.nawa.member.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -107,6 +110,12 @@ class MemberControllerTest {
 
         assertTrue(json.path("success").asBoolean());
         assertEquals("ja", json.path("data").path("preferredLanguage").asText());
+
+        ArgumentCaptor<UpdateMemberProfileRequest> requestCaptor =
+                ArgumentCaptor.forClass(UpdateMemberProfileRequest.class);
+        verify(memberProfileService).updateProfile(eq(1L), requestCaptor.capture());
+        assertEquals("ja", requestCaptor.getValue().getPreferredLanguage());
+        assertNull(requestCaptor.getValue().getPreferredCurrencyCode());
     }
 
     @Test
