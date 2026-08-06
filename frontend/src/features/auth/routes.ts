@@ -1,8 +1,15 @@
 import type { RouteRecordRaw } from 'vue-router'
 
-import { AUTH_CALLBACK_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
+import { AUTH_CALLBACK_PATH, SIGN_IN_PATH, WELCOME_PATH } from '@/shared/config/routePaths'
 
 const routes: RouteRecordRaw[] = [
+  {
+    // 처음 오는 사용자가 만나는 화면. 이미 로그인한 사용자는 guard가 서비스 화면으로 보낸다.
+    path: WELCOME_PATH,
+    name: 'auth-welcome',
+    component: () => import('./views/WelcomeView.vue'),
+    meta: { guestOnly: true },
+  },
   {
     path: SIGN_IN_PATH,
     name: 'auth-sign-in',

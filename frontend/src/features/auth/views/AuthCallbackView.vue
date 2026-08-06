@@ -4,7 +4,6 @@ import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import { AUTHENTICATED_HOME_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
-import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { clearAuthSession, ensureAuthSession } from '../model/authQueries'
@@ -71,17 +70,34 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="flex min-h-dvh items-center justify-center px-screen">
-    <StateError
-      v-if="errorMessage !== null"
-      :title="t('auth.callback.failed')"
-      :description="errorMessage"
-      :action-label="t('auth.signIn.google')"
-      @retry="router.replace(signInLocation)"
-    />
-    <StateLoading
+  <section class="flex min-h-dvh flex-col px-screen pt-14 pb-8">
+    <template v-if="errorMessage !== null">
+      <div class="flex flex-1 flex-col justify-center gap-3">
+        <h1 class="font-display text-screen-title font-bold text-ink-display">
+          {{ t('auth.callback.failed') }}
+        </h1>
+        <p class="max-w-[313px] text-body text-ink-2">{{ errorMessage }}</p>
+      </div>
+
+      <!--
+        실패 화면에서 로그인 수단을 다시 노출한다. 오류만 보여주고 되돌려보내면
+        사용자가 어디로 가야 할지 알 수 없다. 복귀 경로는 query로 옮겨 유지한다.
+      -->
+      <button
+        type="button"
+        class="h-13 w-full rounded-sm bg-paper-fill text-title-sm text-on-color"
+        @click="router.replace(signInLocation)"
+      >
+        {{ t('auth.callback.retry') }}
+      </button>
+    </template>
+
+    <div
       v-else
-      :label="t('auth.callback.pending')"
-    />
+      class="flex flex-1 flex-col items-center justify-center gap-3 text-center"
+    >
+      <StateLoading :label="t('auth.callback.pending')" />
+      <p class="max-w-[280px] text-body-sm text-ink-3">{{ t('auth.callback.pendingBody') }}</p>
+    </div>
   </section>
 </template>

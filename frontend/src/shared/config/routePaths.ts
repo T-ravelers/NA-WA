@@ -5,6 +5,9 @@
  * 이 파일에는 인증 흐름처럼 도메인 경계를 넘는 소수의 고정 경로만 남긴다.
  */
 
+/** 처음 오는 사용자가 만나는 화면. */
+export const WELCOME_PATH = '/'
+
 /** 미인증 사용자를 보낼 화면. */
 export const SIGN_IN_PATH = '/sign-in'
 

@@ -40,7 +40,7 @@ export function detectBrowserLocale(): AppLocale {
       return language
     }
 
-    const base = language.split('-')[0]
+    const base = language.split('-')[0] ?? ''
 
     if (isSupportedLocale(base)) {
       return base
