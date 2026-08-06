@@ -171,7 +171,6 @@
             </when>
             <when test="request.datePreset == 'OPENING_SOON'">
                 AND e.status = 'SCHEDULED'
-                AND e.start_date &gt; CURRENT_DATE()
             </when>
             <when test="request.datePreset == 'THIS_WEEKEND'">
                 AND e.start_date &lt;= DATE_ADD(
