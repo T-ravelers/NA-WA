@@ -1,5 +1,13 @@
 package me.nawa.explore.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map.Entry;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
@@ -10,13 +18,11 @@ import me.nawa.explore.dto.response.EventListResponse;
 import me.nawa.explore.dto.response.EventSummaryResponse;
 import me.nawa.explore.exception.ExploreErrorCode;
 import me.nawa.explore.mapper.EventMapper;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.List;
-import java.util.Locale;
-
-@org.springframework.stereotype.Service
+@Service
 @RequiredArgsConstructor
 public class EventService {
 
@@ -76,7 +82,7 @@ public class EventService {
         request.setSort(sort);
 
         if (!StringUtils.hasText(request.getLanguage())) {
-            request.setLanguage("ko");
+            request.setLanguage("en");
         }
     }
 
@@ -95,8 +101,8 @@ public class EventService {
 
         String normalizedLanguage = StringUtils.hasText(language)
             ? language.toLowerCase(Locale.ROOT)
-            // TODO(국제화 후속 이슈): 크롤링 원본 국제화 전까지 ko를 임시 fallback으로 사용한다.
-            : "ko";
+            // TODO(국제화 후속 이슈): 크롤링 원본 국제화 전까지 en을 기본 fallback으로 사용한다.
+            : "en";
 
         EventDetailResponse event = eventMapper.findEventDetail(
             eventId,
@@ -113,6 +119,106 @@ public class EventService {
         );
 
         event.setActivities(activities == null ? List.of() : activities);
+        normalizeJsonResponse(event);
+        event.setReservationUrl(resolveReservationUrl(event));
         return event;
+    }
+
+    private void normalizeJsonResponse(EventDetailResponse event) {
+        event.setImageUrls(normalizeJsonKeys(event.getImageUrls()));
+        event.setLinks(normalizeJsonKeys(event.getLinks()));
+        event.setPreReservation(normalizeJsonKeys(event.getPreReservation()));
+        event.setOperatingHours(normalizeOperatingHours(
+            event.getOperatingHours()
+        ));
+        event.setOpenDays(normalizeJsonKeys(event.getOpenDays()));
+    }
+
+    private JsonNode normalizeOperatingHours(JsonNode operatingHours) {
+        if (operatingHours == null || operatingHours.isNull()) {
+            return operatingHours;
+        }
+
+        if (operatingHours.isTextual()) {
+            ObjectNode normalized = JsonNodeFactory.instance.objectNode();
+            normalized.put("raw", operatingHours.asText());
+            return normalized;
+        }
+
+        return normalizeJsonKeys(operatingHours);
+    }
+
+    private JsonNode normalizeJsonKeys(JsonNode value) {
+        if (value == null || value.isNull() || value.isValueNode()) {
+            return value;
+        }
+
+        if (value.isArray()) {
+            ArrayNode normalized = JsonNodeFactory.instance.arrayNode();
+            value.forEach(item -> normalized.add(normalizeJsonKeys(item)));
+            return normalized;
+        }
+
+        ObjectNode normalized = JsonNodeFactory.instance.objectNode();
+        Iterator<Entry<String, JsonNode>> fields = value.fields();
+        while (fields.hasNext()) {
+            Entry<String, JsonNode> field = fields.next();
+            normalized.set(
+                toCamelCase(field.getKey()),
+                normalizeJsonKeys(field.getValue())
+            );
+        }
+        return normalized;
+    }
+
+    private String toCamelCase(String fieldName) {
+        StringBuilder result = new StringBuilder();
+        boolean uppercaseNext = false;
+        for (char character : fieldName.toCharArray()) {
+            if (character == '_') {
+                uppercaseNext = true;
+                continue;
+            }
+            result.append(
+                uppercaseNext
+                    ? Character.toUpperCase(character)
+                    : character
+            );
+            uppercaseNext = false;
+        }
+        return result.toString();
+    }
+
+    private String resolveReservationUrl(EventDetailResponse event) {
+        JsonNode preReservation = event.getPreReservation();
+        if (preReservation != null
+            && preReservation.path("has").asBoolean(false)) {
+            String preReservationLink = textValue(preReservation, "link");
+            if (StringUtils.hasText(preReservationLink)) {
+                return preReservationLink;
+            }
+        }
+
+        if (StringUtils.hasText(event.getReservationUrl())) {
+            return event.getReservationUrl();
+        }
+
+        JsonNode links = event.getLinks();
+        if (links != null) {
+            String reservationLink = textValue(links, "reservationUrl");
+            if (!StringUtils.hasText(reservationLink)) {
+                reservationLink = textValue(links, "reservation_url");
+            }
+            if (StringUtils.hasText(reservationLink)) {
+                return reservationLink;
+            }
+        }
+
+        return null;
+    }
+
+    private String textValue(JsonNode object, String fieldName) {
+        JsonNode value = object.get(fieldName);
+        return value == null || value.isNull() ? null : value.asText();
     }
 }

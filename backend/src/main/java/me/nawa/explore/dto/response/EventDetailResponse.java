@@ -1,5 +1,6 @@
 package me.nawa.explore.dto.response;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,6 +11,7 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import me.nawa.explore.domain.EventStatus;
 
 @Getter
 @Setter
@@ -20,14 +22,19 @@ public class EventDetailResponse {
 
     private Long eventId;
     private String eventType;
+    private String eventKind;
 
     private String title;
     private String subtitle;
     private String description;
     private String programText;
     private String thumbnailUrl;
+    private JsonNode imageUrls;
+    private JsonNode links;
+    private String reservationUrl;
+    private JsonNode preReservation;
 
-    private String status;
+    private EventStatus status;
     private Boolean isPermanent;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
@@ -36,8 +43,8 @@ public class EventDetailResponse {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate endDate;
 
-    private String operatingHours;
-    private String openDays;
+    private JsonNode operatingHours;
+    private JsonNode openDays;
     private Boolean openWeekend;
     private Boolean opensLate;
 
@@ -56,6 +63,8 @@ public class EventDetailResponse {
     private String priceText;
     private Boolean hasBenefit;
     private Boolean reservable;
+    private String contact;
+    private String organizer;
 
     private List<EventActivityResponse> activities;
 }

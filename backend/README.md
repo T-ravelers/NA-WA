@@ -11,7 +11,7 @@ NA-WA 백엔드는 Java 17과 Spring MVC로 구성한 WAR 애플리케이션입�
 | Java, Spring, MyBatis와 보안 규칙 확인 | [백엔드 개발 컨벤션](docs/DEVELOPMENT_CONVENTION.md)            |
 | API 성공·실패 응답 계약 확인           | [API 응답 및 오류 코드 컨벤션](docs/API_RESPONSE_CONVENTION.md) |
 | 소셜 로그인 설정과 검증 방법 확인      | [소셜 로그인 운영 가이드](docs/AUTHENTICATION.md)               |
-| 전체 DB 구조와 도메인별 ERD 확인       | [V5 데이터베이스 지도](docs/database/README.md)                 |
+| 전체 DB 구조와 도메인별 ERD 확인       | [V7 데이터베이스 지도](docs/database/README.md)                 |
 | 프로젝트 전체 기술 경계 확인           | [기술 스택과 운영 경계](../docs/TECH_STACK.md)                  |
 
 ## 로컬 실행

@@ -38,5 +38,8 @@ class EventMapperXmlTest {
         assertTrue(configuration.hasStatement(
             "me.nawa.explore.mapper.EventMapper.findEventActivities"
         ));
+        assertTrue(configuration.hasResultMap(
+            "me.nawa.explore.mapper.EventMapper.eventDetailResultMap"
+        ));
     }
 }

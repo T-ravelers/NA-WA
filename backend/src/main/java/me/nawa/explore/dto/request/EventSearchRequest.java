@@ -20,7 +20,7 @@ public class EventSearchRequest {
     private String keyword;
 
     private String sort = "LATEST";
-    private String language = "ko";
+    private String language = "en";
     private int page = 0;
     private int size = 20;
 }
