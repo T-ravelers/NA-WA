@@ -24,6 +24,15 @@
         WHERE topup_id = #{topupId} AND deleted_at IS NULL
     </select>
 
+    <select id="findByTopupIdForUpdate" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT topup_id, wallet_id, topup_status, source_amount, source_currency_code,
+               exchange_rate_krw_per_unit, krw_amount, quoted_at, completed_at, created_at,
+               provider, provider_payment_id, provider_status, idempotency_key, transfer_id
+        FROM wallet_topups
+        WHERE topup_id = #{topupId} AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
     <select id="findByIdempotencyKey" resultType="me.nawa.wallet.domain.WalletTopup">
         SELECT topup_id, wallet_id, topup_status, source_amount, source_currency_code,
                exchange_rate_krw_per_unit, krw_amount, quoted_at, completed_at, created_at,
@@ -38,6 +47,15 @@
                provider, provider_payment_id, provider_status, idempotency_key, transfer_id
         FROM wallet_topups
         WHERE provider_payment_id = #{providerPaymentId} AND deleted_at IS NULL
+    </select>
+
+    <select id="findByProviderPaymentIdForUpdate" resultType="me.nawa.wallet.domain.WalletTopup">
+        SELECT topup_id, wallet_id, topup_status, source_amount, source_currency_code,
+               exchange_rate_krw_per_unit, krw_amount, quoted_at, completed_at, created_at,
+               provider, provider_payment_id, provider_status, idempotency_key, transfer_id
+        FROM wallet_topups
+        WHERE provider_payment_id = #{providerPaymentId} AND deleted_at IS NULL
+        FOR UPDATE
     </select>
 
     <update id="updateProviderStatus">

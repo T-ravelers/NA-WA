@@ -477,7 +477,7 @@ class TopupServiceImplTest {
     void getStripeTopupStatus_throwsBusinessException_whenTopupNotFound() {
         Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
         when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
-        when(walletTopupMapper.findByTopupId(88L)).thenReturn(null);
+        when(walletTopupMapper.findByTopupIdForUpdate(88L)).thenReturn(null);
 
         BusinessException exception = assertThrows(
             BusinessException.class,
@@ -493,7 +493,7 @@ class TopupServiceImplTest {
         Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
         when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
         WalletTopup topup = topupWithStatus(88L, 999L, "QUOTED", "requires_payment_method", null);
-        when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup);
+        when(walletTopupMapper.findByTopupIdForUpdate(88L)).thenReturn(topup);
 
         BusinessException exception = assertThrows(
             BusinessException.class,
@@ -509,7 +509,7 @@ class TopupServiceImplTest {
         Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(60000), "ACTIVE");
         when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
         WalletTopup topup = topupWithStatus(88L, 100L, "COMPLETED", "succeeded", 500L);
-        when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup);
+        when(walletTopupMapper.findByTopupIdForUpdate(88L)).thenReturn(topup);
 
         StripeTopupStatusResponse response = topupService.getStripeTopupStatus(1L, 88L);
 
@@ -524,7 +524,7 @@ class TopupServiceImplTest {
         Wallet wallet = new Wallet(100L, "KRW", BigDecimal.valueOf(50000), "ACTIVE");
         when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
         WalletTopup topup = topupWithStatus(88L, 100L, "FAILED", "requires_payment_method", null);
-        when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup);
+        when(walletTopupMapper.findByTopupIdForUpdate(88L)).thenReturn(topup);
 
         StripeTopupStatusResponse response = topupService.getStripeTopupStatus(1L, 88L);
 
@@ -544,8 +544,9 @@ class TopupServiceImplTest {
 
         WalletTopup topup = topupWithStatus(88L, 100L, "QUOTED", "requires_payment_method", null);
         WalletTopup completedTopup = topupWithStatus(88L, 100L, "COMPLETED", "succeeded", 999L);
-        // findByTopupId도 크레딧 전/후로 두 번 조회한다 (applyProviderUpdate 마지막에 다시 읽어옴)
-        when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup, completedTopup);
+        // 진입 시점엔 락을 잡는 findByTopupIdForUpdate로, applyProviderUpdate 마지막 재조회는 findByTopupId로 읽는다
+        when(walletTopupMapper.findByTopupIdForUpdate(88L)).thenReturn(topup);
+        when(walletTopupMapper.findByTopupId(88L)).thenReturn(completedTopup);
 
         when(stripeClient.retrievePaymentIntent("pi_88"))
             .thenReturn(new StripePaymentIntent("pi_88", "secret", "succeeded"));
@@ -578,7 +579,8 @@ class TopupServiceImplTest {
 
         WalletTopup topup = topupWithStatus(88L, 100L, "QUOTED", "requires_payment_method", null);
         WalletTopup cancelledTopup = topupWithStatus(88L, 100L, "CANCELLED", "canceled", null);
-        when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup, cancelledTopup);
+        when(walletTopupMapper.findByTopupIdForUpdate(88L)).thenReturn(topup);
+        when(walletTopupMapper.findByTopupId(88L)).thenReturn(cancelledTopup);
 
         when(stripeClient.retrievePaymentIntent("pi_88"))
             .thenReturn(new StripePaymentIntent("pi_88", "secret", "canceled"));
@@ -599,7 +601,8 @@ class TopupServiceImplTest {
 
         WalletTopup topup = topupWithStatus(88L, 100L, "QUOTED", "requires_payment_method", null);
         WalletTopup processingTopup = topupWithStatus(88L, 100L, "QUOTED", "processing", null);
-        when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup, processingTopup);
+        when(walletTopupMapper.findByTopupIdForUpdate(88L)).thenReturn(topup);
+        when(walletTopupMapper.findByTopupId(88L)).thenReturn(processingTopup);
 
         when(stripeClient.retrievePaymentIntent("pi_88"))
             .thenReturn(new StripePaymentIntent("pi_88", "secret", "processing"));
@@ -617,7 +620,8 @@ class TopupServiceImplTest {
         when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
 
         WalletTopup topup = topupWithStatus(88L, 100L, "QUOTED", "requires_payment_method", null);
-        when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup, topup);
+        when(walletTopupMapper.findByTopupIdForUpdate(88L)).thenReturn(topup);
+        when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup);
 
         when(stripeClient.retrievePaymentIntent("pi_88"))
             .thenReturn(new StripePaymentIntent("pi_88", "secret", "requires_payment_method"));
@@ -634,7 +638,7 @@ class TopupServiceImplTest {
         when(walletMapper.findByMemberId(1L)).thenReturn(wallet);
 
         WalletTopup topup = topupWithStatus(88L, 100L, "QUOTED", "requires_payment_method", null);
-        when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup);
+        when(walletTopupMapper.findByTopupIdForUpdate(88L)).thenReturn(topup);
 
         when(stripeClient.retrievePaymentIntent("pi_88")).thenThrow(mock(StripeException.class));
 
@@ -699,12 +703,12 @@ class TopupServiceImplTest {
 
     @Test
     void applyStripeWebhookEvent_returnsReceivedOnly_whenPaymentIntentUnknown() throws StripeException {
-        // findByProviderPaymentId에서 null이 나오면 바로 반환하므로 getStatus()까진 안 쓰인다 — getId()만 스텁
+        // findByProviderPaymentIdForUpdate에서 null이 나오면 바로 반환하므로 getStatus()까진 안 쓰인다 — getId()만 스텁
         PaymentIntent paymentIntent = mock(PaymentIntent.class);
         when(paymentIntent.getId()).thenReturn("pi_unknown");
         Event event = mockEvent("payment_intent.succeeded", paymentIntent);
         when(stripeClient.constructWebhookEvent(any(), any())).thenReturn(event);
-        when(walletTopupMapper.findByProviderPaymentId("pi_unknown")).thenReturn(null);
+        when(walletTopupMapper.findByProviderPaymentIdForUpdate("pi_unknown")).thenReturn(null);
 
         StripeWebhookResponse response = topupService.applyStripeWebhookEvent("payload", "sig");
 
@@ -722,7 +726,7 @@ class TopupServiceImplTest {
         when(stripeClient.constructWebhookEvent(any(), any())).thenReturn(event);
 
         WalletTopup topup = topupWithStatus(88L, 100L, "COMPLETED", "succeeded", 500L);
-        when(walletTopupMapper.findByProviderPaymentId("pi_88")).thenReturn(topup);
+        when(walletTopupMapper.findByProviderPaymentIdForUpdate("pi_88")).thenReturn(topup);
 
         StripeWebhookResponse response = topupService.applyStripeWebhookEvent("payload", "sig");
 
@@ -739,7 +743,7 @@ class TopupServiceImplTest {
         when(stripeClient.constructWebhookEvent(any(), any())).thenReturn(event);
 
         WalletTopup topup = topupWithStatus(88L, 100L, "QUOTED", "requires_payment_method", null);
-        when(walletTopupMapper.findByProviderPaymentId("pi_88")).thenReturn(topup);
+        when(walletTopupMapper.findByProviderPaymentIdForUpdate("pi_88")).thenReturn(topup);
         // applyProviderUpdate 마지막에 findByTopupId로 다시 읽는데, 웹훅 응답 자체엔 그 값을 안 쓰므로 아무거나 반환해도 된다
         when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup);
 
@@ -770,7 +774,7 @@ class TopupServiceImplTest {
         when(stripeClient.constructWebhookEvent(any(), any())).thenReturn(event);
 
         WalletTopup topup = topupWithStatus(88L, 100L, "QUOTED", "requires_payment_method", null);
-        when(walletTopupMapper.findByProviderPaymentId("pi_88")).thenReturn(topup);
+        when(walletTopupMapper.findByProviderPaymentIdForUpdate("pi_88")).thenReturn(topup);
         when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup);
 
         StripeWebhookResponse response = topupService.applyStripeWebhookEvent("payload", "sig");
@@ -789,7 +793,7 @@ class TopupServiceImplTest {
         when(stripeClient.constructWebhookEvent(any(), any())).thenReturn(event);
 
         WalletTopup topup = topupWithStatus(88L, 100L, "QUOTED", "requires_payment_method", null);
-        when(walletTopupMapper.findByProviderPaymentId("pi_88")).thenReturn(topup);
+        when(walletTopupMapper.findByProviderPaymentIdForUpdate("pi_88")).thenReturn(topup);
         when(walletTopupMapper.findByTopupId(88L)).thenReturn(topup);
 
         StripeWebhookResponse response = topupService.applyStripeWebhookEvent("payload", "sig");

@@ -199,8 +199,9 @@ public class TopupServiceImpl implements TopupService {
             throw new BusinessException(WalletErrorCode.WALLET_NOT_FOUND);
         }
 
-        //2. 충전 건 조회
-        WalletTopup topup = walletTopupMapper.findByTopupId(topupId);
+        //2. 충전 건 조회 (webhook과 동시에 들어와도 같은 행을 놓고 경합하도록 FOR UPDATE로 잠근다 —
+        //   그렇지 않으면 둘 다 "아직 비최종 상태"로 읽고 동시에 크레딧을 시도해 중복 적립될 수 있다)
+        WalletTopup topup = walletTopupMapper.findByTopupIdForUpdate(topupId);
         if (topup == null) {
             throw new BusinessException(WalletErrorCode.TOPUP_NOT_FOUND);
         }
@@ -211,6 +212,7 @@ public class TopupServiceImpl implements TopupService {
         }
 
         //4. 아직 최종 상태가 아니면 Stripe에서 최신 상태를 가져와 반영한다.
+        //   (락을 잡은 뒤 여기서 최종 상태를 다시 확인하므로, 앞서 webhook이 먼저 처리를 끝냈다면 여기서 걸러진다)
         //   succeeded로 확인되면 이 안에서 실제로 지갑 잔액 적립까지 같이 처리된다 (applyProviderUpdate -> creditWallet).
         if (!isTerminal(topup.getTopupStatus())) {
             StripePaymentIntent latest = retrieveOrThrow(topup.getProviderPaymentId());
@@ -252,13 +254,15 @@ public class TopupServiceImpl implements TopupService {
         }
 
         //3. 우리 DB에서 이 PaymentIntent에 연결된 충전 건 조회 — 모르는 결제면 에러 없이 수신만 확인 (Stripe가 무한 재시도하지 않도록)
-        WalletTopup topup = walletTopupMapper.findByProviderPaymentId(paymentIntent.getId());
+        //   polling과 동시에 들어와도 같은 행을 놓고 경합하도록 FOR UPDATE로 잠근다
+        WalletTopup topup = walletTopupMapper.findByProviderPaymentIdForUpdate(paymentIntent.getId());
         if (topup == null) {
             log.warn("[Stripe Webhook] 알 수 없는 PaymentIntent: {}", paymentIntent.getId());
             return new StripeWebhookResponse(true, false);
         }
 
         //4. 이미 최종 상태로 처리된 건이면 재처리하지 않고 "이미 처리됨"만 알려준다 (이벤트 재전송/중복 방지)
+        //   (락을 잡은 뒤 여기서 다시 확인하므로, 앞서 polling이 먼저 처리를 끝냈다면 여기서 걸러진다)
         if (isTerminal(topup.getTopupStatus())) {
             return new StripeWebhookResponse(true, true);
         }

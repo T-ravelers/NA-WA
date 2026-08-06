@@ -21,9 +21,13 @@ public interface WalletTopupMapper {
 
     WalletTopup findByTopupId(@Param("topupId") Long topupId);
 
+    WalletTopup findByTopupIdForUpdate(@Param("topupId") Long topupId);
+
     WalletTopup findByIdempotencyKey(@Param("idempotencyKey") String idempotencyKey);
 
     WalletTopup findByProviderPaymentId(@Param("providerPaymentId") String providerPaymentId);
+
+    WalletTopup findByProviderPaymentIdForUpdate(@Param("providerPaymentId") String providerPaymentId);
 
     void updateProviderStatus(@Param("topupId") Long topupId, @Param("providerStatus") String providerStatus);
 
