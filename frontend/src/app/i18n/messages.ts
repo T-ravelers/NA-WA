@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES, isSupportedLocale, type AppLocale } from './locales'
+import { SUPPORTED_LOCALES, isSupportedLocale, type AppLocale } from '@/shared/i18n/locales'
 
 /**
  * 로케일 메시지 수집.
