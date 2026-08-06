@@ -115,15 +115,48 @@
         AND e.deleted_at IS NULL
         AND e.status IN ('SCHEDULED', 'ONGOING')
 
-        <if test="request.region1 != null and request.region1 != ''">
-            AND e.region1 = #{request.region1}
+        <if test="request.eventKinds != null and request.eventKinds.size() > 0">
+            AND e.event_kind IN
+            <foreach collection="request.eventKinds"
+                     item="eventKind"
+                     open="("
+                     separator=","
+                     close=")">
+                #{eventKind}
+            </foreach>
         </if>
-        <if test="request.region2 != null and request.region2 != ''">
-            AND e.region2 = #{request.region2}
+
+        <if test="request.region1 != null and request.region1.size() > 0">
+            AND e.region1 IN
+            <foreach collection="request.region1"
+                     item="region1"
+                     open="("
+                     separator=","
+                     close=")">
+                #{region1}
+            </foreach>
         </if>
-        <if test="request.region3 != null and request.region3 != ''">
-            AND e.region3 = #{request.region3}
+        <if test="request.region2 != null and request.region2.size() > 0">
+            AND e.region2 IN
+            <foreach collection="request.region2"
+                     item="region2"
+                     open="("
+                     separator=","
+                     close=")">
+                #{region2}
+            </foreach>
         </if>
+        <if test="request.region3 != null and request.region3.size() > 0">
+            AND e.region3 IN
+            <foreach collection="request.region3"
+                     item="region3"
+                     open="("
+                     separator=","
+                     close=")">
+                #{region3}
+            </foreach>
+        </if>
+
         <if test="request.keyword != null and request.keyword != ''">
             AND (
             e.title LIKE CONCAT('%', #{request.keyword}, '%')
@@ -131,6 +164,60 @@
             OR e.description LIKE CONCAT('%', #{request.keyword}, '%')
             )
         </if>
+
+        <choose>
+            <when test="request.datePreset == 'ONGOING'">
+                AND e.status = 'ONGOING'
+            </when>
+            <when test="request.datePreset == 'OPENING_SOON'">
+                AND e.status = 'SCHEDULED'
+                AND e.start_date &gt; CURRENT_DATE()
+            </when>
+            <when test="request.datePreset == 'THIS_WEEKEND'">
+                AND e.start_date &lt;= DATE_ADD(
+                    CURRENT_DATE(),
+                    INTERVAL (8 - DAYOFWEEK(CURRENT_DATE())) DAY
+                )
+                AND (e.end_date IS NULL OR e.end_date &gt;= DATE_ADD(
+                    CURRENT_DATE(),
+                    INTERVAL (7 - DAYOFWEEK(CURRENT_DATE())) DAY
+                ))
+            </when>
+            <when test="request.datePreset == 'THIS_MONTH'">
+                AND e.start_date &lt;= LAST_DAY(CURRENT_DATE())
+                AND (e.end_date IS NULL OR e.end_date &gt;= DATE_FORMAT(
+                    CURRENT_DATE(),
+                    '%Y-%m-01'
+                ))
+            </when>
+        </choose>
+
+        <if test="request.startDate != null">
+            AND (e.end_date IS NULL OR e.end_date &gt;= #{request.startDate})
+        </if>
+        <if test="request.endDate != null">
+            AND e.start_date &lt;= #{request.endDate}
+        </if>
+
+        <if test="request.freeOnly == true">
+            AND e.is_free = TRUE
+        </if>
+        <if test="request.openWeekendOnly == true">
+            AND e.open_weekend = TRUE
+        </if>
+        <if test="request.opensLateOnly == true">
+            AND e.opens_late = TRUE
+        </if>
+        <if test="request.preReservationOnly == true">
+            AND JSON_UNQUOTE(JSON_EXTRACT(e.pre_reservation, '$.has')) = 'true'
+        </if>
+        <if test="request.experienceOnly == true">
+            AND e.is_experience = TRUE
+        </if>
+        <if test="request.photoZoneOnly == true">
+            AND e.has_photo_zone = TRUE
+        </if>
+
         <if test="request.sectorIds != null and request.sectorIds.size() > 0">
             AND EXISTS (
             SELECT 1
@@ -191,7 +278,10 @@
         <include refid="eventListWhere"/>
         <choose>
             <when test="request.sort == 'POPULAR'">
-                ORDER BY ei.popularity_score DESC, e.event_id DESC
+                ORDER BY e.view_count DESC, e.event_id DESC
+            </when>
+            <when test="request.sort == 'ENDING_SOON'">
+                ORDER BY e.end_date IS NULL, e.end_date ASC, e.event_id DESC
             </when>
             <otherwise>
                 ORDER BY e.created_at DESC, e.event_id DESC

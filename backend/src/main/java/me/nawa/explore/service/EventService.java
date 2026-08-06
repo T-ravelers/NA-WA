@@ -31,6 +31,11 @@ public class EventService {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
+    private static final Set<String> SORTS = Set.of(
+        "LATEST",
+        "POPULAR",
+        "ENDING_SOON"
+    );
     private static final Set<String> EVENT_KINDS = Set.of(
         "POPUP",
         "CONCERT",
@@ -111,7 +116,7 @@ public class EventService {
         String sort = StringUtils.hasText(request.getSort())
             ? request.getSort().toUpperCase(Locale.ROOT)
             : "LATEST";
-        if (!"LATEST".equals(sort) && !"POPULAR".equals(sort)) {
+        if (!SORTS.contains(sort)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         request.setSort(sort);
