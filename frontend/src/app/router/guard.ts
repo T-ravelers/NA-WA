@@ -1,6 +1,7 @@
 import type { NavigationGuard, RouteLocationNormalized } from 'vue-router'
 
-import { ensureAuthSession } from '@/features/auth/model/authQueries'
+import { syncLocaleWithProfile } from '@/features/member/model/localeSync'
+import { ensureMemberProfile } from '@/features/member/model/memberQueries'
 import { AUTHENTICATED_HOME_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
 
 /**
@@ -27,14 +28,20 @@ export const authGuard: NavigationGuard = async (to) => {
     return true
   }
 
-  const session = await ensureAuthSession()
+  // members/me는 미인증이면 401이므로 이 호출 하나가 세션 확인을 겸한다.
+  const profile = await ensureMemberProfile()
 
-  if (to.meta.requiresAuth === true && session === null) {
+  if (to.meta.requiresAuth === true && profile === null) {
     return { path: SIGN_IN_PATH, query: { returnPath: resolveReturnPath(to) } }
   }
 
-  if (to.meta.guestOnly === true && session !== null) {
+  if (to.meta.guestOnly === true && profile !== null) {
     return { path: AUTHENTICATED_HOME_PATH }
+  }
+
+  if (profile !== null) {
+    // 로케일 동기화 실패가 화면 진입을 막아서는 안 된다.
+    await syncLocaleWithProfile(profile).catch(() => undefined)
   }
 
   return true

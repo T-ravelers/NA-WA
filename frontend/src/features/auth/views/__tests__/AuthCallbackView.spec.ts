@@ -4,12 +4,10 @@ import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
-const ensureAuthSession = vi.fn()
-const clearAuthSession = vi.fn()
+const clear = vi.fn()
 
-vi.mock('../../model/authQueries', () => ({
-  ensureAuthSession: () => ensureAuthSession(),
-  clearAuthSession: () => clearAuthSession(),
+vi.mock('@/app/query/client', () => ({
+  queryClient: { clear: () => clear() },
 }))
 
 const { storeReturnPath } = await import('../../model/returnPath')
@@ -43,8 +41,7 @@ async function mountAt(fullPath: string) {
 describe('AuthCallbackView', () => {
   beforeEach(() => {
     sessionStorage.clear()
-    ensureAuthSession.mockReset()
-    clearAuthSession.mockReset()
+    clear.mockReset()
   })
 
   describe('when the provider callback reports an error', () => {
@@ -85,16 +82,15 @@ describe('AuthCallbackView', () => {
       expect(wrapper.text()).toContain('This sign-in link is no longer valid')
     })
 
-    it('does not probe the session', async () => {
+    it('leaves the cache alone', async () => {
       await mountAt('/auth/callback?error=AUTH-014')
 
-      expect(ensureAuthSession).not.toHaveBeenCalled()
+      expect(clear).not.toHaveBeenCalled()
     })
   })
 
   describe('when the provider callback succeeds', () => {
     it('sends the member to the stored return path and consumes it', async () => {
-      ensureAuthSession.mockResolvedValue({ memberId: 1 })
       storeReturnPath('/wallet?tab=history')
 
       const { router } = await mountAt('/auth/callback')
@@ -104,23 +100,21 @@ describe('AuthCallbackView', () => {
     })
 
     it('falls back to the default screen when nothing was stored', async () => {
-      ensureAuthSession.mockResolvedValue({ memberId: 1 })
-
       const { router } = await mountAt('/auth/callback')
 
       expect(router.currentRoute.value.path).toBe('/explore')
     })
 
-    // 회귀: 쿠키 설정이 실패해도 복귀 경로를 잃지 않아야 한다.
-    it('keeps the return path when the session probe comes back empty', async () => {
-      ensureAuthSession.mockResolvedValue(null)
-      storeReturnPath('/wallet')
+    /*
+     * 쿠키 설정이 실패했을 때 복귀 경로를 잃지 않는지는 이제 라우터 guard가 보장한다.
+     * `guard.spec.ts`의 "sends an unauthenticated visitor to sign-in and keeps the
+     * return path"가 그 회귀를 덮는다.
+     */
 
-      const { router } = await mountAt('/auth/callback')
+    it('drops responses cached before authentication', async () => {
+      await mountAt('/auth/callback')
 
-      expect(router.currentRoute.value.path).toBe('/sign-in')
-      expect(router.currentRoute.value.query.returnPath).toBe('/wallet')
-      expect(sessionStorage.getItem('nawa.auth.returnPath')).toBe('/wallet')
+      expect(clear).toHaveBeenCalled()
     })
   })
 })
