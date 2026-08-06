@@ -16,7 +16,7 @@ const showBottomNav = computed(() => route.meta.requiresAuth === true)
 
 <template>
   <div
-    class="mx-auto min-h-dvh w-full max-w-[430px] bg-canvas text-ink"
+    class="mx-auto min-h-dvh w-full max-w-[390px] bg-canvas text-ink"
     :class="showBottomNav ? 'pb-24' : ''"
   >
     <RouterView />
