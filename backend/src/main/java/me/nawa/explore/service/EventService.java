@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.explore.dto.request.EventSearchRequest;
@@ -53,7 +54,20 @@ public class EventService {
 
     @Transactional(readOnly = true)
     public EventListResponse searchEvents(EventSearchRequest request) {
+        return searchEvents(request, null);
+    }
+
+    @Transactional(readOnly = true)
+    public EventListResponse searchEvents(
+        EventSearchRequest request,
+        Long memberId
+    ) {
         normalizeAndValidate(request);
+
+        if (Boolean.TRUE.equals(request.getSavedOnly())
+            && (memberId == null || memberId <= 0)) {
+            throw new BusinessException(AuthErrorCode.AUTHENTICATION_REQUIRED);
+        }
 
         long offsetLong = (long) request.getPage() * request.getSize();
         if (offsetLong > Integer.MAX_VALUE) {
@@ -61,8 +75,12 @@ public class EventService {
         }
 
         int offset = (int) offsetLong;
-        List<EventSummaryResponse> content = eventMapper.searchEvents(request, offset);
-        long totalElements = eventMapper.countEvents(request);
+        List<EventSummaryResponse> content = eventMapper.searchEvents(
+            request,
+            offset,
+            memberId
+        );
+        long totalElements = eventMapper.countEvents(request, memberId);
         int totalPages = calculateTotalPages(totalElements, request.getSize());
 
         return new EventListResponse(

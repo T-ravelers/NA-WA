@@ -2,11 +2,13 @@ package me.nawa.explore.controller;
 
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
+import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.explore.dto.request.EventSearchRequest;
 import me.nawa.explore.dto.response.EventDetailResponse;
 import me.nawa.explore.dto.response.EventListResponse;
 import me.nawa.explore.service.EventService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,9 +26,11 @@ public class EventController {
     @GetMapping
     @ApiOperation("탐색 Event 목록 조회")
     public ApiResponse<EventListResponse> searchEvents(
-        @ModelAttribute EventSearchRequest request
+        @ModelAttribute EventSearchRequest request,
+        @AuthenticationPrincipal AuthenticatedMember member
     ) {
-        return ApiResponse.success(eventService.searchEvents(request));
+        Long memberId = member == null ? null : member.getMemberId();
+        return ApiResponse.success(eventService.searchEvents(request, memberId));
     }
 
     @GetMapping("/{eventId}")

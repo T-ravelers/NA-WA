@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -51,9 +52,16 @@ class EventServiceTest {
             .region3("명동")
             .build();
 
-        when(eventMapper.searchEvents(any(EventSearchRequest.class), eq(2)))
+        when(eventMapper.searchEvents(
+            any(EventSearchRequest.class),
+            eq(2),
+            isNull(Long.class)
+        ))
             .thenReturn(List.of(event));
-        when(eventMapper.countEvents(any(EventSearchRequest.class)))
+        when(eventMapper.countEvents(
+            any(EventSearchRequest.class),
+            isNull(Long.class)
+        ))
             .thenReturn(3L);
 
         EventListResponse result = eventService.searchEvents(request);
@@ -79,9 +87,16 @@ class EventServiceTest {
     void searchEvents_usesDefaultPageAndSize() {
         EventSearchRequest request = new EventSearchRequest();
 
-        when(eventMapper.searchEvents(any(EventSearchRequest.class), eq(0)))
+        when(eventMapper.searchEvents(
+            any(EventSearchRequest.class),
+            eq(0),
+            isNull(Long.class)
+        ))
             .thenReturn(List.of());
-        when(eventMapper.countEvents(any(EventSearchRequest.class)))
+        when(eventMapper.countEvents(
+            any(EventSearchRequest.class),
+            isNull(Long.class)
+        ))
             .thenReturn(0L);
 
         EventListResponse result = eventService.searchEvents(request);
@@ -91,7 +106,7 @@ class EventServiceTest {
         assertEquals(0L, result.getTotalElements());
         assertEquals(0, result.getTotalPages());
         assertEquals(false, result.isHasNext());
-        verify(eventMapper).searchEvents(request, 0);
+        verify(eventMapper).searchEvents(request, 0, null);
     }
 
     @Test
@@ -116,6 +131,34 @@ class EventServiceTest {
             () -> eventService.searchEvents(request)
         );
         verifyNoInteractions(eventMapper);
+    }
+
+    @Test
+    void searchEvents_throwsAuthenticationRequired_whenSavedOnlyWithoutMember() {
+        EventSearchRequest request = new EventSearchRequest();
+        request.setSavedOnly(true);
+
+        assertThrows(
+            BusinessException.class,
+            () -> eventService.searchEvents(request, null)
+        );
+        verifyNoInteractions(eventMapper);
+    }
+
+    @Test
+    void searchEvents_passesMemberId_whenSavedOnlyIsRequested() {
+        EventSearchRequest request = new EventSearchRequest();
+        request.setSavedOnly(true);
+
+        when(eventMapper.searchEvents(request, 0, 7L))
+            .thenReturn(List.of());
+        when(eventMapper.countEvents(request, 7L)).thenReturn(0L);
+
+        EventListResponse result = eventService.searchEvents(request, 7L);
+
+        assertEquals(0, result.getContent().size());
+        verify(eventMapper).searchEvents(request, 0, 7L);
+        verify(eventMapper).countEvents(request, 7L);
     }
 
     @Test

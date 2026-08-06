@@ -253,6 +253,16 @@
             </foreach>
             )
         </if>
+
+        <if test="request.savedOnly == true">
+            AND EXISTS (
+                SELECT 1
+                FROM explore_item_likes saved_like
+                WHERE saved_like.item_id = ei.item_id
+                  AND saved_like.member_id = #{memberId}
+                  AND saved_like.deleted_at IS NULL
+            )
+        </if>
     </sql>
 
     <select id="searchEvents"

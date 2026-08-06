@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -44,6 +46,7 @@ class EventControllerTest {
         mockMvc = MockMvcBuilders
             .standaloneSetup(new EventController(eventService))
             .setControllerAdvice(new GlobalExceptionHandler())
+            .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
             .build();
     }
 
@@ -66,7 +69,10 @@ class EventControllerTest {
             List.of(event), 0, 20, 1L, 1, false
         );
 
-        when(eventService.searchEvents(any(EventSearchRequest.class)))
+        when(eventService.searchEvents(
+            any(EventSearchRequest.class),
+            isNull(Long.class)
+        ))
             .thenReturn(response);
 
         String responseBody = mockMvc.perform(get("/api/v1/explore/events"))
