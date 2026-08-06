@@ -30,6 +30,9 @@ cd backend
 ./gradlew build --no-daemon
 ```
 
+Windows PowerShell에서는 `.\gradlew.bat build --no-daemon`으로 실행하세요. 이 문서의
+나머지 Gradle 명령도 같습니다.
+
 API 계약을 변경했다면 단위·통합 테스트와 Swagger 또는 Postman 확인 결과를 PR에
 작성하세요.
 

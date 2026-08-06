@@ -80,14 +80,66 @@ docker compose down
 - Node.js `24.18.0`
 - pnpm `11.17.0`
 
-macOS에서 fnm을 사용한다면 프로젝트 버전을 활성화하세요.
+버전은 저장소 루트의 `.node-version`에 고정돼 있습니다. Node 버전 관리자로 fnm을
+사용한다면 아래를 따르세요. 다른 관리자(nvm, Volta)를 쓰거나 Node를 직접 설치했다면
+`24.18.0`이 잡히는지만 확인하면 됩니다.
+
+#### macOS
 
 ```shell
-fnm install 24.18.0
-fnm use 24.18.0
-corepack enable pnpm
-pnpm --version
+brew install fnm
 ```
+
+`~/.zshrc`(zsh) 또는 `~/.config/fish/config.fish`(fish)에 셸 훅을 추가하면 디렉터리를
+옮길 때 `.node-version`이 자동으로 적용됩니다.
+
+```shell
+# zsh
+eval "$(fnm env --use-on-cd --shell zsh)"
+
+# fish
+fnm env --use-on-cd --shell fish | source
+```
+
+#### Windows
+
+PowerShell에서 설치합니다. winget 대신 scoop(`scoop install fnm`)이나
+Chocolatey(`choco install fnm`)를 써도 됩니다.
+
+```powershell
+winget install Schniz.fnm
+```
+
+셸 훅은 PowerShell 프로필에 추가합니다. 프로필 파일이 없으면 먼저 만드세요.
+
+```powershell
+if (-not (Test-Path $PROFILE)) { New-Item -ItemType File -Path $PROFILE -Force }
+notepad $PROFILE
+```
+
+열린 파일에 아래 한 줄을 넣고 저장한 뒤 PowerShell을 다시 엽니다.
+
+```powershell
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
+```
+
+> 이 줄을 넣지 않으면 `fnm use`가 현재 세션에만 적용되고 새 터미널에서 풀립니다.
+> Windows 환경 설정에서 가장 자주 막히는 지점입니다.
+
+#### 공통
+
+셸 훅을 설정한 뒤 프로젝트 버전을 설치하고 pnpm을 준비합니다. 저장소 루트에서
+실행하세요.
+
+```shell
+fnm install
+fnm use
+corepack enable pnpm
+node --version   # v24.18.0
+pnpm --version   # 11.17.0
+```
+
+`fnm install`과 `fnm use`는 인자가 없으면 `.node-version`을 읽습니다.
 
 의존성을 설치하고 개발 서버를 실행하세요.
 
