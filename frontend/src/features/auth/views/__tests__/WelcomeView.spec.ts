@@ -37,6 +37,19 @@ describe('WelcomeView', () => {
     expect(wrapper.get('h1').text()).toContain('on record')
   })
 
+  /*
+   * 워드마크는 `NAWA`, 문장 속 표기는 `NA-WA`다. 상단에 있던 텍스트 워드마크가
+   * 헤딩 블록 안 벡터 워드마크로 옮겨졌다.
+   */
+  it('shows the NAWA wordmark once, as artwork', async () => {
+    const { wrapper } = await mountView()
+
+    const wordmarks = wrapper.findAll('svg[aria-label="NAWA"]')
+
+    expect(wordmarks).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('NA-WA')
+  })
+
   it('sends the visitor to sign-in', async () => {
     const { wrapper, router } = await mountView()
 
