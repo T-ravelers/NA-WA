@@ -457,19 +457,36 @@ function retry(): void {
 
         <section class="flex flex-col gap-3">
           <h2 class="text-section-header text-ink">{{ t('explore.detail.location') }}</h2>
-          <div
-            class="relative flex aspect-[1.8] items-end overflow-hidden rounded-card bg-surface-1 p-3"
-          >
-            <ImagePlaceholder :label="t('explore.detail.mapUnavailable')" />
-            <div class="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2">
-              <p
-                class="max-w-[70%] truncate rounded-pill bg-canvas/80 px-3 py-2 text-caption text-ink"
-              >
-                {{ locationLabel || t('explore.detail.unavailable') }}
-              </p>
+          <div class="relative aspect-[1.8] overflow-hidden rounded-card bg-surface-1">
+            <div
+              class="pointer-events-none absolute inset-0 opacity-75"
+              role="img"
+              :aria-label="locationLabel || t('explore.detail.location')"
+            >
+              <div aria-hidden="true">
+                <span class="absolute inset-y-0 left-1/4 w-px bg-hairline-2/70" />
+                <span class="absolute inset-y-0 left-1/2 w-px bg-hairline-2/70" />
+                <span class="absolute inset-y-0 left-3/4 w-px bg-hairline-2/70" />
+                <span class="absolute inset-x-0 top-1/3 h-px bg-hairline-2/70" />
+                <span class="absolute inset-x-0 top-2/3 h-px bg-hairline-2/70" />
+              </div>
+              <span
+                class="absolute -left-[12%] bottom-[27%] h-3 w-[124%] -rotate-6 border-y-4 border-hairline-2/70"
+                aria-hidden="true"
+              />
+              <span
+                class="absolute -left-[12%] bottom-[6%] h-3 w-[124%] rotate-6 border-y-4 border-hairline-2/45"
+                aria-hidden="true"
+              />
+            </div>
+            <span
+              class="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-pill bg-show ring-4 ring-show/20"
+              aria-hidden="true"
+            />
+            <div class="absolute inset-x-3 bottom-3 flex justify-end">
               <button
                 type="button"
-                class="rounded-pill bg-canvas/80 px-3 py-2 text-caption text-ink"
+                class="rounded-pill bg-canvas/85 px-3 py-2 text-caption text-ink shadow-raised"
               >
                 {{ t('explore.detail.directions') }}
               </button>
