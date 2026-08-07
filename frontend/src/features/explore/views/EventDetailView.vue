@@ -38,6 +38,7 @@ import {
   toStringList,
   type DetailEntry,
 } from '../model/eventDetail'
+import { useSavedEventsStore } from '../model/savedEvents'
 
 const route = useRoute()
 const router = useRouter()
@@ -46,9 +47,13 @@ const { locale, t } = useI18n()
 const eventId = computed(() => String(route.params.eventId ?? ''))
 const eventQuery = useEventDetailQuery(eventId, locale)
 const event = computed(() => eventQuery.data.value)
+const savedEvents = useSavedEventsStore()
+const saved = computed(() => {
+  const current = event.value
+  return current ? savedEvents.isSaved(current.eventId) : false
+})
 
 const selectedImage = ref(0)
-const saved = ref(false)
 const journeyAdded = ref(false)
 const journeyDateSheetOpen = ref(false)
 const journeyDate = ref<string | null>(null)
@@ -176,6 +181,11 @@ async function shareEvent(): Promise<void> {
 
 function openReservation(): void {
   if (reservationUrl.value) window.open(reservationUrl.value, '_blank', 'noopener,noreferrer')
+}
+
+function toggleSaved(): void {
+  const current = event.value
+  if (current) savedEvents.toggle(current.eventId)
 }
 
 function openJourneyDateSheet(): void {
@@ -470,7 +480,7 @@ function retry(): void {
           :label="saved ? t('explore.detail.unsave') : t('explore.detail.save')"
           variant="surface"
           class="size-12 rounded-sm border border-hairline-strong bg-transparent"
-          @click="saved = !saved"
+          @click="toggleSaved"
         >
           <IconHeart
             :size="21"

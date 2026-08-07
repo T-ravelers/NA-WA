@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconHeart } from '@tabler/icons-vue'
 
@@ -10,6 +10,7 @@ import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import type { Category } from '@/shared/ui/category'
 
 import type { EventSummary } from '../model/eventExplore'
+import { useSavedEventsStore } from '../model/savedEvents'
 
 interface Props {
   event: EventSummary
@@ -18,7 +19,8 @@ interface Props {
 const { event } = defineProps<Props>()
 const emit = defineEmits<{ open: [eventId: number] }>()
 const { t } = useI18n()
-const saved = ref(false)
+const savedEvents = useSavedEventsStore()
+const saved = computed(() => savedEvents.isSaved(event.itemId))
 
 const statusTone = computed(() => {
   if (event.status === 'ONGOING') return 'ongoing'
@@ -55,6 +57,10 @@ const periodLabel = computed(() => `${formatDate(event.startDate)} ~ ${formatDat
 
 function openEvent(): void {
   emit('open', event.itemId)
+}
+
+function toggleSaved(): void {
+  savedEvents.toggle(event.itemId)
 }
 
 function handleKeydown(event: KeyboardEvent): void {
@@ -105,7 +111,7 @@ function handleKeydown(event: KeyboardEvent): void {
             class="flex size-11 shrink-0 items-center justify-center text-ink-3"
             :aria-label="saved ? 'Remove event from saved' : 'Save event'"
             :aria-pressed="saved"
-            @click.stop="saved = !saved"
+            @click.stop="toggleSaved"
           >
             <IconHeart
               :size="21"
