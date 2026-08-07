@@ -14,11 +14,13 @@ public interface EventMapper {
 
     List<EventSummaryResponse> searchEvents(
         @Param("request") EventSearchRequest request,
-        @Param("offset") int offset
+        @Param("offset") int offset,
+        @Param("memberId") Long memberId
     );
 
     long countEvents(
-        @Param("request") EventSearchRequest request
+        @Param("request") EventSearchRequest request,
+        @Param("memberId") Long memberId
     );
 
     EventDetailResponse findEventDetail(

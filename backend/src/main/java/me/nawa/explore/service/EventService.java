@@ -4,11 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.time.LocalDate;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.explore.dto.request.EventSearchRequest;
@@ -29,12 +32,42 @@ public class EventService {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
-
+    private static final Set<String> SORTS = Set.of(
+        "LATEST",
+        "POPULAR",
+        "ENDING_SOON"
+    );
+    private static final Set<String> EVENT_KINDS = Set.of(
+        "POPUP",
+        "CONCERT",
+        "ETC",
+        "FESTIVAL",
+        "EXHIBITION"
+    );
+    private static final Set<String> DATE_PRESETS = Set.of(
+        "ONGOING",
+        "OPENING_SOON",
+        "THIS_WEEKEND",
+        "THIS_MONTH"
+    );
     private final EventMapper eventMapper;
 
     @Transactional(readOnly = true)
     public EventListResponse searchEvents(EventSearchRequest request) {
+        return searchEvents(request, null);
+    }
+
+    @Transactional(readOnly = true)
+    public EventListResponse searchEvents(
+        EventSearchRequest request,
+        Long memberId
+    ) {
         normalizeAndValidate(request);
+
+        if (Boolean.TRUE.equals(request.getSavedOnly())
+            && (memberId == null || memberId <= 0)) {
+            throw new BusinessException(AuthErrorCode.AUTHENTICATION_REQUIRED);
+        }
 
         long offsetLong = (long) request.getPage() * request.getSize();
         if (offsetLong > Integer.MAX_VALUE) {
@@ -42,8 +75,12 @@ public class EventService {
         }
 
         int offset = (int) offsetLong;
-        List<EventSummaryResponse> content = eventMapper.searchEvents(request, offset);
-        long totalElements = eventMapper.countEvents(request);
+        List<EventSummaryResponse> content = eventMapper.searchEvents(
+            request,
+            offset,
+            memberId
+        );
+        long totalElements = eventMapper.countEvents(request, memberId);
         int totalPages = calculateTotalPages(totalElements, request.getSize());
 
         return new EventListResponse(
@@ -73,16 +110,71 @@ public class EventService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
+        request.setEventKinds(normalizeUppercaseValues(request.getEventKinds()));
+        if (request.getEventKinds().stream()
+            .anyMatch(eventKind -> !EVENT_KINDS.contains(eventKind))) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
+        request.setRegion1(normalizeTextValues(request.getRegion1()));
+        request.setRegion2(normalizeTextValues(request.getRegion2()));
+        request.setRegion3(normalizeTextValues(request.getRegion3()));
+
+        String datePreset = normalizeOptionalUppercase(request.getDatePreset());
+        if (datePreset != null && !DATE_PRESETS.contains(datePreset)) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        if (datePreset != null
+            && (request.getStartDate() != null || request.getEndDate() != null)) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        validateDateRange(request.getStartDate(), request.getEndDate());
+        request.setDatePreset(datePreset);
+
         String sort = StringUtils.hasText(request.getSort())
             ? request.getSort().toUpperCase(Locale.ROOT)
             : "LATEST";
-        if (!"LATEST".equals(sort) && !"POPULAR".equals(sort)) {
+        if (!SORTS.contains(sort)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         request.setSort(sort);
 
         if (!StringUtils.hasText(request.getLanguage())) {
             request.setLanguage("en");
+        }
+    }
+
+    private List<String> normalizeUppercaseValues(List<String> values) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+            .filter(StringUtils::hasText)
+            .map(value -> value.trim().toUpperCase(Locale.ROOT))
+            .distinct()
+            .toList();
+    }
+
+    private List<String> normalizeTextValues(List<String> values) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+            .filter(StringUtils::hasText)
+            .map(String::trim)
+            .distinct()
+            .toList();
+    }
+
+    private String normalizeOptionalUppercase(String value) {
+        return StringUtils.hasText(value)
+            ? value.trim().toUpperCase(Locale.ROOT)
+            : null;
+    }
+
+    private void validateDateRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
     }
 

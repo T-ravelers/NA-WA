@@ -61,7 +61,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 쿼리 파라미터 바인딩에 실패했을 때(예: 존재하지 않는 enum 값) 처리합니다.
+     * 쿼리 파라미터 바인딩에 실패했을 때(예: 존재하지 않는 enum 값, 날짜 형식 오류) 처리합니다.
      */
     @ExceptionHandler(BindException.class)
     public ResponseEntity<ApiResponse<Void>> handleBindException() {

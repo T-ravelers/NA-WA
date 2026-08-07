@@ -3,7 +3,10 @@ package me.nawa.explore.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -44,6 +48,7 @@ class EventControllerTest {
         mockMvc = MockMvcBuilders
             .standaloneSetup(new EventController(eventService))
             .setControllerAdvice(new GlobalExceptionHandler())
+            .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
             .build();
     }
 
@@ -66,7 +71,10 @@ class EventControllerTest {
             List.of(event), 0, 20, 1L, 1, false
         );
 
-        when(eventService.searchEvents(any(EventSearchRequest.class)))
+        when(eventService.searchEvents(
+            any(EventSearchRequest.class),
+            isNull(Long.class)
+        ))
             .thenReturn(response);
 
         String responseBody = mockMvc.perform(get("/api/v1/explore/events"))
@@ -99,6 +107,68 @@ class EventControllerTest {
             body.path("data").path("content").get(0).path("endDate").asText()
         );
         assertEquals(1L, body.path("data").path("totalElements").asLong());
+    }
+
+    @Test
+    void searchEvents_bindsMultiValueFilters() throws Exception {
+        when(eventService.searchEvents(
+            any(EventSearchRequest.class),
+            isNull(Long.class)
+        )).thenReturn(new EventListResponse(
+            List.of(), 0, 20, 0L, 0, false
+        ));
+
+        mockMvc.perform(
+                get("/api/v1/explore/events")
+                    .param("eventKinds", "POPUP", "CONCERT")
+                    .param("region1", "서울", "경기")
+                    .param("region2", "성수", "홍대")
+                    .param("startDate", "2026-08-01")
+                    .param("endDate", "2026-08-31")
+                    .param("freeOnly", "true")
+            )
+            .andExpect(status().isOk());
+
+        var requestCaptor = forClass(EventSearchRequest.class);
+        verify(eventService).searchEvents(
+            requestCaptor.capture(),
+            isNull(Long.class)
+        );
+
+        EventSearchRequest request = requestCaptor.getValue();
+        assertEquals(List.of("POPUP", "CONCERT"), request.getEventKinds());
+        assertEquals(List.of("서울", "경기"), request.getRegion1());
+        assertEquals(List.of("성수", "홍대"), request.getRegion2());
+        assertEquals(
+            LocalDate.of(2026, 8, 1),
+            request.getStartDate()
+        );
+        assertEquals(
+            LocalDate.of(2026, 8, 31),
+            request.getEndDate()
+        );
+        assertEquals(true, request.getFreeOnly());
+    }
+
+    @Test
+    void searchEvents_returnsBadRequest_whenDateFormatIsInvalid()
+        throws Exception {
+        String responseBody = mockMvc.perform(
+                get("/api/v1/explore/events")
+                    .param("startDate", "not-a-date")
+            )
+            .andExpect(status().isBadRequest())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+
+        assertFalse(body.path("success").asBoolean());
+        assertEquals(
+            "COMMON-001",
+            body.path("error").path("code").asText()
+        );
     }
 
     @Test
