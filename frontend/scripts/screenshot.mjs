@@ -192,6 +192,105 @@ const WALLET_TRANSACTIONS = [
   },
 ]
 
+function stubJson(page, pathname, data) {
+  return page.route(
+    (url) => url.pathname === pathname,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data }),
+      }),
+  )
+}
+
+function stubWalletApis(page) {
+  stubJson(page, '/api/v1/wallet', {
+    balance: 84500,
+    availabilityStatus: 'ACTIVE',
+    recentTransactions: [
+      {
+        transferId: 9,
+        transferType: 'TOPUP',
+        entryType: 'CREDIT',
+        amount: 50000,
+        balanceAfter: 84500,
+        createdAt: [2026, 8, 7, 12, 18, 2],
+      },
+      {
+        transferId: 8,
+        transferType: 'TOPUP',
+        entryType: 'CREDIT',
+        amount: 30000,
+        balanceAfter: 34500,
+        createdAt: [2026, 8, 7, 9, 28, 57],
+      },
+    ],
+  })
+
+  stubJson(page, '/api/v1/topups/methods', {
+    methods: [
+      {
+        type: 'STRIPE_CARD',
+        displayName: 'Stripe',
+        testMode: true,
+        enabled: true,
+      },
+    ],
+    guideMessage: null,
+  })
+
+  stubJson(page, '/api/v1/me/transactions', {
+    transactions: [
+      {
+        transferId: 9,
+        transferType: 'TOPUP',
+        entryType: 'CREDIT',
+        amount: 50000,
+        balanceAfter: 452000,
+        createdAt: [2026, 8, 7, 12, 18, 2],
+      },
+      {
+        transferId: 8,
+        transferType: 'TOPUP',
+        entryType: 'CREDIT',
+        amount: 100000,
+        balanceAfter: 402000,
+        createdAt: [2026, 8, 7, 9, 28, 57],
+      },
+      {
+        transferId: 7,
+        transferType: 'TOPUP',
+        entryType: 'CREDIT',
+        amount: 30000,
+        balanceAfter: 302000,
+        createdAt: [2026, 8, 7, 8, 6, 53],
+      },
+    ],
+    nextCursor: null,
+    appliedFilters: {
+      type: null,
+      status: null,
+      from: null,
+      to: null,
+    },
+  })
+
+  stubJson(page, '/api/v1/me/transactions/9', {
+    amount: 50000,
+    occurredAt: [2026, 8, 7, 12, 18, 2],
+    counterparty: { type: 'EXTERNAL', name: 'Stripe' },
+    status: 'COMPLETED',
+    receipt: {
+      transactionNumber: 'ST-20260807-0009',
+      memo: 'Wallet top-up',
+      spendingCategory: null,
+    },
+    transactionNumber: 'ST-20260807-0009',
+    fx: null,
+  })
+}
+
 /**
  * 찍을 화면.
  *
@@ -250,6 +349,33 @@ const SCREENS = [
     setup: async (page) => {
       await stubMemberProfile(page)
       await stubWalletHome(page, [])
+    },
+  },
+  {
+    name: '10-wallet-top-up',
+    path: '/wallet/top-up',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      stubWalletApis(page)
+    },
+    prepare: async (page) => {
+      await page.getByLabel('Top-up amount').fill('50000')
+    },
+  },
+  {
+    name: '11-wallet-transactions',
+    path: '/wallet/transactions',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      stubWalletApis(page)
+    },
+  },
+  {
+    name: '12-wallet-transaction-detail',
+    path: '/wallet/transactions/9',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      stubWalletApis(page)
     },
   },
 
