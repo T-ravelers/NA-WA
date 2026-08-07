@@ -9,12 +9,9 @@ const route = useRoute()
 /**
  * 하단 탭은 서비스 화면에서만 보여준다.
  *
- * 로그인, 콜백, 404와 상세 화면에서는 이동할 곳이 없거나
- * 상세 콘텐츠에 집중해야 하므로 감춘다.
+ * 로그인, 콜백, 404에서는 이동할 곳이 없으므로 감춘다.
  */
-const showBottomNav = computed(
-  () => route.meta.requiresAuth === true && route.meta.hideBottomNav !== true,
-)
+const showBottomNav = computed(() => route.meta.requiresAuth === true)
 </script>
 
 <template>
