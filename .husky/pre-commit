@@ -4,12 +4,26 @@ repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 if ! command -v node >/dev/null 2>&1 && [ -f "$repo_root/.node-version" ]; then
   IFS= read -r node_version < "$repo_root/.node-version"
   node_version=${node_version#v}
-  fnm_node_bin="${XDG_DATA_HOME:-$HOME/.local/share}/fnm/node-versions/v${node_version}/installation/bin"
+  fnm_root="${XDG_DATA_HOME:-$HOME/.local/share}/fnm"
 
-  if [ -x "$fnm_node_bin/node" ]; then
-    PATH="$fnm_node_bin:$PATH"
-    export PATH
+  # On Windows the fnm root is %APPDATA%\fnm. Use APPDATA rather than FNM_DIR:
+  # FNM_DIR only exists once the shell hook has run, which is exactly the case
+  # this fallback covers, while APPDATA is a system variable GUI processes keep.
+  # cygpath is required -- an unconverted "C:/..." would put a colon into PATH.
+  if [ -n "$APPDATA" ] && command -v cygpath >/dev/null 2>&1; then
+    fnm_root="$(cygpath -u "$APPDATA")/fnm"
   fi
+
+  node_install="$fnm_root/node-versions/v${node_version}/installation"
+
+  # Linux/macOS keep node under installation/bin, Windows directly under it.
+  for fnm_node_bin in "$node_install/bin" "$node_install"; do
+    if [ -x "$fnm_node_bin/node" ]; then
+      PATH="$fnm_node_bin:$PATH"
+      export PATH
+      break
+    fi
+  done
 fi
 
 if ! command -v node >/dev/null 2>&1; then
