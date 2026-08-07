@@ -5,4 +5,47 @@
 
 <mapper namespace="me.nawa.journey.mapper.JourneyMapper">
 
+    <insert id="insertJourney" useGeneratedKeys="true" keyProperty="tripId">
+        INSERT INTO trips
+            (member_id, title, start_date, end_date, budget_amount, companion_preference)
+        VALUES
+            (#{memberId}, #{title}, #{startDate}, #{endDate},
+             #{budgetAmount}, #{companionPreference})
+    </insert>
+
+    <insert id="insertRegions">
+        INSERT INTO trip_regions
+            (trip_id, region_code, region_name, display_order)
+        VALUES
+        <foreach collection="regions" item="region" separator=",">
+            (#{region.tripId}, #{region.regionCode}, #{region.regionName},
+             #{region.displayOrder})
+        </foreach>
+    </insert>
+
+    <select id="findJourneyById" resultType="me.nawa.journey.domain.Journey">
+        SELECT
+            trip_id,
+            member_id,
+            title,
+            start_date,
+            end_date,
+            budget_amount,
+            companion_preference
+        FROM trips
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="findRegionsByTripId" resultType="me.nawa.journey.domain.TripRegion">
+        SELECT
+            trip_id,
+            region_code,
+            region_name,
+            display_order
+        FROM trip_regions
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+        ORDER BY display_order ASC, region_code ASC
+    </select>
 </mapper>
