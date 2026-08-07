@@ -372,7 +372,6 @@ function resetSheet(): void {
     EVENT_OPTIONS.forEach(({ key }) => (draft[key] = undefined))
   } else {
     draft.sort = 'LATEST'
-    draft.savedOnly = undefined
   }
 }
 
@@ -668,26 +667,16 @@ function apply(): void {
               v-for="sortOption in [
                 { value: 'LATEST', labelKey: 'explore.sort.latest', hint: 'default' },
                 { value: 'POPULAR', labelKey: 'explore.sort.popular', hint: '' },
-                { value: 'SAVED', labelKey: 'explore.sort.saved', hint: '' },
                 { value: 'ENDING_SOON', labelKey: 'explore.sort.ending_soon', hint: '' },
               ]"
               :key="sortOption.value"
               type="button"
               class="flex min-h-16 w-full items-center justify-between text-left"
-              @click="
-                sortOption.value === 'SAVED'
-                  ? (draft.savedOnly = !draft.savedOnly)
-                  : ((draft.sort = sortOption.value as EventSearchFilters['sort']),
-                    (draft.savedOnly = undefined))
-              "
+              @click="draft.sort = sortOption.value as EventSearchFilters['sort']"
             >
               <span
                 class="text-body"
-                :class="
-                  (sortOption.value === 'SAVED' ? draft.savedOnly : draft.sort === sortOption.value)
-                    ? 'text-ink'
-                    : 'text-ink-2'
-                "
+                :class="draft.sort === sortOption.value ? 'text-ink' : 'text-ink-2'"
               >
                 {{ t(sortOption.labelKey) }}
                 <span
@@ -700,15 +689,13 @@ function apply(): void {
               <span
                 class="flex size-6 items-center justify-center rounded-pill"
                 :class="
-                  (sortOption.value === 'SAVED' ? draft.savedOnly : draft.sort === sortOption.value)
+                  draft.sort === sortOption.value
                     ? 'bg-paper-fill text-on-paper'
                     : 'border border-hairline-2'
                 "
               >
                 <IconCheck
-                  v-if="
-                    sortOption.value === 'SAVED' ? draft.savedOnly : draft.sort === sortOption.value
-                  "
+                  v-if="draft.sort === sortOption.value"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"

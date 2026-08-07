@@ -43,7 +43,6 @@ const startDate = ref(readQueryString('startDate'))
 const endDate = ref(readQueryString('endDate'))
 const keyword = ref(readQueryString('keyword') ?? '')
 const sort = ref<EventSort>(readSort(readQueryString('sort')))
-const savedOnly = ref(readQueryBoolean('savedOnly'))
 const freeOnly = ref(readQueryBoolean('freeOnly'))
 const openWeekendOnly = ref(readQueryBoolean('openWeekendOnly'))
 const opensLateOnly = ref(readQueryBoolean('opensLateOnly'))
@@ -67,7 +66,6 @@ const filters = computed<EventSearchFilters>(() => ({
   datePreset: datePreset.value,
   startDate: startDate.value,
   endDate: endDate.value,
-  savedOnly: savedOnly.value || undefined,
   freeOnly: freeOnly.value || undefined,
   openWeekendOnly: openWeekendOnly.value || undefined,
   opensLateOnly: opensLateOnly.value || undefined,
@@ -134,7 +132,6 @@ const activeFilters = computed(() => {
     if (selected) values.push({ key: `option:${key}`, label })
   })
 
-  if (savedOnly.value) values.push({ key: 'sort:saved', label: t('explore.sort.saved') })
   return values
 })
 
@@ -154,7 +151,6 @@ watch(
     addQueryValue(query, 'endDate', next.endDate)
     addQueryValue(query, 'keyword', next.keyword)
     addQueryValue(query, 'sort', next.sort === 'LATEST' ? undefined : next.sort)
-    addQueryValue(query, 'savedOnly', next.savedOnly)
     addQueryValue(query, 'freeOnly', next.freeOnly)
     addQueryValue(query, 'openWeekendOnly', next.openWeekendOnly)
     addQueryValue(query, 'opensLateOnly', next.opensLateOnly)
@@ -183,7 +179,6 @@ function applySheet(next: EventSearchFilters): void {
   startDate.value = next.startDate
   endDate.value = next.endDate
   sort.value = next.sort ?? 'LATEST'
-  savedOnly.value = next.savedOnly ?? false
   freeOnly.value = next.freeOnly ?? false
   openWeekendOnly.value = next.openWeekendOnly ?? false
   opensLateOnly.value = next.opensLateOnly ?? false
@@ -223,7 +218,6 @@ function removeFilter(key: string): void {
     endDate.value = undefined
     keyword.value = ''
     sort.value = 'LATEST'
-    savedOnly.value = false
     freeOnly.value = false
     openWeekendOnly.value = false
     opensLateOnly.value = false
@@ -259,8 +253,6 @@ function removeFilter(key: string): void {
     if (option === 'opensLateOnly') opensLateOnly.value = false
     if (option === 'preReservationOnly') preReservationOnly.value = false
     if (option === 'experienceOnly') experienceOnly.value = false
-  } else if (key === 'sort:saved') {
-    savedOnly.value = false
   }
 }
 

@@ -6,6 +6,15 @@ import { i18n } from '@/app/i18n'
 import ExploreFilterSheet from '../ExploreFilterSheet.vue'
 
 describe('ExploreFilterSheet', () => {
+  it('does not expose saved sorting before the saved API is connected', () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'sort', filters: { sort: 'LATEST' }, resultCount: 3 },
+    })
+
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Saved')).toBe(false)
+  })
+
   it('emits close when the scrim is pressed', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
