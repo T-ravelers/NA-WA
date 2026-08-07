@@ -1,5 +1,7 @@
 -- Local mock data only. Do not run this file in a shared or production database.
 -- Replaces duplicate sector/activity rows with the Explore taxonomy.
+-- The IDs are fixed only for local preview; a future taxonomy API/seed must
+-- provide the production identifiers and classifications.
 
 START TRANSACTION;
 
