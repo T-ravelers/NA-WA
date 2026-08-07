@@ -3,21 +3,31 @@ package me.nawa.auth.oauth.account;
 import me.nawa.auth.mapper.OAuthAccountMapper;
 import me.nawa.auth.oauth.OAuthProvider;
 import me.nawa.auth.oauth.identity.OAuthUserProfile;
+import me.nawa.wallet.service.WalletProvisioningService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OAuthMemberTransactionTest {
     private FakeOAuthAccountMapper mapper;
+    private RecordingWalletProvisioningService walletProvisioningService;
     private OAuthMemberTransaction transaction;
 
     @BeforeEach
     void setUp() {
         mapper = new FakeOAuthAccountMapper();
-        transaction = new OAuthMemberTransactionImpl(mapper);
+        walletProvisioningService = new RecordingWalletProvisioningService();
+        transaction = new OAuthMemberTransactionImpl(
+                mapper,
+                walletProvisioningService
+        );
     }
 
     @Test
@@ -31,6 +41,7 @@ class OAuthMemberTransactionTest {
         assertEquals(42L, result.getMemberId());
         assertEquals(0, mapper.insertMemberCalls);
         assertEquals(0, mapper.insertSocialAccountCalls);
+        assertTrue(walletProvisioningService.provisionedMemberIds.isEmpty());
     }
 
     @Test
@@ -51,6 +62,31 @@ class OAuthMemberTransactionTest {
         assertEquals(
                 "traveler@example.com",
                 mapper.insertedProviderEmail
+        );
+        assertEquals(
+                List.of(101L),
+                walletProvisioningService.provisionedMemberIds
+        );
+    }
+
+    @Test
+    void resolveOrCreate_firstLogin_provisionsWalletAfterSocialAccount() {
+        mapper.generatedMemberId = 104L;
+
+        transaction.resolveOrCreate(
+                googleProfile("traveler@example.com", "Traveler")
+        );
+
+        assertEquals(1, mapper.insertSocialAccountCalls);
+        assertEquals(
+                List.of(104L),
+                walletProvisioningService.provisionedMemberIds
+        );
+        // 지갑 생성은 소셜 계정 INSERT 이후여야 한다 (유니크 제약이 경합을 먼저 거른다)
+        assertEquals(
+                1,
+                walletProvisioningService
+                        .socialAccountCallsBeforeFirstProvision
         );
     }
 
@@ -120,6 +156,22 @@ class OAuthMemberTransactionTest {
 
         private TestOAuthUserProfile withProfileImageUrlForTest(String url) {
             return new TestOAuthUserProfile(getEmail(), getDisplayName(), url);
+        }
+    }
+
+    private final class RecordingWalletProvisioningService
+            implements WalletProvisioningService {
+        private final List<Long> provisionedMemberIds = new ArrayList<>();
+        private int socialAccountCallsBeforeFirstProvision = -1;
+
+        @Override
+        public long provisionForMember(long memberId) {
+            if (provisionedMemberIds.isEmpty()) {
+                socialAccountCallsBeforeFirstProvision =
+                        mapper.insertSocialAccountCalls;
+            }
+            provisionedMemberIds.add(memberId);
+            return 9_000L + memberId;
         }
     }
 
