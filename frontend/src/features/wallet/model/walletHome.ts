@@ -39,7 +39,7 @@ export const walletKeys = {
 
 const ACTIVITY_COLORS = ['#ff6b1a', '#f5362b', '#7c6af2', '#32a852', '#e5a629']
 const DEFAULT_ACTIVITY_COLOR = '#ff6b1a'
-const DEFAULT_ACCOUNT_NAME = 'NAWA 테스트 지갑'
+const DEFAULT_ACCOUNT_NAME = 'NAWA Test Wallet'
 
 const toAmountString = (amount: string | number): string => String(amount)
 
@@ -48,25 +48,25 @@ const getAbsoluteAmount = (amount: string): string => amount.replace(/^-/, '')
 const getActivityTitle = (transferType: string): string => {
   switch (transferType.toUpperCase()) {
     case 'TOPUP':
-      return '포인트 충전'
+      return 'Point top-up'
     case 'QR_PAYMENT':
-      return 'QR 결제'
+      return 'QR payment'
     case 'TRANSFER':
-      return '포인트 송금'
+      return 'Point transfer'
     case 'SETTLEMENT':
-      return '정산'
+      return 'Settlement'
     default:
-      return '지갑 거래'
+      return 'Wallet transaction'
   }
 }
 
 const getActivityInitial = (title: string): string => title.slice(0, 1)
 
 const getActivityMeta = (createdAt: string | null): string => {
-  if (!createdAt) return '최근 거래'
+  if (!createdAt) return 'Recent transaction'
 
   const date = new Date(createdAt)
-  if (Number.isNaN(date.getTime())) return '최근 거래'
+  if (Number.isNaN(date.getTime())) return 'Recent transaction'
 
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
@@ -106,11 +106,11 @@ export const formatPointAmount = (amount: string): string =>
 export const getWalletStatusLabel = (status: string): string => {
   switch (status.toUpperCase()) {
     case 'ACTIVE':
-      return '사용중'
+      return 'Active'
     case 'SUSPENDED':
-      return '일시정지'
+      return 'Suspended'
     case 'CLOSED':
-      return '종료'
+      return 'Closed'
     default:
       return status
   }

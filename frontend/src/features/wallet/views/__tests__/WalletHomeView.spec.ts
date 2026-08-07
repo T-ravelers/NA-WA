@@ -52,7 +52,7 @@ describe('WalletHomeView', () => {
   it('shows a loading state before the API response arrives', () => {
     const wrapper = mountWalletHome()
 
-    expect(wrapper.get('[role="status"]').text()).toContain('지갑 정보를 불러오는 중입니다.')
+    expect(wrapper.get('[role="status"]').text()).toContain('Loading your wallet...')
   })
 
   it('renders the wallet balance and quick actions after the API response arrives', async () => {
@@ -62,19 +62,19 @@ describe('WalletHomeView', () => {
 
     expect(wrapper.get('h1').text()).toBe('WALLET')
     expect(wrapper.text()).toContain('84,500 P')
-    expect(wrapper.findAll('button').some((button) => button.text() === '충전하기')).toBe(true)
-    expect(wrapper.text()).not.toContain('보내기')
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Top up')).toBe(true)
+    expect(wrapper.text()).not.toContain('Send')
   })
 
   it('announces the selected quick action', async () => {
     const wrapper = mountWalletHome()
 
     await flushPromises()
-    const topUpButton = wrapper.findAll('button').find((button) => button.text() === '충전하기')
+    const topUpButton = wrapper.findAll('button').find((button) => button.text() === 'Top up')
     expect(topUpButton).toBeDefined()
 
     await topUpButton?.trigger('click')
 
-    expect(wrapper.get('[aria-live="polite"]').text()).toContain('충전하기 버튼을 선택했습니다.')
+    expect(wrapper.get('[aria-live="polite"]').text()).toContain('Top up button selected.')
   })
 })
