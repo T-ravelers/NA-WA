@@ -26,6 +26,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   close: []
+  change: [filters: EventSearchFilters]
   apply: [filters: EventSearchFilters]
 }>()
 
@@ -142,6 +143,14 @@ watch(
   (filters) => {
     Object.assign(draft, cloneFilters(filters))
     selectedRegion.value = filters.region1?.[0] ?? 'Seoul'
+  },
+  { deep: true },
+)
+
+watch(
+  draft,
+  (filters) => {
+    emit('change', cloneFilters(filters))
   },
   { deep: true },
 )

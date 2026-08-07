@@ -11,6 +11,7 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 import EventCard from '../components/EventCard.vue'
 import ExploreFilterBar from '../components/ExploreFilterBar.vue'
 import ExploreFilterSheet from '../components/ExploreFilterSheet.vue'
+import ExploreItemTabs from '../components/ExploreItemTabs.vue'
 import { useEventListQuery } from '../composables/useEventListQuery'
 import {
   EVENT_KINDS,
@@ -44,6 +45,7 @@ const openWeekendOnly = ref(readQueryBoolean('openWeekendOnly'))
 const opensLateOnly = ref(readQueryBoolean('opensLateOnly'))
 const preReservationOnly = ref(readQueryBoolean('preReservationOnly'))
 const experienceOnly = ref(readQueryBoolean('experienceOnly'))
+const sheetPreviewFilters = ref<EventSearchFilters | null>(null)
 
 const filters = computed<EventSearchFilters>(() => ({
   language: locale.value,
@@ -67,8 +69,14 @@ const filters = computed<EventSearchFilters>(() => ({
 }))
 
 const eventQuery = useEventListQuery(filters)
+const sheetPreviewQuery = useEventListQuery(
+  computed(() => sheetPreviewFilters.value ?? filters.value),
+)
 const eventList = computed(() => eventQuery.data.value?.content ?? [])
 const totalEvents = computed(() => eventQuery.data.value?.totalElements ?? 0)
+const sheetResultCount = computed(
+  () => sheetPreviewQuery.data.value?.totalElements ?? totalEvents.value,
+)
 
 const eventKindOptions = computed(() =>
   EVENT_KINDS.map((kind) => ({
@@ -135,6 +143,7 @@ watch(
 
 function openSheet(kind: ExploreSheetKind): void {
   selectedSheet.value = kind
+  sheetPreviewFilters.value = { ...filters.value }
 }
 
 function applySheet(next: EventSearchFilters): void {
@@ -153,6 +162,16 @@ function applySheet(next: EventSearchFilters): void {
   preReservationOnly.value = next.preReservationOnly ?? false
   experienceOnly.value = next.experienceOnly ?? false
   selectedSheet.value = null
+  sheetPreviewFilters.value = null
+}
+
+function previewSheet(next: EventSearchFilters): void {
+  sheetPreviewFilters.value = { ...next, page: 0, size: 20, language: locale.value }
+}
+
+function closeSheet(): void {
+  selectedSheet.value = null
+  sheetPreviewFilters.value = null
 }
 
 function toggleEventKind(kind: string): void {
@@ -350,8 +369,9 @@ function addQueryList(
       v-if="selectedSheet !== null"
       :kind="selectedSheet"
       :filters="filters"
-      :result-count="totalEvents"
-      @close="selectedSheet = null"
+      :result-count="sheetResultCount"
+      @close="closeSheet"
+      @change="previewSheet"
       @apply="applySheet"
     />
   </section>

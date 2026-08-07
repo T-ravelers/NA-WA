@@ -28,6 +28,7 @@ describe('ExploreFilterSheet', () => {
       .find((button) => button.text() === 'Free')
       ?.trigger('click')
     expect(wrapper.emitted('apply')).toBeUndefined()
+    expect(wrapper.emitted('change')?.at(-1)?.[0]).toMatchObject({ freeOnly: true })
 
     await wrapper
       .findAll('button')
