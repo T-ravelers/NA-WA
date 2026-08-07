@@ -1,6 +1,6 @@
 package me.nawa.config;
 
-import me.nawa.auth.profile.AuthMeServiceImpl;
+import me.nawa.member.service.MemberProfileServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ComponentScan;
 import org.mybatis.spring.annotation.MapperScan;
@@ -12,13 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RootConfigComponentScanTest {
 
     @Test
-    void componentScan_includesCurrentMemberServicePackage() {
+    void componentScan_includesMemberProfileServicePackage() {
         ComponentScan componentScan = RootConfig.class.getAnnotation(
                 ComponentScan.class
         );
 
         assertTrue(Arrays.asList(componentScan.basePackages()).contains(
-                AuthMeServiceImpl.class.getPackageName()
+                MemberProfileServiceImpl.class.getPackageName()
         ));
     }
 

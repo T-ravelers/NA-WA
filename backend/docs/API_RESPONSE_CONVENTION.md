@@ -209,6 +209,8 @@ me.nawa.wallet.exception.WalletErrorCode
 미리 만들지 마세요.
 
 회원 도메인 오류 코드는 다음과 같이 구현할 수 있습니다.
+(`DUPLICATE_EMAIL`/`MEMBER-005`는 형식을 보여주기 위한 예시일 뿐 실제 구현된 코드가
+아닙니다. 실제 코드는 아래 표의 `MEMBER-001`~`MEMBER-004`를 참고하세요.)
 
 ```java
 package me.nawa.member.exception;
@@ -230,7 +232,7 @@ public enum MemberErrorCode implements ErrorCode {
 
     DUPLICATE_EMAIL(
         HttpStatus.CONFLICT,
-        "MEMBER-002",
+        "MEMBER-005",
         "이미 사용 중인 이메일입니다."
     );
 
@@ -242,6 +244,19 @@ public enum MemberErrorCode implements ErrorCode {
 
 특별한 추가 데이터나 별도 처리가 없다면 `MemberNotFoundException`처럼 오류마다 예외
 클래스를 만들지 않습니다. 공통 `BusinessException`을 사용하세요.
+
+회원 도메인에는 다음 오류 코드가 실제로 구현돼 있습니다.
+
+| enum 상수             | 오류 코드    | HTTP 상태 | 의미                    |
+| ---------------------- | ------------ | --------: | ----------------------- |
+| `MEMBER_NOT_FOUND`     | `MEMBER-001` |       404 | 회원 정보를 찾을 수 없음 |
+| `UNSUPPORTED_LANGUAGE` | `MEMBER-002` |       400 | 지원하지 않는 언어       |
+| `UNSUPPORTED_CURRENCY` | `MEMBER-003` |       400 | 지원하지 않는 통화       |
+| `NO_UPDATABLE_FIELD`   | `MEMBER-004` |       400 | 변경할 항목 없음         |
+
+`PATCH /api/v1/members/me`가 `preferredLanguage`·`preferredCurrencyCode`를
+부분 수정할 때 사용합니다. 언어 allow-list는 `en`, `ja`, `zh-CN`, `zh-TW`,
+`vi`이며 이 백엔드 목록이 정본입니다.
 
 ## BusinessException 발생시키기
 
@@ -360,7 +375,8 @@ API 응답에 다음 정보를 포함하지 마세요.
 | ------------------------- | --------- | ---------------------------- |
 | 회원 조회 성공            | 200       | `success: true`, `data` 포함 |
 | 회원을 찾을 수 없음       | 404       | `MEMBER-001`                 |
+| 지원하지 않는 언어        | 400       | `MEMBER-002`                 |
 | Event를 찾을 수 없음      | 404       | `EXPLORE-001`                |
-| 중복 이메일               | 409       | `MEMBER-002`                 |
+| 변경할 항목 없음          | 400       | `MEMBER-004`                 |
 | 지원하지 않는 HTTP Method | 405       | `COMMON-003`                 |
 | 예상하지 못한 서버 오류   | 500       | `COMMON-999`                 |
