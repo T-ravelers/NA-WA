@@ -235,6 +235,22 @@ const SCREENS = [
     path: '/journeys/42',
     setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetail(page)]),
   },
+  {
+    name: '08-wallet',
+    path: '/wallet',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubWalletHome(page, WALLET_TRANSACTIONS)
+    },
+  },
+  {
+    name: '09-wallet-empty',
+    path: '/wallet',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubWalletHome(page, [])
+    },
+  },
 
   // 조작이 필요한 상태는 이렇게 찍는다.
   //
