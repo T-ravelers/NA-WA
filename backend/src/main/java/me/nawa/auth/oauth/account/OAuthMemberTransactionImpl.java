@@ -3,6 +3,7 @@ package me.nawa.auth.oauth.account;
 import lombok.RequiredArgsConstructor;
 import me.nawa.auth.mapper.OAuthAccountMapper;
 import me.nawa.auth.oauth.identity.OAuthUserProfile;
+import me.nawa.wallet.service.WalletProvisioningService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ public class OAuthMemberTransactionImpl implements OAuthMemberTransaction {
     private static final int MAX_PROVIDER_EMAIL_LENGTH = 320;
 
     private final OAuthAccountMapper accountMapper;
+    private final WalletProvisioningService walletProvisioningService;
 
     @Override
     @Transactional
@@ -48,6 +50,9 @@ public class OAuthMemberTransactionImpl implements OAuthMemberTransaction {
                     "Failed to insert OAuth social account"
             );
         }
+        // 소셜 계정 INSERT 이후에 지갑을 만든다. 동시 최초 로그인 경합은
+        // social_accounts 유니크 제약에서 먼저 걸러지므로 지갑이 헛으로 생기지 않는다.
+        walletProvisioningService.provisionForMember(member.getMemberId());
         return OAuthLoginAccount.newActive(member.getMemberId());
     }
 

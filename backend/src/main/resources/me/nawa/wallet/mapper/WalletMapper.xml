@@ -18,6 +18,33 @@
             AND w.deleted_at IS NULL
     </select>
 
+    <insert id="insertMemberWalletOwner"
+            useGeneratedKeys="true"
+            keyProperty="walletOwnerId"
+            keyColumn="wallet_owner_id">
+        INSERT INTO wallet_owners (
+            member_id,
+            owner_type
+        ) VALUES (
+            #{memberId},
+            'MEMBER'
+        )
+    </insert>
+
+    <!-- available_balance(0), wallet_status(ACTIVE), version(0)은 스키마 기본값을 그대로 쓴다 -->
+    <insert id="insertMemberWallet"
+            useGeneratedKeys="true"
+            keyProperty="walletId"
+            keyColumn="wallet_id">
+        INSERT INTO wallets (
+            wallet_owner_id,
+            currency_code
+        ) VALUES (
+            #{walletOwnerId},
+            #{currencyCode}
+        )
+    </insert>
+
     <select id="findByWalletIdForUpdate" resultType="me.nawa.wallet.domain.Wallet">
         SELECT wallet_id, currency_code, available_balance, wallet_status
         FROM wallets
