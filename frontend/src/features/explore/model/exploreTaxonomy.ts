@@ -13,7 +13,7 @@ export interface ExploreSectorOption {
 }
 
 /**
- * Local Explore taxonomy seed. IDs match EXPLORE_TAXONOMY_MOCK_DATA.sql.
+ * Local Explore taxonomy seed. IDs match EXPLORE_TAXONOMY_MOCK_DATA_LOCAL_ONLY.sql.
  * The IDs are intentionally hardcoded for the local/mock UI; replace this
  * constant with the taxonomy API response when that contract is available.
  * The API continues to receive sectorIds/activityIds; this is not a new
