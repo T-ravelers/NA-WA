@@ -31,6 +31,22 @@
         </foreach>
     </insert>
 
+    <select id="findJourneysByMemberId"
+            resultType="me.nawa.journey.domain.Journey">
+        SELECT
+            trip_id,
+            member_id,
+            title,
+            start_date,
+            end_date,
+            budget_amount,
+            companion_preference
+        FROM trips
+        WHERE member_id = #{memberId}
+          AND deleted_at IS NULL
+        ORDER BY start_date ASC, trip_id DESC
+    </select>
+
     <select id="findJourneyById" resultType="me.nawa.journey.domain.Journey">
         SELECT
             trip_id,

@@ -6,6 +6,7 @@ import {
   createJourney,
   fetchJourney,
   fetchJourneyTimeline,
+  fetchJourneys,
   type Journey,
   type JourneyCreateInput,
 } from '../journeyApi'
@@ -107,6 +108,19 @@ describe('journeyApi', () => {
       tripId: 7,
       timeline: [{ visitDate: '2026-08-10', items: [] }],
     })
+  it('fetches journeys available to the authenticated member', async () => {
+    const data = [
+      {
+        tripId: 12,
+        title: 'Seoul Foodie Week',
+        startDate: '2026-03-28',
+        endDate: '2026-04-01',
+      },
+    ]
+    get.mockResolvedValueOnce({ data })
+
+    await expect(fetchJourneys()).resolves.toEqual(data)
+    expect(get).toHaveBeenCalledWith('/api/v1/journeys')
   })
 
   it('adds an explore item to the selected journey on the selected date', async () => {

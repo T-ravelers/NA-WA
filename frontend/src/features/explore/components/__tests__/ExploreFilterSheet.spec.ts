@@ -37,7 +37,7 @@ describe('ExploreFilterSheet', () => {
     expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({ freeOnly: true })
   })
 
-  it('applies the current sheet reset immediately', async () => {
+  it('clears the current sheet selections without applying or closing', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
       props: {
@@ -52,9 +52,7 @@ describe('ExploreFilterSheet', () => {
       .find((button) => button.text() === 'Reset')
       ?.trigger('click')
 
-    expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({
-      sort: 'POPULAR',
-      freeOnly: undefined,
-    })
+    expect(wrapper.emitted('apply')).toBeUndefined()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
   })
 })

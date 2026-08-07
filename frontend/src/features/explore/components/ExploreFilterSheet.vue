@@ -300,8 +300,6 @@ function resetSheet(): void {
     draft.sort = 'LATEST'
     draft.savedOnly = undefined
   }
-
-  emit('apply', cloneFilters(draft))
 }
 
 function apply(): void {

@@ -30,6 +30,8 @@ import {
 
 import { useEventDetailQuery } from '../composables/useEventDetailQuery'
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
+import JourneySelectSheet from '../components/JourneySelectSheet.vue'
+import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
 import {
   resolveHomepageUrl,
   resolveReservationUrl,
@@ -55,8 +57,10 @@ const saved = computed(() => {
 
 const selectedImage = ref(0)
 const journeyAdded = ref(false)
+const journeySelectSheetOpen = ref(false)
 const journeyDateSheetOpen = ref(false)
 const journeyDate = ref<string | null>(null)
+const selectedJourneyId = ref<number | null>(null)
 const journeyAddPending = ref(false)
 const journeyAddError = ref<'missing' | 'failed' | null>(null)
 const shared = ref(false)
@@ -86,6 +90,8 @@ const journeyLocation = computed(() => regionLabel.value || locationLabel.value)
 const activeJourneyId = computed(
   () => parseJourneyRouteQuery(route.query.journeyId) ?? readActiveJourneyId(),
 )
+const journeyListQuery = useJourneyListQuery(journeySelectSheetOpen)
+const journeys = computed(() => journeyListQuery.data.value ?? [])
 
 const hours = computed(() => (event.value ? toDetailEntries(event.value.operatingHours) : []))
 const openDays = computed(() => (event.value ? toStringList(event.value.openDays).join(', ') : ''))
@@ -190,6 +196,18 @@ function toggleSaved(): void {
 
 function openJourneyDateSheet(): void {
   journeyAddError.value = null
+  selectedJourneyId.value = activeJourneyId.value
+  journeySelectSheetOpen.value = true
+}
+
+function closeJourneySelectSheet(): void {
+  journeySelectSheetOpen.value = false
+}
+
+function selectJourney(journeyId: number): void {
+  selectedJourneyId.value = journeyId
+  storeActiveJourneyId(journeyId)
+  journeySelectSheetOpen.value = false
   journeyDateSheetOpen.value = true
 }
 
@@ -201,7 +219,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
   if (journeyAddPending.value) return
 
   const current = event.value
-  const journeyId = activeJourneyId.value
+  const journeyId = selectedJourneyId.value ?? activeJourneyId.value
   if (!current || journeyId === null) {
     journeyAddError.value = 'missing'
     return
@@ -529,6 +547,16 @@ function retry(): void {
         "
         @close="closeJourneyDateSheet"
         @confirm="confirmJourneyDate"
+      />
+
+      <JourneySelectSheet
+        v-if="journeySelectSheetOpen"
+        :journeys="journeys"
+        :selected-journey-id="selectedJourneyId"
+        :loading="journeyListQuery.isPending.value"
+        :error-message="journeyListQuery.isError.value ? t('explore.journeySelect.error') : null"
+        @close="closeJourneySelectSheet"
+        @select="selectJourney"
       />
     </template>
   </section>

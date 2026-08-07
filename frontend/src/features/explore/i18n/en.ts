@@ -160,5 +160,13 @@ export default {
       selectJourneyFirst: 'Select a journey before adding this event.',
       addFailed: 'We could not add this event to your journey. Please try again.',
     },
+    journeySelect: {
+      close: 'Close journey selector',
+      title: 'Choose a journey',
+      description: 'Select which journey should include this event.',
+      loading: 'Loading your journeys…',
+      error: 'We could not load your journeys. Please try again.',
+      empty: 'Create a journey before adding this event.',
+    },
   },
 }

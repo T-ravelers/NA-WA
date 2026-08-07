@@ -19,6 +19,13 @@ export interface JourneyItemResponse {
   createdAt: string
 }
 
+export interface JourneySummary {
+  tripId: number
+  title: string
+  startDate: string
+  endDate: string
+}
+
 export interface JourneyRegion {
   regionCode: string
   regionName: string
@@ -152,6 +159,12 @@ export function buildJourneyCreateRequest(input: JourneyCreateInput): JourneyCre
       displayOrder,
     })),
   }
+}
+
+export async function fetchJourneys(): Promise<JourneySummary[]> {
+  const response = await httpClient.get<JourneySummary[]>('/api/v1/journeys')
+
+  return response.data
 }
 
 export async function addJourneyItem(
