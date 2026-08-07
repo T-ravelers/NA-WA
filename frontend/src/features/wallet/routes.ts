@@ -4,7 +4,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/wallet',
     name: 'wallet',
-    component: () => import('./views/WalletView.vue'),
+    component: () => import('./views/WalletHomeView.vue'),
     meta: { requiresAuth: true },
   },
 ]
