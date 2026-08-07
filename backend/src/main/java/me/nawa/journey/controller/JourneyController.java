@@ -6,6 +6,7 @@ import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.response.JourneyResponse;
+import me.nawa.journey.dto.response.JourneyTimelineResponse;
 import me.nawa.journey.service.JourneyService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -44,6 +45,17 @@ public class JourneyController {
     ) {
         return ApiResponse.success(
             journeyService.getJourney(member.getMemberId(), tripId)
+        );
+    }
+
+    @GetMapping("/{tripId}/timeline")
+    @ApiOperation("Journey 타임라인 조회")
+    public ApiResponse<JourneyTimelineResponse> getTimeline(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long tripId
+    ) {
+        return ApiResponse.success(
+            journeyService.getTimeline(member.getMemberId(), tripId)
         );
     }
 }

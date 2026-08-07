@@ -1,20 +1,32 @@
 package me.nawa.journey.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.journey.domain.Journey;
+import me.nawa.journey.domain.JourneyTimelineItem;
 import me.nawa.journey.domain.TripRegion;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
 import me.nawa.journey.dto.response.JourneyRegionResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
+import me.nawa.journey.dto.response.JourneyTimelineAppointmentResponse;
+import me.nawa.journey.dto.response.JourneyTimelineDayResponse;
+import me.nawa.journey.dto.response.JourneyTimelineEventDetailResponse;
+import me.nawa.journey.dto.response.JourneyTimelineExploreItemResponse;
+import me.nawa.journey.dto.response.JourneyTimelineItemResponse;
+import me.nawa.journey.dto.response.JourneyTimelineLocationResponse;
+import me.nawa.journey.dto.response.JourneyTimelinePlaceDetailResponse;
+import me.nawa.journey.dto.response.JourneyTimelineResponse;
 import me.nawa.journey.exception.JourneyErrorCode;
 import me.nawa.journey.mapper.JourneyMapper;
 import org.springframework.stereotype.Service;
@@ -67,6 +79,58 @@ public class JourneyService {
 
     @Transactional(readOnly = true)
     public JourneyResponse getJourney(Long memberId, Long tripId) {
+        Journey journey = findOwnedJourney(memberId, tripId);
+
+        List<TripRegion> regions = journeyMapper.findRegionsByTripId(tripId);
+        return toResponse(
+            journey,
+            regions == null ? List.of() : regions
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public JourneyTimelineResponse getTimeline(Long memberId, Long tripId) {
+        findOwnedJourney(memberId, tripId);
+
+        List<JourneyTimelineItem> mappedItems =
+            journeyMapper.findTimelineItemsByTripId(tripId);
+        if (mappedItems == null || mappedItems.isEmpty()) {
+            return JourneyTimelineResponse.builder()
+                .tripId(tripId)
+                .timeline(List.of())
+                .build();
+        }
+
+        List<JourneyTimelineItem> sortedItems = new ArrayList<>(mappedItems);
+        sortedItems.sort(
+            Comparator.comparing(JourneyTimelineItem::getVisitDate)
+                .thenComparing(JourneyTimelineItem::getDisplayOrder)
+                .thenComparing(JourneyTimelineItem::getTripItemId)
+        );
+
+        Map<java.time.LocalDate, List<JourneyTimelineItemResponse>> grouped =
+            new LinkedHashMap<>();
+        for (JourneyTimelineItem item : sortedItems) {
+            grouped.computeIfAbsent(
+                item.getVisitDate(),
+                ignored -> new ArrayList<>()
+            ).add(toTimelineItemResponse(item));
+        }
+
+        List<JourneyTimelineDayResponse> timeline = grouped.entrySet().stream()
+            .map(entry -> JourneyTimelineDayResponse.builder()
+                .visitDate(entry.getKey())
+                .items(List.copyOf(entry.getValue()))
+                .build())
+            .toList();
+
+        return JourneyTimelineResponse.builder()
+            .tripId(tripId)
+            .timeline(timeline)
+            .build();
+    }
+
+    private Journey findOwnedJourney(Long memberId, Long tripId) {
         validateMemberId(memberId);
         if (tripId == null || tripId <= 0) {
             throw new BusinessException(
@@ -81,12 +145,96 @@ public class JourneyService {
         if (!memberId.equals(journey.getMemberId())) {
             throw new BusinessException(JourneyErrorCode.JOURNEY_FORBIDDEN);
         }
+        return journey;
+    }
 
-        List<TripRegion> regions = journeyMapper.findRegionsByTripId(tripId);
-        return toResponse(
-            journey,
-            regions == null ? List.of() : regions
-        );
+    private JourneyTimelineItemResponse toTimelineItemResponse(
+        JourneyTimelineItem item
+    ) {
+        JourneyTimelineExploreItemResponse exploreItem =
+            JourneyTimelineExploreItemResponse.builder()
+                .itemType(item.getItemType())
+                .title(item.getTitle())
+                .thumbnailUrl(item.getThumbnailUrl())
+                .imageUrls(toImageUrls(item.getImageUrls()))
+                .location(JourneyTimelineLocationResponse.builder()
+                    .region1(item.getRegion1())
+                    .region2(item.getRegion2())
+                    .region3(item.getRegion3())
+                    .addressRoad(item.getAddressRoad())
+                    .addressDetail(item.getAddressDetail())
+                    .latitude(item.getLatitude())
+                    .longitude(item.getLongitude())
+                    .build())
+                .build();
+
+        return JourneyTimelineItemResponse.builder()
+            .tripItemId(item.getTripItemId())
+            .itemId(item.getItemId())
+            .status(item.getStatus())
+            .displayOrder(item.getDisplayOrder())
+            .note(item.getNote())
+            .exploreItem(exploreItem)
+            .eventDetail(toEventDetail(item))
+            .placeDetail(toPlaceDetail(item))
+            .appointment(toAppointment(item))
+            .build();
+    }
+
+    private JourneyTimelineEventDetailResponse toEventDetail(
+        JourneyTimelineItem item
+    ) {
+        if (!"EVENT".equals(item.getItemType())) {
+            return null;
+        }
+        return JourneyTimelineEventDetailResponse.builder()
+            .eventKind(item.getEventKind())
+            .startDate(item.getEventStartDate())
+            .endDate(item.getEventEndDate())
+            .organizer(item.getOrganizer())
+            .reservationUrl(item.getEventReservationUrl())
+            .venueName(item.getVenueName())
+            .build();
+    }
+
+    private JourneyTimelinePlaceDetailResponse toPlaceDetail(
+        JourneyTimelineItem item
+    ) {
+        if (!"PLACE".equals(item.getItemType())) {
+            return null;
+        }
+        return JourneyTimelinePlaceDetailResponse.builder()
+            .placeKind(item.getPlaceKind())
+            .addressDetail(item.getAddressDetail())
+            .menuSummary(item.getMenuSummary())
+            .isActive(item.getPlaceActive())
+            .build();
+    }
+
+    private JourneyTimelineAppointmentResponse toAppointment(
+        JourneyTimelineItem item
+    ) {
+        if (item.getAppointmentId() == null) {
+            return null;
+        }
+        return JourneyTimelineAppointmentResponse.builder()
+            .activityStartAt(item.getActivityStartAt())
+            .activityEndAt(item.getActivityEndAt())
+            .appointmentStatus(item.getAppointmentStatus())
+            .build();
+    }
+
+    private List<String> toImageUrls(JsonNode imageUrls) {
+        if (imageUrls == null || !imageUrls.isArray()) {
+            return List.of();
+        }
+        List<String> urls = new ArrayList<>();
+        imageUrls.forEach(value -> {
+            if (value.isTextual() && !value.asText().isBlank()) {
+                urls.add(value.asText());
+            }
+        });
+        return List.copyOf(urls);
     }
 
     private void validateRequest(JourneyCreateRequest request) {

@@ -1,6 +1,8 @@
 package me.nawa.journey.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -12,14 +14,17 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.journey.domain.Journey;
+import me.nawa.journey.domain.JourneyTimelineItem;
 import me.nawa.journey.domain.TripRegion;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
 import me.nawa.journey.dto.response.JourneyResponse;
+import me.nawa.journey.dto.response.JourneyTimelineResponse;
 import me.nawa.journey.exception.JourneyErrorCode;
 import me.nawa.journey.mapper.JourneyMapper;
 import org.junit.jupiter.api.Test;
@@ -206,6 +211,150 @@ class JourneyServiceTest {
             exception.getErrorCode()
         );
         verify(journeyMapper, never()).findRegionsByTripId(40L);
+    }
+
+    @Test
+    void getTimeline_returnsEmptyTimeline_whenJourneyHasNoItems() {
+        when(journeyMapper.findJourneyById(50L)).thenReturn(ownedJourney(50L));
+        when(journeyMapper.findTimelineItemsByTripId(50L)).thenReturn(null);
+
+        JourneyTimelineResponse result = journeyService.getTimeline(1L, 50L);
+
+        assertEquals(50L, result.getTripId());
+        assertEquals(List.of(), result.getTimeline());
+    }
+
+    @Test
+    void getTimeline_groupsAndSortsItemsWithDisplayModels() {
+        JourneyTimelineItem laterDate = timelineItem(
+            103L,
+            LocalDate.of(2026, 4, 2),
+            0,
+            "PLACE"
+        );
+        laterDate.setTitle("Gwangjang Market");
+        laterDate.setPlaceKind("MARKET");
+        laterDate.setAddressDetail("Gate 2");
+        laterDate.setMenuSummary("Bindaetteok");
+        laterDate.setPlaceActive(true);
+        laterDate.setAppointmentId(900L);
+        laterDate.setActivityStartAt(
+            LocalDateTime.of(2026, 4, 2, 10, 0)
+        );
+        laterDate.setActivityEndAt(
+            LocalDateTime.of(2026, 4, 2, 12, 0)
+        );
+        laterDate.setAppointmentStatus("CONFIRMED");
+        laterDate.setStatus("CONFIRMED");
+
+        JourneyTimelineItem second = timelineItem(
+            102L,
+            LocalDate.of(2026, 4, 1),
+            1,
+            "EVENT"
+        );
+        second.setTitle("Night Concert");
+
+        JourneyTimelineItem first = timelineItem(
+            101L,
+            LocalDate.of(2026, 4, 1),
+            0,
+            "EVENT"
+        );
+        first.setTitle("Spring Festival");
+        first.setEventKind("FESTIVAL");
+        first.setEventStartDate(LocalDate.of(2026, 4, 1));
+        first.setEventEndDate(LocalDate.of(2026, 4, 3));
+        first.setOrganizer("Seoul City");
+        first.setEventReservationUrl("https://example.com/reserve");
+        first.setVenueName("City Hall");
+
+        when(journeyMapper.findJourneyById(60L)).thenReturn(ownedJourney(60L));
+        when(journeyMapper.findTimelineItemsByTripId(60L)).thenReturn(
+            List.of(laterDate, second, first)
+        );
+
+        JourneyTimelineResponse result = journeyService.getTimeline(1L, 60L);
+
+        assertEquals(2, result.getTimeline().size());
+        assertEquals(
+            LocalDate.of(2026, 4, 1),
+            result.getTimeline().get(0).getVisitDate()
+        );
+        assertEquals(101L, result.getTimeline().get(0).getItems().get(0)
+            .getTripItemId());
+        assertEquals("FESTIVAL", result.getTimeline().get(0).getItems().get(0)
+            .getEventDetail().getEventKind());
+        assertEquals(List.of(), result.getTimeline().get(0).getItems().get(0)
+            .getExploreItem().getImageUrls());
+        assertNull(result.getTimeline().get(0).getItems().get(0)
+            .getPlaceDetail());
+        assertNotNull(result.getTimeline().get(1).getItems().get(0)
+            .getPlaceDetail());
+        assertNotNull(result.getTimeline().get(1).getItems().get(0)
+            .getAppointment());
+    }
+
+    @Test
+    void getTimeline_throwsNotFound_whenJourneyDoesNotExist() {
+        when(journeyMapper.findJourneyById(70L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.getTimeline(1L, 70L)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_NOT_FOUND,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).findTimelineItemsByTripId(70L);
+    }
+
+    @Test
+    void getTimeline_throwsForbidden_whenJourneyHasDifferentOwner() {
+        Journey journey = ownedJourney(80L);
+        journey.setMemberId(2L);
+        when(journeyMapper.findJourneyById(80L)).thenReturn(journey);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.getTimeline(1L, 80L)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_FORBIDDEN,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).findTimelineItemsByTripId(80L);
+    }
+
+    private Journey ownedJourney(Long tripId) {
+        return Journey.builder()
+            .tripId(tripId)
+            .memberId(1L)
+            .title("Seoul Foodie Week")
+            .startDate(LocalDate.of(2026, 3, 28))
+            .endDate(LocalDate.of(2026, 4, 3))
+            .build();
+    }
+
+    private JourneyTimelineItem timelineItem(
+        Long tripItemId,
+        LocalDate visitDate,
+        int displayOrder,
+        String itemType
+    ) {
+        return JourneyTimelineItem.builder()
+            .tripItemId(tripItemId)
+            .itemId(tripItemId + 1000)
+            .visitDate(visitDate)
+            .status("ADDED")
+            .displayOrder(displayOrder)
+            .itemType(itemType)
+            .region1("Seoul")
+            .addressRoad("1 Jong-ro")
+            .build();
     }
 
     private JourneyCreateRequest validRequest() {
