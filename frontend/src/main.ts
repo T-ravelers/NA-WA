@@ -8,7 +8,7 @@ import { bootstrapLocale } from '@/app/i18n/applyLocale'
 import { queryClient } from '@/app/query/client'
 import { router } from '@/app/router'
 import '@/app/styles/index.css'
-import { clearAuthSession } from '@/features/auth/model/authQueries'
+import { clearMemberProfile } from '@/features/member/model/memberQueries'
 import { setSessionExpiredHandler } from '@/shared/api/sessionRecovery'
 import { AUTH_CALLBACK_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
 
@@ -21,7 +21,7 @@ const AUTH_FLOW_PATHS: string[] = [SIGN_IN_PATH, AUTH_CALLBACK_PATH]
  * shared 계층은 router와 feature를 import하지 않으므로 app에서 주입한다.
  */
 setSessionExpiredHandler(() => {
-  clearAuthSession()
+  clearMemberProfile()
 
   const current = router.currentRoute.value
 

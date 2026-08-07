@@ -7,9 +7,9 @@ const REFRESH_ENDPOINT = '/api/v1/auth/refresh'
 /**
  * 갱신을 시도하지 않는 경로.
  *
- * 갱신 자체와 로그아웃만 제외한다. 세션 조회(`/auth/me`)는 제외하지 않는다. access token
- * TTL이 15분이라 만료 직후 `/auth/me`가 401을 받는 것이 가장 흔한 갱신 시점이고, 여기서
- * 갱신하지 않으면 유효한 refresh 쿠키가 있어도 사용자가 로그인 화면으로 밀려난다.
+ * 갱신 자체와 로그아웃만 제외한다. 세션 조회(`/members/me`)는 제외하지 않는다. access
+ * token TTL이 15분이라 만료 직후 `/members/me`가 401을 받는 것이 가장 흔한 갱신 시점이고,
+ * 여기서 갱신하지 않으면 유효한 refresh 쿠키가 있어도 사용자가 로그인 화면으로 밀려난다.
  */
 const NON_RECOVERABLE_PATHS = [REFRESH_ENDPOINT, '/api/v1/auth/logout']
 

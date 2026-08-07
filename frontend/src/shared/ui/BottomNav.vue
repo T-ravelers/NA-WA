@@ -24,7 +24,7 @@ const route = useRoute()
 const items: NavItem[] = [
   { key: 'home', icon: IconCompass, labelKey: 'nav.home', to: '/explore' },
   { key: 'calendar', icon: IconCalendar, labelKey: 'nav.calendar', to: null },
-  { key: 'profile', icon: IconUser, labelKey: 'nav.profile', to: null },
+  { key: 'profile', icon: IconUser, labelKey: 'nav.profile', to: '/settings' },
   { key: 'wallet', icon: IconWallet, labelKey: 'nav.wallet', to: '/wallet' },
   { key: 'journey', icon: IconRoute, labelKey: 'nav.journey', to: null },
 ]
