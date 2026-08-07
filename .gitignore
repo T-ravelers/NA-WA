@@ -137,6 +137,8 @@ out/
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
 
 # Claude Code local context file
 CLAUDE.md
