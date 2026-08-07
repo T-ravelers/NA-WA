@@ -291,6 +291,7 @@ function resetSheet(): void {
     draft.region1 = undefined
     draft.region2 = undefined
     draft.region3 = undefined
+    selectedRegion.value = REGION_OPTIONS[0].value
   } else if (props.kind === 'category') {
     draft.eventKinds = undefined
   } else if (props.kind === 'options') {
@@ -299,6 +300,8 @@ function resetSheet(): void {
     draft.sort = 'LATEST'
     draft.savedOnly = undefined
   }
+
+  emit('apply', cloneFilters(draft))
 }
 
 function apply(): void {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { IconChevronDown, IconX } from '@tabler/icons-vue'
 import { useI18n } from 'vue-i18n'
 
@@ -38,6 +39,10 @@ const FILTER_LABELS: Record<ExploreSheetKind, string> = {
   options: 'explore.sheets.options',
   sort: 'explore.sheets.sort',
 }
+
+const hasAnyFilter = computed(
+  () => activeFilters.length > 0 || eventKindOptions.some((option) => option.selected),
+)
 </script>
 
 <template>
@@ -99,7 +104,7 @@ const FILTER_LABELS: Record<ExploreSheetKind, string> = {
       </button>
 
       <button
-        v-if="activeFilters.length > 0"
+        v-if="hasAnyFilter"
         type="button"
         class="h-9 shrink-0 px-2 text-caption text-ink-3"
         @click="emit('remove', '*')"

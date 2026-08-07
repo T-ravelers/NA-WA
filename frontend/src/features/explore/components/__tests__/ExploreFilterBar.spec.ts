@@ -30,4 +30,10 @@ describe('ExploreFilterBar', () => {
 
     expect(wrapper.emitted('toggleKind')).toEqual([['POPUP']])
   })
+
+  it('shows the global reset when only an event kind is selected', () => {
+    const wrapper = mount(ExploreFilterBar, { global: { plugins: [i18n] }, props })
+
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Reset')).toBe(true)
+  })
 })
