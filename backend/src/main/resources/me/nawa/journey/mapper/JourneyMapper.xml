@@ -5,6 +5,14 @@
 
 <mapper namespace="me.nawa.journey.mapper.JourneyMapper">
 
+    <resultMap id="journeyTimelineItemResultMap"
+               type="me.nawa.journey.domain.JourneyTimelineItem"
+               autoMapping="true">
+        <result property="imageUrls"
+                column="image_urls"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+    </resultMap>
+
     <insert id="insertJourney" useGeneratedKeys="true" keyProperty="tripId">
         INSERT INTO trips
             (member_id, title, start_date, end_date, budget_amount, companion_preference)
@@ -47,5 +55,89 @@
         WHERE trip_id = #{tripId}
           AND deleted_at IS NULL
         ORDER BY display_order ASC, region_code ASC
+    </select>
+
+    <select id="findTimelineItemsByTripId"
+            resultMap="journeyTimelineItemResultMap">
+        SELECT
+            ti.trip_item_id,
+            ti.item_id,
+            ti.appointment_id,
+            ti.visit_date,
+            ti.trip_item_status AS status,
+            ti.display_order,
+            ti.note,
+            ei.item_type,
+            COALESCE(e.title, p.name) AS title,
+            COALESCE(e.thumbnail_url, p.thumbnail_url) AS thumbnail_url,
+            CASE
+                WHEN ei.item_type = 'EVENT' THEN e.image_urls
+                ELSE p.image_urls
+            END AS image_urls,
+            COALESCE(e.region1, p.region1) AS region1,
+            COALESCE(e.region2, p.region2) AS region2,
+            COALESCE(e.region3, p.region3) AS region3,
+            COALESCE(e.address_road, p.address_road) AS address_road,
+            p.address_detail,
+            COALESCE(e.latitude, p.latitude) AS latitude,
+            COALESCE(e.longitude, p.longitude) AS longitude,
+            e.event_kind,
+            e.start_date AS event_start_date,
+            e.end_date AS event_end_date,
+            e.organizer,
+            COALESCE(
+                CASE
+                    WHEN JSON_UNQUOTE(
+                        JSON_EXTRACT(e.pre_reservation, '$.has')
+                    ) = 'true'
+                    THEN NULLIF(
+                        JSON_UNQUOTE(
+                            JSON_EXTRACT(e.pre_reservation, '$.link')
+                        ),
+                        ''
+                    )
+                END,
+                NULLIF(e.reservation_url, ''),
+                NULLIF(
+                    JSON_UNQUOTE(JSON_EXTRACT(e.links, '$.reservationUrl')),
+                    ''
+                ),
+                NULLIF(
+                    JSON_UNQUOTE(JSON_EXTRACT(e.links, '$.reservation_url')),
+                    ''
+                )
+            ) AS event_reservation_url,
+            e.venue_name,
+            p.place_kind,
+            p.menu_summary,
+            p.is_active AS place_active,
+            a.activity_start_at,
+            a.activity_end_at,
+            a.appointment_status
+        FROM trip_items ti
+        JOIN explore_items ei
+          ON ei.item_id = ti.item_id
+         AND ei.deleted_at IS NULL
+        LEFT JOIN event e
+          ON e.event_id = ei.item_id
+         AND ei.item_type = 'EVENT'
+         AND e.deleted_at IS NULL
+        LEFT JOIN place p
+          ON p.place_id = ei.item_id
+         AND ei.item_type = 'PLACE'
+         AND p.deleted_at IS NULL
+        LEFT JOIN appointments a
+          ON a.appointment_id = ti.appointment_id
+         AND a.item_id = ti.item_id
+         AND a.deleted_at IS NULL
+        WHERE ti.trip_id = #{tripId}
+          AND ti.deleted_at IS NULL
+          AND (
+              (ei.item_type = 'EVENT' AND e.event_id IS NOT NULL)
+              OR (ei.item_type = 'PLACE' AND p.place_id IS NOT NULL)
+          )
+        ORDER BY ti.visit_date ASC,
+                 ti.display_order ASC,
+                 ti.trip_item_id ASC
     </select>
 </mapper>

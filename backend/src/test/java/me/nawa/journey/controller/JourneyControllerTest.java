@@ -21,6 +21,11 @@ import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.response.JourneyResponse;
+import me.nawa.journey.dto.response.JourneyTimelineDayResponse;
+import me.nawa.journey.dto.response.JourneyTimelineEventDetailResponse;
+import me.nawa.journey.dto.response.JourneyTimelineExploreItemResponse;
+import me.nawa.journey.dto.response.JourneyTimelineItemResponse;
+import me.nawa.journey.dto.response.JourneyTimelineResponse;
 import me.nawa.journey.exception.JourneyErrorCode;
 import me.nawa.journey.service.JourneyService;
 import org.junit.jupiter.api.AfterEach;
@@ -146,5 +151,54 @@ class JourneyControllerTest {
             "JOURNEY-002",
             body.path("error").path("code").asText()
         );
+    }
+
+    @Test
+    void getTimeline_returns200WithGroupedEventItem() throws Exception {
+        JourneyTimelineItemResponse item = JourneyTimelineItemResponse.builder()
+            .tripItemId(100L)
+            .itemId(200L)
+            .status("ADDED")
+            .displayOrder(0)
+            .exploreItem(JourneyTimelineExploreItemResponse.builder()
+                .itemType("EVENT")
+                .title("Spring Festival")
+                .imageUrls(List.of())
+                .build())
+            .eventDetail(JourneyTimelineEventDetailResponse.builder()
+                .eventKind("FESTIVAL")
+                .startDate(LocalDate.of(2026, 4, 1))
+                .build())
+            .build();
+        JourneyTimelineResponse response = JourneyTimelineResponse.builder()
+            .tripId(20L)
+            .timeline(List.of(JourneyTimelineDayResponse.builder()
+                .visitDate(LocalDate.of(2026, 4, 1))
+                .items(List.of(item))
+                .build()))
+            .build();
+        when(journeyService.getTimeline(1L, 20L)).thenReturn(response);
+
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/20/timeline")
+            )
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        JsonNode responseItem = body.path("data").path("timeline")
+            .get(0).path("items").get(0);
+        assertTrue(body.path("success").asBoolean());
+        assertEquals("2026-04-01", body.path("data").path("timeline")
+            .get(0).path("visitDate").asText());
+        assertTrue(responseItem.path("exploreItem").path("imageUrls").isArray());
+        assertEquals("FESTIVAL", responseItem.path("eventDetail")
+            .path("eventKind").asText());
+        assertTrue(responseItem.has("note"));
+        assertTrue(responseItem.path("note").isNull());
+        assertFalse(responseItem.has("placeDetail"));
+        assertFalse(responseItem.has("appointment"));
     }
 }
