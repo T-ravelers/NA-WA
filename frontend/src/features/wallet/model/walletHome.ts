@@ -1,4 +1,4 @@
-import type { WalletHome, WalletTransaction } from '../api/walletApi'
+import type { ServerDateTime, WalletHome, WalletTransaction } from '../api/walletApi'
 
 /**
  * Wallet 홈 응답을 화면이 쓰는 형태로 옮긴다.
@@ -58,15 +58,57 @@ export const walletQueryKeys = {
 /**
  * 오프셋 없는 서버 시각을 KST로 해석한다.
  *
- * 백엔드가 `LocalDateTime`을 그대로 직렬화하므로 `2026-07-25T12:00:00`에는 타임존이 없다.
- * 이대로 `new Date()`에 넘기면 브라우저의 로컬 타임존으로 읽혀, 방한 외국인 사용자의
- * 기기에서 거래 날짜가 하루 어긋난다. "서버 시각은 KST"라는 전제를 이 한 곳에만 둔다.
- * 백엔드가 오프셋을 포함해 내려주게 되면 이 함수를 지우면 된다.
+ * 백엔드는 `LocalDateTime`을 타임존 없이 내려준다. 이대로 브라우저에 맡기면 로컬 타임존으로
+ * 읽혀, 방한 외국인 사용자의 기기에서 거래 날짜가 하루 어긋난다. "서버 시각은 KST"라는
+ * 전제를 이 한 곳에만 둔다. 백엔드가 오프셋을 포함해 내려주게 되면 이 함수를 지우면 된다.
+ *
+ * 형식이 두 가지인 이유는 `ServerDateTime` 주석에 있다. 배열이 현재 실제 형식이고,
+ * 문자열은 백엔드가 `@JsonFormat`을 도입했을 때를 위한 것이다.
+ *
+ * 배열을 `new Date(년, 월, 일, ...)`로 넘기지 않는다. 그 생성자는 인자를 **로컬 타임존**의
+ * 벽시계로 읽으므로 KST 전제가 깨진다. 시(hour)에서 9를 빼고 `Date.UTC`로 만든다. 자정
+ * 부근에서 음수가 되어도 `Date.UTC`가 전날로 정규화한다.
  */
 const KST_OFFSET = '+09:00'
+const KST_OFFSET_HOURS = 9
 const HAS_OFFSET = /(?:Z|[+-]\d{2}:?\d{2})$/
 
-export function parseServerDateTime(value: string | null): Date | null {
+function parseDateTimeParts(parts: number[]): Date | null {
+  // 뒤쪽 0은 생략되므로 길이가 흔들린다. 날짜 세 칸만 있으면 해석할 수 있다.
+  if (parts.length < 3 || parts.some((part) => !Number.isFinite(part))) {
+    return null
+  }
+
+  const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = parts as [
+    number,
+    number,
+    number,
+    number?,
+    number?,
+    number?,
+    number?,
+  ]
+
+  const parsed = new Date(
+    Date.UTC(
+      year,
+      month - 1,
+      day,
+      hour - KST_OFFSET_HOURS,
+      minute,
+      second,
+      Math.floor(nanosecond / 1_000_000),
+    ),
+  )
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+export function parseServerDateTime(value: ServerDateTime): Date | null {
+  if (Array.isArray(value)) {
+    return parseDateTimeParts(value)
+  }
+
   if (value === null || value === '') {
     return null
   }

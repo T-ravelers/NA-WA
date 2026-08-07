@@ -11,7 +11,7 @@ function transaction(overrides: Partial<WalletTransaction> = {}): WalletTransact
     entryType: 'DEBIT',
     amount: 18000,
     balanceAfter: 84500,
-    createdAt: '2026-07-25T12:00:00',
+    createdAt: [2026, 7, 25, 12, 0],
     ...overrides,
   }
 }
@@ -96,6 +96,35 @@ describe('toWalletHomeData', () => {
 })
 
 describe('parseServerDateTime', () => {
+  // 회귀: 백엔드가 실제로 내려주는 형식이다. 문자열로 가정하면 전 거래의 시각이 사라진다.
+  it('숫자 배열 시각을 KST로 읽는다', () => {
+    expect(parseServerDateTime([2026, 7, 25, 12, 0])?.toISOString()).toBe(
+      '2026-07-25T03:00:00.000Z',
+    )
+  })
+
+  it('배열의 초·나노초가 생략돼도 읽는다', () => {
+    // 뒤쪽 0은 직렬화에서 빠진다. 날짜만 있는 3칸도 자정으로 읽는다.
+    expect(parseServerDateTime([2026, 7, 25])?.toISOString()).toBe('2026-07-24T15:00:00.000Z')
+    expect(parseServerDateTime([2026, 7, 25, 12, 30, 45])?.toISOString()).toBe(
+      '2026-07-25T03:30:45.000Z',
+    )
+    expect(parseServerDateTime([2026, 7, 25, 12, 0, 0, 500_000_000])?.toISOString()).toBe(
+      '2026-07-25T03:00:00.500Z',
+    )
+  })
+
+  it('KST 자정 이전 시각도 전날 UTC로 정규화한다', () => {
+    // 시에서 9를 빼면 음수가 된다. Date.UTC가 전날로 넘겨야 한다.
+    expect(parseServerDateTime([2026, 7, 25, 3, 0])?.toISOString()).toBe('2026-07-24T18:00:00.000Z')
+  })
+
+  it('배열이 짧거나 숫자가 아니면 null이다', () => {
+    expect(parseServerDateTime([2026, 7])).toBeNull()
+    expect(parseServerDateTime([])).toBeNull()
+    expect(parseServerDateTime([2026, 7, Number.NaN])).toBeNull()
+  })
+
   it('오프셋이 없는 서버 시각을 KST로 읽는다', () => {
     // KST 23:30은 같은 날 UTC 14:30이다. 로컬 타임존으로 읽으면 날짜가 밀린다.
     expect(parseServerDateTime('2026-07-25T23:30:00')?.toISOString()).toBe(
