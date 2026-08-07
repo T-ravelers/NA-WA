@@ -12,6 +12,7 @@ NA-WA는 KB IT's Your Life 7기 T-ravelers 팀이 만드는 모바일 우선 여
 | 기술 선택과 운영 경계 확인         | [기술 스택과 운영 경계](./docs/TECH_STACK.md)                             |
 | 프론트엔드 구조와 현재 상태 확인   | [프론트엔드 안내](./frontend/README.md)                                   |
 | 프론트엔드 구현 규칙 확인          | [프론트엔드 개발 컨벤션](./frontend/docs/DEVELOPMENT_CONVENTION.md)       |
+| 공용 UI 컴포넌트와 사용 규칙 확인  | [shared/ui 안내](./frontend/src/shared/ui/README.md)                      |
 | 백엔드 구조와 검증 방법 확인       | [백엔드 안내](./backend/README.md)                                        |
 | 백엔드 구현 규칙 확인              | [백엔드 개발 컨벤션](./backend/docs/DEVELOPMENT_CONVENTION.md)            |
 | API 성공·실패 응답 계약 확인       | [API 응답 및 오류 코드 컨벤션](./backend/docs/API_RESPONSE_CONVENTION.md) |

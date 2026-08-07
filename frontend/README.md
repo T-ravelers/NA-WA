@@ -12,6 +12,7 @@ NA-WA 프론트엔드는 Vue 3와 TypeScript로 구성한 모바일 우선 PWA�
 | Issue, 브랜치, 커밋과 PR 규칙 확인     | [공통 협업 가이드](../CONTRIBUTING.md)                     |
 | 기술 선택과 운영 경계 확인             | [기술 스택과 운영 경계](../docs/TECH_STACK.md)             |
 | 프론트엔드 구현 규칙 확인              | [프론트엔드 개발 컨벤션](./docs/DEVELOPMENT_CONVENTION.md) |
+| 공용 UI 컴포넌트와 사용 규칙 확인      | [shared/ui 안내](./src/shared/ui/README.md)                |
 
 ## 소스 구조
 
