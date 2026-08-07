@@ -41,23 +41,63 @@ const SCALE = 2
 const BASE = (process.env.SCREENSHOT_BASE ?? 'http://localhost:5173').replace(/\/+$/, '')
 const OUT = process.env.SCREENSHOT_OUT ?? 'screenshots'
 
+/** @typedef {(page: import('@playwright/test').Page) => Promise<unknown>} Hook */
+
+/** 인증된 회원인 것처럼 프로필 응답을 세운다. 백엔드 `ApiResponse` 봉투를 그대로 흉내낸다. */
+function stubMemberProfile(page) {
+  return page.route('**/api/v1/members/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          memberId: 1,
+          displayName: 'Mina Park',
+          profileImageUrl: null,
+          preferredLanguage: 'en',
+          preferredCurrencyCode: 'KRW',
+          onboardingRequired: false,
+        },
+      }),
+    }),
+  )
+}
+
 /**
  * 찍을 화면.
  *
  * 작업 중인 화면을 여기에 추가한다. `prepare`는 진입한 뒤 실행되며, 바텀시트를 연 상태처럼
- * 조작이 필요한 화면을 찍을 때 쓴다.
+ * 조작이 필요한 화면을 찍을 때 쓴다. `setup`은 진입 **전에** 실행된다. 라우터 guard가
+ * 이동 중에 API를 부르므로, 인증이 필요한 화면은 여기서 응답을 세워 둬야 한다. 그러지
+ * 않으면 guard가 로그인 화면으로 보내고 그 화면이 조용히 대신 찍힌다.
  *
  * 머무르지 않고 스스로 빠져나가는 상태는 넣지 않는다. 예를 들어 `/auth/callback`의 대기
  * 화면은 세션 조회가 끝나는 즉시 `router.replace`로 넘어가므로, 목록에 넣으면 대기 화면이
  * 아니라 이동한 뒤의 화면이 조용히 찍힌다. 그런 상태를 찍으려면 응답을 붙잡아야 하는데
  * 그것은 리뷰용 이미지가 아니라 검증 도구의 일이다.
  *
- * @type {{ name: string, path: string, prepare?: (page: import('@playwright/test').Page) => Promise<void> }[]}
+ * @type {{ name: string, path: string, setup?: Hook, prepare?: Hook }[]}
  */
 const SCREENS = [
   { name: '01-sign-in', path: '/sign-in' },
   { name: '02-callback-failed', path: '/auth/callback?error=AUTH-014' },
   { name: '03-not-found', path: '/no-such-page' },
+  {
+    name: '04-settings',
+    path: '/settings',
+    // 백엔드를 띄우지 않고 찍는다. 리뷰용 이미지지 통합 검증이 아니다.
+    setup: (page) => stubMemberProfile(page),
+  },
+  {
+    name: '05-settings-language',
+    path: '/settings',
+    setup: (page) => stubMemberProfile(page),
+    prepare: async (page) => {
+      await page.getByLabel('Change screen language').click()
+      await page.waitForSelector('[role="dialog"]')
+    },
+  },
 
   // 조작이 필요한 상태는 이렇게 찍는다.
   //
@@ -115,6 +155,8 @@ for (const screen of SCREENS) {
   const page = await context.newPage()
 
   try {
+    await screen.setup?.(page)
+
     // 화면 경로 앞의 슬래시도 함께 정규화해 중복 슬래시를 만들지 않는다.
     await page.goto(`${BASE}/${screen.path.replace(/^\/+/, '')}`, { waitUntil: 'networkidle' })
     await screen.prepare?.(page)
