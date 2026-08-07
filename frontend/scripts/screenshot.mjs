@@ -16,6 +16,7 @@
  * 환경변수:
  *   SCREENSHOT_BASE  대상 주소 (기본 http://localhost:5173)
  *   SCREENSHOT_OUT   출력 경로 (기본 frontend/screenshots)
+ *   SCREENSHOT_CHANNEL Playwright 브라우저 채널 (예: 설치된 Google Chrome은 chrome)
  *
  * 출력물은 저장소에 커밋하지 않는다. `.gitignore`에 들어 있다.
  */
@@ -40,6 +41,7 @@ const SCALE = 2
  */
 const BASE = (process.env.SCREENSHOT_BASE ?? 'http://localhost:5173').replace(/\/+$/, '')
 const OUT = process.env.SCREENSHOT_OUT ?? 'screenshots'
+const CHANNEL = process.env.SCREENSHOT_CHANNEL
 
 /** @typedef {(page: import('@playwright/test').Page) => Promise<unknown>} Hook */
 
@@ -62,6 +64,70 @@ function stubMemberProfile(page) {
       }),
     }),
   )
+}
+
+function stubJourneyDetail(page) {
+  return Promise.all([
+    page.route('**/api/v1/journeys/42', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            tripId: 42,
+            title: 'Seoul Foodie Week',
+            startDate: '2026-08-10',
+            endDate: '2026-08-12',
+            budgetAmount: 1500000,
+            companionPreference: '2-4',
+            regions: [],
+          },
+        }),
+      }),
+    ),
+    page.route('**/api/v1/journeys/42/timeline', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            tripId: 42,
+            timeline: [
+              {
+                visitDate: '2026-08-10',
+                items: [
+                  {
+                    tripItemId: 1,
+                    itemId: 101,
+                    status: 'ADDED',
+                    displayOrder: 0,
+                    note: 'Try the evening market',
+                    exploreItem: {
+                      itemType: 'EVENT',
+                      title: 'Seoul Night Market',
+                      thumbnailUrl: null,
+                      imageUrls: [],
+                      location: {
+                        region1: 'Seoul',
+                        region2: 'Yeouido',
+                        region3: null,
+                        addressRoad: null,
+                        addressDetail: null,
+                        latitude: null,
+                        longitude: null,
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      }),
+    ),
+  ])
 }
 
 /**
@@ -160,20 +226,14 @@ const SCREENS = [
     },
   },
   {
-    name: '06-wallet',
-    path: '/wallet',
-    setup: async (page) => {
-      await stubMemberProfile(page)
-      await stubWalletHome(page, WALLET_TRANSACTIONS)
-    },
+    name: '06-journey-create',
+    path: '/journeys/new',
+    setup: (page) => stubMemberProfile(page),
   },
   {
-    name: '07-wallet-empty',
-    path: '/wallet',
-    setup: async (page) => {
-      await stubMemberProfile(page)
-      await stubWalletHome(page, [])
-    },
+    name: '07-journey-detail',
+    path: '/journeys/42',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetail(page)]),
   },
 
   // 조작이 필요한 상태는 이렇게 찍는다.
@@ -203,7 +263,7 @@ async function assertServerIsUp() {
 
 async function launchBrowser() {
   try {
-    return await chromium.launch()
+    return await chromium.launch(CHANNEL === undefined ? {} : { channel: CHANNEL })
   } catch (error) {
     // Playwright가 안내하는 `npx playwright install`은 이 워크스페이스에서 맞지 않는다.
     console.error(
