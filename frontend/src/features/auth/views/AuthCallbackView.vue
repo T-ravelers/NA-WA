@@ -6,7 +6,8 @@ import { useI18n } from 'vue-i18n'
 import { AUTHENTICATED_HOME_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
-import { clearAuthSession, ensureAuthSession } from '../model/authQueries'
+import { queryClient } from '@/app/query/client'
+
 import { consumeReturnPath, peekReturnPath } from '../model/returnPath'
 
 const i18n = useI18n()
@@ -50,20 +51,17 @@ const signInLocation = computed<RouteLocationRaw>(() => {
 
 onMounted(async () => {
   if (errorCode.value !== null) {
-    clearAuthSession()
     return
   }
 
-  // 콜백에서 쿠키가 새로 설정됐으므로 캐시된 세션을 버리고 다시 조회한다.
-  clearAuthSession()
-
-  const session = await ensureAuthSession()
-
-  if (session === null) {
-    // 복귀 경로는 소비하지 않는다. 재시도 후에도 원래 목적지로 돌아가야 한다.
-    await router.replace(signInLocation.value)
-    return
-  }
+  /*
+   * 쿠키가 새로 설정됐으므로 인증 전에 캐시된 응답을 전부 버린다.
+   *
+   * 세션이 실제로 유효한지는 여기서 확인하지 않는다. 인증 정책은 라우터 guard 한 곳이
+   * 소유하고, 화면 컴포넌트는 개별적으로 인증을 확인하지 않는다. 쿠키 설정이 실패했다면
+   * 목적지의 guard가 로그인 화면으로 되돌리면서 복귀 경로를 query에 실어 준다.
+   */
+  queryClient.clear()
 
   await router.replace(consumeReturnPath() ?? AUTHENTICATED_HOME_PATH)
 })

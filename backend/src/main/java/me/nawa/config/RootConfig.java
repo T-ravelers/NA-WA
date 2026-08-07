@@ -34,7 +34,6 @@ import javax.sql.DataSource;
 @ComponentScan(basePackages = {"me.nawa.auth.service",
     "me.nawa.auth.jwt",
     "me.nawa.auth.oauth",
-    "me.nawa.auth.profile",
     "me.nawa.auth.refresh",
     "me.nawa.auth.token",
     "me.nawa.auth.cookie",

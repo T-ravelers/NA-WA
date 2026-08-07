@@ -6,12 +6,12 @@ import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.oauth.callback.OAuthCallbackResult;
 import me.nawa.auth.oauth.callback.OAuthCallbackService;
-import me.nawa.auth.profile.AuthMeResponse;
-import me.nawa.auth.profile.AuthMeService;
-import me.nawa.auth.profile.AuthMemberProfile;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.ErrorCode;
+import me.nawa.member.dto.MemberProfileResponse;
+import me.nawa.member.dto.UpdateMemberProfileRequest;
+import me.nawa.member.service.MemberProfileService;
 import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
 import me.nawa.wallet.dto.request.TransactionSearchCondition;
@@ -67,6 +67,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.JourneyTestConfig.class,
         SwaggerConfigTest.TopupTestConfig.class,
         SwaggerConfigTest.TransactionTestConfig.class,
+        SwaggerConfigTest.MemberTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -181,13 +182,6 @@ class SwaggerConfigTest {
                 }
             };
         }
-
-        @Bean
-        AuthMeService authMeService() {
-            return memberId -> new AuthMeResponse(
-                    AuthMemberProfile.active(memberId, false)
-            );
-        }
     }
 
     @Configuration
@@ -255,6 +249,26 @@ class SwaggerConfigTest {
 
                 @Override
                 public TransactionDetailResponse getTransactionDetail(Long memberId, Long transferId) {
+                    throw new UnsupportedOperationException();
+                }
+            };
+        }
+    }
+
+    @Configuration
+    static class MemberTestConfig {
+
+        @Bean
+        MemberProfileService memberProfileService() {
+            return new MemberProfileService() {
+                @Override
+                public MemberProfileResponse getProfile(long memberId) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public MemberProfileResponse updateProfile(
+                        long memberId, UpdateMemberProfileRequest request) {
                     throw new UnsupportedOperationException();
                 }
             };

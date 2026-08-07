@@ -2,12 +2,12 @@ package me.nawa.wallet.service;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import me.nawa.auth.mapper.AuthMapper;
 import me.nawa.auth.mapper.OAuthAccountMapper;
 import me.nawa.auth.oauth.OAuthProvider;
 import me.nawa.auth.oauth.account.OAuthLoginAccount;
 import me.nawa.auth.oauth.account.OAuthMemberTransactionImpl;
 import me.nawa.auth.oauth.identity.OAuthUserProfile;
+import me.nawa.member.mapper.MemberMapper;
 import me.nawa.wallet.domain.Wallet;
 import me.nawa.wallet.mapper.WalletMapper;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WalletProvisioningIntegrationTest {
     private static HikariDataSource dataSource;
     private static OAuthAccountMapper accountMapper;
-    private static AuthMapper authMapper;
+    private static MemberMapper memberMapper;
     private static WalletMapper walletMapper;
     private static TransactionTemplate transactionTemplate;
 
@@ -69,13 +69,13 @@ class WalletProvisioningIntegrationTest {
         sqlSessionFactory.getConfiguration().addMapper(
                 OAuthAccountMapper.class
         );
-        sqlSessionFactory.getConfiguration().addMapper(AuthMapper.class);
+        sqlSessionFactory.getConfiguration().addMapper(MemberMapper.class);
         sqlSessionFactory.getConfiguration().addMapper(WalletMapper.class);
         SqlSessionTemplate sqlSessionTemplate = new SqlSessionTemplate(
                 sqlSessionFactory
         );
         accountMapper = sqlSessionTemplate.getMapper(OAuthAccountMapper.class);
-        authMapper = sqlSessionTemplate.getMapper(AuthMapper.class);
+        memberMapper = sqlSessionTemplate.getMapper(MemberMapper.class);
         walletMapper = sqlSessionTemplate.getMapper(WalletMapper.class);
         transactionTemplate = new TransactionTemplate(
                 new DataSourceTransactionManager(dataSource)
@@ -152,7 +152,7 @@ class WalletProvisioningIntegrationTest {
                     "social_accounts가 롤백돼야 한다"
             );
             assertNull(
-                    authMapper.findMemberProfile(attemptedMemberId.get()),
+                    memberMapper.findProfile(attemptedMemberId.get()),
                     "members가 롤백돼야 한다"
             );
         });

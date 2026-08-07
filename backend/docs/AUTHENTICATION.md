@@ -2,7 +2,7 @@
 
 NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 자체 세션을
 사용합니다. 프런트엔드는 공급자 토큰을 받거나 저장하지 않으며, 로그인 완료 후
-`GET /api/v1/auth/me`로 로그인 상태와 온보딩 필요 여부를 확인합니다.
+`GET /api/v1/members/me`로 로그인 상태와 온보딩 필요 여부를 확인합니다.
 
 ## API 흐름
 
@@ -11,7 +11,7 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 | CSRF 준비   | `GET /api/v1/auth/csrf`                                         | CSRF 쿠키와 요청 헤더 이름 반환                |
 | 로그인 시작 | `GET /api/v1/auth/oauth2/authorization/{provider}?returnPath=/` | Google 또는 LINE으로 `302` 이동                |
 | 공급자 콜백 | `GET /api/v1/auth/oauth2/callback/{provider}`                   | 자체 토큰 쿠키 발급 후 프런트엔드로 `302` 이동 |
-| 로그인 확인 | `GET /api/v1/auth/me`                                           | 현재 회원 정보와 `onboardingRequired` 반환     |
+| 로그인 확인 | `GET /api/v1/members/me`                                        | 현재 회원 정보와 `onboardingRequired` 반환     |
 | 토큰 갱신   | `POST /api/v1/auth/refresh`                                     | access·refresh 쿠키 교체                       |
 | 로그아웃    | `POST /api/v1/auth/logout`                                      | Redis 세션 폐기와 인증 쿠키 삭제               |
 
@@ -19,7 +19,18 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 토큰이나 개인정보를 넣지 않습니다. 실패 시에는 프런트엔드가 처리할 안정적인
 `error` 코드만 전달합니다.
 
-### 로그인 회원 응답
+### 로그인 상태 확인은 `members/me`가 겸합니다
+
+`GET /api/v1/auth/me`는 더 이상 존재하지 않습니다. auth 도메인은 로그인
+시작·콜백, `/csrf`, `/refresh`, `/logout`만 소유하고, 로그인 회원 정보 조회는
+`GET /api/v1/members/me`(member 도메인)로 옮겼습니다. `/api/**`는
+`SecurityConfig`에서 `authenticated()`이므로 이 엔드포인트는 인증되지 않은
+요청에 자동으로 `401`을 반환합니다. 즉 별도의 "세션 확인" 요청 없이
+`GET /api/v1/members/me` 호출 하나로 로그인 여부 판정과 프로필 조회를 동시에
+끝냅니다. `auth/me`를 그대로 남겨 두면 화면 진입마다 두 번 요청하거나 죽은
+엔드포인트가 남는 결과가 되므로, 유지하는 대신 제거했습니다.
+
+### 회원 프로필 응답
 
 ```json
 {
@@ -35,8 +46,16 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 }
 ```
 
+`PATCH /api/v1/members/me`는 같은 형태의 응답을 반환하며 `preferredLanguage`와
+`preferredCurrencyCode`만 부분 수정합니다. 필드를 아예 보내지 않는 것과 값에
+`null`을 보내는 것은 모두 "변경하지 않음"으로 취급하며, 두 필드 모두 없으면
+`MEMBER-004`를 반환합니다. 지원 언어는 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며
+이 백엔드 allow-list가 정본입니다(한국어는 서비스 locale이 아닙니다). 목록에
+없는 언어는 `MEMBER-002`, 활성 통화 코드가 아니면 `MEMBER-003`을 반환합니다.
+
 access token이 없거나 유효하지 않으면 `AUTH-003`, 정지 회원은 `AUTH-016`,
-탈퇴 또는 삭제 회원은 `AUTH-017`을 반환합니다. 일반 JSON 오류 형식은
+탈퇴 또는 삭제 회원은 `AUTH-017`을 반환합니다. 회원을 찾을 수 없으면
+`MEMBER-001`을 반환합니다. 일반 JSON 오류 형식은
 [API 응답 및 오류 코드 컨벤션](API_RESPONSE_CONVENTION.md)을 따릅니다.
 
 ## 저장소 책임
@@ -103,10 +122,10 @@ Tomcat을 재시작하고 브라우저의 네트워크 탭을 연 뒤 Google과 
 1. `/api/v1/auth/oauth2/authorization/google?returnPath=/` 또는 `line` 경로를 엽니다.
 2. 공급자 동의 후 프런트엔드 콜백으로 돌아오며 URL에 토큰·이메일이 없는지 봅니다.
 3. `access_token`과 `refresh_token`이 HttpOnly 쿠키로 저장됐는지 확인합니다.
-4. `GET /api/v1/auth/me`가 `200`과 회원 정보를 반환하는지 확인합니다.
+4. `GET /api/v1/members/me`가 `200`과 회원 정보를 반환하는지 확인합니다.
 5. `POST /api/v1/auth/refresh` 후 두 쿠키가 교체되는지 확인합니다.
-6. `POST /api/v1/auth/logout` 후 두 쿠키가 삭제되고, 다시 `/me`를 호출하면
-   `401 AUTH-003`인지 확인합니다.
+6. `POST /api/v1/auth/logout` 후 두 쿠키가 삭제되고, 다시
+   `GET /api/v1/members/me`를 호출하면 `401 AUTH-003`인지 확인합니다.
 7. MySQL에서 동일 `(provider, provider_user_id)`로 회원과 소셜 계정이 중복 생성되지
    않았는지 확인합니다.
 

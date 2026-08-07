@@ -5,4 +5,45 @@
 
 <mapper namespace="me.nawa.member.mapper.MemberMapper">
 
+    <select id="findProfile"
+            resultType="me.nawa.member.domain.MemberProfile">
+        SELECT
+            member_id,
+            display_name,
+            profile_image_url,
+            preferred_language,
+            preferred_currency_code,
+            member_status,
+            (onboarding_completed_at IS NOT NULL) AS onboarding_completed,
+            (deleted_at IS NOT NULL) AS deleted
+        FROM members
+        WHERE member_id = #{memberId}
+        LIMIT 1
+    </select>
+
+    <select id="existsActiveCurrency" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM currencies
+            WHERE currency_code = #{currencyCode}
+              AND is_active = TRUE
+              AND deleted_at IS NULL
+        )
+    </select>
+
+    <update id="updateProfile">
+        UPDATE members
+        <set>
+            <if test="preferredLanguage != null">
+                preferred_language = #{preferredLanguage},
+            </if>
+            <if test="preferredCurrencyCode != null">
+                preferred_currency_code = #{preferredCurrencyCode},
+            </if>
+            updated_at = CURRENT_TIMESTAMP
+        </set>
+        WHERE member_id = #{memberId}
+          AND deleted_at IS NULL
+    </update>
+
 </mapper>
