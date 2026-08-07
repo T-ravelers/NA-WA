@@ -28,7 +28,9 @@ describe('ExploreFilterSheet', () => {
       .find((button) => button.text() === 'Free')
       ?.trigger('click')
     expect(wrapper.emitted('apply')).toBeUndefined()
-    expect(wrapper.emitted('change')?.at(-1)?.[0]).toMatchObject({ freeOnly: true })
+    expect(wrapper.emitted('change')?.[wrapper.emitted('change')!.length - 1]?.[0]).toMatchObject({
+      freeOnly: true,
+    })
 
     await wrapper
       .findAll('button')
@@ -77,7 +79,7 @@ describe('ExploreFilterSheet', () => {
       .find((button) => button.text().includes('Apply'))
       ?.trigger('click')
 
-    expect(wrapper.emitted('apply')?.at(-1)?.[0]).toMatchObject({
+    expect(wrapper.emitted('apply')?.[wrapper.emitted('apply')!.length - 1]?.[0]).toMatchObject({
       region1: ['Gyeonggi'],
       region2: ['Suwon'],
     })
@@ -102,7 +104,7 @@ describe('ExploreFilterSheet', () => {
       .find((button) => button.text().includes('Apply'))
       ?.trigger('click')
 
-    expect(wrapper.emitted('apply')?.at(-1)?.[0]).toMatchObject({
+    expect(wrapper.emitted('apply')?.[wrapper.emitted('apply')!.length - 1]?.[0]).toMatchObject({
       region1: ['Gyeonggi'],
       region2Other: true,
     })
@@ -131,10 +133,34 @@ describe('ExploreFilterSheet', () => {
       .find((button) => button.text().includes('Apply'))
       ?.trigger('click')
 
-    expect(wrapper.emitted('apply')?.at(-1)?.[0]).toMatchObject({
+    expect(wrapper.emitted('apply')?.[wrapper.emitted('apply')!.length - 1]?.[0]).toMatchObject({
       region1: ['Gyeonggi'],
       region2: ['Suwon'],
       region2Other: true,
+    })
+  })
+
+  it('selects a sector and its activities using the existing numeric filter contract', async () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'category', filters: { sort: 'LATEST' }, resultCount: 3 },
+    })
+
+    const foodHeader = wrapper.findAll('button').find((button) => button.text().includes('Food'))
+    await foodHeader?.find('[role="checkbox"]').trigger('click')
+
+    expect(wrapper.emitted('change')?.[wrapper.emitted('change')!.length - 1]?.[0]).toMatchObject({
+      sectorIds: [1],
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Cafe / Dessert')
+      ?.trigger('click')
+
+    expect(wrapper.emitted('change')?.[wrapper.emitted('change')!.length - 1]?.[0]).toMatchObject({
+      sectorIds: undefined,
+      activityIds: [101],
     })
   })
 })

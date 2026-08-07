@@ -19,6 +19,7 @@ import {
   type EventSearchFilters,
   type EventSort,
 } from '../model/eventExplore'
+import { EVENT_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
 
 type ExploreSheetKind = 'date' | 'region' | 'category' | 'options' | 'sort'
 
@@ -31,6 +32,8 @@ const selectedSheet = ref<ExploreSheetKind | null>(null)
 const searchOpen = ref(false)
 
 const selectedEventKinds = ref<EventKind[]>(readQueryList('eventKinds').filter(isEventKind))
+const selectedSectorIds = ref(readQueryNumberList('sectorIds'))
+const selectedActivityIds = ref(readQueryNumberList('activityIds'))
 const selectedRegion1 = ref(readQueryList('region1'))
 const selectedRegion2 = ref(readQueryList('region2'))
 const selectedRegion2Other = ref(readQueryBoolean('region2Other'))
@@ -55,6 +58,8 @@ const filters = computed<EventSearchFilters>(() => ({
   sort: sort.value,
   keyword: keyword.value || undefined,
   eventKinds: selectedEventKinds.value.length > 0 ? selectedEventKinds.value : undefined,
+  sectorIds: selectedSectorIds.value.length > 0 ? selectedSectorIds.value : undefined,
+  activityIds: selectedActivityIds.value.length > 0 ? selectedActivityIds.value : undefined,
   region1: selectedRegion1.value.length > 0 ? selectedRegion1.value : undefined,
   region2: selectedRegion2.value.length > 0 ? selectedRegion2.value : undefined,
   region2Other: selectedRegion2Other.value || undefined,
@@ -106,6 +111,17 @@ const activeFilters = computed(() => {
   }
   selectedRegion3.value.forEach((value) => values.push({ key: `region3:${value}`, label: value }))
 
+  selectedSectorIds.value.forEach((value) => {
+    const sector = EVENT_SECTOR_OPTIONS.find((option) => option.id === value)
+    if (sector) values.push({ key: `sector:${value}`, label: t(sector.labelKey) })
+  })
+  selectedActivityIds.value.forEach((value) => {
+    const activity = EVENT_SECTOR_OPTIONS.flatMap((sector) => sector.activities).find(
+      (option) => option.id === value,
+    )
+    if (activity) values.push({ key: `activity:${value}`, label: t(activity.labelKey) })
+  })
+
   const options: Array<[string, boolean, string]> = [
     ['freeOnly', freeOnly.value, t('explore.options.free')],
     ['openWeekendOnly', openWeekendOnly.value, t('explore.options.openWeekend')],
@@ -126,6 +142,8 @@ watch(
   (next) => {
     const query: LocationQueryRaw = {}
     addQueryList(query, 'eventKinds', next.eventKinds)
+    addQueryList(query, 'sectorIds', next.sectorIds)
+    addQueryList(query, 'activityIds', next.activityIds)
     addQueryList(query, 'region1', next.region1)
     addQueryList(query, 'region2', next.region2)
     addQueryValue(query, 'region2Other', next.region2Other)
@@ -154,6 +172,8 @@ function openSheet(kind: ExploreSheetKind): void {
 
 function applySheet(next: EventSearchFilters): void {
   selectedEventKinds.value = next.eventKinds ?? []
+  selectedSectorIds.value = next.sectorIds ?? []
+  selectedActivityIds.value = next.activityIds ?? []
   selectedRegion1.value = next.region1 ?? []
   selectedRegion2.value = next.region2 ?? []
   selectedRegion2Other.value = next.region2Other ?? false
@@ -191,6 +211,8 @@ function toggleEventKind(kind: string): void {
 function removeFilter(key: string): void {
   if (key === '*') {
     selectedEventKinds.value = []
+    selectedSectorIds.value = []
+    selectedActivityIds.value = []
     selectedRegion1.value = []
     selectedRegion2.value = []
     selectedRegion2Other.value = false
@@ -223,6 +245,12 @@ function removeFilter(key: string): void {
     }
   } else if (key.startsWith('region3:')) {
     selectedRegion3.value = selectedRegion3.value.filter((value) => `region3:${value}` !== key)
+  } else if (key.startsWith('sector:')) {
+    const sectorId = Number(key.slice('sector:'.length))
+    selectedSectorIds.value = selectedSectorIds.value.filter((value) => value !== sectorId)
+  } else if (key.startsWith('activity:')) {
+    const activityId = Number(key.slice('activity:'.length))
+    selectedActivityIds.value = selectedActivityIds.value.filter((value) => value !== activityId)
   } else if (key.startsWith('option:')) {
     const option = key.slice('option:'.length)
     if (option === 'freeOnly') freeOnly.value = false
@@ -244,6 +272,12 @@ function readQueryList(key: string): string[] {
   const value = route.query[key]
   if (Array.isArray(value)) return value.filter((item): item is string => item !== null)
   return value === undefined || value === null ? [] : [value]
+}
+
+function readQueryNumberList(key: string): number[] {
+  return readQueryList(key)
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0)
 }
 
 function readQueryBoolean(key: string): boolean {

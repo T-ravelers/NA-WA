@@ -12,6 +12,8 @@ describe('exploreApi', () => {
   it('serializes repeated filters as repeated query parameters', () => {
     const params = toSearchParams({
       eventKinds: ['POPUP', 'CONCERT'],
+      sectorIds: [1],
+      activityIds: [101, 412],
       region1: ['Seoul', 'Busan'],
       region2Other: true,
       freeOnly: true,
@@ -20,6 +22,8 @@ describe('exploreApi', () => {
     })
 
     expect(params.getAll('eventKinds')).toEqual(['POPUP', 'CONCERT'])
+    expect(params.getAll('sectorIds')).toEqual(['1'])
+    expect(params.getAll('activityIds')).toEqual(['101', '412'])
     expect(params.getAll('region1')).toEqual(['Seoul', 'Busan'])
     expect(params.get('region2Other')).toBe('true')
     expect(params.get('freeOnly')).toBe('true')

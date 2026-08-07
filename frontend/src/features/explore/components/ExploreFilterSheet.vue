@@ -11,9 +11,9 @@ import {
 
 import AppButton from '@/shared/ui/AppButton.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
-import type { Category } from '@/shared/ui/category'
 
-import type { EventKind, EventSearchFilters } from '../model/eventExplore'
+import type { EventSearchFilters } from '../model/eventExplore'
+import { EVENT_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
 import type { ExploreSheetKind } from './ExploreFilterBar.vue'
 
 interface Props {
@@ -40,29 +40,6 @@ const SHEET_TITLES: Record<ExploreSheetKind, string> = {
   category: 'explore.sheets.category',
   options: 'explore.sheets.options',
   sort: 'explore.sheets.sort',
-}
-
-const EVENT_KIND_GROUPS: Array<{
-  labelKey: string
-  category: Category
-  kinds: EventKind[]
-}> = [
-  {
-    labelKey: 'explore.categories.show',
-    category: 'show',
-    kinds: ['FESTIVAL', 'CONCERT', 'EXHIBITION'],
-  },
-  { labelKey: 'explore.categories.shopping', category: 'shopping', kinds: ['POPUP'] },
-  { labelKey: 'explore.categories.food', category: 'food', kinds: ['FESTIVAL'] },
-  { labelKey: 'explore.categories.beauty', category: 'beauty', kinds: ['POPUP'] },
-]
-
-const EVENT_KIND_LABEL_KEYS: Record<EventKind, string> = {
-  POPUP: 'explore.eventKinds.POPUP',
-  CONCERT: 'explore.eventKinds.CONCERT',
-  ETC: 'explore.eventKinds.ETC',
-  FESTIVAL: 'explore.eventKinds.FESTIVAL',
-  EXHIBITION: 'explore.eventKinds.EXHIBITION',
 }
 
 const REGION_OPTIONS = [
@@ -187,7 +164,7 @@ const DATE_PRESETS = [
 
 const draft = reactive<EventSearchFilters>(cloneFilters(props.filters))
 const selectedRegion = ref(props.filters.region1?.[0] ?? 'Seoul')
-const expandedCategories = ref<string[]>(['explore.categories.show'])
+const expandedCategories = ref<string[]>(['explore.categories.food'])
 const monthCursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
 watch(
@@ -207,7 +184,8 @@ watch(
   { deep: true },
 )
 
-const selectedKinds = computed(() => new Set(draft.eventKinds ?? []))
+const selectedSectors = computed(() => new Set(draft.sectorIds ?? []))
+const selectedActivities = computed(() => new Set(draft.activityIds ?? []))
 const currentRegion = computed(
   () => REGION_OPTIONS.find((region) => region.value === selectedRegion.value) ?? REGION_OPTIONS[0],
 )
@@ -326,18 +304,44 @@ function toggleArea(value: string): void {
   draft.region2 = [...current]
 }
 
-function toggleKind(kind: EventKind): void {
-  const current = new Set(draft.eventKinds ?? [])
-  if (current.has(kind)) current.delete(kind)
-  else current.add(kind)
-  draft.eventKinds = [...current]
+function isSectorSelected(sectorId: number): boolean {
+  return selectedSectors.value.has(sectorId)
 }
 
-function toggleCategory(category: (typeof EVENT_KIND_GROUPS)[number]): void {
-  const current = new Set(draft.eventKinds ?? [])
-  const isSelected = category.kinds.every((kind) => current.has(kind))
-  category.kinds.forEach((kind) => (isSelected ? current.delete(kind) : current.add(kind)))
-  draft.eventKinds = [...current]
+function isActivitySelected(activityId: number): boolean {
+  return selectedActivities.value.has(activityId)
+}
+
+function isSectorFullySelected(sector: (typeof EVENT_SECTOR_OPTIONS)[number]): boolean {
+  return (
+    isSectorSelected(sector.id) ||
+    sector.activities.every((activity) => selectedActivities.value.has(activity.id))
+  )
+}
+
+function toggleSector(sector: (typeof EVENT_SECTOR_OPTIONS)[number]): void {
+  const sectorIds = new Set(draft.sectorIds ?? [])
+  const activityIds = new Set(draft.activityIds ?? [])
+  const isSelected = isSectorFullySelected(sector)
+
+  sector.activities.forEach((activity) => activityIds.delete(activity.id))
+  if (isSelected) sectorIds.delete(sector.id)
+  else sectorIds.add(sector.id)
+
+  draft.sectorIds = [...sectorIds]
+  draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
+}
+
+function toggleActivity(sectorId: number, activityId: number): void {
+  const sectorIds = new Set(draft.sectorIds ?? [])
+  const activityIds = new Set(draft.activityIds ?? [])
+
+  if (activityIds.has(activityId)) activityIds.delete(activityId)
+  else activityIds.add(activityId)
+  sectorIds.delete(sectorId)
+
+  draft.sectorIds = sectorIds.size > 0 ? [...sectorIds] : undefined
+  draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
 }
 
 function toggleExpandedCategory(label: string): void {
@@ -362,7 +366,8 @@ function resetSheet(): void {
     draft.region3 = undefined
     selectedRegion.value = REGION_OPTIONS[0].value
   } else if (props.kind === 'category') {
-    draft.eventKinds = undefined
+    draft.sectorIds = undefined
+    draft.activityIds = undefined
   } else if (props.kind === 'options') {
     EVENT_OPTIONS.forEach(({ key }) => (draft[key] = undefined))
   } else {
@@ -556,40 +561,40 @@ function apply(): void {
         <template v-else-if="kind === 'category'">
           <div class="flex flex-col divide-y divide-hairline">
             <div
-              v-for="category in EVENT_KIND_GROUPS"
-              :key="category.labelKey"
+              v-for="sector in EVENT_SECTOR_OPTIONS"
+              :key="sector.id"
               class="py-3"
             >
               <button
                 type="button"
                 class="flex w-full items-center gap-2 text-left"
-                @click="toggleExpandedCategory(category.labelKey)"
+                @click="toggleExpandedCategory(sector.labelKey)"
               >
-                <CategoryDot :category="category.category" />
-                <span class="flex-1 text-title-sm text-ink">{{ t(category.labelKey) }}</span>
+                <CategoryDot :category="sector.category" />
+                <span class="flex-1 text-title-sm text-ink">{{ t(sector.labelKey) }}</span>
                 <span
                   role="checkbox"
                   tabindex="0"
-                  :aria-checked="category.kinds.every((kindValue) => selectedKinds.has(kindValue))"
+                  :aria-checked="isSectorFullySelected(sector)"
                   class="flex size-6 items-center justify-center rounded-xs"
                   :class="
-                    category.kinds.every((kindValue) => selectedKinds.has(kindValue))
+                    isSectorFullySelected(sector)
                       ? 'bg-paper-fill text-on-paper'
                       : 'border border-hairline-2'
                   "
-                  @click.stop="toggleCategory(category)"
-                  @keydown.space.prevent.stop="toggleCategory(category)"
-                  @keydown.enter.prevent.stop="toggleCategory(category)"
+                  @click.stop="toggleSector(sector)"
+                  @keydown.space.prevent.stop="toggleSector(sector)"
+                  @keydown.enter.prevent.stop="toggleSector(sector)"
                 >
                   <IconCheck
-                    v-if="category.kinds.every((kindValue) => selectedKinds.has(kindValue))"
+                    v-if="isSectorFullySelected(sector)"
                     :size="15"
                     :stroke-width="2.5"
                     aria-hidden="true"
                   />
                 </span>
                 <IconChevronUp
-                  v-if="expandedCategories.includes(category.labelKey)"
+                  v-if="expandedCategories.includes(sector.labelKey)"
                   :size="16"
                   class="text-ink-3"
                   aria-hidden="true"
@@ -602,22 +607,22 @@ function apply(): void {
                 />
               </button>
               <div
-                v-if="expandedCategories.includes(category.labelKey)"
+                v-if="expandedCategories.includes(sector.labelKey)"
                 class="mt-3 flex flex-wrap gap-2"
               >
                 <button
-                  v-for="eventKind in category.kinds"
-                  :key="eventKind"
+                  v-for="activity in sector.activities"
+                  :key="activity.id"
                   type="button"
                   class="rounded-pill border px-3 py-2 text-caption"
                   :class="
-                    selectedKinds.has(eventKind)
+                    isActivitySelected(activity.id)
                       ? 'border-paper-fill bg-paper-fill text-on-paper'
                       : 'border-hairline text-ink-2'
                   "
-                  @click="toggleKind(eventKind)"
+                  @click="toggleActivity(sector.id, activity.id)"
                 >
-                  {{ t(EVENT_KIND_LABEL_KEYS[eventKind]) }}
+                  {{ t(activity.labelKey) }}
                 </button>
               </div>
             </div>
