@@ -27,6 +27,7 @@ import me.nawa.wallet.service.TopupService;
 import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
+import me.nawa.journey.service.JourneyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,6 +64,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.AuthTestConfig.class,
         SwaggerConfigTest.WalletTestConfig.class,
         SwaggerConfigTest.ExploreTestConfig.class,
+        SwaggerConfigTest.JourneyTestConfig.class,
         SwaggerConfigTest.TopupTestConfig.class,
         SwaggerConfigTest.TransactionTestConfig.class,
         SwaggerConfigTest.TestController.class
@@ -283,6 +285,15 @@ class SwaggerConfigTest {
         @Bean
         EventService eventService() {
             return new EventService(null);
+        }
+    }
+
+    @Configuration
+    static class JourneyTestConfig {
+
+        @Bean
+        JourneyService journeyService() {
+            return new JourneyService(null);
         }
     }
 
