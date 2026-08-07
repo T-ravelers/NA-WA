@@ -11,7 +11,9 @@ const route = useRoute()
  *
  * 로그인, 콜백, 404에서는 이동할 곳이 없으므로 감춘다.
  */
-const showBottomNav = computed(() => route.meta.requiresAuth === true)
+const showBottomNav = computed(
+  () => route.meta.requiresAuth === true && route.meta.hideBottomNav !== true,
+)
 </script>
 
 <template>

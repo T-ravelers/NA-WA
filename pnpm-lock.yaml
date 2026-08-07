@@ -17,6 +17,9 @@ importers:
 
   frontend:
     dependencies:
+      '@stripe/stripe-js':
+        specifier: ^9.13.0
+        version: 9.13.0
       '@tabler/icons-vue':
         specifier: ^3.45.0
         version: 3.45.0(vue@3.5.40(typescript@6.0.3))
@@ -1131,6 +1134,10 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@stripe/stripe-js@9.13.0':
+    resolution: {integrity: sha512-/0c72BUgzzVkVTlsw5uBn8x3waTdVJ/PZGfQ6jY1eu6K7olUPf4d9lgDPA9/0sIdsR8j7o3QIG8fOCO6ItcL7A==}
+    engines: {node: '>=12.16'}
 
   '@tabler/icons-vue@3.45.0':
     resolution: {integrity: sha512-Q/cmDsx0zrzBScIL6Xxwevg7JqvkrteFW2R+NGTN9pwOrgJMzBLhyz/7ONvktjuwDn6eUKhFSM66CNAR8u3tRw==}
@@ -4541,6 +4548,8 @@ snapshots:
     optional: true
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@stripe/stripe-js@9.13.0': {}
 
   '@tabler/icons-vue@3.45.0(vue@3.5.40(typescript@6.0.3))':
     dependencies:

@@ -1,11 +1,25 @@
-import axios, { type AxiosResponse } from 'axios'
+import axios, { type AxiosError, type AxiosResponse } from 'axios'
 
 import { normalizeApiError } from './apiError'
 import { isApiResponse } from './apiResponse'
-import { attachCsrfToken } from './csrf'
+import { attachCsrfToken, clearCsrfToken } from './csrf'
 import { recoverAndRetry } from './sessionRecovery'
 
 const HTTP_TIMEOUT_MS = 10_000
+
+type CsrfRetriableConfig = NonNullable<AxiosError['config']> & {
+  __csrfRetried?: boolean
+}
+
+function isInvalidCsrfResponse(error: unknown): error is AxiosError {
+  if (!axios.isAxiosError(error)) {
+    return false
+  }
+
+  const body: unknown = error.response?.data
+
+  return error.response?.status === 403 && isApiResponse(body) && body.error?.code === 'AUTH-005'
+}
 
 /**
  * 공통 HTTP 클라이언트.
@@ -50,6 +64,17 @@ httpClient.interceptors.response.use(
     )
   },
   async (error: unknown) => {
+    if (isInvalidCsrfResponse(error)) {
+      const config = error.config as CsrfRetriableConfig | undefined
+
+      if (config !== undefined && config.__csrfRetried !== true) {
+        clearCsrfToken()
+        config.__csrfRetried = true
+
+        return httpClient.request(config)
+      }
+    }
+
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const retried = await recoverAndRetry(httpClient, error.config)
 

@@ -21,6 +21,12 @@ function createTestRouter() {
         component: { template: '<h1>Wallet</h1>' },
         meta: { requiresAuth: true },
       },
+      {
+        path: '/wallet/top-up',
+        name: 'wallet-top-up',
+        component: { template: '<h1>Top up</h1>' },
+        meta: { requiresAuth: true, hideBottomNav: true },
+      },
     ],
   })
 }
@@ -53,6 +59,12 @@ describe('AppShell', () => {
 
   it('hides the bottom navigation on the sign-in screen', async () => {
     const wrapper = await mountAt('/sign-in')
+
+    expect(wrapper.find('nav').exists()).toBe(false)
+  })
+
+  it('hides the bottom navigation during the top-up flow', async () => {
+    const wrapper = await mountAt('/wallet/top-up')
 
     expect(wrapper.find('nav').exists()).toBe(false)
   })

@@ -7,6 +7,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/WalletHomeView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/wallet/top-up',
+    name: 'wallet-top-up',
+    component: () => import('./views/TopupView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
 ]
 
 export default routes

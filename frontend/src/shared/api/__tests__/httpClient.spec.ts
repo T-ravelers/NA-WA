@@ -289,6 +289,39 @@ describe('httpClient', () => {
     expect(wallet?.csrfHeader).toBeUndefined()
   })
 
+  it('refreshes the CSRF token and retries once after AUTH-005', async () => {
+    const invalidCsrf = {
+      success: false,
+      error: { code: 'AUTH-005', message: 'invalid csrf token' },
+    }
+    const { httpClient, calls } = await loadClient({
+      'get /api/v1/auth/csrf': [
+        {
+          status: 200,
+          body: { success: true, data: { token: 'csrf-token', headerName: 'X-CSRF-TOKEN' } },
+        },
+        {
+          status: 200,
+          body: { success: true, data: { token: 'fresh-csrf-token', headerName: 'X-CSRF-TOKEN' } },
+        },
+      ],
+      'post /api/v1/topups/preview': [
+        { status: 403, body: invalidCsrf },
+        { status: 200, body: { success: true, data: { amount: '50000' } } },
+      ],
+    })
+
+    const response = await httpClient.post('/api/v1/topups/preview', {
+      amount: 50000,
+      method: 'STRIPE_CARD',
+      currency: 'KRW',
+    })
+
+    expect(response.data).toEqual({ amount: '50000' })
+    expect(countCalls(calls, 'get', '/api/v1/auth/csrf')).toBe(2)
+    expect(countCalls(calls, 'post', '/api/v1/topups/preview')).toBe(2)
+  })
+
   it('keeps axios importable for consumers that need error helpers', () => {
     expect(axios.isAxiosError(new AxiosError('x'))).toBe(true)
   })
