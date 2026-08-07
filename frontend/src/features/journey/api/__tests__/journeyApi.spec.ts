@@ -108,6 +108,8 @@ describe('journeyApi', () => {
       tripId: 7,
       timeline: [{ visitDate: '2026-08-10', items: [] }],
     })
+  })
+
   it('fetches journeys available to the authenticated member', async () => {
     const data = [
       {
