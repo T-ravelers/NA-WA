@@ -12,6 +12,8 @@ interface Props {
   endDate: string | null
   isPermanent: boolean
   initialDate?: string | null
+  loading?: boolean
+  errorMessage?: string | null
 }
 
 const props = defineProps<Props>()
@@ -216,10 +218,19 @@ function confirm(): void {
         </button>
       </div>
 
+      <p
+        v-if="props.errorMessage"
+        class="mt-3 text-caption text-danger"
+        role="alert"
+      >
+        {{ props.errorMessage }}
+      </p>
+
       <AppButton
         block
         class="mt-5"
-        :disabled="selectedDate === null"
+        :disabled="selectedDate === null || props.loading"
+        :loading="props.loading"
         @click="confirm"
       >
         {{ t('explore.journeyDate.apply', { date: selectedDateLabel }) }}

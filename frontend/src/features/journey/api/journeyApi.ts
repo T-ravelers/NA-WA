@@ -4,6 +4,21 @@ export type CompanionPreference = '1' | '2-4' | '5+'
 export type JourneyItemType = 'EVENT' | 'PLACE'
 export type JourneyItemStatus = 'ADDED' | 'CONFIRMED'
 
+export interface JourneyItemAddRequest {
+  itemId: number
+  visitDate: string
+}
+
+export interface JourneyItemResponse {
+  tripItemId: number
+  journeyId: number
+  itemId: number
+  itemType: JourneyItemType
+  visitDate: string
+  tripItemStatus: JourneyItemStatus
+  createdAt: string
+}
+
 export interface JourneyRegion {
   regionCode: string
   regionName: string
@@ -137,6 +152,18 @@ export function buildJourneyCreateRequest(input: JourneyCreateInput): JourneyCre
       displayOrder,
     })),
   }
+}
+
+export async function addJourneyItem(
+  journeyId: number,
+  request: JourneyItemAddRequest,
+): Promise<JourneyItemResponse> {
+  const response = await httpClient.post<JourneyItemResponse>(
+    `/api/v1/journeys/${journeyId}/items`,
+    request,
+  )
+
+  return response.data
 }
 
 export async function createJourney(input: JourneyCreateInput): Promise<Journey> {

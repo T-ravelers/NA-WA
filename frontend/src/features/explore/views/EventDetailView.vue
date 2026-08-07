@@ -21,6 +21,12 @@ import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
+import { addJourneyItem } from '@/features/journey/api/journeyApi'
+import {
+  parseJourneyRouteQuery,
+  readActiveJourneyId,
+  storeActiveJourneyId,
+} from '@/features/journey/model/activeJourney'
 
 import { useEventDetailQuery } from '../composables/useEventDetailQuery'
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
@@ -46,6 +52,8 @@ const saved = ref(false)
 const journeyAdded = ref(false)
 const journeyDateSheetOpen = ref(false)
 const journeyDate = ref<string | null>(null)
+const journeyAddPending = ref(false)
+const journeyAddError = ref<'missing' | 'failed' | null>(null)
 const shared = ref(false)
 
 const imageUrls = computed(() => (event.value ? toImageUrls(event.value.imageUrls) : []))
@@ -70,6 +78,9 @@ const locationLabel = computed(() =>
 )
 
 const journeyLocation = computed(() => regionLabel.value || locationLabel.value)
+const activeJourneyId = computed(
+  () => parseJourneyRouteQuery(route.query.journeyId) ?? readActiveJourneyId(),
+)
 
 const hours = computed(() => (event.value ? toDetailEntries(event.value.operatingHours) : []))
 const openDays = computed(() => (event.value ? toStringList(event.value.openDays).join(', ') : ''))
@@ -168,6 +179,7 @@ function openReservation(): void {
 }
 
 function openJourneyDateSheet(): void {
+  journeyAddError.value = null
   journeyDateSheetOpen.value = true
 }
 
@@ -175,10 +187,34 @@ function closeJourneyDateSheet(): void {
   journeyDateSheetOpen.value = false
 }
 
-function confirmJourneyDate(date: string): void {
-  journeyDate.value = date
-  journeyAdded.value = true
-  journeyDateSheetOpen.value = false
+async function confirmJourneyDate(date: string): Promise<void> {
+  if (journeyAddPending.value) return
+
+  const current = event.value
+  const journeyId = activeJourneyId.value
+  if (!current || journeyId === null) {
+    journeyAddError.value = 'missing'
+    return
+  }
+
+  journeyAddPending.value = true
+  journeyAddError.value = null
+
+  try {
+    await addJourneyItem(journeyId, {
+      itemId: current.eventId,
+      visitDate: date,
+    })
+    storeActiveJourneyId(journeyId)
+    journeyDate.value = date
+    journeyAdded.value = true
+    journeyDateSheetOpen.value = false
+    await router.push({ name: 'journey-detail', params: { tripId: journeyId } })
+  } catch {
+    journeyAddError.value = 'failed'
+  } finally {
+    journeyAddPending.value = false
+  }
 }
 
 function retry(): void {
@@ -473,6 +509,14 @@ function retry(): void {
         :end-date="event.endDate"
         :is-permanent="event.isPermanent === true"
         :initial-date="journeyDate"
+        :loading="journeyAddPending"
+        :error-message="
+          journeyAddError === 'missing'
+            ? t('explore.journeyDate.selectJourneyFirst')
+            : journeyAddError === 'failed'
+              ? t('explore.journeyDate.addFailed')
+              : null
+        "
         @close="closeJourneyDateSheet"
         @confirm="confirmJourneyDate"
       />

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  addJourneyItem,
   buildJourneyCreateRequest,
   createJourney,
   fetchJourney,
@@ -106,5 +107,36 @@ describe('journeyApi', () => {
       tripId: 7,
       timeline: [{ visitDate: '2026-08-10', items: [] }],
     })
+  })
+
+  it('adds an explore item to the selected journey on the selected date', async () => {
+    const data = {
+      tripItemId: 7,
+      journeyId: 12,
+      itemId: 990001,
+      itemType: 'EVENT',
+      visitDate: '2026-08-08',
+      tripItemStatus: 'ADDED',
+      createdAt: '2026-08-07T18:00:00',
+    } as const
+    post.mockResolvedValueOnce({ data })
+
+    await expect(addJourneyItem(12, { itemId: 990001, visitDate: '2026-08-08' })).resolves.toEqual(
+      data,
+    )
+
+    expect(post).toHaveBeenCalledWith('/api/v1/journeys/12/items', {
+      itemId: 990001,
+      visitDate: '2026-08-08',
+    })
+  })
+
+  it('propagates server errors for duplicate or invalid journey items', async () => {
+    const error = new Error('JOURNEY-004')
+    post.mockRejectedValueOnce(error)
+
+    await expect(addJourneyItem(12, { itemId: 990001, visitDate: '2026-08-31' })).rejects.toBe(
+      error,
+    )
   })
 })

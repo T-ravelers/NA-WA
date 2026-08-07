@@ -157,6 +157,8 @@ export default {
       chooseDate: 'Choose a date',
       selectDate: 'Select {date}',
       apply: 'Add to {date}',
+      selectJourneyFirst: 'Select a journey before adding this event.',
+      addFailed: 'We could not add this event to your journey. Please try again.',
     },
   },
 }
