@@ -38,7 +38,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
       :aria-checked="option.value === modelValue"
       class="flex-1 rounded-pill text-title-sm"
       :class="
-        option.value === modelValue ? 'bg-paper-fill text-on-color' : 'bg-transparent text-ink-2'
+        option.value === modelValue ? 'bg-paper-fill text-on-paper' : 'bg-transparent text-ink-2'
       "
       @click="emit('update:modelValue', option.value)"
     >

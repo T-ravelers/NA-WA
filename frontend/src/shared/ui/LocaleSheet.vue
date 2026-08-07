@@ -82,7 +82,7 @@ const LOCALE_LABEL: Record<AppLocale, { native: string; english: string }> = {
             v-if="locale === modelValue"
             :size="16"
             :stroke-width="2.5"
-            class="text-on-color"
+            class="text-on-paper"
           />
         </span>
       </button>

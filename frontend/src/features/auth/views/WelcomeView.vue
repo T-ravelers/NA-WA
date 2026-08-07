@@ -61,7 +61,7 @@ const router = useRouter()
 
     <button
       type="button"
-      class="h-13 w-full rounded-sm bg-paper-fill text-title-sm text-on-color"
+      class="h-13 w-full rounded-sm bg-paper-fill text-title-sm text-on-paper"
       @click="router.push(SIGN_IN_PATH)"
     >
       {{ t('auth.welcome.start') }}

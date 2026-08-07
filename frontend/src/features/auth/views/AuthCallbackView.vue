@@ -85,7 +85,7 @@ onMounted(async () => {
       -->
       <button
         type="button"
-        class="h-13 w-full rounded-sm bg-paper-fill text-title-sm text-on-color"
+        class="h-13 w-full rounded-sm bg-paper-fill text-title-sm text-on-paper"
         @click="router.replace(signInLocation)"
       >
         {{ t('auth.callback.retry') }}
