@@ -305,6 +305,35 @@ pnpm build
 pnpm test:e2e
 ```
 
+## 화면 스냅샷 남기기
+
+화면을 추가하거나 크게 바꿨다면 스냅샷을 찍어 PR에 첨부하세요. 코드와 단위 테스트로는
+확인할 수 없는 것이 있습니다. 폰트 폴백이 깨져 CJK가 두부(□□□)로 나와도 DOM assertion은
+통과하고, 여백과 대비는 클래스 이름만 봐서는 알 수 없습니다.
+
+스냅샷은 Chromium으로 찍으므로 브라우저를 최초 1회 내려받아야 합니다. E2E 테스트를 이미
+실행해 봤다면 준비돼 있습니다.
+
+```shell
+pnpm --filter @na-wa/frontend exec playwright install chromium
+```
+
+개발 서버를 띄운 뒤 실행합니다.
+
+```shell
+pnpm dev
+pnpm --filter @na-wa/frontend screenshot
+```
+
+찍을 화면은 `frontend/scripts/screenshot.mjs`의 `SCREENS` 배열에 추가합니다. 바텀시트를
+연 상태처럼 조작이 필요한 화면은 `prepare`에 동작을 적습니다.
+
+모든 화면은 시안 기준인 390×844에 2배율로 찍힙니다. 리뷰어가 시안과 나란히 놓고 볼 수
+있게 하려는 것이므로 크기를 바꾸지 마세요.
+
+출력물은 `frontend/screenshots/`에 생기며 **저장소에 커밋하지 않습니다.** GitHub은 이미지
+업로드를 웹 UI에서만 지원하므로, 생성된 PNG를 PR 본문에 끌어다 놓으세요.
+
 ## 완료 조건 확인하기
 
 - 정상, 빈 상태, 로딩, 오류와 권한 없음 상태를 처리했습니다.

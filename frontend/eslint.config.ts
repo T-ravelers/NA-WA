@@ -54,5 +54,14 @@ export default withVueTs(
     files: ['src/**/__tests__/**/*.{ts,tsx}', 'src/**/*.{test,spec}.{ts,tsx}'],
   },
 
+  {
+    // 개발용 CLI 스크립트는 콘솔 출력이 목적이다. 앱 코드에는 이 예외를 적용하지 않는다.
+    name: 'app/script-rules',
+    files: ['scripts/**/*.{js,mjs,ts,mts}'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
   skipFormatting,
 )
