@@ -26,7 +26,7 @@ const WALLET: WalletHome = {
       entryType: 'DEBIT',
       amount: 18000,
       balanceAfter: 84500,
-      createdAt: '2026-07-25T12:00:00',
+      createdAt: [2026, 7, 25, 12, 0],
     },
   ],
 }

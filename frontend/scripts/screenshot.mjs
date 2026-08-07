@@ -133,8 +133,9 @@ function stubJourneyDetail(page) {
 /**
  * 지갑 홈 응답을 세운다.
  *
- * 금액은 `BigDecimal`이 JSON number로 내려오고, `createdAt`은 `LocalDateTime`이라 오프셋이
- * 없다. 실제 응답 모양을 그대로 흉내내야 자릿수 구분과 날짜 해석이 시안대로 찍힌다.
+ * 금액은 `BigDecimal`이 JSON number로 내려오고, `createdAt`은 `LocalDateTime`이 오프셋 없이
+ * `[년, 월, 일, 시, 분]` 배열로 직렬화된 것이다(#108). 실제 응답 모양을 그대로 흉내내야
+ * 자릿수 구분과 날짜 해석이 시안대로 찍힌다.
  *
  * `transactions`에 빈 배열을 넘기면 거래 없는 상태를 찍는다.
  */
@@ -163,7 +164,7 @@ const WALLET_TRANSACTIONS = [
     entryType: 'DEBIT',
     amount: 18000,
     balanceAfter: 84500,
-    createdAt: '2026-07-25T12:00:00',
+    createdAt: [2026, 7, 25, 12, 0],
   },
   {
     transferId: 2,
@@ -171,7 +172,7 @@ const WALLET_TRANSACTIONS = [
     entryType: 'CREDIT',
     amount: 100000,
     balanceAfter: 102500,
-    createdAt: '2026-07-24T09:12:00',
+    createdAt: [2026, 7, 24, 9, 12],
   },
   {
     transferId: 3,
@@ -179,7 +180,7 @@ const WALLET_TRANSACTIONS = [
     entryType: 'CREDIT',
     amount: 32500,
     balanceAfter: 2500,
-    createdAt: '2026-07-22T21:40:00',
+    createdAt: [2026, 7, 22, 21, 40],
   },
   {
     transferId: 4,
@@ -187,7 +188,7 @@ const WALLET_TRANSACTIONS = [
     entryType: 'DEBIT',
     amount: 50000,
     balanceAfter: 52500,
-    createdAt: '2026-07-20T18:05:00',
+    createdAt: [2026, 7, 20, 18, 5],
   },
 ]
 
