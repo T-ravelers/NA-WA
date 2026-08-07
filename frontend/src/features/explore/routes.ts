@@ -11,7 +11,7 @@ const routes: RouteRecordRaw[] = [
     path: '/explore/events/:eventId',
     name: 'explore-event-detail',
     component: () => import('./views/EventDetailView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideBottomNav: true },
   },
 ]
 

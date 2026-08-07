@@ -464,7 +464,7 @@ function retry(): void {
       </main>
 
       <div
-        class="sticky bottom-20 z-10 mt-6 flex w-full min-w-0 items-center gap-2 bg-canvas/95 px-screen py-3 backdrop-blur"
+        class="sticky bottom-0 z-10 mt-6 flex w-full min-w-0 items-center gap-2 bg-canvas/95 px-screen py-3 backdrop-blur"
       >
         <IconOrb
           :label="saved ? t('explore.detail.unsave') : t('explore.detail.save')"

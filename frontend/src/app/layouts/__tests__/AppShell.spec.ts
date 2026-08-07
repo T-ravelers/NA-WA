@@ -21,6 +21,12 @@ function createTestRouter() {
         component: { template: '<h1>Wallet</h1>' },
         meta: { requiresAuth: true },
       },
+      {
+        path: '/explore/events/:eventId',
+        name: 'explore-event-detail',
+        component: { template: '<h1>Event detail</h1>' },
+        meta: { requiresAuth: true, hideBottomNav: true },
+      },
     ],
   })
 }
@@ -53,6 +59,12 @@ describe('AppShell', () => {
 
   it('hides the bottom navigation on the sign-in screen', async () => {
     const wrapper = await mountAt('/sign-in')
+
+    expect(wrapper.find('nav').exists()).toBe(false)
+  })
+
+  it('hides the bottom navigation on detail screens', async () => {
+    const wrapper = await mountAt('/explore/events/990001')
 
     expect(wrapper.find('nav').exists()).toBe(false)
   })
