@@ -16,6 +16,7 @@ interface Props {
 }
 
 const { event } = defineProps<Props>()
+const emit = defineEmits<{ open: [eventId: number] }>()
 const { t } = useI18n()
 const saved = ref(false)
 
@@ -47,15 +48,31 @@ const regionLabel = computed(() =>
 )
 
 function formatDate(value: string): string {
-  return value.replaceAll('-', '.')
+  return value.replace(/-/g, '.')
 }
 
 const periodLabel = computed(() => `${formatDate(event.startDate)} ~ ${formatDate(event.endDate)}`)
+
+function openEvent(): void {
+  emit('open', event.itemId)
+}
+
+function handleKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  event.preventDefault()
+  openEvent()
+}
 </script>
 
 <template>
   <AppCard padding="none">
-    <article class="flex min-h-36 gap-0">
+    <article
+      class="flex min-h-36 cursor-pointer gap-0"
+      role="link"
+      tabindex="0"
+      @click="openEvent"
+      @keydown="handleKeydown"
+    >
       <div class="w-28 shrink-0 p-3">
         <img
           v-if="event.thumbnailUrl"

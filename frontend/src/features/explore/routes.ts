@@ -7,6 +7,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/ExploreView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/explore/events/:eventId',
+    name: 'explore-event-detail',
+    component: () => import('./views/EventDetailView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 export default routes

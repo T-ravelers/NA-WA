@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { fetchEventList, toSearchParams } from '../exploreApi'
+import { fetchEventDetail, fetchEventList, toSearchParams } from '../exploreApi'
 
 const { get } = vi.hoisted(() => ({ get: vi.fn() }))
 
@@ -45,6 +45,16 @@ describe('exploreApi', () => {
     await expect(fetchEventList({ sort: 'LATEST' })).resolves.toEqual(data)
     expect(get).toHaveBeenCalledWith('/api/v1/explore/events', {
       params: expect.any(URLSearchParams),
+    })
+  })
+
+  it('fetches one event detail with the requested language', async () => {
+    const data = { eventId: 42, title: 'Sample event' }
+    get.mockResolvedValueOnce({ data })
+
+    await expect(fetchEventDetail(42, 'en')).resolves.toEqual(data)
+    expect(get).toHaveBeenCalledWith('/api/v1/explore/events/42', {
+      params: { language: 'en' },
     })
   })
 })

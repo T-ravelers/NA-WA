@@ -336,6 +336,7 @@ function addQueryList(
           v-for="event in eventList"
           :key="event.itemId"
           :event="event"
+          @open="router.push({ name: 'explore-event-detail', params: { eventId: event.itemId } })"
         />
       </div>
     </template>

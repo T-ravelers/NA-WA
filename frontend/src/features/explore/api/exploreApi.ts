@@ -1,8 +1,10 @@
 import { httpClient } from '@/shared/api/httpClient'
 
+import type { EventDetail } from '../model/eventDetail'
 import type { EventListResponse, EventSearchFilters } from '../model/eventExplore'
 
 const EVENT_LIST_PATH = '/api/v1/explore/events'
+const EVENT_DETAIL_PATH = '/api/v1/explore/events'
 
 function appendList(
   params: URLSearchParams,
@@ -59,4 +61,15 @@ export async function fetchEventList(filters: EventSearchFilters = {}): Promise<
   return response.data
 }
 
-export { EVENT_LIST_PATH, toSearchParams }
+export async function fetchEventDetail(
+  eventId: number | string,
+  language = 'en',
+): Promise<EventDetail> {
+  const response = await httpClient.get<EventDetail>(`${EVENT_DETAIL_PATH}/${eventId}`, {
+    params: { language },
+  })
+
+  return response.data
+}
+
+export { EVENT_DETAIL_PATH, EVENT_LIST_PATH, toSearchParams }
