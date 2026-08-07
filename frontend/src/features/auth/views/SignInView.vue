@@ -75,7 +75,7 @@ function signInWith(provider: 'google' | 'line'): void {
     <div class="flex flex-col gap-2.5">
       <button
         type="button"
-        class="flex h-13 items-center justify-center gap-2 rounded-sm bg-paper-fill text-title-sm text-on-color"
+        class="flex h-13 items-center justify-center gap-2 rounded-sm bg-paper-fill text-title-sm text-on-paper"
         @click="signInWith('google')"
       >
         <span
