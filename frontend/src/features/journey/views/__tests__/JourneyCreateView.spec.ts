@@ -83,4 +83,16 @@ describe('JourneyCreateView', () => {
     expect(wrapper.text()).toContain('Check the journey details and try again.')
     expect(router.currentRoute.value.fullPath).toBe('/journeys/new')
   })
+
+  it('falls back to the common error message for an untranslated API code', async () => {
+    const { NormalizedApiError } = await import('@/shared/api/apiError')
+    createJourney.mockRejectedValue(new NormalizedApiError('COMMON-001', 400, 'invalid input'))
+    const { wrapper } = await mountView()
+
+    wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Something went wrong. Please try again.')
+    expect(wrapper.text()).not.toContain('common.errorCode.COMMON-001')
+  })
 })

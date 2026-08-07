@@ -21,7 +21,9 @@ interface Props {
   error?: string
   /** 평상시 하단 도움말. `error`가 있으면 그쪽이 우선한다. */
   helper?: string
-  type?: 'text' | 'email' | 'search'
+  type?: 'text' | 'email' | 'search' | 'date'
+  /** 날짜 입력처럼 브라우저가 지원하는 최소값을 전달한다. */
+  min?: string
   /** 라벨을 스크린 리더 전용으로 감춘다. 검색창처럼 맥락이 분명한 곳에만 쓴다. */
   labelHidden?: boolean
 }
@@ -33,6 +35,7 @@ const {
   error = undefined,
   helper = undefined,
   type = 'text',
+  min = undefined,
   labelHidden = false,
 } = defineProps<Props>()
 
@@ -61,6 +64,7 @@ function handleInput(event: Event): void {
     <input
       :id="inputId"
       :type="type"
+      :min="min"
       :value="modelValue"
       :placeholder="placeholder"
       :aria-invalid="hasError"

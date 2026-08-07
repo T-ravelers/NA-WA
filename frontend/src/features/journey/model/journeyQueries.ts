@@ -1,23 +1,33 @@
+import { computed, type Ref } from 'vue'
+
 import { fetchJourney, fetchJourneyTimeline } from '../api/journeyApi'
 
 export const journeyKeys = {
   all: ['journeys'] as const,
   details: () => [...journeyKeys.all, 'detail'] as const,
-  detail: (tripId: number) => [...journeyKeys.details(), tripId] as const,
+  detail: (tripId: number | null) => [...journeyKeys.details(), tripId] as const,
   timelines: () => [...journeyKeys.all, 'timeline'] as const,
-  timeline: (tripId: number) => [...journeyKeys.timelines(), tripId] as const,
+  timeline: (tripId: number | null) => [...journeyKeys.timelines(), tripId] as const,
 }
 
-export function journeyDetailQueryOptions(tripId: number) {
+function requireTripId(tripId: number | null): number {
+  if (tripId === null) {
+    throw new Error('A valid trip id is required before fetching a journey.')
+  }
+
+  return tripId
+}
+
+export function journeyDetailQueryOptions(tripId: Readonly<Ref<number | null>>) {
   return {
-    queryKey: journeyKeys.detail(tripId),
-    queryFn: () => fetchJourney(tripId),
+    queryKey: computed(() => journeyKeys.detail(tripId.value)),
+    queryFn: () => fetchJourney(requireTripId(tripId.value)),
   }
 }
 
-export function journeyTimelineQueryOptions(tripId: number) {
+export function journeyTimelineQueryOptions(tripId: Readonly<Ref<number | null>>) {
   return {
-    queryKey: journeyKeys.timeline(tripId),
-    queryFn: () => fetchJourneyTimeline(tripId),
+    queryKey: computed(() => journeyKeys.timeline(tripId.value)),
+    queryFn: () => fetchJourneyTimeline(requireTripId(tripId.value)),
   }
 }

@@ -7,7 +7,6 @@ import {
   fetchJourneyTimeline,
   type Journey,
   type JourneyCreateInput,
-  type JourneyTimeline,
 } from '../journeyApi'
 
 const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
@@ -84,11 +83,28 @@ describe('journeyApi', () => {
     expect(get).toHaveBeenCalledWith('/api/v1/journeys/7')
   })
 
+  it('normalizes absent response regions to an empty list', async () => {
+    get.mockResolvedValue({ data: { ...journey, regions: null } })
+
+    await expect(fetchJourney(7)).resolves.toMatchObject({ regions: [] })
+  })
+
   it('normalizes an absent timeline collection to an empty list', async () => {
-    const response = { tripId: 7, timeline: undefined } as unknown as JourneyTimeline
+    const response = { tripId: 7, timeline: null }
     get.mockResolvedValue({ data: response })
 
     await expect(fetchJourneyTimeline(7)).resolves.toEqual({ tripId: 7, timeline: [] })
     expect(get).toHaveBeenCalledWith('/api/v1/journeys/7/timeline')
+  })
+
+  it('normalizes absent day items to an empty list', async () => {
+    get.mockResolvedValue({
+      data: { tripId: 7, timeline: [{ visitDate: '2026-08-10', items: null }] },
+    })
+
+    await expect(fetchJourneyTimeline(7)).resolves.toEqual({
+      tripId: 7,
+      timeline: [{ visitDate: '2026-08-10', items: [] }],
+    })
   })
 })

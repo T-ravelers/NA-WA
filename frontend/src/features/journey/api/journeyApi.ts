@@ -20,6 +20,10 @@ export interface Journey {
   regions: JourneyRegion[]
 }
 
+interface JourneyResponse extends Omit<Journey, 'regions'> {
+  regions?: JourneyRegion[] | null
+}
+
 export interface JourneyCreateInput {
   title: string
   startDate: string
@@ -91,7 +95,15 @@ export interface JourneyTimeline {
   timeline: JourneyTimelineDay[]
 }
 
-function normalizeJourney(journey: Journey): Journey {
+interface JourneyTimelineDayResponse extends Omit<JourneyTimelineDay, 'items'> {
+  items?: JourneyTimelineItem[] | null
+}
+
+interface JourneyTimelineResponse extends Omit<JourneyTimeline, 'timeline'> {
+  timeline?: JourneyTimelineDayResponse[] | null
+}
+
+function normalizeJourney(journey: JourneyResponse): Journey {
   return {
     ...journey,
     regions: [...(journey.regions ?? [])].sort(
@@ -102,7 +114,7 @@ function normalizeJourney(journey: Journey): Journey {
   }
 }
 
-function normalizeTimeline(response: JourneyTimeline): JourneyTimeline {
+function normalizeTimeline(response: JourneyTimelineResponse): JourneyTimeline {
   return {
     ...response,
     timeline: (response.timeline ?? []).map((day) => ({
@@ -128,7 +140,7 @@ export function buildJourneyCreateRequest(input: JourneyCreateInput): JourneyCre
 }
 
 export async function createJourney(input: JourneyCreateInput): Promise<Journey> {
-  const response = await httpClient.post<Journey>(
+  const response = await httpClient.post<JourneyResponse>(
     '/api/v1/journeys',
     buildJourneyCreateRequest(input),
   )
@@ -137,13 +149,15 @@ export async function createJourney(input: JourneyCreateInput): Promise<Journey>
 }
 
 export async function fetchJourney(tripId: number): Promise<Journey> {
-  const response = await httpClient.get<Journey>(`/api/v1/journeys/${tripId}`)
+  const response = await httpClient.get<JourneyResponse>(`/api/v1/journeys/${tripId}`)
 
   return normalizeJourney(response.data)
 }
 
 export async function fetchJourneyTimeline(tripId: number): Promise<JourneyTimeline> {
-  const response = await httpClient.get<JourneyTimeline>(`/api/v1/journeys/${tripId}/timeline`)
+  const response = await httpClient.get<JourneyTimelineResponse>(
+    `/api/v1/journeys/${tripId}/timeline`,
+  )
 
   return normalizeTimeline(response.data)
 }

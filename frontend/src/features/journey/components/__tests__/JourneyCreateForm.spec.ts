@@ -17,8 +17,10 @@ function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
 
 async function fillRequiredFields(wrapper: ReturnType<typeof mount>): Promise<void> {
   await wrapper.get('input[type="text"]').setValue('Seoul Foodie Week')
-  await wrapper.get('#journey-start-date').setValue('2026-08-10')
-  await wrapper.get('#journey-end-date').setValue('2026-08-12')
+  const dateInputs = wrapper.findAll('input[type="date"]')
+
+  await dateInputs[0]?.setValue('2026-08-10')
+  await dateInputs[1]?.setValue('2026-08-12')
 }
 
 describe('JourneyCreateForm', () => {
@@ -58,5 +60,16 @@ describe('JourneyCreateForm', () => {
 
     expect(wrapper.get('form').attributes('aria-busy')).toBe('true')
     expect(wrapper.get('fieldset').attributes()).toHaveProperty('disabled')
+  })
+
+  it('uses unique shared input ids and constrains the end date from the selected start date', async () => {
+    const wrapper = mount(JourneyCreateForm, { global: { plugins: [i18n] } })
+    const dateInputs = wrapper.findAll('input[type="date"]')
+
+    await dateInputs[0]?.setValue('2026-08-10')
+
+    expect(dateInputs).toHaveLength(2)
+    expect(dateInputs[0]?.attributes('id')).not.toBe(dateInputs[1]?.attributes('id'))
+    expect(dateInputs[1]?.attributes('min')).toBe('2026-08-10')
   })
 })

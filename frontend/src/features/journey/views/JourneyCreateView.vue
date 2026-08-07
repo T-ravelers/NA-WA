@@ -9,9 +9,11 @@ import { createJourney, type JourneyCreateInput } from '../api/journeyApi'
 import { journeyErrorMessageKey } from '../model/journeyErrors'
 import { journeyKeys } from '../model/journeyQueries'
 
-const { t } = useI18n()
+const i18n = useI18n()
+const { t } = i18n
 const router = useRouter()
 const queryClient = useQueryClient()
+const hasMessage = (key: string): boolean => i18n.te(key)
 
 const createMutation = useMutation({
   mutationFn: createJourney,
@@ -24,7 +26,7 @@ const createMutation = useMutation({
 const errorMessage = computed(() =>
   createMutation.error.value === null
     ? undefined
-    : t(journeyErrorMessageKey(createMutation.error.value)),
+    : t(journeyErrorMessageKey(createMutation.error.value, hasMessage)),
 )
 
 function submit(input: JourneyCreateInput): void {
@@ -35,8 +37,10 @@ function submit(input: JourneyCreateInput): void {
 </script>
 
 <template>
-  <main class="mx-auto flex w-full max-w-screen-sm flex-col gap-6 px-5 py-8">
-    <h1 class="text-display text-ink">{{ t('journey.create.title') }}</h1>
+  <main class="flex w-full flex-col gap-6 px-screen py-8">
+    <h1 class="font-display text-screen-title font-bold text-ink-display">
+      {{ t('journey.create.title') }}
+    </h1>
     <JourneyCreateForm
       :pending="createMutation.isPending.value"
       :error-message="errorMessage"

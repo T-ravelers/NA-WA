@@ -48,7 +48,7 @@ function formatCompanionPreference(value: string | null): string {
 
 <template>
   <header class="flex flex-col gap-2">
-    <h1 class="text-display text-ink">{{ journey.title }}</h1>
+    <h1 class="font-display text-screen-title font-bold text-ink-display">{{ journey.title }}</h1>
     <p class="text-body-sm text-ink-3">
       <time :datetime="journey.startDate">{{ formatDate(journey.startDate) }}</time>
       –
@@ -56,7 +56,7 @@ function formatCompanionPreference(value: string | null): string {
     </p>
   </header>
 
-  <dl class="grid gap-4 rounded-card bg-surface-1 p-4 sm:grid-cols-2">
+  <dl class="grid gap-4 rounded-card bg-surface-1 p-4">
     <div class="flex flex-col gap-1">
       <dt class="text-caption text-ink-3">{{ t('journey.detail.budget') }}</dt>
       <dd class="text-data-lg text-ink">{{ formatBudget(journey.budgetAmount) }}</dd>

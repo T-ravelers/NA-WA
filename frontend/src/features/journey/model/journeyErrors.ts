@@ -1,7 +1,14 @@
 import { NormalizedApiError } from '@/shared/api/apiError'
 
-export function journeyErrorMessageKey(error: unknown): string {
-  return error instanceof NormalizedApiError ? error.messageKey : 'error.unknown'
+export function journeyErrorMessageKey(
+  error: unknown,
+  hasMessage: (key: string) => boolean,
+): string {
+  if (!(error instanceof NormalizedApiError) || !hasMessage(error.messageKey)) {
+    return 'error.unknown'
+  }
+
+  return error.messageKey
 }
 
 export function isJourneyForbidden(error: unknown): boolean {

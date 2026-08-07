@@ -147,53 +147,23 @@ function submit(): void {
         />
 
         <div class="grid grid-cols-2 gap-3">
-          <div class="flex min-w-0 flex-col gap-1.5">
-            <label
-              for="journey-start-date"
-              class="text-caption text-ink-2"
-            >
-              {{ t('journey.create.startDate') }}
-            </label>
-            <input
-              id="journey-start-date"
+          <div class="min-w-0">
+            <TextInput
               v-model="draft.startDate"
               type="date"
-              :aria-invalid="errors.startDate !== undefined"
-              :aria-describedby="errors.startDate === undefined ? undefined : 'start-date-error'"
-              class="h-13 min-w-0 rounded-sm border-2 border-transparent bg-surface-2 px-3 text-body text-ink outline-none focus-visible:border-ink"
+              :label="t('journey.create.startDate')"
+              :error="translatedError(errors.startDate)"
             />
-            <p
-              v-if="errors.startDate !== undefined"
-              id="start-date-error"
-              class="text-caption text-danger"
-            >
-              {{ t(errors.startDate) }}
-            </p>
           </div>
 
-          <div class="flex min-w-0 flex-col gap-1.5">
-            <label
-              for="journey-end-date"
-              class="text-caption text-ink-2"
-            >
-              {{ t('journey.create.endDate') }}
-            </label>
-            <input
-              id="journey-end-date"
+          <div class="min-w-0">
+            <TextInput
               v-model="draft.endDate"
               type="date"
               :min="draft.startDate || undefined"
-              :aria-invalid="errors.endDate !== undefined"
-              :aria-describedby="errors.endDate === undefined ? undefined : 'end-date-error'"
-              class="h-13 min-w-0 rounded-sm border-2 border-transparent bg-surface-2 px-3 text-body text-ink outline-none focus-visible:border-ink"
+              :label="t('journey.create.endDate')"
+              :error="translatedError(errors.endDate)"
             />
-            <p
-              v-if="errors.endDate !== undefined"
-              id="end-date-error"
-              class="text-caption text-danger"
-            >
-              {{ t(errors.endDate) }}
-            </p>
           </div>
         </div>
 

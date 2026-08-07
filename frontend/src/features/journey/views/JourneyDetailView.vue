@@ -13,8 +13,10 @@ import JourneyTimelineList from '../components/JourneyTimelineList.vue'
 import { journeyErrorMessageKey, isJourneyForbidden } from '../model/journeyErrors'
 import { journeyDetailQueryOptions, journeyTimelineQueryOptions } from '../model/journeyQueries'
 
-const { t } = useI18n()
+const i18n = useI18n()
+const { t } = i18n
 const route = useRoute()
+const hasMessage = (key: string): boolean => i18n.te(key)
 
 const tripId = computed(() => {
   const rawTripId = Array.isArray(route.params.tripId)
@@ -26,20 +28,22 @@ const tripId = computed(() => {
 })
 
 const detailQuery = useQuery({
-  ...journeyDetailQueryOptions(tripId.value ?? 0),
+  ...journeyDetailQueryOptions(tripId),
   enabled: computed(() => tripId.value !== null),
   retry: false,
 })
 
 const timelineQuery = useQuery({
-  ...journeyTimelineQueryOptions(tripId.value ?? 0),
+  ...journeyTimelineQueryOptions(tripId),
   enabled: computed(() => tripId.value !== null),
   retry: false,
 })
 
 const requestError = computed(() => detailQuery.error.value ?? timelineQuery.error.value)
 const forbidden = computed(() => isJourneyForbidden(requestError.value))
-const requestErrorDescription = computed(() => t(journeyErrorMessageKey(requestError.value)))
+const requestErrorDescription = computed(() =>
+  t(journeyErrorMessageKey(requestError.value, hasMessage)),
+)
 
 function retryAll(): void {
   void detailQuery.refetch()
@@ -48,14 +52,15 @@ function retryAll(): void {
 </script>
 
 <template>
-  <main class="mx-auto flex w-full max-w-screen-sm flex-col gap-8 px-5 py-8">
+  <main class="flex w-full flex-col gap-8 px-screen py-8">
     <section
       v-if="tripId === null"
-      class="flex flex-col gap-2 py-12 text-center"
       role="alert"
     >
-      <h1 class="text-title text-ink">{{ t('journey.detail.invalidTitle') }}</h1>
-      <p class="text-body-sm text-ink-3">{{ t('journey.detail.invalidDescription') }}</p>
+      <StateEmpty
+        :title="t('journey.detail.invalidTitle')"
+        :description="t('journey.detail.invalidDescription')"
+      />
     </section>
 
     <StateLoading
@@ -65,11 +70,12 @@ function retryAll(): void {
 
     <section
       v-else-if="forbidden"
-      class="flex flex-col gap-2 py-12 text-center"
       role="alert"
     >
-      <h1 class="text-title text-ink">{{ t('journey.detail.accessDeniedTitle') }}</h1>
-      <p class="text-body-sm text-ink-3">{{ t('journey.detail.accessDeniedDescription') }}</p>
+      <StateEmpty
+        :title="t('journey.detail.accessDeniedTitle')"
+        :description="t('journey.detail.accessDeniedDescription')"
+      />
     </section>
 
     <StateError
@@ -101,11 +107,12 @@ function retryAll(): void {
 
         <section
           v-else-if="isJourneyForbidden(timelineQuery.error.value)"
-          class="flex flex-col gap-2 py-12 text-center"
           role="alert"
         >
-          <h3 class="text-title text-ink">{{ t('journey.detail.accessDeniedTitle') }}</h3>
-          <p class="text-body-sm text-ink-3">{{ t('journey.detail.accessDeniedDescription') }}</p>
+          <StateEmpty
+            :title="t('journey.detail.accessDeniedTitle')"
+            :description="t('journey.detail.accessDeniedDescription')"
+          />
         </section>
 
         <StateError

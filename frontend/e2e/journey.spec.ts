@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 test('creates a journey and opens its empty itinerary', async ({ page }) => {
   let createRequest: unknown
 
-  await page.route('**/api/v1/auth/me', async (route) => {
+  await page.route('**/api/v1/members/me', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

@@ -27,7 +27,7 @@ const journey = {
   regions: [{ regionCode: 'SEOUL', regionName: 'Seoul', displayOrder: 0 }],
 }
 
-async function mountAt(path: string) {
+async function mountWithRouter(path: string) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/journeys/:tripId', name: 'journey-detail', component: JourneyDetailView }],
@@ -45,7 +45,11 @@ async function mountAt(path: string) {
 
   await flushPromises()
 
-  return wrapper
+  return { wrapper, router }
+}
+
+async function mountAt(path: string) {
+  return (await mountWithRouter(path)).wrapper
 }
 
 describe('JourneyDetailView', () => {
@@ -176,5 +180,22 @@ describe('JourneyDetailView', () => {
     expect(fetchJourney).not.toHaveBeenCalled()
     expect(fetchJourneyTimeline).not.toHaveBeenCalled()
     expect(wrapper.get('[role="alert"]').text()).toContain('Invalid journey link')
+  })
+
+  it('loads the new journey when the route reuses the detail view with another id', async () => {
+    fetchJourney.mockImplementation((tripId: number) =>
+      Promise.resolve({ ...journey, tripId, title: `Journey ${tripId}` }),
+    )
+    fetchJourneyTimeline.mockImplementation((tripId: number) =>
+      Promise.resolve({ tripId, timeline: [] }),
+    )
+    const { wrapper, router } = await mountWithRouter('/journeys/7')
+
+    await router.push('/journeys/8')
+    await flushPromises()
+
+    expect(fetchJourney).toHaveBeenLastCalledWith(8)
+    expect(fetchJourneyTimeline).toHaveBeenLastCalledWith(8)
+    expect(wrapper.get('h1').text()).toBe('Journey 8')
   })
 })

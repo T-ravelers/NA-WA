@@ -32,6 +32,15 @@ describe('TextInput', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([['Seoul']])
   })
 
+  it('forwards native date constraints without losing the generated label connection', () => {
+    const wrapper = mountInput({ type: 'date', min: '2026-08-10' })
+    const input = wrapper.get('input')
+
+    expect(input.attributes('type')).toBe('date')
+    expect(input.attributes('min')).toBe('2026-08-10')
+    expect(wrapper.get('label').attributes('for')).toBe(input.attributes('id'))
+  })
+
   /*
    * 오류를 빨간 테두리로만 말하면 색각 이상 사용자와 스크린 리더 사용자가 무엇이
    * 잘못됐는지 알 수 없다. 문구가 입력과 연결돼 있어야 한다.

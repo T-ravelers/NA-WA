@@ -8,7 +8,7 @@ interface Props {
   days: JourneyTimelineDay[]
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 const { locale, t } = useI18n()
 
@@ -65,17 +65,34 @@ function typeLabel(item: JourneyTimelineItem): string {
     ? t('journey.detail.event')
     : t('journey.detail.place')
 }
+
+const displayDays = computed(() =>
+  props.days.map((day) => ({
+    visitDate: day.visitDate,
+    dateLabel: formatDate(day.visitDate),
+    items: day.items.map((item) => ({
+      tripItemId: item.tripItemId,
+      timeLabel: formatTime(item),
+      statusLabel:
+        item.status === 'CONFIRMED' ? t('journey.detail.confirmed') : t('journey.detail.saved'),
+      title: item.exploreItem.title,
+      typeLabel: typeLabel(item),
+      location: formatLocation(item),
+      note: item.note,
+    })),
+  })),
+)
 </script>
 
 <template>
   <ol class="flex flex-col gap-8">
     <li
-      v-for="day in days"
+      v-for="day in displayDays"
       :key="day.visitDate"
       class="flex flex-col gap-3"
     >
       <h3 class="text-title text-ink">
-        <time :datetime="day.visitDate">{{ formatDate(day.visitDate) }}</time>
+        <time :datetime="day.visitDate">{{ day.dateLabel }}</time>
       </h3>
 
       <ol class="flex flex-col gap-3">
@@ -86,21 +103,13 @@ function typeLabel(item: JourneyTimelineItem): string {
         >
           <article class="flex flex-col gap-2">
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="text-caption text-ink-3">{{ formatTime(item) }}</p>
-              <p class="text-caption text-ink-3">
-                {{
-                  item.status === 'CONFIRMED'
-                    ? t('journey.detail.confirmed')
-                    : t('journey.detail.saved')
-                }}
-              </p>
+              <p class="text-caption text-ink-3">{{ item.timeLabel }}</p>
+              <p class="text-caption text-ink-3">{{ item.statusLabel }}</p>
             </div>
-            <h4 class="text-title-sm text-ink">{{ item.exploreItem.title }}</h4>
+            <h4 class="text-title-sm text-ink">{{ item.title }}</h4>
             <p class="text-body-sm text-ink-2">
-              {{ typeLabel(item) }}
-              <template v-if="formatLocation(item) !== null">
-                · {{ formatLocation(item) }}</template
-              >
+              {{ item.typeLabel }}
+              <template v-if="item.location !== null"> · {{ item.location }}</template>
             </p>
             <p
               v-if="item.note !== null && item.note !== ''"
