@@ -2,7 +2,7 @@ export const EVENT_KINDS = ['POPUP', 'CONCERT', 'ETC', 'FESTIVAL', 'EXHIBITION']
 
 export type EventKind = (typeof EVENT_KINDS)[number]
 export type EventStatus = 'SCHEDULED' | 'ONGOING' | 'ENDED'
-export type EventSort = 'LATEST' | 'POPULAR'
+export type EventSort = 'LATEST' | 'POPULAR' | 'ENDING_SOON'
 
 export interface EventSummary {
   itemId: number

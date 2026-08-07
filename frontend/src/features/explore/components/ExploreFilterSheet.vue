@@ -1,0 +1,647 @@
+<script setup lang="ts">
+import { computed, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronUp,
+  IconChevronDown,
+  IconCheck,
+} from '@tabler/icons-vue'
+
+import AppButton from '@/shared/ui/AppButton.vue'
+import CategoryDot from '@/shared/ui/CategoryDot.vue'
+import type { Category } from '@/shared/ui/category'
+
+import type { EventKind, EventSearchFilters } from '../model/eventExplore'
+import type { ExploreSheetKind } from './ExploreFilterBar.vue'
+
+interface Props {
+  kind: ExploreSheetKind
+  filters: EventSearchFilters
+  resultCount: number
+}
+
+const props = defineProps<Props>()
+
+const emit = defineEmits<{
+  close: []
+  apply: [filters: EventSearchFilters]
+}>()
+
+const { locale, t } = useI18n()
+
+const SHEET_TITLES: Record<ExploreSheetKind, string> = {
+  date: 'explore.sheets.date',
+  region: 'explore.sheets.region',
+  category: 'explore.sheets.category',
+  options: 'explore.sheets.options',
+  sort: 'explore.sheets.sort',
+}
+
+const EVENT_KIND_GROUPS: Array<{
+  labelKey: string
+  category: Category
+  kinds: EventKind[]
+}> = [
+  {
+    labelKey: 'explore.categories.show',
+    category: 'show',
+    kinds: ['FESTIVAL', 'CONCERT', 'EXHIBITION'],
+  },
+  { labelKey: 'explore.categories.shopping', category: 'shopping', kinds: ['POPUP'] },
+  { labelKey: 'explore.categories.food', category: 'food', kinds: ['FESTIVAL'] },
+  { labelKey: 'explore.categories.beauty', category: 'beauty', kinds: ['POPUP'] },
+]
+
+const EVENT_KIND_LABEL_KEYS: Record<EventKind, string> = {
+  POPUP: 'explore.eventKinds.POPUP',
+  CONCERT: 'explore.eventKinds.CONCERT',
+  ETC: 'explore.eventKinds.ETC',
+  FESTIVAL: 'explore.eventKinds.FESTIVAL',
+  EXHIBITION: 'explore.eventKinds.EXHIBITION',
+}
+
+const REGION_OPTIONS = [
+  {
+    labelKey: 'explore.regions.seoul',
+    value: 'Seoul',
+    areas: [
+      { labelKey: 'explore.areas.allSeoul', value: 'All of Seoul' },
+      { labelKey: 'explore.areas.seongsu', value: 'Seongsu' },
+      { labelKey: 'explore.areas.hongdae', value: 'Hongdae' },
+      { labelKey: 'explore.areas.jamsil', value: 'Jamsil' },
+      { labelKey: 'explore.areas.yeouido', value: 'Yeouido' },
+      { labelKey: 'explore.areas.yongsan', value: 'Yongsan' },
+      { labelKey: 'explore.areas.myeongdong', value: 'Myeongdong' },
+      { labelKey: 'explore.areas.dongdaemun', value: 'Dongdaemun·DDP' },
+    ],
+  },
+  {
+    labelKey: 'explore.regions.gyeonggi',
+    value: 'Gyeonggi',
+    areas: [{ labelKey: 'explore.areas.allGyeonggi', value: 'All of Gyeonggi' }],
+  },
+  {
+    labelKey: 'explore.regions.busan',
+    value: 'Busan',
+    areas: [{ labelKey: 'explore.areas.allBusan', value: 'All of Busan' }],
+  },
+  {
+    labelKey: 'explore.regions.gangwon',
+    value: 'Gangwon',
+    areas: [{ labelKey: 'explore.areas.allGangwon', value: 'All of Gangwon' }],
+  },
+  {
+    labelKey: 'explore.regions.gyeongbuk',
+    value: 'Gyeongbuk',
+    areas: [{ labelKey: 'explore.areas.allGyeongbuk', value: 'All of Gyeongbuk' }],
+  },
+  {
+    labelKey: 'explore.regions.chungnam',
+    value: 'Chungnam',
+    areas: [{ labelKey: 'explore.areas.allChungnam', value: 'All of Chungnam' }],
+  },
+  {
+    labelKey: 'explore.regions.jeonbuk',
+    value: 'Jeonbuk',
+    areas: [{ labelKey: 'explore.areas.allJeonbuk', value: 'All of Jeonbuk' }],
+  },
+  {
+    labelKey: 'explore.regions.jeju',
+    value: 'Jeju',
+    areas: [{ labelKey: 'explore.areas.allJeju', value: 'All of Jeju' }],
+  },
+] as const
+
+type OptionKey =
+  'freeOnly' | 'openWeekendOnly' | 'opensLateOnly' | 'preReservationOnly' | 'experienceOnly'
+
+const EVENT_OPTIONS: Array<{ key: OptionKey; labelKey: string }> = [
+  { key: 'freeOnly', labelKey: 'explore.options.free' },
+  { key: 'openWeekendOnly', labelKey: 'explore.options.openWeekend' },
+  { key: 'opensLateOnly', labelKey: 'explore.options.openLate' },
+  { key: 'preReservationOnly', labelKey: 'explore.options.preReservation' },
+  { key: 'experienceOnly', labelKey: 'explore.options.experience' },
+]
+
+const DATE_PRESETS = [
+  { value: 'ONGOING', labelKey: 'explore.datePresets.ONGOING' },
+  { value: 'OPENING_SOON', labelKey: 'explore.datePresets.OPENING_SOON' },
+  { value: 'THIS_WEEKEND', labelKey: 'explore.datePresets.THIS_WEEKEND' },
+  { value: 'THIS_MONTH', labelKey: 'explore.datePresets.THIS_MONTH' },
+] as const
+
+const draft = reactive<EventSearchFilters>(cloneFilters(props.filters))
+const selectedRegion = ref(props.filters.region1?.[0] ?? 'Seoul')
+const expandedCategories = ref<string[]>(['explore.categories.show'])
+const monthCursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+
+watch(
+  () => props.filters,
+  (filters) => {
+    Object.assign(draft, cloneFilters(filters))
+    selectedRegion.value = filters.region1?.[0] ?? 'Seoul'
+  },
+  { deep: true },
+)
+
+const selectedKinds = computed(() => new Set(draft.eventKinds ?? []))
+const currentRegion = computed(
+  () => REGION_OPTIONS.find((region) => region.value === selectedRegion.value) ?? REGION_OPTIONS[0],
+)
+const selectedAreas = computed(() => new Set(draft.region2 ?? []))
+const monthLabel = computed(() =>
+  new Intl.DateTimeFormat(locale.value, { month: 'long', year: 'numeric' }).format(
+    monthCursor.value,
+  ),
+)
+
+const calendarDays = computed(() => {
+  const year = monthCursor.value.getFullYear()
+  const month = monthCursor.value.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const startOffset = firstDay.getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const previousMonthDays = new Date(year, month, 0).getDate()
+  const cells: Array<{ date: string; day: number; inMonth: boolean }> = []
+
+  for (let index = 0; index < 42; index += 1) {
+    const rawDay = index - startOffset + 1
+    const inMonth = rawDay >= 1 && rawDay <= daysInMonth
+    const date = new Date(year, month, rawDay)
+    const day = inMonth ? rawDay : rawDay < 1 ? previousMonthDays + rawDay : rawDay - daysInMonth
+    cells.push({ date: formatDate(date), day, inMonth })
+  }
+
+  return cells
+})
+
+function cloneFilters(filters: EventSearchFilters): EventSearchFilters {
+  return {
+    ...filters,
+    sectorIds: filters.sectorIds ? [...filters.sectorIds] : undefined,
+    activityIds: filters.activityIds ? [...filters.activityIds] : undefined,
+    eventKinds: filters.eventKinds ? [...filters.eventKinds] : undefined,
+    region1: filters.region1 ? [...filters.region1] : undefined,
+    region2: filters.region2 ? [...filters.region2] : undefined,
+    region3: filters.region3 ? [...filters.region3] : undefined,
+  }
+}
+
+function formatDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function setDatePreset(value: string): void {
+  draft.datePreset = draft.datePreset === value ? undefined : value
+  draft.startDate = undefined
+  draft.endDate = undefined
+}
+
+function setCalendarDate(value: string): void {
+  draft.datePreset = undefined
+
+  if (draft.startDate === undefined || draft.endDate !== undefined) {
+    draft.startDate = value
+    draft.endDate = undefined
+    return
+  }
+
+  if (value < draft.startDate) {
+    draft.endDate = draft.startDate
+    draft.startDate = value
+    return
+  }
+
+  draft.endDate = value
+}
+
+function isDateSelected(value: string): boolean {
+  return value === draft.startDate || value === draft.endDate
+}
+
+function isDateInRange(value: string): boolean {
+  return (
+    draft.startDate !== undefined &&
+    draft.endDate !== undefined &&
+    value >= draft.startDate &&
+    value <= draft.endDate
+  )
+}
+
+function shiftMonth(offset: number): void {
+  monthCursor.value = new Date(
+    monthCursor.value.getFullYear(),
+    monthCursor.value.getMonth() + offset,
+    1,
+  )
+}
+
+function selectRegion(value: string): void {
+  selectedRegion.value = value
+  draft.region1 = [value]
+  draft.region2 = undefined
+}
+
+function toggleArea(value: string): void {
+  const current = new Set(draft.region2 ?? [])
+  if (value === 'All of Seoul' || value.startsWith('All of ')) {
+    draft.region2 = undefined
+    return
+  }
+  if (current.has(value)) current.delete(value)
+  else current.add(value)
+  draft.region2 = [...current]
+}
+
+function toggleKind(kind: EventKind): void {
+  const current = new Set(draft.eventKinds ?? [])
+  if (current.has(kind)) current.delete(kind)
+  else current.add(kind)
+  draft.eventKinds = [...current]
+}
+
+function toggleCategory(category: (typeof EVENT_KIND_GROUPS)[number]): void {
+  const current = new Set(draft.eventKinds ?? [])
+  const isSelected = category.kinds.every((kind) => current.has(kind))
+  category.kinds.forEach((kind) => (isSelected ? current.delete(kind) : current.add(kind)))
+  draft.eventKinds = [...current]
+}
+
+function toggleExpandedCategory(label: string): void {
+  expandedCategories.value = expandedCategories.value.includes(label)
+    ? expandedCategories.value.filter((value) => value !== label)
+    : [...expandedCategories.value, label]
+}
+
+function toggleOption(key: OptionKey): void {
+  draft[key] = !draft[key]
+}
+
+function resetSheet(): void {
+  if (props.kind === 'date') {
+    draft.datePreset = undefined
+    draft.startDate = undefined
+    draft.endDate = undefined
+  } else if (props.kind === 'region') {
+    draft.region1 = undefined
+    draft.region2 = undefined
+    draft.region3 = undefined
+  } else if (props.kind === 'category') {
+    draft.eventKinds = undefined
+  } else if (props.kind === 'options') {
+    EVENT_OPTIONS.forEach(({ key }) => (draft[key] = undefined))
+  } else {
+    draft.sort = 'LATEST'
+    draft.savedOnly = undefined
+  }
+}
+
+function apply(): void {
+  emit('apply', cloneFilters(draft))
+}
+</script>
+
+<template>
+  <div class="fixed inset-0 z-30">
+    <button
+      type="button"
+      class="absolute inset-0 bg-scrim/65"
+      :aria-label="t('explore.filter.close')"
+      @click="emit('close')"
+    />
+
+    <section
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t(SHEET_TITLES[kind])"
+      class="absolute inset-x-0 bottom-0 z-10 mx-auto flex max-h-[88dvh] w-full max-w-[390px] flex-col rounded-t-lg bg-surface-1 px-screen pt-3 pb-6 shadow-sheet"
+    >
+      <span
+        aria-hidden="true"
+        class="mb-4 h-1 w-10 shrink-0 self-center rounded-pill bg-hairline-2"
+      />
+
+      <header class="mb-4 flex items-center justify-between">
+        <h2 class="font-display text-section-header uppercase text-ink-display">
+          {{ t(SHEET_TITLES[kind]) }}
+        </h2>
+        <button
+          type="button"
+          class="text-caption text-ink-3"
+          @click="resetSheet"
+        >
+          {{ t('explore.filter.reset') }}
+        </button>
+      </header>
+
+      <div class="min-h-0 overflow-y-auto">
+        <template v-if="kind === 'date'">
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="preset in DATE_PRESETS"
+              :key="preset.value"
+              type="button"
+              class="min-h-11 rounded-pill border px-3 text-caption"
+              :class="
+                draft.datePreset === preset.value
+                  ? 'border-paper-fill bg-paper-fill text-on-paper'
+                  : 'border-hairline text-ink-2'
+              "
+              @click="setDatePreset(preset.value)"
+            >
+              {{ t(preset.labelKey) }}
+            </button>
+          </div>
+
+          <div class="my-5 border-t border-hairline" />
+
+          <div class="flex items-center justify-between">
+            <button
+              type="button"
+              class="flex size-8 items-center justify-center text-ink-2"
+              :aria-label="t('explore.calendar.previousMonth')"
+              @click="shiftMonth(-1)"
+            >
+              <IconChevronLeft
+                :size="18"
+                aria-hidden="true"
+              />
+            </button>
+            <strong class="text-title-sm text-ink">{{ monthLabel }}</strong>
+            <button
+              type="button"
+              class="flex size-8 items-center justify-center text-ink-2"
+              :aria-label="t('explore.calendar.nextMonth')"
+              @click="shiftMonth(1)"
+            >
+              <IconChevronRight
+                :size="18"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+
+          <div class="mt-3 grid grid-cols-7 text-center text-micro text-ink-3">
+            <span
+              v-for="day in ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']"
+              :key="day"
+              >{{ t(`explore.calendar.weekdays.${day}`) }}</span
+            >
+          </div>
+          <div class="mt-2 grid grid-cols-7 gap-y-1 text-center">
+            <button
+              v-for="cell in calendarDays"
+              :key="cell.date"
+              type="button"
+              class="mx-auto flex size-9 items-center justify-center rounded-pill text-caption"
+              :class="[
+                !cell.inMonth && 'text-ink-3/40',
+                cell.inMonth &&
+                  !isDateSelected(cell.date) &&
+                  !isDateInRange(cell.date) &&
+                  'text-ink-2',
+                isDateInRange(cell.date) && 'rounded-none bg-surface-2',
+                isDateSelected(cell.date) && 'bg-paper-fill text-on-paper',
+              ]"
+              @click="cell.inMonth && setCalendarDate(cell.date)"
+            >
+              {{ cell.day }}
+            </button>
+          </div>
+          <p class="mt-3 text-caption text-ink-3">
+            {{ draft.startDate ?? t('explore.calendar.startDate')
+            }}<span v-if="draft.endDate"> – {{ draft.endDate }}</span>
+          </p>
+        </template>
+
+        <template v-else-if="kind === 'region'">
+          <div class="grid min-h-80 grid-cols-[112px_1fr] border-y border-hairline">
+            <div class="border-r border-hairline">
+              <button
+                v-for="region in REGION_OPTIONS"
+                :key="region.value"
+                type="button"
+                class="flex w-full items-center justify-between px-1 py-3 text-left text-body-sm"
+                :class="selectedRegion === region.value ? 'bg-surface-2 text-ink' : 'text-ink-2'"
+                @click="selectRegion(region.value)"
+              >
+                <span>{{ t(region.labelKey) }}</span>
+                <span class="text-ink-3">—</span>
+              </button>
+            </div>
+            <div class="flex flex-col gap-1 p-2">
+              <button
+                v-for="area in currentRegion.areas"
+                :key="area.value"
+                type="button"
+                class="flex min-h-11 items-center justify-between rounded-sm px-3 text-left text-body-sm"
+                :class="
+                  (area.value.startsWith('All of ') && selectedAreas.size === 0) ||
+                  selectedAreas.has(area.value)
+                    ? 'text-ink'
+                    : 'text-ink-2'
+                "
+                @click="toggleArea(area.value)"
+              >
+                {{ t(area.labelKey) }}
+                <span
+                  class="flex size-6 items-center justify-center rounded-xs"
+                  :class="
+                    (area.value.startsWith('All of ') && selectedAreas.size === 0) ||
+                    selectedAreas.has(area.value)
+                      ? 'bg-paper-fill text-on-paper'
+                      : 'border border-hairline-2'
+                  "
+                >
+                  <IconCheck
+                    v-if="
+                      (area.value.startsWith('All of ') && selectedAreas.size === 0) ||
+                      selectedAreas.has(area.value)
+                    "
+                    :size="15"
+                    :stroke-width="2.5"
+                    aria-hidden="true"
+                  />
+                </span>
+              </button>
+            </div>
+          </div>
+          <p class="mt-3 text-caption text-ink-3">{{ t('explore.regionHint') }}</p>
+        </template>
+
+        <template v-else-if="kind === 'category'">
+          <div class="flex flex-col divide-y divide-hairline">
+            <div
+              v-for="category in EVENT_KIND_GROUPS"
+              :key="category.labelKey"
+              class="py-3"
+            >
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 text-left"
+                @click="toggleExpandedCategory(category.labelKey)"
+              >
+                <CategoryDot :category="category.category" />
+                <span class="flex-1 text-title-sm text-ink">{{ t(category.labelKey) }}</span>
+                <span
+                  role="checkbox"
+                  tabindex="0"
+                  :aria-checked="category.kinds.every((kindValue) => selectedKinds.has(kindValue))"
+                  class="flex size-6 items-center justify-center rounded-xs"
+                  :class="
+                    category.kinds.every((kindValue) => selectedKinds.has(kindValue))
+                      ? 'bg-paper-fill text-on-paper'
+                      : 'border border-hairline-2'
+                  "
+                  @click.stop="toggleCategory(category)"
+                  @keydown.space.prevent.stop="toggleCategory(category)"
+                  @keydown.enter.prevent.stop="toggleCategory(category)"
+                >
+                  <IconCheck
+                    v-if="category.kinds.every((kindValue) => selectedKinds.has(kindValue))"
+                    :size="15"
+                    :stroke-width="2.5"
+                    aria-hidden="true"
+                  />
+                </span>
+                <IconChevronUp
+                  v-if="expandedCategories.includes(category.labelKey)"
+                  :size="16"
+                  class="text-ink-3"
+                  aria-hidden="true"
+                />
+                <IconChevronDown
+                  v-else
+                  :size="16"
+                  class="text-ink-3"
+                  aria-hidden="true"
+                />
+              </button>
+              <div
+                v-if="expandedCategories.includes(category.labelKey)"
+                class="mt-3 flex flex-wrap gap-2"
+              >
+                <button
+                  v-for="eventKind in category.kinds"
+                  :key="eventKind"
+                  type="button"
+                  class="rounded-pill border px-3 py-2 text-caption"
+                  :class="
+                    selectedKinds.has(eventKind)
+                      ? 'border-paper-fill bg-paper-fill text-on-paper'
+                      : 'border-hairline text-ink-2'
+                  "
+                  @click="toggleKind(eventKind)"
+                >
+                  {{ t(EVENT_KIND_LABEL_KEYS[eventKind]) }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <p class="mt-3 text-caption text-ink-3">{{ t('explore.categoryHint') }}</p>
+        </template>
+
+        <template v-else-if="kind === 'options'">
+          <p class="mb-5 text-caption text-ink-3">{{ t('explore.optionsHint') }}</p>
+          <div class="divide-y divide-hairline">
+            <button
+              v-for="option in EVENT_OPTIONS"
+              :key="option.key"
+              type="button"
+              class="flex min-h-14 w-full items-center justify-between text-left"
+              @click="toggleOption(option.key)"
+            >
+              <span
+                class="text-body text-ink-2"
+                :class="draft[option.key] ? 'text-ink' : ''"
+                >{{ t(option.labelKey) }}</span
+              >
+              <span
+                class="flex size-6 items-center justify-center rounded-xs"
+                :class="
+                  draft[option.key] ? 'bg-paper-fill text-on-paper' : 'border border-hairline-2'
+                "
+              >
+                <IconCheck
+                  v-if="draft[option.key]"
+                  :size="15"
+                  :stroke-width="2.5"
+                  aria-hidden="true"
+                />
+              </span>
+            </button>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="divide-y divide-hairline">
+            <button
+              v-for="sortOption in [
+                { value: 'LATEST', labelKey: 'explore.sort.latest', hint: 'default' },
+                { value: 'POPULAR', labelKey: 'explore.sort.popular', hint: '' },
+                { value: 'SAVED', labelKey: 'explore.sort.saved', hint: '' },
+                { value: 'ENDING_SOON', labelKey: 'explore.sort.ending_soon', hint: '' },
+              ]"
+              :key="sortOption.value"
+              type="button"
+              class="flex min-h-16 w-full items-center justify-between text-left"
+              @click="
+                sortOption.value === 'SAVED'
+                  ? (draft.savedOnly = !draft.savedOnly)
+                  : ((draft.sort = sortOption.value as EventSearchFilters['sort']),
+                    (draft.savedOnly = undefined))
+              "
+            >
+              <span
+                class="text-body"
+                :class="
+                  (sortOption.value === 'SAVED' ? draft.savedOnly : draft.sort === sortOption.value)
+                    ? 'text-ink'
+                    : 'text-ink-2'
+                "
+              >
+                {{ t(sortOption.labelKey) }}
+                <span
+                  v-if="sortOption.hint"
+                  class="text-caption text-ink-3"
+                >
+                  · {{ sortOption.hint }}</span
+                >
+              </span>
+              <span
+                class="flex size-6 items-center justify-center rounded-pill"
+                :class="
+                  (sortOption.value === 'SAVED' ? draft.savedOnly : draft.sort === sortOption.value)
+                    ? 'bg-paper-fill text-on-paper'
+                    : 'border border-hairline-2'
+                "
+              >
+                <IconCheck
+                  v-if="
+                    sortOption.value === 'SAVED' ? draft.savedOnly : draft.sort === sortOption.value
+                  "
+                  :size="15"
+                  :stroke-width="2.5"
+                  aria-hidden="true"
+                />
+              </span>
+            </button>
+          </div>
+        </template>
+      </div>
+
+      <AppButton
+        block
+        class="mt-5"
+        @click="apply"
+      >
+        {{ t('explore.filter.apply') }} · {{ resultCount }} {{ t('explore.resultUnit') }}
+      </AppButton>
+    </section>
+  </div>
+</template>
