@@ -35,6 +35,7 @@ export interface EventSearchFilters {
   eventKinds?: EventKind[]
   region1?: string[]
   region2?: string[]
+  region2Other?: boolean
   region3?: string[]
   keyword?: string
   datePreset?: string

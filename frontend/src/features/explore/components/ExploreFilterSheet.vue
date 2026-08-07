@@ -30,6 +30,8 @@ const emit = defineEmits<{
   apply: [filters: EventSearchFilters]
 }>()
 
+const REGION2_OTHER = '__OTHER_REGION2__'
+
 const { locale, t } = useI18n()
 
 const SHEET_TITLES: Record<ExploreSheetKind, string> = {
@@ -76,42 +78,92 @@ const REGION_OPTIONS = [
       { labelKey: 'explore.areas.yongsan', value: 'Yongsan' },
       { labelKey: 'explore.areas.myeongdong', value: 'Myeongdong' },
       { labelKey: 'explore.areas.dongdaemun', value: 'Dongdaemun·DDP' },
+      { labelKey: 'explore.areas.other', value: REGION2_OTHER },
     ],
   },
   {
     labelKey: 'explore.regions.gyeonggi',
     value: 'Gyeonggi',
-    areas: [{ labelKey: 'explore.areas.allGyeonggi', value: 'All of Gyeonggi' }],
+    areas: [
+      { labelKey: 'explore.areas.allGyeonggi', value: 'All of Gyeonggi' },
+      { labelKey: 'explore.areas.suwon', value: 'Suwon' },
+      { labelKey: 'explore.areas.seongnam', value: 'Seongnam' },
+      { labelKey: 'explore.areas.goyang', value: 'Goyang' },
+      { labelKey: 'explore.areas.yongin', value: 'Yongin' },
+      { labelKey: 'explore.areas.paju', value: 'Paju' },
+      { labelKey: 'explore.areas.other', value: REGION2_OTHER },
+    ],
   },
   {
     labelKey: 'explore.regions.busan',
     value: 'Busan',
-    areas: [{ labelKey: 'explore.areas.allBusan', value: 'All of Busan' }],
+    areas: [
+      { labelKey: 'explore.areas.allBusan', value: 'All of Busan' },
+      { labelKey: 'explore.areas.haeundae', value: 'Haeundae' },
+      { labelKey: 'explore.areas.seomyeon', value: 'Seomyeon' },
+      { labelKey: 'explore.areas.gwangalli', value: 'Gwangalli' },
+      { labelKey: 'explore.areas.nampo', value: 'Nampo' },
+      { labelKey: 'explore.areas.other', value: REGION2_OTHER },
+    ],
   },
   {
     labelKey: 'explore.regions.gangwon',
     value: 'Gangwon',
-    areas: [{ labelKey: 'explore.areas.allGangwon', value: 'All of Gangwon' }],
+    areas: [
+      { labelKey: 'explore.areas.allGangwon', value: 'All of Gangwon' },
+      { labelKey: 'explore.areas.chuncheon', value: 'Chuncheon' },
+      { labelKey: 'explore.areas.gangneung', value: 'Gangneung' },
+      { labelKey: 'explore.areas.sokcho', value: 'Sokcho' },
+      { labelKey: 'explore.areas.pyeongchang', value: 'Pyeongchang' },
+      { labelKey: 'explore.areas.other', value: REGION2_OTHER },
+    ],
   },
   {
     labelKey: 'explore.regions.gyeongbuk',
     value: 'Gyeongbuk',
-    areas: [{ labelKey: 'explore.areas.allGyeongbuk', value: 'All of Gyeongbuk' }],
+    areas: [
+      { labelKey: 'explore.areas.allGyeongbuk', value: 'All of Gyeongbuk' },
+      { labelKey: 'explore.areas.gyeongju', value: 'Gyeongju' },
+      { labelKey: 'explore.areas.andong', value: 'Andong' },
+      { labelKey: 'explore.areas.pohang', value: 'Pohang' },
+      { labelKey: 'explore.areas.other', value: REGION2_OTHER },
+    ],
   },
   {
     labelKey: 'explore.regions.chungnam',
     value: 'Chungnam',
-    areas: [{ labelKey: 'explore.areas.allChungnam', value: 'All of Chungnam' }],
+    areas: [
+      { labelKey: 'explore.areas.allChungnam', value: 'All of Chungnam' },
+      { labelKey: 'explore.areas.cheonan', value: 'Cheonan' },
+      { labelKey: 'explore.areas.asan', value: 'Asan' },
+      { labelKey: 'explore.areas.gongju', value: 'Gongju' },
+      { labelKey: 'explore.areas.boryeong', value: 'Boryeong' },
+      { labelKey: 'explore.areas.other', value: REGION2_OTHER },
+    ],
   },
   {
     labelKey: 'explore.regions.jeonbuk',
     value: 'Jeonbuk',
-    areas: [{ labelKey: 'explore.areas.allJeonbuk', value: 'All of Jeonbuk' }],
+    areas: [
+      { labelKey: 'explore.areas.allJeonbuk', value: 'All of Jeonbuk' },
+      { labelKey: 'explore.areas.jeonju', value: 'Jeonju' },
+      { labelKey: 'explore.areas.gunsan', value: 'Gunsan' },
+      { labelKey: 'explore.areas.iksan', value: 'Iksan' },
+      { labelKey: 'explore.areas.namwon', value: 'Namwon' },
+      { labelKey: 'explore.areas.other', value: REGION2_OTHER },
+    ],
   },
   {
     labelKey: 'explore.regions.jeju',
     value: 'Jeju',
-    areas: [{ labelKey: 'explore.areas.allJeju', value: 'All of Jeju' }],
+    areas: [
+      { labelKey: 'explore.areas.allJeju', value: 'All of Jeju' },
+      { labelKey: 'explore.areas.jejuCity', value: 'Jeju City' },
+      { labelKey: 'explore.areas.seogwipo', value: 'Seogwipo' },
+      { labelKey: 'explore.areas.aewol', value: 'Aewol' },
+      { labelKey: 'explore.areas.hallim', value: 'Hallim' },
+      { labelKey: 'explore.areas.other', value: REGION2_OTHER },
+    ],
   },
 ] as const
 
@@ -254,12 +306,19 @@ function selectRegion(value: string): void {
   selectedRegion.value = value
   draft.region1 = [value]
   draft.region2 = undefined
+  draft.region2Other = undefined
 }
 
 function toggleArea(value: string): void {
+  if (value === REGION2_OTHER) {
+    draft.region2Other = !draft.region2Other
+    return
+  }
+
   const current = new Set(draft.region2 ?? [])
   if (value === 'All of Seoul' || value.startsWith('All of ')) {
     draft.region2 = undefined
+    draft.region2Other = undefined
     return
   }
   if (current.has(value)) current.delete(value)
@@ -299,6 +358,7 @@ function resetSheet(): void {
   } else if (props.kind === 'region') {
     draft.region1 = undefined
     draft.region2 = undefined
+    draft.region2Other = undefined
     draft.region3 = undefined
     selectedRegion.value = REGION_OPTIONS[0].value
   } else if (props.kind === 'category') {
@@ -451,8 +511,11 @@ function apply(): void {
                 type="button"
                 class="flex min-h-11 items-center justify-between rounded-sm px-3 text-left text-body-sm"
                 :class="
-                  (area.value.startsWith('All of ') && selectedAreas.size === 0) ||
-                  selectedAreas.has(area.value)
+                  (area.value.startsWith('All of ') &&
+                    selectedAreas.size === 0 &&
+                    !draft.region2Other) ||
+                  selectedAreas.has(area.value) ||
+                  (area.value === REGION2_OTHER && draft.region2Other)
                     ? 'text-ink'
                     : 'text-ink-2'
                 "
@@ -462,16 +525,22 @@ function apply(): void {
                 <span
                   class="flex size-6 items-center justify-center rounded-xs"
                   :class="
-                    (area.value.startsWith('All of ') && selectedAreas.size === 0) ||
-                    selectedAreas.has(area.value)
+                    (area.value.startsWith('All of ') &&
+                      selectedAreas.size === 0 &&
+                      !draft.region2Other) ||
+                    selectedAreas.has(area.value) ||
+                    (area.value === REGION2_OTHER && draft.region2Other)
                       ? 'bg-paper-fill text-on-paper'
                       : 'border border-hairline-2'
                   "
                 >
                   <IconCheck
                     v-if="
-                      (area.value.startsWith('All of ') && selectedAreas.size === 0) ||
-                      selectedAreas.has(area.value)
+                      (area.value.startsWith('All of ') &&
+                        selectedAreas.size === 0 &&
+                        !draft.region2Other) ||
+                      selectedAreas.has(area.value) ||
+                      (area.value === REGION2_OTHER && draft.region2Other)
                     "
                     :size="15"
                     :stroke-width="2.5"

@@ -43,6 +43,7 @@ function toSearchParams(filters: EventSearchFilters): URLSearchParams {
     'experienceOnly',
     'photoZoneOnly',
     'savedOnly',
+    'region2Other',
   ] as const
 
   booleanFilters.forEach((name) => {

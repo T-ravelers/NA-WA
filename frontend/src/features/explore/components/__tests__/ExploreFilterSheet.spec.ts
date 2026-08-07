@@ -56,4 +56,85 @@ describe('ExploreFilterSheet', () => {
     expect(wrapper.emitted('apply')).toBeUndefined()
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
   })
+
+  it('offers subregions for regions outside Seoul', async () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'region', filters: { sort: 'LATEST' }, resultCount: 3 },
+    })
+
+    const gyeonggiButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Gyeonggi'))
+    await gyeonggiButton?.trigger('click')
+
+    const suwonButton = wrapper.findAll('button').find((button) => button.text().includes('Suwon'))
+    expect(suwonButton).toBeDefined()
+
+    await suwonButton?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+
+    expect(wrapper.emitted('apply')?.at(-1)?.[0]).toMatchObject({
+      region1: ['Gyeonggi'],
+      region2: ['Suwon'],
+    })
+  })
+
+  it('can select unclassified region2 values as other areas', async () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'region', filters: { sort: 'LATEST' }, resultCount: 3 },
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Gyeonggi'))
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Other areas')
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+
+    expect(wrapper.emitted('apply')?.at(-1)?.[0]).toMatchObject({
+      region1: ['Gyeonggi'],
+      region2Other: true,
+    })
+  })
+
+  it('can combine a named subregion with other areas', async () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'region', filters: { sort: 'LATEST' }, resultCount: 3 },
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Gyeonggi'))
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Suwon'))
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Other areas')
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+
+    expect(wrapper.emitted('apply')?.at(-1)?.[0]).toMatchObject({
+      region1: ['Gyeonggi'],
+      region2: ['Suwon'],
+      region2Other: true,
+    })
+  })
 })

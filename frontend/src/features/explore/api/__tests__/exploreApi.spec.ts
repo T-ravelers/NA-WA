@@ -13,6 +13,7 @@ describe('exploreApi', () => {
     const params = toSearchParams({
       eventKinds: ['POPUP', 'CONCERT'],
       region1: ['Seoul', 'Busan'],
+      region2Other: true,
       freeOnly: true,
       page: 1,
       size: 20,
@@ -20,6 +21,7 @@ describe('exploreApi', () => {
 
     expect(params.getAll('eventKinds')).toEqual(['POPUP', 'CONCERT'])
     expect(params.getAll('region1')).toEqual(['Seoul', 'Busan'])
+    expect(params.get('region2Other')).toBe('true')
     expect(params.get('freeOnly')).toBe('true')
     expect(params.get('page')).toBe('1')
     expect(params.get('size')).toBe('20')

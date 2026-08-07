@@ -33,6 +33,7 @@ const searchOpen = ref(false)
 const selectedEventKinds = ref<EventKind[]>(readQueryList('eventKinds').filter(isEventKind))
 const selectedRegion1 = ref(readQueryList('region1'))
 const selectedRegion2 = ref(readQueryList('region2'))
+const selectedRegion2Other = ref(readQueryBoolean('region2Other'))
 const selectedRegion3 = ref(readQueryList('region3'))
 const datePreset = ref(readQueryString('datePreset'))
 const startDate = ref(readQueryString('startDate'))
@@ -56,6 +57,7 @@ const filters = computed<EventSearchFilters>(() => ({
   eventKinds: selectedEventKinds.value.length > 0 ? selectedEventKinds.value : undefined,
   region1: selectedRegion1.value.length > 0 ? selectedRegion1.value : undefined,
   region2: selectedRegion2.value.length > 0 ? selectedRegion2.value : undefined,
+  region2Other: selectedRegion2Other.value || undefined,
   region3: selectedRegion3.value.length > 0 ? selectedRegion3.value : undefined,
   datePreset: datePreset.value,
   startDate: startDate.value,
@@ -99,6 +101,9 @@ const activeFilters = computed(() => {
 
   selectedRegion1.value.forEach((value) => values.push({ key: `region1:${value}`, label: value }))
   selectedRegion2.value.forEach((value) => values.push({ key: `region2:${value}`, label: value }))
+  if (selectedRegion2Other.value) {
+    values.push({ key: 'region2:other', label: t('explore.areas.other') })
+  }
   selectedRegion3.value.forEach((value) => values.push({ key: `region3:${value}`, label: value }))
 
   const options: Array<[string, boolean, string]> = [
@@ -123,6 +128,7 @@ watch(
     addQueryList(query, 'eventKinds', next.eventKinds)
     addQueryList(query, 'region1', next.region1)
     addQueryList(query, 'region2', next.region2)
+    addQueryValue(query, 'region2Other', next.region2Other)
     addQueryList(query, 'region3', next.region3)
     addQueryValue(query, 'datePreset', next.datePreset)
     addQueryValue(query, 'startDate', next.startDate)
@@ -150,6 +156,7 @@ function applySheet(next: EventSearchFilters): void {
   selectedEventKinds.value = next.eventKinds ?? []
   selectedRegion1.value = next.region1 ?? []
   selectedRegion2.value = next.region2 ?? []
+  selectedRegion2Other.value = next.region2Other ?? false
   selectedRegion3.value = next.region3 ?? []
   datePreset.value = next.datePreset
   startDate.value = next.startDate
@@ -186,6 +193,7 @@ function removeFilter(key: string): void {
     selectedEventKinds.value = []
     selectedRegion1.value = []
     selectedRegion2.value = []
+    selectedRegion2Other.value = false
     selectedRegion3.value = []
     datePreset.value = undefined
     startDate.value = undefined
@@ -208,7 +216,11 @@ function removeFilter(key: string): void {
   } else if (key.startsWith('region1:')) {
     selectedRegion1.value = selectedRegion1.value.filter((value) => `region1:${value}` !== key)
   } else if (key.startsWith('region2:')) {
-    selectedRegion2.value = selectedRegion2.value.filter((value) => `region2:${value}` !== key)
+    if (key === 'region2:other') {
+      selectedRegion2Other.value = false
+    } else {
+      selectedRegion2.value = selectedRegion2.value.filter((value) => `region2:${value}` !== key)
+    }
   } else if (key.startsWith('region3:')) {
     selectedRegion3.value = selectedRegion3.value.filter((value) => `region3:${value}` !== key)
   } else if (key.startsWith('option:')) {
