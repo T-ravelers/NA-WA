@@ -13,21 +13,33 @@ interface Props {
   raised?: boolean
   /** `none`은 이미지를 가장자리까지 채울 때 쓴다. */
   padding?: 'none' | 'base' | 'lg'
+  /**
+   * 면의 밝기. 기본은 어두운 `surface-1`이다.
+   *
+   * `paper`는 지갑 잔액처럼 화면에서 한 장만 떠 있어야 하는 카드에 쓴다. 밝은 면 위
+   * 글자는 `on-paper`로 함께 뒤집히므로, 화면에서 텍스트 색을 따로 지정하지 않는다.
+   */
+  tone?: 'surface' | 'paper'
 }
 
-const { raised = false, padding = 'base' } = defineProps<Props>()
+const { raised = false, padding = 'base', tone = 'surface' } = defineProps<Props>()
 
 const PADDING_CLASS: Record<NonNullable<Props['padding']>, string> = {
   none: 'p-0',
   base: 'p-4',
   lg: 'p-5',
 }
+
+const TONE_CLASS: Record<NonNullable<Props['tone']>, string> = {
+  surface: 'bg-surface-1 text-ink',
+  paper: 'bg-paper text-on-paper',
+}
 </script>
 
 <template>
   <div
-    class="overflow-hidden rounded-card bg-surface-1 text-ink"
-    :class="[PADDING_CLASS[padding], raised ? 'shadow-raised' : '']"
+    class="overflow-hidden rounded-card"
+    :class="[TONE_CLASS[tone], PADDING_CLASS[padding], raised ? 'shadow-raised' : '']"
   >
     <slot />
   </div>

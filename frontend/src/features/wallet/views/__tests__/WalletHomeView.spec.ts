@@ -1,80 +1,169 @@
-import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import { VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getWalletHome } from '@/features/wallet/api/walletApi'
-import WalletHomeView from '@/features/wallet/views/WalletHomeView.vue'
 import { i18n } from '@/app/i18n'
+import { queryClient } from '@/app/query/client'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
-vi.mock('@/features/wallet/api/walletApi', () => ({
-  getWalletHome: vi.fn(),
+import type { WalletHome } from '../../api/walletApi'
+
+const fetchWalletHome = vi.fn()
+
+vi.mock('../../api/walletApi', () => ({
+  fetchWalletHome: () => fetchWalletHome(),
 }))
 
-const walletHomeResponse = {
-  balance: '84500',
+const WalletHomeView = (await import('../WalletHomeView.vue')).default
+
+const WALLET: WalletHome = {
+  balance: 84500,
   availabilityStatus: 'ACTIVE',
   recentTransactions: [
     {
       transferId: 1,
       transferType: 'QR_PAYMENT',
       entryType: 'DEBIT',
-      amount: '18000',
-      balanceAfter: '84500',
+      amount: 18000,
+      balanceAfter: 84500,
       createdAt: '2026-07-25T12:00:00',
     },
   ],
 }
 
-const mountWalletHome = () =>
-  mount(WalletHomeView, {
-    global: {
-      plugins: [
-        i18n,
-        [
-          VueQueryPlugin,
-          {
-            queryClient: new QueryClient({
-              defaultOptions: {
-                queries: { retry: false },
-              },
-            }),
-          },
-        ],
-      ],
-    },
+function mountView() {
+  return mount(WalletHomeView, {
+    global: { plugins: [i18n, [VueQueryPlugin, { queryClient }]] },
   })
+}
+
+async function mountLoaded() {
+  const wrapper = mountView()
+
+  await flushPromises()
+
+  return wrapper
+}
+
+beforeEach(() => {
+  queryClient.clear()
+  fetchWalletHome.mockReset()
+  fetchWalletHome.mockResolvedValue(WALLET)
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  i18n.global.locale.value = 'en'
+})
 
 describe('WalletHomeView', () => {
-  beforeEach(() => {
-    vi.mocked(getWalletHome).mockResolvedValue(walletHomeResponse)
+  it('응답 전에는 로딩 상태를 보여준다', () => {
+    const wrapper = mountView()
+
+    expect(wrapper.find('[role="status"]').exists()).toBe(true)
   })
 
-  it('shows a loading state before the API response arrives', () => {
-    const wrapper = mountWalletHome()
+  it('잔액과 지갑 상태를 표시한다', async () => {
+    const wrapper = await mountLoaded()
 
-    expect(wrapper.get('[role="status"]').text()).toContain('Loading your wallet...')
-  })
-
-  it('renders the wallet balance and quick actions after the API response arrives', async () => {
-    const wrapper = mountWalletHome()
-
-    await flushPromises()
-
-    expect(wrapper.get('h1').text()).toBe('WALLET')
     expect(wrapper.text()).toContain('84,500 P')
-    expect(wrapper.findAll('button').some((button) => button.text() === 'Top up')).toBe(true)
-    expect(wrapper.text()).not.toContain('Send')
+    expect(wrapper.text()).toContain('Active')
+    expect(wrapper.text()).toContain('My wallet')
   })
 
-  it('announces the selected quick action', async () => {
-    const wrapper = mountWalletHome()
+  it('응답에 없는 계좌명을 지어내지 않는다', async () => {
+    const wrapper = await mountLoaded()
 
+    expect(wrapper.text()).not.toContain('Test')
+  })
+
+  it('거래를 종류별 문구와 부호로 표시한다', async () => {
+    const wrapper = await mountLoaded()
+
+    expect(wrapper.text()).toContain('QR payment')
+    expect(wrapper.text()).toContain('-18,000 P')
+  })
+
+  it('백엔드에 없는 거래 종류가 와도 항목을 지우지 않는다', async () => {
+    fetchWalletHome.mockResolvedValue({
+      ...WALLET,
+      recentTransactions: [{ ...WALLET.recentTransactions[0]!, transferType: 'DEPOSIT_HOLD' }],
+    })
+
+    const wrapper = await mountLoaded()
+
+    expect(wrapper.text()).toContain('Deposit held')
+  })
+
+  it('상세 화면이 없는 버튼은 비활성이고 이유를 밝힌다', async () => {
+    const wrapper = await mountLoaded()
+
+    const buttons = wrapper.findAll('button')
+    expect(buttons.length).toBeGreaterThan(0)
+
+    for (const button of buttons) {
+      expect(button.attributes('disabled')).toBeDefined()
+    }
+
+    expect(wrapper.text()).toContain('These become available in a later release.')
+  })
+
+  it('누르지도 않은 동작을 스크린 리더에 알리지 않는다', async () => {
+    const wrapper = await mountLoaded()
+
+    await wrapper.findAll('button')[0]?.trigger('click')
+
+    expect(wrapper.text()).not.toContain('button selected')
+  })
+
+  it('거래가 없으면 빈 상태를 보여준다', async () => {
+    fetchWalletHome.mockResolvedValue({ ...WALLET, recentTransactions: [] })
+
+    const wrapper = await mountLoaded()
+
+    expect(wrapper.text()).toContain('No activity yet')
+  })
+
+  it('실패하면 오류 코드에 해당하는 문구를 덧붙인다', async () => {
+    vi.useFakeTimers()
+    fetchWalletHome.mockRejectedValue(new NormalizedApiError('WALLET-001', 404, 'not found'))
+
+    const wrapper = mountView()
+
+    // 일시적 실패는 1회 재시도하므로 대기 시간이 지난 뒤에야 오류 화면이 확정된다.
+    await vi.advanceTimersByTimeAsync(5_000)
     await flushPromises()
-    const topUpButton = wrapper.findAll('button').find((button) => button.text() === 'Top up')
-    expect(topUpButton).toBeDefined()
 
-    await topUpButton?.trigger('click')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('We could not find your wallet.')
+  })
 
-    expect(wrapper.get('[aria-live="polite"]').text()).toContain('Top up button selected.')
+  /*
+   * httpClient가 401에서 이미 갱신을 1회 시도한다. 여기까지 401이 올라왔다면 그 복구가
+   * 실패했다는 뜻이라, 다시 부르면 refresh와 세션 만료 처리만 요청 수만큼 더 실행된다.
+   */
+  it('401은 재시도하지 않는다', async () => {
+    fetchWalletHome.mockRejectedValue(new NormalizedApiError('AUTH-003', 401, 'unauthorized'))
+
+    const wrapper = await mountLoaded()
+
+    expect(fetchWalletHome).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+  })
+
+  it('로케일을 바꾸면 문구와 숫자 표기가 함께 따라온다', async () => {
+    i18n.global.setLocaleMessage('vi', {
+      wallet: { home: { quickActions: { topUp: 'Nạp tiền' } } },
+    })
+
+    const wrapper = await mountLoaded()
+    expect(wrapper.text()).toContain('84,500 P')
+
+    i18n.global.locale.value = 'vi'
+    await flushPromises()
+
+    // 문구는 computed로 다시 계산되고, 숫자는 vi 로케일의 자릿수 구분(.)을 따른다.
+    expect(wrapper.text()).toContain('Nạp tiền')
+    expect(wrapper.text()).toContain('84.500 P')
   })
 })

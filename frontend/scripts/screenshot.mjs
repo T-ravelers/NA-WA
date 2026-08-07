@@ -131,6 +131,67 @@ function stubJourneyDetail(page) {
 }
 
 /**
+ * 지갑 홈 응답을 세운다.
+ *
+ * 금액은 `BigDecimal`이 JSON number로 내려오고, `createdAt`은 `LocalDateTime`이라 오프셋이
+ * 없다. 실제 응답 모양을 그대로 흉내내야 자릿수 구분과 날짜 해석이 시안대로 찍힌다.
+ *
+ * `transactions`에 빈 배열을 넘기면 거래 없는 상태를 찍는다.
+ */
+function stubWalletHome(page, transactions) {
+  return page.route('**/api/v1/wallet', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          balance: 84500,
+          availabilityStatus: 'ACTIVE',
+          recentTransactions: transactions,
+        },
+      }),
+    }),
+  )
+}
+
+/** 거래 종류마다 아이콘과 문구가 다르므로, 한 장에 여러 종류를 섞어 찍는다. */
+const WALLET_TRANSACTIONS = [
+  {
+    transferId: 1,
+    transferType: 'QR_PAYMENT',
+    entryType: 'DEBIT',
+    amount: 18000,
+    balanceAfter: 84500,
+    createdAt: '2026-07-25T12:00:00',
+  },
+  {
+    transferId: 2,
+    transferType: 'TOPUP',
+    entryType: 'CREDIT',
+    amount: 100000,
+    balanceAfter: 102500,
+    createdAt: '2026-07-24T09:12:00',
+  },
+  {
+    transferId: 3,
+    transferType: 'SETTLEMENT',
+    entryType: 'CREDIT',
+    amount: 32500,
+    balanceAfter: 2500,
+    createdAt: '2026-07-22T21:40:00',
+  },
+  {
+    transferId: 4,
+    transferType: 'DEPOSIT_HOLD',
+    entryType: 'DEBIT',
+    amount: 50000,
+    balanceAfter: 52500,
+    createdAt: '2026-07-20T18:05:00',
+  },
+]
+
+/**
  * 찍을 화면.
  *
  * 작업 중인 화면을 여기에 추가한다. `prepare`는 진입한 뒤 실행되며, 바텀시트를 연 상태처럼
@@ -173,6 +234,22 @@ const SCREENS = [
     name: '07-journey-detail',
     path: '/journeys/42',
     setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetail(page)]),
+  },
+  {
+    name: '08-wallet',
+    path: '/wallet',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubWalletHome(page, WALLET_TRANSACTIONS)
+    },
+  },
+  {
+    name: '09-wallet-empty',
+    path: '/wallet',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubWalletHome(page, [])
+    },
   },
 
   // 조작이 필요한 상태는 이렇게 찍는다.

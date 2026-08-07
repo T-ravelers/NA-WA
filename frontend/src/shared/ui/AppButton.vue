@@ -24,6 +24,13 @@ interface Props {
   loading?: boolean
   /** 폼 안에서 의도치 않게 submit되지 않도록 기본은 `button`이다. */
   type?: 'button' | 'submit'
+  /**
+   * 좌우 여백을 줄인다.
+   *
+   * 기본 여백(24px)은 한 줄을 채우는 CTA 기준이다. 지갑의 3분할 버튼처럼 좁은 칸에
+   * 넣으면 라벨이 먼저 잘린다. 높이와 라운드는 그대로 두고 여백만 좁힌다.
+   */
+  compact?: boolean
 }
 
 const {
@@ -32,6 +39,7 @@ const {
   disabled = false,
   loading = false,
   type = 'button',
+  compact = false,
 } = defineProps<Props>()
 
 const emit = defineEmits<{ click: [] }>()
@@ -60,8 +68,8 @@ function handleClick(): void {
     :type="type"
     :disabled="disabled || loading"
     :aria-busy="loading"
-    class="relative inline-flex shrink-0 items-center justify-center px-6 text-title-sm transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
-    :class="[VARIANT_CLASS[variant], block ? 'w-full' : '']"
+    class="relative inline-flex shrink-0 items-center justify-center text-title-sm transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
+    :class="[VARIANT_CLASS[variant], block ? 'w-full' : '', compact ? 'px-3' : 'px-6']"
     @click="handleClick"
   >
     <span :class="loading ? 'sr-only' : 'truncate'">
