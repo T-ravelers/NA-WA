@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { i18n } from '../index'
-import { DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES } from '../locales'
+import { DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES } from '@/shared/i18n/locales'
 import { buildMessages } from '../messages'
 
 describe('i18n messages', () => {

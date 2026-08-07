@@ -6,15 +6,38 @@
  */
 export default {
   auth: {
+    welcome: {
+      /** 줄바꿈이 조판의 일부다. 로케일마다 끊는 위치가 달라질 수 있다. */
+      headline: 'Your trip,\non record',
+      body: 'Plan journeys in Korea, split costs with the people you travel with, and keep the receipts in one place.',
+      passLabel: 'Boarding · NA-WA',
+      passTitle: 'Seoul & Beyond',
+      passStamp: 'GO',
+      start: 'Get started',
+    },
     signIn: {
       title: 'Welcome to NA-WA',
       description: 'Sign in to plan trips and settle up with your travel mates.',
       google: 'Continue with Google',
       line: 'Continue with LINE',
+      lineNotice: 'LINE sign-in is still being verified.',
+      consent: 'By continuing you agree to the',
+      terms: 'Terms of Service',
+      privacy: 'Privacy Policy',
+    },
+    locale: {
+      open: 'Change screen language',
+      title: 'Language',
+      /** 로그인 전에는 이 기기에만 남는다는 것을 알린다. */
+      hint: 'Applies to this screen right away. We save it to your account after you sign in.',
+      current: 'Screen language · {language}',
     },
     callback: {
-      pending: 'Signing you in',
-      failed: 'We could not sign you in',
+      pending: 'Checking your sign-in',
+      pendingBody:
+        'One moment — we are confirming your account. No further input is needed on this screen.',
+      failed: 'Sign-in did not finish',
+      retry: 'Try signing in again',
     },
     signOut: 'Sign out',
     errorCode: {

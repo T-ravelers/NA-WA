@@ -4,6 +4,7 @@ import { createApp } from 'vue'
 
 import App from '@/app/App.vue'
 import { i18n } from '@/app/i18n'
+import { bootstrapLocale } from '@/app/i18n/applyLocale'
 import { queryClient } from '@/app/query/client'
 import { router } from '@/app/router'
 import '@/app/styles/index.css'
@@ -34,6 +35,8 @@ setSessionExpiredHandler(() => {
     query: { returnPath: current.fullPath },
   })
 })
+
+bootstrapLocale()
 
 const app = createApp(App)
 
