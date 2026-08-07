@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import walletMessages from '../../i18n/en'
 import type { WalletHome, WalletTransaction } from '../../api/walletApi'
-import { TRANSFER_TYPES, parseServerDateTime, toWalletHomeData } from '../walletHome'
+import { formatTransactionDateTime, TRANSFER_TYPES, parseServerDateTime, toWalletHomeData } from '../walletHome'
 
 function transaction(overrides: Partial<WalletTransaction> = {}): WalletTransaction {
   return {
@@ -93,6 +93,15 @@ describe('toWalletHomeData', () => {
     expect(toWalletHomeData(response({ availabilityStatus: 'FROZEN' })).status).toBe('UNKNOWN')
     expect(toWalletHomeData(response({ availabilityStatus: 'ACTIVE' })).status).toBe('ACTIVE')
   })
+
+  // 회귀: 지갑 응답 필드가 누락된 사례가 실제로 관측됐다. 계약상 필수 필드지만 방어적으로 다룬다.
+  it('지갑 응답 필드가 누락돼도 화면을 중단시키지 않고 기본값을 쓴다', () => {
+    const data = toWalletHomeData({} as WalletHome)
+
+    expect(data.balance).toBe(0)
+    expect(data.status).toBe('UNKNOWN')
+    expect(data.activities).toEqual([])
+  })
 })
 
 describe('parseServerDateTime', () => {
@@ -142,5 +151,13 @@ describe('parseServerDateTime', () => {
     expect(parseServerDateTime(null)).toBeNull()
     expect(parseServerDateTime('')).toBeNull()
     expect(parseServerDateTime('nope')).toBeNull()
+  })
+})
+
+describe('formatTransactionDateTime', () => {
+  // 거래 내역·거래 상세 화면(#99)에서 쓰는 표시 문자열이다. 배열 응답을 못 읽으면
+  // 화면에 'Unknown date'가 그대로 노출된다.
+  it('LocalDateTime 배열 응답을 사람이 읽을 수 있는 문자열로 만든다', () => {
+    expect(formatTransactionDateTime([2026, 8, 7, 12, 18, 2])).not.toBe('Unknown date')
   })
 })
