@@ -19,6 +19,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/TransactionsView.vue'),
     meta: { requiresAuth: true, hideBottomNav: true },
   },
+  {
+    path: '/wallet/transactions/:transactionId',
+    name: 'wallet-transaction-detail',
+    component: () => import('./views/TransactionDetailView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
 ]
 
 export default routes

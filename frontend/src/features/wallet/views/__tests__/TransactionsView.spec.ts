@@ -42,30 +42,38 @@ const mountTransactions = async () => {
         name: 'wallet-transactions',
         component: { template: '<div />' },
       },
+      {
+        path: '/wallet/transactions/:transactionId',
+        name: 'wallet-transaction-detail',
+        component: { template: '<div />' },
+      },
     ],
   })
 
   await router.push('/wallet/transactions')
   await router.isReady()
 
-  return mount(TransactionsView, {
-    global: {
-      plugins: [
-        i18n,
-        router,
-        [
-          VueQueryPlugin,
-          {
-            queryClient: new QueryClient({
-              defaultOptions: {
-                queries: { retry: false },
-              },
-            }),
-          },
+  return {
+    router,
+    wrapper: mount(TransactionsView, {
+      global: {
+        plugins: [
+          i18n,
+          router,
+          [
+            VueQueryPlugin,
+            {
+              queryClient: new QueryClient({
+                defaultOptions: {
+                  queries: { retry: false },
+                },
+              }),
+            },
+          ],
         ],
-      ],
-    },
-  })
+      },
+    }),
+  }
 }
 
 describe('TransactionsView', () => {
@@ -75,7 +83,7 @@ describe('TransactionsView', () => {
   })
 
   it('renders the transaction list and filter controls', async () => {
-    const wrapper = await mountTransactions()
+    const { wrapper } = await mountTransactions()
 
     await flushPromises()
 
@@ -83,6 +91,7 @@ describe('TransactionsView', () => {
     expect(wrapper.text()).toContain('Point top-up')
     expect(wrapper.text()).toContain('+30,000 P')
     expect(wrapper.text()).toContain('Balance after')
+    expect(wrapper.text()).toContain('Details')
     expect(vi.mocked(getTransactions)).toHaveBeenCalledWith({
       cursor: undefined,
       size: 20,
@@ -90,7 +99,7 @@ describe('TransactionsView', () => {
   })
 
   it('requests transactions with the selected filters', async () => {
-    const wrapper = await mountTransactions()
+    const { wrapper } = await mountTransactions()
 
     await flushPromises()
     await wrapper.get('select[aria-label="Transaction type"]').setValue('TOPUP')
@@ -111,7 +120,7 @@ describe('TransactionsView', () => {
   })
 
   it('rejects an invalid date range before requesting filtered data', async () => {
-    const wrapper = await mountTransactions()
+    const { wrapper } = await mountTransactions()
 
     await flushPromises()
     await wrapper.get('input[aria-label="From"]').setValue('2026-08-01')
@@ -122,5 +131,16 @@ describe('TransactionsView', () => {
       'The start date must be before the end date.',
     )
     expect(vi.mocked(getTransactions)).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the transaction detail route when a transaction is selected', async () => {
+    const { router, wrapper } = await mountTransactions()
+
+    await flushPromises()
+    await wrapper.get('li > button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('wallet-transaction-detail')
+    expect(router.currentRoute.value.params.transactionId).toBe('101')
   })
 })

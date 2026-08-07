@@ -113,6 +113,10 @@ const loadMore = (): void => {
 
   cursor.value = nextCursor.value
 }
+
+const openTransactionDetail = (transactionId: number): void => {
+  void router.push({ name: 'wallet-transaction-detail', params: { transactionId } })
+}
 </script>
 
 <template>
@@ -274,46 +278,64 @@ const loadMore = (): void => {
         <li
           v-for="transaction in transactions"
           :key="`${transaction.transferId}-${transaction.createdAt}`"
-          class="rounded-2xl bg-[#262626] px-4 py-4"
+          class="rounded-2xl bg-[#262626]"
         >
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <p class="truncate text-sm font-semibold">
-                {{ getTransactionTypeLabel(transaction.transferType) }}
-              </p>
-              <p class="mt-1 text-xs text-[#989898]">
-                {{ formatTransactionDateTime(transaction.createdAt) }}
-              </p>
-            </div>
-            <p
-              class="shrink-0 text-base font-bold"
-              :class="
-                transaction.entryType.toUpperCase() === 'DEBIT'
-                  ? 'text-[#f5f4f0]'
-                  : 'text-[#47c887]'
-              "
-            >
-              {{ formatTransactionAmount(transaction) }}
-            </p>
-          </div>
-
-          <div
-            class="mt-3 flex items-center justify-between border-t border-[#353533] pt-3 text-xs"
+          <button
+            type="button"
+            class="w-full p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#91cdbb]"
+            :aria-label="t('wallet.transactions.openDetail')"
+            @click="openTransactionDetail(transaction.transferId)"
           >
-            <span class="text-[#aaa8a3]">
-              {{ t('wallet.transactions.balanceAfter') }}
-              <strong class="ml-1 font-semibold text-[#f5f4f0]">
-                {{ formatPointAmount(String(transaction.balanceAfter)) }} P
-              </strong>
-            </span>
-            <span class="text-[#91cdbb]">
-              {{
-                transaction.entryType.toUpperCase() === 'DEBIT'
-                  ? t('wallet.transactions.debit')
-                  : t('wallet.transactions.credit')
-              }}
-            </span>
-          </div>
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold">
+                  {{ getTransactionTypeLabel(transaction.transferType) }}
+                </p>
+                <p class="mt-1 text-xs text-[#989898]">
+                  {{ formatTransactionDateTime(transaction.createdAt) }}
+                </p>
+              </div>
+              <div class="shrink-0 text-right">
+                <p
+                  class="text-base font-bold"
+                  :class="
+                    transaction.entryType.toUpperCase() === 'DEBIT'
+                      ? 'text-[#f5f4f0]'
+                      : 'text-[#47c887]'
+                  "
+                >
+                  {{ formatTransactionAmount(transaction) }}
+                </p>
+                <p class="mt-1 text-xs text-[#91cdbb]">
+                  {{
+                    transaction.entryType.toUpperCase() === 'DEBIT'
+                      ? t('wallet.transactions.debit')
+                      : t('wallet.transactions.credit')
+                  }}
+                </p>
+              </div>
+            </div>
+
+            <div
+              class="mt-3 flex items-center justify-between border-t border-[#353533] pt-3 text-xs"
+            >
+              <span class="text-[#aaa8a3]">
+                {{ t('wallet.transactions.balanceAfter') }}
+                <strong class="ml-1 font-semibold text-[#f5f4f0]">
+                  {{ formatPointAmount(String(transaction.balanceAfter)) }} P
+                </strong>
+              </span>
+              <span class="flex items-center gap-1 font-semibold text-[#aaa8a3]">
+                {{ t('wallet.transactions.details') }}
+                <span
+                  class="text-lg leading-none"
+                  aria-hidden="true"
+                >
+                  ›
+                </span>
+              </span>
+            </div>
+          </button>
         </li>
       </ul>
 
