@@ -80,9 +80,10 @@ const sheetPreviewQuery = useEventListQuery(
   computed(() => sheetPreviewFilters.value ?? filters.value),
 )
 const eventList = computed(() => eventQuery.data.value?.content ?? [])
-const totalEvents = computed(() => eventQuery.data.value?.totalElements ?? 0)
+const visibleEventCount = computed(() => eventList.value.length)
+const totalEventElements = computed(() => eventQuery.data.value?.totalElements ?? 0)
 const sheetResultCount = computed(
-  () => sheetPreviewQuery.data.value?.totalElements ?? totalEvents.value,
+  () => sheetPreviewQuery.data.value?.totalElements ?? totalEventElements.value,
 )
 
 const eventKindOptions = computed(() =>
@@ -367,7 +368,7 @@ function addQueryList(
 
       <div class="flex items-center justify-between gap-4 pt-1">
         <h2 class="text-title-sm text-ink">
-          {{ t('explore.resultCount', { count: totalEvents }) }}
+          {{ t('explore.resultCount', { count: visibleEventCount }) }}
         </h2>
         <button
           type="button"
