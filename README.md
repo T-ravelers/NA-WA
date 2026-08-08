@@ -36,6 +36,23 @@ NA-WA/
 Docker와 Docker Compose만 있으면 IDE나 로컬 Node/Java 설치 없이 프론트엔드,
 백엔드, MySQL, Redis를 한 번에 띄울 수 있습니다.
 
+처음 실행할 때 루트 환경 변수 예시 파일을 복사합니다.
+
+```shell
+cp -n .env.example .env
+```
+
+`cp -n`은 이미 `.env`가 있을 때 기존 파일을 덮어쓰지 않습니다. 기존 `.env`가
+있다면 `.env.example`에 새로 추가된 변수만 기존 파일에 직접 추가합니다. 이
+예시 파일에는 Docker Compose가 참조하는 전체 환경 변수와 로컬 기본값이 정리되어
+있습니다. MySQL 값은 로컬 컨테이너 전용 기본값이며, JWT·OAuth·Stripe 관련
+실제 비밀값은 별도로 발급받아 `.env`에만 입력합니다. `.env`는 Git에 커밋하지
+않습니다.
+
+`DOCKERHUB_USERNAME=local`은 로컬에서 빌드하는 backend 이미지의 이름 공간입니다.
+이미 빌드된 Docker Hub 이미지를 받으려면 해당 이미지의 실제 Docker Hub 이름으로
+바꿉니다.
+
 ```shell
 docker compose up
 ```
@@ -62,9 +79,6 @@ docker compose up
 docker compose up -d --build backend
 ```
 
-- 루트 `.env` 파일에 `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`,
-  `MYSQL_PASSWORD`, `DOCKERHUB_USERNAME`을 설정해야 합니다. `.env`는 Git에
-  커밋하지 않습니다.
 - 로컬 3306/8080 포트를 다른 프로세스(네이티브 MySQL, IDE에서 띄운 Tomcat
   등)가 이미 쓰고 있다면 포트 충돌이 발생하니 먼저 정리하세요.
 
