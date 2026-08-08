@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import walletMessages from '../../i18n/en'
 import type { WalletHome, WalletTransaction } from '../../api/walletApi'
-import { formatTransactionDateTime, TRANSFER_TYPES, parseServerDateTime, toWalletHomeData } from '../walletHome'
+import {
+  formatTransactionDateTime,
+  TRANSFER_TYPES,
+  parseServerDateTime,
+  toWalletHomeData,
+} from '../walletHome'
 
 function transaction(overrides: Partial<WalletTransaction> = {}): WalletTransaction {
   return {
@@ -159,5 +164,11 @@ describe('formatTransactionDateTime', () => {
   // 화면에 'Unknown date'가 그대로 노출된다.
   it('LocalDateTime 배열 응답을 사람이 읽을 수 있는 문자열로 만든다', () => {
     expect(formatTransactionDateTime([2026, 8, 7, 12, 18, 2])).not.toBe('Unknown date')
+  })
+
+  // 회귀: 서비스는 한국에서만 쓰이므로 거래 시각은 항상 KST로 보여야 한다. 표시
+  // 타임존을 기기에 맡기면 해외 타임존 기기에서 날짜가 전날로 밀린다.
+  it('기기 타임존과 무관하게 KST로 표시한다', () => {
+    expect(formatTransactionDateTime([2026, 8, 7, 12, 18, 2])).toBe('Aug 7, 2026, 12:18 PM')
   })
 })

@@ -290,12 +290,15 @@ export const formatTransactionDateTime = (createdAt: ServerDateTime): string => 
   const date = parseServerDateTime(createdAt)
   if (date === null) return 'Unknown date'
 
+  // 표시 타임존을 KST로 고정한다. 서비스는 한국에서만 쓰이므로 거래 시각은 한국 시간
+  // 기준이어야 한다 — 기기 타임존에 맡기면 외국인 방문자 기기에서 날짜가 밀린다.
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: 'Asia/Seoul',
   }).format(date)
 }
 
