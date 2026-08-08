@@ -142,27 +142,46 @@ pnpm --version   # 11.17.0
 
 `fnm install`과 `fnm use`는 인자가 없으면 `.node-version`을 읽습니다.
 
-의존성을 설치하고 개발 서버를 실행하세요.
+의존성을 설치하고 환경 변수 파일을 만든 뒤 개발 서버를 실행하세요.
 
 ```shell
 pnpm install
+cp frontend/.env.example frontend/.env.development
 pnpm dev
 ```
 
 개발 서버의 기본 주소는 `http://localhost:5173`입니다.
 
-### API 주소 설정
+### 환경 변수 설정
 
-`VITE_API_BASE_URL`에 프론트엔드가 요청할 API 주소를 설정하세요.
+프론트엔드가 요구하는 변수의 목록과 예시 값은 `frontend/.env.example`에
+정리돼 있습니다. 이 파일을 복사해 개발용 파일을 만드세요.
 
-| 파일                              | 용도                      |
-| --------------------------------- | ------------------------- |
-| `frontend/.env.development`       | 팀이 공유하는 개발 기본값 |
-| `frontend/.env.production`        | 운영 빌드 기본값          |
-| `frontend/.env.development.local` | 개발자별 로컬 값          |
+```shell
+cp frontend/.env.example frontend/.env.development
+```
 
-`VITE_*` 값은 클라이언트 번들에 포함됩니다. 토큰, 비밀번호와 API 비밀키를
-저장하지 마세요.
+| 파일                              | Git 추적 | 용도                         |
+| --------------------------------- | -------- | ---------------------------- |
+| `frontend/.env.example`           | 추적     | 필요한 변수의 목록과 예시 값 |
+| `frontend/.env.development`       | 미추적   | 개발 서버가 읽는 값          |
+| `frontend/.env.production`        | 미추적   | 운영 빌드가 읽는 값          |
+| `frontend/.env.development.local` | 미추적   | 개발자별 로컬 덮어쓰기       |
+
+`.env.example`을 제외한 `.env*`는 `.gitignore`가 막습니다. **팀이 공유하는
+기본값 파일은 없으므로 클론한 뒤 각자 만들어야 합니다.**
+
+| 변수                          | 설명                                                   |
+| ----------------------------- | ------------------------------------------------------ |
+| `VITE_API_BASE_URL`           | 백엔드 API 주소. 비어 있으면 앱이 기동하지 않습니다    |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe 공개 키(`pk_`). 지갑 충전 화면에서만 사용합니다 |
+
+`VITE_API_BASE_URL`을 설정하지 않으면 요청이 개발 서버 자신에게 가고 앱 셸
+HTML이 `200 OK`로 돌아옵니다. 이 실패는 화면에 드러나지 않기 때문에, 앱이
+기동 시점에 오류를 내고 멈춥니다.
+
+`VITE_*` 값은 클라이언트 번들에 그대로 포함됩니다. 토큰, 비밀번호와 API
+비밀키를 저장하지 마세요.
 
 ### 변경 사항 검증
 
