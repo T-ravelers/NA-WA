@@ -1,8 +1,8 @@
 # NA-WA Frontend
 
-NA-WA 프론트엔드는 Vue 3와 TypeScript로 구성한 모바일 우선 PWA입니다. 현재 앱
-진입점, 전역 Provider, API 클라이언트, PWA와 테스트 도구를 제공하며 도메인 기능은
-구현 전입니다.
+NA-WA 프론트엔드는 Vue 3와 TypeScript로 구성한 모바일 우선 PWA입니다. 앱 진입점과
+전역 Provider, 공통 API 클라이언트, PWA와 테스트 도구를 갖추고 있으며, 도메인 기능은
+`src/features/` 아래에서 도메인별로 나눠 구현합니다.
 
 ## 필요한 문서 찾기
 
@@ -32,8 +32,9 @@ src/
 | HTTP 통신                            | `src/shared/api/httpClient.ts` |
 | 사용자에게 보이는 문구               | Vue I18n                       |
 
-현재 Router에는 실제 route가 없습니다. 인증 인터셉터, 공통 오류 모델과 도메인
-feature도 구현 전입니다.
+route는 각 feature의 `routes.ts`가 소유하고 `app/router`가 자동으로 모읍니다. 인증
+갱신과 오류 정규화는 `src/shared/api/httpClient.ts`의 공통 인터셉터가 처리하므로
+feature에서 다시 만들지 않습니다.
 
 ## PWA 캐시 경계
 
