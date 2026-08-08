@@ -16,6 +16,8 @@ declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
     guestOnly?: boolean
+    /** 하단 탭바를 감춘다. 상세·플로우 화면처럼 뒤로 갈 곳이 명확한 화면에서 쓴다. */
+    hideBottomNav?: boolean
   }
 }
 

@@ -1,6 +1,6 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
@@ -80,9 +80,16 @@ const mountTopup = async () => {
 describe('TopupView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // 로컬 `.env.local`에 실제 Stripe 공개 키가 있어도 이 테스트는 키가 없는 경우를
+    // 검증해야 한다. Vite는 테스트 모드에서도 `.env.local`을 읽으므로 명시적으로 비운다.
+    vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', '')
     vi.mocked(createStripeIntent).mockResolvedValue(stripeIntentResponse)
     vi.mocked(getTopupMethods).mockResolvedValue(methodsResponse)
     vi.mocked(previewTopup).mockResolvedValue(previewResponse)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   it('renders the English top-up form and payment method', async () => {
