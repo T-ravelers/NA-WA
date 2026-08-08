@@ -1,12 +1,14 @@
 package me.nawa.journey.controller;
 
 import io.swagger.annotations.ApiOperation;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineResponse;
+import me.nawa.journey.dto.response.JourneySummaryResponse;
 import me.nawa.journey.service.JourneyService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -34,6 +36,16 @@ public class JourneyController {
     ) {
         return ApiResponse.success(
             journeyService.createJourney(member.getMemberId(), request)
+        );
+    }
+
+    @GetMapping
+    @ApiOperation("내 Journey 목록 조회")
+    public ApiResponse<List<JourneySummaryResponse>> getJourneys(
+        @AuthenticationPrincipal AuthenticatedMember member
+    ) {
+        return ApiResponse.success(
+            journeyService.getJourneys(member.getMemberId())
         );
     }
 

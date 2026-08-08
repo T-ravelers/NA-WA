@@ -33,6 +33,9 @@ class JourneyMapperXmlTest {
         String namespace = "me.nawa.journey.mapper.JourneyMapper.";
         assertTrue(configuration.hasStatement(namespace + "insertJourney"));
         assertTrue(configuration.hasStatement(namespace + "insertRegions"));
+        assertTrue(configuration.hasStatement(
+            namespace + "findJourneysByMemberId"
+        ));
         assertTrue(configuration.hasStatement(namespace + "findJourneyById"));
         assertTrue(configuration.hasStatement(
             namespace + "findRegionsByTripId"

@@ -25,6 +25,7 @@ import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineResponse;
+import me.nawa.journey.dto.response.JourneySummaryResponse;
 import me.nawa.journey.exception.JourneyErrorCode;
 import me.nawa.journey.mapper.JourneyMapper;
 import org.junit.jupiter.api.Test;
@@ -176,6 +177,26 @@ class JourneyServiceTest {
 
         assertEquals(20L, result.getTripId());
         assertEquals(List.of(), result.getRegions());
+    }
+
+    @Test
+    void getJourneys_returnsOnlySummaryFields() {
+        when(journeyMapper.findJourneysByMemberId(1L)).thenReturn(List.of(
+            Journey.builder()
+                .tripId(20L)
+                .memberId(1L)
+                .title("Seoul Foodie Week")
+                .startDate(LocalDate.of(2026, 3, 28))
+                .endDate(LocalDate.of(2026, 4, 1))
+                .build()
+        ));
+
+        List<JourneySummaryResponse> result = journeyService.getJourneys(1L);
+
+        assertEquals(1, result.size());
+        assertEquals(20L, result.get(0).getTripId());
+        assertEquals("Seoul Foodie Week", result.get(0).getTitle());
+        assertEquals(LocalDate.of(2026, 3, 28), result.get(0).getStartDate());
     }
 
     @Test

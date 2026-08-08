@@ -14,6 +14,8 @@ public interface JourneyMapper {
 
     void insertRegions(@Param("regions") List<TripRegion> regions);
 
+    List<Journey> findJourneysByMemberId(@Param("memberId") Long memberId);
+
     Journey findJourneyById(@Param("tripId") Long tripId);
 
     List<TripRegion> findRegionsByTripId(@Param("tripId") Long tripId);
