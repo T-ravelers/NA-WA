@@ -5,6 +5,9 @@ import type { ServerDateTime, WalletHome, WalletTransaction } from '../api/walle
  *
  * 이 계층은 문구를 만들지 않는다. i18n key로 쓸 값과 숫자·시각만 정하고, 번역과 색·아이콘은
  * 화면이 고른다. 표시 문자열이 여기 굳어 있으면 로케일을 바꿔도 화면이 따라오지 못한다.
+ *
+ * 거래 내역·거래 상세(#99)는 별도 화면이라 문구를 영어로 직접 고정해 둔다. 이 화면들이
+ * i18n으로 옮겨가면 `getTransactionTypeLabel`·`getTransactionStatusLabel`도 함께 정리한다.
  */
 
 /** 백엔드 `me.nawa.wallet.domain.enums.TransferType`과 1:1이다. */
@@ -20,10 +23,16 @@ export const TRANSFER_TYPES = [
 
 export type TransferType = (typeof TRANSFER_TYPES)[number]
 
+/** 거래 내역 필터에서 쓰는 거래 종류. 백엔드 `TransferType`과 같은 값이다. */
+export type TransactionType = TransferType
+
 /** 백엔드 `wallets.wallet_status` ENUM과 1:1이다. */
 export const WALLET_STATUSES = ['ACTIVE', 'SUSPENDED', 'CLOSED'] as const
 
 export type WalletStatus = (typeof WALLET_STATUSES)[number]
+
+/** 백엔드 거래 상태. 거래 내역·거래 상세 화면에서만 쓴다. */
+export type TransactionStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'REVERSED'
 
 /**
  * 서버가 모르는 값을 내려도 화면을 비우지 않는다.
@@ -50,9 +59,75 @@ export interface WalletHomeData {
   activities: WalletActivity[]
 }
 
-export const walletQueryKeys = {
+/** 거래 목록·상세 API가 내려주는 거래 1건. `WalletTransaction`과 필드가 같다. */
+export interface WalletTransactionResponse {
+  transferId: number
+  transferType: string
+  entryType: string
+  amount: string | number
+  balanceAfter: string | number
+  createdAt: ServerDateTime
+}
+
+export interface TransactionCounterpartyResponse {
+  type: string
+  name: string
+}
+
+export interface TransactionReceiptResponse {
+  transactionNumber: string | null
+  memo: string | null
+  spendingCategory: string | null
+}
+
+export interface TransactionFxResponse {
+  sourceAmount: string | number | null
+  sourceCurrency: string | null
+  displayCurrency: string | null
+  exchangeRate: string | number | null
+  ratedAt: ServerDateTime
+}
+
+export interface TransactionDetailResponse {
+  amount: string | number
+  occurredAt: ServerDateTime
+  counterparty: TransactionCounterpartyResponse | null
+  status: string
+  receipt: TransactionReceiptResponse | null
+  transactionNumber: string | null
+  fx: TransactionFxResponse | null
+}
+
+export interface TransactionAppliedFilters {
+  type: TransactionType | null
+  status: TransactionStatus | null
+  from: string | null
+  to: string | null
+}
+
+export interface TransactionListResponse {
+  transactions: WalletTransactionResponse[]
+  nextCursor: string | null
+  appliedFilters: TransactionAppliedFilters
+}
+
+export interface TransactionSearchParams {
+  type?: TransactionType
+  status?: TransactionStatus
+  from?: string
+  to?: string
+  cursor?: string
+  size?: number
+}
+
+export const walletKeys = {
   all: ['wallet'] as const,
-  home: () => [...walletQueryKeys.all, 'home'] as const,
+  home: () => [...walletKeys.all, 'home'] as const,
+  transactions: () => [...walletKeys.all, 'transactions'] as const,
+  transactionList: (filters: TransactionSearchParams, cursor?: string) =>
+    [...walletKeys.transactions(), filters, cursor ?? null] as const,
+  transactionDetail: (transactionId: number) =>
+    [...walletKeys.transactions(), 'detail', transactionId] as const,
 }
 
 /**
@@ -144,10 +219,19 @@ function toSignedAmount(transaction: WalletTransaction): number {
 }
 
 export function toWalletHomeData(response: WalletHome): WalletHomeData {
+  // 지갑 응답 필드가 누락돼도 화면을 중단시키지 않는다. 백엔드 계약은 필수 필드지만,
+  // 실제로 누락된 응답이 관측된 적이 있어 방어적으로 다룬다.
+  const recentTransactions = Array.isArray(response.recentTransactions)
+    ? response.recentTransactions
+    : []
+
   return {
-    balance: response.balance,
-    status: toWalletStatus(response.availabilityStatus),
-    activities: response.recentTransactions.map((transaction) => {
+    balance: typeof response.balance === 'number' ? response.balance : 0,
+    status:
+      typeof response.availabilityStatus === 'string'
+        ? toWalletStatus(response.availabilityStatus)
+        : 'UNKNOWN',
+    activities: recentTransactions.map((transaction) => {
       const kind = toActivityKind(transaction.transferType)
 
       return {
@@ -159,4 +243,68 @@ export function toWalletHomeData(response: WalletHome): WalletHomeData {
       }
     }),
   }
+}
+
+const toAmountString = (amount: string | number | null | undefined): string =>
+  amount === null || amount === undefined ? '0' : String(amount)
+
+const getAbsoluteAmount = (amount: string): string => amount.replace(/^-/, '')
+
+export const formatPointAmount = (amount: string): string =>
+  amount.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+
+/** 거래 내역·거래 상세 화면에서 쓰는 영문 표시명. 백엔드 `TransferType`과 1:1이다. */
+export const getTransactionTypeLabel = (transferType: string): string => {
+  switch (transferType.toUpperCase()) {
+    case 'TOPUP':
+      return 'Point top-up'
+    case 'QR_PAYMENT':
+      return 'QR payment'
+    case 'TRANSFER':
+      return 'Point transfer'
+    case 'SETTLEMENT':
+      return 'Settlement'
+    default:
+      return 'Wallet transaction'
+  }
+}
+
+export const getTransactionStatusLabel = (status: string): string => {
+  switch (status.toUpperCase()) {
+    case 'PENDING':
+      return 'Pending'
+    case 'COMPLETED':
+      return 'Completed'
+    case 'FAILED':
+      return 'Failed'
+    case 'CANCELLED':
+      return 'Cancelled'
+    case 'REVERSED':
+      return 'Reversed'
+    default:
+      return status
+  }
+}
+
+export const formatTransactionDateTime = (createdAt: ServerDateTime): string => {
+  const date = parseServerDateTime(createdAt)
+  if (date === null) return 'Unknown date'
+
+  // 표시 타임존을 KST로 고정한다. 서비스는 한국에서만 쓰이므로 거래 시각은 한국 시간
+  // 기준이어야 한다 — 기기 타임존에 맡기면 외국인 방문자 기기에서 날짜가 밀린다.
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'Asia/Seoul',
+  }).format(date)
+}
+
+export const formatTransactionAmount = (transaction: WalletTransactionResponse): string => {
+  const amount = getAbsoluteAmount(toAmountString(transaction.amount))
+  const sign = transaction.entryType.toUpperCase() === 'DEBIT' ? '-' : '+'
+
+  return `${sign}${formatPointAmount(amount)} P`
 }
