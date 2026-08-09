@@ -397,7 +397,8 @@ function confirmJourneyDate(date: string): void {
             <div class="absolute inset-x-3 bottom-3 flex justify-end">
               <button
                 type="button"
-                class="rounded-pill bg-canvas/85 px-3 py-2 text-caption text-ink shadow-raised"
+                class="rounded-pill bg-canvas/85 px-3 py-2 text-caption text-ink shadow-raised disabled:pointer-events-none disabled:opacity-40"
+                disabled
               >
                 {{ t('explore.placeDetail.directions') }}
               </button>
@@ -450,6 +451,7 @@ function confirmJourneyDate(date: string): void {
           <AppButton
             block
             variant="secondary"
+            disabled
             class="h-12 whitespace-nowrap border-success px-2 text-success"
           >
             {{ t('explore.placeDetail.findCompanions') }}
