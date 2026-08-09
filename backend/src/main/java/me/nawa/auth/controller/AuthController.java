@@ -166,13 +166,23 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
             HttpServletRequest request) {
-        authCookieManager.findRefreshToken(request.getCookies())
-                .ifPresent(authTokenService::revokeRefreshToken);
-
         ResponseCookie deletedAccessToken =
                 authCookieManager.deleteAccessTokenCookie();
         ResponseCookie deletedRefreshToken =
                 authCookieManager.deleteRefreshTokenCookie();
+
+        authCookieManager.findRefreshToken(request.getCookies())
+                .ifPresent(refreshToken -> {
+                    try {
+                        authTokenService.revokeRefreshToken(refreshToken);
+                    } catch (RuntimeException exception) {
+                        log.error(
+                                "[LogoutRefreshRevocationFailure] type={}",
+                                exception.getClass().getName(),
+                                exception
+                        );
+                    }
+                });
 
         return ResponseEntity.ok()
                 .header(
