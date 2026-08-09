@@ -134,6 +134,7 @@ function chooseLocale(next: AppLocale): void {
         <button
           type="button"
           class="text-caption text-ink-display underline"
+          :disabled="signOut.isPending.value"
           @click="signOut.mutate()"
         >
           {{ t('action.retry') }}
