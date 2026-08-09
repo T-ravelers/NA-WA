@@ -49,7 +49,12 @@ HttpOnly 인증 쿠키를 사용합니다.
 검색 결과 수이며, 현재 프론트엔드는 무한 스크롤을 구현하지 않았으므로 화면의 건수
 표시는 현재 페이지의 `content.length`를 사용합니다.
 
-## Place 목록 필터 계약
+## Place 목록 필터 계약 초안
+
+> 현재 `main`에는 `/api/v1/explore/places`를 제공하는 Controller·Service·Mapper가
+> 아직 포함되어 있지 않습니다. 따라서 이 API는 백엔드 Place 목록 구현 이슈
+> (#64, #65, #83)가 병합되기 전까지 호출하면 `404`가 반환됩니다. 아래 내용은
+> 프론트엔드와 백엔드가 합의할 요청 계약 초안이며, 구현 완료를 의미하지 않습니다.
 
 `GET /api/v1/explore/places`
 
@@ -57,7 +62,7 @@ HttpOnly 인증 쿠키를 사용합니다.
 
 | 파라미터 | 형식 | 의미 |
 | --- | --- | --- |
-| `placeKinds` | 반복 가능한 문자열 목록 | Place 유형을 같은 종류 안에서 OR로 필터링합니다. 허용값은 `RESTAURANT`, `CAFE`, `MARKET`, `BEAUTY`, `ETC`입니다. |
+| `placeKinds` | 반복 가능한 문자열 목록 | **#83 백엔드 계약 확정 예정**. Place 유형을 같은 종류 안에서 OR로 필터링합니다. 제안 허용값은 `RESTAURANT`, `CAFE`, `MARKET`, `BEAUTY`, `ETC`입니다. |
 | `sectorIds` | 반복 가능한 숫자 목록 | Sector를 같은 종류 안에서 OR로 필터링합니다. |
 | `activityIds` | 반복 가능한 숫자 목록 | Activity를 같은 종류 안에서 OR로 필터링합니다. |
 | `region1`, `region2`, `region3` | 반복 가능한 문자열 목록 | 지역을 같은 종류 안에서 OR로 필터링합니다. |
@@ -69,8 +74,8 @@ HttpOnly 인증 쿠키를 사용합니다.
 | `page` | 0 이상의 정수 | 0부터 시작하는 페이지 번호입니다. |
 | `size` | 양의 정수 | 페이지 크기입니다. 기본값은 20입니다. |
 
-`placeKinds=ETC`는 화면에서 `Other`로 표시합니다. 백엔드 구현에서는
-`place_kind`가 `ETC`이거나 NULL·허용 목록 밖의 미분류 값인 Place를 함께 포함합니다.
+`placeKinds=ETC`는 화면에서 `Other`로 표시합니다. NULL·허용 목록 밖의
+`place_kind`를 `ETC`에 포함할지는 #83 백엔드 계약에서 확정해야 합니다.
 
 ### 필터 결합
 
@@ -80,7 +85,10 @@ HttpOnly 인증 쿠키를 사용합니다.
 - `Free`와 `Open now`는 Place 필터 계약에 포함하지 않습니다.
 - `DISTANCE` 정렬은 거리 계산 계약이 확정되기 전까지 지원하지 않습니다.
 
-## Place 상세
+## Place 상세 계약 초안
+
+Place 목록 API와 동일하게, 아래 상세 API도 백엔드 Place 상세 구현 이슈가
+병합되기 전까지는 제공되지 않습니다.
 
 `GET /api/v1/explore/places/{placeId}?language=en`
 
