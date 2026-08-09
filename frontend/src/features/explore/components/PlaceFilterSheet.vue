@@ -200,7 +200,7 @@ function toggleExpandedCategory(label: string): void {
 }
 
 function toggleOption(key: PlaceOptionKey): void {
-  draft[key] = !draft[key]
+  draft[key] = draft[key] === true ? undefined : true
 }
 
 function resetSheet(): void {
@@ -453,7 +453,7 @@ function apply(): void {
             <button
               type="button"
               class="flex min-h-16 w-full items-center justify-between text-left"
-              @click="draft.savedOnly = !draft.savedOnly"
+              @click="draft.savedOnly = draft.savedOnly === true ? undefined : true"
             >
               <span
                 class="text-body"

@@ -56,4 +56,29 @@ describe('PlaceFilterSheet', () => {
       region2: ['Suwon'],
     })
   })
+
+  it('normalizes option deselection to undefined', async () => {
+    const wrapper = mount(PlaceFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'options', filters: { sort: 'LATEST' }, resultCount: 3 },
+    })
+
+    const parkingButton = wrapper.findAll('button').find((button) => button.text() === 'Parking')
+    await parkingButton?.trigger('click')
+
+    let changes = wrapper.emitted('change') ?? []
+    expect(changes[changes.length - 1]?.[0]).toMatchObject({ hasParking: true })
+
+    await parkingButton?.trigger('click')
+
+    changes = wrapper.emitted('change') ?? []
+    expect(changes[changes.length - 1]?.[0]).toMatchObject({ hasParking: undefined })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+
+    expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({ hasParking: undefined })
+  })
 })
