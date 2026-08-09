@@ -93,7 +93,12 @@
   /* ── 폰트 ──
    * Display는 로케일별로 달라진다. en·vi는 Sztos를 쓰고 CJK Display 3종
    * (Smiley Sans·Taipei Sans TC Beta·M PLUS 1)은 아직 번들에 없으므로 Body 폰트로
-   * 폴백한다. 로고용 Ria Sans도 번들이 없어 Sztos로 폴백한다. */
+   * 폴백한다. 로고용 Ria Sans도 번들이 없어 Sztos로 폴백한다.
+   *
+   * `Sztos`는 현재 어디에서도 로드되지 않는다(#122). 재배포 권한이 확인되지 않아
+   * 셀프 호스팅을 제거했고, CDN은 아직 연결하지 않았다. 이름을 그대로 둔 것은
+   * 디자인 의도가 바뀐 것이 아니기 때문이며, CDN을 연결하면 이 줄을 고치지 않아도
+   * 바로 적용된다. 지금은 `Noto Sans`로 폴백한다. */
   --font-display: 'Sztos', 'Noto Sans', sans-serif;
   --font-body: 'Noto Sans', sans-serif;
 
