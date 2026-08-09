@@ -64,7 +64,6 @@ const selectedPlaceSectorIds = ref(readQueryNumberList('placeSectorIds'))
 const selectedPlaceActivityIds = ref(readQueryNumberList('placeActivityIds'))
 const selectedPlaceRegion1 = ref(readQueryList('placeRegion1'))
 const selectedPlaceRegion2 = ref(readQueryList('placeRegion2'))
-const selectedPlaceRegion3 = ref(readQueryList('placeRegion3'))
 const selectedPlaceHasForeignLang = ref(readQueryBoolean('hasForeignLang'))
 const selectedPlaceHasParking = ref(readQueryBoolean('hasParking'))
 const selectedPlaceReservable = ref(readQueryBoolean('reservable'))
@@ -115,7 +114,6 @@ const placeFilters = computed<PlaceSearchFilters>(() => ({
     selectedPlaceActivityIds.value.length > 0 ? selectedPlaceActivityIds.value : undefined,
   region1: selectedPlaceRegion1.value.length > 0 ? selectedPlaceRegion1.value : undefined,
   region2: selectedPlaceRegion2.value.length > 0 ? selectedPlaceRegion2.value : undefined,
-  region3: selectedPlaceRegion3.value.length > 0 ? selectedPlaceRegion3.value : undefined,
   hasForeignLang: selectedPlaceHasForeignLang.value || undefined,
   hasParking: selectedPlaceHasParking.value || undefined,
   reservable: selectedPlaceReservable.value || undefined,
@@ -218,10 +216,6 @@ const placeActiveFilters = computed(() => {
   selectedPlaceRegion2.value.forEach((value) =>
     values.push({ key: `placeRegion2:${value}`, label: value }),
   )
-  selectedPlaceRegion3.value.forEach((value) =>
-    values.push({ key: `placeRegion3:${value}`, label: value }),
-  )
-
   selectedPlaceSectorIds.value.forEach((value) => {
     const sector = EVENT_SECTOR_OPTIONS.find((option) => option.id === value)
     if (sector) values.push({ key: `placeSector:${value}`, label: t(sector.labelKey) })
@@ -295,7 +289,6 @@ watch(
     addQueryList(query, 'placeActivityIds', next.activityIds)
     addQueryList(query, 'placeRegion1', next.region1)
     addQueryList(query, 'placeRegion2', next.region2)
-    addQueryList(query, 'placeRegion3', next.region3)
     addQueryValue(query, 'keyword', next.keyword)
     addQueryValue(query, 'placeSort', next.sort === 'LATEST' ? undefined : next.sort)
     addQueryValue(query, 'hasForeignLang', next.hasForeignLang)
@@ -354,7 +347,6 @@ function applyPlaceSheet(next: PlaceSearchFilters): void {
   selectedPlaceActivityIds.value = next.activityIds ?? []
   selectedPlaceRegion1.value = next.region1 ?? []
   selectedPlaceRegion2.value = next.region2 ?? []
-  selectedPlaceRegion3.value = next.region3 ?? []
   placeSort.value = next.sort ?? 'LATEST'
   selectedPlaceHasForeignLang.value = next.hasForeignLang ?? false
   selectedPlaceHasParking.value = next.hasParking ?? false
@@ -476,7 +468,6 @@ function removePlaceFilter(key: string): void {
     selectedPlaceActivityIds.value = []
     selectedPlaceRegion1.value = []
     selectedPlaceRegion2.value = []
-    selectedPlaceRegion3.value = []
     placeSort.value = 'LATEST'
     selectedPlaceHasForeignLang.value = false
     selectedPlaceHasParking.value = false
@@ -497,10 +488,6 @@ function removePlaceFilter(key: string): void {
   } else if (key.startsWith('placeRegion2:')) {
     selectedPlaceRegion2.value = selectedPlaceRegion2.value.filter(
       (value) => `placeRegion2:${value}` !== key,
-    )
-  } else if (key.startsWith('placeRegion3:')) {
-    selectedPlaceRegion3.value = selectedPlaceRegion3.value.filter(
-      (value) => `placeRegion3:${value}` !== key,
     )
   } else if (key.startsWith('placeSector:')) {
     const sectorId = Number(key.slice('placeSector:'.length))
