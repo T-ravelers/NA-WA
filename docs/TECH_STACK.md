@@ -17,11 +17,15 @@
 | Server state | TanStack Vue Query `5`                | API 조회, 캐시와 mutation 상태        |
 | Client state | Pinia `4`                             | 여러 화면이 공유하는 클라이언트 상태  |
 | HTTP         | Axios `1`                             | 공통 API 클라이언트                   |
-| i18n         | Vue I18n `11`                         | 한국어 기본 다국어 메시지             |
+| i18n         | Vue I18n `11`                         | 영어 기본 다국어 메시지               |
 | Styling      | Tailwind CSS `4`                      | 디자인 토큰 기반 UI 스타일            |
 | PWA          | vite-plugin-pwa, Workbox `generateSW` | 앱 셸과 정적 자원 사전 캐시           |
 | Test         | Vitest, Vue Test Utils, Playwright    | 단위, 컴포넌트와 브라우저 테스트      |
 | Quality      | ESLint, Prettier, Husky, lint-staged  | 정적 검사와 커밋 전 검사              |
+
+지원 로케일은 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
+방한 외국인이 대상이라 한국어는 서비스 로케일이 아닙니다. 최종 기준은
+`frontend/src/shared/i18n/locales.ts`입니다.
 
 프론트엔드 의존 방향은 `app → features → shared`입니다.
 
@@ -60,7 +64,9 @@ Vue Query가 서버 응답을 소유합니다. 서버 응답을 Pinia에 복제�
   Origin을 서버 allowlist에 등록하세요.
 - 요청·응답 DTO와 오류 코드는 프론트엔드와 백엔드가 함께 검토하는 API 계약입니다.
 - 백엔드는 공통 API 응답과 전역 예외 처리 구조를 구현했습니다.
-- 프론트엔드 인증 인터셉터와 공통 API 오류 정규화는 구현 전입니다.
+- 프론트엔드는 공통 Axios 인스턴스의 인터셉터에서 CSRF 헤더 부착, 응답 봉투 해제,
+  401 갱신 재시도와 오류 정규화를 처리합니다. feature에서 재시도 로직을 다시 만들지
+  마세요. 백엔드의 refresh 재사용 감지에 걸립니다.
 
 ## PWA 캐시 경계
 
@@ -105,5 +111,3 @@ test와 build를 실행합니다. Vercel은 프론트엔드 배포를 담당하�
 - 제품 범위에는 채팅과 WebSocket/STOMP 기능이 없습니다.
 - Nginx에는 WebSocket upgrade 설정이 남아 있습니다. 이 설정은 프론트엔드 기능
   계약이 아니며 인프라 후속 작업에서 제거 여부를 결정합니다.
-- Router의 실제 route, 프론트엔드 공통 API 오류 모델, Query Key factory, 공통 UI와
-  앱 셸은 구현 전입니다.
