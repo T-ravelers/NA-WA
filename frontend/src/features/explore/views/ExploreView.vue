@@ -439,6 +439,7 @@ function addQueryList(
           v-for="place in placeList"
           :key="place.itemId"
           :place="place"
+          @open="router.push({ name: 'explore-place-detail', params: { placeId: place.itemId } })"
         />
       </div>
     </template>

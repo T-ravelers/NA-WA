@@ -7,8 +7,8 @@
 
 `GET /api/v1/explore/events`
 
-`/api/**` 경로는 인증이 필요합니다. Swagger에서 호출할 때는 먼저 `Authorize`로
-유효한 Bearer 토큰을 등록해야 합니다.
+`/api/**` 경로는 인증이 필요합니다. 브라우저 확인은 프론트엔드에서 로그인한 뒤
+HttpOnly 인증 쿠키를 사용합니다.
 
 ### 주요 요청 파라미터
 
@@ -79,3 +79,20 @@
 - `savedOnly`는 정렬이 아니라 저장 여부 조건입니다.
 - `Free`와 `Open now`는 Place 필터 계약에 포함하지 않습니다.
 - `DISTANCE` 정렬은 거리 계산 계약이 확정되기 전까지 지원하지 않습니다.
+
+## Place 상세
+
+`GET /api/v1/explore/places/{placeId}?language=en`
+
+상세 응답은 목록 기본 정보에 다음 Place 상세 필드를 더해 반환합니다.
+
+- `placeId`, `name`, `brand`, `branch`, `placeKind`
+- `thumbnailUrl`, `imageUrls`
+- `region1`, `region2`, `region3`, `addressRoad`, `addressDetail`, `postalCode`
+- `latitude`, `longitude`, `openingHours`, `closedDays`, `menuSummary`, `tel`, `sourceUrl`
+- `hasForeignLang`, `hasParking`, `reservable`, `takeoutAvailable`
+- `cardPaymentAvailable`, `smokeFree`, `kidFacility`, `hasRestroom`
+- `activities`
+
+`placeKind=ETC`와 허용 목록 밖 또는 NULL인 값은 화면에서 `Other`로 표시합니다.
+Place의 기본 언어 콘텐츠는 번역 테이블이 아닌 `place` 기본 테이블에서 반환합니다.

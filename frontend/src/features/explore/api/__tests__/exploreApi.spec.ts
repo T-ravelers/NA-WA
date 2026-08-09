@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   fetchEventDetail,
   fetchEventList,
+  fetchPlaceDetail,
   fetchPlaceList,
   toPlaceSearchParams,
   toSearchParams,
@@ -105,6 +106,32 @@ describe('exploreApi', () => {
 
     await expect(fetchEventDetail(42, 'en')).resolves.toEqual(data)
     expect(get).toHaveBeenCalledWith('/api/v1/explore/events/42', {
+      params: { language: 'en' },
+    })
+  })
+
+  it('fetches and normalizes one Place detail with the requested language', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        placeId: 880001,
+        itemId: 880001,
+        name: 'Seongsu Onsil',
+        placeKind: null,
+        imageUrls: ['place.jpg', null],
+        isActive: null,
+        activities: null,
+      },
+    })
+
+    await expect(fetchPlaceDetail(880001, 'en')).resolves.toMatchObject({
+      placeId: 880001,
+      itemId: 880001,
+      placeKind: 'ETC',
+      imageUrls: ['place.jpg'],
+      isActive: false,
+      activities: [],
+    })
+    expect(get).toHaveBeenCalledWith('/api/v1/explore/places/880001', {
       params: { language: 'en' },
     })
   })

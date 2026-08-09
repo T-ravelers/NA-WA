@@ -4,6 +4,10 @@ export const PLACE_KINDS = ['RESTAURANT', 'CAFE', 'MARKET', 'BEAUTY', 'ETC'] as 
 
 export type PlaceKind = (typeof PLACE_KINDS)[number]
 
+export function normalizePlaceKind(value: string | null | undefined): PlaceKind {
+  return PLACE_KINDS.includes(value as PlaceKind) ? (value as PlaceKind) : 'ETC'
+}
+
 export interface PlaceSummaryResponse {
   itemId: number
   name: string

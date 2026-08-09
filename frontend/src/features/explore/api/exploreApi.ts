@@ -8,10 +8,16 @@ import {
   type PlaceSearchFilters,
   type PlaceListResponsePayload,
 } from '../model/placeExplore'
+import {
+  normalizePlaceDetail,
+  type PlaceDetail,
+  type PlaceDetailResponse,
+} from '../model/placeDetail'
 
 const EVENT_LIST_PATH = '/api/v1/explore/events'
 const EVENT_DETAIL_PATH = '/api/v1/explore/events'
 const PLACE_LIST_PATH = '/api/v1/explore/places'
+const PLACE_DETAIL_PATH = '/api/v1/explore/places'
 
 function appendList(
   params: URLSearchParams,
@@ -126,4 +132,22 @@ export async function fetchPlaceList(filters: PlaceSearchFilters = {}): Promise<
   return normalizePlaceListResponse(response.data)
 }
 
-export { EVENT_DETAIL_PATH, EVENT_LIST_PATH, PLACE_LIST_PATH, toPlaceSearchParams, toSearchParams }
+export async function fetchPlaceDetail(
+  placeId: number | string,
+  language = 'en',
+): Promise<PlaceDetail> {
+  const response = await httpClient.get<PlaceDetailResponse>(`${PLACE_DETAIL_PATH}/${placeId}`, {
+    params: { language },
+  })
+
+  return normalizePlaceDetail(response.data)
+}
+
+export {
+  EVENT_DETAIL_PATH,
+  EVENT_LIST_PATH,
+  PLACE_DETAIL_PATH,
+  PLACE_LIST_PATH,
+  toPlaceSearchParams,
+  toSearchParams,
+}

@@ -553,8 +553,8 @@ function retry(): void {
 
       <JourneyDateSheet
         v-if="journeyDateSheetOpen"
-        :event-title="event.title"
-        :event-location="journeyLocation"
+        :item-title="event.title"
+        :item-location="journeyLocation"
         :start-date="event.startDate"
         :end-date="event.endDate"
         :is-permanent="event.isPermanent === true"
@@ -562,9 +562,9 @@ function retry(): void {
         :loading="journeyAddPending"
         :error-message="
           journeyAddError === 'missing'
-            ? t('explore.journeyDate.selectJourneyFirst')
+            ? t('explore.journeyDate.selectItemFirst')
             : journeyAddError === 'failed'
-              ? t('explore.journeyDate.addFailed')
+              ? t('explore.journeyDate.addItemFailed')
               : null
         "
         @close="closeJourneyDateSheet"

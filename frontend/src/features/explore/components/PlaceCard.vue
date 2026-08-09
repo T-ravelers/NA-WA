@@ -9,7 +9,7 @@ import CategoryDot from '@/shared/ui/CategoryDot.vue'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import type { Category } from '@/shared/ui/category'
 
-import { PLACE_KINDS, type PlaceKind, type PlaceSummary } from '../model/placeExplore'
+import { normalizePlaceKind, type PlaceKind, type PlaceSummary } from '../model/placeExplore'
 
 interface Props {
   place: PlaceSummary
@@ -19,9 +19,7 @@ const { place } = defineProps<Props>()
 const emit = defineEmits<{ open: [placeId: number] }>()
 const { t } = useI18n()
 
-const normalizedKind = computed<PlaceKind>(() =>
-  PLACE_KINDS.includes(place.placeKind as PlaceKind) ? (place.placeKind as PlaceKind) : 'ETC',
-)
+const normalizedKind = computed<PlaceKind>(() => normalizePlaceKind(place.placeKind))
 
 const kindLabel = computed(() => t(`explore.placeKinds.${normalizedKind.value}`))
 

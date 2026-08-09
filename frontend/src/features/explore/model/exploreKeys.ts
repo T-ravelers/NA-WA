@@ -9,4 +9,6 @@ export const exploreKeys = {
     [...exploreKeys.events(), 'detail', eventId, language] as const,
   places: () => [...exploreKeys.all, 'places'] as const,
   placeList: (filters: PlaceSearchFilters) => [...exploreKeys.places(), 'list', filters] as const,
+  placeDetail: (placeId: number | string, language: string) =>
+    [...exploreKeys.places(), 'detail', placeId, language] as const,
 } as const
