@@ -74,6 +74,7 @@ const selectedPlaceSmokeFree = ref(readQueryBoolean('smokeFree'))
 const selectedPlaceKidFacility = ref(readQueryBoolean('kidFacility'))
 const selectedPlaceRestroom = ref(readQueryBoolean('hasRestroom'))
 const selectedPlaceSavedOnly = ref(readQueryBoolean('savedOnly'))
+const selectedPlacePage = ref(readQueryPage('placePage'))
 const placeSort = ref<PlaceSort>(readPlaceSort(readQueryString('placeSort')))
 const sheetPreviewFilters = ref<EventSearchFilters | null>(null)
 const placeSheetPreviewFilters = ref<PlaceSearchFilters | null>(null)
@@ -104,7 +105,7 @@ const filters = computed<EventSearchFilters>(() => ({
 const eventQuery = useEventListQuery(filters)
 const placeFilters = computed<PlaceSearchFilters>(() => ({
   language: locale.value,
-  page: 0,
+  page: selectedPlacePage.value,
   size: 20,
   sort: placeSort.value,
   keyword: keyword.value || undefined,
@@ -306,6 +307,7 @@ watch(
     addQueryValue(query, 'kidFacility', next.kidFacility)
     addQueryValue(query, 'hasRestroom', next.hasRestroom)
     addQueryValue(query, 'savedOnly', next.savedOnly)
+    addQueryValue(query, 'placePage', next.page && next.page > 0 ? String(next.page) : undefined)
     router.replace({ query }).catch(() => undefined)
   },
   { deep: true },
@@ -346,6 +348,7 @@ function applySheet(next: EventSearchFilters): void {
 }
 
 function applyPlaceSheet(next: PlaceSearchFilters): void {
+  selectedPlacePage.value = 0
   selectedPlaceKinds.value = next.placeKinds ?? []
   selectedPlaceSectorIds.value = next.sectorIds ?? []
   selectedPlaceActivityIds.value = next.activityIds ?? []
@@ -374,6 +377,18 @@ function previewPlaceSheet(next: PlaceSearchFilters): void {
   placeSheetPreviewFilters.value = { ...next, page: 0, size: 20, language: locale.value }
 }
 
+watch(keyword, () => {
+  if (selectedTab.value === 'places') selectedPlacePage.value = 0
+})
+
+function goToPreviousPlacePage(): void {
+  if (selectedPlacePage.value > 0) selectedPlacePage.value -= 1
+}
+
+function goToNextPlacePage(): void {
+  if (placeQuery.data.value?.hasNext) selectedPlacePage.value += 1
+}
+
 function closeSheet(): void {
   selectedSheet.value = null
   sheetPreviewFilters.value = null
@@ -381,6 +396,7 @@ function closeSheet(): void {
 }
 
 function togglePlaceKind(kind: PlaceKind): void {
+  selectedPlacePage.value = 0
   selectedPlaceKinds.value = selectedPlaceKinds.value.includes(kind)
     ? selectedPlaceKinds.value.filter((value) => value !== kind)
     : [...selectedPlaceKinds.value, kind]
@@ -453,6 +469,7 @@ function removeFilter(key: string): void {
 }
 
 function removePlaceFilter(key: string): void {
+  selectedPlacePage.value = 0
   if (key === '*') {
     selectedPlaceKinds.value = []
     selectedPlaceSectorIds.value = []
@@ -528,6 +545,11 @@ function readQueryNumberList(key: string): number[] {
 
 function readQueryBoolean(key: string): boolean {
   return readQueryString(key) === 'true'
+}
+
+function readQueryPage(key: string): number {
+  const value = Number(readQueryString(key))
+  return Number.isInteger(value) && value >= 0 ? value : 0
 }
 
 function readSort(value: string | undefined): EventSort {
@@ -715,6 +737,32 @@ function addQueryList(
           @open="openPlaceDetail"
         />
       </div>
+
+      <nav
+        v-if="placeQuery.data.value && (selectedPlacePage > 0 || placeQuery.data.value.hasNext)"
+        class="mt-2 flex items-center justify-between gap-3"
+        :aria-label="t('explore.pagination.page', { page: selectedPlacePage + 1 })"
+      >
+        <button
+          type="button"
+          class="rounded-pill border border-hairline-2 px-4 py-2 text-body-sm text-ink-2 disabled:opacity-40"
+          :disabled="selectedPlacePage === 0 || placeQuery.isFetching.value"
+          @click="goToPreviousPlacePage"
+        >
+          {{ t('explore.pagination.previousPage') }}
+        </button>
+        <span class="text-caption text-ink-3">
+          {{ t('explore.pagination.page', { page: selectedPlacePage + 1 }) }}
+        </span>
+        <button
+          type="button"
+          class="rounded-pill border border-hairline-2 px-4 py-2 text-body-sm text-ink-2 disabled:opacity-40"
+          :disabled="!placeQuery.data.value?.hasNext || placeQuery.isFetching.value"
+          @click="goToNextPlacePage"
+        >
+          {{ t('explore.pagination.nextPage') }}
+        </button>
+      </nav>
     </template>
 
     <ExploreFilterSheet

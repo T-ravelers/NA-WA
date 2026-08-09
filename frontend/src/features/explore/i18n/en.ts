@@ -217,6 +217,11 @@ export default {
     openPlace: 'Open {name}',
     savePlaceUnavailable: 'Save place is not available yet',
     placeResultCount: '{count} places',
+    pagination: {
+      previousPage: 'Previous page',
+      nextPage: 'Next page',
+      page: 'Page {page}',
+    },
     placeListError: 'We could not load places right now.',
     placeOptions: {
       reservation: 'Reservation',
