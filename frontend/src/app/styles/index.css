@@ -18,21 +18,14 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: 'Sztos';
-  src: url('/fonts/Sztos-BoldCondensed.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Sztos';
-  src: url('/fonts/Sztos-ExtraBoldCondensed.woff2') format('woff2');
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
+/*
+ * Display 폰트 `Sztos`의 `@font-face`는 여기 있었다. 재배포 권한이 확인되지 않아
+ * 셀프 호스팅 파일을 제거했다(#122). 셀프 호스팅으로 되돌리지 않는다.
+ *
+ * `--font-display`는 이름을 그대로 두었으므로 현재는 `Noto Sans`로 폴백한다.
+ * CDN이 연결되면 그 로더만 추가하면 되고 이 파일은 손대지 않아도 된다.
+ * 자세한 내용은 `public/fonts/README.md`의 「Display 폰트」 절 참조.
+ */
 
 @layer base {
   html {
