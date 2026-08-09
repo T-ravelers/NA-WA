@@ -12,7 +12,9 @@ import EventCard from '../components/EventCard.vue'
 import ExploreFilterBar from '../components/ExploreFilterBar.vue'
 import ExploreFilterSheet from '../components/ExploreFilterSheet.vue'
 import ExploreItemTabs from '../components/ExploreItemTabs.vue'
+import PlaceCard from '../components/PlaceCard.vue'
 import { useEventListQuery } from '../composables/useEventListQuery'
+import { usePlaceListQuery } from '../composables/usePlaceListQuery'
 import {
   EVENT_KINDS,
   type EventKind,
@@ -20,6 +22,7 @@ import {
   type EventSort,
 } from '../model/eventExplore'
 import { EVENT_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
+import type { PlaceSearchFilters, PlaceSort } from '../model/placeExplore'
 
 type ExploreSheetKind = 'date' | 'region' | 'category' | 'options' | 'sort'
 
@@ -48,6 +51,7 @@ const openWeekendOnly = ref(readQueryBoolean('openWeekendOnly'))
 const opensLateOnly = ref(readQueryBoolean('opensLateOnly'))
 const preReservationOnly = ref(readQueryBoolean('preReservationOnly'))
 const experienceOnly = ref(readQueryBoolean('experienceOnly'))
+const placeSort = ref<PlaceSort>('LATEST')
 const sheetPreviewFilters = ref<EventSearchFilters | null>(null)
 
 const filters = computed<EventSearchFilters>(() => ({
@@ -74,12 +78,23 @@ const filters = computed<EventSearchFilters>(() => ({
 }))
 
 const eventQuery = useEventListQuery(filters)
+const placeFilters = computed<PlaceSearchFilters>(() => ({
+  language: locale.value,
+  page: 0,
+  size: 20,
+  sort: placeSort.value,
+}))
+const placeQuery = usePlaceListQuery(placeFilters, {
+  enabled: () => selectedTab.value === 'places',
+})
 const sheetPreviewQuery = useEventListQuery(
   computed(() => sheetPreviewFilters.value ?? filters.value),
 )
 const eventList = computed(() => eventQuery.data.value?.content ?? [])
 const visibleEventCount = computed(() => eventList.value.length)
 const totalEventElements = computed(() => eventQuery.data.value?.totalElements ?? 0)
+const placeList = computed(() => placeQuery.data.value?.content ?? [])
+const visiblePlaceCount = computed(() => placeList.value.length)
 const sheetResultCount = computed(
   () => sheetPreviewQuery.data.value?.totalElements ?? totalEventElements.value,
 )
@@ -399,10 +414,34 @@ function addQueryList(
       </div>
     </template>
 
-    <StateEmpty
-      v-else
-      :description="t('explore.placesComingSoon')"
-    />
+    <template v-else>
+      <div class="flex items-center justify-between gap-4 pt-1">
+        <h2 class="text-title-sm text-ink">
+          {{ t('explore.placeResultCount', { count: visiblePlaceCount }) }}
+        </h2>
+      </div>
+
+      <StateLoading v-if="placeQuery.isPending.value" />
+      <StateError
+        v-else-if="placeQuery.isError.value"
+        :description="t('explore.placeListError')"
+        @retry="placeQuery.refetch"
+      />
+      <StateEmpty
+        v-else-if="placeList.length === 0"
+        :description="t('state.empty.description')"
+      />
+      <div
+        v-else
+        class="flex flex-col gap-3"
+      >
+        <PlaceCard
+          v-for="place in placeList"
+          :key="place.itemId"
+          :place="place"
+        />
+      </div>
+    </template>
 
     <ExploreFilterSheet
       v-if="selectedSheet !== null"

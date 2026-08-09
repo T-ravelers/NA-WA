@@ -189,7 +189,16 @@ export default {
       placeholder: 'Search events',
     },
     imageUnavailable: 'Event image unavailable',
-    placesComingSoon: 'Place browsing is coming soon.',
+    placePhoto: 'Place photo',
+    openPlace: 'Open {name}',
+    savePlaceUnavailable: 'Save place is not available yet',
+    placeResultCount: '{count} places',
+    placeListError: 'We could not load places right now.',
+    placeOptions: {
+      reservation: 'Reservation',
+      takeout: 'Takeout',
+      restroom: 'Restroom',
+    },
     eventListError: 'We could not load events right now.',
     detail: {
       back: 'Back to events',
