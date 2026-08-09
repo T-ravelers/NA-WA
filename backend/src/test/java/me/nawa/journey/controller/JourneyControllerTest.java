@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import me.nawa.auth.security.AuthenticatedMember;
@@ -123,6 +124,8 @@ class JourneyControllerTest {
             .visitDate(LocalDate.of(2026, 8, 8))
             .tripItemStatus("ADDED")
             .displayOrder(0)
+            .confirmedAt(null)
+            .createdAt(LocalDateTime.of(2026, 8, 8, 9, 30))
             .build();
         when(journeyService.addJourneyItem(
             eq(1L),
@@ -145,6 +148,11 @@ class JourneyControllerTest {
         assertEquals(7L, body.path("data").path("tripItemId").asLong());
         assertEquals("EVENT", body.path("data").path("itemType").asText());
         assertTrue(body.path("data").path("appointmentId").isNull());
+        assertEquals(
+            "2026-08-08T09:30:00",
+            body.path("data").path("createdAt").asText()
+        );
+        assertTrue(body.path("data").path("confirmedAt").isNull());
     }
 
     @Test

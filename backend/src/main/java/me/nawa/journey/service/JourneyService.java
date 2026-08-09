@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.journey.domain.Journey;
 import me.nawa.journey.domain.JourneyExploreItem;
 import me.nawa.journey.domain.JourneyItem;
@@ -141,13 +142,17 @@ public class JourneyService {
             );
         }
 
-        JourneyItem createdItem = journeyItem.getTripItemId() == null
-            ? journeyItem
-            : journeyMapper.findJourneyItemById(journeyItem.getTripItemId());
-        return toJourneyItemResponse(
-            createdItem == null ? journeyItem : createdItem,
-            tripId
+        if (journeyItem.getTripItemId() == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        JourneyItem createdItem = journeyMapper.findJourneyItemById(
+            journeyItem.getTripItemId()
         );
+        if (createdItem == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        return toJourneyItemResponse(createdItem);
     }
 
     @Transactional(readOnly = true)
@@ -422,17 +427,10 @@ public class JourneyService {
             .build();
     }
 
-    private JourneyItemResponse toJourneyItemResponse(
-        JourneyItem journeyItem,
-        Long tripId
-    ) {
+    private JourneyItemResponse toJourneyItemResponse(JourneyItem journeyItem) {
         return JourneyItemResponse.builder()
             .tripItemId(journeyItem.getTripItemId())
-            .journeyId(
-                journeyItem.getTripId() == null
-                    ? tripId
-                    : journeyItem.getTripId()
-            )
+            .journeyId(journeyItem.getTripId())
             .itemId(journeyItem.getItemId())
             .itemType(journeyItem.getItemType())
             .visitDate(journeyItem.getVisitDate())

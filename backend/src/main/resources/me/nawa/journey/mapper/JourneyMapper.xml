@@ -185,6 +185,10 @@
           )
     </select>
 
+    <!--
+        V5's unique key is not partial, so a soft-deleted row remains a
+        permanent duplicate until a future delete/restore policy changes it.
+    -->
     <select id="existsJourneyItem" resultType="boolean">
         SELECT EXISTS(
             SELECT 1
@@ -192,7 +196,6 @@
             WHERE trip_id = #{tripId}
               AND item_id = #{itemId}
               AND visit_date = #{visitDate}
-              AND deleted_at IS NULL
         )
     </select>
 

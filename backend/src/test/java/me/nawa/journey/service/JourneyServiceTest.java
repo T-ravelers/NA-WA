@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.journey.domain.Journey;
 import me.nawa.journey.domain.JourneyExploreItem;
 import me.nawa.journey.domain.JourneyItem;
@@ -134,6 +135,22 @@ class JourneyServiceTest {
             300L,
             request.getVisitDate()
         )).thenReturn(false);
+        doAnswer(invocation -> {
+            JourneyItem item = invocation.getArgument(0);
+            item.setTripItemId(902L);
+            return null;
+        }).when(journeyMapper).insertJourneyItem(any(JourneyItem.class));
+        when(journeyMapper.findJourneyItemById(902L)).thenReturn(
+            JourneyItem.builder()
+                .tripItemId(902L)
+                .tripId(90L)
+                .itemId(300L)
+                .itemType("PLACE")
+                .visitDate(request.getVisitDate())
+                .tripItemStatus("ADDED")
+                .displayOrder(0)
+                .build()
+        );
 
         journeyService.addJourneyItem(1L, 90L, request);
 
@@ -145,6 +162,61 @@ class JourneyServiceTest {
         assertEquals("ADDED", captor.getValue().getTripItemStatus());
         assertNull(captor.getValue().getAppointmentId());
         assertNull(captor.getValue().getConfirmedAt());
+    }
+
+    @Test
+    void addJourneyItem_throwsInternalError_whenGeneratedKeyIsMissing() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
+        );
+        when(journeyMapper.existsJourneyItem(
+            90L,
+            300L,
+            request.getVisitDate()
+        )).thenReturn(false);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            CommonErrorCode.INTERNAL_SERVER_ERROR,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).findJourneyItemById(any());
+    }
+
+    @Test
+    void addJourneyItem_throwsInternalError_whenCreatedItemCannotBeReloaded() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
+        );
+        when(journeyMapper.existsJourneyItem(
+            90L,
+            300L,
+            request.getVisitDate()
+        )).thenReturn(false);
+        doAnswer(invocation -> {
+            JourneyItem item = invocation.getArgument(0);
+            item.setTripItemId(903L);
+            return null;
+        }).when(journeyMapper).insertJourneyItem(any(JourneyItem.class));
+        when(journeyMapper.findJourneyItemById(903L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            CommonErrorCode.INTERNAL_SERVER_ERROR,
+            exception.getErrorCode()
+        );
     }
 
     @Test

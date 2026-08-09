@@ -1,5 +1,6 @@
 package me.nawa.journey.mapper;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
@@ -99,7 +100,7 @@ class JourneyMapperXmlTest {
             .replaceAll("\\s+", " ")
             .trim();
         assertTrue(duplicateSql.contains("FROM trip_items"));
-        assertTrue(duplicateSql.contains("deleted_at IS NULL"));
+        assertFalse(duplicateSql.contains("deleted_at IS NULL"));
 
         MappedStatement insertStatement = configuration
             .getMappedStatement(namespace + "insertJourneyItem");

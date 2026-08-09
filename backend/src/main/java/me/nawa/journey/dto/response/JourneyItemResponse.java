@@ -26,6 +26,16 @@ public class JourneyItemResponse {
     private Integer displayOrder;
     private String note;
     private Long appointmentId;
+
+    @JsonFormat(
+        shape = JsonFormat.Shape.STRING,
+        pattern = "yyyy-MM-dd'T'HH:mm:ss"
+    )
     private LocalDateTime confirmedAt;
+
+    @JsonFormat(
+        shape = JsonFormat.Shape.STRING,
+        pattern = "yyyy-MM-dd'T'HH:mm:ss"
+    )
     private LocalDateTime createdAt;
 }
