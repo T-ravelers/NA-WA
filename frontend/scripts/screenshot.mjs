@@ -307,6 +307,7 @@ function stubWalletApis(page) {
  * @type {{ name: string, path: string, setup?: Hook, prepare?: Hook }[]}
  */
 const SCREENS = [
+  { name: '00-welcome', path: '/' },
   { name: '01-sign-in', path: '/sign-in' },
   { name: '02-callback-failed', path: '/auth/callback?error=AUTH-014' },
   { name: '03-not-found', path: '/no-such-page' },

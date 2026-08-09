@@ -9,8 +9,9 @@ export default {
     welcome: {
       /** 줄바꿈이 조판의 일부다. 로케일마다 끊는 위치가 달라질 수 있다. */
       headline: 'Your trip,\non record',
-      body: 'Plan journeys in Korea, split costs with the people you travel with, and keep the receipts in one place.',
-      passLabel: 'Boarding · NA-WA',
+      body: 'Plan journeys in Korea, split costs with your crew, and see where every won went.',
+      /** 티켓 위 표기는 워드마크와 같은 `NAWA`다. 문장 속 `app.name`(NA-WA)과 다르다. */
+      passLabel: 'Boarding · NAWA',
       passTitle: 'Seoul & Beyond',
       passStamp: 'GO',
       start: 'Get started',

@@ -14,6 +14,7 @@
 | `AppCard`                                    | `surface-1` r20 면. 절취선 없는 카드                      |
 | `AppTicket`                                  | **시그니처.** 노치 + 퍼포레이션 티켓                      |
 | `TicketStamp`                                | 티켓 우하단 원형 도장                                     |
+| `BrandWordmark`                              | `NAWA` 워드마크. Ria Sans 조판을 고정한 벡터 패스         |
 | `CategoryChip`                               | 소비영역 칩. 필터 토글 / 티켓 안 정적 라벨 겸용           |
 | `CategoryDot`                                | 소비영역 8px 점. 타임라인·범례                            |
 | `AppBadge`                                   | 진행중·예정·정산·동행 등 짧은 상태 표식                   |

@@ -53,7 +53,7 @@ grep -rn 'font-display' src --include='*.vue'
 
 2026-08-09 기준 14개 파일 21곳이며, 각 화면의 제목(`text-screen-title`)과 섹션
 헤더(`text-section-header`), 그리고 온보딩 `WelcomeView`의 52px 헤드라인이 여기
-해당한다. **워드마크와 티켓 스탬프도 같은 토큰을 쓴다.**
+해당한다. **티켓 스탬프도 같은 토큰을 쓴다.**
 
 ### 되돌리는 방법
 
@@ -62,15 +62,19 @@ CDN 구독으로 웹폰트 사용권을 확보한 뒤 **로더만 추가한다.*
 
 **셀프 호스팅 `woff2`를 다시 추가하지 않는다.**
 
+## 로고
+
+온보딩의 `NAWA` 워드마크는 `shared/ui/BrandWordmark.vue`의 SVG 패스다. Ria Sans
+Regular로 조판한 네 글자만 고정했으며, 런타임 폰트 파일은 배포하지 않는다. 따라서
+Sztos 로드 여부와 관계없이 워드마크 모양이 유지되고 추가 네트워크 요청이나 FOUT이
+생기지 않는다.
+
 ## 아직 없는 폰트
 
 - **CJK Body**: `ja`, `zh-CN`, `zh-TW`용 Noto Sans JP/SC/TC. 원본 합계가 37MB라
   서브셋 후 로케일별 동적 로드로 추가한다. 전체 선로드는 하지 않는다.
 - **CJK Display**: Smiley Sans(`zh-CN`), Taipei Sans TC Beta(`zh-TW`),
   M PLUS 1(`ja`). 디자인 번들에 없다. 확보 전까지 Body 폰트로 폴백한다.
-- **로고**: `Ria Sans`는 런타임 폰트로 배포하지 않는다. 벡터 로고 자산이 확보될
-  때까지 워드마크는 `--font-display`를 쓰며, Sztos가 로드되지 않는 현재는 `Noto Sans`로
-  폴백한다.
 
 ## Service Worker
 
@@ -80,6 +84,8 @@ CDN 구독으로 웹폰트 사용권을 확보한 뒤 **로더만 추가한다.*
 ## 라이선스
 
 - **Noto Sans**: SIL Open Font License 1.1. 전문은 `NotoSans-OFL.txt`.
+- **Ria Sans**: 온보딩 워드마크 네 글자만 SVG 패스로 포함한다. 원본 폰트 파일은
+  저장소와 빌드 산출물에 넣지 않는다.
 - **Sztos**: 디자인 번들에 라이선스 파일이 포함되어 있지 않아 재배포 권한을 확인할 수
   없다. 셀프 호스팅 파일을 제거했다(#122). 이 저장소는 공개이므로 `public/` 아래에 둔
   폰트는 빌드 산출물과 배포본에서 누구나 내려받을 수 있다. **권한이 확인되지 않은
