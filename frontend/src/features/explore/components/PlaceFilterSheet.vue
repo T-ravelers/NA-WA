@@ -6,7 +6,7 @@ import { IconCheck, IconChevronDown, IconChevronUp } from '@tabler/icons-vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 
-import { EVENT_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
+import { PLACE_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
 import type { PlaceSearchFilters, PlaceSort } from '../model/placeExplore'
 import type { PlaceSheetKind } from './PlaceFilterBar.vue'
 
@@ -161,14 +161,14 @@ function isActivitySelected(activityId: number): boolean {
   return selectedActivities.value.has(activityId)
 }
 
-function isSectorFullySelected(sector: (typeof EVENT_SECTOR_OPTIONS)[number]): boolean {
+function isSectorFullySelected(sector: (typeof PLACE_SECTOR_OPTIONS)[number]): boolean {
   return (
     isSectorSelected(sector.id) ||
     sector.activities.every((activity) => selectedActivities.value.has(activity.id))
   )
 }
 
-function toggleSector(sector: (typeof EVENT_SECTOR_OPTIONS)[number]): void {
+function toggleSector(sector: (typeof PLACE_SECTOR_OPTIONS)[number]): void {
   const sectorIds = new Set(draft.sectorIds ?? [])
   const activityIds = new Set(draft.activityIds ?? [])
   const selected = isSectorFullySelected(sector)
@@ -308,7 +308,7 @@ function apply(): void {
         <template v-else-if="kind === 'category'">
           <div class="flex flex-col divide-y divide-hairline">
             <div
-              v-for="sector in EVENT_SECTOR_OPTIONS"
+              v-for="sector in PLACE_SECTOR_OPTIONS"
               :key="sector.id"
               class="py-3"
             >

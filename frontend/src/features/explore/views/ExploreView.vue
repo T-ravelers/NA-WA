@@ -23,7 +23,7 @@ import {
   type EventSearchFilters,
   type EventSort,
 } from '../model/eventExplore'
-import { EVENT_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
+import { EVENT_SECTOR_OPTIONS, PLACE_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
 import {
   PLACE_KINDS,
   normalizePlaceKind,
@@ -217,11 +217,11 @@ const placeActiveFilters = computed(() => {
     values.push({ key: `placeRegion2:${value}`, label: value }),
   )
   selectedPlaceSectorIds.value.forEach((value) => {
-    const sector = EVENT_SECTOR_OPTIONS.find((option) => option.id === value)
+    const sector = PLACE_SECTOR_OPTIONS.find((option) => option.id === value)
     if (sector) values.push({ key: `placeSector:${value}`, label: t(sector.labelKey) })
   })
   selectedPlaceActivityIds.value.forEach((value) => {
-    const activity = EVENT_SECTOR_OPTIONS.flatMap((sector) => sector.activities).find(
+    const activity = PLACE_SECTOR_OPTIONS.flatMap((sector) => sector.activities).find(
       (option) => option.id === value,
     )
     if (activity) values.push({ key: `placeActivity:${value}`, label: t(activity.labelKey) })

@@ -86,6 +86,7 @@ export default {
       dance: 'Dance',
       nonVerbal: 'Non-verbal',
       kPopConcert: 'K-pop Concert',
+      other: 'Other',
     },
     sheets: {
       date: 'Date',
