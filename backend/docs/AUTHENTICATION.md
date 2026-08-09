@@ -13,7 +13,7 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 | 공급자 콜백 | `GET /api/v1/auth/oauth2/callback/{provider}`                   | 자체 토큰 쿠키 발급 후 프런트엔드로 `302` 이동 |
 | 로그인 확인 | `GET /api/v1/members/me`                                        | 현재 회원 정보와 `onboardingRequired` 반환     |
 | 토큰 갱신   | `POST /api/v1/auth/refresh`                                     | access·refresh 쿠키 교체                       |
-| 로그아웃    | `POST /api/v1/auth/logout`                                      | Redis 세션 폐기와 인증 쿠키 삭제               |
+| 로그아웃    | `POST /api/v1/auth/logout`                                      | 인증 쿠키 삭제와 Redis 세션 폐기 시도           |
 
 `provider`는 `google` 또는 `line`만 허용합니다. 성공·실패 리다이렉트 URL에는
 토큰이나 개인정보를 넣지 않습니다. 실패 시에는 프런트엔드가 처리할 안정적인
@@ -29,6 +29,16 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 `GET /api/v1/members/me` 호출 하나로 로그인 여부 판정과 프로필 조회를 동시에
 끝냅니다. `auth/me`를 그대로 남겨 두면 화면 진입마다 두 번 요청하거나 죽은
 엔드포인트가 남는 결과가 되므로, 유지하는 대신 제거했습니다.
+
+### 로그아웃은 브라우저 인증 쿠키를 항상 삭제합니다
+
+`POST /api/v1/auth/logout`은 refresh 세션이 없거나 Redis 세션 폐기에 실패해도
+멱등적인 성공 응답과 access·refresh 삭제 쿠키를 반환합니다. 내부 세션 폐기 실패는
+서버 오류 로그로 기록하며, 토큰이나 세션 식별자는 로그에 남기지 않습니다.
+
+이 계약은 서버가 HTTP 응답을 반환한 경우에 적용됩니다. 네트워크 단절로 브라우저가
+응답을 받지 못하면 쿠키 삭제를 확인할 수 없으므로 프런트엔드는 성공으로 처리하지
+않습니다.
 
 ### 회원 프로필 응답
 
