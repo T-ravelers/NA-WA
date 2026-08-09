@@ -96,3 +96,8 @@ HttpOnly 인증 쿠키를 사용합니다.
 
 `placeKind=ETC`와 허용 목록 밖 또는 NULL인 값은 화면에서 `Other`로 표시합니다.
 Place의 기본 언어 콘텐츠는 번역 테이블이 아닌 `place` 기본 테이블에서 반환합니다.
+
+운영 원본(`operational_v9`)의 `place_kind`는 한국어 원천 분류값입니다. 애플리케이션은
+이를 위의 공개 값으로 정규화하며, 허용 목록 밖이거나 NULL인 값은 `ETC`로 처리합니다.
+로컬 목 SQL은 원천 `place_kind`와 운영 taxonomy의 Activity ID를 기준으로
+`place_activity`를 구성합니다. 이 ID는 taxonomy API가 제공되기 전 로컬 확인용입니다.

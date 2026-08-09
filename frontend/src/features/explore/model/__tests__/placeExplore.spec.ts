@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { normalizePlaceListResponse, toImageUrls } from '../placeExplore'
+import { normalizePlaceKind, normalizePlaceListResponse, toImageUrls } from '../placeExplore'
 
 describe('placeExplore model helpers', () => {
   it('normalizes nullable and invalid image entries', () => {
@@ -10,6 +10,14 @@ describe('placeExplore model helpers', () => {
       'place.jpg',
       ' detail.jpg ',
     ])
+  })
+
+  it('maps operational_v9 Korean place kinds to the public filter values', () => {
+    expect(normalizePlaceKind('관광식당')).toBe('RESTAURANT')
+    expect(normalizePlaceKind('카페')).toBe('CAFE')
+    expect(normalizePlaceKind('상설시장')).toBe('MARKET')
+    expect(normalizePlaceKind('뷰티매장')).toBe('BEAUTY')
+    expect(normalizePlaceKind('알 수 없는 원본 값')).toBe('ETC')
   })
 
   it('normalizes a nullable Place list payload for the screen', () => {

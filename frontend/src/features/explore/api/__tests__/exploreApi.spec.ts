@@ -20,7 +20,7 @@ describe('exploreApi', () => {
     const params = toSearchParams({
       eventKinds: ['POPUP', 'CONCERT'],
       sectorIds: [1],
-      activityIds: [101, 412],
+      activityIds: [1, 30],
       region1: ['Seoul', 'Busan'],
       region2Other: true,
       freeOnly: true,
@@ -30,7 +30,7 @@ describe('exploreApi', () => {
 
     expect(params.getAll('eventKinds')).toEqual(['POPUP', 'CONCERT'])
     expect(params.getAll('sectorIds')).toEqual(['1'])
-    expect(params.getAll('activityIds')).toEqual(['101', '412'])
+    expect(params.getAll('activityIds')).toEqual(['1', '30'])
     expect(params.getAll('region1')).toEqual(['Seoul', 'Busan'])
     expect(params.get('region2Other')).toBe('true')
     expect(params.get('freeOnly')).toBe('true')
@@ -66,7 +66,7 @@ describe('exploreApi', () => {
       region1: ['Seoul'],
       region2: ['Seongsu', 'Hongdae'],
       sectorIds: [2],
-      activityIds: [101, 102],
+      activityIds: [9, 10],
       placeKinds: ['RESTAURANT', 'CAFE'],
       hasParking: true,
       takeoutAvailable: false,
@@ -77,7 +77,7 @@ describe('exploreApi', () => {
     })
 
     expect(params.getAll('region2')).toEqual(['Seongsu', 'Hongdae'])
-    expect(params.getAll('activityIds')).toEqual(['101', '102'])
+    expect(params.getAll('activityIds')).toEqual(['9', '10'])
     expect(params.getAll('placeKinds')).toEqual(['RESTAURANT', 'CAFE'])
     expect(params.get('hasParking')).toBe('true')
     expect(params.get('takeoutAvailable')).toBe('false')

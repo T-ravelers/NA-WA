@@ -4,8 +4,42 @@ export const PLACE_KINDS = ['RESTAURANT', 'CAFE', 'MARKET', 'BEAUTY', 'ETC'] as 
 
 export type PlaceKind = (typeof PLACE_KINDS)[number]
 
+/**
+ * operational_v9 stores the source provider's Korean place-kind labels. The
+ * public API keeps the normalized five-value contract used by the UI.
+ */
+const SOURCE_PLACE_KIND_ALIASES: Record<string, PlaceKind> = {
+  관광식당: 'RESTAURANT',
+  서양식: 'RESTAURANT',
+  일식: 'RESTAURANT',
+  중식: 'RESTAURANT',
+  기타외국식: 'RESTAURANT',
+  '김밥 분식': 'RESTAURANT',
+  분식: 'RESTAURANT',
+  퓨전음식: 'RESTAURANT',
+  이동음식: 'RESTAURANT',
+  모범음식점: 'RESTAURANT',
+  카페: 'CAFE',
+  찻집: 'CAFE',
+  제과: 'CAFE',
+  기타음료점: 'CAFE',
+  상설시장: 'MARKET',
+  비상설시장: 'MARKET',
+  복합쇼핑몰: 'MARKET',
+  백화점: 'MARKET',
+  '관광기념품/특산물판매점': 'MARKET',
+  아웃렛: 'MARKET',
+  뷰티매장: 'BEAUTY',
+}
+
 export function normalizePlaceKind(value: string | null | undefined): PlaceKind {
-  return PLACE_KINDS.includes(value as PlaceKind) ? (value as PlaceKind) : 'ETC'
+  const trimmed = value?.trim()
+  if (!trimmed) return 'ETC'
+
+  const normalized = trimmed.toUpperCase()
+  if (PLACE_KINDS.includes(normalized as PlaceKind)) return normalized as PlaceKind
+
+  return SOURCE_PLACE_KIND_ALIASES[trimmed] ?? 'ETC'
 }
 
 export interface PlaceSummaryResponse {
