@@ -41,6 +41,20 @@ const FILTER_LABELS: Record<PlaceSheetKind, string> = {
   sort: 'explore.placeSheets.sort',
 }
 
+const FILTERABLE_SHEET_KINDS = ['region', 'category', 'options'] as const
+
+const FILTER_PREFIXES: Record<Exclude<PlaceSheetKind, 'sort'>, string[]> = {
+  region: ['placeRegion1:', 'placeRegion2:', 'placeRegion3:'],
+  category: ['placeSector:', 'placeActivity:'],
+  options: ['placeOption:'],
+}
+
+function filtersFor(kind: Exclude<PlaceSheetKind, 'sort'>): ActiveFilter[] {
+  return activeFilters.filter((filter) =>
+    FILTER_PREFIXES[kind].some((prefix) => filter.key.startsWith(prefix)),
+  )
+}
+
 const hasAnyFilter = computed(
   () => activeFilters.length > 0 || placeKindOptions.some((option) => option.selected),
 )
@@ -50,12 +64,12 @@ const hasAnyFilter = computed(
   <div class="flex min-w-0 flex-col gap-2">
     <div class="scrollbar-hidden -mx-screen flex gap-2 overflow-x-auto px-screen">
       <button
-        v-for="kind in ['region', 'category', 'options'] as PlaceSheetKind[]"
+        v-for="kind in FILTERABLE_SHEET_KINDS"
         :key="kind"
         type="button"
         class="flex h-11 shrink-0 items-center gap-1 rounded-pill border px-4 text-body-sm transition-colors"
         :class="
-          activeSheet === kind || activeFilters.some((filter) => filter.key.startsWith(kind))
+          activeSheet === kind || filtersFor(kind).length > 0
             ? 'border-paper-fill bg-paper-fill text-on-paper'
             : 'border-hairline-2 bg-transparent text-ink-2'
         "
@@ -63,10 +77,10 @@ const hasAnyFilter = computed(
       >
         {{ t(FILTER_LABELS[kind]) }}
         <span
-          v-if="activeFilters.some((filter) => filter.key.startsWith(kind))"
+          v-if="filtersFor(kind).length > 0"
           class="text-caption"
         >
-          · {{ activeFilters.filter((filter) => filter.key.startsWith(kind)).length }}
+          · {{ filtersFor(kind).length }}
         </span>
         <IconChevronDown
           :size="16"
