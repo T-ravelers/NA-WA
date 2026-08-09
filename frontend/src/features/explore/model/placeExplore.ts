@@ -5,8 +5,9 @@ export const PLACE_KINDS = ['RESTAURANT', 'CAFE', 'MARKET', 'BEAUTY', 'ETC'] as 
 export type PlaceKind = (typeof PLACE_KINDS)[number]
 
 /**
- * operational_v9 stores the source provider's Korean place-kind labels. The
- * public API keeps the normalized five-value contract used by the UI.
+ * operational_v9 stores the source provider's Korean place-kind labels (for
+ * example, 관광식당·카페·상설시장·뷰티매장). The public API keeps the
+ * normalized five-value contract used by the UI; ETC is rendered as Other.
  */
 const SOURCE_PLACE_KIND_ALIASES: Record<string, PlaceKind> = {
   관광식당: 'RESTAURANT',
@@ -29,6 +30,8 @@ const SOURCE_PLACE_KIND_ALIASES: Record<string, PlaceKind> = {
   백화점: 'MARKET',
   '관광기념품/특산물판매점': 'MARKET',
   아웃렛: 'MARKET',
+  '공방/공예품점': 'MARKET',
+  '바/펍': 'RESTAURANT',
   뷰티매장: 'BEAUTY',
 }
 

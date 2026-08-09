@@ -16,6 +16,8 @@ describe('placeExplore model helpers', () => {
     expect(normalizePlaceKind('관광식당')).toBe('RESTAURANT')
     expect(normalizePlaceKind('카페')).toBe('CAFE')
     expect(normalizePlaceKind('상설시장')).toBe('MARKET')
+    expect(normalizePlaceKind('공방/공예품점')).toBe('MARKET')
+    expect(normalizePlaceKind('바/펍')).toBe('RESTAURANT')
     expect(normalizePlaceKind('뷰티매장')).toBe('BEAUTY')
     expect(normalizePlaceKind('알 수 없는 원본 값')).toBe('ETC')
   })

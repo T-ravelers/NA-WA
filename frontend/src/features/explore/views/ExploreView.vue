@@ -12,6 +12,8 @@ import EventCard from '../components/EventCard.vue'
 import ExploreFilterBar from '../components/ExploreFilterBar.vue'
 import ExploreFilterSheet from '../components/ExploreFilterSheet.vue'
 import ExploreItemTabs from '../components/ExploreItemTabs.vue'
+import PlaceFilterBar from '../components/PlaceFilterBar.vue'
+import PlaceFilterSheet from '../components/PlaceFilterSheet.vue'
 import PlaceCard from '../components/PlaceCard.vue'
 import { useEventListQuery } from '../composables/useEventListQuery'
 import { usePlaceListQuery } from '../composables/usePlaceListQuery'
@@ -22,7 +24,13 @@ import {
   type EventSort,
 } from '../model/eventExplore'
 import { EVENT_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
-import type { PlaceSearchFilters, PlaceSort } from '../model/placeExplore'
+import {
+  PLACE_KINDS,
+  normalizePlaceKind,
+  type PlaceKind,
+  type PlaceSearchFilters,
+  type PlaceSort,
+} from '../model/placeExplore'
 
 type ExploreSheetKind = 'date' | 'region' | 'category' | 'options' | 'sort'
 
@@ -51,8 +59,23 @@ const openWeekendOnly = ref(readQueryBoolean('openWeekendOnly'))
 const opensLateOnly = ref(readQueryBoolean('opensLateOnly'))
 const preReservationOnly = ref(readQueryBoolean('preReservationOnly'))
 const experienceOnly = ref(readQueryBoolean('experienceOnly'))
-const placeSort = ref<PlaceSort>('LATEST')
+const selectedPlaceKinds = ref<PlaceKind[]>(readQueryList('placeKinds').map(normalizePlaceKind))
+const selectedPlaceSectorIds = ref(readQueryNumberList('placeSectorIds'))
+const selectedPlaceActivityIds = ref(readQueryNumberList('placeActivityIds'))
+const selectedPlaceRegion1 = ref(readQueryList('placeRegion1'))
+const selectedPlaceRegion2 = ref(readQueryList('placeRegion2'))
+const selectedPlaceRegion3 = ref(readQueryList('placeRegion3'))
+const selectedPlaceHasForeignLang = ref(readQueryBoolean('hasForeignLang'))
+const selectedPlaceHasParking = ref(readQueryBoolean('hasParking'))
+const selectedPlaceReservable = ref(readQueryBoolean('reservable'))
+const selectedPlaceTakeout = ref(readQueryBoolean('takeoutAvailable'))
+const selectedPlaceCardPayment = ref(readQueryBoolean('cardPaymentAvailable'))
+const selectedPlaceSmokeFree = ref(readQueryBoolean('smokeFree'))
+const selectedPlaceKidFacility = ref(readQueryBoolean('kidFacility'))
+const selectedPlaceRestroom = ref(readQueryBoolean('hasRestroom'))
+const placeSort = ref<PlaceSort>(readPlaceSort(readQueryString('placeSort')))
 const sheetPreviewFilters = ref<EventSearchFilters | null>(null)
+const placeSheetPreviewFilters = ref<PlaceSearchFilters | null>(null)
 
 const filters = computed<EventSearchFilters>(() => ({
   language: locale.value,
@@ -83,12 +106,32 @@ const placeFilters = computed<PlaceSearchFilters>(() => ({
   page: 0,
   size: 20,
   sort: placeSort.value,
+  keyword: keyword.value || undefined,
+  placeKinds: selectedPlaceKinds.value.length > 0 ? selectedPlaceKinds.value : undefined,
+  sectorIds: selectedPlaceSectorIds.value.length > 0 ? selectedPlaceSectorIds.value : undefined,
+  activityIds:
+    selectedPlaceActivityIds.value.length > 0 ? selectedPlaceActivityIds.value : undefined,
+  region1: selectedPlaceRegion1.value.length > 0 ? selectedPlaceRegion1.value : undefined,
+  region2: selectedPlaceRegion2.value.length > 0 ? selectedPlaceRegion2.value : undefined,
+  region3: selectedPlaceRegion3.value.length > 0 ? selectedPlaceRegion3.value : undefined,
+  hasForeignLang: selectedPlaceHasForeignLang.value || undefined,
+  hasParking: selectedPlaceHasParking.value || undefined,
+  reservable: selectedPlaceReservable.value || undefined,
+  takeoutAvailable: selectedPlaceTakeout.value || undefined,
+  cardPaymentAvailable: selectedPlaceCardPayment.value || undefined,
+  smokeFree: selectedPlaceSmokeFree.value || undefined,
+  kidFacility: selectedPlaceKidFacility.value || undefined,
+  hasRestroom: selectedPlaceRestroom.value || undefined,
 }))
 const placeQuery = usePlaceListQuery(placeFilters, {
   enabled: () => selectedTab.value === 'places',
 })
 const sheetPreviewQuery = useEventListQuery(
   computed(() => sheetPreviewFilters.value ?? filters.value),
+)
+const placeSheetPreviewQuery = usePlaceListQuery(
+  computed(() => placeSheetPreviewFilters.value ?? placeFilters.value),
+  { enabled: () => selectedTab.value === 'places' && selectedSheet.value !== null },
 )
 const eventList = computed(() => eventQuery.data.value?.content ?? [])
 const visibleEventCount = computed(() => eventList.value.length)
@@ -97,6 +140,10 @@ const placeList = computed(() => placeQuery.data.value?.content ?? [])
 const visiblePlaceCount = computed(() => placeList.value.length)
 const sheetResultCount = computed(
   () => sheetPreviewQuery.data.value?.totalElements ?? totalEventElements.value,
+)
+const placeSheetResultCount = computed(
+  () =>
+    placeSheetPreviewQuery.data.value?.totalElements ?? placeQuery.data.value?.totalElements ?? 0,
 )
 
 const eventKindOptions = computed(() =>
@@ -108,6 +155,15 @@ const eventKindOptions = computed(() =>
 )
 
 const sortLabel = computed(() => t(`explore.sort.${sort.value.toLowerCase()}`))
+const placeSortLabel = computed(() => t(`explore.sort.${placeSort.value.toLowerCase()}`))
+
+const placeKindOptions = computed(() =>
+  PLACE_KINDS.map((kind) => ({
+    key: kind,
+    label: t(`explore.placeKinds.${kind}`),
+    selected: selectedPlaceKinds.value.includes(kind),
+  })),
+)
 
 const activeFilters = computed(() => {
   const values: Array<{ key: string; label: string }> = []
@@ -150,9 +206,56 @@ const activeFilters = computed(() => {
   return values
 })
 
+const placeActiveFilters = computed(() => {
+  const values: Array<{ key: string; label: string }> = []
+
+  selectedPlaceRegion1.value.forEach((value) =>
+    values.push({ key: `placeRegion1:${value}`, label: value }),
+  )
+  selectedPlaceRegion2.value.forEach((value) =>
+    values.push({ key: `placeRegion2:${value}`, label: value }),
+  )
+  selectedPlaceRegion3.value.forEach((value) =>
+    values.push({ key: `placeRegion3:${value}`, label: value }),
+  )
+
+  selectedPlaceSectorIds.value.forEach((value) => {
+    const sector = EVENT_SECTOR_OPTIONS.find((option) => option.id === value)
+    if (sector) values.push({ key: `placeSector:${value}`, label: t(sector.labelKey) })
+  })
+  selectedPlaceActivityIds.value.forEach((value) => {
+    const activity = EVENT_SECTOR_OPTIONS.flatMap((sector) => sector.activities).find(
+      (option) => option.id === value,
+    )
+    if (activity) values.push({ key: `placeActivity:${value}`, label: t(activity.labelKey) })
+  })
+
+  const options: Array<[string, boolean, string]> = [
+    [
+      'hasForeignLang',
+      selectedPlaceHasForeignLang.value,
+      t('explore.placeFilterOptions.foreignLanguage'),
+    ],
+    ['hasParking', selectedPlaceHasParking.value, t('explore.placeFilterOptions.parking')],
+    ['reservable', selectedPlaceReservable.value, t('explore.placeFilterOptions.reservation')],
+    ['takeoutAvailable', selectedPlaceTakeout.value, t('explore.placeFilterOptions.takeout')],
+    ['cardPaymentAvailable', selectedPlaceCardPayment.value, t('explore.placeFilterOptions.card')],
+    ['smokeFree', selectedPlaceSmokeFree.value, t('explore.placeFilterOptions.smokeFree')],
+    ['kidFacility', selectedPlaceKidFacility.value, t('explore.placeFilterOptions.kids')],
+    ['hasRestroom', selectedPlaceRestroom.value, t('explore.placeFilterOptions.restroom')],
+  ]
+  options.forEach(([key, selected, label]) => {
+    if (selected) values.push({ key: `placeOption:${key}`, label })
+  })
+
+  return values
+})
+
 watch(
   filters,
   (next) => {
+    if (selectedTab.value !== 'events') return
+
     const query: LocationQueryRaw = {}
     addQueryList(query, 'eventKinds', next.eventKinds)
     addQueryList(query, 'sectorIds', next.sectorIds)
@@ -177,9 +280,44 @@ watch(
   { deep: true },
 )
 
+watch(
+  placeFilters,
+  (next) => {
+    if (selectedTab.value !== 'places') return
+
+    const query: LocationQueryRaw = {}
+    addQueryList(query, 'placeKinds', next.placeKinds)
+    addQueryList(query, 'placeSectorIds', next.sectorIds)
+    addQueryList(query, 'placeActivityIds', next.activityIds)
+    addQueryList(query, 'placeRegion1', next.region1)
+    addQueryList(query, 'placeRegion2', next.region2)
+    addQueryList(query, 'placeRegion3', next.region3)
+    addQueryValue(query, 'keyword', next.keyword)
+    addQueryValue(query, 'placeSort', next.sort === 'LATEST' ? undefined : next.sort)
+    addQueryValue(query, 'hasForeignLang', next.hasForeignLang)
+    addQueryValue(query, 'hasParking', next.hasParking)
+    addQueryValue(query, 'reservable', next.reservable)
+    addQueryValue(query, 'takeoutAvailable', next.takeoutAvailable)
+    addQueryValue(query, 'cardPaymentAvailable', next.cardPaymentAvailable)
+    addQueryValue(query, 'smokeFree', next.smokeFree)
+    addQueryValue(query, 'kidFacility', next.kidFacility)
+    addQueryValue(query, 'hasRestroom', next.hasRestroom)
+    router.replace({ query }).catch(() => undefined)
+  },
+  { deep: true },
+)
+
+watch(selectedTab, closeSheet)
+
 function openSheet(kind: ExploreSheetKind): void {
   selectedSheet.value = kind
-  sheetPreviewFilters.value = { ...filters.value }
+  if (selectedTab.value === 'events') {
+    sheetPreviewFilters.value = { ...filters.value }
+    placeSheetPreviewFilters.value = null
+  } else if (kind !== 'date') {
+    placeSheetPreviewFilters.value = { ...placeFilters.value }
+    sheetPreviewFilters.value = null
+  }
 }
 
 function applySheet(next: EventSearchFilters): void {
@@ -203,13 +341,51 @@ function applySheet(next: EventSearchFilters): void {
   sheetPreviewFilters.value = null
 }
 
+function applyPlaceSheet(next: PlaceSearchFilters): void {
+  selectedPlaceKinds.value = next.placeKinds ?? []
+  selectedPlaceSectorIds.value = next.sectorIds ?? []
+  selectedPlaceActivityIds.value = next.activityIds ?? []
+  selectedPlaceRegion1.value = next.region1 ?? []
+  selectedPlaceRegion2.value = next.region2 ?? []
+  selectedPlaceRegion3.value = next.region3 ?? []
+  placeSort.value = next.sort ?? 'LATEST'
+  selectedPlaceHasForeignLang.value = next.hasForeignLang ?? false
+  selectedPlaceHasParking.value = next.hasParking ?? false
+  selectedPlaceReservable.value = next.reservable ?? false
+  selectedPlaceTakeout.value = next.takeoutAvailable ?? false
+  selectedPlaceCardPayment.value = next.cardPaymentAvailable ?? false
+  selectedPlaceSmokeFree.value = next.smokeFree ?? false
+  selectedPlaceKidFacility.value = next.kidFacility ?? false
+  selectedPlaceRestroom.value = next.hasRestroom ?? false
+  selectedSheet.value = null
+  placeSheetPreviewFilters.value = null
+}
+
 function previewSheet(next: EventSearchFilters): void {
   sheetPreviewFilters.value = { ...next, page: 0, size: 20, language: locale.value }
+}
+
+function previewPlaceSheet(next: PlaceSearchFilters): void {
+  placeSheetPreviewFilters.value = { ...next, page: 0, size: 20, language: locale.value }
 }
 
 function closeSheet(): void {
   selectedSheet.value = null
   sheetPreviewFilters.value = null
+  placeSheetPreviewFilters.value = null
+}
+
+function togglePlaceKind(kind: PlaceKind): void {
+  selectedPlaceKinds.value = selectedPlaceKinds.value.includes(kind)
+    ? selectedPlaceKinds.value.filter((value) => value !== kind)
+    : [...selectedPlaceKinds.value, kind]
+}
+
+function openPlaceDetail(placeId: number): void {
+  void router.push({
+    name: 'explore-place-detail',
+    params: { placeId },
+  })
 }
 
 function toggleEventKind(kind: string): void {
@@ -271,6 +447,61 @@ function removeFilter(key: string): void {
   }
 }
 
+function removePlaceFilter(key: string): void {
+  if (key === '*') {
+    selectedPlaceKinds.value = []
+    selectedPlaceSectorIds.value = []
+    selectedPlaceActivityIds.value = []
+    selectedPlaceRegion1.value = []
+    selectedPlaceRegion2.value = []
+    selectedPlaceRegion3.value = []
+    placeSort.value = 'LATEST'
+    selectedPlaceHasForeignLang.value = false
+    selectedPlaceHasParking.value = false
+    selectedPlaceReservable.value = false
+    selectedPlaceTakeout.value = false
+    selectedPlaceCardPayment.value = false
+    selectedPlaceSmokeFree.value = false
+    selectedPlaceKidFacility.value = false
+    selectedPlaceRestroom.value = false
+    return
+  }
+
+  if (key.startsWith('placeRegion1:')) {
+    selectedPlaceRegion1.value = selectedPlaceRegion1.value.filter(
+      (value) => `placeRegion1:${value}` !== key,
+    )
+  } else if (key.startsWith('placeRegion2:')) {
+    selectedPlaceRegion2.value = selectedPlaceRegion2.value.filter(
+      (value) => `placeRegion2:${value}` !== key,
+    )
+  } else if (key.startsWith('placeRegion3:')) {
+    selectedPlaceRegion3.value = selectedPlaceRegion3.value.filter(
+      (value) => `placeRegion3:${value}` !== key,
+    )
+  } else if (key.startsWith('placeSector:')) {
+    const sectorId = Number(key.slice('placeSector:'.length))
+    selectedPlaceSectorIds.value = selectedPlaceSectorIds.value.filter(
+      (value) => value !== sectorId,
+    )
+  } else if (key.startsWith('placeActivity:')) {
+    const activityId = Number(key.slice('placeActivity:'.length))
+    selectedPlaceActivityIds.value = selectedPlaceActivityIds.value.filter(
+      (value) => value !== activityId,
+    )
+  } else if (key.startsWith('placeOption:')) {
+    const option = key.slice('placeOption:'.length)
+    if (option === 'hasForeignLang') selectedPlaceHasForeignLang.value = false
+    if (option === 'hasParking') selectedPlaceHasParking.value = false
+    if (option === 'reservable') selectedPlaceReservable.value = false
+    if (option === 'takeoutAvailable') selectedPlaceTakeout.value = false
+    if (option === 'cardPaymentAvailable') selectedPlaceCardPayment.value = false
+    if (option === 'smokeFree') selectedPlaceSmokeFree.value = false
+    if (option === 'kidFacility') selectedPlaceKidFacility.value = false
+    if (option === 'hasRestroom') selectedPlaceRestroom.value = false
+  }
+}
+
 function readQueryString(key: string): string | undefined {
   const value = route.query[key]
   return Array.isArray(value) ? (value[0] ?? undefined) : (value ?? undefined)
@@ -294,6 +525,10 @@ function readQueryBoolean(key: string): boolean {
 
 function readSort(value: string | undefined): EventSort {
   return value === 'POPULAR' || value === 'ENDING_SOON' ? value : 'LATEST'
+}
+
+function readPlaceSort(value: string | undefined): PlaceSort {
+  return value === 'POPULAR' ? value : 'LATEST'
 }
 
 function isEventKind(value: string): value is EventKind {
@@ -326,7 +561,9 @@ function addQueryList(
       <button
         type="button"
         class="flex size-12 items-center justify-center rounded-pill bg-surface-2 text-ink"
-        :aria-label="t('explore.search.open')"
+        :aria-label="
+          t(selectedTab === 'events' ? 'explore.search.open' : 'explore.search.placeOpen')
+        "
         :aria-pressed="searchOpen"
         @click="searchOpen = !searchOpen"
       >
@@ -351,8 +588,16 @@ function addQueryList(
         v-model="keyword"
         type="search"
         class="min-w-0 flex-1 bg-transparent py-3 text-body text-ink outline-none placeholder:text-ink-3"
-        :placeholder="t('explore.search.placeholder')"
-        :aria-label="t('explore.search.label')"
+        :placeholder="
+          t(
+            selectedTab === 'events'
+              ? 'explore.search.placeholder'
+              : 'explore.search.placePlaceholder',
+          )
+        "
+        :aria-label="
+          t(selectedTab === 'events' ? 'explore.search.label' : 'explore.search.placeLabel')
+        "
       />
     </div>
 
@@ -415,10 +660,31 @@ function addQueryList(
     </template>
 
     <template v-else>
+      <PlaceFilterBar
+        :active-sheet="selectedSheet === 'date' ? null : selectedSheet"
+        :place-kind-options="placeKindOptions"
+        :active-filters="placeActiveFilters"
+        @open="openSheet"
+        @remove="removePlaceFilter"
+        @toggle-kind="togglePlaceKind"
+      />
+
       <div class="flex items-center justify-between gap-4 pt-1">
         <h2 class="text-title-sm text-ink">
           {{ t('explore.placeResultCount', { count: visiblePlaceCount }) }}
         </h2>
+        <button
+          type="button"
+          class="flex items-center gap-1 text-body-sm text-ink-2"
+          @click="openSheet('sort')"
+        >
+          {{ placeSortLabel }}
+          <IconChevronDown
+            :size="16"
+            :stroke-width="1.8"
+            aria-hidden="true"
+          />
+        </button>
       </div>
 
       <StateLoading v-if="placeQuery.isPending.value" />
@@ -439,19 +705,29 @@ function addQueryList(
           v-for="place in placeList"
           :key="place.itemId"
           :place="place"
-          @open="router.push({ name: 'explore-place-detail', params: { placeId: place.itemId } })"
+          @open="openPlaceDetail"
         />
       </div>
     </template>
 
     <ExploreFilterSheet
-      v-if="selectedSheet !== null"
+      v-if="selectedSheet !== null && selectedTab === 'events'"
       :kind="selectedSheet"
       :filters="filters"
       :result-count="sheetResultCount"
       @close="closeSheet"
       @change="previewSheet"
       @apply="applySheet"
+    />
+
+    <PlaceFilterSheet
+      v-if="selectedSheet !== null && selectedTab === 'places' && selectedSheet !== 'date'"
+      :kind="selectedSheet"
+      :filters="placeFilters"
+      :result-count="placeSheetResultCount"
+      @close="closeSheet"
+      @change="previewPlaceSheet"
+      @apply="applyPlaceSheet"
     />
   </section>
 </template>

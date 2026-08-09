@@ -94,6 +94,12 @@ export default {
       options: 'Options',
       sort: 'Sort by',
     },
+    placeSheets: {
+      region: 'Region',
+      category: 'Category',
+      options: 'Options',
+      sort: 'Sort by',
+    },
     filter: {
       reset: 'Reset',
       close: 'Close filter sheet',
@@ -172,6 +178,7 @@ export default {
     regionHint: 'Deselecting a region also clears its areas.',
     categoryHint: 'Selecting multiple categories matches any selected category.',
     optionsHint: 'Independent conditions — results match all selected.',
+    placeOptionsHint: 'Independent conditions — results match all selected.',
     eventPhoto: 'Event photo',
     statuses: {
       SCHEDULED: 'Opening soon',
@@ -201,6 +208,9 @@ export default {
       open: 'Search events',
       label: 'Search event name or description',
       placeholder: 'Search events',
+      placeOpen: 'Search places',
+      placeLabel: 'Search place name, brand, or address',
+      placePlaceholder: 'Search places',
     },
     imageUnavailable: 'Event image unavailable',
     placePhoto: 'Place photo',
@@ -211,6 +221,16 @@ export default {
     placeOptions: {
       reservation: 'Reservation',
       takeout: 'Takeout',
+      restroom: 'Restroom',
+    },
+    placeFilterOptions: {
+      foreignLanguage: 'Foreign language',
+      parking: 'Parking',
+      reservation: 'Reservation',
+      takeout: 'Takeout',
+      card: 'Card payment',
+      smokeFree: 'Smoke-free',
+      kids: 'Kids facility',
       restroom: 'Restroom',
     },
     placeDetail: {
