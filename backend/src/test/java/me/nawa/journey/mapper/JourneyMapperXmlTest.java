@@ -1,5 +1,6 @@
 package me.nawa.journey.mapper;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
@@ -43,6 +44,14 @@ class JourneyMapperXmlTest {
         assertTrue(configuration.hasStatement(
             namespace + "findTimelineItemsByTripId"
         ));
+        assertTrue(configuration.hasStatement(
+            namespace + "findAvailableExploreItemById"
+        ));
+        assertTrue(configuration.hasStatement(namespace + "existsJourneyItem"));
+        assertTrue(configuration.hasStatement(namespace + "insertJourneyItem"));
+        assertTrue(configuration.hasStatement(
+            namespace + "findJourneyItemById"
+        ));
 
         MappedStatement timelineStatement = configuration.getMappedStatement(
             namespace + "findTimelineItemsByTripId"
@@ -64,5 +73,50 @@ class JourneyMapperXmlTest {
             "ORDER BY ti.visit_date ASC, ti.display_order ASC, "
                 + "ti.trip_item_id ASC"
         ));
+
+        MappedStatement availableItemStatement = configuration
+            .getMappedStatement(namespace + "findAvailableExploreItemById");
+        String availableItemSql = availableItemStatement
+            .getBoundSql(Map.of("itemId", 1L))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+        assertTrue(availableItemSql.contains("ei.approval_status = 'APPROVED'"));
+        assertTrue(availableItemSql.contains("ei.visibility_status = 'VISIBLE'"));
+        assertTrue(availableItemSql.contains("e.status IN ('SCHEDULED', 'ONGOING')"));
+        assertTrue(availableItemSql.contains("p.is_active = TRUE"));
+        assertTrue(availableItemSql.contains("e.deleted_at IS NULL"));
+        assertTrue(availableItemSql.contains("p.deleted_at IS NULL"));
+
+        MappedStatement duplicateStatement = configuration
+            .getMappedStatement(namespace + "existsJourneyItem");
+        String duplicateSql = duplicateStatement
+            .getBoundSql(Map.of(
+                "tripId", 1L,
+                "itemId", 2L,
+                "visitDate", java.time.LocalDate.of(2026, 8, 8)
+            ))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+        assertTrue(duplicateSql.contains("FROM trip_items"));
+        assertFalse(duplicateSql.contains("deleted_at IS NULL"));
+
+        MappedStatement insertStatement = configuration
+            .getMappedStatement(namespace + "insertJourneyItem");
+        String insertSql = insertStatement
+            .getBoundSql(Map.of(
+                "tripId", 1L,
+                "itemId", 2L,
+                "visitDate", java.time.LocalDate.of(2026, 8, 8),
+                "displayOrder", 0,
+                "note", "note"
+            ))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+        assertTrue(insertSql.contains("INSERT INTO trip_items"));
+        assertTrue(insertSql.contains("'ADDED'"));
+        assertTrue(insertSql.contains("NULL"));
     }
 }

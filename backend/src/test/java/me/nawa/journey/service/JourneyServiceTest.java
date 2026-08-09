@@ -18,11 +18,16 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.journey.domain.Journey;
+import me.nawa.journey.domain.JourneyExploreItem;
+import me.nawa.journey.domain.JourneyItem;
 import me.nawa.journey.domain.JourneyTimelineItem;
 import me.nawa.journey.domain.TripRegion;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
+import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
+import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineResponse;
 import me.nawa.journey.dto.response.JourneySummaryResponse;
@@ -30,6 +35,7 @@ import me.nawa.journey.exception.JourneyErrorCode;
 import me.nawa.journey.mapper.JourneyMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.dao.DuplicateKeyException;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -61,6 +67,301 @@ class JourneyServiceTest {
         assertEquals(BigDecimal.valueOf(1000), result.getBudgetAmount());
         assertEquals(List.of(), result.getRegions());
         verify(journeyMapper, never()).insertRegions(anyList());
+    }
+
+    @Test
+    void addJourneyItem_createsAddedEventWithNullConfirmationFields() {
+        JourneyItemCreateRequest request = itemRequest();
+        request.setDisplayOrder(2);
+        request.setNote("오전 방문");
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            JourneyExploreItem.builder()
+                .itemId(300L)
+                .itemType("EVENT")
+                .build()
+        );
+        when(journeyMapper.existsJourneyItem(
+            90L,
+            300L,
+            request.getVisitDate()
+        )).thenReturn(false);
+        doAnswer(invocation -> {
+            JourneyItem item = invocation.getArgument(0);
+            item.setTripItemId(901L);
+            return null;
+        }).when(journeyMapper).insertJourneyItem(any(JourneyItem.class));
+        when(journeyMapper.findJourneyItemById(901L)).thenReturn(
+            JourneyItem.builder()
+                .tripItemId(901L)
+                .tripId(90L)
+                .itemId(300L)
+                .itemType("EVENT")
+                .visitDate(request.getVisitDate())
+                .tripItemStatus("ADDED")
+                .displayOrder(2)
+                .note("오전 방문")
+                .createdAt(LocalDateTime.of(2026, 4, 1, 10, 0))
+                .build()
+        );
+
+        JourneyItemResponse result = journeyService.addJourneyItem(
+            1L,
+            90L,
+            request
+        );
+
+        assertEquals(901L, result.getTripItemId());
+        assertEquals(90L, result.getJourneyId());
+        assertEquals("EVENT", result.getItemType());
+        assertEquals("ADDED", result.getTripItemStatus());
+        assertEquals(2, result.getDisplayOrder());
+        assertEquals("오전 방문", result.getNote());
+        assertNull(result.getAppointmentId());
+        assertNull(result.getConfirmedAt());
+    }
+
+    @Test
+    void addJourneyItem_defaultsDisplayOrderAndNormalizesBlankNote() {
+        JourneyItemCreateRequest request = itemRequest();
+        request.setDisplayOrder(null);
+        request.setNote("  ");
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            JourneyExploreItem.builder().itemId(300L).itemType("PLACE").build()
+        );
+        when(journeyMapper.existsJourneyItem(
+            90L,
+            300L,
+            request.getVisitDate()
+        )).thenReturn(false);
+        doAnswer(invocation -> {
+            JourneyItem item = invocation.getArgument(0);
+            item.setTripItemId(902L);
+            return null;
+        }).when(journeyMapper).insertJourneyItem(any(JourneyItem.class));
+        when(journeyMapper.findJourneyItemById(902L)).thenReturn(
+            JourneyItem.builder()
+                .tripItemId(902L)
+                .tripId(90L)
+                .itemId(300L)
+                .itemType("PLACE")
+                .visitDate(request.getVisitDate())
+                .tripItemStatus("ADDED")
+                .displayOrder(0)
+                .build()
+        );
+
+        journeyService.addJourneyItem(1L, 90L, request);
+
+        org.mockito.ArgumentCaptor<JourneyItem> captor =
+            org.mockito.ArgumentCaptor.forClass(JourneyItem.class);
+        verify(journeyMapper).insertJourneyItem(captor.capture());
+        assertEquals(0, captor.getValue().getDisplayOrder());
+        assertNull(captor.getValue().getNote());
+        assertEquals("ADDED", captor.getValue().getTripItemStatus());
+        assertNull(captor.getValue().getAppointmentId());
+        assertNull(captor.getValue().getConfirmedAt());
+    }
+
+    @Test
+    void addJourneyItem_throwsInternalError_whenGeneratedKeyIsMissing() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
+        );
+        when(journeyMapper.existsJourneyItem(
+            90L,
+            300L,
+            request.getVisitDate()
+        )).thenReturn(false);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            CommonErrorCode.INTERNAL_SERVER_ERROR,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).findJourneyItemById(any());
+    }
+
+    @Test
+    void addJourneyItem_throwsInternalError_whenCreatedItemCannotBeReloaded() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
+        );
+        when(journeyMapper.existsJourneyItem(
+            90L,
+            300L,
+            request.getVisitDate()
+        )).thenReturn(false);
+        doAnswer(invocation -> {
+            JourneyItem item = invocation.getArgument(0);
+            item.setTripItemId(903L);
+            return null;
+        }).when(journeyMapper).insertJourneyItem(any(JourneyItem.class));
+        when(journeyMapper.findJourneyItemById(903L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            CommonErrorCode.INTERNAL_SERVER_ERROR,
+            exception.getErrorCode()
+        );
+    }
+
+    @Test
+    void addJourneyItem_throwsDuplicate_whenExistingItemMatchesTripDate() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
+        );
+        when(journeyMapper.existsJourneyItem(
+            90L,
+            300L,
+            request.getVisitDate()
+        )).thenReturn(true);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_ITEM_DUPLICATE,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).insertJourneyItem(any(JourneyItem.class));
+    }
+
+    @Test
+    void addJourneyItem_mapsConcurrentUniqueViolationToDuplicate() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
+        );
+        when(journeyMapper.existsJourneyItem(
+            90L,
+            300L,
+            request.getVisitDate()
+        )).thenReturn(false);
+        org.mockito.Mockito.doThrow(new DuplicateKeyException("duplicate"))
+            .when(journeyMapper).insertJourneyItem(any(JourneyItem.class));
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_ITEM_DUPLICATE,
+            exception.getErrorCode()
+        );
+    }
+
+    @Test
+    void addJourneyItem_throwsDateError_whenVisitDateIsOutsideJourney() {
+        JourneyItemCreateRequest request = itemRequest();
+        request.setVisitDate(LocalDate.of(2026, 4, 4));
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
+        );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_ITEM_DATE_OUT_OF_RANGE,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).insertJourneyItem(any(JourneyItem.class));
+    }
+
+    @Test
+    void addJourneyItem_throwsDisplayOrderError_whenNegative() {
+        JourneyItemCreateRequest request = itemRequest();
+        request.setDisplayOrder(-1);
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_ITEM_DISPLAY_ORDER_INVALID,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).findAvailableExploreItemById(300L);
+    }
+
+    @Test
+    void addJourneyItem_throwsNotFound_whenExploreItemIsUnavailable() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_ITEM_NOT_FOUND,
+            exception.getErrorCode()
+        );
+    }
+
+    @Test
+    void addJourneyItem_throwsTypeError_whenExploreItemTypeIsUnsupported() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            JourneyExploreItem.builder().itemId(300L).itemType("HOTEL").build()
+        );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_ITEM_TYPE_UNSUPPORTED,
+            exception.getErrorCode()
+        );
+    }
+
+    @Test
+    void addJourneyItem_throwsForbidden_whenJourneyHasDifferentOwner() {
+        JourneyItemCreateRequest request = itemRequest();
+        Journey journey = ownedJourney(90L);
+        journey.setMemberId(2L);
+        when(journeyMapper.findJourneyById(90L)).thenReturn(journey);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_FORBIDDEN,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).findAvailableExploreItemById(300L);
     }
 
     @Test
@@ -376,6 +677,13 @@ class JourneyServiceTest {
             .region1("Seoul")
             .addressRoad("1 Jong-ro")
             .build();
+    }
+
+    private JourneyItemCreateRequest itemRequest() {
+        JourneyItemCreateRequest request = new JourneyItemCreateRequest();
+        request.setItemId(300L);
+        request.setVisitDate(LocalDate.of(2026, 4, 1));
+        return request;
     }
 
     private JourneyCreateRequest validRequest() {

@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
+import me.nawa.journey.dto.request.JourneyItemCreateRequest;
+import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineResponse;
 import me.nawa.journey.dto.response.JourneySummaryResponse;
@@ -36,6 +38,23 @@ public class JourneyController {
     ) {
         return ApiResponse.success(
             journeyService.createJourney(member.getMemberId(), request)
+        );
+    }
+
+    @PostMapping("/{tripId}/items")
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiOperation("Journey에 Explore 항목 추가")
+    public ApiResponse<JourneyItemResponse> addJourneyItem(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long tripId,
+        @RequestBody JourneyItemCreateRequest request
+    ) {
+        return ApiResponse.success(
+            journeyService.addJourneyItem(
+                member.getMemberId(),
+                tripId,
+                request
+            )
         );
     }
 
