@@ -15,6 +15,13 @@ export default {
       FESTIVAL: 'Festival',
       EXHIBITION: 'Exhibition',
     },
+    placeKinds: {
+      RESTAURANT: 'Restaurant',
+      CAFE: 'Cafe',
+      MARKET: 'Market',
+      BEAUTY: 'Beauty',
+      ETC: 'Other',
+    },
     categories: {
       show: 'Shows',
       shopping: 'Shopping',

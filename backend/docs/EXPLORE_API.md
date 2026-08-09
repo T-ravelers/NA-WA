@@ -48,3 +48,34 @@
 응답의 `data.content`가 현재 페이지에 포함된 목록입니다. `totalElements`는 전체
 검색 결과 수이며, 현재 프론트엔드는 무한 스크롤을 구현하지 않았으므로 화면의 건수
 표시는 현재 페이지의 `content.length`를 사용합니다.
+
+## Place 목록 필터 계약
+
+`GET /api/v1/explore/places`
+
+### 주요 요청 파라미터
+
+| 파라미터 | 형식 | 의미 |
+| --- | --- | --- |
+| `placeKinds` | 반복 가능한 문자열 목록 | Place 유형을 같은 종류 안에서 OR로 필터링합니다. 허용값은 `RESTAURANT`, `CAFE`, `MARKET`, `BEAUTY`, `ETC`입니다. |
+| `sectorIds` | 반복 가능한 숫자 목록 | Sector를 같은 종류 안에서 OR로 필터링합니다. |
+| `activityIds` | 반복 가능한 숫자 목록 | Activity를 같은 종류 안에서 OR로 필터링합니다. |
+| `region1`, `region2`, `region3` | 반복 가능한 문자열 목록 | 지역을 같은 종류 안에서 OR로 필터링합니다. |
+| `keyword` | 문자열 | Place 이름·브랜드·지점·주소에 대해 부분 일치 검색을 적용합니다. |
+| `hasForeignLang`, `hasParking`, `reservable`, `takeoutAvailable` | boolean | Place 옵션을 필터링합니다. |
+| `cardPaymentAvailable`, `smokeFree`, `kidFacility`, `hasRestroom` | boolean | Place 옵션을 필터링합니다. |
+| `savedOnly` | boolean | 로그인한 회원이 저장한 Place만 조회합니다. |
+| `sort` | `LATEST` 또는 `POPULAR` | 최신순 또는 조회수순으로 정렬합니다. |
+| `page` | 0 이상의 정수 | 0부터 시작하는 페이지 번호입니다. |
+| `size` | 양의 정수 | 페이지 크기입니다. 기본값은 20입니다. |
+
+`placeKinds=ETC`는 화면에서 `Other`로 표시합니다. 백엔드 구현에서는
+`place_kind`가 `ETC`이거나 NULL·허용 목록 밖의 미분류 값인 Place를 함께 포함합니다.
+
+### 필터 결합
+
+- 같은 종류의 다중 값은 OR 조건으로 적용합니다.
+- 지역, Sector, Activity, 검색어와 옵션처럼 서로 다른 종류의 필터는 AND 조건으로 적용합니다.
+- `savedOnly`는 정렬이 아니라 저장 여부 조건입니다.
+- `Free`와 `Open now`는 Place 필터 계약에 포함하지 않습니다.
+- `DISTANCE` 정렬은 거리 계산 계약이 확정되기 전까지 지원하지 않습니다.

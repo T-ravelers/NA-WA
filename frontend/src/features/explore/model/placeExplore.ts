@@ -1,5 +1,9 @@
 export type PlaceSort = 'LATEST' | 'POPULAR'
 
+export const PLACE_KINDS = ['RESTAURANT', 'CAFE', 'MARKET', 'BEAUTY', 'ETC'] as const
+
+export type PlaceKind = (typeof PLACE_KINDS)[number]
+
 export interface PlaceSummaryResponse {
   itemId: number
   name: string
@@ -46,6 +50,7 @@ export interface PlaceListResponsePayload {
 export interface PlaceSearchFilters {
   sectorIds?: number[]
   activityIds?: number[]
+  placeKinds?: PlaceKind[]
   region1?: string[]
   region2?: string[]
   region3?: string[]

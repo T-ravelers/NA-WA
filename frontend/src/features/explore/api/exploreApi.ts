@@ -66,6 +66,7 @@ function toPlaceSearchParams(filters: PlaceSearchFilters): URLSearchParams {
 
   appendList(params, 'sectorIds', filters.sectorIds)
   appendList(params, 'activityIds', filters.activityIds)
+  appendList(params, 'placeKinds', filters.placeKinds)
   appendList(params, 'region1', filters.region1)
   appendList(params, 'region2', filters.region2)
   appendList(params, 'region3', filters.region3)

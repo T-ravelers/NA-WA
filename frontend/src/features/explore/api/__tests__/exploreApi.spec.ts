@@ -66,6 +66,7 @@ describe('exploreApi', () => {
       region2: ['Seongsu', 'Hongdae'],
       sectorIds: [2],
       activityIds: [101, 102],
+      placeKinds: ['RESTAURANT', 'CAFE'],
       hasParking: true,
       takeoutAvailable: false,
       savedOnly: true,
@@ -76,6 +77,7 @@ describe('exploreApi', () => {
 
     expect(params.getAll('region2')).toEqual(['Seongsu', 'Hongdae'])
     expect(params.getAll('activityIds')).toEqual(['101', '102'])
+    expect(params.getAll('placeKinds')).toEqual(['RESTAURANT', 'CAFE'])
     expect(params.get('hasParking')).toBe('true')
     expect(params.get('takeoutAvailable')).toBe('false')
     expect(params.get('savedOnly')).toBe('true')
