@@ -13,10 +13,14 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.journey.domain.Journey;
+import me.nawa.journey.domain.JourneyExploreItem;
+import me.nawa.journey.domain.JourneyItem;
 import me.nawa.journey.domain.JourneyTimelineItem;
 import me.nawa.journey.domain.TripRegion;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
+import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
+import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyRegionResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineAppointmentResponse;
@@ -30,6 +34,7 @@ import me.nawa.journey.dto.response.JourneyTimelineResponse;
 import me.nawa.journey.dto.response.JourneySummaryResponse;
 import me.nawa.journey.exception.JourneyErrorCode;
 import me.nawa.journey.mapper.JourneyMapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,6 +81,73 @@ public class JourneyService {
         }
 
         return toResponse(journey, regions);
+    }
+
+    @Transactional
+    public JourneyItemResponse addJourneyItem(
+        Long memberId,
+        Long tripId,
+        JourneyItemCreateRequest request
+    ) {
+        Journey journey = findOwnedJourney(memberId, tripId);
+        validateJourneyItemRequest(request);
+
+        JourneyExploreItem exploreItem = journeyMapper
+            .findAvailableExploreItemById(request.getItemId());
+        if (exploreItem == null) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_ITEM_NOT_FOUND
+            );
+        }
+        if (!isSupportedItemType(exploreItem.getItemType())) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_ITEM_TYPE_UNSUPPORTED
+            );
+        }
+        if (request.getVisitDate().isBefore(journey.getStartDate())
+            || request.getVisitDate().isAfter(journey.getEndDate())) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_ITEM_DATE_OUT_OF_RANGE
+            );
+        }
+        if (journeyMapper.existsJourneyItem(
+            tripId,
+            request.getItemId(),
+            request.getVisitDate()
+        )) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_ITEM_DUPLICATE
+            );
+        }
+
+        JourneyItem journeyItem = JourneyItem.builder()
+            .tripId(tripId)
+            .itemId(request.getItemId())
+            .itemType(exploreItem.getItemType())
+            .visitDate(request.getVisitDate())
+            .tripItemStatus("ADDED")
+            .displayOrder(normalizeDisplayOrder(request.getDisplayOrder()))
+            .note(normalizeOptional(request.getNote()))
+            .appointmentId(null)
+            .confirmedAt(null)
+            .build();
+
+        try {
+            journeyMapper.insertJourneyItem(journeyItem);
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_ITEM_DUPLICATE,
+                exception
+            );
+        }
+
+        JourneyItem createdItem = journeyItem.getTripItemId() == null
+            ? journeyItem
+            : journeyMapper.findJourneyItemById(journeyItem.getTripItemId());
+        return toJourneyItemResponse(
+            createdItem == null ? journeyItem : createdItem,
+            tripId
+        );
     }
 
     @Transactional(readOnly = true)
@@ -348,6 +420,65 @@ public class JourneyService {
             .companionPreference(journey.getCompanionPreference())
             .regions(regionResponses)
             .build();
+    }
+
+    private JourneyItemResponse toJourneyItemResponse(
+        JourneyItem journeyItem,
+        Long tripId
+    ) {
+        return JourneyItemResponse.builder()
+            .tripItemId(journeyItem.getTripItemId())
+            .journeyId(
+                journeyItem.getTripId() == null
+                    ? tripId
+                    : journeyItem.getTripId()
+            )
+            .itemId(journeyItem.getItemId())
+            .itemType(journeyItem.getItemType())
+            .visitDate(journeyItem.getVisitDate())
+            .tripItemStatus(journeyItem.getTripItemStatus())
+            .displayOrder(journeyItem.getDisplayOrder())
+            .note(journeyItem.getNote())
+            .appointmentId(journeyItem.getAppointmentId())
+            .confirmedAt(journeyItem.getConfirmedAt())
+            .createdAt(journeyItem.getCreatedAt())
+            .build();
+    }
+
+    private void validateJourneyItemRequest(
+        JourneyItemCreateRequest request
+    ) {
+        if (request == null
+            || request.getItemId() == null
+            || request.getItemId() <= 0
+            || request.getVisitDate() == null) {
+            throw new BusinessException(
+                JourneyErrorCode.INVALID_JOURNEY_INPUT
+            );
+        }
+
+        Integer displayOrder = request.getDisplayOrder();
+        if (displayOrder != null
+            && (displayOrder < 0 || displayOrder > Short.MAX_VALUE)) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_ITEM_DISPLAY_ORDER_INVALID
+            );
+        }
+
+        String note = normalizeOptional(request.getNote());
+        if (note != null && note.length() > 500) {
+            throw new BusinessException(
+                JourneyErrorCode.INVALID_JOURNEY_INPUT
+            );
+        }
+    }
+
+    private Integer normalizeDisplayOrder(Integer displayOrder) {
+        return displayOrder == null ? 0 : displayOrder;
+    }
+
+    private boolean isSupportedItemType(String itemType) {
+        return "EVENT".equals(itemType) || "PLACE".equals(itemType);
     }
 
     private void validateMemberId(Long memberId) {

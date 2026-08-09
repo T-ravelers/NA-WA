@@ -156,4 +156,75 @@
                  ti.display_order ASC,
                  ti.trip_item_id ASC
     </select>
+
+    <select id="findAvailableExploreItemById"
+            resultType="me.nawa.journey.domain.JourneyExploreItem">
+        SELECT
+            ei.item_id,
+            ei.item_type
+        FROM explore_items ei
+        LEFT JOIN event e
+          ON e.event_id = ei.item_id
+         AND ei.item_type = 'EVENT'
+        LEFT JOIN place p
+          ON p.place_id = ei.item_id
+         AND ei.item_type = 'PLACE'
+        WHERE ei.item_id = #{itemId}
+          AND ei.deleted_at IS NULL
+          AND ei.approval_status = 'APPROVED'
+          AND ei.visibility_status = 'VISIBLE'
+          AND (
+              (ei.item_type = 'EVENT'
+                  AND e.event_id IS NOT NULL
+                  AND e.deleted_at IS NULL
+                  AND e.status IN ('SCHEDULED', 'ONGOING'))
+              OR (ei.item_type = 'PLACE'
+                  AND p.place_id IS NOT NULL
+                  AND p.deleted_at IS NULL
+                  AND p.is_active = TRUE)
+          )
+    </select>
+
+    <select id="existsJourneyItem" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM trip_items
+            WHERE trip_id = #{tripId}
+              AND item_id = #{itemId}
+              AND visit_date = #{visitDate}
+              AND deleted_at IS NULL
+        )
+    </select>
+
+    <insert id="insertJourneyItem"
+            useGeneratedKeys="true"
+            keyProperty="tripItemId">
+        INSERT INTO trip_items
+            (trip_id, item_id, appointment_id, visit_date,
+             trip_item_status, display_order, note, confirmed_at)
+        VALUES
+            (#{tripId}, #{itemId}, NULL, #{visitDate},
+             'ADDED', #{displayOrder}, #{note}, NULL)
+    </insert>
+
+    <select id="findJourneyItemById"
+            resultType="me.nawa.journey.domain.JourneyItem">
+        SELECT
+            ti.trip_item_id,
+            ti.trip_id,
+            ti.item_id,
+            ei.item_type,
+            ti.visit_date,
+            ti.trip_item_status,
+            ti.display_order,
+            ti.note,
+            ti.appointment_id,
+            ti.confirmed_at,
+            ti.created_at
+        FROM trip_items ti
+        JOIN explore_items ei
+          ON ei.item_id = ti.item_id
+        WHERE ti.trip_item_id = #{tripItemId}
+          AND ti.deleted_at IS NULL
+    </select>
 </mapper>

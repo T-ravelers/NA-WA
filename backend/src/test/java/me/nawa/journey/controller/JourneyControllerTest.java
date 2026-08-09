@@ -20,6 +20,8 @@ import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
+import me.nawa.journey.dto.request.JourneyItemCreateRequest;
+import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineDayResponse;
 import me.nawa.journey.dto.response.JourneyTimelineEventDetailResponse;
@@ -109,6 +111,68 @@ class JourneyControllerTest {
         assertEquals(10L, body.path("data").path("tripId").asLong());
         assertTrue(body.path("data").path("regions").isArray());
         assertEquals(0, body.path("data").path("regions").size());
+    }
+
+    @Test
+    void addJourneyItem_returns201WithApiResponse() throws Exception {
+        JourneyItemResponse response = JourneyItemResponse.builder()
+            .tripItemId(7L)
+            .journeyId(12L)
+            .itemId(990001L)
+            .itemType("EVENT")
+            .visitDate(LocalDate.of(2026, 8, 8))
+            .tripItemStatus("ADDED")
+            .displayOrder(0)
+            .build();
+        when(journeyService.addJourneyItem(
+            eq(1L),
+            eq(12L),
+            any(JourneyItemCreateRequest.class)
+        )).thenReturn(response);
+
+        String responseBody = mockMvc.perform(
+                post("/api/v1/journeys/12/items")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"itemId\":990001,\"visitDate\":\"2026-08-08\"}")
+            )
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertTrue(body.path("success").asBoolean());
+        assertEquals(7L, body.path("data").path("tripItemId").asLong());
+        assertEquals("EVENT", body.path("data").path("itemType").asText());
+        assertTrue(body.path("data").path("appointmentId").isNull());
+    }
+
+    @Test
+    void addJourneyItem_returns409ForDuplicate() throws Exception {
+        when(journeyService.addJourneyItem(
+            eq(1L),
+            eq(12L),
+            any(JourneyItemCreateRequest.class)
+        )).thenThrow(new BusinessException(
+            JourneyErrorCode.JOURNEY_ITEM_DUPLICATE
+        ));
+
+        String responseBody = mockMvc.perform(
+                post("/api/v1/journeys/12/items")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"itemId\":990001,\"visitDate\":\"2026-08-08\"}")
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals(
+            "JOURNEY-004",
+            body.path("error").path("code").asText()
+        );
     }
 
     @Test

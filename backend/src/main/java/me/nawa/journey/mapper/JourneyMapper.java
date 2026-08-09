@@ -2,6 +2,8 @@ package me.nawa.journey.mapper;
 
 import java.util.List;
 import me.nawa.journey.domain.Journey;
+import me.nawa.journey.domain.JourneyExploreItem;
+import me.nawa.journey.domain.JourneyItem;
 import me.nawa.journey.domain.JourneyTimelineItem;
 import me.nawa.journey.domain.TripRegion;
 import org.apache.ibatis.annotations.Mapper;
@@ -23,4 +25,18 @@ public interface JourneyMapper {
     List<JourneyTimelineItem> findTimelineItemsByTripId(
         @Param("tripId") Long tripId
     );
+
+    JourneyExploreItem findAvailableExploreItemById(
+        @Param("itemId") Long itemId
+    );
+
+    boolean existsJourneyItem(
+        @Param("tripId") Long tripId,
+        @Param("itemId") Long itemId,
+        @Param("visitDate") java.time.LocalDate visitDate
+    );
+
+    void insertJourneyItem(JourneyItem journeyItem);
+
+    JourneyItem findJourneyItemById(@Param("tripItemId") Long tripItemId);
 }
