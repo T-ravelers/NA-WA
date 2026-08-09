@@ -73,6 +73,7 @@ const selectedPlaceCardPayment = ref(readQueryBoolean('cardPaymentAvailable'))
 const selectedPlaceSmokeFree = ref(readQueryBoolean('smokeFree'))
 const selectedPlaceKidFacility = ref(readQueryBoolean('kidFacility'))
 const selectedPlaceRestroom = ref(readQueryBoolean('hasRestroom'))
+const selectedPlaceSavedOnly = ref(readQueryBoolean('savedOnly'))
 const placeSort = ref<PlaceSort>(readPlaceSort(readQueryString('placeSort')))
 const sheetPreviewFilters = ref<EventSearchFilters | null>(null)
 const placeSheetPreviewFilters = ref<PlaceSearchFilters | null>(null)
@@ -122,6 +123,7 @@ const placeFilters = computed<PlaceSearchFilters>(() => ({
   smokeFree: selectedPlaceSmokeFree.value || undefined,
   kidFacility: selectedPlaceKidFacility.value || undefined,
   hasRestroom: selectedPlaceRestroom.value || undefined,
+  savedOnly: selectedPlaceSavedOnly.value || undefined,
 }))
 const placeQuery = usePlaceListQuery(placeFilters, {
   enabled: () => selectedTab.value === 'places',
@@ -243,6 +245,7 @@ const placeActiveFilters = computed(() => {
     ['smokeFree', selectedPlaceSmokeFree.value, t('explore.placeFilterOptions.smokeFree')],
     ['kidFacility', selectedPlaceKidFacility.value, t('explore.placeFilterOptions.kids')],
     ['hasRestroom', selectedPlaceRestroom.value, t('explore.placeFilterOptions.restroom')],
+    ['savedOnly', selectedPlaceSavedOnly.value, t('explore.sort.saved')],
   ]
   options.forEach(([key, selected, label]) => {
     if (selected) values.push({ key: `placeOption:${key}`, label })
@@ -302,6 +305,7 @@ watch(
     addQueryValue(query, 'smokeFree', next.smokeFree)
     addQueryValue(query, 'kidFacility', next.kidFacility)
     addQueryValue(query, 'hasRestroom', next.hasRestroom)
+    addQueryValue(query, 'savedOnly', next.savedOnly)
     router.replace({ query }).catch(() => undefined)
   },
   { deep: true },
@@ -357,6 +361,7 @@ function applyPlaceSheet(next: PlaceSearchFilters): void {
   selectedPlaceSmokeFree.value = next.smokeFree ?? false
   selectedPlaceKidFacility.value = next.kidFacility ?? false
   selectedPlaceRestroom.value = next.hasRestroom ?? false
+  selectedPlaceSavedOnly.value = next.savedOnly ?? false
   selectedSheet.value = null
   placeSheetPreviewFilters.value = null
 }
@@ -464,6 +469,7 @@ function removePlaceFilter(key: string): void {
     selectedPlaceSmokeFree.value = false
     selectedPlaceKidFacility.value = false
     selectedPlaceRestroom.value = false
+    selectedPlaceSavedOnly.value = false
     return
   }
 
@@ -499,6 +505,7 @@ function removePlaceFilter(key: string): void {
     if (option === 'smokeFree') selectedPlaceSmokeFree.value = false
     if (option === 'kidFacility') selectedPlaceKidFacility.value = false
     if (option === 'hasRestroom') selectedPlaceRestroom.value = false
+    if (option === 'savedOnly') selectedPlaceSavedOnly.value = false
   }
 }
 

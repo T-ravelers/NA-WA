@@ -216,6 +216,7 @@ function resetSheet(): void {
     PLACE_OPTIONS.forEach(({ key }) => (draft[key] = undefined))
   } else {
     draft.sort = 'LATEST'
+    draft.savedOnly = undefined
   }
 }
 
@@ -443,6 +444,31 @@ function apply(): void {
               >
                 <IconCheck
                   v-if="draft.sort === sortOption.value"
+                  :size="15"
+                  :stroke-width="2.5"
+                  aria-hidden="true"
+                />
+              </span>
+            </button>
+            <button
+              type="button"
+              class="flex min-h-16 w-full items-center justify-between text-left"
+              @click="draft.savedOnly = !draft.savedOnly"
+            >
+              <span
+                class="text-body"
+                :class="draft.savedOnly ? 'text-ink' : 'text-ink-2'"
+              >
+                {{ t('explore.sort.saved') }}
+              </span>
+              <span
+                class="flex size-6 items-center justify-center rounded-pill"
+                :class="
+                  draft.savedOnly ? 'bg-paper-fill text-on-paper' : 'border border-hairline-2'
+                "
+              >
+                <IconCheck
+                  v-if="draft.savedOnly"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"
