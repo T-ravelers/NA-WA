@@ -19,6 +19,14 @@ export interface PlaceSummaryResponse {
   addressDetail: string | null
   latitude: number | null
   longitude: number | null
+  hasForeignLang?: boolean | null
+  hasParking?: boolean | null
+  reservable?: boolean | null
+  takeoutAvailable?: boolean | null
+  cardPaymentAvailable?: boolean | null
+  smokeFree?: boolean | null
+  kidFacility?: boolean | null
+  hasRestroom?: boolean | null
   isActive: boolean | null
   viewCount: number
   favoriteCount: number
