@@ -14,6 +14,7 @@ import org.springframework.web.servlet.config.annotation.*;
     "me.nawa.member.controller",
     "me.nawa.explore.controller",
     "me.nawa.journey.controller",
+    "me.nawa.report.controller",
     "me.nawa.map.controller",
     "me.nawa.wallet.controller",
     "me.nawa.settlement.controller",

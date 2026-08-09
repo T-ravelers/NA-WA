@@ -28,6 +28,8 @@ import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
 import me.nawa.journey.service.JourneyService;
+import me.nawa.report.controller.ReportController;
+import me.nawa.report.service.ReportService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,6 +67,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.WalletTestConfig.class,
         SwaggerConfigTest.ExploreTestConfig.class,
         SwaggerConfigTest.JourneyTestConfig.class,
+        SwaggerConfigTest.ReportTestConfig.class,
         SwaggerConfigTest.TopupTestConfig.class,
         SwaggerConfigTest.TransactionTestConfig.class,
         SwaggerConfigTest.MemberTestConfig.class,
@@ -85,6 +88,11 @@ class SwaggerConfigTest {
     @Test
     void swaggerConfig_registersDocket() {
         assertNotNull(context.getBean(Docket.class));
+    }
+
+    @Test
+    void servletConfig_registersReportController() {
+        assertNotNull(context.getBean(ReportController.class));
     }
 
     @Test
@@ -308,6 +316,15 @@ class SwaggerConfigTest {
         @Bean
         JourneyService journeyService() {
             return new JourneyService(null);
+        }
+    }
+
+    @Configuration
+    static class ReportTestConfig {
+
+        @Bean
+        ReportService reportService() {
+            return new ReportService(null);
         }
     }
 
