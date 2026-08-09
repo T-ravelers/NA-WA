@@ -267,6 +267,7 @@ export default {
       },
       saveUnavailable: 'Save place is not available yet',
       addToJourney: 'Add to journey',
+      addedToJourney: 'Added to journey',
       findCompanions: 'Find companions',
       detailError: 'We could not load this place right now.',
       notFound: 'This place is no longer available.',

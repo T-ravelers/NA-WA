@@ -526,13 +526,8 @@ function retry(): void {
           />
         </IconOrb>
         <div class="min-w-0 flex-1">
-          <!--
-            백엔드에 `POST /api/v1/journeys/{journeyId}/items`가 아직 없어 누르면 404가 난다.
-            엔드포인트가 생기면 `disabled`만 지운다. 시트와 호출 경로는 그대로 둔다.
-          -->
           <AppButton
             block
-            disabled
             class="h-12 whitespace-nowrap px-2 text-on-paper"
             @click="openJourneyDateSheet"
           >

@@ -21,14 +21,16 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
 
-import JourneyDateSheet from '../components/JourneyDateSheet.vue'
-import JourneySelectSheet from '../components/JourneySelectSheet.vue'
+import { addJourneyItem } from '@/features/journey/api/journeyApi'
 import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
 import {
   parseJourneyRouteQuery,
   readActiveJourneyId,
   storeActiveJourneyId,
 } from '@/features/journey/model/activeJourney'
+
+import JourneyDateSheet from '../components/JourneyDateSheet.vue'
+import JourneySelectSheet from '../components/JourneySelectSheet.vue'
 import { usePlaceDetailQuery } from '../composables/usePlaceDetailQuery'
 import { normalizePlaceKind, type PlaceKind } from '../model/placeExplore'
 import { toClosedDays, toDetailEntries } from '../model/placeDetail'
@@ -47,6 +49,9 @@ const journeySelectSheetOpen = ref(false)
 const journeyDateSheetOpen = ref(false)
 const journeyDate = ref<string | null>(null)
 const selectedJourneyId = ref<number | null>(null)
+const journeyAdded = ref(false)
+const journeyAddPending = ref(false)
+const journeyAddError = ref<'missing' | 'failed' | null>(null)
 
 const imageUrls = computed(() => place.value?.imageUrls ?? [])
 const currentImage = computed(() => imageUrls.value[selectedImage.value])
@@ -189,6 +194,7 @@ function retry(): void {
 }
 
 function openJourneyDateSheet(): void {
+  journeyAddError.value = null
   selectedJourneyId.value = activeJourneyId.value
   journeySelectSheetOpen.value = true
 }
@@ -208,8 +214,34 @@ function closeJourneyDateSheet(): void {
   journeyDateSheetOpen.value = false
 }
 
-function confirmJourneyDate(date: string): void {
-  journeyDate.value = date
+async function confirmJourneyDate(date: string): Promise<void> {
+  if (journeyAddPending.value) return
+
+  const current = place.value
+  const journeyId = selectedJourneyId.value ?? activeJourneyId.value
+  if (!current || journeyId === null) {
+    journeyAddError.value = 'missing'
+    return
+  }
+
+  journeyAddPending.value = true
+  journeyAddError.value = null
+
+  try {
+    await addJourneyItem(journeyId, {
+      itemId: current.itemId,
+      visitDate: date,
+    })
+    storeActiveJourneyId(journeyId)
+    journeyDate.value = date
+    journeyAdded.value = true
+    journeyDateSheetOpen.value = false
+    await router.push({ name: 'journey-detail', params: { tripId: journeyId } })
+  } catch {
+    journeyAddError.value = 'failed'
+  } finally {
+    journeyAddPending.value = false
+  }
 }
 </script>
 
@@ -444,7 +476,11 @@ function confirmJourneyDate(date: string): void {
             class="h-12 whitespace-nowrap px-2 text-on-paper"
             @click="openJourneyDateSheet"
           >
-            {{ t('explore.placeDetail.addToJourney') }}
+            {{
+              journeyAdded
+                ? t('explore.placeDetail.addedToJourney')
+                : t('explore.placeDetail.addToJourney')
+            }}
           </AppButton>
         </div>
         <div class="min-w-0 flex-1">
@@ -467,7 +503,14 @@ function confirmJourneyDate(date: string): void {
         :end-date="null"
         :is-permanent="true"
         :initial-date="journeyDate"
-        confirm-disabled
+        :loading="journeyAddPending"
+        :error-message="
+          journeyAddError === 'missing'
+            ? t('explore.journeyDate.selectItemFirst')
+            : journeyAddError === 'failed'
+              ? t('explore.journeyDate.addItemFailed')
+              : null
+        "
         @close="closeJourneyDateSheet"
         @confirm="confirmJourneyDate"
       />
