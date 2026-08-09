@@ -82,7 +82,7 @@ describe('ExploreView Place branch', () => {
   })
 
   it('switches to Places and requests the Place list', async () => {
-    const { wrapper } = await mountView()
+    const { wrapper, router } = await mountView()
 
     await wrapper
       .findAll('button')
