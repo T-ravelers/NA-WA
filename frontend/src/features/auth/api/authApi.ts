@@ -1,9 +1,3 @@
-import { httpClient } from '@/shared/api/httpClient'
-
-export async function requestSignOut(): Promise<void> {
-  await httpClient.post('/api/v1/auth/logout')
-}
-
 /**
  * 소셜 로그인 시작. 백엔드가 302로 provider 인증 페이지에 보낸다.
  *

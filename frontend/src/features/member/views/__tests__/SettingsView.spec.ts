@@ -11,6 +11,7 @@ import type { MemberProfile } from '../../api/memberApi'
 const fetchMemberProfile = vi.fn()
 const updateMemberProfile = vi.fn()
 const applyLocale = vi.fn()
+const requestSignOut = vi.fn()
 
 vi.mock('../../api/memberApi', () => ({
   fetchMemberProfile: () => fetchMemberProfile(),
@@ -19,6 +20,10 @@ vi.mock('../../api/memberApi', () => ({
 
 vi.mock('@/app/i18n/applyLocale', () => ({
   applyLocale: (...args: unknown[]) => applyLocale(...args),
+}))
+
+vi.mock('@/shared/api/sessionSignOut', () => ({
+  requestSignOut: () => requestSignOut(),
 }))
 
 const SettingsView = (await import('../SettingsView.vue')).default
@@ -55,6 +60,7 @@ describe('SettingsView', () => {
     queryClient.setDefaultOptions({ queries: { retry: false } })
     fetchMemberProfile.mockResolvedValue(PROFILE)
     updateMemberProfile.mockResolvedValue(PROFILE)
+    requestSignOut.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -64,6 +70,15 @@ describe('SettingsView', () => {
 
   it('shows the signed-in member', async () => {
     expect((await mountView()).text()).toContain('Mina')
+  })
+
+  it('signs out from the account section', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.get('[aria-label="Sign out"]').trigger('click')
+    await flushPromises()
+
+    expect(requestSignOut).toHaveBeenCalledOnce()
   })
 
   it('shows an error state with a retry when the profile cannot be loaded', async () => {
