@@ -18,13 +18,13 @@
  */
 interface Props {
   /**
-   * 렌더 높이(px). 기본값은 시안의 52px 조판이 실제로 차지하는 잉크 높이다.
-   * 폭은 종횡비로 따라온다.
+   * 렌더 높이(px). 기본 52px에서 폭이 약 196.4px로 시안 텍스트 노드와 일치한다.
+   * 다른 높이에서도 폭은 종횡비로 따라온다.
    */
   height?: number
 }
 
-const { height = 49.56 } = defineProps<Props>()
+const { height = 52 } = defineProps<Props>()
 </script>
 
 <template>

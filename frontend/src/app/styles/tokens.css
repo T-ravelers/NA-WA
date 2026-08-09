@@ -86,6 +86,14 @@
   --spacing-screen: 20px;
   --spacing-section: 40px;
 
+  /* 온보딩 A1 전용. 프레임 실측 좌표와 보딩패스 크기다. */
+  --spacing-welcome-top: 148px;
+  --spacing-welcome-ticket-gap: 92px;
+  --spacing-welcome-wordmark-gap: 33px;
+  --spacing-welcome-copy-width: 290px;
+  --spacing-welcome-ticket-height: 71px;
+  --spacing-welcome-ticket-stub-width: 66px;
+
   /* ── 그림자 ── */
   --shadow-raised: 0 8px 24px rgb(0 0 0 / 0.45);
   --shadow-sheet: 0 -8px 32px rgb(0 0 0 / 0.55);
@@ -93,7 +101,8 @@
   /* ── 폰트 ──
    * Display는 로케일별로 달라진다. en·vi는 Sztos를 쓰고 CJK Display 3종
    * (Smiley Sans·Taipei Sans TC Beta·M PLUS 1)은 아직 번들에 없으므로 Body 폰트로
-   * 폴백한다. 로고용 Ria Sans도 번들이 없어 Sztos로 폴백한다.
+   * 폴백한다. `NAWA` 워드마크는 Ria Sans 조판을 SVG 패스로 고정하므로 이 토큰을
+   * 사용하지 않는다.
    *
    * `Sztos`는 현재 어디에서도 로드되지 않는다(#122). 재배포 권한이 확인되지 않아
    * 셀프 호스팅을 제거했고, CDN은 아직 연결하지 않았다. 이름을 그대로 둔 것은
@@ -111,6 +120,16 @@
   --text-section-header: 22px;
   --text-section-header--line-height: 1.15;
   --text-section-header--font-weight: 700;
+
+  /* 온보딩 A1 헤드라인. */
+  --text-welcome-headline: 40px;
+  --text-welcome-headline--line-height: 1.274;
+  --text-welcome-headline--font-weight: 200;
+
+  /* 온보딩 보딩패스 도장. */
+  --text-welcome-stamp: 8px;
+  --text-welcome-stamp--line-height: 1.2;
+  --text-welcome-stamp--letter-spacing: 0.5px;
 
   /* 여정 티켓 제목. 1줄, 초과 시 말줄임. */
   --text-trip-ticket-title: 24px;

@@ -22,7 +22,7 @@ describe('BrandWordmark', () => {
     const svg = mount(BrandWordmark).get('svg')
 
     expect(svg.attributes('viewBox')).toBe('0 0 187.15 49.56')
-    expect(svg.attributes('height')).toBe('49.56')
+    expect(svg.attributes('height')).toBe('52')
   })
 
   it('scales to the requested height', () => {
