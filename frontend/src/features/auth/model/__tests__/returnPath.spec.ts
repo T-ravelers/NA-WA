@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { consumeReturnPath, peekReturnPath, storeReturnPath } from '../returnPath'
+import { clearReturnPath, consumeReturnPath, peekReturnPath, storeReturnPath } from '../returnPath'
 
 describe('returnPath', () => {
   beforeEach(() => {
@@ -24,6 +24,14 @@ describe('returnPath', () => {
     consumeReturnPath()
 
     expect(consumeReturnPath()).toBeNull()
+  })
+
+  it('clears a stored return path without consuming it', () => {
+    storeReturnPath('/wallet')
+
+    clearReturnPath()
+
+    expect(peekReturnPath()).toBeNull()
   })
 
   it('rejects a protocol relative path that would leave the app', () => {

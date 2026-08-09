@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { useMutation } from '@tanstack/vue-query'
-import { IconChevronRight } from '@tabler/icons-vue'
+import { IconChevronRight, IconLogout } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { applyLocale } from '@/app/i18n/applyLocale'
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { requestSignOut } from '@/shared/api/sessionSignOut'
 import type { AppLocale } from '@/shared/i18n/locales'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import LocaleSheet from '@/shared/ui/LocaleSheet.vue'
@@ -44,6 +45,8 @@ const saveLanguage = useMutation({
   mutationFn: (next: AppLocale) => updateMemberProfile({ preferredLanguage: next }),
   onSuccess: setMemberProfile,
 })
+
+const signOut = useMutation({ mutationFn: requestSignOut })
 
 /** 저장 실패의 구체적 사유. 번역된 코드가 있을 때만 덧붙인다. */
 const saveFailureReason = computed(() => {
@@ -104,6 +107,38 @@ function chooseLocale(next: AppLocale): void {
           <ImagePlaceholder v-else />
         </span>
         <span class="text-title-sm text-ink-display">{{ profile.displayName }}</span>
+      </div>
+
+      <button
+        type="button"
+        class="mt-2 flex min-h-14 w-full items-center gap-3 rounded-sm bg-surface-2 px-3.5 text-left disabled:opacity-60"
+        :aria-label="t('auth.signOut')"
+        :disabled="signOut.isPending.value"
+        @click="signOut.mutate()"
+      >
+        <span class="flex-1 text-body text-ink">{{ t('auth.signOut') }}</span>
+        <IconLogout
+          :size="18"
+          :stroke-width="1.75"
+          class="text-icon-muted"
+          aria-hidden="true"
+        />
+      </button>
+
+      <div
+        v-if="signOut.isError.value"
+        role="alert"
+        class="mt-2 flex flex-col items-start gap-2 rounded-sm bg-surface-3 px-3.5 py-3"
+      >
+        <p class="text-body-sm text-ink-2">{{ t('auth.signOutFailed') }}</p>
+        <button
+          type="button"
+          class="text-caption text-ink-display underline"
+          :disabled="signOut.isPending.value"
+          @click="signOut.mutate()"
+        >
+          {{ t('action.retry') }}
+        </button>
       </div>
 
       <h2 class="mt-8 font-display text-section-header text-ink-display uppercase">

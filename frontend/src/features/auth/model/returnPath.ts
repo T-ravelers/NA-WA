@@ -50,7 +50,12 @@ export function peekReturnPath(): string | null {
 export function consumeReturnPath(): string | null {
   const stored = readReturnPath()
 
-  sessionStorage.removeItem(STORAGE_KEY)
+  clearReturnPath()
 
   return stored
+}
+
+/** 명시적 로그아웃처럼 이전 로그인 흐름을 이어가면 안 될 때 저장값을 폐기한다. */
+export function clearReturnPath(): void {
+  sessionStorage.removeItem(STORAGE_KEY)
 }
