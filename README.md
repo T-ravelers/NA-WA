@@ -36,6 +36,23 @@ NA-WA/
 Docker와 Docker Compose만 있으면 IDE나 로컬 Node/Java 설치 없이 프론트엔드,
 백엔드, MySQL, Redis를 한 번에 띄울 수 있습니다.
 
+처음 실행할 때 루트 환경 변수 예시 파일을 복사합니다.
+
+```shell
+cp -n .env.example .env
+```
+
+`cp -n`은 이미 `.env`가 있을 때 기존 파일을 덮어쓰지 않습니다. 기존 `.env`가
+있다면 `.env.example`에 새로 추가된 변수만 기존 파일에 직접 추가합니다. 이
+예시 파일에는 Docker Compose가 참조하는 전체 환경 변수와 로컬 기본값이 정리되어
+있습니다. MySQL 값은 로컬 컨테이너 전용 기본값이며, JWT·OAuth·Stripe 관련
+실제 비밀값은 별도로 발급받아 `.env`에만 입력합니다. `.env`는 Git에 커밋하지
+않습니다.
+
+`DOCKERHUB_USERNAME=local`은 로컬에서 빌드하는 backend 이미지의 이름 공간입니다.
+이미 빌드된 Docker Hub 이미지를 받으려면 해당 이미지의 실제 Docker Hub 이름으로
+바꿉니다.
+
 ```shell
 docker compose up
 ```
@@ -62,9 +79,6 @@ docker compose up
 docker compose up -d --build backend
 ```
 
-- 루트 `.env` 파일에 `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`,
-  `MYSQL_PASSWORD`, `DOCKERHUB_USERNAME`을 설정해야 합니다. `.env`는 Git에
-  커밋하지 않습니다.
 - 로컬 3306/8080 포트를 다른 프로세스(네이티브 MySQL, IDE에서 띄운 Tomcat
   등)가 이미 쓰고 있다면 포트 충돌이 발생하니 먼저 정리하세요.
 
@@ -142,27 +156,46 @@ pnpm --version   # 11.17.0
 
 `fnm install`과 `fnm use`는 인자가 없으면 `.node-version`을 읽습니다.
 
-의존성을 설치하고 개발 서버를 실행하세요.
+의존성을 설치하고 환경 변수 파일을 만든 뒤 개발 서버를 실행하세요.
 
 ```shell
 pnpm install
+cp frontend/.env.example frontend/.env.development
 pnpm dev
 ```
 
 개발 서버의 기본 주소는 `http://localhost:5173`입니다.
 
-### API 주소 설정
+### 환경 변수 설정
 
-`VITE_API_BASE_URL`에 프론트엔드가 요청할 API 주소를 설정하세요.
+프론트엔드가 요구하는 변수의 목록과 예시 값은 `frontend/.env.example`에
+정리돼 있습니다. 이 파일을 복사해 개발용 파일을 만드세요.
 
-| 파일                              | 용도                      |
-| --------------------------------- | ------------------------- |
-| `frontend/.env.development`       | 팀이 공유하는 개발 기본값 |
-| `frontend/.env.production`        | 운영 빌드 기본값          |
-| `frontend/.env.development.local` | 개발자별 로컬 값          |
+```shell
+cp frontend/.env.example frontend/.env.development
+```
 
-`VITE_*` 값은 클라이언트 번들에 포함됩니다. 토큰, 비밀번호와 API 비밀키를
-저장하지 마세요.
+| 파일                              | Git 추적 | 용도                         |
+| --------------------------------- | -------- | ---------------------------- |
+| `frontend/.env.example`           | 추적     | 필요한 변수의 목록과 예시 값 |
+| `frontend/.env.development`       | 미추적   | 개발 서버가 읽는 값          |
+| `frontend/.env.production`        | 미추적   | 운영 빌드가 읽는 값          |
+| `frontend/.env.development.local` | 미추적   | 개발자별 로컬 덮어쓰기       |
+
+`.env.example`을 제외한 `.env*`는 `.gitignore`가 막습니다. **팀이 공유하는
+기본값 파일은 없으므로 클론한 뒤 각자 만들어야 합니다.**
+
+| 변수                          | 설명                                                   |
+| ----------------------------- | ------------------------------------------------------ |
+| `VITE_API_BASE_URL`           | 백엔드 API 주소. 비어 있으면 앱이 기동하지 않습니다    |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe 공개 키(`pk_`). 지갑 충전 화면에서만 사용합니다 |
+
+`VITE_API_BASE_URL`을 설정하지 않으면 요청이 개발 서버 자신에게 가고 앱 셸
+HTML이 `200 OK`로 돌아옵니다. 이 실패는 화면에 드러나지 않기 때문에, 앱이
+기동 시점에 오류를 내고 멈춥니다.
+
+`VITE_*` 값은 클라이언트 번들에 그대로 포함됩니다. 토큰, 비밀번호와 API
+비밀키를 저장하지 마세요.
 
 ### 변경 사항 검증
 

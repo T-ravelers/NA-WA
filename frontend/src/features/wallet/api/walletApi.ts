@@ -1,5 +1,11 @@
 import { httpClient } from '@/shared/api/httpClient'
 
+import type {
+  TransactionDetailResponse,
+  TransactionListResponse,
+  TransactionSearchParams,
+} from '../model/walletHome'
+
 /**
  * 거래 1건. 백엔드 `TransactionSummaryResponse`와 1:1이다.
  *
@@ -47,6 +53,26 @@ export interface WalletHome {
 
 export async function fetchWalletHome(): Promise<WalletHome> {
   const { data } = await httpClient.get<WalletHome>('/api/v1/wallet')
+
+  return data
+}
+
+export async function getTransactions(
+  params: TransactionSearchParams = {},
+): Promise<TransactionListResponse> {
+  const { data } = await httpClient.get<TransactionListResponse>('/api/v1/me/transactions', {
+    params,
+  })
+
+  return data
+}
+
+export async function getTransactionDetail(
+  transactionId: number,
+): Promise<TransactionDetailResponse> {
+  const { data } = await httpClient.get<TransactionDetailResponse>(
+    `/api/v1/me/transactions/${transactionId}`,
+  )
 
   return data
 }

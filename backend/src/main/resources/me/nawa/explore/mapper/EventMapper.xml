@@ -107,6 +107,14 @@
                  a.activity_id
     </select>
 
+    <!-- region2Other는 선택한 region1에서 세부지역이 분류되지 않은 데이터를 의미한다. -->
+    <sql id="region2OtherCondition">
+        (
+            e.region2 IS NULL
+            OR TRIM(e.region2) = ''
+        )
+    </sql>
+
     <sql id="eventListWhere">
         ei.item_type = 'EVENT'
         AND ei.approval_status = 'APPROVED'
@@ -136,16 +144,38 @@
                 #{region1}
             </foreach>
         </if>
-        <if test="request.region2 != null and request.region2.size() > 0">
-            AND e.region2 IN
-            <foreach collection="request.region2"
-                     item="region2"
-                     open="("
-                     separator=","
-                     close=")">
-                #{region2}
-            </foreach>
-        </if>
+        <choose>
+            <when test="request.region2Other == true and request.region1 != null and request.region1.size() > 0 and request.region2 != null and request.region2.size() > 0">
+                AND (
+                e.region2 IN
+                <foreach collection="request.region2"
+                         item="region2"
+                         open="("
+                         separator=","
+                         close=")">
+                    #{region2}
+                </foreach>
+                OR <include refid="region2OtherCondition"/>
+                )
+            </when>
+            <when test="request.region2Other == true and request.region1 != null and request.region1.size() > 0">
+                AND <include refid="region2OtherCondition"/>
+            </when>
+            <when test="request.region2Other == true">
+                <!-- Other는 부모 region1 없이 전체 지역으로 해석하지 않는다. -->
+                AND 1 = 0
+            </when>
+            <when test="request.region2 != null and request.region2.size() > 0">
+                AND e.region2 IN
+                <foreach collection="request.region2"
+                         item="region2"
+                         open="("
+                         separator=","
+                         close=")">
+                    #{region2}
+                </foreach>
+            </when>
+        </choose>
         <if test="request.region3 != null and request.region3.size() > 0">
             AND e.region3 IN
             <foreach collection="request.region3"

@@ -4,7 +4,7 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 
 import { fetchWalletHome, type WalletHome } from '../api/walletApi'
 
-import { walletQueryKeys } from './walletHome'
+import { walletKeys } from './walletHome'
 
 /**
  * 401은 재시도하지 않는다.
@@ -31,7 +31,7 @@ function shouldRetry(failureCount: number, error: Error): boolean {
  */
 export function useWalletHome(): UseQueryReturnType<WalletHome, Error> {
   return useQuery({
-    queryKey: walletQueryKeys.home(),
+    queryKey: walletKeys.home(),
     queryFn: fetchWalletHome,
     staleTime: 30_000,
     retry: shouldRetry,

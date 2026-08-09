@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  addJourneyItem,
   buildJourneyCreateRequest,
   createJourney,
   fetchJourney,
   fetchJourneyTimeline,
+  fetchJourneys,
   type Journey,
   type JourneyCreateInput,
 } from '../journeyApi'
@@ -106,5 +108,51 @@ describe('journeyApi', () => {
       tripId: 7,
       timeline: [{ visitDate: '2026-08-10', items: [] }],
     })
+  })
+
+  it('fetches journeys available to the authenticated member', async () => {
+    const data = [
+      {
+        tripId: 12,
+        title: 'Seoul Foodie Week',
+        startDate: '2026-03-28',
+        endDate: '2026-04-01',
+      },
+    ]
+    get.mockResolvedValueOnce({ data })
+
+    await expect(fetchJourneys()).resolves.toEqual(data)
+    expect(get).toHaveBeenCalledWith('/api/v1/journeys')
+  })
+
+  it('adds an explore item to the selected journey on the selected date', async () => {
+    const data = {
+      tripItemId: 7,
+      journeyId: 12,
+      itemId: 990001,
+      itemType: 'EVENT',
+      visitDate: '2026-08-08',
+      tripItemStatus: 'ADDED',
+      createdAt: '2026-08-07T18:00:00',
+    } as const
+    post.mockResolvedValueOnce({ data })
+
+    await expect(addJourneyItem(12, { itemId: 990001, visitDate: '2026-08-08' })).resolves.toEqual(
+      data,
+    )
+
+    expect(post).toHaveBeenCalledWith('/api/v1/journeys/12/items', {
+      itemId: 990001,
+      visitDate: '2026-08-08',
+    })
+  })
+
+  it('propagates server errors for duplicate or invalid journey items', async () => {
+    const error = new Error('JOURNEY-004')
+    post.mockRejectedValueOnce(error)
+
+    await expect(addJourneyItem(12, { itemId: 990001, visitDate: '2026-08-31' })).rejects.toBe(
+      error,
+    )
   })
 })

@@ -19,6 +19,7 @@ public class EventSearchRequest {
 
     private List<String> region1;
     private List<String> region2;
+    private Boolean region2Other;
     private List<String> region3;
     private String keyword;
 

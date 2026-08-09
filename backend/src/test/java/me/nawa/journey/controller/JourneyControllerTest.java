@@ -134,6 +134,35 @@ class JourneyControllerTest {
     }
 
     @Test
+    void getJourneys_returns200WithJourneySummaries() throws Exception {
+        when(journeyService.getJourneys(1L)).thenReturn(List.of(
+            me.nawa.journey.dto.response.JourneySummaryResponse.builder()
+                .tripId(20L)
+                .title("Seoul Foodie Week")
+                .startDate(LocalDate.of(2026, 3, 28))
+                .endDate(LocalDate.of(2026, 4, 1))
+                .build()
+        ));
+
+        String responseBody = mockMvc.perform(get("/api/v1/journeys"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertTrue(body.path("success").asBoolean());
+        assertEquals(
+            20L,
+            body.path("data").get(0).path("tripId").asLong()
+        );
+        assertEquals(
+            "2026-03-28",
+            body.path("data").get(0).path("startDate").asText()
+        );
+    }
+
+    @Test
     void getJourney_returns403WhenJourneyHasDifferentOwner() throws Exception {
         when(journeyService.getJourney(1L, 20L)).thenThrow(
             new BusinessException(JourneyErrorCode.JOURNEY_FORBIDDEN)

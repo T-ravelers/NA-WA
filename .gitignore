@@ -137,9 +137,13 @@ out/
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
 
-# Claude Code local context file
-CLAUDE.md
+# 에이전트 개인 로컬 컨텍스트. 공유 규칙은 AGENTS.md와 CLAUDE.md로 추적한다.
+CLAUDE.local.md
+AGENTS.local.md
+.claude/settings.local.json
 
 # npm cache directory
 .npm

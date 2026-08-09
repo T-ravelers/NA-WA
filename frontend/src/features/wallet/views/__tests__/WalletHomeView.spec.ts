@@ -1,12 +1,28 @@
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { queryClient } from '@/app/query/client'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
 import type { WalletHome } from '../../api/walletApi'
+
+function createTestRouter(): Router {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/wallet', name: 'wallet', component: { template: '<div />' } },
+      { path: '/wallet/top-up', name: 'wallet-top-up', component: { template: '<div />' } },
+      {
+        path: '/wallet/transactions',
+        name: 'wallet-transactions',
+        component: { template: '<div />' },
+      },
+    ],
+  })
+}
 
 const fetchWalletHome = vi.fn()
 
@@ -31,14 +47,17 @@ const WALLET: WalletHome = {
   ],
 }
 
-function mountView() {
+async function mountView(router: Router = createTestRouter()) {
+  await router.push('/wallet')
+  await router.isReady()
+
   return mount(WalletHomeView, {
-    global: { plugins: [i18n, [VueQueryPlugin, { queryClient }]] },
+    global: { plugins: [i18n, [VueQueryPlugin, { queryClient }], router] },
   })
 }
 
-async function mountLoaded() {
-  const wrapper = mountView()
+async function mountLoaded(router?: Router) {
+  const wrapper = await mountView(router)
 
   await flushPromises()
 
@@ -57,8 +76,8 @@ afterEach(() => {
 })
 
 describe('WalletHomeView', () => {
-  it('응답 전에는 로딩 상태를 보여준다', () => {
-    const wrapper = mountView()
+  it('응답 전에는 로딩 상태를 보여준다', async () => {
+    const wrapper = await mountView()
 
     expect(wrapper.find('[role="status"]').exists()).toBe(true)
   })
@@ -95,25 +114,42 @@ describe('WalletHomeView', () => {
     expect(wrapper.text()).toContain('Deposit held')
   })
 
-  it('상세 화면이 없는 버튼은 비활성이고 이유를 밝힌다', async () => {
+  it('상세 화면이 없는 QR·정산 버튼은 비활성이고 이유를 밝힌다', async () => {
     const wrapper = await mountLoaded()
 
     const buttons = wrapper.findAll('button')
-    expect(buttons.length).toBeGreaterThan(0)
+    const qrButton = buttons.find((button) => button.text() === 'QR')
+    const settlementButton = buttons.find((button) => button.text() === 'Settle up')
 
-    for (const button of buttons) {
-      expect(button.attributes('disabled')).toBeDefined()
-    }
-
+    expect(qrButton?.attributes('disabled')).toBeDefined()
+    expect(settlementButton?.attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('These become available in a later release.')
   })
 
-  it('누르지도 않은 동작을 스크린 리더에 알리지 않는다', async () => {
-    const wrapper = await mountLoaded()
+  it('충전 버튼을 누르면 충전 화면으로 이동한다', async () => {
+    const router = createTestRouter()
+    const wrapper = await mountLoaded(router)
+    const pushSpy = vi.spyOn(router, 'push')
 
-    await wrapper.findAll('button')[0]?.trigger('click')
+    const topUpButton = wrapper.findAll('button').find((button) => button.text() === 'Top up')
+    expect(topUpButton?.attributes('disabled')).toBeUndefined()
 
-    expect(wrapper.text()).not.toContain('button selected')
+    await topUpButton?.trigger('click')
+
+    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-top-up' })
+  })
+
+  it('전체보기 버튼을 누르면 거래 내역 화면으로 이동한다', async () => {
+    const router = createTestRouter()
+    const wrapper = await mountLoaded(router)
+    const pushSpy = vi.spyOn(router, 'push')
+
+    const viewAllButton = wrapper.findAll('button').find((button) => button.text() === 'View all')
+    expect(viewAllButton?.attributes('disabled')).toBeUndefined()
+
+    await viewAllButton?.trigger('click')
+
+    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-transactions' })
   })
 
   it('거래가 없으면 빈 상태를 보여준다', async () => {
@@ -128,7 +164,7 @@ describe('WalletHomeView', () => {
     vi.useFakeTimers()
     fetchWalletHome.mockRejectedValue(new NormalizedApiError('WALLET-001', 404, 'not found'))
 
-    const wrapper = mountView()
+    const wrapper = await mountView()
 
     // 일시적 실패는 1회 재시도하므로 대기 시간이 지난 뒤에야 오류 화면이 확정된다.
     await vi.advanceTimersByTimeAsync(5_000)

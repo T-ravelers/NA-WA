@@ -10,7 +10,11 @@ import { router } from '@/app/router'
 import '@/app/styles/index.css'
 import { clearMemberProfile } from '@/features/member/model/memberQueries'
 import { setSessionExpiredHandler } from '@/shared/api/sessionRecovery'
+import { assertApiBaseUrlConfigured } from '@/shared/config/apiBaseUrl'
 import { AUTH_CALLBACK_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
+
+// 설정이 빠진 채로 뜨면 모든 요청이 조용히 앱 셸 HTML을 받는다. 화면을 그리기 전에 끊는다.
+assertApiBaseUrlConfigured(import.meta.env.VITE_API_BASE_URL)
 
 /** 이미 인증 화면에 있으면 다시 보내지 않는다. */
 const AUTH_FLOW_PATHS: string[] = [SIGN_IN_PATH, AUTH_CALLBACK_PATH]

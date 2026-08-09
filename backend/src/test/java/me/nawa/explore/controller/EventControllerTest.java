@@ -123,6 +123,7 @@ class EventControllerTest {
                     .param("eventKinds", "POPUP", "CONCERT")
                     .param("region1", "서울", "경기")
                     .param("region2", "성수", "홍대")
+                    .param("region2Other", "true")
                     .param("startDate", "2026-08-01")
                     .param("endDate", "2026-08-31")
                     .param("freeOnly", "true")
@@ -139,6 +140,7 @@ class EventControllerTest {
         assertEquals(List.of("POPUP", "CONCERT"), request.getEventKinds());
         assertEquals(List.of("서울", "경기"), request.getRegion1());
         assertEquals(List.of("성수", "홍대"), request.getRegion2());
+        assertTrue(request.getRegion2Other());
         assertEquals(
             LocalDate.of(2026, 8, 1),
             request.getStartDate()

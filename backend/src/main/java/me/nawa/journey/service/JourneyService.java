@@ -27,6 +27,7 @@ import me.nawa.journey.dto.response.JourneyTimelineItemResponse;
 import me.nawa.journey.dto.response.JourneyTimelineLocationResponse;
 import me.nawa.journey.dto.response.JourneyTimelinePlaceDetailResponse;
 import me.nawa.journey.dto.response.JourneyTimelineResponse;
+import me.nawa.journey.dto.response.JourneySummaryResponse;
 import me.nawa.journey.exception.JourneyErrorCode;
 import me.nawa.journey.mapper.JourneyMapper;
 import org.springframework.stereotype.Service;
@@ -235,6 +236,20 @@ public class JourneyService {
             }
         });
         return List.copyOf(urls);
+    }
+
+    @Transactional(readOnly = true)
+    public List<JourneySummaryResponse> getJourneys(Long memberId) {
+        validateMemberId(memberId);
+
+        return journeyMapper.findJourneysByMemberId(memberId).stream()
+            .map(journey -> JourneySummaryResponse.builder()
+                .tripId(journey.getTripId())
+                .title(journey.getTitle())
+                .startDate(journey.getStartDate())
+                .endDate(journey.getEndDate())
+                .build())
+            .toList();
     }
 
     private void validateRequest(JourneyCreateRequest request) {

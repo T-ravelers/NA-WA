@@ -11,6 +11,7 @@ import {
 } from '@tabler/icons-vue'
 import { computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
 import AppBadge from '@/shared/ui/AppBadge.vue'
@@ -25,6 +26,7 @@ import { useWalletHome } from '../model/walletQueries'
 
 const i18n = useI18n()
 const { t, locale } = i18n
+const router = useRouter()
 
 const walletQuery = useWalletHome()
 const { data, isPending } = walletQuery
@@ -75,15 +77,40 @@ const ACTIVITY_ICON: Record<ActivityKind, Component> = {
 }
 
 /*
- * 세 버튼의 상세 화면이 아직 없다. 누를 수 있게 두고 아무 일도 일어나지 않으면
+ * QR·정산은 아직 상세 화면이 없다. 누를 수 있게 두고 아무 일도 일어나지 않으면
  * 고장으로 읽히므로 비활성으로 두고, 이유를 화면에 적는다. 후속 작업에서 화면을 붙일 때
- * `disabled`만 떼면 된다.
+ * `disabled`만 떼면 된다. 충전은 화면이 생겨 활성화한다.
  */
 const quickActions = computed(() => [
-  { id: 'topUp', label: t('wallet.home.quickActions.topUp'), variant: 'secondary' as const },
-  { id: 'qr', label: t('wallet.home.quickActions.qr'), variant: 'secondary' as const },
-  { id: 'settlement', label: t('wallet.home.quickActions.settlement'), variant: 'settle' as const },
+  {
+    id: 'topUp',
+    label: t('wallet.home.quickActions.topUp'),
+    variant: 'secondary' as const,
+    disabled: false,
+  },
+  {
+    id: 'qr',
+    label: t('wallet.home.quickActions.qr'),
+    variant: 'secondary' as const,
+    disabled: true,
+  },
+  {
+    id: 'settlement',
+    label: t('wallet.home.quickActions.settlement'),
+    variant: 'settle' as const,
+    disabled: true,
+  },
 ])
+
+function handleQuickAction(id: string): void {
+  if (id === 'topUp') {
+    void router.push({ name: 'wallet-top-up' })
+  }
+}
+
+function openTransactions(): void {
+  void router.push({ name: 'wallet-transactions' })
+}
 
 /** 실패 사유. 번역된 코드가 있을 때만 덧붙이고, 서버 message는 화면에 내지 않는다. */
 const errorDescription = computed(() => {
@@ -136,7 +163,8 @@ const errorDescription = computed(() => {
           :variant="action.variant"
           block
           compact
-          disabled
+          :disabled="action.disabled"
+          @click="handleQuickAction(action.id)"
         >
           {{ action.label }}
         </AppButton>
@@ -155,7 +183,7 @@ const errorDescription = computed(() => {
         </h2>
         <AppButton
           variant="tertiary"
-          disabled
+          @click="openTransactions"
         >
           {{ t('wallet.home.viewAll') }}
         </AppButton>
