@@ -91,7 +91,29 @@ describe('ExploreView Place branch', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Seongsu Onsil')
+    expect(router.currentRoute.value.query.tab).toBe('places')
     expect(fetchPlaceList).toHaveBeenCalledWith(expect.objectContaining({ page: 0, size: 20 }))
+  })
+
+  it('restores the Places tab from the URL', async () => {
+    const { wrapper } = await mountView('/explore?tab=places')
+
+    expect(wrapper.get('[role="radio"][aria-checked="true"]').text()).toBe('Places')
+  })
+
+  it('restores the Events tab when navigating back after switching tabs', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Places')
+      ?.trigger('click')
+    await flushPromises()
+    router.back()
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.tab).toBeUndefined()
+    expect(wrapper.get('[role="radio"][aria-checked="true"]').text()).toBe('Events')
   })
 
   it('applies a Place region filter and reflects it in the URL', async () => {
@@ -124,6 +146,20 @@ describe('ExploreView Place branch', () => {
     expect(router.currentRoute.value.query.placeRegion2).toEqual(['Suwon'])
     expect(fetchPlaceList).toHaveBeenLastCalledWith(
       expect.objectContaining({ region1: ['Gyeonggi'], region2: ['Suwon'], page: 0 }),
+    )
+  })
+
+  it('ignores invalid Place kind values from the URL', async () => {
+    const { wrapper } = await mountView('/explore?placeKinds=GARBAGE')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Places')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(fetchPlaceList).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ placeKinds: ['ETC'] }),
     )
   })
 })

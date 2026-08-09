@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { normalizePlaceKind, normalizePlaceListResponse, toImageUrls } from '../placeExplore'
+import {
+  isPlaceKind,
+  normalizePlaceKind,
+  normalizePlaceListResponse,
+  toImageUrls,
+} from '../placeExplore'
 
 describe('placeExplore model helpers', () => {
   it('normalizes nullable and invalid image entries', () => {
@@ -20,6 +25,10 @@ describe('placeExplore model helpers', () => {
     expect(normalizePlaceKind('바/펍')).toBe('RESTAURANT')
     expect(normalizePlaceKind('뷰티매장')).toBe('BEAUTY')
     expect(normalizePlaceKind('알 수 없는 원본 값')).toBe('ETC')
+  })
+
+  it('accepts only public Place kind values from URL filters', () => {
+    expect(['RESTAURANT', 'GARBAGE', 'ETC'].filter(isPlaceKind)).toEqual(['RESTAURANT', 'ETC'])
   })
 
   it('normalizes a nullable Place list payload for the screen', () => {

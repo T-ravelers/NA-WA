@@ -4,6 +4,10 @@ export const PLACE_KINDS = ['RESTAURANT', 'CAFE', 'MARKET', 'BEAUTY', 'ETC'] as 
 
 export type PlaceKind = (typeof PLACE_KINDS)[number]
 
+export function isPlaceKind(value: string): value is PlaceKind {
+  return PLACE_KINDS.includes(value as PlaceKind)
+}
+
 /**
  * operational_v9 stores the source provider's Korean place-kind labels (for
  * example, 관광식당·카페·상설시장·뷰티매장). The public API keeps the
@@ -40,7 +44,7 @@ export function normalizePlaceKind(value: string | null | undefined): PlaceKind 
   if (!trimmed) return 'ETC'
 
   const normalized = trimmed.toUpperCase()
-  if (PLACE_KINDS.includes(normalized as PlaceKind)) return normalized as PlaceKind
+  if (isPlaceKind(normalized)) return normalized
 
   return SOURCE_PLACE_KIND_ALIASES[trimmed] ?? 'ETC'
 }

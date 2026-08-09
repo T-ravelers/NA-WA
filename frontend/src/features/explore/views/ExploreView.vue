@@ -26,19 +26,20 @@ import {
 import { EVENT_SECTOR_OPTIONS, PLACE_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
 import {
   PLACE_KINDS,
-  normalizePlaceKind,
+  isPlaceKind,
   type PlaceKind,
   type PlaceSearchFilters,
   type PlaceSort,
 } from '../model/placeExplore'
 
 type ExploreSheetKind = 'date' | 'region' | 'category' | 'options' | 'sort'
+type ExploreTab = 'events' | 'places'
 
 const { locale, t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const selectedTab = ref<'events' | 'places'>('events')
+const selectedTab = ref<ExploreTab>(readExploreTab(readQueryString('tab')))
 const selectedSheet = ref<ExploreSheetKind | null>(null)
 const searchOpen = ref(false)
 
@@ -59,7 +60,7 @@ const openWeekendOnly = ref(readQueryBoolean('openWeekendOnly'))
 const opensLateOnly = ref(readQueryBoolean('opensLateOnly'))
 const preReservationOnly = ref(readQueryBoolean('preReservationOnly'))
 const experienceOnly = ref(readQueryBoolean('experienceOnly'))
-const selectedPlaceKinds = ref<PlaceKind[]>(readQueryList('placeKinds').map(normalizePlaceKind))
+const selectedPlaceKinds = ref<PlaceKind[]>(readQueryList('placeKinds').filter(isPlaceKind))
 const selectedPlaceSectorIds = ref(readQueryNumberList('placeSectorIds'))
 const selectedPlaceActivityIds = ref(readQueryNumberList('placeActivityIds'))
 const selectedPlaceRegion1 = ref(readQueryList('placeRegion1'))
@@ -283,7 +284,7 @@ watch(
   (next) => {
     if (selectedTab.value !== 'places') return
 
-    const query: LocationQueryRaw = {}
+    const query: LocationQueryRaw = { tab: 'places' }
     addQueryList(query, 'placeKinds', next.placeKinds)
     addQueryList(query, 'placeSectorIds', next.sectorIds)
     addQueryList(query, 'placeActivityIds', next.activityIds)
@@ -306,7 +307,24 @@ watch(
   { deep: true },
 )
 
-watch(selectedTab, closeSheet)
+watch(selectedTab, (next, previous) => {
+  closeSheet()
+  if (next === previous) return
+
+  const query: LocationQueryRaw = { ...route.query }
+  if (next === 'places') query.tab = 'places'
+  else delete query.tab
+
+  router.push({ query }).catch(() => undefined)
+})
+
+watch(
+  () => route.query.tab,
+  (value) => {
+    const next = readExploreTab(typeof value === 'string' ? value : undefined)
+    if (selectedTab.value !== next) selectedTab.value = next
+  },
+)
 
 function openSheet(kind: ExploreSheetKind): void {
   selectedSheet.value = kind
@@ -516,6 +534,10 @@ function removePlaceFilter(key: string): void {
 function readQueryString(key: string): string | undefined {
   const value = route.query[key]
   return Array.isArray(value) ? (value[0] ?? undefined) : (value ?? undefined)
+}
+
+function readExploreTab(value: string | undefined): ExploreTab {
+  return value === 'places' ? 'places' : 'events'
 }
 
 function readQueryList(key: string): string[] {
