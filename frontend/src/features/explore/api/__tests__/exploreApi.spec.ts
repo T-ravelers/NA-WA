@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { fetchEventDetail, fetchEventList, toSearchParams } from '../exploreApi'
+import {
+  fetchEventDetail,
+  fetchEventList,
+  fetchPlaceList,
+  toPlaceSearchParams,
+  toSearchParams,
+} from '../exploreApi'
 
 const { get } = vi.hoisted(() => ({ get: vi.fn() }))
 
@@ -50,6 +56,43 @@ describe('exploreApi', () => {
 
     await expect(fetchEventList({ sort: 'LATEST' })).resolves.toEqual(data)
     expect(get).toHaveBeenCalledWith('/api/v1/explore/events', {
+      params: expect.any(URLSearchParams),
+    })
+  })
+
+  it('serializes Place filters and returns the unwrapped Place list', async () => {
+    const params = toPlaceSearchParams({
+      region1: ['Seoul'],
+      region2: ['Seongsu', 'Hongdae'],
+      sectorIds: [2],
+      activityIds: [101, 102],
+      hasParking: true,
+      takeoutAvailable: false,
+      savedOnly: true,
+      sort: 'POPULAR',
+      page: 1,
+      size: 20,
+    })
+
+    expect(params.getAll('region2')).toEqual(['Seongsu', 'Hongdae'])
+    expect(params.getAll('activityIds')).toEqual(['101', '102'])
+    expect(params.get('hasParking')).toBe('true')
+    expect(params.get('takeoutAvailable')).toBe('false')
+    expect(params.get('savedOnly')).toBe('true')
+    expect(params.get('sort')).toBe('POPULAR')
+
+    const data = {
+      content: null,
+      page: 1,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+      hasNext: false,
+    }
+    get.mockResolvedValueOnce({ data })
+
+    await expect(fetchPlaceList({ sort: 'LATEST' })).resolves.toEqual({ ...data, content: [] })
+    expect(get).toHaveBeenCalledWith('/api/v1/explore/places', {
       params: expect.any(URLSearchParams),
     })
   })

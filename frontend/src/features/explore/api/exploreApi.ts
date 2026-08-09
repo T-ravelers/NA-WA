@@ -2,9 +2,16 @@ import { httpClient } from '@/shared/api/httpClient'
 
 import type { EventDetail } from '../model/eventDetail'
 import type { EventListResponse, EventSearchFilters } from '../model/eventExplore'
+import {
+  normalizePlaceListResponse,
+  type PlaceListResponse,
+  type PlaceSearchFilters,
+  type PlaceListResponsePayload,
+} from '../model/placeExplore'
 
 const EVENT_LIST_PATH = '/api/v1/explore/events'
 const EVENT_DETAIL_PATH = '/api/v1/explore/events'
+const PLACE_LIST_PATH = '/api/v1/explore/places'
 
 function appendList(
   params: URLSearchParams,
@@ -54,6 +61,43 @@ function toSearchParams(filters: EventSearchFilters): URLSearchParams {
   return params
 }
 
+function toPlaceSearchParams(filters: PlaceSearchFilters): URLSearchParams {
+  const params = new URLSearchParams()
+
+  appendList(params, 'sectorIds', filters.sectorIds)
+  appendList(params, 'activityIds', filters.activityIds)
+  appendList(params, 'region1', filters.region1)
+  appendList(params, 'region2', filters.region2)
+  appendList(params, 'region3', filters.region3)
+
+  if (filters.keyword !== undefined && filters.keyword !== '') {
+    params.set('keyword', filters.keyword)
+  }
+  if (filters.sort !== undefined) params.set('sort', filters.sort)
+  if (filters.language !== undefined) params.set('language', filters.language)
+  if (filters.page !== undefined) params.set('page', String(filters.page))
+  if (filters.size !== undefined) params.set('size', String(filters.size))
+
+  const booleanFilters = [
+    'hasForeignLang',
+    'hasParking',
+    'reservable',
+    'takeoutAvailable',
+    'cardPaymentAvailable',
+    'smokeFree',
+    'kidFacility',
+    'hasRestroom',
+    'savedOnly',
+  ] as const
+
+  booleanFilters.forEach((name) => {
+    const value = filters[name]
+    if (value !== undefined) params.set(name, String(value))
+  })
+
+  return params
+}
+
 export async function fetchEventList(filters: EventSearchFilters = {}): Promise<EventListResponse> {
   const response = await httpClient.get<EventListResponse>(EVENT_LIST_PATH, {
     params: toSearchParams(filters),
@@ -73,4 +117,12 @@ export async function fetchEventDetail(
   return response.data
 }
 
-export { EVENT_DETAIL_PATH, EVENT_LIST_PATH, toSearchParams }
+export async function fetchPlaceList(filters: PlaceSearchFilters = {}): Promise<PlaceListResponse> {
+  const response = await httpClient.get<PlaceListResponsePayload>(PLACE_LIST_PATH, {
+    params: toPlaceSearchParams(filters),
+  })
+
+  return normalizePlaceListResponse(response.data)
+}
+
+export { EVENT_DETAIL_PATH, EVENT_LIST_PATH, PLACE_LIST_PATH, toPlaceSearchParams, toSearchParams }
