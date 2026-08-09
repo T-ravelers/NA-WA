@@ -100,7 +100,7 @@ export const EVENT_ACTIVITY_OPTIONS = EVENT_SECTOR_OPTIONS.flatMap((sector) => s
  * Place taxonomy proposal from the operational_v9 handoff.
  *
  * Activity IDs are provisional local IDs until the Place backend contract is
- * finalized in #83. They are intentionally separate from Event activity IDs.
+ * finalized in #138. They are intentionally separate from Event activity IDs.
  */
 export const PLACE_SECTOR_OPTIONS: ExploreSectorOption[] = [
   {
