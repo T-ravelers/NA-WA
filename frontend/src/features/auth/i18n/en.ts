@@ -40,6 +40,7 @@ export default {
       retry: 'Try signing in again',
     },
     signOut: 'Sign out',
+    signOutFailed: 'We could not sign you out. Please try again.',
     errorCode: {
       'AUTH-001': 'Your session has expired. Please sign in again.',
       'AUTH-002': 'Your session was ended for security reasons. Please sign in again.',

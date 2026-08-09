@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const clearQueries = vi.fn()
 const clearMemberProfile = vi.fn()
 const clearReturnPath = vi.fn()
+const clearCsrfToken = vi.fn()
 const replace = vi.fn()
 const currentRoute = { value: { path: '/wallet', fullPath: '/wallet?tab=history' } }
 
@@ -22,6 +23,10 @@ vi.mock('@/features/member/model/memberQueries', () => ({
   clearMemberProfile: () => clearMemberProfile(),
 }))
 
+vi.mock('@/shared/api/csrf', () => ({
+  clearCsrfToken: () => clearCsrfToken(),
+}))
+
 const { handleSessionExpired, handleSignedOut } = await import('../sessionHandlers')
 
 describe('sessionHandlers', () => {
@@ -35,6 +40,7 @@ describe('sessionHandlers', () => {
 
     expect(clearMemberProfile).toHaveBeenCalledOnce()
     expect(clearQueries).toHaveBeenCalledOnce()
+    expect(clearCsrfToken).toHaveBeenCalledOnce()
     expect(replace).toHaveBeenCalledWith({
       path: '/sign-in',
       query: { returnPath: '/wallet?tab=history' },
@@ -55,6 +61,7 @@ describe('sessionHandlers', () => {
 
     expect(clearMemberProfile).toHaveBeenCalledOnce()
     expect(clearQueries).toHaveBeenCalledOnce()
+    expect(clearCsrfToken).toHaveBeenCalledOnce()
     expect(clearReturnPath).toHaveBeenCalledOnce()
     expect(replace).toHaveBeenCalledWith({ path: '/sign-in' })
   })

@@ -125,6 +125,21 @@ function chooseLocale(next: AppLocale): void {
         />
       </button>
 
+      <div
+        v-if="signOut.isError.value"
+        role="alert"
+        class="mt-2 flex flex-col items-start gap-2 rounded-sm bg-surface-3 px-3.5 py-3"
+      >
+        <p class="text-body-sm text-ink-2">{{ t('auth.signOutFailed') }}</p>
+        <button
+          type="button"
+          class="text-caption text-ink-display underline"
+          @click="signOut.mutate()"
+        >
+          {{ t('action.retry') }}
+        </button>
+      </div>
+
       <h2 class="mt-8 font-display text-section-header text-ink-display uppercase">
         {{ t('member.settings.preferences') }}
       </h2>

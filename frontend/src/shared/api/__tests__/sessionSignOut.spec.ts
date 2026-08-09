@@ -25,13 +25,13 @@ describe('sessionSignOut', () => {
     expect(onSignedOut).toHaveBeenCalledOnce()
   })
 
-  it('runs the local handler even when the server request fails', async () => {
+  it('keeps the local session when the server request fails', async () => {
     const failure = new Error('network unavailable')
     const onSignedOut = vi.fn()
     post.mockRejectedValue(failure)
     setSignedOutHandler(onSignedOut)
 
     await expect(requestSignOut()).rejects.toBe(failure)
-    expect(onSignedOut).toHaveBeenCalledOnce()
+    expect(onSignedOut).not.toHaveBeenCalled()
   })
 })

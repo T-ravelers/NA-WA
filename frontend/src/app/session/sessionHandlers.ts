@@ -2,6 +2,7 @@ import { queryClient } from '@/app/query/client'
 import { router } from '@/app/router'
 import { clearReturnPath } from '@/features/auth/model/returnPath'
 import { clearMemberProfile } from '@/features/member/model/memberQueries'
+import { clearCsrfToken } from '@/shared/api/csrf'
 import { AUTH_CALLBACK_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
 
 /** 이미 인증 화면에 있으면 다시 보내지 않는다. */
@@ -11,6 +12,7 @@ function clearSessionData(): void {
   // 프로필 전용 정리 계약을 먼저 지키고, 다른 계정 데이터까지 전체 캐시에서 제거한다.
   clearMemberProfile()
   queryClient.clear()
+  clearCsrfToken()
 }
 
 /** 세션 만료는 사용자가 보던 보호 경로를 로그인 뒤 복원한다. */

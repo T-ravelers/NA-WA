@@ -15,14 +15,9 @@ export function setSignedOutHandler(handler: SignedOutHandler): void {
 }
 
 /**
- * 서버 세션 종료가 실패해도 브라우저의 세션 상태는 반드시 폐기한다.
- *
- * 로그아웃 API는 멱등이며, 응답 실패 뒤 기존 캐시를 계속 노출하는 쪽이 더 위험하다.
+ * 서버가 브라우저 인증 쿠키 만료를 확인한 뒤 앱의 세션 상태를 폐기한다.
  */
 export async function requestSignOut(): Promise<void> {
-  try {
-    await httpClient.post('/api/v1/auth/logout')
-  } finally {
-    signedOutHandler?.()
-  }
+  await httpClient.post('/api/v1/auth/logout')
+  signedOutHandler?.()
 }
