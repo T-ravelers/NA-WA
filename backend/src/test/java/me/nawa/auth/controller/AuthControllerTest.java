@@ -256,6 +256,52 @@ class AuthControllerTest {
     }
 
     @Test
+    void refresh_suspendedMember_returnsForbiddenAndDeletesCookies()
+            throws Exception {
+        authTokenService.refreshFailure = new BusinessException(
+                me.nawa.auth.exception.AuthErrorCode
+                        .OAUTH_MEMBER_SUSPENDED
+        );
+
+        MockHttpServletResponse response = mockMvc.perform(
+                        post("/api/v1/auth/refresh")
+                                .cookie(new Cookie(
+                                        "refresh_token",
+                                        "current-refresh"
+                                ))
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(403, response.getStatus());
+        assertTrue(response.getContentAsString().contains("AUTH-016"));
+        assertDeletedCookies(response.getHeaders(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
+    void refresh_withdrawnMember_returnsForbiddenAndDeletesCookies()
+            throws Exception {
+        authTokenService.refreshFailure = new BusinessException(
+                me.nawa.auth.exception.AuthErrorCode
+                        .OAUTH_MEMBER_WITHDRAWN
+        );
+
+        MockHttpServletResponse response = mockMvc.perform(
+                        post("/api/v1/auth/refresh")
+                                .cookie(new Cookie(
+                                        "refresh_token",
+                                        "current-refresh"
+                                ))
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(403, response.getStatus());
+        assertTrue(response.getContentAsString().contains("AUTH-017"));
+        assertDeletedCookies(response.getHeaders(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
     void logout_withCookie_revokesSessionAndDeletesCookies() throws Exception {
         MockHttpServletResponse response = mockMvc.perform(
                         post("/api/v1/auth/logout")
@@ -339,6 +385,7 @@ class AuthControllerTest {
             implements AuthTokenService {
         private String refreshedValue;
         private AuthTokens refreshedTokens;
+        private RuntimeException refreshFailure;
         private String revokedValue;
         private RuntimeException revokeFailure;
 
@@ -350,6 +397,9 @@ class AuthControllerTest {
         @Override
         public AuthTokens refreshTokens(String currentRefreshToken) {
             refreshedValue = currentRefreshToken;
+            if (refreshFailure != null) {
+                throw refreshFailure;
+            }
             return refreshedTokens;
         }
 

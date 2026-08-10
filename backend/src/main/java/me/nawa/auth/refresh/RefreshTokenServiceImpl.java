@@ -3,6 +3,8 @@ package me.nawa.auth.refresh;
 import lombok.RequiredArgsConstructor;
 import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.member.domain.MemberAuthState;
+import me.nawa.member.mapper.MemberMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -12,6 +14,7 @@ import java.util.UUID;
 public class RefreshTokenServiceImpl implements RefreshTokenService {
     private final RefreshTokenProvider refreshTokenProvider;
     private final RefreshTokenStore refreshTokenStore;
+    private final MemberMapper memberMapper;
 
     @Override
     public RefreshToken issueRefreshToken(long memberId) {
@@ -30,6 +33,8 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                                 AuthErrorCode.INVALID_REFRESH_TOKEN
                         )
                 );
+
+        requireActiveMember(currentSession.getMemberId(), sessionId);
 
         RefreshToken replacementToken =
                 refreshTokenProvider.issueRefreshToken(sessionId);
@@ -76,6 +81,36 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                     exception
             );
         }
+    }
+
+    private void requireActiveMember(long memberId, UUID sessionId) {
+        MemberAuthState authState = memberMapper.findAuthState(memberId);
+        if (authState == null
+                || authState.isDeleted()
+                || "WITHDRAWN".equals(authState.getMemberStatus())) {
+            throw revokeInactiveSession(
+                    sessionId,
+                    AuthErrorCode.OAUTH_MEMBER_WITHDRAWN
+            );
+        }
+        if ("SUSPENDED".equals(authState.getMemberStatus())) {
+            throw revokeInactiveSession(
+                    sessionId,
+                    AuthErrorCode.OAUTH_MEMBER_SUSPENDED
+            );
+        }
+        if (!"ACTIVE".equals(authState.getMemberStatus())) {
+            throw new IllegalStateException(
+                    "Stored member status is invalid"
+            );
+        }
+    }
+
+    private BusinessException revokeInactiveSession(
+            UUID sessionId,
+            AuthErrorCode errorCode) {
+        refreshTokenStore.deleteBySessionId(sessionId);
+        return new BusinessException(errorCode);
     }
 
     private RefreshTokenSession toSession(long memberId, RefreshToken token) {

@@ -13,11 +13,25 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 | 공급자 콜백 | `GET /api/v1/auth/oauth2/callback/{provider}`                   | 자체 토큰 쿠키 발급 후 프런트엔드로 `302` 이동 |
 | 로그인 확인 | `GET /api/v1/members/me`                                        | 현재 회원 정보와 `onboardingRequired` 반환     |
 | 토큰 갱신   | `POST /api/v1/auth/refresh`                                     | access·refresh 쿠키 교체                       |
-| 로그아웃    | `POST /api/v1/auth/logout`                                      | 인증 쿠키 삭제와 Redis 세션 폐기 시도           |
+| 로그아웃    | `POST /api/v1/auth/logout`                                      | 인증 쿠키 삭제와 Redis 세션 폐기 시도          |
 
 `provider`는 `google` 또는 `line`만 허용합니다. 성공·실패 리다이렉트 URL에는
 토큰이나 개인정보를 넣지 않습니다. 실패 시에는 프런트엔드가 처리할 안정적인
 `error` 코드만 전달합니다.
+
+### 토큰 갱신은 현재 회원 상태를 다시 확인합니다
+
+`POST /api/v1/auth/refresh`는 MySQL에서 현재 회원 상태와 삭제 여부를 확인한 뒤
+token을 회전합니다. `ACTIVE` 회원만 기존 Redis 원자적 회전을 거쳐 새
+access·refresh 쿠키를 받습니다.
+
+정지 회원은 `403 AUTH-016`, 탈퇴·삭제되었거나 존재하지 않는 회원은
+`403 AUTH-017`을 반환합니다. 이때 해당 Redis refresh 세션을 폐기하고 응답에서
+access·refresh 쿠키를 삭제합니다. MySQL 오류처럼 현재 상태를 확인할 수 없으면 새
+token을 발급하지 않지만, 확인되지 않은 Redis 세션까지 폐기하지는 않습니다.
+
+이미 발급된 access token은 설정된 TTL까지 유효할 수 있습니다. 회원별 전체 세션
+인덱스와 access token 즉시 폐기는 별도 운영 정책이 필요한 후속 범위입니다.
 
 ### 로그인 상태 확인은 `members/me`가 겸합니다
 

@@ -29,6 +29,13 @@ class MemberMapperXmlTest {
     }
 
     @Test
+    void mapperXml_parsesFindAuthStateStatement() throws Exception {
+        assertTrue(parsedConfiguration().hasStatement(
+                "me.nawa.member.mapper.MemberMapper.findAuthState"
+        ));
+    }
+
+    @Test
     void mapperXml_parsesFindProfileStatement() throws Exception {
         assertTrue(parsedConfiguration().hasStatement(
                 "me.nawa.member.mapper.MemberMapper.findProfile"

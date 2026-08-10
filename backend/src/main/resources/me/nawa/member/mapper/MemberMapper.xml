@@ -5,6 +5,16 @@
 
 <mapper namespace="me.nawa.member.mapper.MemberMapper">
 
+    <select id="findAuthState"
+            resultType="me.nawa.member.domain.MemberAuthState">
+        SELECT
+            member_status,
+            (deleted_at IS NOT NULL) AS deleted
+        FROM members
+        WHERE member_id = #{memberId}
+        LIMIT 1
+    </select>
+
     <select id="findProfile"
             resultType="me.nawa.member.domain.MemberProfile">
         SELECT
