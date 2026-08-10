@@ -35,6 +35,7 @@ class OAuthAccountMapperIntegrationTest {
     private static OAuthAccountMapper mapper;
     private static MemberMapper memberMapper;
     private static JdbcTemplate jdbcTemplate;
+    private static SqlSessionTemplate sqlSessionTemplate;
     private static TransactionTemplate transactionTemplate;
 
     @BeforeAll
@@ -60,7 +61,7 @@ class OAuthAccountMapperIntegrationTest {
                 OAuthAccountMapper.class
         );
         sqlSessionFactory.getConfiguration().addMapper(MemberMapper.class);
-        SqlSessionTemplate sqlSessionTemplate = new SqlSessionTemplate(
+        sqlSessionTemplate = new SqlSessionTemplate(
                 sqlSessionFactory
         );
         mapper = sqlSessionTemplate.getMapper(
@@ -131,6 +132,8 @@ class OAuthAccountMapperIntegrationTest {
                             + "WHERE member_id = ?",
                     member.getMemberId()
             );
+            // JdbcTemplate 변경은 MyBatis 1차 캐시를 무효화하지 않는다.
+            sqlSessionTemplate.clearCache();
             MemberAuthState suspendedState = memberMapper.findAuthState(
                     member.getMemberId()
             );
@@ -142,6 +145,7 @@ class OAuthAccountMapperIntegrationTest {
                             + "WHERE member_id = ?",
                     member.getMemberId()
             );
+            sqlSessionTemplate.clearCache();
             assertTrue(memberMapper.findAuthState(
                     member.getMemberId()
             ).isDeleted());

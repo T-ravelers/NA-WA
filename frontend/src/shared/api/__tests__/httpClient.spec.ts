@@ -202,7 +202,7 @@ describe('httpClient', () => {
     ['AUTH-016', 'This account is suspended'],
     ['AUTH-017', 'This account has been withdrawn'],
   ])(
-    'refreshes only once and expires the session when refresh fails with %s',
+    'shares one refresh attempt and invokes session expiry handling when refresh fails with %s',
     async (code, message) => {
       const inactiveMember = {
         success: false,
@@ -232,6 +232,8 @@ describe('httpClient', () => {
       expect(results.every((result) => result.status === 'rejected')).toBe(true)
       expect(countCalls(calls, 'post', '/api/v1/auth/refresh')).toBe(1)
       expect(countCalls(calls, 'get', '/api/v1/auth/csrf')).toBe(1)
+      // 이 회귀 테스트는 refresh 요청의 단일 비행만 고정한다.
+      // 만료 핸들러 호출 횟수는 #134의 클라이언트 로그아웃 상태 계약에서 결정한다.
       expect(onExpired).toHaveBeenCalled()
     },
   )
