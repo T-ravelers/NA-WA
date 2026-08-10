@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { IconChevronDown, IconSearch } from '@tabler/icons-vue'
@@ -76,6 +76,7 @@ const selectedPlaceRestroom = ref(readQueryBoolean('hasRestroom'))
 const selectedPlaceSavedOnly = ref(readQueryBoolean('savedOnly'))
 const selectedPlacePage = ref(readQueryPage('placePage'))
 const placeSort = ref<PlaceSort>(readPlaceSort(readQueryString('placeSort')))
+const hydratingPlaceQuery = ref(false)
 const sheetPreviewFilters = ref<EventSearchFilters | null>(null)
 const placeSheetPreviewFilters = ref<PlaceSearchFilters | null>(null)
 
@@ -282,7 +283,7 @@ watch(
 watch(
   placeFilters,
   (next) => {
-    if (selectedTab.value !== 'places') return
+    if (selectedTab.value !== 'places' || hydratingPlaceQuery.value) return
 
     const query: LocationQueryRaw = { tab: 'places' }
     addQueryList(query, 'placeKinds', next.placeKinds)
@@ -319,11 +320,35 @@ watch(selectedTab, (next, previous) => {
 })
 
 watch(
-  () => route.query.tab,
-  (value) => {
-    const next = readExploreTab(typeof value === 'string' ? value : undefined)
-    if (selectedTab.value !== next) selectedTab.value = next
+  () => route.query,
+  async (query) => {
+    const tabValue = typeof query.tab === 'string' ? query.tab : undefined
+    const nextTab = readExploreTab(tabValue)
+    if (selectedTab.value !== nextTab) selectedTab.value = nextTab
+    if (nextTab !== 'places') return
+
+    hydratingPlaceQuery.value = true
+    selectedPlaceKinds.value = readQueryList('placeKinds').filter(isPlaceKind)
+    selectedPlaceSectorIds.value = readQueryNumberList('placeSectorIds')
+    selectedPlaceActivityIds.value = readQueryNumberList('placeActivityIds')
+    selectedPlaceRegion1.value = readQueryList('placeRegion1')
+    selectedPlaceRegion2.value = readQueryList('placeRegion2')
+    selectedPlaceHasForeignLang.value = readQueryBoolean('hasForeignLang')
+    selectedPlaceHasParking.value = readQueryBoolean('hasParking')
+    selectedPlaceReservable.value = readQueryBoolean('reservable')
+    selectedPlaceTakeout.value = readQueryBoolean('takeoutAvailable')
+    selectedPlaceCardPayment.value = readQueryBoolean('cardPaymentAvailable')
+    selectedPlaceSmokeFree.value = readQueryBoolean('smokeFree')
+    selectedPlaceKidFacility.value = readQueryBoolean('kidFacility')
+    selectedPlaceRestroom.value = readQueryBoolean('hasRestroom')
+    selectedPlaceSavedOnly.value = readQueryBoolean('savedOnly')
+    selectedPlacePage.value = readQueryPage('placePage')
+    placeSort.value = readPlaceSort(readQueryString('placeSort'))
+    keyword.value = readQueryString('keyword') ?? ''
+    await nextTick()
+    hydratingPlaceQuery.value = false
   },
+  { deep: true },
 )
 
 function openSheet(kind: ExploreSheetKind): void {

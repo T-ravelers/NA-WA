@@ -24,8 +24,6 @@ const emit = defineEmits<{
   apply: [filters: PlaceSearchFilters]
 }>()
 
-const REGION2_OTHER = '__OTHER_REGION2__'
-
 const { t } = useI18n()
 
 const SHEET_TITLES: Record<PlaceSheetKind, string> = {
@@ -129,7 +127,6 @@ function cloneFilters(filters: PlaceSearchFilters): PlaceSearchFilters {
     placeKinds: filters.placeKinds ? [...filters.placeKinds] : undefined,
     region1: filters.region1 ? [...filters.region1] : undefined,
     region2: filters.region2 ? [...filters.region2] : undefined,
-    region3: filters.region3 ? [...filters.region3] : undefined,
   }
 }
 
@@ -137,12 +134,9 @@ function selectRegion(value: string): void {
   selectedRegion.value = value
   draft.region1 = [value]
   draft.region2 = undefined
-  draft.region3 = undefined
 }
 
 function toggleArea(value: string): void {
-  if (value === REGION2_OTHER) return
-
   const current = new Set(draft.region2 ?? [])
   if (current.has(value)) current.delete(value)
   else current.add(value)
@@ -207,7 +201,6 @@ function resetSheet(): void {
   if (props.kind === 'region') {
     draft.region1 = undefined
     draft.region2 = undefined
-    draft.region3 = undefined
     selectedRegion.value = REGION_OPTIONS[0].value
   } else if (props.kind === 'category') {
     draft.sectorIds = undefined
@@ -299,7 +292,6 @@ function apply(): void {
                   />
                 </span>
               </button>
-              <span class="px-3 pt-2 text-caption text-ink-3">Other areas</span>
             </div>
           </div>
           <p class="mt-3 text-caption text-ink-3">{{ t('explore.regionHint') }}</p>
@@ -414,8 +406,12 @@ function apply(): void {
           <div class="divide-y divide-hairline">
             <button
               v-for="sortOption in [
-                { value: 'LATEST', labelKey: 'explore.sort.latest', hint: 'default' },
-                { value: 'POPULAR', labelKey: 'explore.sort.popular', hint: '' },
+                {
+                  value: 'LATEST',
+                  labelKey: 'explore.sort.latest',
+                  hintKey: 'explore.sort.defaultHint',
+                },
+                { value: 'POPULAR', labelKey: 'explore.sort.popular', hintKey: '' },
               ]"
               :key="sortOption.value"
               type="button"
@@ -428,10 +424,10 @@ function apply(): void {
               >
                 {{ t(sortOption.labelKey) }}
                 <span
-                  v-if="sortOption.hint"
+                  v-if="sortOption.hintKey"
                   class="text-caption text-ink-3"
                 >
-                  · {{ sortOption.hint }}</span
+                  · {{ t(sortOption.hintKey) }}</span
                 >
               </span>
               <span

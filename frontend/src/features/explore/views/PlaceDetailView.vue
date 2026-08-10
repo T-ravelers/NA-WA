@@ -21,23 +21,23 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
 
-import { addJourneyItem } from '@/features/journey/api/journeyApi'
-import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
-import {
-  parseJourneyRouteQuery,
-  readActiveJourneyId,
-  storeActiveJourneyId,
-} from '@/features/journey/model/activeJourney'
-
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
 import JourneySelectSheet from '../components/JourneySelectSheet.vue'
 import { usePlaceDetailQuery } from '../composables/usePlaceDetailQuery'
+import { useExploreJourneyIntegration } from '../model/journeyIntegration'
 import { normalizePlaceKind, type PlaceKind } from '../model/placeExplore'
 import { toClosedDays, toDetailEntries } from '../model/placeDetail'
 
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
+const {
+  addJourneyItem,
+  parseJourneyRouteQuery,
+  readActiveJourneyId,
+  storeActiveJourneyId,
+  useJourneyListQuery,
+} = useExploreJourneyIntegration()
 
 const placeId = computed(() => String(route.params.placeId ?? ''))
 const placeQuery = usePlaceDetailQuery(placeId, locale)

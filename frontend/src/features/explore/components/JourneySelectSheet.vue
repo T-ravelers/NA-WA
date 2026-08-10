@@ -2,10 +2,10 @@
 import { IconCheck } from '@tabler/icons-vue'
 import { useI18n } from 'vue-i18n'
 
-import type { JourneySummary } from '@/features/journey/api/journeyApi'
+import type { ExploreJourneySummary } from '../model/journeyIntegration'
 
 interface Props {
-  journeys: JourneySummary[]
+  journeys: ExploreJourneySummary[]
   selectedJourneyId?: number | null
   loading?: boolean
   errorMessage?: string | null

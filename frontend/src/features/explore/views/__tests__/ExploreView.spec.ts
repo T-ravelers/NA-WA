@@ -162,4 +162,15 @@ describe('ExploreView Place branch', () => {
       expect.not.objectContaining({ placeKinds: ['ETC'] }),
     )
   })
+
+  it('rehydrates Place filters when the route query changes after mount', async () => {
+    const { router } = await mountView('/explore?tab=places&placeRegion1=Seoul')
+
+    await router.push('/explore?tab=places&placeRegion1=Gyeonggi&hasParking=true')
+    await flushPromises()
+
+    expect(fetchPlaceList).toHaveBeenLastCalledWith(
+      expect.objectContaining({ region1: ['Gyeonggi'], hasParking: true, page: 0 }),
+    )
+  })
 })

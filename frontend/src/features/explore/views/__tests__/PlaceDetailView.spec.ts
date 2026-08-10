@@ -9,6 +9,27 @@ const fetchPlaceDetail = vi.fn()
 const fetchJourneys = vi.fn()
 const addJourneyItem = vi.fn()
 
+vi.mock('../../model/journeyIntegration', async () => {
+  const { useQuery } = await import('@tanstack/vue-query')
+  const { computed, toValue } = await import('vue')
+  return {
+    useExploreJourneyIntegration: () => ({
+      addJourneyItem: (journeyId: number, request: { itemId: number; visitDate: string }) =>
+        addJourneyItem(journeyId, request),
+      parseJourneyRouteQuery: () => null,
+      readActiveJourneyId: () => null,
+      storeActiveJourneyId: vi.fn(),
+      useJourneyListQuery: (enabled: import('vue').MaybeRefOrGetter<boolean>) =>
+        useQuery({
+          queryKey: ['journeys', 'review-test'],
+          queryFn: () => fetchJourneys(),
+          enabled: computed(() => toValue(enabled)),
+          retry: false,
+        }),
+    }),
+  }
+})
+
 vi.mock('../../api/exploreApi', () => ({
   fetchPlaceDetail: (placeId: number | string, language: string) =>
     fetchPlaceDetail(placeId, language),

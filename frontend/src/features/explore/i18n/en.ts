@@ -187,6 +187,7 @@ export default {
       ENDED: 'Ended',
     },
     sort: {
+      defaultHint: 'Default',
       latest: 'Newest',
       popular: 'Popular',
       ending_soon: 'Ending soon',
