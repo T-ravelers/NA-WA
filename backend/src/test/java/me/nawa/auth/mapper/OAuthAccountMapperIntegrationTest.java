@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import me.nawa.auth.oauth.account.OAuthLoginAccount;
 import me.nawa.auth.oauth.account.OAuthMemberInsert;
+import me.nawa.member.domain.MemberAuthState;
 import me.nawa.member.domain.MemberProfile;
 import me.nawa.member.mapper.MemberMapper;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -32,6 +34,7 @@ class OAuthAccountMapperIntegrationTest {
     private static HikariDataSource dataSource;
     private static OAuthAccountMapper mapper;
     private static MemberMapper memberMapper;
+    private static JdbcTemplate jdbcTemplate;
     private static TransactionTemplate transactionTemplate;
 
     @BeforeAll
@@ -64,6 +67,7 @@ class OAuthAccountMapperIntegrationTest {
                 OAuthAccountMapper.class
         );
         memberMapper = sqlSessionTemplate.getMapper(MemberMapper.class);
+        jdbcTemplate = new JdbcTemplate(dataSource);
         transactionTemplate = new TransactionTemplate(
                 new DataSourceTransactionManager(dataSource)
         );
@@ -115,6 +119,32 @@ class OAuthAccountMapperIntegrationTest {
             assertEquals("en", profile.getPreferredLanguage());
             assertFalse(profile.isOnboardingCompleted());
             assertFalse(profile.isDeleted());
+
+            MemberAuthState activeState = memberMapper.findAuthState(
+                    member.getMemberId()
+            );
+            assertEquals("ACTIVE", activeState.getMemberStatus());
+            assertFalse(activeState.isDeleted());
+
+            jdbcTemplate.update(
+                    "UPDATE members SET member_status = 'SUSPENDED' "
+                            + "WHERE member_id = ?",
+                    member.getMemberId()
+            );
+            MemberAuthState suspendedState = memberMapper.findAuthState(
+                    member.getMemberId()
+            );
+            assertEquals("SUSPENDED", suspendedState.getMemberStatus());
+            assertFalse(suspendedState.isDeleted());
+
+            jdbcTemplate.update(
+                    "UPDATE members SET deleted_at = CURRENT_TIMESTAMP "
+                            + "WHERE member_id = ?",
+                    member.getMemberId()
+            );
+            assertTrue(memberMapper.findAuthState(
+                    member.getMemberId()
+            ).isDeleted());
             assertNull(mapper.findLoginAccount(
                     "google",
                     providerUserId

@@ -1,11 +1,14 @@
 package me.nawa.member.mapper;
 
+import me.nawa.member.domain.MemberAuthState;
 import me.nawa.member.domain.MemberProfile;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface MemberMapper {
+
+    MemberAuthState findAuthState(@Param("memberId") long memberId);
 
     MemberProfile findProfile(@Param("memberId") long memberId);
 
