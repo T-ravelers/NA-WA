@@ -198,6 +198,44 @@ describe('httpClient', () => {
     expect(countCalls(calls, 'post', '/api/v1/auth/refresh')).toBe(1)
   })
 
+  it.each([
+    ['AUTH-016', 'This account is suspended'],
+    ['AUTH-017', 'This account has been withdrawn'],
+  ])(
+    'refreshes only once and expires the session when refresh fails with %s',
+    async (code, message) => {
+      const inactiveMember = {
+        success: false,
+        error: { code, message },
+      }
+      const { httpClient, sessionRecovery, calls } = await loadClient({
+        'get /api/v1/auth/csrf': [
+          {
+            status: 200,
+            body: { success: true, data: { token: 'csrf-token', headerName: 'X-CSRF-TOKEN' } },
+          },
+        ],
+        'get /api/v1/wallet': [{ status: 401, body: authRequired }],
+        'get /api/v1/explore/events': [{ status: 401, body: authRequired }],
+        'post /api/v1/auth/refresh': [{ status: 403, body: inactiveMember }],
+      })
+      const onExpired = vi.fn()
+
+      sessionRecovery.setSessionExpiredHandler(onExpired)
+
+      const results = await Promise.allSettled([
+        httpClient.get('/api/v1/wallet'),
+        httpClient.get('/api/v1/explore/events'),
+      ])
+
+      expect(results).toHaveLength(2)
+      expect(results.every((result) => result.status === 'rejected')).toBe(true)
+      expect(countCalls(calls, 'post', '/api/v1/auth/refresh')).toBe(1)
+      expect(countCalls(calls, 'get', '/api/v1/auth/csrf')).toBe(1)
+      expect(onExpired).toHaveBeenCalled()
+    },
+  )
+
   it('runs the session expired handler when the refresh fails', async () => {
     const { httpClient, sessionRecovery } = await loadClient({
       'get /api/v1/wallet': [{ status: 401, body: authRequired }],
