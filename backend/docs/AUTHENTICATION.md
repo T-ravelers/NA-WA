@@ -21,9 +21,9 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 
 ### 토큰 갱신은 현재 회원 상태를 다시 확인합니다
 
-`POST /api/v1/auth/refresh`는 Redis refresh 세션의 `memberId`만 신뢰하지 않고
-MySQL의 현재 회원 상태와 삭제 여부를 확인합니다. `ACTIVE` 회원만 기존 Redis 원자적
-회전을 거쳐 새 access·refresh 쿠키를 받습니다.
+`POST /api/v1/auth/refresh`는 MySQL에서 현재 회원 상태와 삭제 여부를 확인한 뒤
+token을 회전합니다. `ACTIVE` 회원만 기존 Redis 원자적 회전을 거쳐 새
+access·refresh 쿠키를 받습니다.
 
 정지 회원은 `403 AUTH-016`, 탈퇴·삭제되었거나 존재하지 않는 회원은
 `403 AUTH-017`을 반환합니다. 이때 해당 Redis refresh 세션을 폐기하고 응답에서
