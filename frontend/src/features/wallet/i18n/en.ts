@@ -146,5 +146,21 @@ export default {
       currentBalance: 'Current balance {balance}',
       backToWallet: 'Back to wallet',
     },
+    qr: {
+      title: 'QR PAYMENT',
+      back: 'Back to wallet',
+      heading: 'My wallet QR code',
+      requestLabel: 'Payment request QR',
+      imageLabel: 'Wallet payment QR code',
+      tabs: {
+        label: 'QR payment modes',
+        myQr: 'My QR',
+        scan: 'Scan QR',
+      },
+      validity: 'NA-WA · Valid for 05:00',
+      balance: 'Available balance {amount} P',
+      balanceUnavailable: 'Available balance unavailable',
+      sandboxNotice: 'Sandbox mode · QR payments are not processed yet.',
+    },
   },
 }
