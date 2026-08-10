@@ -43,6 +43,36 @@ export default withVueTs(
   },
 
   {
+    name: 'app/feature-boundaries',
+    files: ['src/features/**/*.{ts,tsx,vue}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@/features/auth',
+                '@/features/auth/**',
+                '@/features/explore',
+                '@/features/explore/**',
+                '@/features/journey',
+                '@/features/journey/**',
+                '@/features/member',
+                '@/features/member/**',
+                '@/features/wallet',
+                '@/features/wallet/**',
+              ],
+              message:
+                'Feature 간 직접 import는 금지합니다. app 주입 또는 shared 계약을 사용하세요.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
     ...pluginPlaywright.configs['flat/recommended'],
     name: 'app/playwright-rules',
     files: ['e2e/**/*.{test,spec}.{js,ts,jsx,tsx}'],
