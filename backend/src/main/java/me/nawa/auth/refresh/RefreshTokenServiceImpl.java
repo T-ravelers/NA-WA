@@ -88,13 +88,13 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         if (authState == null
                 || authState.isDeleted()
                 || "WITHDRAWN".equals(authState.getMemberStatus())) {
-            revokeInactiveSession(
+            throw revokeInactiveSession(
                     sessionId,
                     AuthErrorCode.OAUTH_MEMBER_WITHDRAWN
             );
         }
         if ("SUSPENDED".equals(authState.getMemberStatus())) {
-            revokeInactiveSession(
+            throw revokeInactiveSession(
                     sessionId,
                     AuthErrorCode.OAUTH_MEMBER_SUSPENDED
             );
@@ -106,11 +106,11 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         }
     }
 
-    private void revokeInactiveSession(
+    private BusinessException revokeInactiveSession(
             UUID sessionId,
             AuthErrorCode errorCode) {
         refreshTokenStore.deleteBySessionId(sessionId);
-        throw new BusinessException(errorCode);
+        return new BusinessException(errorCode);
     }
 
     private RefreshTokenSession toSession(long memberId, RefreshToken token) {
