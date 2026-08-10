@@ -26,7 +26,7 @@ const items: NavItem[] = [
   { key: 'calendar', icon: IconCalendar, labelKey: 'nav.calendar', to: null },
   { key: 'profile', icon: IconUser, labelKey: 'nav.profile', to: '/settings' },
   { key: 'wallet', icon: IconWallet, labelKey: 'nav.wallet', to: '/wallet' },
-  { key: 'journey', icon: IconRoute, labelKey: 'nav.journey', to: null },
+  { key: 'journey', icon: IconRoute, labelKey: 'nav.journey', to: '/journeys' },
 ]
 
 function isActive(item: NavItem): boolean {

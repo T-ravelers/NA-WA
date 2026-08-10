@@ -130,6 +130,32 @@ function stubJourneyDetail(page) {
   ])
 }
 
+function stubJourneyList(page) {
+  return page.route('**/api/v1/journeys', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: [
+          {
+            tripId: 42,
+            title: 'Seoul Foodie Week',
+            startDate: '2098-08-10',
+            endDate: '2098-08-12',
+          },
+          {
+            tripId: 7,
+            title: 'Busan Weekender',
+            startDate: '2020-08-10',
+            endDate: '2020-08-12',
+          },
+        ],
+      }),
+    }),
+  )
+}
+
 /**
  * 지갑 홈 응답을 세운다.
  *
@@ -325,6 +351,11 @@ const SCREENS = [
       await page.getByLabel('Change screen language').click()
       await page.waitForSelector('[role="dialog"]')
     },
+  },
+  {
+    name: '13-journey-list',
+    path: '/journeys',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyList(page)]),
   },
   {
     name: '06-journey-create',
