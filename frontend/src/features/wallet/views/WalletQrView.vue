@@ -128,8 +128,8 @@ const goBack = (): void => {
         type="button"
         role="tab"
         aria-selected="false"
-        disabled
-        class="min-h-12 border-b-2 border-transparent px-3 text-body-sm text-ink-3 disabled:cursor-not-allowed"
+        class="min-h-12 border-b-2 border-transparent px-3 text-body-sm text-ink-3 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
+        @click="router.push({ name: 'wallet-qr-scan' })"
       >
         {{ t('wallet.qr.tabs.scan') }}
       </button>

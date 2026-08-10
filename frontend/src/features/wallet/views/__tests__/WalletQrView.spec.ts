@@ -18,6 +18,7 @@ function createTestRouter(): Router {
     routes: [
       { path: '/wallet', name: 'wallet', component: { template: '<div />' } },
       { path: '/wallet/qr', name: 'wallet-qr', component: { template: '<div />' } },
+      { path: '/wallet/qr/scan', name: 'wallet-qr-scan', component: { template: '<div />' } },
     ],
   })
 }
@@ -77,5 +78,14 @@ describe('WalletQrView', () => {
     await wrapper.get('header button').trigger('click')
 
     expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet' })
+  })
+
+  it('opens the QR scan screen from the scan tab', async () => {
+    const { router, wrapper } = await mountView()
+    const pushSpy = vi.spyOn(router, 'push')
+
+    await wrapper.get('[role="tab"][aria-selected="false"]').trigger('click')
+
+    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr-scan' })
   })
 })

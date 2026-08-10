@@ -162,5 +162,13 @@ export default {
       balanceUnavailable: 'Available balance unavailable',
       sandboxNotice: 'Sandbox mode · QR payments are not processed yet.',
     },
+    qrScan: {
+      back: 'Back to wallet',
+      heading: 'Scan a QR code',
+      imageLabel: 'QR code scanning area',
+      instruction: 'Frame the QR code inside the box.',
+      memo: 'Note: QR code not recognized',
+      sandboxNotice: 'Sandbox mode · QR payments are not processed yet.',
+    },
   },
 }

@@ -387,6 +387,13 @@ const SCREENS = [
       await stubWalletHome(page, [])
     },
   },
+  {
+    name: '14-wallet-qr-scan',
+    path: '/wallet/qr/scan',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+    },
+  },
 
   // 조작이 필요한 상태는 이렇게 찍는다.
   //
