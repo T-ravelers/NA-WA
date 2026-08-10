@@ -2,6 +2,8 @@ package me.nawa.auth.refresh;
 
 import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.member.domain.MemberAuthState;
+import me.nawa.member.mapper.MemberMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class RefreshTokenServiceTest {
     private static final Instant CURRENT_TIME =
@@ -26,6 +31,7 @@ class RefreshTokenServiceTest {
 
     private RefreshTokenProvider refreshTokenProvider;
     private InMemoryRefreshTokenStore refreshTokenStore;
+    private MemberMapper memberMapper;
     private RefreshTokenService refreshTokenService;
 
     @BeforeEach
@@ -36,9 +42,13 @@ class RefreshTokenServiceTest {
                 new SecureRandom()
         );
         refreshTokenStore = new InMemoryRefreshTokenStore();
+        memberMapper = mock(MemberMapper.class);
+        when(memberMapper.findAuthState(anyLong()))
+                .thenReturn(memberAuthState("ACTIVE", false));
         refreshTokenService = new RefreshTokenServiceImpl(
                 refreshTokenProvider,
-                refreshTokenStore
+                refreshTokenStore,
+                memberMapper
         );
     }
 
@@ -109,6 +119,137 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    void rotateRefreshToken_suspendedMember_revokesSession() {
+        RefreshToken current = refreshTokenService.issueRefreshToken(42L);
+        when(memberMapper.findAuthState(42L))
+                .thenReturn(memberAuthState("SUSPENDED", false));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> refreshTokenService.rotateRefreshToken(
+                        current.getValue()
+                )
+        );
+
+        assertEquals(
+                AuthErrorCode.OAUTH_MEMBER_SUSPENDED,
+                exception.getErrorCode()
+        );
+        assertTrue(refreshTokenStore.findBySessionId(
+                current.getSessionId()
+        ).isEmpty());
+    }
+
+    @Test
+    void rotateRefreshToken_withdrawnMember_revokesSession() {
+        RefreshToken current = refreshTokenService.issueRefreshToken(42L);
+        when(memberMapper.findAuthState(42L))
+                .thenReturn(memberAuthState("WITHDRAWN", false));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> refreshTokenService.rotateRefreshToken(
+                        current.getValue()
+                )
+        );
+
+        assertEquals(
+                AuthErrorCode.OAUTH_MEMBER_WITHDRAWN,
+                exception.getErrorCode()
+        );
+        assertTrue(refreshTokenStore.findBySessionId(
+                current.getSessionId()
+        ).isEmpty());
+    }
+
+    @Test
+    void rotateRefreshToken_deletedMember_revokesSession() {
+        RefreshToken current = refreshTokenService.issueRefreshToken(42L);
+        when(memberMapper.findAuthState(42L))
+                .thenReturn(memberAuthState("ACTIVE", true));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> refreshTokenService.rotateRefreshToken(
+                        current.getValue()
+                )
+        );
+
+        assertEquals(
+                AuthErrorCode.OAUTH_MEMBER_WITHDRAWN,
+                exception.getErrorCode()
+        );
+        assertTrue(refreshTokenStore.findBySessionId(
+                current.getSessionId()
+        ).isEmpty());
+    }
+
+    @Test
+    void rotateRefreshToken_missingMember_revokesSession() {
+        RefreshToken current = refreshTokenService.issueRefreshToken(42L);
+        when(memberMapper.findAuthState(42L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> refreshTokenService.rotateRefreshToken(
+                        current.getValue()
+                )
+        );
+
+        assertEquals(
+                AuthErrorCode.OAUTH_MEMBER_WITHDRAWN,
+                exception.getErrorCode()
+        );
+        assertTrue(refreshTokenStore.findBySessionId(
+                current.getSessionId()
+        ).isEmpty());
+    }
+
+    @Test
+    void rotateRefreshToken_memberLookupFailure_doesNotRotateOrDeleteSession() {
+        RefreshToken current = refreshTokenService.issueRefreshToken(42L);
+        when(memberMapper.findAuthState(42L))
+                .thenThrow(new IllegalStateException("database unavailable"));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> refreshTokenService.rotateRefreshToken(
+                        current.getValue()
+                )
+        );
+
+        RefreshTokenSession stored = refreshTokenStore
+                .findBySessionId(current.getSessionId())
+                .orElseThrow();
+        assertTrue(refreshTokenProvider.matches(
+                current.getValue(),
+                stored.getTokenHash()
+        ));
+    }
+
+    @Test
+    void rotateRefreshToken_unknownMemberStatus_doesNotRotateOrDeleteSession() {
+        RefreshToken current = refreshTokenService.issueRefreshToken(42L);
+        when(memberMapper.findAuthState(42L))
+                .thenReturn(memberAuthState("UNKNOWN", false));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> refreshTokenService.rotateRefreshToken(
+                        current.getValue()
+                )
+        );
+
+        RefreshTokenSession stored = refreshTokenStore
+                .findBySessionId(current.getSessionId())
+                .orElseThrow();
+        assertTrue(refreshTokenProvider.matches(
+                current.getValue(),
+                stored.getTokenHash()
+        ));
+    }
+
+    @Test
     void rotateRefreshToken_missingSession_throwsInvalidRefreshToken() {
         RefreshToken token = refreshTokenProvider.issueRefreshToken();
 
@@ -150,6 +291,13 @@ class RefreshTokenServiceTest {
     @Test
     void revokeRefreshToken_malformedToken_doesNotThrow() {
         refreshTokenService.revokeRefreshToken("malformed");
+    }
+
+    private MemberAuthState memberAuthState(String status, boolean deleted) {
+        MemberAuthState state = new MemberAuthState();
+        state.setMemberStatus(status);
+        state.setDeleted(deleted);
+        return state;
     }
 
     private static final class InMemoryRefreshTokenStore
