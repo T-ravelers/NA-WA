@@ -51,13 +51,13 @@ const openPaymentPreview = (): void => {
     >
       <RouterLink
         :to="{ name: 'wallet-qr' }"
-        class="min-h-12 border-b-2 border-transparent px-3 text-body-sm text-ink-3 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
+        class="flex min-h-12 items-center justify-center border-b-2 border-transparent px-3 text-body-sm text-ink-3 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
       >
         {{ t('wallet.qr.tabs.myQr') }}
       </RouterLink>
       <RouterLink
         :to="{ name: 'wallet-qr-scan' }"
-        class="min-h-12 border-b-2 px-3 text-body-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
+        class="flex min-h-12 items-center justify-center border-b-2 px-3 text-body-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
         :class="
           isScanQrActive
             ? 'border-ink font-semibold text-ink'
