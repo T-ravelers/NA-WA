@@ -13,13 +13,13 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 import JourneyListCard from '../components/JourneyListCard.vue'
 import { useJourneyListQuery } from '../composables/useJourneyListQuery'
 import { journeyErrorMessageKey } from '../model/journeyErrors'
-import { filterJourneysByStatus, getKoreaToday, type JourneyListTab } from '../model/journeyStatus'
+import { filterJourneysByStatus, type JourneyListTab, useKoreaToday } from '../model/journeyStatus'
 
 const i18n = useI18n()
 const { t } = i18n
 const router = useRouter()
 const activeTab = ref<JourneyListTab>('ongoing')
-const today = getKoreaToday()
+const today = useKoreaToday()
 const hasMessage = (key: string): boolean => i18n.te(key)
 const journeyQuery = useJourneyListQuery(true)
 
@@ -30,7 +30,7 @@ const tabOptions = computed(() => [
 
 const journeys = computed(() => journeyQuery.data.value ?? [])
 const visibleJourneys = computed(() =>
-  filterJourneysByStatus(journeys.value, activeTab.value, today),
+  filterJourneysByStatus(journeys.value, activeTab.value, today.value),
 )
 const activeTabLabel = computed(() => t(`journey.list.${activeTab.value}`))
 const requestErrorDescription = computed(() =>
@@ -120,7 +120,6 @@ function retry(): void {
         <ul
           v-else
           class="flex flex-col gap-3"
-          aria-live="polite"
         >
           <JourneyListCard
             v-for="journey in visibleJourneys"

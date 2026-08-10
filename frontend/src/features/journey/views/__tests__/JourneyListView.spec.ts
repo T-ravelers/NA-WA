@@ -31,6 +31,8 @@ const journeys = [
 ]
 
 let queryClient: QueryClient
+const queryClients: QueryClient[] = []
+const mountedWrappers: Array<{ unmount: () => void }> = []
 
 async function mountView() {
   const router = createRouter({
@@ -46,6 +48,7 @@ async function mountView() {
     ],
   })
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  queryClients.push(queryClient)
 
   await router.push('/journeys')
   await router.isReady()
@@ -57,6 +60,7 @@ async function mountView() {
   })
 
   await flushPromises()
+  mountedWrappers.push(wrapper)
 
   return { wrapper, router }
 }
@@ -67,7 +71,9 @@ describe('JourneyListView', () => {
   })
 
   afterEach(() => {
-    queryClient?.clear()
+    mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
+    queryClients.splice(0).forEach((client) => client.clear())
+    vi.useRealTimers()
   })
 
   it('loads ongoing journeys first and switches to past journeys', async () => {
@@ -78,6 +84,7 @@ describe('JourneyListView', () => {
     expect(wrapper.text()).toContain('Seoul Foodie Week')
     expect(wrapper.text()).toContain('2098.08.10')
     expect(wrapper.text()).not.toContain('Busan Weekender')
+    expect(wrapper.find('ul[aria-live]').exists()).toBe(false)
 
     await wrapper.findAll('[role="radio"]')[1]?.trigger('click')
 
@@ -148,7 +155,9 @@ describe('JourneyListView', () => {
     fetchJourneys.mockReset()
     fetchJourneys.mockRejectedValueOnce(new NormalizedApiError('NETWORK', null, 'offline'))
     const failed = await mountView()
-    expect(failed.wrapper.get('[role="alert"]').text()).toContain('Journeys could not be loaded')
+    expect(failed.wrapper.get('[role="alert"]').text()).toContain(
+      'We could not load your journeys. Please try again.',
+    )
 
     fetchJourneys.mockResolvedValueOnce(journeys)
     const retryButton = failed.wrapper
@@ -157,5 +166,27 @@ describe('JourneyListView', () => {
     await retryButton?.trigger('click')
     await flushPromises()
     expect(failed.wrapper.text()).toContain('Seoul Foodie Week')
+  })
+
+  it('refreshes the Korea date after midnight while the screen remains mounted', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-09T14:59:59.000Z'))
+    fetchJourneys.mockResolvedValue([
+      {
+        tripId: 42,
+        title: 'Seoul Foodie Week',
+        startDate: '2026-08-08',
+        endDate: '2026-08-09',
+      },
+    ])
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Seoul Foodie Week')
+
+    await vi.advanceTimersByTimeAsync(1_000)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No Ongoing journeys')
   })
 })

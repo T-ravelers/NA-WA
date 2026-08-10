@@ -12,7 +12,7 @@ export default {
       fullEmptyDescription: 'Create your first journey to start planning.',
       tabEmptyTitle: 'No {status} journeys',
       tabEmptyDescription: 'Your {status} journeys will appear here.',
-      loadFailed: 'Journeys could not be loaded',
+      loadFailed: 'We could not load your journeys. Please try again.',
     },
     create: {
       title: 'New journey',
