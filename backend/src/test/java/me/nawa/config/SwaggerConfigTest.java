@@ -12,6 +12,8 @@ import me.nawa.common.exception.ErrorCode;
 import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.service.MemberProfileService;
+import me.nawa.settlement.service.SettlementService;
+import me.nawa.settlement.service.SettlementService;
 import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
 import me.nawa.wallet.dto.request.TransactionSearchCondition;
@@ -69,9 +71,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.ExploreTestConfig.class,
         SwaggerConfigTest.JourneyTestConfig.class,
         SwaggerConfigTest.ReportTestConfig.class,
+        SwaggerConfigTest.SettlementTestConfig.class,
         SwaggerConfigTest.TopupTestConfig.class,
         SwaggerConfigTest.TransactionTestConfig.class,
         SwaggerConfigTest.MemberTestConfig.class,
+        SwaggerConfigTest.SettlementTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -322,6 +326,16 @@ class SwaggerConfigTest {
         @Bean
         JourneyService journeyService() {
             return new JourneyService(null);
+        }
+    }
+
+    @Configuration
+    static class SettlementTestConfig {
+
+        @Bean
+        SettlementService settlementService() {
+            return new SettlementService() {
+            };
         }
     }
 
