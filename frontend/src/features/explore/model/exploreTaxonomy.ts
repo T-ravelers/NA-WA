@@ -13,11 +13,11 @@ export interface ExploreSectorOption {
 }
 
 /**
- * Local Explore taxonomy seed. IDs match EXPLORE_TAXONOMY_MOCK_DATA_LOCAL_ONLY.sql.
- * The IDs are intentionally hardcoded for the local/mock UI; replace this
- * constant with the taxonomy API response when that contract is available.
- * The API continues to receive sectorIds/activityIds; this is not a new
- * classification model.
+ * Explore taxonomy seed shared by the Event and Place filters. IDs match
+ * EXPLORE_TAXONOMY_MOCK_DATA_LOCAL_ONLY.sql.
+ *
+ * Keep this collection stable. Changing these IDs changes the meaning of every
+ * saved Explore filter URL and of the sectorIds/activityIds the API receives.
  */
 export const EVENT_SECTOR_OPTIONS: ExploreSectorOption[] = [
   {
@@ -96,3 +96,13 @@ export const EVENT_SECTOR_OPTIONS: ExploreSectorOption[] = [
 ]
 
 export const EVENT_ACTIVITY_OPTIONS = EVENT_SECTOR_OPTIONS.flatMap((sector) => sector.activities)
+
+/**
+ * Place reuses the Event taxonomy until the Place taxonomy contract is agreed.
+ *
+ * The Place backend (#138) filters on the same sector and activity tables as
+ * Event, and the local seed only contains these IDs. Declaring a separate Place
+ * ID range here would send activity IDs that no row matches.
+ */
+export const PLACE_SECTOR_OPTIONS = EVENT_SECTOR_OPTIONS
+export const PLACE_ACTIVITY_OPTIONS = EVENT_ACTIVITY_OPTIONS

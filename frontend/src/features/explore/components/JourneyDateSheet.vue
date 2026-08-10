@@ -6,13 +6,14 @@ import { IconChevronLeft, IconChevronRight } from '@tabler/icons-vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 
 interface Props {
-  eventTitle: string
-  eventLocation?: string
+  itemTitle: string
+  itemLocation?: string
   startDate: string | null
   endDate: string | null
   isPermanent: boolean
   initialDate?: string | null
   loading?: boolean
+  confirmDisabled?: boolean
   errorMessage?: string | null
 }
 
@@ -83,12 +84,12 @@ const selectedDateLabel = computed(() => {
 })
 
 const description = computed(() =>
-  props.eventLocation
+  props.itemLocation
     ? t('explore.journeyDate.description', {
-        title: props.eventTitle,
-        location: props.eventLocation,
+        title: props.itemTitle,
+        location: props.itemLocation,
       })
-    : t('explore.journeyDate.descriptionWithoutLocation', { title: props.eventTitle }),
+    : t('explore.journeyDate.descriptionWithoutLocation', { title: props.itemTitle }),
 )
 
 const calendarDays = computed(() => {
@@ -225,11 +226,18 @@ function confirm(): void {
       >
         {{ props.errorMessage }}
       </p>
+      <p
+        v-else-if="props.confirmDisabled"
+        class="mt-3 text-caption text-ink-3"
+        role="note"
+      >
+        {{ t('explore.journeyDate.unavailable') }}
+      </p>
 
       <AppButton
         block
         class="mt-5"
-        :disabled="selectedDate === null || props.loading"
+        :disabled="selectedDate === null || props.loading || props.confirmDisabled"
         :loading="props.loading"
         @click="confirm"
       >

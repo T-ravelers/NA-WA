@@ -13,6 +13,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/EventDetailView.vue'),
     meta: { requiresAuth: true, hideBottomNav: true },
   },
+  {
+    path: '/explore/places/:placeId',
+    name: 'explore-place-detail',
+    component: () => import('./views/PlaceDetailView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
 ]
 
 export default routes

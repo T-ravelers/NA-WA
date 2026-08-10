@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { IconChevronDown, IconSearch } from '@tabler/icons-vue'
@@ -12,22 +12,34 @@ import EventCard from '../components/EventCard.vue'
 import ExploreFilterBar from '../components/ExploreFilterBar.vue'
 import ExploreFilterSheet from '../components/ExploreFilterSheet.vue'
 import ExploreItemTabs from '../components/ExploreItemTabs.vue'
+import PlaceFilterBar from '../components/PlaceFilterBar.vue'
+import PlaceFilterSheet from '../components/PlaceFilterSheet.vue'
+import PlaceCard from '../components/PlaceCard.vue'
 import { useEventListQuery } from '../composables/useEventListQuery'
+import { usePlaceListQuery } from '../composables/usePlaceListQuery'
 import {
   EVENT_KINDS,
   type EventKind,
   type EventSearchFilters,
   type EventSort,
 } from '../model/eventExplore'
-import { EVENT_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
+import { EVENT_SECTOR_OPTIONS, PLACE_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
+import {
+  PLACE_KINDS,
+  isPlaceKind,
+  type PlaceKind,
+  type PlaceSearchFilters,
+  type PlaceSort,
+} from '../model/placeExplore'
 
 type ExploreSheetKind = 'date' | 'region' | 'category' | 'options' | 'sort'
+type ExploreTab = 'events' | 'places'
 
 const { locale, t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const selectedTab = ref<'events' | 'places'>('events')
+const selectedTab = ref<ExploreTab>(readExploreTab(readQueryString('tab')))
 const selectedSheet = ref<ExploreSheetKind | null>(null)
 const searchOpen = ref(false)
 
@@ -48,7 +60,25 @@ const openWeekendOnly = ref(readQueryBoolean('openWeekendOnly'))
 const opensLateOnly = ref(readQueryBoolean('opensLateOnly'))
 const preReservationOnly = ref(readQueryBoolean('preReservationOnly'))
 const experienceOnly = ref(readQueryBoolean('experienceOnly'))
+const selectedPlaceKinds = ref<PlaceKind[]>(readQueryList('placeKinds').filter(isPlaceKind))
+const selectedPlaceSectorIds = ref(readQueryNumberList('placeSectorIds'))
+const selectedPlaceActivityIds = ref(readQueryNumberList('placeActivityIds'))
+const selectedPlaceRegion1 = ref(readQueryList('placeRegion1'))
+const selectedPlaceRegion2 = ref(readQueryList('placeRegion2'))
+const selectedPlaceHasForeignLang = ref(readQueryBoolean('hasForeignLang'))
+const selectedPlaceHasParking = ref(readQueryBoolean('hasParking'))
+const selectedPlaceReservable = ref(readQueryBoolean('reservable'))
+const selectedPlaceTakeout = ref(readQueryBoolean('takeoutAvailable'))
+const selectedPlaceCardPayment = ref(readQueryBoolean('cardPaymentAvailable'))
+const selectedPlaceSmokeFree = ref(readQueryBoolean('smokeFree'))
+const selectedPlaceKidFacility = ref(readQueryBoolean('kidFacility'))
+const selectedPlaceRestroom = ref(readQueryBoolean('hasRestroom'))
+const selectedPlaceSavedOnly = ref(readQueryBoolean('savedOnly'))
+const selectedPlacePage = ref(readQueryPage('placePage'))
+const placeSort = ref<PlaceSort>(readPlaceSort(readQueryString('placeSort')))
+const hydratingPlaceQuery = ref(false)
 const sheetPreviewFilters = ref<EventSearchFilters | null>(null)
+const placeSheetPreviewFilters = ref<PlaceSearchFilters | null>(null)
 
 const filters = computed<EventSearchFilters>(() => ({
   language: locale.value,
@@ -74,14 +104,49 @@ const filters = computed<EventSearchFilters>(() => ({
 }))
 
 const eventQuery = useEventListQuery(filters)
+const placeFilters = computed<PlaceSearchFilters>(() => ({
+  language: locale.value,
+  page: selectedPlacePage.value,
+  size: 20,
+  sort: placeSort.value,
+  keyword: keyword.value || undefined,
+  placeKinds: selectedPlaceKinds.value.length > 0 ? selectedPlaceKinds.value : undefined,
+  sectorIds: selectedPlaceSectorIds.value.length > 0 ? selectedPlaceSectorIds.value : undefined,
+  activityIds:
+    selectedPlaceActivityIds.value.length > 0 ? selectedPlaceActivityIds.value : undefined,
+  region1: selectedPlaceRegion1.value.length > 0 ? selectedPlaceRegion1.value : undefined,
+  region2: selectedPlaceRegion2.value.length > 0 ? selectedPlaceRegion2.value : undefined,
+  hasForeignLang: selectedPlaceHasForeignLang.value || undefined,
+  hasParking: selectedPlaceHasParking.value || undefined,
+  reservable: selectedPlaceReservable.value || undefined,
+  takeoutAvailable: selectedPlaceTakeout.value || undefined,
+  cardPaymentAvailable: selectedPlaceCardPayment.value || undefined,
+  smokeFree: selectedPlaceSmokeFree.value || undefined,
+  kidFacility: selectedPlaceKidFacility.value || undefined,
+  hasRestroom: selectedPlaceRestroom.value || undefined,
+  savedOnly: selectedPlaceSavedOnly.value || undefined,
+}))
+const placeQuery = usePlaceListQuery(placeFilters, {
+  enabled: () => selectedTab.value === 'places',
+})
 const sheetPreviewQuery = useEventListQuery(
   computed(() => sheetPreviewFilters.value ?? filters.value),
+)
+const placeSheetPreviewQuery = usePlaceListQuery(
+  computed(() => placeSheetPreviewFilters.value ?? placeFilters.value),
+  { enabled: () => selectedTab.value === 'places' && selectedSheet.value !== null },
 )
 const eventList = computed(() => eventQuery.data.value?.content ?? [])
 const visibleEventCount = computed(() => eventList.value.length)
 const totalEventElements = computed(() => eventQuery.data.value?.totalElements ?? 0)
+const placeList = computed(() => placeQuery.data.value?.content ?? [])
+const visiblePlaceCount = computed(() => placeList.value.length)
 const sheetResultCount = computed(
   () => sheetPreviewQuery.data.value?.totalElements ?? totalEventElements.value,
+)
+const placeSheetResultCount = computed(
+  () =>
+    placeSheetPreviewQuery.data.value?.totalElements ?? placeQuery.data.value?.totalElements ?? 0,
 )
 
 const eventKindOptions = computed(() =>
@@ -93,6 +158,15 @@ const eventKindOptions = computed(() =>
 )
 
 const sortLabel = computed(() => t(`explore.sort.${sort.value.toLowerCase()}`))
+const placeSortLabel = computed(() => t(`explore.sort.${placeSort.value.toLowerCase()}`))
+
+const placeKindOptions = computed(() =>
+  PLACE_KINDS.map((kind) => ({
+    key: kind,
+    label: t(`explore.placeKinds.${kind}`),
+    selected: selectedPlaceKinds.value.includes(kind),
+  })),
+)
 
 const activeFilters = computed(() => {
   const values: Array<{ key: string; label: string }> = []
@@ -135,9 +209,53 @@ const activeFilters = computed(() => {
   return values
 })
 
+const placeActiveFilters = computed(() => {
+  const values: Array<{ key: string; label: string }> = []
+
+  selectedPlaceRegion1.value.forEach((value) =>
+    values.push({ key: `placeRegion1:${value}`, label: value }),
+  )
+  selectedPlaceRegion2.value.forEach((value) =>
+    values.push({ key: `placeRegion2:${value}`, label: value }),
+  )
+  selectedPlaceSectorIds.value.forEach((value) => {
+    const sector = PLACE_SECTOR_OPTIONS.find((option) => option.id === value)
+    if (sector) values.push({ key: `placeSector:${value}`, label: t(sector.labelKey) })
+  })
+  selectedPlaceActivityIds.value.forEach((value) => {
+    const activity = PLACE_SECTOR_OPTIONS.flatMap((sector) => sector.activities).find(
+      (option) => option.id === value,
+    )
+    if (activity) values.push({ key: `placeActivity:${value}`, label: t(activity.labelKey) })
+  })
+
+  const options: Array<[string, boolean, string]> = [
+    [
+      'hasForeignLang',
+      selectedPlaceHasForeignLang.value,
+      t('explore.placeFilterOptions.foreignLanguage'),
+    ],
+    ['hasParking', selectedPlaceHasParking.value, t('explore.placeFilterOptions.parking')],
+    ['reservable', selectedPlaceReservable.value, t('explore.placeFilterOptions.reservation')],
+    ['takeoutAvailable', selectedPlaceTakeout.value, t('explore.placeFilterOptions.takeout')],
+    ['cardPaymentAvailable', selectedPlaceCardPayment.value, t('explore.placeFilterOptions.card')],
+    ['smokeFree', selectedPlaceSmokeFree.value, t('explore.placeFilterOptions.smokeFree')],
+    ['kidFacility', selectedPlaceKidFacility.value, t('explore.placeFilterOptions.kids')],
+    ['hasRestroom', selectedPlaceRestroom.value, t('explore.placeFilterOptions.restroom')],
+    ['savedOnly', selectedPlaceSavedOnly.value, t('explore.sort.saved')],
+  ]
+  options.forEach(([key, selected, label]) => {
+    if (selected) values.push({ key: `placeOption:${key}`, label })
+  })
+
+  return values
+})
+
 watch(
   filters,
   (next) => {
+    if (selectedTab.value !== 'events') return
+
     const query: LocationQueryRaw = {}
     addQueryList(query, 'eventKinds', next.eventKinds)
     addQueryList(query, 'sectorIds', next.sectorIds)
@@ -162,9 +280,86 @@ watch(
   { deep: true },
 )
 
+watch(
+  placeFilters,
+  (next) => {
+    if (selectedTab.value !== 'places' || hydratingPlaceQuery.value) return
+
+    const query: LocationQueryRaw = { tab: 'places' }
+    addQueryList(query, 'placeKinds', next.placeKinds)
+    addQueryList(query, 'placeSectorIds', next.sectorIds)
+    addQueryList(query, 'placeActivityIds', next.activityIds)
+    addQueryList(query, 'placeRegion1', next.region1)
+    addQueryList(query, 'placeRegion2', next.region2)
+    addQueryValue(query, 'keyword', next.keyword)
+    addQueryValue(query, 'placeSort', next.sort === 'LATEST' ? undefined : next.sort)
+    addQueryValue(query, 'hasForeignLang', next.hasForeignLang)
+    addQueryValue(query, 'hasParking', next.hasParking)
+    addQueryValue(query, 'reservable', next.reservable)
+    addQueryValue(query, 'takeoutAvailable', next.takeoutAvailable)
+    addQueryValue(query, 'cardPaymentAvailable', next.cardPaymentAvailable)
+    addQueryValue(query, 'smokeFree', next.smokeFree)
+    addQueryValue(query, 'kidFacility', next.kidFacility)
+    addQueryValue(query, 'hasRestroom', next.hasRestroom)
+    addQueryValue(query, 'savedOnly', next.savedOnly)
+    addQueryValue(query, 'placePage', next.page && next.page > 0 ? String(next.page) : undefined)
+    router.replace({ query }).catch(() => undefined)
+  },
+  { deep: true },
+)
+
+watch(selectedTab, (next, previous) => {
+  closeSheet()
+  if (next === previous) return
+
+  const query: LocationQueryRaw = { ...route.query }
+  if (next === 'places') query.tab = 'places'
+  else delete query.tab
+
+  router.push({ query }).catch(() => undefined)
+})
+
+watch(
+  () => route.query,
+  async (query) => {
+    const tabValue = typeof query.tab === 'string' ? query.tab : undefined
+    const nextTab = readExploreTab(tabValue)
+    if (selectedTab.value !== nextTab) selectedTab.value = nextTab
+    if (nextTab !== 'places') return
+
+    hydratingPlaceQuery.value = true
+    selectedPlaceKinds.value = readQueryList('placeKinds').filter(isPlaceKind)
+    selectedPlaceSectorIds.value = readQueryNumberList('placeSectorIds')
+    selectedPlaceActivityIds.value = readQueryNumberList('placeActivityIds')
+    selectedPlaceRegion1.value = readQueryList('placeRegion1')
+    selectedPlaceRegion2.value = readQueryList('placeRegion2')
+    selectedPlaceHasForeignLang.value = readQueryBoolean('hasForeignLang')
+    selectedPlaceHasParking.value = readQueryBoolean('hasParking')
+    selectedPlaceReservable.value = readQueryBoolean('reservable')
+    selectedPlaceTakeout.value = readQueryBoolean('takeoutAvailable')
+    selectedPlaceCardPayment.value = readQueryBoolean('cardPaymentAvailable')
+    selectedPlaceSmokeFree.value = readQueryBoolean('smokeFree')
+    selectedPlaceKidFacility.value = readQueryBoolean('kidFacility')
+    selectedPlaceRestroom.value = readQueryBoolean('hasRestroom')
+    selectedPlaceSavedOnly.value = readQueryBoolean('savedOnly')
+    selectedPlacePage.value = readQueryPage('placePage')
+    placeSort.value = readPlaceSort(readQueryString('placeSort'))
+    keyword.value = readQueryString('keyword') ?? ''
+    await nextTick()
+    hydratingPlaceQuery.value = false
+  },
+  { deep: true },
+)
+
 function openSheet(kind: ExploreSheetKind): void {
   selectedSheet.value = kind
-  sheetPreviewFilters.value = { ...filters.value }
+  if (selectedTab.value === 'events') {
+    sheetPreviewFilters.value = { ...filters.value }
+    placeSheetPreviewFilters.value = null
+  } else if (kind !== 'date') {
+    placeSheetPreviewFilters.value = { ...placeFilters.value }
+    sheetPreviewFilters.value = null
+  }
 }
 
 function applySheet(next: EventSearchFilters): void {
@@ -188,13 +383,65 @@ function applySheet(next: EventSearchFilters): void {
   sheetPreviewFilters.value = null
 }
 
+function applyPlaceSheet(next: PlaceSearchFilters): void {
+  selectedPlacePage.value = 0
+  selectedPlaceKinds.value = next.placeKinds ?? []
+  selectedPlaceSectorIds.value = next.sectorIds ?? []
+  selectedPlaceActivityIds.value = next.activityIds ?? []
+  selectedPlaceRegion1.value = next.region1 ?? []
+  selectedPlaceRegion2.value = next.region2 ?? []
+  placeSort.value = next.sort ?? 'LATEST'
+  selectedPlaceHasForeignLang.value = next.hasForeignLang ?? false
+  selectedPlaceHasParking.value = next.hasParking ?? false
+  selectedPlaceReservable.value = next.reservable ?? false
+  selectedPlaceTakeout.value = next.takeoutAvailable ?? false
+  selectedPlaceCardPayment.value = next.cardPaymentAvailable ?? false
+  selectedPlaceSmokeFree.value = next.smokeFree ?? false
+  selectedPlaceKidFacility.value = next.kidFacility ?? false
+  selectedPlaceRestroom.value = next.hasRestroom ?? false
+  selectedPlaceSavedOnly.value = next.savedOnly ?? false
+  selectedSheet.value = null
+  placeSheetPreviewFilters.value = null
+}
+
 function previewSheet(next: EventSearchFilters): void {
   sheetPreviewFilters.value = { ...next, page: 0, size: 20, language: locale.value }
+}
+
+function previewPlaceSheet(next: PlaceSearchFilters): void {
+  placeSheetPreviewFilters.value = { ...next, page: 0, size: 20, language: locale.value }
+}
+
+watch(keyword, () => {
+  if (selectedTab.value === 'places') selectedPlacePage.value = 0
+})
+
+function goToPreviousPlacePage(): void {
+  if (selectedPlacePage.value > 0) selectedPlacePage.value -= 1
+}
+
+function goToNextPlacePage(): void {
+  if (placeQuery.data.value?.hasNext) selectedPlacePage.value += 1
 }
 
 function closeSheet(): void {
   selectedSheet.value = null
   sheetPreviewFilters.value = null
+  placeSheetPreviewFilters.value = null
+}
+
+function togglePlaceKind(kind: PlaceKind): void {
+  selectedPlacePage.value = 0
+  selectedPlaceKinds.value = selectedPlaceKinds.value.includes(kind)
+    ? selectedPlaceKinds.value.filter((value) => value !== kind)
+    : [...selectedPlaceKinds.value, kind]
+}
+
+function openPlaceDetail(placeId: number): void {
+  void router.push({
+    name: 'explore-place-detail',
+    params: { placeId },
+  })
 }
 
 function toggleEventKind(kind: string): void {
@@ -256,9 +503,66 @@ function removeFilter(key: string): void {
   }
 }
 
+function removePlaceFilter(key: string): void {
+  selectedPlacePage.value = 0
+  if (key === '*') {
+    selectedPlaceKinds.value = []
+    selectedPlaceSectorIds.value = []
+    selectedPlaceActivityIds.value = []
+    selectedPlaceRegion1.value = []
+    selectedPlaceRegion2.value = []
+    placeSort.value = 'LATEST'
+    selectedPlaceHasForeignLang.value = false
+    selectedPlaceHasParking.value = false
+    selectedPlaceReservable.value = false
+    selectedPlaceTakeout.value = false
+    selectedPlaceCardPayment.value = false
+    selectedPlaceSmokeFree.value = false
+    selectedPlaceKidFacility.value = false
+    selectedPlaceRestroom.value = false
+    selectedPlaceSavedOnly.value = false
+    return
+  }
+
+  if (key.startsWith('placeRegion1:')) {
+    selectedPlaceRegion1.value = selectedPlaceRegion1.value.filter(
+      (value) => `placeRegion1:${value}` !== key,
+    )
+  } else if (key.startsWith('placeRegion2:')) {
+    selectedPlaceRegion2.value = selectedPlaceRegion2.value.filter(
+      (value) => `placeRegion2:${value}` !== key,
+    )
+  } else if (key.startsWith('placeSector:')) {
+    const sectorId = Number(key.slice('placeSector:'.length))
+    selectedPlaceSectorIds.value = selectedPlaceSectorIds.value.filter(
+      (value) => value !== sectorId,
+    )
+  } else if (key.startsWith('placeActivity:')) {
+    const activityId = Number(key.slice('placeActivity:'.length))
+    selectedPlaceActivityIds.value = selectedPlaceActivityIds.value.filter(
+      (value) => value !== activityId,
+    )
+  } else if (key.startsWith('placeOption:')) {
+    const option = key.slice('placeOption:'.length)
+    if (option === 'hasForeignLang') selectedPlaceHasForeignLang.value = false
+    if (option === 'hasParking') selectedPlaceHasParking.value = false
+    if (option === 'reservable') selectedPlaceReservable.value = false
+    if (option === 'takeoutAvailable') selectedPlaceTakeout.value = false
+    if (option === 'cardPaymentAvailable') selectedPlaceCardPayment.value = false
+    if (option === 'smokeFree') selectedPlaceSmokeFree.value = false
+    if (option === 'kidFacility') selectedPlaceKidFacility.value = false
+    if (option === 'hasRestroom') selectedPlaceRestroom.value = false
+    if (option === 'savedOnly') selectedPlaceSavedOnly.value = false
+  }
+}
+
 function readQueryString(key: string): string | undefined {
   const value = route.query[key]
   return Array.isArray(value) ? (value[0] ?? undefined) : (value ?? undefined)
+}
+
+function readExploreTab(value: string | undefined): ExploreTab {
+  return value === 'places' ? 'places' : 'events'
 }
 
 function readQueryList(key: string): string[] {
@@ -277,8 +581,17 @@ function readQueryBoolean(key: string): boolean {
   return readQueryString(key) === 'true'
 }
 
+function readQueryPage(key: string): number {
+  const value = Number(readQueryString(key))
+  return Number.isInteger(value) && value >= 0 ? value : 0
+}
+
 function readSort(value: string | undefined): EventSort {
   return value === 'POPULAR' || value === 'ENDING_SOON' ? value : 'LATEST'
+}
+
+function readPlaceSort(value: string | undefined): PlaceSort {
+  return value === 'POPULAR' ? value : 'LATEST'
 }
 
 function isEventKind(value: string): value is EventKind {
@@ -311,7 +624,9 @@ function addQueryList(
       <button
         type="button"
         class="flex size-12 items-center justify-center rounded-pill bg-surface-2 text-ink"
-        :aria-label="t('explore.search.open')"
+        :aria-label="
+          t(selectedTab === 'events' ? 'explore.search.open' : 'explore.search.placeOpen')
+        "
         :aria-pressed="searchOpen"
         @click="searchOpen = !searchOpen"
       >
@@ -336,8 +651,16 @@ function addQueryList(
         v-model="keyword"
         type="search"
         class="min-w-0 flex-1 bg-transparent py-3 text-body text-ink outline-none placeholder:text-ink-3"
-        :placeholder="t('explore.search.placeholder')"
-        :aria-label="t('explore.search.label')"
+        :placeholder="
+          t(
+            selectedTab === 'events'
+              ? 'explore.search.placeholder'
+              : 'explore.search.placePlaceholder',
+          )
+        "
+        :aria-label="
+          t(selectedTab === 'events' ? 'explore.search.label' : 'explore.search.placeLabel')
+        "
       />
     </div>
 
@@ -399,19 +722,101 @@ function addQueryList(
       </div>
     </template>
 
-    <StateEmpty
-      v-else
-      :description="t('explore.placesComingSoon')"
-    />
+    <template v-else>
+      <PlaceFilterBar
+        :active-sheet="selectedSheet === 'date' ? null : selectedSheet"
+        :place-kind-options="placeKindOptions"
+        :active-filters="placeActiveFilters"
+        @open="openSheet"
+        @remove="removePlaceFilter"
+        @toggle-kind="togglePlaceKind"
+      />
+
+      <div class="flex items-center justify-between gap-4 pt-1">
+        <h2 class="text-title-sm text-ink">
+          {{ t('explore.placeResultCount', { count: visiblePlaceCount }) }}
+        </h2>
+        <button
+          type="button"
+          class="flex items-center gap-1 text-body-sm text-ink-2"
+          @click="openSheet('sort')"
+        >
+          {{ placeSortLabel }}
+          <IconChevronDown
+            :size="16"
+            :stroke-width="1.8"
+            aria-hidden="true"
+          />
+        </button>
+      </div>
+
+      <StateLoading v-if="placeQuery.isPending.value" />
+      <StateError
+        v-else-if="placeQuery.isError.value"
+        :description="t('explore.placeListError')"
+        @retry="placeQuery.refetch"
+      />
+      <StateEmpty
+        v-else-if="placeList.length === 0"
+        :description="t('state.empty.description')"
+      />
+      <div
+        v-else
+        class="flex flex-col gap-3"
+      >
+        <PlaceCard
+          v-for="place in placeList"
+          :key="place.itemId"
+          :place="place"
+          @open="openPlaceDetail"
+        />
+      </div>
+
+      <nav
+        v-if="placeQuery.data.value && (selectedPlacePage > 0 || placeQuery.data.value.hasNext)"
+        class="mt-2 flex items-center justify-between gap-3"
+        :aria-label="t('explore.pagination.page', { page: selectedPlacePage + 1 })"
+      >
+        <button
+          type="button"
+          class="rounded-pill border border-hairline-2 px-4 py-2 text-body-sm text-ink-2 disabled:opacity-40"
+          :disabled="selectedPlacePage === 0 || placeQuery.isFetching.value"
+          @click="goToPreviousPlacePage"
+        >
+          {{ t('explore.pagination.previousPage') }}
+        </button>
+        <span class="text-caption text-ink-3">
+          {{ t('explore.pagination.page', { page: selectedPlacePage + 1 }) }}
+        </span>
+        <button
+          type="button"
+          class="rounded-pill border border-hairline-2 px-4 py-2 text-body-sm text-ink-2 disabled:opacity-40"
+          :disabled="!placeQuery.data.value?.hasNext || placeQuery.isFetching.value"
+          @click="goToNextPlacePage"
+        >
+          {{ t('explore.pagination.nextPage') }}
+        </button>
+      </nav>
+    </template>
 
     <ExploreFilterSheet
-      v-if="selectedSheet !== null"
+      v-if="selectedSheet !== null && selectedTab === 'events'"
       :kind="selectedSheet"
       :filters="filters"
       :result-count="sheetResultCount"
       @close="closeSheet"
       @change="previewSheet"
       @apply="applySheet"
+    />
+
+    <PlaceFilterSheet
+      v-if="selectedSheet !== null && selectedTab === 'places' && selectedSheet !== 'date'"
+      :kind="selectedSheet"
+      :filters="placeFilters"
+      :result-count="placeSheetResultCount"
+      @close="closeSheet"
+      @change="previewPlaceSheet"
+      @apply="applyPlaceSheet"
     />
   </section>
 </template>

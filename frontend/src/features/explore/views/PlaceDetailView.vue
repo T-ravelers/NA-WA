@@ -6,7 +6,6 @@ import {
   IconArrowLeft,
   IconChevronLeft,
   IconChevronRight,
-  IconExternalLink,
   IconHeart,
   IconMapPin,
   IconShare2,
@@ -21,130 +20,135 @@ import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
-import { addJourneyItem } from '@/features/journey/api/journeyApi'
-import {
-  parseJourneyRouteQuery,
-  readActiveJourneyId,
-  storeActiveJourneyId,
-} from '@/features/journey/model/activeJourney'
 
-import { useEventDetailQuery } from '../composables/useEventDetailQuery'
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
 import JourneySelectSheet from '../components/JourneySelectSheet.vue'
-import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
-import {
-  resolveHomepageUrl,
-  resolveReservationUrl,
-  toDetailEntries,
-  toImageUrls,
-  toStringList,
-  type DetailEntry,
-} from '../model/eventDetail'
-import { useSavedEventsStore } from '../model/savedEvents'
+import { usePlaceDetailQuery } from '../composables/usePlaceDetailQuery'
+import { useExploreJourneyIntegration } from '../model/journeyIntegration'
+import { normalizePlaceKind, type PlaceKind } from '../model/placeExplore'
+import { toClosedDays, toDetailEntries } from '../model/placeDetail'
 
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
+const {
+  addJourneyItem,
+  parseJourneyRouteQuery,
+  readActiveJourneyId,
+  storeActiveJourneyId,
+  useJourneyListQuery,
+} = useExploreJourneyIntegration()
 
-const eventId = computed(() => String(route.params.eventId ?? ''))
-const eventQuery = useEventDetailQuery(eventId, locale)
-const event = computed(() => eventQuery.data.value)
-const savedEvents = useSavedEventsStore()
-const saved = computed(() => {
-  const current = event.value
-  return current ? savedEvents.isSaved(current.eventId) : false
-})
+const placeId = computed(() => String(route.params.placeId ?? ''))
+const placeQuery = usePlaceDetailQuery(placeId, locale)
+const place = computed(() => placeQuery.data.value)
 
 const selectedImage = ref(0)
-const journeyAdded = ref(false)
+const shared = ref(false)
 const journeySelectSheetOpen = ref(false)
 const journeyDateSheetOpen = ref(false)
 const journeyDate = ref<string | null>(null)
 const selectedJourneyId = ref<number | null>(null)
+const journeyAdded = ref(false)
 const journeyAddPending = ref(false)
 const journeyAddError = ref<'missing' | 'failed' | null>(null)
-const shared = ref(false)
 
-const imageUrls = computed(() => (event.value ? toImageUrls(event.value.imageUrls) : []))
+const imageUrls = computed(() => place.value?.imageUrls ?? [])
 const currentImage = computed(() => imageUrls.value[selectedImage.value])
-const reservationUrl = computed(() => (event.value ? resolveReservationUrl(event.value) : null))
-const homepageUrl = computed(() => (event.value ? resolveHomepageUrl(event.value) : null))
+
+const normalizedKind = computed<PlaceKind>(() => normalizePlaceKind(place.value?.placeKind))
+const kindLabel = computed(() => t(`explore.placeKinds.${normalizedKind.value}`))
 
 const category = computed<Category>(() => {
-  const kind = event.value?.eventKind
-  if (kind === 'POPUP') return 'shopping'
-  if (kind === 'FESTIVAL') return 'food'
-  if (kind === 'ETC') return 'beauty'
+  if (normalizedKind.value === 'BEAUTY') return 'beauty'
+  if (normalizedKind.value === 'MARKET') return 'shopping'
+  if (normalizedKind.value === 'RESTAURANT' || normalizedKind.value === 'CAFE') return 'food'
   return 'show'
 })
 
+const categoryLabel = computed(() => t(`explore.categories.${category.value}`))
+
 const regionLabel = computed(() =>
-  [event.value?.region1, event.value?.region2, event.value?.region3].filter(Boolean).join(' · '),
+  [place.value?.region1, place.value?.region2, place.value?.region3].filter(Boolean).join(' · '),
+)
+
+const addressLabel = computed(() =>
+  [place.value?.addressRoad, place.value?.addressDetail].filter(Boolean).join(' '),
 )
 
 const locationLabel = computed(() =>
-  [event.value?.venueName, event.value?.addressRoad].filter(Boolean).join(' · '),
+  [regionLabel.value, addressLabel.value].filter(Boolean).join(' · '),
 )
 
-const journeyLocation = computed(() => regionLabel.value || locationLabel.value)
+const hours = computed(() => (place.value ? toDetailEntries(place.value.openingHours) : []))
+const closedDays = computed(() => (place.value ? toClosedDays(place.value.closedDays) : ''))
+
+const detailRows = computed(() => {
+  const current = place.value
+  if (!current) return []
+
+  const rows: Array<{ label: string; value: string }> = []
+  if (hours.value.length > 0) {
+    rows.push({
+      label: t('explore.placeDetail.hours'),
+      value: hours.value.map((entry) => `${entry.label}: ${entry.value}`).join('\n'),
+    })
+  }
+  if (closedDays.value) {
+    rows.push({ label: t('explore.placeDetail.closed'), value: closedDays.value })
+  }
+  if (addressLabel.value) {
+    rows.push({ label: t('explore.placeDetail.address'), value: addressLabel.value })
+  }
+  if (current.tel) {
+    rows.push({ label: t('explore.placeDetail.phone'), value: current.tel })
+  }
+  if (current.sourceUrl) {
+    rows.push({ label: t('explore.placeDetail.homepage'), value: current.sourceUrl })
+  }
+
+  return rows
+})
+
+const optionBadges = computed(() => {
+  const current = place.value
+  if (!current) return []
+
+  const options = [
+    ['hasForeignLang', current.hasForeignLang, t('explore.placeDetail.options.foreignLanguage')],
+    ['hasParking', current.hasParking, t('explore.placeDetail.options.parking')],
+    ['reservable', current.reservable, t('explore.placeDetail.options.reservation')],
+    ['takeoutAvailable', current.takeoutAvailable, t('explore.placeDetail.options.takeout')],
+    ['cardPaymentAvailable', current.cardPaymentAvailable, t('explore.placeDetail.options.card')],
+    ['smokeFree', current.smokeFree, t('explore.placeDetail.options.smokeFree')],
+    ['kidFacility', current.kidFacility, t('explore.placeDetail.options.kids')],
+    ['hasRestroom', current.hasRestroom, t('explore.placeDetail.options.restroom')],
+  ] as const
+
+  return options
+    .filter(([, selected]) => selected === true)
+    .map(([key, , label]) => ({ key, label }))
+})
+
+const menuItems = computed(() => {
+  const value = place.value?.menuSummary
+  if (!value) return []
+
+  return value
+    .split(/\n|\s*·\s*|\s*,\s*/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+})
+
 const activeJourneyId = computed(
   () => parseJourneyRouteQuery(route.query.journeyId) ?? readActiveJourneyId(),
 )
 const journeyListQuery = useJourneyListQuery(journeySelectSheetOpen)
 const journeys = computed(() => journeyListQuery.data.value ?? [])
 
-const hours = computed(() => (event.value ? toDetailEntries(event.value.operatingHours) : []))
-const openDays = computed(() => (event.value ? toStringList(event.value.openDays).join(', ') : ''))
-
-const detailRows = computed(() => {
-  const current = event.value
-  if (!current) return []
-
-  const rows: DetailEntry[] = []
-  const period = current.isPermanent
-    ? t('explore.detail.permanent')
-    : [formatDate(current.startDate), formatDate(current.endDate)].filter(Boolean).join(' – ')
-  if (period) rows.push({ label: t('explore.detail.period'), value: period })
-  if (current.venueName || current.addressRoad) {
-    rows.push({ label: t('explore.detail.venue'), value: locationLabel.value })
-  }
-  if (hours.value.length > 0) {
-    rows.push({
-      label: t('explore.detail.hours'),
-      value: hours.value.map((entry) => `${entry.label}: ${entry.value}`).join('\n'),
-    })
-  } else if (openDays.value) {
-    rows.push({ label: t('explore.detail.hours'), value: openDays.value })
-  }
-  if (current.isFree === true) {
-    rows.push({ label: t('explore.detail.price'), value: t('explore.detail.free') })
-  } else if (current.priceText) {
-    rows.push({ label: t('explore.detail.price'), value: current.priceText })
-  }
-  if (current.ageLimit) rows.push({ label: t('explore.detail.age'), value: current.ageLimit })
-  if (current.organizer) rows.push({ label: t('explore.detail.host'), value: current.organizer })
-  if (current.contact) rows.push({ label: t('explore.detail.contact'), value: current.contact })
-  if (homepageUrl.value)
-    rows.push({ label: t('explore.detail.homepage'), value: homepageUrl.value })
-
-  return rows
-})
-
-const statusTone = computed(() => (event.value?.status === 'ONGOING' ? 'ongoing' : 'scheduled'))
-
-const statusLabel = computed(() => (event.value ? t(`explore.statuses.${event.value.status}`) : ''))
-
-const kindLabel = computed(() =>
-  event.value ? t(`explore.eventKinds.${event.value.eventKind}`) : '',
-)
-
 watch(imageUrls, () => {
   selectedImage.value = 0
 })
-
-function formatDate(value: string | null): string {
-  return value ? value.replace(/-/g, '.') : ''
-}
 
 function showPreviousImage(): void {
   if (imageUrls.value.length === 0) return
@@ -165,13 +169,13 @@ function goBack(): void {
   void router.push({ name: 'explore' })
 }
 
-async function shareEvent(): Promise<void> {
-  const current = event.value
+async function sharePlace(): Promise<void> {
+  const current = place.value
   if (!current) return
 
   try {
     if (navigator.share) {
-      await navigator.share({ title: current.title, url: window.location.href })
+      await navigator.share({ title: current.name, url: window.location.href })
       shared.value = true
       return
     }
@@ -185,13 +189,8 @@ async function shareEvent(): Promise<void> {
   }
 }
 
-function openReservation(): void {
-  if (reservationUrl.value) window.open(reservationUrl.value, '_blank', 'noopener,noreferrer')
-}
-
-function toggleSaved(): void {
-  const current = event.value
-  if (current) savedEvents.toggle(current.eventId)
+function retry(): void {
+  void placeQuery.refetch()
 }
 
 function openJourneyDateSheet(): void {
@@ -218,7 +217,7 @@ function closeJourneyDateSheet(): void {
 async function confirmJourneyDate(date: string): Promise<void> {
   if (journeyAddPending.value) return
 
-  const current = event.value
+  const current = place.value
   const journeyId = selectedJourneyId.value ?? activeJourneyId.value
   if (!current || journeyId === null) {
     journeyAddError.value = 'missing'
@@ -230,7 +229,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
 
   try {
     await addJourneyItem(journeyId, {
-      itemId: current.eventId,
+      itemId: current.itemId,
       visitDate: date,
     })
     storeActiveJourneyId(journeyId)
@@ -244,10 +243,6 @@ async function confirmJourneyDate(date: string): Promise<void> {
     journeyAddPending.value = false
   }
 }
-
-function retry(): void {
-  void eventQuery.refetch()
-}
 </script>
 
 <template>
@@ -256,7 +251,7 @@ function retry(): void {
       class="sticky top-0 z-20 flex items-center justify-between bg-canvas/95 px-screen py-3 backdrop-blur"
     >
       <IconOrb
-        :label="t('explore.detail.back')"
+        :label="t('explore.placeDetail.back')"
         @click="goBack"
       >
         <IconArrowLeft
@@ -270,11 +265,11 @@ function retry(): void {
         class="sr-only"
         aria-live="polite"
       >
-        {{ t('explore.detail.shared') }}
+        {{ t('explore.placeDetail.shared') }}
       </span>
       <IconOrb
-        :label="t('explore.detail.share')"
-        @click="shareEvent"
+        :label="t('explore.placeDetail.share')"
+        @click="sharePlace"
       >
         <IconShare2
           :size="21"
@@ -285,20 +280,20 @@ function retry(): void {
     </header>
 
     <StateLoading
-      v-if="eventQuery.isPending.value"
+      v-if="placeQuery.isPending.value"
       :lines="4"
       class="px-screen pt-4"
     />
     <StateError
-      v-else-if="eventQuery.isError.value"
+      v-else-if="placeQuery.isError.value"
       class="px-screen pt-4"
-      :description="t('explore.detail.detailError')"
+      :description="t('explore.placeDetail.detailError')"
       @retry="retry"
     />
     <StateError
-      v-else-if="event === undefined"
+      v-else-if="place === undefined"
       class="px-screen pt-4"
-      :description="t('explore.detail.notFound')"
+      :description="t('explore.placeDetail.notFound')"
       @retry="retry"
     />
     <template v-else>
@@ -306,12 +301,12 @@ function retry(): void {
         <img
           v-if="currentImage"
           :src="currentImage"
-          :alt="event.title"
+          :alt="place.name"
           class="size-full object-cover"
         />
         <ImagePlaceholder
           v-else
-          :label="t('explore.imageUnavailable')"
+          :label="t('explore.placePhoto')"
         />
         <div
           v-if="imageUrls.length > 1"
@@ -320,7 +315,7 @@ function retry(): void {
           <button
             type="button"
             class="flex size-9 items-center justify-center rounded-pill bg-scrim/55 text-ink"
-            :aria-label="t('explore.detail.previousImage')"
+            :aria-label="t('explore.placeDetail.previousImage')"
             @click="showPreviousImage"
           >
             <IconChevronLeft
@@ -330,7 +325,7 @@ function retry(): void {
           </button>
           <span class="rounded-pill bg-scrim/65 px-3 py-1 text-micro text-ink">
             {{
-              t('explore.detail.imageCount', {
+              t('explore.placeDetail.imageCount', {
                 current: selectedImage + 1,
                 total: imageUrls.length,
               })
@@ -339,7 +334,7 @@ function retry(): void {
           <button
             type="button"
             class="flex size-9 items-center justify-center rounded-pill bg-scrim/55 text-ink"
-            :aria-label="t('explore.detail.nextImage')"
+            :aria-label="t('explore.placeDetail.nextImage')"
             @click="showNextImage"
           >
             <IconChevronRight
@@ -354,14 +349,14 @@ function retry(): void {
         <section class="flex flex-col gap-3">
           <div class="flex items-center gap-2 text-micro uppercase tracking-wide text-ink-2">
             <CategoryDot :category="category" />
-            <span>{{ kindLabel }}</span>
+            <span>{{ categoryLabel }} · {{ kindLabel }}</span>
           </div>
-          <h1 class="font-display text-4xl leading-[0.98] text-ink-display">{{ event.title }}</h1>
+          <h1 class="font-display text-4xl leading-[0.98] text-ink-display">{{ place.name }}</h1>
           <p
-            v-if="event.subtitle"
+            v-if="place.brand || place.branch"
             class="text-body-sm text-ink-2"
           >
-            {{ event.subtitle }}
+            {{ [place.brand, place.branch].filter(Boolean).join(' · ') }}
           </p>
           <p
             v-if="regionLabel"
@@ -375,49 +370,12 @@ function retry(): void {
           </p>
           <div class="flex flex-wrap gap-2">
             <AppBadge
-              :tone="statusTone"
-              dot
-              >{{ statusLabel }}</AppBadge
-            >
-            <AppBadge
-              v-if="event.isPermanent"
-              tone="neutral"
-              >{{ t('explore.detail.permanent') }}</AppBadge
-            >
-            <AppBadge
-              v-if="reservationUrl"
+              v-for="badge in optionBadges"
+              :key="badge.key"
               tone="settlement"
-              >{{ t('explore.detail.reservation') }}</AppBadge
             >
-            <AppBadge
-              v-if="event.isFree"
-              tone="neutral"
-              >{{ t('explore.detail.free') }}</AppBadge
-            >
-          </div>
-        </section>
-
-        <section
-          v-if="event.description || event.programText"
-          class="flex flex-col gap-5"
-        >
-          <div
-            v-if="event.description"
-            class="flex flex-col gap-2"
-          >
-            <h2 class="text-section-header text-ink">{{ t('explore.detail.description') }}</h2>
-            <p class="whitespace-pre-line text-body-sm leading-relaxed text-ink-2">
-              {{ event.description }}
-            </p>
-          </div>
-          <div
-            v-if="event.programText"
-            class="flex flex-col gap-2"
-          >
-            <h2 class="text-section-header text-ink">{{ t('explore.detail.program') }}</h2>
-            <p class="whitespace-pre-line text-body-sm leading-relaxed text-ink-2">
-              {{ event.programText }}
-            </p>
+              {{ badge.label }}
+            </AppBadge>
           </div>
         </section>
 
@@ -426,7 +384,9 @@ function retry(): void {
           padding="none"
         >
           <section>
-            <h2 class="px-5 pt-5 text-section-header text-ink">{{ t('explore.detail.basics') }}</h2>
+            <h2 class="px-5 pt-5 text-section-header text-ink">
+              {{ t('explore.placeDetail.openingInfo') }}
+            </h2>
             <dl class="mt-3 divide-y divide-hairline">
               <div
                 v-for="row in detailRows"
@@ -434,34 +394,21 @@ function retry(): void {
                 class="grid grid-cols-[5.5rem_1fr] gap-3 px-5 py-4"
               >
                 <dt class="text-caption text-ink-3">{{ row.label }}</dt>
-                <dd class="whitespace-pre-line text-body-sm text-ink">{{ row.value }}</dd>
+                <dd class="whitespace-pre-line break-words text-body-sm text-ink">
+                  {{ row.value }}
+                </dd>
               </div>
             </dl>
           </section>
         </AppCard>
 
-        <section
-          v-if="event.activities.length > 0"
-          class="flex flex-col gap-3"
-        >
-          <h2 class="text-section-header text-ink">{{ t('explore.detail.activities') }}</h2>
-          <div class="flex flex-wrap gap-2">
-            <AppBadge
-              v-for="activity in event.activities"
-              :key="activity.activityId"
-              tone="neutral"
-              >{{ activity.activityName ?? activity.activityCode }}</AppBadge
-            >
-          </div>
-        </section>
-
         <section class="flex flex-col gap-3">
-          <h2 class="text-section-header text-ink">{{ t('explore.detail.location') }}</h2>
+          <h2 class="text-section-header text-ink">{{ t('explore.placeDetail.location') }}</h2>
           <div class="relative aspect-[1.8] overflow-hidden rounded-card bg-surface-1">
             <div
               class="pointer-events-none absolute inset-0 opacity-75"
               role="img"
-              :aria-label="locationLabel || t('explore.detail.location')"
+              :aria-label="locationLabel || t('explore.placeDetail.location')"
             >
               <div aria-hidden="true">
                 <span class="absolute inset-y-0 left-1/4 w-px bg-hairline-2/70" />
@@ -474,13 +421,9 @@ function retry(): void {
                 class="absolute -left-[12%] bottom-[27%] h-3 w-[124%] -rotate-6 border-y-4 border-hairline-2/70"
                 aria-hidden="true"
               />
-              <span
-                class="absolute -left-[12%] bottom-[6%] h-3 w-[124%] rotate-6 border-y-4 border-hairline-2/45"
-                aria-hidden="true"
-              />
             </div>
             <span
-              class="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-pill bg-show ring-4 ring-show/20"
+              class="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-pill bg-food ring-4 ring-food/20"
               aria-hidden="true"
             />
             <div class="absolute inset-x-3 bottom-3 flex justify-end">
@@ -489,42 +432,44 @@ function retry(): void {
                 class="rounded-pill bg-canvas/85 px-3 py-2 text-caption text-ink shadow-raised disabled:pointer-events-none disabled:opacity-40"
                 disabled
               >
-                {{ t('explore.detail.directions') }}
+                {{ t('explore.placeDetail.directions') }}
               </button>
             </div>
           </div>
         </section>
 
-        <a
-          v-if="reservationUrl"
-          href="#"
-          class="flex items-center justify-between rounded-sm bg-settlement px-5 py-4 text-title-sm text-on-paper"
-          @click.prevent="openReservation"
+        <section
+          v-if="menuItems.length > 0"
+          class="flex flex-col gap-3"
         >
-          {{ t('explore.detail.openReservation') }}
-          <IconExternalLink
-            :size="18"
-            aria-hidden="true"
-          />
-        </a>
+          <h2 class="text-section-header text-ink">{{ t('explore.placeDetail.signatureMenu') }}</h2>
+          <div class="flex flex-wrap gap-2">
+            <AppBadge
+              v-for="item in menuItems"
+              :key="item"
+              tone="neutral"
+            >
+              {{ item }}
+            </AppBadge>
+          </div>
+        </section>
       </main>
 
       <div
         class="sticky bottom-0 z-10 mt-6 flex w-full min-w-0 items-center gap-2 bg-canvas/95 px-screen py-3 backdrop-blur"
       >
-        <IconOrb
-          :label="saved ? t('explore.detail.unsave') : t('explore.detail.save')"
-          variant="surface"
-          class="size-12 rounded-sm border border-hairline-strong bg-transparent"
-          @click="toggleSaved"
+        <button
+          type="button"
+          class="flex size-12 shrink-0 items-center justify-center rounded-sm border border-hairline-strong bg-transparent text-ink"
+          :aria-label="t('explore.placeDetail.saveUnavailable')"
+          disabled
         >
           <IconHeart
             :size="21"
             :stroke-width="1.8"
-            :class="saved ? 'fill-danger text-danger' : ''"
             aria-hidden="true"
           />
-        </IconOrb>
+        </button>
         <div class="min-w-0 flex-1">
           <AppButton
             block
@@ -532,7 +477,9 @@ function retry(): void {
             @click="openJourneyDateSheet"
           >
             {{
-              journeyAdded ? t('explore.detail.addedToJourney') : t('explore.detail.addToJourney')
+              journeyAdded
+                ? t('explore.placeDetail.addedToJourney')
+                : t('explore.placeDetail.addToJourney')
             }}
           </AppButton>
         </div>
@@ -543,18 +490,18 @@ function retry(): void {
             disabled
             class="h-12 whitespace-nowrap border-success px-2 text-success"
           >
-            {{ t('explore.detail.findCompanions') }}
+            {{ t('explore.placeDetail.findCompanions') }}
           </AppButton>
         </div>
       </div>
 
       <JourneyDateSheet
         v-if="journeyDateSheetOpen"
-        :item-title="event.title"
-        :item-location="journeyLocation"
-        :start-date="event.startDate"
-        :end-date="event.endDate"
-        :is-permanent="event.isPermanent === true"
+        :item-title="place.name"
+        :item-location="locationLabel"
+        :start-date="null"
+        :end-date="null"
+        :is-permanent="true"
         :initial-date="journeyDate"
         :loading="journeyAddPending"
         :error-message="

@@ -8,6 +8,14 @@ import { bootstrapLocale } from '@/app/i18n/applyLocale'
 import { queryClient } from '@/app/query/client'
 import { router } from '@/app/router'
 import { handleSessionExpired, handleSignedOut } from '@/app/session/sessionHandlers'
+import { addJourneyItem } from '@/features/journey/api/journeyApi'
+import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
+import {
+  parseJourneyRouteQuery,
+  readActiveJourneyId,
+  storeActiveJourneyId,
+} from '@/features/journey/model/activeJourney'
+import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
 import '@/app/styles/index.css'
 import { setSessionExpiredHandler } from '@/shared/api/sessionRecovery'
 import { setSignedOutHandler } from '@/shared/api/sessionSignOut'
@@ -32,5 +40,12 @@ app.use(createPinia())
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
 app.use(i18n)
+app.provide(exploreJourneyIntegrationKey, {
+  useJourneyListQuery,
+  addJourneyItem,
+  parseJourneyRouteQuery,
+  readActiveJourneyId,
+  storeActiveJourneyId,
+})
 
 app.mount('#app')
