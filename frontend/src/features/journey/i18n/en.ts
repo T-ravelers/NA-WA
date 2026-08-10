@@ -1,5 +1,19 @@
 export default {
   journey: {
+    list: {
+      title: 'Journeys',
+      add: 'Add journey',
+      tabsLabel: 'Journey status',
+      ongoing: 'Ongoing',
+      past: 'Past',
+      ongoingTitle: 'Ongoing journeys',
+      pastTitle: 'Past journeys',
+      fullEmptyTitle: 'No journeys yet',
+      fullEmptyDescription: 'Create your first journey to start planning.',
+      tabEmptyTitle: 'No {status} journeys',
+      tabEmptyDescription: 'Your {status} journeys will appear here.',
+      loadFailed: 'We could not load your journeys. Please try again.',
+    },
     create: {
       title: 'New journey',
       stepLabel: 'Journey setup progress',

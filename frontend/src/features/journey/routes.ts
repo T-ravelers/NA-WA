@@ -2,6 +2,12 @@ import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/journeys',
+    name: 'journey-list',
+    component: () => import('./views/JourneyListView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/journeys/new',
     name: 'journey-create',
     component: () => import('./views/JourneyCreateView.vue'),

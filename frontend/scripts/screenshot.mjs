@@ -130,6 +130,32 @@ function stubJourneyDetail(page) {
   ])
 }
 
+function stubJourneyList(page) {
+  return page.route('**/api/v1/journeys', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: [
+          {
+            tripId: 42,
+            title: 'Seoul Foodie Week',
+            startDate: '2098-08-10',
+            endDate: '2098-08-12',
+          },
+          {
+            tripId: 7,
+            title: 'Busan Weekender',
+            startDate: '2020-08-10',
+            endDate: '2020-08-12',
+          },
+        ],
+      }),
+    }),
+  )
+}
+
 /**
  * 지갑 홈 응답을 세운다.
  *
@@ -327,6 +353,11 @@ const SCREENS = [
     },
   },
   {
+    name: '13-journey-list',
+    path: '/journeys',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyList(page)]),
+  },
+  {
     name: '06-journey-create',
     path: '/journeys/new',
     setup: (page) => stubMemberProfile(page),
@@ -377,6 +408,35 @@ const SCREENS = [
     setup: async (page) => {
       await stubMemberProfile(page)
       stubWalletApis(page)
+    },
+  },
+  {
+    name: '13-wallet-qr',
+    path: '/wallet/qr',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubWalletHome(page, [])
+    },
+  },
+  {
+    name: '14-wallet-qr-scan',
+    path: '/wallet/qr/scan',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+    },
+  },
+  {
+    name: '15-wallet-qr-payment-preview',
+    path: '/wallet/qr/payment/preview',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+    },
+  },
+  {
+    name: '16-wallet-qr-payment-complete',
+    path: '/wallet/qr/payment/complete?scope=shared&appointment=seoul-night-tour',
+    setup: async (page) => {
+      await stubMemberProfile(page)
     },
   },
 

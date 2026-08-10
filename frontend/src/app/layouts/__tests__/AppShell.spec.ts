@@ -27,6 +27,12 @@ function createTestRouter() {
         component: { template: '<h1>Top up</h1>' },
         meta: { requiresAuth: true, hideBottomNav: true },
       },
+      {
+        path: '/journeys',
+        name: 'journey-list',
+        component: { template: '<h1>Journeys</h1>' },
+        meta: { requiresAuth: true },
+      },
     ],
   })
 }
@@ -79,5 +85,13 @@ describe('AppShell', () => {
     for (const control of controls) {
       expect(control.attributes('aria-label')).toBeTruthy()
     }
+  })
+
+  it('links the Journey item to the list and marks it active', async () => {
+    const wrapper = await mountAt('/journeys')
+    const journeyLink = wrapper.get('a[href="/journeys"]')
+
+    expect(journeyLink.attributes('aria-label')).toBe('Journeys')
+    expect(journeyLink.attributes('aria-current')).toBe('page')
   })
 })

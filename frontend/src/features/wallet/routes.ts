@@ -14,6 +14,30 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, hideBottomNav: true },
   },
   {
+    path: '/wallet/qr',
+    name: 'wallet-qr',
+    component: () => import('./views/WalletQrView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
+  {
+    path: '/wallet/qr/scan',
+    name: 'wallet-qr-scan',
+    component: () => import('./views/WalletQrScanView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
+  {
+    path: '/wallet/qr/payment/preview',
+    name: 'wallet-qr-payment-preview',
+    component: () => import('./views/WalletQrPaymentPreviewView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
+  {
+    path: '/wallet/qr/payment/complete',
+    name: 'wallet-qr-payment-complete',
+    component: () => import('./views/WalletQrPaymentCompleteView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
+  {
     path: '/wallet/transactions',
     name: 'wallet-transactions',
     component: () => import('./views/TransactionsView.vue'),
