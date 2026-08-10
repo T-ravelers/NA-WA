@@ -13,6 +13,11 @@ function createTestRouter(): Router {
       { path: '/wallet', name: 'wallet', component: { template: '<div />' } },
       { path: '/wallet/qr', name: 'wallet-qr', component: { template: '<div />' } },
       { path: '/wallet/qr/scan', name: 'wallet-qr-scan', component: { template: '<div />' } },
+      {
+        path: '/wallet/qr/payment/preview',
+        name: 'wallet-qr-payment-preview',
+        component: { template: '<div />' },
+      },
     ],
   })
 }
@@ -35,7 +40,7 @@ describe('WalletQrScanView', () => {
 
     expect(wrapper.get('h1').text()).toBe('QR PAYMENT')
     expect(wrapper.text()).toContain('Frame the QR code inside the box.')
-    expect(wrapper.text()).toContain('Note: QR code not recognized')
+    expect(wrapper.text()).toContain('QR code detected')
     expect(wrapper.get('[role="img"]').attributes('aria-label')).toBe('QR code scanning area')
     expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('Scan QR')
   })
@@ -56,5 +61,14 @@ describe('WalletQrScanView', () => {
     await wrapper.get('[role="tab"][aria-selected="false"]').trigger('click')
 
     expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr' })
+  })
+
+  it('opens the payment preview after a QR code is detected', async () => {
+    const { router, wrapper } = await mountView()
+    const pushSpy = vi.spyOn(router, 'push')
+
+    await wrapper.get('button:not(header button):not([role="tab"])').trigger('click')
+
+    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr-payment-preview' })
   })
 })

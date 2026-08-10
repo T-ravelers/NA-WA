@@ -15,6 +15,10 @@ const goBack = (): void => {
 const openMyQr = (): void => {
   void router.push({ name: 'wallet-qr' })
 }
+
+const openPaymentPreview = (): void => {
+  void router.push({ name: 'wallet-qr-payment-preview' })
+}
 </script>
 
 <template>
@@ -106,12 +110,13 @@ const openMyQr = (): void => {
         <p>{{ t('wallet.qrScan.sandboxNotice') }}</p>
       </div>
 
-      <div
+      <button
+        type="button"
         class="mt-3 flex min-h-12 items-center justify-center rounded-sm border border-hairline-strong px-4 text-body-sm text-ink-2"
-        role="status"
+        @click="openPaymentPreview"
       >
-        {{ t('wallet.qrScan.memo') }}
-      </div>
+        {{ t('wallet.qrScan.detected') }}
+      </button>
     </section>
   </main>
 </template>

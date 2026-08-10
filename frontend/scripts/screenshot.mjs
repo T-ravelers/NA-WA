@@ -394,6 +394,20 @@ const SCREENS = [
       await stubMemberProfile(page)
     },
   },
+  {
+    name: '15-wallet-qr-payment-preview',
+    path: '/wallet/qr/payment/preview',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+    },
+  },
+  {
+    name: '16-wallet-qr-payment-complete',
+    path: '/wallet/qr/payment/complete?scope=shared&appointment=seoul-night-tour',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+    },
+  },
 
   // 조작이 필요한 상태는 이렇게 찍는다.
   //
