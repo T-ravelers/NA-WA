@@ -159,7 +159,7 @@ describe('ExploreFilterSheet', () => {
     await foodHeader?.find('[role="checkbox"]').trigger('click')
 
     expect(wrapper.emitted('change')?.[wrapper.emitted('change')!.length - 1]?.[0]).toMatchObject({
-      sectorIds: [1],
+      sectorIds: [2],
     })
 
     await wrapper
@@ -169,7 +169,7 @@ describe('ExploreFilterSheet', () => {
 
     expect(wrapper.emitted('change')?.[wrapper.emitted('change')!.length - 1]?.[0]).toMatchObject({
       sectorIds: undefined,
-      activityIds: [101],
+      activityIds: [9],
     })
   })
 })

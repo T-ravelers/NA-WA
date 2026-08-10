@@ -3,12 +3,25 @@
 탐색 목록 API의 요청 파라미터와 필터 결합 규칙을 정리합니다. API 응답 봉투와
 오류 코드는 [API 응답 및 오류 코드 컨벤션](API_RESPONSE_CONVENTION.md)을 따릅니다.
 
+## 공통 taxonomy
+
+Event와 Place는 2026-08-06 `operational_v9` 핸드오프의 공통 taxonomy를 사용합니다.
+Sector ID는 `1~4`, Activity ID는 `1~56`이며, 같은 Activity ID를 두 item 유형의
+필터에 함께 전달합니다. 로컬 미리보기 SQL은
+[`database/EXPLORE_TAXONOMY_MOCK_DATA_LOCAL_ONLY.sql`](database/EXPLORE_TAXONOMY_MOCK_DATA_LOCAL_ONLY.sql)
+을 기준으로 합니다.
+
+이 핸드오프는 현재 로컬 적재와 API 연동 기준이며, 운영 taxonomy의 최종 권위로
+확정된 것은 아닙니다. 실제 크롤러 분류가 제공되기 전까지 로컬 연결 데이터는
+필터 동작 확인을 위한 분류입니다.
+
 ## Event 목록
 
 `GET /api/v1/explore/events`
 
-`/api/**` 경로는 인증이 필요합니다. Swagger에서 호출할 때는 먼저 `Authorize`로
-유효한 Bearer 토큰을 등록해야 합니다.
+`/api/**` 경로는 인증이 필요합니다. 현재 백엔드는 `access_token` HttpOnly 쿠키를
+읽는 방식이므로 Swagger의 Bearer `Authorize`만으로는 인증되지 않습니다. 인증된
+브라우저 세션이나 로컬 테스트용 access token 쿠키를 사용해야 합니다.
 
 ### 주요 요청 파라미터
 
@@ -53,8 +66,8 @@
 
 `GET /api/v1/explore/places`
 
-인증 없이 공개 Place를 조회할 수 있습니다. 단, `savedOnly=true`는 인증된 회원만
-사용할 수 있습니다.
+인증된 요청으로 공개 Place를 조회할 수 있습니다. 단, `savedOnly=true`는 인증된
+회원만 사용할 수 있습니다.
 
 ### 주요 요청 파라미터
 
