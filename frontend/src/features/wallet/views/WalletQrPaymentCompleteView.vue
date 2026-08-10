@@ -18,8 +18,14 @@ const selectedAppointment = computed(() => {
   return ACTIVE_APPOINTMENTS.find((appointment) => appointment.id === appointmentId)
 })
 
+const hasValidExpenseContext = computed(() => {
+  if (route.query.scope === 'personal') return true
+
+  return route.query.scope === 'shared' && selectedAppointment.value !== undefined
+})
+
 const expenseLabel = computed(() => {
-  if (route.query.scope === 'shared' && selectedAppointment.value !== undefined) {
+  if (route.query.scope === 'shared' && selectedAppointment.value) {
     return t('wallet.qrPayment.sharedExpense', {
       appointment: selectedAppointment.value.name,
     })
@@ -31,6 +37,10 @@ const expenseLabel = computed(() => {
 const backToWallet = (): void => {
   void router.push({ name: 'wallet' })
 }
+
+const backToPreview = (): void => {
+  void router.push({ name: 'wallet-qr-payment-preview' })
+}
 </script>
 
 <template>
@@ -39,7 +49,10 @@ const backToWallet = (): void => {
       class="flex min-h-dvh flex-col items-center text-center"
       aria-labelledby="wallet-qr-payment-complete-heading"
     >
-      <div class="flex flex-1 flex-col items-center justify-center pt-12">
+      <div
+        v-if="hasValidExpenseContext"
+        class="flex flex-1 flex-col items-center justify-center pt-12"
+      >
         <div
           class="grid size-16 place-items-center rounded-full border-2 border-hairline-strong"
           role="img"
@@ -74,11 +87,36 @@ const backToWallet = (): void => {
       </div>
 
       <AppButton
+        v-if="hasValidExpenseContext"
         block
         class="mb-1"
         @click="backToWallet"
       >
         {{ t('wallet.qrPayment.backToWallet') }}
+      </AppButton>
+
+      <div
+        v-else
+        class="flex flex-1 flex-col items-center justify-center px-6"
+      >
+        <h1
+          id="wallet-qr-payment-complete-heading"
+          class="text-title font-bold"
+        >
+          {{ t('wallet.qrPayment.invalidContextTitle') }}
+        </h1>
+        <p class="mt-4 max-w-sm text-body-sm text-ink-2">
+          {{ t('wallet.qrPayment.invalidContextDescription') }}
+        </p>
+      </div>
+
+      <AppButton
+        v-if="!hasValidExpenseContext"
+        block
+        class="mb-1"
+        @click="backToPreview"
+      >
+        {{ t('wallet.qrPayment.backToPreview') }}
       </AppButton>
     </section>
   </main>

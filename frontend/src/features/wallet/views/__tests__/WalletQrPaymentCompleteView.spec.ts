@@ -6,6 +6,11 @@ import { i18n } from '@/app/i18n'
 
 import WalletQrPaymentCompleteView from '../WalletQrPaymentCompleteView.vue'
 
+type CompletionQuery = {
+  scope: string
+  appointment?: string
+}
+
 function createTestRouter(): Router {
   return createRouter({
     history: createMemoryHistory(),
@@ -16,15 +21,22 @@ function createTestRouter(): Router {
         name: 'wallet-qr-payment-complete',
         component: { template: '<div />' },
       },
+      {
+        path: '/wallet/qr/payment/preview',
+        name: 'wallet-qr-payment-preview',
+        component: { template: '<div />' },
+      },
     ],
   })
 }
 
-async function mountView(): Promise<{ router: Router; wrapper: ReturnType<typeof mount> }> {
+async function mountView(
+  query: CompletionQuery = { scope: 'shared', appointment: 'seoul-night-tour' },
+): Promise<{ router: Router; wrapper: ReturnType<typeof mount> }> {
   const router = createTestRouter()
   await router.push({
     name: 'wallet-qr-payment-complete',
-    query: { scope: 'shared', appointment: 'seoul-night-tour' },
+    query,
   })
   await router.isReady()
 
@@ -56,5 +68,29 @@ describe('WalletQrPaymentCompleteView', () => {
       ?.trigger('click')
 
     expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet' })
+  })
+
+  it.each([{ scope: 'shared' }, { scope: 'shared', appointment: 'unknown-appointment' }])(
+    'does not treat an invalid shared context as a personal expense',
+    async (query) => {
+      const { wrapper } = await mountView(query)
+
+      expect(wrapper.text()).toContain('Payment context unavailable')
+      expect(wrapper.text()).toContain('Return to payment preview')
+      expect(wrapper.text()).not.toContain('Payment complete')
+      expect(wrapper.text()).not.toContain('Personal expense')
+    },
+  )
+
+  it('returns to the payment preview when the context is invalid', async () => {
+    const { router, wrapper } = await mountView({ scope: 'shared' })
+    const pushSpy = vi.spyOn(router, 'push')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Return to payment preview')
+      ?.trigger('click')
+
+    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr-payment-preview' })
   })
 })

@@ -82,10 +82,12 @@ describe('WalletQrView', () => {
 
   it('opens the QR scan screen from the scan tab', async () => {
     const { router, wrapper } = await mountView()
-    const pushSpy = vi.spyOn(router, 'push')
 
-    await wrapper.get('[role="tab"][aria-selected="false"]').trigger('click')
+    await wrapper.get('a[href="/wallet/qr/scan"]').trigger('click')
+    await flushPromises()
+    await router.isReady()
 
-    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr-scan' })
+    expect(router.currentRoute.value.name).toBe('wallet-qr-scan')
+    expect(wrapper.find('[role="tab"]').exists()).toBe(false)
   })
 })

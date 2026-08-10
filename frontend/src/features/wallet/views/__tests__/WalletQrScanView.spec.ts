@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
@@ -42,7 +42,8 @@ describe('WalletQrScanView', () => {
     expect(wrapper.text()).toContain('Frame the QR code inside the box.')
     expect(wrapper.text()).toContain('QR code detected')
     expect(wrapper.get('[role="img"]').attributes('aria-label')).toBe('QR code scanning area')
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('Scan QR')
+    expect(wrapper.get('a[href="/wallet/qr/scan"]').text()).toBe('Scan QR')
+    expect(wrapper.find('[role="tab"]').exists()).toBe(false)
   })
 
   it('returns to the wallet from the back button', async () => {
@@ -56,18 +57,19 @@ describe('WalletQrScanView', () => {
 
   it('opens my QR from the first tab', async () => {
     const { router, wrapper } = await mountView()
-    const pushSpy = vi.spyOn(router, 'push')
 
-    await wrapper.get('[role="tab"][aria-selected="false"]').trigger('click')
+    await wrapper.get('a[href="/wallet/qr"]').trigger('click')
+    await flushPromises()
+    await router.isReady()
 
-    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr' })
+    expect(router.currentRoute.value.name).toBe('wallet-qr')
   })
 
   it('opens the payment preview after a QR code is detected', async () => {
     const { router, wrapper } = await mountView()
     const pushSpy = vi.spyOn(router, 'push')
 
-    await wrapper.get('button:not(header button):not([role="tab"])').trigger('click')
+    await wrapper.get('button:not(header button)').trigger('click')
 
     expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr-payment-preview' })
   })

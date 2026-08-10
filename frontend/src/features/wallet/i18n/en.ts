@@ -192,6 +192,10 @@ export default {
       remainingBalance: 'Remaining balance {amount}',
       personalExpense: 'Personal expense',
       sharedExpense: 'Shared expense · {appointment}',
+      invalidContextTitle: 'Payment context unavailable',
+      invalidContextDescription:
+        'This payment context is invalid or incomplete. Return to the payment preview and try again.',
+      backToPreview: 'Return to payment preview',
       backToWallet: 'Back to wallet',
     },
   },

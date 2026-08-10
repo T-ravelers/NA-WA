@@ -2,7 +2,7 @@
 import { IconChevronLeft, IconInfoCircle } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import AppCard from '@/shared/ui/AppCard.vue'
 
@@ -67,9 +67,12 @@ function createQrCells(): boolean[] {
 }
 
 const { t, locale } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const walletQuery = useWalletHome()
 const qrCells = createQrCells()
+
+const isMyQrActive = computed(() => route.name === 'wallet-qr')
 
 const balanceLabel = computed(() => {
   const balance = walletQuery.data.value?.balance
@@ -116,23 +119,23 @@ const goBack = (): void => {
       class="grid grid-cols-2 border-b border-hairline"
       :aria-label="t('wallet.qr.tabs.label')"
     >
-      <button
-        type="button"
-        role="tab"
-        aria-selected="true"
-        class="min-h-12 border-b-2 border-ink px-3 text-body-sm font-semibold text-ink"
+      <RouterLink
+        :to="{ name: 'wallet-qr' }"
+        class="min-h-12 border-b-2 px-3 text-body-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
+        :class="
+          isMyQrActive
+            ? 'border-ink font-semibold text-ink'
+            : 'border-transparent text-ink-3 hover:text-ink'
+        "
       >
         {{ t('wallet.qr.tabs.myQr') }}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected="false"
+      </RouterLink>
+      <RouterLink
+        :to="{ name: 'wallet-qr-scan' }"
         class="min-h-12 border-b-2 border-transparent px-3 text-body-sm text-ink-3 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
-        @click="router.push({ name: 'wallet-qr-scan' })"
       >
         {{ t('wallet.qr.tabs.scan') }}
-      </button>
+      </RouterLink>
     </nav>
 
     <section
