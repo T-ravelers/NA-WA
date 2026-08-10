@@ -7,8 +7,9 @@
 
 `GET /api/v1/explore/events`
 
-`/api/**` 경로는 인증이 필요합니다. Swagger에서 호출할 때는 먼저 `Authorize`로
-유효한 Bearer 토큰을 등록해야 합니다.
+`/api/**` 경로는 인증이 필요합니다. 현재 백엔드는 `access_token` HttpOnly 쿠키를
+읽는 방식이므로 Swagger의 Bearer `Authorize`만으로는 인증되지 않습니다. 인증된
+브라우저 세션이나 로컬 테스트용 access token 쿠키를 사용해야 합니다.
 
 ### 주요 요청 파라미터
 
@@ -48,3 +49,59 @@
 응답의 `data.content`가 현재 페이지에 포함된 목록입니다. `totalElements`는 전체
 검색 결과 수이며, 현재 프론트엔드는 무한 스크롤을 구현하지 않았으므로 화면의 건수
 표시는 현재 페이지의 `content.length`를 사용합니다.
+
+## Place 목록
+
+`GET /api/v1/explore/places`
+
+인증된 요청으로 공개 Place를 조회할 수 있습니다. 단, `savedOnly=true`는 인증된
+회원만 사용할 수 있습니다.
+
+### 주요 요청 파라미터
+
+| 파라미터 | 형식 | 의미 |
+| --- | --- | --- |
+| `placeKinds` | 반복 가능한 문자열 목록 | `RESTAURANT`, `CAFE`, `MARKET`, `BEAUTY`, `ETC`를 같은 종류 안에서 OR로 필터링합니다. |
+| `sectorIds` | 반복 가능한 숫자 목록 | Sector를 같은 종류 안에서 OR로 필터링합니다. |
+| `activityIds` | 반복 가능한 숫자 목록 | Activity를 같은 종류 안에서 OR로 필터링합니다. |
+| `region1`, `region2`, `region3` | 반복 가능한 문자열 목록 | 각 지역 단계 안에서는 OR, 단계 사이에는 AND로 필터링합니다. 현재 프론트엔드는 `region1`·`region2`를 사용하며, 사용자 위치 기반 기능은 `region3`까지 전달할 수 있습니다. |
+| `keyword` | 문자열 | 이름·브랜드·지점·도로명 주소·상세 주소에 부분 일치 검색을 적용합니다. |
+| `hasForeignLang` | boolean | 외국어 안내가 있는 Place만 조회합니다. |
+| `hasParking` | boolean | 주차 가능한 Place만 조회합니다. |
+| `reservable` | boolean | 예약 가능한 Place만 조회합니다. |
+| `takeoutAvailable` | boolean | 포장 가능한 Place만 조회합니다. |
+| `cardPaymentAvailable` | boolean | 카드 결제 가능한 Place만 조회합니다. |
+| `smokeFree` | boolean | 금연 Place만 조회합니다. |
+| `kidFacility` | boolean | 유아 시설이 있는 Place만 조회합니다. |
+| `hasRestroom` | boolean | 화장실이 있는 Place만 조회합니다. |
+| `savedOnly` | boolean | 인증한 회원이 저장한 Place만 조회합니다. |
+| `sort` | `LATEST` 또는 `POPULAR` | 최신순 또는 인기순으로 정렬합니다. |
+| `language` | 문자열 | Activity·Sector 이름 언어입니다. `en`은 영문, 그 외에는 한글입니다. |
+| `page` | 0 이상의 정수 | 0부터 시작하며 잘못된 음수는 0으로 보정합니다. |
+| `size` | 양의 정수 | 기본값은 20, 최댓값은 100입니다. |
+
+### 필터 및 데이터 공개 규칙
+
+- 같은 종류의 다중 값은 OR, 서로 다른 종류의 필터는 AND로 결합합니다.
+- 여러 Activity에 연결된 Place도 목록에는 한 번만 반환합니다.
+- `APPROVED`·`VISIBLE`이며 삭제되지 않은 활성 Place만 목록과 상세에 반환합니다.
+- 저장 여부는 `explore_item_likes`의 삭제되지 않은 데이터로 판단합니다.
+- DB의 세부 Place 유형은 API에서 `RESTAURANT`, `CAFE`, `MARKET`, `BEAUTY`,
+  `ETC`로 정규화합니다. 알 수 없는 유형은 `ETC`로 반환합니다.
+
+운영시간과 휴무일 원문은 상세 응답에서 그대로 반환합니다. 현재 목록 API에는
+운영시간 문자열을 애플리케이션에서 재해석하는 `openNow` 필터를 포함하지 않습니다.
+크롤러의 구조화된 운영시간 데이터와 DB 필터 기준이 확정된 뒤 별도 작업으로 추가합니다.
+
+### 응답
+
+목록 응답은 `data.content`, `page`, `size`, `totalElements`, `totalPages`,
+`hasNext`를 반환합니다. 상세 응답은 기본 정보와 주소·좌표, 운영시간 원문, 편의 옵션,
+조회·저장 수, 연결된 Activity와 Sector를 반환합니다.
+
+## Place 상세
+
+`GET /api/v1/explore/places/{placeId}?language=en`
+
+공개·활성 조건을 만족하는 Place만 조회합니다. 없거나 비공개·비활성·삭제 상태이면
+HTTP 404와 `EXPLORE-002`를 반환합니다.

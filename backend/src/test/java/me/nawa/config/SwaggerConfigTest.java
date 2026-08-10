@@ -27,6 +27,7 @@ import me.nawa.wallet.service.TopupService;
 import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
+import me.nawa.explore.service.PlaceService;
 import me.nawa.journey.service.JourneyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -299,6 +300,11 @@ class SwaggerConfigTest {
         @Bean
         EventService eventService() {
             return new EventService(null);
+        }
+
+        @Bean
+        PlaceService placeService() {
+            return new PlaceService(null);
         }
     }
 

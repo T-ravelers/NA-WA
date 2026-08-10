@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.explore.mapper.PlaceMapper">
+    <resultMap id="placeSummaryResultMap"
+               type="me.nawa.explore.dto.response.PlaceSummaryResponse"
+               autoMapping="true">
+        <result property="imageUrls" column="image_urls"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+        <result property="openingHours" column="opening_hours"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+        <result property="closedDays" column="closed_days"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+    </resultMap>
+
+    <resultMap id="placeDetailResultMap"
+               type="me.nawa.explore.dto.response.PlaceDetailResponse"
+               autoMapping="true">
+        <result property="imageUrls" column="image_urls"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+        <result property="openingHours" column="opening_hours"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+        <result property="closedDays" column="closed_days"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+    </resultMap>
+
+    <sql id="normalizedPlaceKind">
+        CASE
+            WHEN UPPER(TRIM(p.place_kind)) IN
+                ('RESTAURANT','CAFE','MARKET','BEAUTY','ETC')
+                THEN UPPER(TRIM(p.place_kind))
+            WHEN p.place_kind IN
+                ('관광식당','서양식','일식','중식','기타외국식','김밥 분식','분식',
+                 '퓨전음식','이동음식','모범음식점','바/펍') THEN 'RESTAURANT'
+            WHEN p.place_kind IN ('카페','찻집','제과','기타음료점') THEN 'CAFE'
+            WHEN p.place_kind IN
+                ('상설시장','비상설시장','복합쇼핑몰','백화점',
+                 '관광기념품/특산물판매점','아웃렛','공방/공예품점') THEN 'MARKET'
+            WHEN p.place_kind = '뷰티매장' THEN 'BEAUTY'
+            ELSE 'ETC'
+        END
+    </sql>
+
+    <sql id="placeListWhere">
+        ei.item_type = 'PLACE'
+        AND ei.approval_status = 'APPROVED'
+        AND ei.visibility_status = 'VISIBLE'
+        AND ei.deleted_at IS NULL
+        AND p.deleted_at IS NULL
+        AND p.is_active = TRUE
+
+        <if test="request.placeKinds != null and request.placeKinds.size() > 0">
+            AND <include refid="normalizedPlaceKind"/> IN
+            <foreach collection="request.placeKinds" item="placeKind"
+                     open="(" separator="," close=")">
+                #{placeKind}
+            </foreach>
+        </if>
+        <if test="request.region1 != null and request.region1.size() > 0">
+            AND p.region1 IN
+            <foreach collection="request.region1" item="value"
+                     open="(" separator="," close=")">#{value}</foreach>
+        </if>
+        <if test="request.region2 != null and request.region2.size() > 0">
+            AND p.region2 IN
+            <foreach collection="request.region2" item="value"
+                     open="(" separator="," close=")">#{value}</foreach>
+        </if>
+        <if test="request.region3 != null and request.region3.size() > 0">
+            AND p.region3 IN
+            <foreach collection="request.region3" item="value"
+                     open="(" separator="," close=")">#{value}</foreach>
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            AND (
+                p.name LIKE CONCAT('%', #{request.keyword}, '%')
+                OR p.brand LIKE CONCAT('%', #{request.keyword}, '%')
+                OR p.branch LIKE CONCAT('%', #{request.keyword}, '%')
+                OR p.address_road LIKE CONCAT('%', #{request.keyword}, '%')
+                OR p.address_detail LIKE CONCAT('%', #{request.keyword}, '%')
+            )
+        </if>
+        <if test="request.hasForeignLang == true">AND p.has_foreign_lang = TRUE</if>
+        <if test="request.hasParking == true">AND p.has_parking = TRUE</if>
+        <if test="request.reservable == true">AND p.reservable = TRUE</if>
+        <if test="request.takeoutAvailable == true">AND p.takeout_available = TRUE</if>
+        <if test="request.cardPaymentAvailable == true">AND p.card_payment_available = TRUE</if>
+        <if test="request.smokeFree == true">AND p.smoke_free = TRUE</if>
+        <if test="request.kidFacility == true">AND p.kid_facility = TRUE</if>
+        <if test="request.hasRestroom == true">AND p.has_restroom = TRUE</if>
+
+        <if test="request.sectorIds != null and request.sectorIds.size() > 0">
+            AND EXISTS (
+                SELECT 1
+                FROM place_activity filter_pa
+                JOIN activity filter_a ON filter_a.activity_id = filter_pa.activity_id
+                WHERE filter_pa.place_id = p.place_id
+                  AND filter_pa.deleted_at IS NULL
+                  AND filter_a.deleted_at IS NULL
+                  AND filter_a.sector_id IN
+                <foreach collection="request.sectorIds" item="sectorId"
+                         open="(" separator="," close=")">#{sectorId}</foreach>
+            )
+        </if>
+        <if test="request.activityIds != null and request.activityIds.size() > 0">
+            AND EXISTS (
+                SELECT 1
+                FROM place_activity filter_pa
+                WHERE filter_pa.place_id = p.place_id
+                  AND filter_pa.deleted_at IS NULL
+                  AND filter_pa.activity_id IN
+                <foreach collection="request.activityIds" item="activityId"
+                         open="(" separator="," close=")">#{activityId}</foreach>
+            )
+        </if>
+        <if test="request.savedOnly == true">
+            AND EXISTS (
+                SELECT 1
+                FROM explore_item_likes saved_like
+                WHERE saved_like.item_id = ei.item_id
+                  AND saved_like.member_id = #{memberId}
+                  AND saved_like.deleted_at IS NULL
+            )
+        </if>
+    </sql>
+
+    <select id="searchPlaces" resultMap="placeSummaryResultMap">
+        SELECT
+            p.place_id AS item_id,
+            p.name, p.brand, p.branch, p.place_kind, p.thumbnail_url,
+            p.image_urls, p.region1, p.region2, p.region3, p.address_road,
+            p.address_detail, p.latitude, p.longitude, p.has_foreign_lang,
+            p.has_parking, p.reservable, p.takeout_available,
+            p.card_payment_available, p.smoke_free, p.kid_facility,
+            p.has_restroom, p.is_active, p.view_count, p.favorite_count,
+            p.opening_hours, p.closed_days
+        FROM explore_items ei
+        JOIN place p ON p.place_id = ei.item_id
+        WHERE <include refid="placeListWhere"/>
+        <choose>
+            <when test="request.sort == 'POPULAR'">
+                ORDER BY p.view_count DESC, p.place_id DESC
+            </when>
+            <otherwise>
+                ORDER BY p.created_at DESC, p.place_id DESC
+            </otherwise>
+        </choose>
+        <if test="limit != null">
+            LIMIT #{limit} OFFSET #{offset}
+        </if>
+    </select>
+
+    <select id="countPlaces" resultType="long">
+        SELECT COUNT(*)
+        FROM explore_items ei
+        JOIN place p ON p.place_id = ei.item_id
+        WHERE <include refid="placeListWhere"/>
+    </select>
+
+    <select id="findPlaceDetail" resultMap="placeDetailResultMap">
+        SELECT
+            p.place_id, p.place_id AS item_id, p.name, p.brand, p.branch,
+            p.place_kind, p.thumbnail_url, p.image_urls, p.source_url,
+            p.region1, p.region2, p.region3, p.address_road,
+            p.address_detail, p.postal_code, p.latitude, p.longitude,
+            p.opening_hours, p.closed_days, p.menu_summary, p.tel,
+            p.has_foreign_lang, p.has_parking, p.reservable,
+            p.takeout_available, p.card_payment_available, p.smoke_free,
+            p.kid_facility, p.has_restroom, p.is_active,
+            p.view_count, p.favorite_count
+        FROM explore_items ei
+        JOIN place p ON p.place_id = ei.item_id
+        WHERE ei.item_type = 'PLACE'
+          AND ei.item_id = #{placeId}
+          AND ei.approval_status = 'APPROVED'
+          AND ei.visibility_status = 'VISIBLE'
+          AND ei.deleted_at IS NULL
+          AND p.deleted_at IS NULL
+          AND p.is_active = TRUE
+    </select>
+
+    <select id="findPlaceActivities"
+            resultType="me.nawa.explore.dto.response.PlaceActivityResponse">
+        SELECT
+            a.activity_id, a.activity_code,
+            CASE WHEN #{language} = 'en' THEN a.label_en ELSE a.label_ko END
+                AS activity_name,
+            s.sector_id, s.sector_code,
+            CASE WHEN #{language} = 'en' THEN s.label_en ELSE s.label_ko END
+                AS sector_name,
+            pa.is_primary
+        FROM place_activity pa
+        JOIN activity a ON a.activity_id = pa.activity_id
+        JOIN sector s ON s.sector_id = a.sector_id
+        WHERE pa.place_id = #{placeId}
+          AND pa.deleted_at IS NULL
+          AND a.deleted_at IS NULL
+          AND s.deleted_at IS NULL
+        ORDER BY pa.is_primary DESC, s.display_order,
+                 a.display_order, a.activity_id
+    </select>
+</mapper>
