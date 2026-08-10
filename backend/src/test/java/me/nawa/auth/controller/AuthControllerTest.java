@@ -286,6 +286,29 @@ class AuthControllerTest {
         assertDeletedCookies(response.getHeaders(HttpHeaders.SET_COOKIE));
     }
 
+    @Test
+    void logout_revokeFailure_deletesCookiesAndReturnsSuccess()
+            throws Exception {
+        authTokenService.revokeFailure = new IllegalStateException(
+                "redis unavailable"
+        );
+
+        MockHttpServletResponse response = mockMvc.perform(
+                        post("/api/v1/auth/logout")
+                                .cookie(new Cookie(
+                                        "refresh_token",
+                                        "refresh-value"
+                                ))
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(200, response.getStatus());
+        assertEquals("{\"success\":true}", response.getContentAsString());
+        assertEquals("refresh-value", authTokenService.revokedValue);
+        assertDeletedCookies(response.getHeaders(HttpHeaders.SET_COOKIE));
+    }
+
     private AuthTokens createAuthTokens() {
         Instant now = Instant.now();
         return new AuthTokens(
@@ -306,8 +329,10 @@ class AuthControllerTest {
         assertEquals(2, setCookies.size());
         assertTrue(setCookies.get(0).contains("access_token="));
         assertTrue(setCookies.get(0).contains("Max-Age=0"));
+        assertTrue(setCookies.get(0).contains("Path=/;"));
         assertTrue(setCookies.get(1).contains("refresh_token="));
         assertTrue(setCookies.get(1).contains("Max-Age=0"));
+        assertTrue(setCookies.get(1).contains("Path=/api/v1/auth;"));
     }
 
     private static final class FakeAuthTokenService
@@ -315,6 +340,7 @@ class AuthControllerTest {
         private String refreshedValue;
         private AuthTokens refreshedTokens;
         private String revokedValue;
+        private RuntimeException revokeFailure;
 
         @Override
         public AuthTokens issueTokens(long memberId) {
@@ -330,6 +356,9 @@ class AuthControllerTest {
         @Override
         public void revokeRefreshToken(String refreshToken) {
             revokedValue = refreshToken;
+            if (revokeFailure != null) {
+                throw revokeFailure;
+            }
         }
     }
 
