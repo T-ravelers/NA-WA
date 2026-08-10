@@ -4,9 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.time.Clock;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -34,14 +31,11 @@ public class PlaceService {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
-    private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
     private static final Set<String> SORTS = Set.of("LATEST", "POPULAR");
     private static final Set<String> PLACE_KINDS = Set.of(
         "RESTAURANT", "CAFE", "MARKET", "BEAUTY", "ETC"
     );
     private final PlaceMapper placeMapper;
-    private final PlaceOpenStatusEvaluator openStatusEvaluator;
-    private final Clock clock = Clock.system(SEOUL_ZONE);
 
     @Transactional(readOnly = true)
     public PlaceListResponse searchPlaces(
@@ -51,24 +45,6 @@ public class PlaceService {
         normalizeAndValidate(request);
         validateSavedOnly(request, memberId);
         int offset = calculateOffset(request);
-
-        if (Boolean.TRUE.equals(request.getOpenNow())) {
-            List<PlaceSummaryResponse> openPlaces = placeMapper.searchPlaces(
-                request, 0, null, memberId
-            ).stream()
-                .filter(place -> openStatusEvaluator.isOpen(
-                    place.getOpeningHours(),
-                    place.getClosedDays(),
-                    ZonedDateTime.now(clock)
-                ))
-                .toList();
-            List<PlaceSummaryResponse> content = openPlaces.stream()
-                .skip(offset)
-                .limit(request.getSize())
-                .toList();
-            normalizeSummaries(content);
-            return createListResponse(content, openPlaces.size(), request);
-        }
 
         List<PlaceSummaryResponse> content = placeMapper.searchPlaces(
             request, offset, request.getSize(), memberId

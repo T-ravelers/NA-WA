@@ -3,18 +3,6 @@
 탐색 목록 API의 요청 파라미터와 필터 결합 규칙을 정리합니다. API 응답 봉투와
 오류 코드는 [API 응답 및 오류 코드 컨벤션](API_RESPONSE_CONVENTION.md)을 따릅니다.
 
-## 공통 taxonomy
-
-Event와 Place는 2026-08-06 `operational_v9` 핸드오프의 공통 taxonomy를 사용합니다.
-Sector ID는 `1~4`, Activity ID는 `1~56`이며, 같은 Activity ID를 두 item 유형의
-필터에 함께 전달합니다. 로컬 미리보기 SQL은
-[`database/EXPLORE_TAXONOMY_MOCK_DATA_LOCAL_ONLY.sql`](database/EXPLORE_TAXONOMY_MOCK_DATA_LOCAL_ONLY.sql)
-을 기준으로 합니다.
-
-이 핸드오프는 현재 로컬 적재와 API 연동 기준이며, 운영 taxonomy의 최종 권위로
-확정된 것은 아닙니다. 실제 크롤러 분류가 제공되기 전까지 로컬 연결 데이터는
-필터 동작 확인을 위한 분류입니다.
-
 ## Event 목록
 
 `GET /api/v1/explore/events`
@@ -87,7 +75,6 @@ Sector ID는 `1~4`, Activity ID는 `1~56`이며, 같은 Activity ID를 두 item 
 | `kidFacility` | boolean | 유아 시설이 있는 Place만 조회합니다. |
 | `hasRestroom` | boolean | 화장실이 있는 Place만 조회합니다. |
 | `savedOnly` | boolean | 인증한 회원이 저장한 Place만 조회합니다. |
-| `openNow` | boolean | `true`이면 서울 현재 시각에 영업 중임을 확실히 판정할 수 있는 Place만 조회합니다. |
 | `sort` | `LATEST` 또는 `POPULAR` | 최신순 또는 인기순으로 정렬합니다. |
 | `language` | 문자열 | Activity·Sector 이름 언어입니다. `en`은 영문, 그 외에는 한글입니다. |
 | `page` | 0 이상의 정수 | 0부터 시작하며 잘못된 음수는 0으로 보정합니다. |
@@ -102,29 +89,14 @@ Sector ID는 `1~4`, Activity ID는 `1~56`이며, 같은 Activity ID를 두 item 
 - DB의 세부 Place 유형은 API에서 `RESTAURANT`, `CAFE`, `MARKET`, `BEAUTY`,
   `ETC`로 정규화합니다. 알 수 없는 유형은 `ETC`로 반환합니다.
 
-### 현재 영업 중 판정
-
-크롤러가 전달하는 `openingHours`는 주로 다음처럼 원문 문자열을 가진 JSON입니다.
-
-```json
-{
-  "raw": "11:30~22:00 (브레이크타임 14:30~17:00)"
-}
-```
-
-`closedDays`는 `［"매주 일요일"］`, `［"연중무휴"］`,
-`［"설·추석 연휴"］` 같은 JSON 배열입니다. 상세 응답은 이 원문 JSON을 변경하지
-않고 반환합니다.
-
-`openNow=true`는 `Asia/Seoul` 기준으로 단순 영업시간, 자정을 넘는 영업시간,
-24시간 운영, 명시된 휴게·준비 시간, 정기 요일 휴무를 보수적으로 해석합니다.
-운영시간이 없거나 복잡해서 확실히 판정할 수 없는 Place는 결과에서 제외합니다.
-향후 구조화된 운영시간 데이터가 제공되면 DB 필터로 교체할 수 있습니다.
+운영시간과 휴무일 원문은 상세 응답에서 그대로 반환합니다. 현재 목록 API에는
+운영시간 문자열을 애플리케이션에서 재해석하는 `openNow` 필터를 포함하지 않습니다.
+크롤러의 구조화된 운영시간 데이터와 DB 필터 기준이 확정된 뒤 별도 작업으로 추가합니다.
 
 ### 응답
 
 목록 응답은 `data.content`, `page`, `size`, `totalElements`, `totalPages`,
-`last`를 반환합니다. 상세 응답은 기본 정보와 주소·좌표, 운영시간 원문, 편의 옵션,
+`hasNext`를 반환합니다. 상세 응답은 기본 정보와 주소·좌표, 운영시간 원문, 편의 옵션,
 조회·저장 수, 연결된 Activity와 Sector를 반환합니다.
 
 ## Place 상세

@@ -79,15 +79,13 @@ class PlaceControllerTest {
         mockMvc.perform(get("/api/v1/explore/places")
                 .param("placeKinds", "CAFE", "ETC")
                 .param("region1", "서울")
-                .param("sectorIds", "1", "2")
-                .param("openNow", "true"))
+                .param("sectorIds", "1", "2"))
             .andExpect(status().isOk());
 
         var captor = forClass(PlaceSearchRequest.class);
         verify(placeService).searchPlaces(captor.capture(), isNull());
         assertEquals(List.of("CAFE", "ETC"), captor.getValue().getPlaceKinds());
         assertEquals(List.of(1L, 2L), captor.getValue().getSectorIds());
-        assertTrue(captor.getValue().getOpenNow());
     }
 
     @Test

@@ -27,7 +27,6 @@ import me.nawa.wallet.service.TopupService;
 import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
-import me.nawa.explore.service.PlaceOpenStatusEvaluator;
 import me.nawa.explore.service.PlaceService;
 import me.nawa.journey.service.JourneyService;
 import org.junit.jupiter.api.BeforeEach;
@@ -305,7 +304,7 @@ class SwaggerConfigTest {
 
         @Bean
         PlaceService placeService() {
-            return new PlaceService(null, new PlaceOpenStatusEvaluator());
+            return new PlaceService(null);
         }
     }
 

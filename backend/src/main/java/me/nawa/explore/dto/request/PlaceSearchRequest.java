@@ -35,9 +35,6 @@ public class PlaceSearchRequest {
     private Boolean hasRestroom;
     private Boolean savedOnly;
 
-    @ApiModelProperty("서울 현재 시각에 확실히 영업 중으로 판정되는 Place만 조회")
-    private Boolean openNow;
-
     @ApiModelProperty("LATEST 또는 POPULAR")
     private String sort = "LATEST";
     @ApiModelProperty("Activity/Sector 이름 언어. en이면 영문, 그 외에는 한글")

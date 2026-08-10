@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -28,13 +27,11 @@ class PlaceServiceTest {
 
     @Mock
     private PlaceMapper placeMapper;
-    @Mock
-    private PlaceOpenStatusEvaluator openStatusEvaluator;
     private PlaceService placeService;
 
     @BeforeEach
     void setUp() {
-        placeService = new PlaceService(placeMapper, openStatusEvaluator);
+        placeService = new PlaceService(placeMapper);
     }
 
     @Test
@@ -90,28 +87,6 @@ class PlaceServiceTest {
             () -> placeService.searchPlaces(request, null)
         );
         verifyNoInteractions(placeMapper);
-    }
-
-    @Test
-    void searchPlaces_filtersOpenNowBeforePaging() {
-        PlaceSearchRequest request = new PlaceSearchRequest();
-        request.setOpenNow(true);
-        request.setSize(1);
-        PlaceSummaryResponse closed = PlaceSummaryResponse.builder()
-            .itemId(1L).build();
-        PlaceSummaryResponse open = PlaceSummaryResponse.builder()
-            .itemId(2L).build();
-        when(placeMapper.searchPlaces(request, 0, null, null))
-            .thenReturn(List.of(closed, open));
-        when(openStatusEvaluator.isOpen(any(), any(), any()))
-            .thenReturn(false, true);
-
-        PlaceListResponse result = placeService.searchPlaces(request, null);
-
-        assertEquals(1, result.getContent().size());
-        assertEquals(2L, result.getContent().get(0).getItemId());
-        assertEquals(1L, result.getTotalElements());
-        verify(placeMapper).searchPlaces(request, 0, null, null);
     }
 
     @Test
