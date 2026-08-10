@@ -379,6 +379,35 @@ const SCREENS = [
       stubWalletApis(page)
     },
   },
+  {
+    name: '13-wallet-qr',
+    path: '/wallet/qr',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubWalletHome(page, [])
+    },
+  },
+  {
+    name: '14-wallet-qr-scan',
+    path: '/wallet/qr/scan',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+    },
+  },
+  {
+    name: '15-wallet-qr-payment-preview',
+    path: '/wallet/qr/payment/preview',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+    },
+  },
+  {
+    name: '16-wallet-qr-payment-complete',
+    path: '/wallet/qr/payment/complete?scope=shared&appointment=seoul-night-tour',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+    },
+  },
 
   // 조작이 필요한 상태는 이렇게 찍는다.
   //

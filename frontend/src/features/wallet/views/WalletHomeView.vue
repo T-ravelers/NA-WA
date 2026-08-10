@@ -76,11 +76,7 @@ const ACTIVITY_ICON: Record<ActivityKind, Component> = {
   UNKNOWN: IconReceipt,
 }
 
-/*
- * QR·정산은 아직 상세 화면이 없다. 누를 수 있게 두고 아무 일도 일어나지 않으면
- * 고장으로 읽히므로 비활성으로 두고, 이유를 화면에 적는다. 후속 작업에서 화면을 붙일 때
- * `disabled`만 떼면 된다. 충전은 화면이 생겨 활성화한다.
- */
+/* QR은 이번 작업에서 화면을 붙였고, 정산은 아직 후속 화면이 없다. */
 const quickActions = computed(() => [
   {
     id: 'topUp',
@@ -92,7 +88,7 @@ const quickActions = computed(() => [
     id: 'qr',
     label: t('wallet.home.quickActions.qr'),
     variant: 'secondary' as const,
-    disabled: true,
+    disabled: false,
   },
   {
     id: 'settlement',
@@ -105,6 +101,10 @@ const quickActions = computed(() => [
 function handleQuickAction(id: string): void {
   if (id === 'topUp') {
     void router.push({ name: 'wallet-top-up' })
+  }
+
+  if (id === 'qr') {
+    void router.push({ name: 'wallet-qr' })
   }
 }
 
