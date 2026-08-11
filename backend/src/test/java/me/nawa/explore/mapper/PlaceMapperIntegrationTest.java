@@ -52,7 +52,13 @@ class PlaceMapperIntegrationTest {
         ));
 
         SqlSessionFactory sqlSessionFactory = factoryBean.getObject();
-        sqlSessionFactory.getConfiguration().addMapper(PlaceMapper.class);
+        // XML의 namespace가 이미 인터페이스를 등록하므로 그대로 addMapper를 부르면
+        // MapperRegistry가 중복 등록으로 BindingException을 던진다.
+        if (!sqlSessionFactory.getConfiguration().hasMapper(
+            PlaceMapper.class
+        )) {
+            sqlSessionFactory.getConfiguration().addMapper(PlaceMapper.class);
+        }
         mapper = new SqlSessionTemplate(sqlSessionFactory)
             .getMapper(PlaceMapper.class);
     }
