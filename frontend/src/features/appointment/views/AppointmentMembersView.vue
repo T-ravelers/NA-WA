@@ -82,5 +82,26 @@ function goBack(): void {
       v-else
       :members="members"
     />
+
+    <div class="grid grid-cols-2 gap-3">
+      <AppButton
+        block
+        variant="secondary"
+        @click="
+          router.push({ name: 'appointment-attendance', params: { appointmentId: appointmentId } })
+        "
+      >
+        {{ t('appointment.members.attendance') }}
+      </AppButton>
+      <AppButton
+        block
+        variant="secondary"
+        @click="
+          router.push({ name: 'appointment-reviews', params: { appointmentId: appointmentId } })
+        "
+      >
+        {{ t('appointment.members.reviews') }}
+      </AppButton>
+    </div>
   </main>
 </template>
