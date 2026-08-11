@@ -52,6 +52,7 @@ export default withVueTs(
           patterns: [
             {
               group: ['@/features/*', '@/features/*/**'],
+              allowTypeImports: false,
               message:
                 'Feature 간 직접 import는 금지합니다. app 주입 또는 shared 계약을 사용하세요.',
             },
@@ -71,6 +72,7 @@ export default withVueTs(
           patterns: [
             {
               group: ['@/features/*', '@/features/*/**'],
+              allowTypeImports: false,
               message:
                 'Shared는 Feature를 import할 수 없습니다. Feature 조합은 app에서 처리하세요.',
             },
