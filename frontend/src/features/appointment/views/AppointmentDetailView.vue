@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -12,6 +12,7 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
+import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
 import { type AppointmentStatus } from '../api/appointmentApi'
 import {
   appointmentDetailQueryOptions,
@@ -45,9 +46,13 @@ const membersQuery = useQuery({
 const appointment = computed(() => detailQuery.data.value)
 const members = computed(() => membersQuery.data.value ?? appointment.value?.members ?? [])
 
+const depositSheetOpen = ref(false)
+
 const statusTone = computed(() =>
   appointment.value?.appointmentStatus === 'RECRUITING' ? 'ongoing' : 'neutral',
 )
+
+const isJoinAvailable = computed(() => appointment.value?.appointmentStatus === 'RECRUITING')
 
 function formatDateTime(value: string | null): string {
   if (!value) return t('appointment.detail.notProvided')
@@ -88,6 +93,14 @@ function openMembers(): void {
 function retry(): void {
   void detailQuery.refetch()
   void membersQuery.refetch()
+}
+
+function openDepositSheet(): void {
+  if (isJoinAvailable.value) depositSheetOpen.value = true
+}
+
+function closeDepositSheet(): void {
+  depositSheetOpen.value = false
 }
 </script>
 
@@ -236,11 +249,20 @@ function retry(): void {
 
       <AppButton
         block
-        disabled
-        :title="t('appointment.detail.joinUnavailable')"
+        :disabled="!isJoinAvailable"
+        :title="!isJoinAvailable ? t('appointment.detail.joinUnavailable') : undefined"
+        @click="openDepositSheet"
       >
         {{ t('appointment.detail.join') }}
       </AppButton>
+
+      <AppointmentDepositSheet
+        v-if="depositSheetOpen"
+        :appointment-name="appointment.appointmentName"
+        :deposit-amount="appointment.depositAmount"
+        confirm-disabled
+        @close="closeDepositSheet"
+      />
     </template>
   </main>
 </template>

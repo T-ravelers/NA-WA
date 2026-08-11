@@ -243,7 +243,7 @@ function confirmCreation(): void {
         <button
           type="button"
           class="text-title text-on-paper"
-          :aria-label="t('action.close')"
+          :aria-label="t('appointment.create.close')"
           @click="cancelConfirmation"
         >
           ×
@@ -264,7 +264,7 @@ function confirmCreation(): void {
           variant="secondary"
           @click="cancelConfirmation"
         >
-          {{ t('action.cancel') }}
+          {{ t('appointment.create.cancel') }}
         </AppButton>
         <AppButton
           block

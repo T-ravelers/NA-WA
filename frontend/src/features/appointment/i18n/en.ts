@@ -53,6 +53,8 @@ export default {
       confirmTitle: 'Confirm appointment',
       confirmDescription: 'Check the appointment details before creating it.',
       confirm: 'Confirm',
+      cancel: 'Cancel',
+      close: 'Close confirmation',
       loadFailed: 'Appointment could not be created. Please try again.',
       validation: {
         itemContext: 'Open this form from an Event or Place.',
@@ -101,6 +103,15 @@ export default {
       loadFailedDescription: 'Please try again in a moment.',
       emptyTitle: 'No members yet',
       emptyDescription: 'Members will appear here after they join.',
+    },
+    deposit: {
+      title: 'Confirm participation',
+      close: 'Close deposit confirmation',
+      description: 'A deposit is required to secure your place in {name}.',
+      refundable: 'Refundable deposit',
+      paymentPending: 'Payment integration will be connected separately.',
+      confirm: 'Pay ₩{amount}',
+      cancel: 'Cancel',
     },
   },
 }

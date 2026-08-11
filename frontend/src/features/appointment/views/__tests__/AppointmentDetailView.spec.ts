@@ -96,17 +96,24 @@ describe('AppointmentDetailView', () => {
     fetchAppointmentMembers.mockResolvedValue(members)
   })
 
-  it('renders appointment details, members, and the disabled join action', async () => {
+  it('renders appointment details, members, and opens deposit confirmation', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Seongsu K-Beauty Tour')
     expect(wrapper.text()).toContain('Seongsu Beauty Lab')
     expect(wrapper.text()).toContain('Mina Park')
     expect(wrapper.text()).toContain('Host')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Confirm participation')
     expect(
       wrapper
+        .get('[role="dialog"]')
         .findAll('button')
-        .find((button) => button.text() === 'Join appointment')
+        .find((button) => button.text().includes('Pay'))
         ?.attributes('disabled'),
     ).toBeDefined()
   })
