@@ -106,7 +106,10 @@ export async function fetchAppointment(appointmentId: number): Promise<Appointme
     `${APPOINTMENT_LIST_PATH}/${appointmentId}`,
   )
 
-  return response.data
+  return {
+    ...response.data,
+    members: response.data.members ?? [],
+  }
 }
 
 export async function createAppointment(
@@ -122,7 +125,7 @@ export async function fetchAppointmentMembers(appointmentId: number): Promise<Ap
     `${APPOINTMENT_LIST_PATH}/${appointmentId}/members`,
   )
 
-  return response.data
+  return response.data ?? []
 }
 
 export async function submitAppointmentReview(

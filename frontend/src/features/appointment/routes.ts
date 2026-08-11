@@ -13,6 +13,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/AppointmentCreateView.vue'),
     meta: { requiresAuth: true, hideBottomNav: true },
   },
+  {
+    path: '/appointments/:appointmentId/members',
+    name: 'appointment-members',
+    component: () => import('./views/AppointmentMembersView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
+  {
+    path: '/appointments/:appointmentId',
+    name: 'appointment-detail',
+    component: () => import('./views/AppointmentDetailView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
 ]
 
 export default routes
