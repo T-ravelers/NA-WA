@@ -9,6 +9,7 @@ export default {
       languageLabel: 'Appointment language',
       resultCount: '{count} appointments',
       memberCount: '{current}/{max} members',
+      scheduleUnavailable: 'Schedule unavailable',
       placePending: 'Meeting place to be confirmed',
       deposit: 'Refundable deposit ₩{amount}',
       view: 'View',

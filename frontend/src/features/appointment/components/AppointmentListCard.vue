@@ -8,6 +8,7 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import type { AppointmentSummary } from '../api/appointmentApi'
+import { parseAppointmentDateTime } from '../model/appointmentDateTime'
 
 interface Props {
   appointment: AppointmentSummary
@@ -22,6 +23,7 @@ const dateFormatter = computed(
     new Intl.DateTimeFormat(locale.value, {
       month: 'numeric',
       day: 'numeric',
+      timeZone: 'Asia/Seoul',
     }),
 )
 
@@ -30,16 +32,15 @@ const timeFormatter = computed(
     new Intl.DateTimeFormat(locale.value, {
       hour: 'numeric',
       minute: '2-digit',
+      timeZone: 'Asia/Seoul',
     }),
 )
 
-function parseDate(value: string): Date {
-  return new Date(value)
-}
-
 const scheduleLabel = computed(() => {
-  const start = parseDate(appointment.activityStartAt)
-  const end = parseDate(appointment.activityEndAt)
+  const start = parseAppointmentDateTime(appointment.activityStartAt)
+  const end = parseAppointmentDateTime(appointment.activityEndAt)
+
+  if (!start || !end) return t('appointment.list.scheduleUnavailable')
 
   return `${dateFormatter.value.format(start)} · ${timeFormatter.value.format(start)}–${timeFormatter.value.format(end)}`
 })

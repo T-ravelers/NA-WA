@@ -19,6 +19,7 @@ import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
 } from '../model/appointmentQueries'
+import { parseAppointmentDateTime } from '../model/appointmentDateTime'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,11 +63,12 @@ const isJoinAvailable = computed(() => appointment.value?.appointmentStatus === 
 
 function formatDateTime(value: string | null): string {
   if (!value) return t('appointment.detail.notProvided')
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
+  const parsed = parseAppointmentDateTime(value)
+  if (!parsed) return value
   return new Intl.DateTimeFormat(locale.value, {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: 'Asia/Seoul',
   }).format(parsed)
 }
 
