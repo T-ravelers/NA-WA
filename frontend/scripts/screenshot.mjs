@@ -419,6 +419,13 @@ const SCREENS = [
     },
   },
   {
+    name: '17-wallet-qr-create',
+    path: '/wallet/qr/create',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+    },
+  },
+  {
     name: '14-wallet-qr-scan',
     path: '/wallet/qr/scan',
     setup: async (page) => {

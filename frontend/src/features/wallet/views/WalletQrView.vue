@@ -4,8 +4,10 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
+import { formatKrw } from '../model/qrPayment'
 import { useWalletHome } from '../model/walletQueries'
 
 const QR_SIZE = 21
@@ -74,6 +76,26 @@ const qrCells = createQrCells()
 
 const isMyQrActive = computed(() => route.name === 'wallet-qr')
 
+const qrRequest = computed(() => {
+  const rawAmount = route.query.amount
+  const payerEntersAmount = route.query.amountMode === 'payer' || rawAmount === 'payer'
+  const parsedAmount =
+    typeof rawAmount === 'string' && /^\d+$/.test(rawAmount) ? Number(rawAmount) : 18_500
+  const memo = typeof route.query.memo === 'string' ? route.query.memo : 'Seoul Night Tour'
+
+  return {
+    amount: payerEntersAmount ? null : parsedAmount,
+    memo,
+    payerEntersAmount,
+  }
+})
+
+const displayAmount = computed(() =>
+  qrRequest.value.payerEntersAmount || qrRequest.value.amount === null
+    ? t('wallet.qr.amountEnteredByPayer')
+    : formatKrw(qrRequest.value.amount),
+)
+
 const balanceLabel = computed(() => {
   const balance = walletQuery.data.value?.balance
 
@@ -88,6 +110,10 @@ const balanceLabel = computed(() => {
 
 const goBack = (): void => {
   void router.push({ name: 'wallet' })
+}
+
+const createNewQr = (): void => {
+  void router.push({ name: 'wallet-qr-create' })
 }
 </script>
 
@@ -177,7 +203,21 @@ const goBack = (): void => {
         <p class="mt-4 text-body-sm font-semibold text-ink-2">
           {{ t('wallet.qr.validity') }}
         </p>
-        <p class="mt-2 text-caption text-ink-3">
+
+        <dl class="mt-4 divide-y divide-hairline border-t border-hairline text-left">
+          <div class="flex items-center justify-between gap-4 py-3">
+            <dt class="text-body-sm text-ink-2">{{ t('wallet.qr.amount') }}</dt>
+            <dd class="text-right text-body-sm font-semibold">{{ displayAmount }}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-4 py-3 last:pb-0">
+            <dt class="text-body-sm text-ink-2">{{ t('wallet.qr.memo') }}</dt>
+            <dd class="max-w-[65%] text-right text-body-sm font-semibold">
+              {{ qrRequest.memo || t('wallet.qr.noMemo') }}
+            </dd>
+          </div>
+        </dl>
+
+        <p class="mt-3 text-caption text-ink-3">
           {{ balanceLabel }}
         </p>
       </AppCard>
@@ -192,6 +232,15 @@ const goBack = (): void => {
         />
         <p>{{ t('wallet.qr.sandboxNotice') }}</p>
       </div>
+
+      <AppButton
+        block
+        variant="secondary"
+        class="mt-3"
+        @click="createNewQr"
+      >
+        {{ t('wallet.qr.createNew') }}
+      </AppButton>
     </section>
   </main>
 </template>
