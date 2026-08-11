@@ -122,19 +122,17 @@ class ReportConcurrencyIntegrationTest {
             );
 
             assertEquals(
-                1L,
+                2L,
                 outcomes.stream().filter(CreationOutcome::succeeded).count()
             );
-            BusinessException conflict = outcomes.stream()
-                .map(CreationOutcome::failure)
-                .filter(failure -> failure != null)
-                .findFirst()
-                .orElseThrow();
             assertEquals(
-                ReportErrorCode.REPORT_ALREADY_EXISTS,
-                conflict.getErrorCode()
+                1L,
+                outcomes.stream()
+                    .map(CreationOutcome::response)
+                    .map(ReportDetailResponse::getReportId)
+                    .distinct()
+                    .count()
             );
-            assertEquals("REPORT-005", conflict.getErrorCode().getCode());
             assertEquals(
                 1,
                 jdbcTemplate.queryForObject(
