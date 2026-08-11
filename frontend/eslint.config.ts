@@ -51,18 +51,7 @@ export default withVueTs(
         {
           patterns: [
             {
-              group: [
-                '@/features/auth',
-                '@/features/auth/**',
-                '@/features/explore',
-                '@/features/explore/**',
-                '@/features/journey',
-                '@/features/journey/**',
-                '@/features/member',
-                '@/features/member/**',
-                '@/features/wallet',
-                '@/features/wallet/**',
-              ],
+              group: ['@/features/*', '@/features/*/**'],
               message:
                 'Feature 간 직접 import는 금지합니다. app 주입 또는 shared 계약을 사용하세요.',
             },
