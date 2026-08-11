@@ -7,6 +7,11 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
 
+/**
+ * 정산 후보 응답
+ *
+ * 정산 생성에 사용할 원거래와 여정·약속·결제자 및 참여자 정보를 반환합니다.
+ */
 @Getter
 @Builder
 public class SettlementCandidateResponse {

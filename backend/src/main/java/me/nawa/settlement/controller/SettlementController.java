@@ -20,6 +20,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 정산 요청 API
+ *
+ * 정산 목록·후보·상세 조회와 생성, 결제 및 취소 요청을 처리합니다.
+ */
 @RestController
 @RequestMapping("/api/v1/settlements")
 @RequiredArgsConstructor
@@ -27,6 +32,11 @@ public class SettlementController {
 
     private final SettlementService settlementService;
 
+    /**
+     * 정산 목록 조회
+     *
+     * 인증된 회원이 받은 정산 요청과 보낸 정산 요청을 함께 조회합니다.
+     */
     @GetMapping
     public ApiResponse<SettlementListResponse> getSettlements(
         @AuthenticationPrincipal AuthenticatedMember member
@@ -36,6 +46,11 @@ public class SettlementController {
         );
     }
 
+    /**
+     * 정산 후보 조회
+     *
+     * 인증된 회원이 정산 생성에 사용할 수 있는 원거래와 참여자 정보를 조회합니다.
+     */
     @GetMapping("/candidates")
     public ApiResponse<List<SettlementCandidateResponse>> getCandidates(
         @AuthenticationPrincipal AuthenticatedMember member
@@ -45,6 +60,11 @@ public class SettlementController {
         );
     }
 
+    /**
+     * 정산 생성
+     *
+     * 원거래와 참여자, 정산 유형을 바탕으로 새 정산을 생성합니다.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<SettlementCreateResponse> createSettlement(
@@ -56,6 +76,11 @@ public class SettlementController {
         ));
     }
 
+    /**
+     * 정산 상세 조회
+     *
+     * 인증된 회원이 참여한 정산의 금액, 상태 및 항목 정보를 조회합니다.
+     */
     @GetMapping("/{settlementId}")
     public ApiResponse<SettlementDetailResponse> getSettlement(
         @AuthenticationPrincipal AuthenticatedMember member,
@@ -66,6 +91,11 @@ public class SettlementController {
         ));
     }
 
+    /**
+     * 정산 결제
+     *
+     * 인증된 회원의 정산 부담금 결제를 처리합니다.
+     */
     @PostMapping("/{settlementId}/payments")
     public ApiResponse<Void> paySettlement(
         @AuthenticationPrincipal AuthenticatedMember member,
@@ -75,6 +105,11 @@ public class SettlementController {
         return ApiResponse.success();
     }
 
+    /**
+     * 정산 취소
+     *
+     * 인증된 회원이 생성한 정산 요청을 취소합니다.
+     */
     @PostMapping("/{settlementId}/cancel")
     public ApiResponse<Void> cancelSettlement(
         @AuthenticationPrincipal AuthenticatedMember member,

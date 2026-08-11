@@ -5,6 +5,11 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
 
+/**
+ * 영수증 분석 응답
+ *
+ * 영수증 분석 식별자와 인식 합계, 항목 목록을 반환합니다.
+ */
 @Getter
 @Builder
 public class ReceiptAnalysisResponse {

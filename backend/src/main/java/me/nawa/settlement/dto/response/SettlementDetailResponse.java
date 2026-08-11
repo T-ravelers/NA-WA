@@ -5,6 +5,11 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
 
+/**
+ * 정산 상세 응답
+ *
+ * 정산의 금액, 진행 상태, 원거래와 항목 및 결제자 정보를 반환합니다.
+ */
 @Getter
 @Builder
 public class SettlementDetailResponse {
