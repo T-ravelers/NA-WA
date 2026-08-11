@@ -188,18 +188,18 @@ function stubReportApis(page) {
           ],
         },
       ],
-    },
-    analytics: {
-      totalSpent: '1284500.0000',
-      dailyAverage: '128450.0000',
-      categoryBreakdown: [
-        { category: 'FOOD', amount: '1000000.0000', percentage: '77.85' },
-        { category: 'OTHER', amount: '284500.0000', percentage: '22.15' },
-      ],
-      dailyTrend: [
-        { date: '2021-07-18', amount: '1284500.0000' },
-        { date: '2021-07-19', amount: '0.0000' },
-      ],
+      analytics: {
+        totalSpent: 1284500,
+        dailyAverage: 128450,
+        categoryBreakdown: [
+          { category: 'FOOD', amount: 1000000, percentage: 77.85 },
+          { category: 'OTHER', amount: 284500, percentage: 22.15 },
+        ],
+        dailyTrend: [
+          { date: '2021-07-18', amount: 1284500 },
+          { date: '2021-07-19', amount: 0 },
+        ],
+      },
     },
   }
 

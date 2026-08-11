@@ -33,12 +33,12 @@ const detailWire = {
       endDate: '2026-07-27',
     },
     days: [{ visitDate: '2026-07-18', items: null }],
-  },
-  analytics: {
-    totalSpent: '1284500.0000',
-    dailyAverage: '128450.0000',
-    categoryBreakdown: null,
-    dailyTrend: [{ date: '2026-07-18', amount: '0.0000' }],
+    analytics: {
+      totalSpent: 1284500,
+      dailyAverage: 128450,
+      categoryBreakdown: null,
+      dailyTrend: [{ date: '2026-07-18', amount: 0 }],
+    },
   },
 }
 
@@ -57,48 +57,52 @@ describe('reportApi', () => {
     expect(get).toHaveBeenNthCalledWith(2, '/api/v1/reports')
   })
 
-  it('preserves decimal strings and normalizes absent candidate collections', async () => {
-    get.mockResolvedValueOnce({ data: { tripId: 7, candidates: null } }).mockResolvedValueOnce({
-      data: {
-        tripId: 7,
-        candidates: [
-          {
-            transferId: 30,
-            amount: '18000.0000',
-            occurredDate: '2026-07-18',
-            category: 'FOOD',
-            displayMemo: null,
-            selected: true,
-          },
-        ],
-      },
+  it('maps the candidate array and numeric amount to the frontend model', async () => {
+    get.mockResolvedValueOnce({ data: null }).mockResolvedValueOnce({
+      data: [
+        {
+          transferId: 30,
+          amount: 18000,
+          occurredOn: '2026-07-18',
+          category: 'FOOD',
+          memo: null,
+          selected: true,
+        },
+      ],
     })
 
     await expect(fetchReportExpenseCandidates(7)).resolves.toEqual({ tripId: 7, candidates: [] })
-    await expect(fetchReportExpenseCandidates(7)).resolves.toMatchObject({
-      candidates: [{ amount: '18000.0000', selected: true }],
+    await expect(fetchReportExpenseCandidates(7)).resolves.toEqual({
+      tripId: 7,
+      candidates: [
+        {
+          transferId: 30,
+          amount: '18000',
+          occurredDate: '2026-07-18',
+          category: 'FOOD',
+          displayMemo: null,
+          selected: true,
+        },
+      ],
     })
   })
 
-  it('rejects a numeric or malformed mock amount instead of losing precision', async () => {
+  it('rejects a string amount that violates the numeric backend contract', async () => {
     get.mockResolvedValue({
-      data: {
-        tripId: 7,
-        candidates: [
-          {
-            transferId: 30,
-            amount: 18000,
-            occurredDate: '2026-07-18',
-            category: 'FOOD',
-            displayMemo: null,
-            selected: false,
-          },
-        ],
-      },
+      data: [
+        {
+          transferId: 30,
+          amount: '18000.0000',
+          occurredOn: '2026-07-18',
+          category: 'FOOD',
+          memo: null,
+          selected: false,
+        },
+      ],
     })
 
     await expect(fetchReportExpenseCandidates(7)).rejects.toThrow(
-      'candidate.amount must be a nonnegative decimal string.',
+      'candidate.amount must be a nonnegative finite JSON number.',
     )
   })
 
@@ -108,9 +112,9 @@ describe('reportApi', () => {
     await expect(createReport({ tripId: 7, transferIds: [30, 10, 30] })).resolves.toMatchObject({
       reportId: 100,
       analytics: {
-        totalSpent: '1284500.0000',
+        totalSpent: '1284500',
         categoryBreakdown: [],
-        dailyTrend: [{ amount: '0.0000' }],
+        dailyTrend: [{ amount: '0' }],
       },
       reportContent: { days: [{ items: [] }] },
     })
@@ -127,8 +131,7 @@ describe('reportApi', () => {
   it('normalizes an absent analytics field as a legacy report', async () => {
     const legacy = {
       ...detailWire,
-      analytics: undefined,
-      reportContent: { ...detailWire.reportContent, days: null },
+      reportContent: { ...detailWire.reportContent, days: null, analytics: undefined },
     }
     get.mockResolvedValue({ data: legacy })
 

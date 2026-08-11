@@ -76,20 +76,38 @@ interface ReportSnapshotDayWire extends Omit<ReportSnapshotDay, 'items'> {
 
 interface ReportSnapshotWire extends Omit<ReportSnapshot, 'days'> {
   days?: ReportSnapshotDayWire[] | null
+  analytics?: ReportAnalyticsWire | null
 }
 
-interface ReportAnalyticsWire extends Omit<ReportAnalytics, 'categoryBreakdown' | 'dailyTrend'> {
-  categoryBreakdown?: ReportCategoryBreakdown[] | null
-  dailyTrend?: ReportDailyTrend[] | null
+interface ReportCategoryBreakdownWire {
+  category: string
+  amount: number
+  percentage: number
+}
+
+interface ReportDailyTrendWire {
+  date: string
+  amount: number
+}
+
+interface ReportAnalyticsWire {
+  totalSpent: number
+  dailyAverage: number
+  categoryBreakdown?: ReportCategoryBreakdownWire[] | null
+  dailyTrend?: ReportDailyTrendWire[] | null
 }
 
 interface ReportDetailWire extends Omit<ReportDetail, 'reportContent' | 'analytics'> {
   reportContent: ReportSnapshotWire
-  analytics?: ReportAnalyticsWire | null
 }
 
-interface ReportExpenseCandidatesWire extends Omit<ReportExpenseCandidates, 'candidates'> {
-  candidates?: ReportExpenseCandidate[] | null
+interface ReportExpenseCandidateWire {
+  transferId: number
+  amount: number
+  occurredOn: string
+  category: string
+  memo: string | null
+  selected: boolean
 }
 
 export interface ReportCreateInput {
@@ -103,14 +121,12 @@ export interface ReportCreateRequest {
   transferIds: number[]
 }
 
-const DECIMAL_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d+)?$/
-
-function requireDecimalString(value: string, field: string): string {
-  if (typeof value !== 'string' || !DECIMAL_PATTERN.test(value)) {
-    throw new TypeError(`${field} must be a nonnegative decimal string.`)
+function normalizeDecimalNumber(value: number, field: string): string {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new TypeError(`${field} must be a nonnegative finite JSON number.`)
   }
 
-  return value
+  return String(value)
 }
 
 function normalizeAnalytics(
@@ -121,42 +137,49 @@ function normalizeAnalytics(
   }
 
   return {
-    totalSpent: requireDecimalString(analytics.totalSpent, 'analytics.totalSpent'),
-    dailyAverage: requireDecimalString(analytics.dailyAverage, 'analytics.dailyAverage'),
+    totalSpent: normalizeDecimalNumber(analytics.totalSpent, 'analytics.totalSpent'),
+    dailyAverage: normalizeDecimalNumber(analytics.dailyAverage, 'analytics.dailyAverage'),
     categoryBreakdown: (analytics.categoryBreakdown ?? []).map((row) => ({
       ...row,
-      amount: requireDecimalString(row.amount, 'analytics.categoryBreakdown.amount'),
-      percentage: requireDecimalString(row.percentage, 'analytics.categoryBreakdown.percentage'),
+      amount: normalizeDecimalNumber(row.amount, 'analytics.categoryBreakdown.amount'),
+      percentage: normalizeDecimalNumber(row.percentage, 'analytics.categoryBreakdown.percentage'),
     })),
     dailyTrend: (analytics.dailyTrend ?? []).map((row) => ({
       ...row,
-      amount: requireDecimalString(row.amount, 'analytics.dailyTrend.amount'),
+      amount: normalizeDecimalNumber(row.amount, 'analytics.dailyTrend.amount'),
     })),
   }
 }
 
 function normalizeReportDetail(report: ReportDetailWire): ReportDetail {
+  const { analytics, ...snapshot } = report.reportContent
+
   return {
     ...report,
     reportContent: {
-      ...report.reportContent,
-      days: (report.reportContent.days ?? []).map((day) => ({
+      ...snapshot,
+      days: (snapshot.days ?? []).map((day) => ({
         ...day,
         items: day.items ?? [],
       })),
     },
-    analytics: normalizeAnalytics(report.analytics),
+    analytics: normalizeAnalytics(analytics),
   }
 }
 
 function normalizeExpenseCandidates(
-  response: ReportExpenseCandidatesWire,
+  tripId: number,
+  candidates: ReportExpenseCandidateWire[] | null,
 ): ReportExpenseCandidates {
   return {
-    tripId: response.tripId,
-    candidates: (response.candidates ?? []).map((candidate) => ({
-      ...candidate,
-      amount: requireDecimalString(candidate.amount, 'candidate.amount'),
+    tripId,
+    candidates: (candidates ?? []).map((candidate) => ({
+      transferId: candidate.transferId,
+      amount: normalizeDecimalNumber(candidate.amount, 'candidate.amount'),
+      occurredDate: candidate.occurredOn,
+      category: candidate.category,
+      displayMemo: candidate.memo,
+      selected: candidate.selected,
     })),
   }
 }
@@ -183,11 +206,11 @@ export async function fetchReports(): Promise<ReportSummary[]> {
 export async function fetchReportExpenseCandidates(
   tripId: number,
 ): Promise<ReportExpenseCandidates> {
-  const response = await httpClient.get<ReportExpenseCandidatesWire>(
+  const response = await httpClient.get<ReportExpenseCandidateWire[] | null>(
     `/api/v1/journeys/${tripId}/report-expense-candidates`,
   )
 
-  return normalizeExpenseCandidates(response.data)
+  return normalizeExpenseCandidates(tripId, response.data)
 }
 
 export async function createReport(input: ReportCreateInput): Promise<ReportDetail> {

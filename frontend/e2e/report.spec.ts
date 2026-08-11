@@ -43,19 +43,19 @@ const reportDetail = {
         ],
       },
     ],
-  },
-  analytics: {
-    totalSpent: '23000.0000',
-    dailyAverage: '2300.0000',
-    categoryBreakdown: [
-      { category: 'FOOD', amount: '18000.0000', percentage: '78.26' },
-      { category: 'OTHER', amount: '5000.0000', percentage: '21.74' },
-    ],
-    dailyTrend: [
-      { date: '2021-07-18', amount: '18000.0000' },
-      { date: '2021-07-19', amount: '5000.0000' },
-      { date: '2021-07-20', amount: '0.0000' },
-    ],
+    analytics: {
+      totalSpent: 23000,
+      dailyAverage: 2300,
+      categoryBreakdown: [
+        { category: 'FOOD', amount: 18000, percentage: 78.26 },
+        { category: 'OTHER', amount: 5000, percentage: 21.74 },
+      ],
+      dailyTrend: [
+        { date: '2021-07-18', amount: 18000 },
+        { date: '2021-07-19', amount: 5000 },
+        { date: '2021-07-20', amount: 0 },
+      ],
+    },
   },
 }
 
@@ -117,27 +117,24 @@ test('selects expenses, prevents duplicate generation, and opens the final repor
       contentType: 'application/json',
       body: JSON.stringify({
         success: true,
-        data: {
-          tripId: 9,
-          candidates: [
-            {
-              transferId: 30,
-              amount: '18000.0000',
-              occurredDate: '2021-07-18',
-              category: 'FOOD',
-              displayMemo: 'Night market',
-              selected: true,
-            },
-            {
-              transferId: 10,
-              amount: '5000.0000',
-              occurredDate: '2021-07-19',
-              category: 'OTHER',
-              displayMemo: null,
-              selected: false,
-            },
-          ],
-        },
+        data: [
+          {
+            transferId: 30,
+            amount: 18000,
+            occurredOn: '2021-07-18',
+            category: 'FOOD',
+            memo: 'Night market',
+            selected: true,
+          },
+          {
+            transferId: 10,
+            amount: 5000,
+            occurredOn: '2021-07-19',
+            category: 'OTHER',
+            memo: null,
+            selected: false,
+          },
+        ],
       }),
     }),
   )
