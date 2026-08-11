@@ -5,8 +5,10 @@ import lombok.RequiredArgsConstructor;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.wallet.dto.request.QrPaymentCreateRequest;
+import me.nawa.wallet.dto.request.QrPaymentPreviewRequest;
 import me.nawa.wallet.dto.request.QrPaymentResolveRequest;
 import me.nawa.wallet.dto.response.QrPaymentCreateResponse;
+import me.nawa.wallet.dto.response.QrPaymentPreviewResponse;
 import me.nawa.wallet.dto.response.QrPaymentResolveResponse;
 import me.nawa.wallet.service.QrPaymentService;
 import org.springframework.http.HttpStatus;
@@ -42,6 +44,17 @@ public class QrPaymentController {
     ) {
         return ApiResponse.success(
             qrPaymentService.resolvePaymentQr(member.getMemberId(), request)
+        );
+    }
+
+    // 요청에 단순 식별자 외에도 결제 시도 조건이 들어가기 때문에 POST
+    @PostMapping("/payment/preview")
+    public ApiResponse<QrPaymentPreviewResponse> previewPayment(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @RequestBody QrPaymentPreviewRequest request
+    ) {
+        return ApiResponse.success(
+            qrPaymentService.previewPayment(member.getMemberId(), request)
         );
     }
 

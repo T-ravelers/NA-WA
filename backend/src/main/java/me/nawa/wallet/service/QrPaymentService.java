@@ -1,8 +1,10 @@
 package me.nawa.wallet.service;
 
 import me.nawa.wallet.dto.request.QrPaymentCreateRequest;
+import me.nawa.wallet.dto.request.QrPaymentPreviewRequest;
 import me.nawa.wallet.dto.request.QrPaymentResolveRequest;
 import me.nawa.wallet.dto.response.QrPaymentCreateResponse;
+import me.nawa.wallet.dto.response.QrPaymentPreviewResponse;
 import me.nawa.wallet.dto.response.QrPaymentResolveResponse;
 
 public interface QrPaymentService {
@@ -15,5 +17,10 @@ public interface QrPaymentService {
     QrPaymentResolveResponse resolvePaymentQr(
         Long memberId,
         QrPaymentResolveRequest request
+    );
+
+    QrPaymentPreviewResponse previewPayment(
+        Long memberId,
+        QrPaymentPreviewRequest request
     );
 }

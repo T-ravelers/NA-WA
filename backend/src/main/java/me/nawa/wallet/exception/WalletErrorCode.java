@@ -145,6 +145,36 @@ public enum WalletErrorCode implements ErrorCode {
         HttpStatus.CONFLICT,
     "WALLET-020",
         "수취인의 지갑을 현재 사용할 수 없습니다."
+    ),
+
+    QR_PAYMENT_AMOUNT_REQUIRED(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-021",
+        "결제 금액을 입력해야 합니다."
+    ),
+
+    QR_PERSONAL_APPOINTMENT_NOT_ALLOWED(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-022",
+        "개인 소비에는 약속을 연결할 수 없습니다."
+    ),
+
+    QR_APPOINTMENT_MEMBERSHIP_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "WALLET-023",
+        "약속 멤버십을 찾을 수 없습니다."
+    ),
+
+    QR_APPOINTMENT_TRIP_NOT_LINKED(
+        HttpStatus.CONFLICT,
+        "WALLET-024",
+        "약속에 연결된 여행이 없습니다."
+    ),
+
+    QR_SHARED_APPOINTMENT_REQUIRED(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-025",
+        "공동 소비에는 약속 정보가 필요합니다."
     );
 
     private final HttpStatus status;

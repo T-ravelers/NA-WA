@@ -5,13 +5,19 @@ import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
+import me.nawa.wallet.domain.QrPaymentAppointmentMembership;
 import me.nawa.wallet.domain.QrPaymentCode;
 import me.nawa.wallet.domain.QrPaymentResolveTarget;
 import me.nawa.wallet.domain.Wallet;
 import me.nawa.wallet.domain.enums.QrPaymentStatus;
+import me.nawa.wallet.domain.enums.SpendingScope;
 import me.nawa.wallet.dto.request.QrPaymentCreateRequest;
+import me.nawa.wallet.dto.request.QrPaymentPreviewRequest;
 import me.nawa.wallet.dto.request.QrPaymentResolveRequest;
 import me.nawa.wallet.dto.response.QrPaymentCreateResponse;
+import me.nawa.wallet.dto.response.QrPaymentPreviewResponse;
+import me.nawa.wallet.dto.response.QrPaymentPreviewResponse.AppointmentInfo;
+import me.nawa.wallet.dto.response.QrPaymentPreviewResponse.TripInfo;
 import me.nawa.wallet.dto.response.QrPaymentResolveResponse;
 import me.nawa.wallet.exception.WalletErrorCode;
 import me.nawa.wallet.mapper.QrPaymentCodeMapper;
@@ -109,6 +115,92 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         );
     }
 
+    @Override
+    @Transactional
+    public QrPaymentPreviewResponse previewPayment(Long memberId, QrPaymentPreviewRequest request) {
+        // 1. QR 토큰, 소비 범위, 약속 id의 형태를 먼저 검증
+        validatePreviewRequest(request);
+
+        // 2. 결제자(로그인 사용자)의 지갑 조회
+        Wallet payerWallet = walletMapper.findByMemberId(memberId);
+
+        if(payerWallet == null){
+            throw new BusinessException(WalletErrorCode.WALLET_NOT_FOUND);
+        }
+
+        // 3. QR 존재/만료/완료/취소/자기 결재/수취 지갑 상태를 검증
+        QrPaymentResolveTarget qrPayment =
+            findAndValidateActiveQr(payerWallet, request.qrToken());
+
+        // 4. 실제 결제 금액 확정
+        // - 고정 QR: QR DB의 amount 사용
+        // - 금액 입력 QR: 요청 amount 사용
+        BigDecimal paymentAmount = resolvePaymentAmount(
+            qrPayment.getAmount(),
+            request.amount()
+        );
+
+        // 5. 공동 소비일 때만 로그인 사용자의 약속 활성 멤버십을 확인
+        QrPaymentPreviewResponse.TripInfo trip = null;
+        QrPaymentPreviewResponse.AppointmentInfo appointment = null;
+
+        if(request.spendingScope() == SpendingScope.SHARED){
+            QrPaymentAppointmentMembership membership =
+                qrPaymentCodeMapper.findActiveAppointmentMembership(
+                    memberId,
+                    request.appointmentId()
+                );
+
+            // 공동 소비인데 membership이 null이면
+            if(membership == null){
+                throw new BusinessException(
+                    WalletErrorCode.QR_APPOINTMENT_MEMBERSHIP_NOT_FOUND
+                );
+            }
+
+            // 공동 소비는 나중에 trip_expense_links에 연결해야 하므로
+            // 해당 약속 멤버십에 여행이 연결되어 있어야 함
+            if(membership.getTripId() == null
+            || membership.getTripTitle() == null){
+                throw new BusinessException(
+                    WalletErrorCode.QR_APPOINTMENT_TRIP_NOT_LINKED
+                );
+            }
+
+            trip = new TripInfo(
+                membership.getTripId(),
+                membership.getTripTitle()
+            );
+
+            appointment = new AppointmentInfo(
+                membership.getAppointmentId(),
+                membership.getAppointmentName()
+            );
+        }
+
+        // 6. 미리보기용 예상 잔액 계산
+        BigDecimal currentBalance = payerWallet.getAvailableBalance();
+        BigDecimal balanceAfter= currentBalance.subtract(paymentAmount);
+
+        // 잔액 부족은 예외가 아니라 결제 불가 상태로 응답
+        boolean canPay = balanceAfter.compareTo(BigDecimal.ZERO) >= 0;
+
+        // 7. 화면에 표시할 미리보기 응답 반환
+        return new QrPaymentPreviewResponse(
+            qrPayment.getQrPaymentCodeId(),
+            qrPayment.getPayeeName(),
+            paymentAmount,
+            currentBalance,
+            balanceAfter,
+            qrPayment.getCurrencyCode(),
+            request.spendingScope(),
+            trip,
+            appointment,
+            canPay,
+            qrPayment.getExpiresAt()
+        );
+    }
+
     private void validateRequest(QrPaymentCreateRequest request){
         if(request == null){
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
@@ -141,6 +233,53 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             || request.qrToken().isBlank()
             || request.qrToken().trim().length() > 255) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+    }
+
+    // QR에 저장된 금액과 욘청 금액을 분기하는 함수
+    private BigDecimal resolvePaymentAmount(
+        // db에 저장되어 있었던 금액 정보
+        BigDecimal qrAmount,
+        // 이번 요청의 금액 정보
+        BigDecimal requestAmount
+    ){
+        // 고정 금액: QR: 프론트가 보낸 amount는 신뢰하지 않고 DB 값을 사용
+        if(qrAmount != null){
+            return qrAmount;
+        }
+
+        //금액 입력 QR: 결재자가 0보다 큰 금액을 반드시 입력
+        if(requestAmount == null
+        || requestAmount.compareTo(BigDecimal.ZERO) <= 0){
+            throw new BusinessException(
+                WalletErrorCode.QR_PAYMENT_AMOUNT_REQUIRED
+            );
+        }
+
+        return requestAmount;
+    }
+
+    // 요청 형식 검증
+    private void validatePreviewRequest(QrPaymentPreviewRequest request) {
+        if (request == null
+            || request.qrToken() == null
+            || request.qrToken().isBlank()
+            || request.spendingScope() == null) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
+        // 개인 소비에는 약속을 연결하면 안 됨
+        if (request.spendingScope() == SpendingScope.PERSONAL
+            && request.appointmentId() != null) {
+            throw new BusinessException(
+                WalletErrorCode.QR_PERSONAL_APPOINTMENT_NOT_ALLOWED
+            );
+        }
+
+        // 공동 소비에는 약속이 필수
+        if (request.spendingScope() == SpendingScope.SHARED
+            && request.appointmentId() == null) {
+            throw new BusinessException(WalletErrorCode.QR_SHARED_APPOINTMENT_REQUIRED);
         }
     }
 
