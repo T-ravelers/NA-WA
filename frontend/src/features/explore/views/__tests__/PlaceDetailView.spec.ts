@@ -35,13 +35,6 @@ vi.mock('../../api/exploreApi', () => ({
     fetchPlaceDetail(placeId, language),
 }))
 
-vi.mock('@/features/journey/api/journeyApi', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/features/journey/api/journeyApi')>()),
-  fetchJourneys: () => fetchJourneys(),
-  addJourneyItem: (journeyId: number, request: { itemId: number; visitDate: string }) =>
-    addJourneyItem(journeyId, request),
-}))
-
 const PlaceDetailView = (await import('../PlaceDetailView.vue')).default
 
 const place = {
