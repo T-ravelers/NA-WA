@@ -166,6 +166,17 @@ function goBack(): void {
   void router.push({ name: 'explore' })
 }
 
+function openAppointments(): void {
+  const current = event.value
+  const itemId = Number(current?.eventId)
+  if (!current || !Number.isSafeInteger(itemId) || itemId <= 0) return
+
+  void router.push({
+    name: 'appointment-list',
+    query: { itemId: String(itemId), itemType: 'EVENT' },
+  })
+}
+
 async function shareEvent(): Promise<void> {
   const current = event.value
   if (!current) return
@@ -541,8 +552,8 @@ function retry(): void {
           <AppButton
             block
             variant="secondary"
-            disabled
             class="h-12 whitespace-nowrap border-success px-2 text-success"
+            @click="openAppointments"
           >
             {{ t('explore.detail.findCompanions') }}
           </AppButton>

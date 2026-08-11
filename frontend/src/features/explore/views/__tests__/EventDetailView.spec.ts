@@ -104,6 +104,11 @@ async function mountView() {
         name: 'journey-detail',
         component: { template: '<div>Journey detail</div>' },
       },
+      {
+        path: '/appointments',
+        name: 'appointment-list',
+        component: { template: '<div>Appointments</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -167,5 +172,18 @@ describe('EventDetailView', () => {
       visitDate: expect.any(String),
     })
     expect(router.currentRoute.value.name).toBe('journey-detail')
+  })
+
+  it('opens the Event appointment list from Find companions', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Find companions')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-list')
+    expect(router.currentRoute.value.query).toEqual({ itemId: '42', itemType: 'EVENT' })
   })
 })
