@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.report.mapper.ReportMapper">
+
+    <resultMap id="reportResultMap"
+               type="me.nawa.report.domain.Report"
+               autoMapping="true">
+        <result property="reportContent"
+                column="report_content"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+    </resultMap>
+
+    <select id="findJourneyForUpdate"
+            resultType="me.nawa.report.domain.ReportJourney">
+        SELECT
+            trip_id,
+            member_id,
+            title,
+            start_date,
+            end_date
+        FROM trips
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="findActiveReportByTripId"
+            resultType="me.nawa.report.domain.Report">
+        SELECT
+            report_id,
+            trip_id,
+            generation_status,
+            locale
+        FROM reports
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+        ORDER BY report_id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findTimelineItemsByTripId"
+            resultType="me.nawa.report.domain.ReportTimelineItem">
+        SELECT
+            ti.trip_item_id,
+            ti.item_id,
+            ti.visit_date,
+            ei.item_type,
+            COALESCE(e.title, p.name) AS title,
+            ti.trip_item_status AS status
+        FROM trip_items ti
+        JOIN explore_items ei
+          ON ei.item_id = ti.item_id
+         AND ei.deleted_at IS NULL
+        LEFT JOIN event e
+          ON e.event_id = ei.item_id
+         AND ei.item_type = 'EVENT'
+         AND e.deleted_at IS NULL
+        LEFT JOIN place p
+          ON p.place_id = ei.item_id
+         AND ei.item_type = 'PLACE'
+         AND p.deleted_at IS NULL
+        WHERE ti.trip_id = #{tripId}
+          AND ti.deleted_at IS NULL
+          AND (
+              (ei.item_type = 'EVENT' AND e.event_id IS NOT NULL)
+              OR (ei.item_type = 'PLACE' AND p.place_id IS NOT NULL)
+          )
+        ORDER BY ti.visit_date ASC,
+                 ti.display_order ASC,
+                 ti.trip_item_id ASC
+    </select>
+
+    <insert id="insertReport" useGeneratedKeys="true" keyProperty="reportId">
+        INSERT INTO reports
+            (trip_id, generation_status, locale, report_content, generated_at)
+        VALUES
+            (#{tripId}, #{generationStatus}, #{locale},
+             #{reportContent,
+               typeHandler=me.nawa.explore.mapper.JsonNodeTypeHandler},
+             CURRENT_TIMESTAMP)
+    </insert>
+
+    <select id="findReportById"
+            resultMap="reportResultMap">
+        SELECT
+            r.report_id,
+            r.trip_id,
+            t.member_id,
+            t.title,
+            t.start_date,
+            t.end_date,
+            r.generation_status,
+            r.locale,
+            r.report_content,
+            r.generated_at,
+            r.created_at
+        FROM reports r
+        JOIN trips t
+          ON t.trip_id = r.trip_id
+         AND t.deleted_at IS NULL
+        WHERE r.report_id = #{reportId}
+          AND r.deleted_at IS NULL
+    </select>
+
+    <select id="findReportsByMemberId"
+            resultType="me.nawa.report.domain.Report">
+        SELECT
+            r.report_id,
+            r.trip_id,
+            t.member_id,
+            t.title,
+            t.start_date,
+            t.end_date,
+            r.generation_status,
+            r.locale,
+            r.generated_at,
+            r.created_at
+        FROM reports r
+        JOIN trips t
+          ON t.trip_id = r.trip_id
+         AND t.deleted_at IS NULL
+        WHERE t.member_id = #{memberId}
+          AND r.deleted_at IS NULL
+        ORDER BY r.created_at DESC,
+                 r.report_id DESC
+    </select>
+
+</mapper>

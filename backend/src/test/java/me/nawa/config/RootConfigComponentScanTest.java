@@ -1,6 +1,8 @@
 package me.nawa.config;
 
 import me.nawa.member.service.MemberProfileServiceImpl;
+import me.nawa.report.mapper.ReportMapper;
+import me.nawa.report.service.ReportService;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ComponentScan;
 import org.mybatis.spring.annotation.MapperScan;
@@ -30,6 +32,23 @@ class RootConfigComponentScanTest {
 
         assertTrue(Arrays.asList(mapperScan.basePackages()).contains(
                 "me.nawa.deposit.mapper"
+        ));
+    }
+
+    @Test
+    void reportPackages_areRegisteredInRootConfig() {
+        ComponentScan componentScan = RootConfig.class.getAnnotation(
+                ComponentScan.class
+        );
+        MapperScan mapperScan = RootConfig.class.getAnnotation(
+                MapperScan.class
+        );
+
+        assertTrue(Arrays.asList(componentScan.basePackages()).contains(
+                ReportService.class.getPackageName()
+        ));
+        assertTrue(Arrays.asList(mapperScan.basePackages()).contains(
+                ReportMapper.class.getPackageName()
         ));
     }
 }
