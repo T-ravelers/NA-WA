@@ -4,5 +4,367 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="me.nawa.settlement.mapper.SettlementMapper">
+    <select id="findDetail" resultType="me.nawa.settlement.domain.SettlementDetail">
+        SELECT s.settlement_id, s.split_method, s.total_amount, s.settlement_status,
+               creator.display_name AS requested_by, a.appointment_name AS gathering_name,
+               COALESCE(t.memo, a.appointment_name) AS merchant_name,
+               t.transfer_number, payer.display_name AS paid_by
+        FROM settlements s
+        JOIN appointments a ON a.appointment_id = s.appointment_id
+        JOIN wallet_transfers t ON t.transfer_id = s.source_transfer_id
+        JOIN members creator ON creator.member_id = s.created_by_member_id
+        JOIN members payer ON payer.member_id = s.payer_member_id
+        WHERE s.settlement_id = #{settlementId} AND s.deleted_at IS NULL
+          AND (s.created_by_member_id = #{memberId} OR EXISTS (
+              SELECT 1 FROM settlement_members sm
+              JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+              WHERE sm.settlement_id = s.settlement_id AND am.member_id = #{memberId}
+                AND sm.deleted_at IS NULL AND am.deleted_at IS NULL
+          ))
+    </select>
+
+    <select id="findItemNames" resultType="string">
+        SELECT item_name FROM settlement_items
+        WHERE settlement_id = #{settlementId} AND deleted_at IS NULL
+        ORDER BY source_order, settlement_item_id
+    </select>
+
+    <select id="findCandidateSources" resultType="me.nawa.settlement.domain.SettlementSource">
+        SELECT DISTINCT t.transfer_id, am.appointment_id, t.initiator_member_id AS payer_member_id,
+               t.amount, tr.title AS journey_name, a.appointment_name AS gathering_name,
+               a.appointment_name AS merchant_name, t.completed_at AS paid_at, payer.display_name AS payer_name
+        FROM wallet_transfers t
+        JOIN wallet_ledger_entries le ON le.transfer_id = t.transfer_id AND le.entry_type = 'DEBIT'
+        JOIN trip_expense_links tel ON tel.ledger_entry_id = le.ledger_entry_id
+        JOIN appointment_members am ON am.appointment_member_id = tel.appointment_member_id
+        JOIN appointments a ON a.appointment_id = am.appointment_id
+        LEFT JOIN trips tr ON tr.trip_id = tel.trip_id
+        JOIN members payer ON payer.member_id = t.initiator_member_id
+        LEFT JOIN settlements s ON s.source_transfer_id = t.transfer_id AND s.deleted_at IS NULL
+        WHERE t.initiator_member_id = #{memberId} AND t.transfer_status = 'COMPLETED'
+          AND s.settlement_id IS NULL AND t.deleted_at IS NULL
+        ORDER BY t.completed_at DESC, t.transfer_id DESC
+    </select>
+
+    <select id="findParticipants" resultType="me.nawa.settlement.domain.SettlementParticipant">
+        SELECT am.member_id, m.display_name
+        FROM appointment_members am
+        JOIN members m ON m.member_id = am.member_id
+        WHERE am.appointment_id = #{appointmentId}
+          AND am.membership_status = 'ACTIVE' AND am.deleted_at IS NULL
+        ORDER BY am.appointment_member_id
+    </select>
+
+    <select id="findReceivedSummaries" resultType="me.nawa.settlement.domain.SettlementSummary">
+        SELECT s.settlement_id, a.appointment_name AS title, sm.share_amount AS amount,
+               s.split_method, s.settlement_status
+        FROM settlement_members sm
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        JOIN settlements s ON s.settlement_id = sm.settlement_id
+        JOIN appointments a ON a.appointment_id = s.appointment_id
+        WHERE am.member_id = #{memberId}
+          AND s.created_by_member_id != #{memberId}
+          AND s.deleted_at IS NULL AND sm.deleted_at IS NULL
+        ORDER BY s.requested_at DESC, s.settlement_id DESC
+    </select>
+
+    <select id="findSentSummaries" resultType="me.nawa.settlement.domain.SettlementSummary">
+        SELECT s.settlement_id, a.appointment_name AS title, s.receivable_amount AS amount,
+               s.split_method, s.settlement_status
+        FROM settlements s
+        JOIN appointments a ON a.appointment_id = s.appointment_id
+        WHERE s.created_by_member_id = #{memberId} AND s.deleted_at IS NULL
+        ORDER BY s.requested_at DESC, s.settlement_id DESC
+    </select>
+
+    <select id="findSourceForCreate" resultType="me.nawa.settlement.domain.SettlementSource">
+        SELECT t.transfer_id, am.appointment_id, t.initiator_member_id AS payer_member_id, t.amount
+        FROM wallet_transfers t
+        JOIN wallet_ledger_entries le ON le.transfer_id = t.transfer_id AND le.entry_type = 'DEBIT'
+        JOIN trip_expense_links tel ON tel.ledger_entry_id = le.ledger_entry_id
+        JOIN appointment_members am ON am.appointment_member_id = tel.appointment_member_id
+        WHERE t.transfer_id = #{sourceTransferId}
+          AND t.initiator_member_id = #{memberId}
+          AND t.transfer_status = 'COMPLETED'
+          AND t.deleted_at IS NULL
+          AND am.membership_status = 'ACTIVE'
+        LIMIT 1
+    </select>
+
+    <select id="findActiveMembers" resultType="me.nawa.settlement.domain.SettlementMember">
+        SELECT appointment_member_id, member_id
+        FROM appointment_members
+        WHERE appointment_id = #{appointmentId}
+          AND membership_status = 'ACTIVE'
+          AND deleted_at IS NULL
+        ORDER BY appointment_member_id
+    </select>
+
+    <select id="findByIdForUpdate" resultType="me.nawa.settlement.domain.Settlement">
+        SELECT settlement_id, appointment_id, created_by_member_id, payer_member_id,
+               source_transfer_id, settlement_status, split_method, total_amount,
+               payer_share_amount, receivable_amount, requested_at, memo, version
+        FROM settlements
+        WHERE settlement_id = #{settlementId} AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="findById" resultType="me.nawa.settlement.domain.Settlement">
+        SELECT settlement_id, appointment_id, created_by_member_id, payer_member_id, source_transfer_id,
+               settlement_status, split_method, total_amount, payer_share_amount, receivable_amount
+        FROM settlements
+        WHERE settlement_id = #{settlementId} AND deleted_at IS NULL
+    </select>
+
+    <select id="findMembersBySettlementIdForUpdate" resultType="me.nawa.settlement.domain.SettlementMember">
+        SELECT sm.settlement_member_id, sm.settlement_id, sm.appointment_member_id,
+               am.member_id, sm.share_amount, sm.request_status, sm.paid_transfer_id
+        FROM settlement_members sm
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        WHERE sm.settlement_id = #{settlementId} AND sm.deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <insert id="insertSettlement" useGeneratedKeys="true" keyProperty="settlementId">
+        INSERT INTO settlements (
+            appointment_id, created_by_member_id, payer_member_id, source_transfer_id,
+            settlement_status, split_method, total_amount, payer_share_amount,
+            receivable_amount, requested_at, memo
+        ) VALUES (
+            #{appointmentId}, #{createdByMemberId}, #{payerMemberId}, #{sourceTransferId},
+            #{settlementStatus}, #{splitMethod}, #{totalAmount}, #{payerShareAmount},
+            #{receivableAmount}, #{requestedAt}, #{memo}
+        )
+    </insert>
+
+    <insert id="insertSettlementMembers">
+        INSERT INTO settlement_members (settlement_id, appointment_member_id, share_amount, request_status)
+        VALUES
+        <foreach collection="members" item="member" separator=",">
+            (#{member.settlementId}, #{member.appointmentMemberId}, #{member.shareAmount}, #{member.requestStatus})
+        </foreach>
+    </insert>
+
+    <insert id="insertSettlementItems">
+        INSERT INTO settlement_items (settlement_id, item_name, unit_price, quantity, line_total, source_order)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.settlementId}, #{item.itemName}, #{item.unitPrice}, #{item.quantity}, #{item.lineTotal}, #{item.sourceOrder})
+        </foreach>
+    </insert>
+
+    <select id="findReceiptAnalysisForUpdate" resultType="me.nawa.settlement.domain.ReceiptAnalysis">
+        SELECT receipt_analysis_id, source_transfer_id, appointment_id, created_by_member_id,
+               original_file_name, analysis_status, recognized_total
+        FROM receipt_analyses
+        WHERE receipt_analysis_id = #{receiptAnalysisId} AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <insert id="insertReceiptAnalysis" useGeneratedKeys="true" keyProperty="receiptAnalysisId">
+        INSERT INTO receipt_analyses (
+            source_transfer_id, appointment_id, created_by_member_id, original_file_name,
+            analysis_status, recognized_total
+        ) VALUES (
+            #{sourceTransferId}, #{appointmentId}, #{createdByMemberId}, #{originalFileName},
+            #{analysisStatus}, #{recognizedTotal}
+        )
+    </insert>
+
+    <update id="deleteReceiptItems">
+        UPDATE receipt_analysis_items SET deleted_at = CURRENT_TIMESTAMP
+        WHERE receipt_analysis_id = #{receiptAnalysisId} AND deleted_at IS NULL
+    </update>
+
+    <insert id="insertReceiptItems">
+        INSERT INTO receipt_analysis_items (
+            receipt_analysis_id, item_name, unit_price, quantity, line_total, source_order
+        ) VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.receiptAnalysisId}, #{item.itemName}, #{item.unitPrice}, #{item.quantity},
+             #{item.lineTotal}, #{item.sourceOrder})
+        </foreach>
+    </insert>
+
+    <update id="updateReceiptTotal">
+        UPDATE receipt_analyses SET recognized_total = #{recognizedTotal}
+        WHERE receipt_analysis_id = #{receiptAnalysisId} AND analysis_status = 'DRAFT'
+    </update>
+
+    <select id="findReceiptItemsForUpdate" resultType="me.nawa.settlement.domain.ReceiptAnalysisItem">
+        SELECT receipt_analysis_item_id, receipt_analysis_id, item_name, unit_price,
+               quantity, line_total, source_order
+        FROM receipt_analysis_items
+        WHERE receipt_analysis_id = #{receiptAnalysisId} AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <update id="deleteReceiptAllocations">
+        UPDATE receipt_item_allocations ria
+        JOIN receipt_analysis_items rai ON rai.receipt_analysis_item_id = ria.receipt_analysis_item_id
+        SET ria.deleted_at = CURRENT_TIMESTAMP
+        WHERE rai.receipt_analysis_id = #{receiptAnalysisId} AND ria.deleted_at IS NULL
+    </update>
+
+    <insert id="insertReceiptAllocations">
+        INSERT INTO receipt_item_allocations (
+            receipt_analysis_item_id, appointment_member_id, allocated_quantity, allocated_amount
+        ) VALUES
+        <foreach collection="allocations" item="allocation" separator=",">
+            (#{allocation.receiptAnalysisItemId}, #{allocation.appointmentMemberId},
+             #{allocation.allocatedQuantity}, #{allocation.allocatedAmount})
+        </foreach>
+    </insert>
+
+    <update id="markReceiptAllocated">
+        UPDATE receipt_analyses SET analysis_status = 'ALLOCATED'
+        WHERE receipt_analysis_id = #{receiptAnalysisId} AND analysis_status = 'DRAFT'
+    </update>
+
+    <select id="findReceiptAllocationViews" resultType="me.nawa.settlement.domain.ReceiptAllocationView">
+        SELECT am.member_id, SUM(ria.allocated_amount) AS allocated_amount
+        FROM receipt_item_allocations ria
+        JOIN receipt_analysis_items rai ON rai.receipt_analysis_item_id = ria.receipt_analysis_item_id
+        JOIN appointment_members am ON am.appointment_member_id = ria.appointment_member_id
+        WHERE rai.receipt_analysis_id = #{receiptAnalysisId}
+          AND ria.deleted_at IS NULL AND rai.deleted_at IS NULL
+        GROUP BY am.member_id
+    </select>
+
+    <insert id="copyReceiptItemsToSettlement">
+        INSERT INTO settlement_items (settlement_id, item_name, unit_price, quantity, line_total, source_order)
+        SELECT #{settlementId}, item_name, unit_price, quantity, line_total, source_order
+        FROM receipt_analysis_items
+        WHERE receipt_analysis_id = #{receiptAnalysisId} AND deleted_at IS NULL
+        ORDER BY source_order
+    </insert>
+
+    <insert id="copyReceiptItemSharesToSettlement">
+        INSERT INTO settlement_item_shares (
+            settlement_item_id, settlement_member_id, allocated_quantity, allocated_amount
+        )
+        SELECT si.settlement_item_id, sm.settlement_member_id,
+               ria.allocated_quantity, ria.allocated_amount
+        FROM receipt_item_allocations ria
+        JOIN receipt_analysis_items rai ON rai.receipt_analysis_item_id = ria.receipt_analysis_item_id
+        JOIN settlement_items si ON si.settlement_id = #{settlementId}
+            AND si.source_order = rai.source_order AND si.deleted_at IS NULL
+        JOIN settlement_members sm ON sm.settlement_id = #{settlementId}
+            AND sm.appointment_member_id = ria.appointment_member_id AND sm.deleted_at IS NULL
+        WHERE rai.receipt_analysis_id = #{receiptAnalysisId}
+          AND rai.deleted_at IS NULL AND ria.deleted_at IS NULL
+    </insert>
+
+    <update id="markReceiptUsed">
+        UPDATE receipt_analyses SET analysis_status = 'USED'
+        WHERE receipt_analysis_id = #{receiptAnalysisId} AND analysis_status = 'ALLOCATED'
+    </update>
+
+    <insert id="insertSettlementGame">
+        INSERT INTO settlement_games (settlement_id, game_type, liable_count, game_status)
+        VALUES (#{settlementId}, #{gameType}, #{liableCount}, #{gameStatus})
+    </insert>
+
+    <insert id="insertSettlementGameMembers">
+        INSERT INTO settlement_game_members (settlement_id, appointment_member_id, consent_status, is_liable)
+        VALUES
+        <foreach collection="members" item="member" separator=",">
+            (#{member.settlementId}, #{member.appointmentMemberId}, #{member.consentStatus}, #{member.liable})
+        </foreach>
+    </insert>
+
+    <select id="findSettlementGameForUpdate" resultType="me.nawa.settlement.domain.SettlementGame">
+        SELECT settlement_id, game_type, liable_count, game_status, random_seed
+        FROM settlement_games
+        WHERE settlement_id = #{settlementId}
+        FOR UPDATE
+    </select>
+
+    <select id="findSettlementGame" resultType="me.nawa.settlement.domain.SettlementGame">
+        SELECT settlement_id, game_type, liable_count, game_status, random_seed
+        FROM settlement_games
+        WHERE settlement_id = #{settlementId}
+    </select>
+
+    <update id="updateGameConsent">
+        UPDATE settlement_game_members sgm
+        JOIN appointment_members am ON am.appointment_member_id = sgm.appointment_member_id
+        JOIN settlement_games sg ON sg.settlement_id = sgm.settlement_id
+        SET sgm.consent_status = #{consentStatus}, sgm.responded_at = CURRENT_TIMESTAMP
+        WHERE sgm.settlement_id = #{settlementId} AND am.member_id = #{memberId}
+          AND sgm.consent_status = 'PENDING' AND sg.game_status = 'WAITING_CONSENT'
+    </update>
+
+    <select id="findGameMembersForUpdate" resultType="me.nawa.settlement.domain.SettlementGameMember">
+        SELECT sgm.settlement_id, sgm.appointment_member_id, am.member_id,
+               sgm.consent_status, sgm.is_liable AS liable
+        FROM settlement_game_members sgm
+        JOIN appointment_members am ON am.appointment_member_id = sgm.appointment_member_id
+        WHERE sgm.settlement_id = #{settlementId}
+        FOR UPDATE
+    </select>
+
+    <select id="findGameMembers" resultType="me.nawa.settlement.domain.SettlementGameMember">
+        SELECT sgm.settlement_id, sgm.appointment_member_id, am.member_id,
+               sgm.consent_status, sgm.is_liable AS liable
+        FROM settlement_game_members sgm
+        JOIN appointment_members am ON am.appointment_member_id = sgm.appointment_member_id
+        WHERE sgm.settlement_id = #{settlementId}
+    </select>
+
+    <update id="assignGameLiables">
+        UPDATE settlement_game_members
+        SET is_liable = CASE WHEN appointment_member_id IN
+            <foreach collection="appointmentMemberIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+            THEN TRUE ELSE FALSE END
+        WHERE settlement_id = #{settlementId}
+    </update>
+
+    <update id="activateGameSettlement">
+        UPDATE settlements SET settlement_status = 'REQUESTED', payer_share_amount = #{payerShareAmount},
+            receivable_amount = #{receivableAmount}, requested_at = CURRENT_TIMESTAMP, version = version + 1
+        WHERE settlement_id = #{settlementId} AND settlement_status = 'DRAFT'
+    </update>
+
+    <update id="completeGame">
+        UPDATE settlement_games SET game_status = 'COMPLETED', random_seed = #{randomSeed},
+            completed_at = CURRENT_TIMESTAMP
+        WHERE settlement_id = #{settlementId} AND game_status = 'WAITING_CONSENT'
+    </update>
+
+    <update id="markSettlementMemberPaid">
+        UPDATE settlement_members
+        SET request_status = 'PAID', paid_transfer_id = #{transferId}, paid_at = CURRENT_TIMESTAMP
+        WHERE settlement_member_id = #{settlementMemberId}
+          AND request_status = 'PENDING'
+          AND paid_transfer_id IS NULL
+    </update>
+
+    <update id="completeSettlementIfNoPendingPayments">
+        UPDATE settlements
+        SET settlement_status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, version = version + 1
+        WHERE settlement_id = #{settlementId}
+          AND settlement_status = 'REQUESTED'
+          AND NOT EXISTS (
+              SELECT 1 FROM settlement_members
+              WHERE settlement_id = #{settlementId} AND request_status = 'PENDING' AND deleted_at IS NULL
+          )
+    </update>
+
+    <update id="cancelSettlement">
+        UPDATE settlements
+        SET settlement_status = 'CANCELLED', canceled_by_member_id = #{memberId},
+            canceled_at = CURRENT_TIMESTAMP, version = version + 1
+        WHERE settlement_id = #{settlementId}
+          AND created_by_member_id = #{memberId}
+          AND settlement_status = 'REQUESTED'
+          AND deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM settlement_members
+              WHERE settlement_id = #{settlementId} AND request_status = 'PAID'
+          )
+    </update>
 
 </mapper>
