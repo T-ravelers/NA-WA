@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -158,6 +161,119 @@ class ReportConcurrencyIntegrationTest {
         }
     }
 
+    @Test
+    void softDeletedExpenseLink_isHiddenAndRejectedAsConflict() {
+        long memberId = insertMember();
+        long tripId = insertEndedJourney(memberId);
+        long walletOwnerId = 0L;
+        long walletId = 0L;
+        long transferId = 0L;
+        long ledgerEntryId = 0L;
+
+        try {
+            walletOwnerId = insertWalletOwner(memberId);
+            walletId = insertWallet(walletOwnerId);
+            transferId = insertExpenseTransfer(memberId);
+            ledgerEntryId = insertDebitLedgerEntry(transferId, walletId);
+            jdbcTemplate.update(
+                """
+                INSERT INTO trip_expense_links (
+                    trip_id, ledger_entry_id, deleted_at
+                ) VALUES (?, ?, CURRENT_TIMESTAMP)
+                """,
+                tripId,
+                ledgerEntryId
+            );
+
+            TransactionTemplate readOnly = new TransactionTemplate(
+                transactionManager
+            );
+            readOnly.setReadOnly(true);
+            assertEquals(
+                List.of(),
+                readOnly.execute(status -> reportService.getExpenseCandidates(
+                    memberId,
+                    tripId
+                ))
+            );
+
+            ReportCreateRequest request = new ReportCreateRequest();
+            request.setTransferIds(List.of(transferId));
+            BusinessException conflict = org.junit.jupiter.api.Assertions
+                .assertThrows(
+                    BusinessException.class,
+                    () -> new TransactionTemplate(transactionManager).execute(
+                        status -> reportService.createReport(
+                            memberId,
+                            tripId,
+                            request
+                        )
+                    )
+                );
+
+            assertEquals(
+                ReportErrorCode.REPORT_EXPENSE_ALREADY_LINKED,
+                conflict.getErrorCode()
+            );
+            assertEquals("REPORT-008", conflict.getErrorCode().getCode());
+            assertEquals(
+                0,
+                jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM reports WHERE trip_id = ?",
+                    Integer.class,
+                    tripId
+                )
+            );
+            assertEquals(
+                1,
+                jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*)
+                    FROM trip_expense_links
+                    WHERE ledger_entry_id = ? AND deleted_at IS NOT NULL
+                    """,
+                    Integer.class,
+                    ledgerEntryId
+                )
+            );
+        } finally {
+            if (ledgerEntryId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM trip_expense_links WHERE ledger_entry_id = ?",
+                    ledgerEntryId
+                );
+                jdbcTemplate.update(
+                    "DELETE FROM wallet_ledger_entries WHERE ledger_entry_id = ?",
+                    ledgerEntryId
+                );
+            }
+            jdbcTemplate.update("DELETE FROM reports WHERE trip_id = ?", tripId);
+            if (transferId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM wallet_transfers WHERE transfer_id = ?",
+                    transferId
+                );
+            }
+            if (walletId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM wallets WHERE wallet_id = ?",
+                    walletId
+                );
+            }
+            if (walletOwnerId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM wallet_owners WHERE wallet_owner_id = ?",
+                    walletOwnerId
+                );
+            }
+            jdbcTemplate.update("DELETE FROM trips WHERE trip_id = ?", tripId);
+            jdbcTemplate.update(
+                "DELETE FROM members WHERE member_id = ?",
+                memberId
+            );
+        }
+    }
+
     private CreationOutcome createReport(
         long memberId,
         long tripId,
@@ -206,6 +322,86 @@ class ReportConcurrencyIntegrationTest {
                 "title", "Concurrent Report Journey",
                 "start_date", endDate.minusDays(2),
                 "end_date", endDate
+            ));
+        return key.longValue();
+    }
+
+    private long insertWalletOwner(long memberId) {
+        Number key = new SimpleJdbcInsert(dataSource)
+            .withTableName("wallet_owners")
+            .usingColumns("member_id", "owner_type")
+            .usingGeneratedKeyColumns("wallet_owner_id")
+            .executeAndReturnKey(Map.of(
+                "member_id", memberId,
+                "owner_type", "MEMBER"
+            ));
+        return key.longValue();
+    }
+
+    private long insertWallet(long walletOwnerId) {
+        Number key = new SimpleJdbcInsert(dataSource)
+            .withTableName("wallets")
+            .usingColumns(
+                "wallet_owner_id",
+                "currency_code",
+                "available_balance"
+            )
+            .usingGeneratedKeyColumns("wallet_id")
+            .executeAndReturnKey(Map.of(
+                "wallet_owner_id", walletOwnerId,
+                "currency_code", "KRW",
+                "available_balance", new BigDecimal("100000.0000")
+            ));
+        return key.longValue();
+    }
+
+    private long insertExpenseTransfer(long memberId) {
+        Number key = new SimpleJdbcInsert(dataSource)
+            .withTableName("wallet_transfers")
+            .usingColumns(
+                "currency_code",
+                "initiator_member_id",
+                "transfer_number",
+                "transfer_type",
+                "transfer_status",
+                "amount",
+                "spending_category",
+                "memo",
+                "completed_at"
+            )
+            .usingGeneratedKeyColumns("transfer_id")
+            .executeAndReturnKey(Map.of(
+                "currency_code", "KRW",
+                "initiator_member_id", memberId,
+                "transfer_number", "REPORT-EXP-" + UUID.randomUUID()
+                    .toString().replace("-", ""),
+                "transfer_type", "QR_PAYMENT",
+                "transfer_status", "COMPLETED",
+                "amount", new BigDecimal("12000.0000"),
+                "spending_category", "FOOD",
+                "memo", "Report integration expense",
+                "completed_at", LocalDateTime.now(KOREA_ZONE).minusDays(2)
+            ));
+        return key.longValue();
+    }
+
+    private long insertDebitLedgerEntry(long transferId, long walletId) {
+        Number key = new SimpleJdbcInsert(dataSource)
+            .withTableName("wallet_ledger_entries")
+            .usingColumns(
+                "transfer_id",
+                "wallet_id",
+                "entry_type",
+                "amount",
+                "balance_after"
+            )
+            .usingGeneratedKeyColumns("ledger_entry_id")
+            .executeAndReturnKey(Map.of(
+                "transfer_id", transferId,
+                "wallet_id", walletId,
+                "entry_type", "DEBIT",
+                "amount", new BigDecimal("12000.0000"),
+                "balance_after", new BigDecimal("88000.0000")
             ));
         return key.longValue();
     }

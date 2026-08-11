@@ -13,6 +13,8 @@ public interface ReportMapper {
 
     ReportJourney findJourneyForUpdate(@Param("tripId") Long tripId);
 
+    ReportJourney findJourneyById(@Param("tripId") Long tripId);
+
     Report findActiveReportByTripId(@Param("tripId") Long tripId);
 
     List<ReportTimelineItem> findTimelineItemsByTripId(

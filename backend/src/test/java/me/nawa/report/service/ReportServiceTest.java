@@ -2,6 +2,7 @@ package me.nawa.report.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -10,12 +11,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.report.domain.Report;
+import me.nawa.report.domain.ReportExpense;
 import me.nawa.report.domain.ReportJourney;
 import me.nawa.report.domain.ReportTimelineItem;
 import me.nawa.report.dto.request.ReportCreateRequest;
@@ -145,6 +149,121 @@ class ReportServiceTest {
     }
 
     @Test
+    void createReport_linksSelectedExpensesAndStoresAnalytics() {
+        ReportCreateRequest request = new ReportCreateRequest();
+        request.setTransferIds(List.of(11L, 12L));
+        List<ReportExpense> expenses = List.of(
+            expense(11L, 101L, "10000.00", LocalDate.of(2026, 8, 1), "FOOD"),
+            expense(12L, 102L, "5000.00", LocalDate.of(2026, 8, 3), " ")
+        );
+        when(reportMapper.findJourneyForUpdate(1L)).thenReturn(completedJourney());
+        when(reportMapper.findEligibleExpensesForUpdate(
+            1L,
+            1L,
+            List.of(11L, 12L)
+        )).thenReturn(expenses);
+        when(reportMapper.findActiveReportByTripId(1L)).thenReturn(null);
+        when(reportMapper.findLinkedTripIdByLedgerEntryId(101L)).thenReturn(null);
+        when(reportMapper.findLinkedTripIdByLedgerEntryId(102L)).thenReturn(null);
+        when(reportMapper.findTimelineItemsByTripId(1L)).thenReturn(List.of());
+
+        AtomicReference<Report> insertedReport = new AtomicReference<>();
+        doAnswer(invocation -> {
+            Report report = invocation.getArgument(0);
+            report.setReportId(100L);
+            insertedReport.set(report);
+            return null;
+        }).when(reportMapper).insertReport(any(Report.class));
+        when(reportMapper.findReportById(100L)).thenAnswer(
+            invocation -> persistedReport(insertedReport.get())
+        );
+
+        ReportDetailResponse result = reportService.createReport(
+            1L,
+            1L,
+            request
+        );
+
+        verify(reportMapper).insertTripExpenseLink(1L, 101L);
+        verify(reportMapper).insertTripExpenseLink(1L, 102L);
+        assertDecimalEquals(
+            "15000.00",
+            result.getReportContent().getAnalytics().getTotalSpent()
+        );
+        assertDecimalEquals(
+            "3000.00",
+            result.getReportContent().getAnalytics().getDailyAverage()
+        );
+        assertEquals(
+            List.of("FOOD", "OTHER"),
+            result.getReportContent().getAnalytics().getCategoryBreakdown()
+                .stream().map(row -> row.getCategory()).toList()
+        );
+        assertDecimalEquals(
+            "66.67",
+            result.getReportContent().getAnalytics().getCategoryBreakdown()
+                .get(0).getPercentage()
+        );
+        assertEquals(
+            5,
+            result.getReportContent().getAnalytics().getDailyTrend().size()
+        );
+        assertDecimalEquals(
+            "0",
+            result.getReportContent().getAnalytics().getDailyTrend()
+                .get(1).getAmount()
+        );
+        assertDecimalEquals(
+            "5000.00",
+            result.getReportContent().getAnalytics().getDailyTrend()
+                .get(2).getAmount()
+        );
+    }
+
+    @Test
+    void createReport_sameSelectionReturnsExistingReportWithoutInserts() {
+        ReportCreateRequest request = new ReportCreateRequest();
+        request.setTransferIds(List.of(11L));
+        ReportExpense expense = expense(
+            11L,
+            101L,
+            "10000.00",
+            LocalDate.of(2026, 8, 1),
+            "FOOD"
+        );
+        when(reportMapper.findJourneyForUpdate(1L)).thenReturn(completedJourney());
+        when(reportMapper.findEligibleExpensesForUpdate(1L, 1L, List.of(11L)))
+            .thenReturn(List.of(expense));
+        when(reportMapper.findActiveReportByTripId(1L)).thenReturn(
+            Report.builder().reportId(100L).tripId(1L).build()
+        );
+        when(reportMapper.findLinkedLedgerEntryIdsByTripId(1L)).thenReturn(
+            List.of(101L)
+        );
+        when(reportMapper.findReportById(100L)).thenReturn(savedReport());
+
+        ReportDetailResponse result = reportService.createReport(
+            1L,
+            1L,
+            request
+        );
+
+        assertEquals(100L, result.getReportId());
+        verify(reportMapper, never()).insertTripExpenseLink(any(), any());
+        verify(reportMapper, never()).insertReport(any(Report.class));
+    }
+
+    @Test
+    void createReport_rejectsExpenseLinkedToAnotherJourney() {
+        assertLinkedExpenseRejected(2L);
+    }
+
+    @Test
+    void createReport_rejectsSoftDeletedSameJourneyExpenseLink() {
+        assertLinkedExpenseRejected(1L);
+    }
+
+    @Test
     void createReport_rejectsJourneyThatHasNotEndedInKorea() {
         ReportJourney journey = ReportJourney.builder()
             .tripId(1L)
@@ -203,6 +322,27 @@ class ReportServiceTest {
     }
 
     @Test
+    void getExpenseCandidates_usesNonLockingJourneyLookup() {
+        when(reportMapper.findJourneyById(1L)).thenReturn(completedJourney());
+        when(reportMapper.findExpenseCandidates(1L, 1L)).thenReturn(List.of(
+            expense(
+                11L,
+                101L,
+                "10000.00",
+                LocalDate.of(2026, 8, 1),
+                "FOOD"
+            )
+        ));
+
+        var result = reportService.getExpenseCandidates(1L, 1L);
+
+        assertEquals(1, result.size());
+        assertEquals(LocalDate.of(2026, 8, 1), result.get(0).getOccurredOn());
+        verify(reportMapper).findJourneyById(1L);
+        verify(reportMapper, never()).findJourneyForUpdate(1L);
+    }
+
+    @Test
     void getReport_returnsStoredSnapshotAsTypedResponse() {
         when(reportMapper.findReportById(100L)).thenReturn(savedReport());
 
@@ -215,6 +355,7 @@ class ReportServiceTest {
             LocalDate.of(2026, 8, 2),
             result.getReportContent().getDays().get(0).getVisitDate()
         );
+        assertNull(result.getReportContent().getAnalytics());
     }
 
     @Test
@@ -254,6 +395,74 @@ class ReportServiceTest {
             .startDate(LocalDate.of(2026, 8, 1))
             .endDate(LocalDate.of(2026, 8, 5))
             .build();
+    }
+
+    private void assertLinkedExpenseRejected(Long linkedTripId) {
+        ReportCreateRequest request = new ReportCreateRequest();
+        request.setTransferIds(List.of(11L));
+        ReportExpense expense = expense(
+            11L,
+            101L,
+            "10000.00",
+            LocalDate.of(2026, 8, 1),
+            "FOOD"
+        );
+        when(reportMapper.findJourneyForUpdate(1L)).thenReturn(completedJourney());
+        when(reportMapper.findEligibleExpensesForUpdate(1L, 1L, List.of(11L)))
+            .thenReturn(List.of(expense));
+        when(reportMapper.findActiveReportByTripId(1L)).thenReturn(null);
+        when(reportMapper.findLinkedTripIdByLedgerEntryId(101L)).thenReturn(
+            linkedTripId
+        );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> reportService.createReport(1L, 1L, request)
+        );
+
+        assertEquals(
+            ReportErrorCode.REPORT_EXPENSE_ALREADY_LINKED,
+            exception.getErrorCode()
+        );
+        verify(reportMapper, never()).insertTripExpenseLink(any(), any());
+        verify(reportMapper, never()).insertReport(any(Report.class));
+    }
+
+    private ReportExpense expense(
+        Long transferId,
+        Long ledgerEntryId,
+        String amount,
+        LocalDate occurredOn,
+        String category
+    ) {
+        return ReportExpense.builder()
+            .transferId(transferId)
+            .ledgerEntryId(ledgerEntryId)
+            .amount(new BigDecimal(amount))
+            .occurredOn(occurredOn)
+            .category(category)
+            .memo("Expense " + transferId)
+            .build();
+    }
+
+    private Report persistedReport(Report inserted) {
+        return Report.builder()
+            .reportId(inserted.getReportId())
+            .tripId(inserted.getTripId())
+            .memberId(1L)
+            .title("Seoul Foodie Week")
+            .startDate(LocalDate.of(2026, 8, 1))
+            .endDate(LocalDate.of(2026, 8, 5))
+            .generationStatus(inserted.getGenerationStatus())
+            .locale(inserted.getLocale())
+            .reportContent(inserted.getReportContent())
+            .generatedAt(LocalDateTime.of(2026, 8, 9, 12, 0))
+            .createdAt(LocalDateTime.of(2026, 8, 9, 12, 0))
+            .build();
+    }
+
+    private void assertDecimalEquals(String expected, BigDecimal actual) {
+        assertEquals(0, new BigDecimal(expected).compareTo(actual));
     }
 
     private Report savedReport() {

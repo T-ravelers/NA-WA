@@ -21,10 +21,13 @@ import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.report.dto.request.ReportCreateRequest;
+import me.nawa.report.dto.response.ReportAnalyticsResponse;
+import me.nawa.report.dto.response.ReportCategoryBreakdownResponse;
 import me.nawa.report.dto.response.ReportContentDayResponse;
 import me.nawa.report.dto.response.ReportContentItemResponse;
 import me.nawa.report.dto.response.ReportContentJourneyResponse;
 import me.nawa.report.dto.response.ReportContentResponse;
+import me.nawa.report.dto.response.ReportDailyTrendResponse;
 import me.nawa.report.dto.response.ReportDetailResponse;
 import me.nawa.report.dto.response.ReportExpenseCandidateResponse;
 import me.nawa.report.dto.response.ReportSummaryResponse;
@@ -146,7 +149,12 @@ class ReportControllerTest {
 
         JsonNode candidate = objectMapper.readTree(responseBody).path("data").get(0);
         assertEquals(99L, candidate.path("transferId").asLong());
+        assertTrue(candidate.path("amount").isNumber());
+        assertDecimalEquals("12000", candidate.path("amount"));
+        assertEquals("2026-08-02", candidate.path("occurredOn").asText());
         assertEquals("FOOD", candidate.path("category").asText());
+        assertEquals("Lunch", candidate.path("memo").asText());
+        assertFalse(candidate.path("selected").asBoolean());
     }
 
     @Test
@@ -268,6 +276,27 @@ class ReportControllerTest {
                         .status("ADDED")
                         .build()))
                     .build()))
+                .analytics(ReportAnalyticsResponse.builder()
+                    .totalSpent(new java.math.BigDecimal("12000"))
+                    .dailyAverage(new java.math.BigDecimal("2400.00"))
+                    .categoryBreakdown(List.of(
+                        ReportCategoryBreakdownResponse.builder()
+                            .category("FOOD")
+                            .amount(new java.math.BigDecimal("12000"))
+                            .percentage(new java.math.BigDecimal("100.00"))
+                            .build()
+                    ))
+                    .dailyTrend(List.of(
+                        ReportDailyTrendResponse.builder()
+                            .date(LocalDate.of(2026, 8, 1))
+                            .amount(java.math.BigDecimal.ZERO)
+                            .build(),
+                        ReportDailyTrendResponse.builder()
+                            .date(LocalDate.of(2026, 8, 2))
+                            .amount(new java.math.BigDecimal("12000"))
+                            .build()
+                    ))
+                    .build())
                 .build())
             .build();
     }
@@ -295,6 +324,34 @@ class ReportControllerTest {
         assertEquals(
             "2026-08-02",
             content.path("days").get(0).path("visitDate").asText()
+        );
+        assertFalse(data.has("analytics"));
+        JsonNode analytics = content.path("analytics");
+        assertTrue(analytics.isObject());
+        assertTrue(analytics.path("totalSpent").isNumber());
+        assertDecimalEquals("12000", analytics.path("totalSpent"));
+        assertTrue(analytics.path("dailyAverage").isNumber());
+        assertDecimalEquals("2400.00", analytics.path("dailyAverage"));
+
+        JsonNode category = analytics.path("categoryBreakdown").get(0);
+        assertEquals("FOOD", category.path("category").asText());
+        assertTrue(category.path("amount").isNumber());
+        assertDecimalEquals("12000", category.path("amount"));
+        assertTrue(category.path("percentage").isNumber());
+        assertDecimalEquals("100.00", category.path("percentage"));
+
+        JsonNode trend = analytics.path("dailyTrend");
+        assertEquals("2026-08-01", trend.get(0).path("date").asText());
+        assertTrue(trend.get(0).path("amount").isNumber());
+        assertDecimalEquals("0", trend.get(0).path("amount"));
+        assertEquals("2026-08-02", trend.get(1).path("date").asText());
+        assertDecimalEquals("12000", trend.get(1).path("amount"));
+    }
+
+    private void assertDecimalEquals(String expected, JsonNode actual) {
+        assertEquals(
+            0,
+            new java.math.BigDecimal(expected).compareTo(actual.decimalValue())
         );
     }
 }

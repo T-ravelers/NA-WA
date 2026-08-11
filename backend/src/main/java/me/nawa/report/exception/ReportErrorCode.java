@@ -54,7 +54,7 @@ public enum ReportErrorCode implements ErrorCode {
     REPORT_EXPENSE_ALREADY_LINKED(
         HttpStatus.CONFLICT,
         "REPORT-008",
-        "Selected expense is already linked to another Journey."
+        "Selected expense is already linked to a Journey."
     );
 
     private final HttpStatus status;

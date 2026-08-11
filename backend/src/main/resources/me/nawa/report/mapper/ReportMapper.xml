@@ -27,6 +27,19 @@
         FOR UPDATE
     </select>
 
+    <select id="findJourneyById"
+            resultType="me.nawa.report.domain.ReportJourney">
+        SELECT
+            trip_id,
+            member_id,
+            title,
+            start_date,
+            end_date
+        FROM trips
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+    </select>
+
     <select id="findActiveReportByTripId"
             resultType="me.nawa.report.domain.Report">
         SELECT
@@ -94,13 +107,15 @@
         JOIN trips tr ON tr.trip_id = #{tripId} AND tr.member_id = #{memberId}
             AND tr.deleted_at IS NULL
         LEFT JOIN trip_expense_links tel ON tel.ledger_entry_id = le.ledger_entry_id
-            AND tel.deleted_at IS NULL
         WHERE le.entry_type = 'DEBIT' AND le.deleted_at IS NULL
           AND t.initiator_member_id = #{memberId} AND t.deleted_at IS NULL
           AND t.currency_code = 'KRW' AND t.transfer_status = 'COMPLETED'
           AND t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')
           AND DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date
-          AND (tel.trip_id IS NULL OR tel.trip_id = #{tripId})
+          AND (
+              tel.ledger_entry_id IS NULL
+              OR (tel.trip_id = #{tripId} AND tel.deleted_at IS NULL)
+          )
         ORDER BY t.completed_at ASC, t.transfer_id ASC
     </select>
 
@@ -135,7 +150,7 @@
 
     <select id="findLinkedTripIdByLedgerEntryId" resultType="long">
         SELECT trip_id FROM trip_expense_links
-        WHERE ledger_entry_id = #{ledgerEntryId} AND deleted_at IS NULL
+        WHERE ledger_entry_id = #{ledgerEntryId}
     </select>
 
     <insert id="insertTripExpenseLink">

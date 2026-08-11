@@ -104,7 +104,7 @@ public class ReportService {
             Long linkedTripId = reportMapper.findLinkedTripIdByLedgerEntryId(
                 expense.getLedgerEntryId()
             );
-            if (linkedTripId != null && !tripId.equals(linkedTripId)) {
+            if (linkedTripId != null) {
                 throw new BusinessException(
                     ReportErrorCode.REPORT_EXPENSE_ALREADY_LINKED
                 );
@@ -144,7 +144,7 @@ public class ReportService {
     ) {
         validateMemberId(memberId);
         validateResourceId(tripId);
-        ReportJourney journey = reportMapper.findJourneyForUpdate(tripId);
+        ReportJourney journey = reportMapper.findJourneyById(tripId);
         if (journey == null) {
             throw new BusinessException(ReportErrorCode.REPORT_JOURNEY_NOT_FOUND);
         }
