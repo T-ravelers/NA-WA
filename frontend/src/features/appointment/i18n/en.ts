@@ -1,0 +1,38 @@
+export default {
+  appointment: {
+    list: {
+      title: 'Appointments',
+      titleEvent: 'Appointments for this event',
+      titlePlace: 'Appointments for this place',
+      searchLabel: 'Search appointments',
+      searchPlaceholder: 'Search appointments',
+      languageLabel: 'Appointment language',
+      resultCount: '{count} appointments',
+      memberCount: '{current}/{max} members',
+      placePending: 'Meeting place to be confirmed',
+      deposit: 'Refundable deposit ₩{amount}',
+      view: 'View',
+      create: 'Create appointment',
+      emptyTitle: 'No appointments yet',
+      emptyDescription: 'Create an appointment for this activity.',
+      loadFailed: 'Appointments could not be loaded',
+      loadFailedDescription: 'Please try again in a moment.',
+    },
+    status: {
+      RECRUITING: 'Open',
+      CLOSED: 'Closed',
+      CONFIRMED: 'Confirmed',
+      IN_PROGRESS: 'In progress',
+      COMPLETED: 'Completed',
+      CANCELLED: 'Canceled',
+    },
+    languages: {
+      all: 'All',
+      en: 'English',
+      ja: 'Japanese',
+      'zh-CN': 'Chinese (Simplified)',
+      'zh-TW': 'Chinese (Traditional)',
+      vi: 'Vietnamese',
+    },
+  },
+}
