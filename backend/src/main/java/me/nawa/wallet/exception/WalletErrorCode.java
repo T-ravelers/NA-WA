@@ -103,6 +103,12 @@ public enum WalletErrorCode implements ErrorCode {
         HttpStatus.FORBIDDEN,
         "WALLET-016",
         "현재 지갑 상태에서는 정산 이체를 할 수 없습니다."
+    ),
+
+    WALLET_NOT_ACTIVE(
+        HttpStatus.FORBIDDEN,
+        "WALLET-017",
+        "지갑이 활성 상태가 아닙니다."
     );
 
     private final HttpStatus status;
