@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -88,14 +89,15 @@ class SettlementControllerTest {
     }
 
     @Test
-    void createSettlement_returns201WithServerGeneratedId() throws Exception {
+    void createSettlement_createsDraftAtAppointmentEndpointWithIdempotencyKey() throws Exception {
         when(settlementCreationService.createSettlement(
-            eq(1L), any(CreateSettlementRequest.class)
+            eq(1L), eq(7L), eq("settlement-create-1"), any(CreateSettlementRequest.class)
         )).thenReturn(SettlementCreateResponse.builder().id(69L).build());
 
-        String responseBody = mockMvc.perform(post("/api/v1/settlements")
+        String responseBody = mockMvc.perform(post("/api/v1/appointments/7/settlements")
+                .header("Idempotency-Key", "settlement-create-1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"sourceTransferId\":20,\"type\":\"EQUAL\",\"participantIds\":[2,3]}"))
+                .content("{\"sourceTransferId\":20,\"type\":\"EQUAL\",\"participantAppointmentMemberIds\":[71,72]}"))
             .andExpect(status().isCreated())
             .andReturn()
             .getResponse()
@@ -104,6 +106,24 @@ class SettlementControllerTest {
         JsonNode body = objectMapper.readTree(responseBody);
         assertTrue(body.path("success").asBoolean());
         assertEquals(69L, body.path("data").path("id").asLong());
+        verify(settlementCreationService).createSettlement(
+            eq(1L), eq(7L), eq("settlement-create-1"), any(CreateSettlementRequest.class)
+        );
+    }
+
+    @Test
+    void createSettlement_withoutIdempotencyKey_returnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/v1/appointments/7/settlements")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"sourceTransferId\":20,\"type\":\"EQUAL\",\"participantAppointmentMemberIds\":[71,72]}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void analyzeReceipt_withoutFilePart_returnsBadRequest() throws Exception {
+        mockMvc.perform(multipart("/api/v1/settlements/receipt-analyses")
+                .param("sourceTransferId", "20"))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -119,6 +139,8 @@ class SettlementControllerTest {
         mockMvc.perform(get("/api/v1/settlements/69"))
             .andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/settlements/69/payments"))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/settlements/69/request"))
             .andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/settlements/69/cancel"))
             .andExpect(status().isOk());
@@ -144,5 +166,13 @@ class SettlementControllerTest {
             .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/settlements/69/game/result"))
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void requestSettlement_requestsDraftThroughLifecycleEndpoint() throws Exception {
+        mockMvc.perform(post("/api/v1/settlements/69/request"))
+            .andExpect(status().isOk());
+
+        verify(settlementCreationService).requestSettlement(1L, 69L);
     }
 }

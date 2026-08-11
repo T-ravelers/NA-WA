@@ -16,6 +16,8 @@ public class Settlement {
     private Long createdByMemberId;
     private Long payerMemberId;
     private Long sourceTransferId;
+    private String idempotencyKey;
+    private String requestFingerprint;
     private String settlementStatus;
     private String splitMethod;
     private BigDecimal totalAmount;
@@ -27,13 +29,16 @@ public class Settlement {
 
     @Builder
     public Settlement(Long appointmentId, Long createdByMemberId, Long payerMemberId,
-            Long sourceTransferId, String settlementStatus, String splitMethod,
+            Long sourceTransferId, String idempotencyKey, String requestFingerprint,
+            String settlementStatus, String splitMethod,
             BigDecimal totalAmount, BigDecimal payerShareAmount, BigDecimal receivableAmount,
             LocalDateTime requestedAt, String memo) {
         this.appointmentId = appointmentId;
         this.createdByMemberId = createdByMemberId;
         this.payerMemberId = payerMemberId;
         this.sourceTransferId = sourceTransferId;
+        this.idempotencyKey = idempotencyKey;
+        this.requestFingerprint = requestFingerprint;
         this.settlementStatus = settlementStatus;
         this.splitMethod = splitMethod;
         this.totalAmount = totalAmount;

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 상세 화면의 “Pay”와 “Cancel” 클릭은 각각 전용 정산 작업으로 위임한다.
  */
 @RestController
-@RequestMapping("/api/v1/settlements")
+@RequestMapping("/api/v1")
 @RequiredArgsConstructor
 public class SettlementController {
 
@@ -42,7 +43,7 @@ public class SettlementController {
      *
      * 인증된 회원이 받은 정산 요청과 보낸 정산 요청을 함께 조회합니다.
      */
-    @GetMapping
+    @GetMapping("/settlements")
     public ApiResponse<SettlementListResponse> getSettlements(
         @AuthenticationPrincipal AuthenticatedMember member
     ) {
@@ -56,7 +57,7 @@ public class SettlementController {
      *
      * 인증된 회원이 정산 생성에 사용할 수 있는 원거래와 참여자 정보를 조회합니다.
      */
-    @GetMapping("/candidates")
+    @GetMapping("/settlements/candidates")
     public ApiResponse<List<SettlementCandidateResponse>> getCandidates(
         @AuthenticationPrincipal AuthenticatedMember member
     ) {
@@ -70,14 +71,16 @@ public class SettlementController {
      *
      * 원거래와 참여자, 정산 유형을 바탕으로 새 정산을 생성합니다.
      */
-    @PostMapping
+    @PostMapping("/appointments/{appointmentId}/settlements")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<SettlementCreateResponse> createSettlement(
         @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long appointmentId,
+        @RequestHeader("Idempotency-Key") String idempotencyKey,
         @RequestBody CreateSettlementRequest request
     ) {
         return ApiResponse.success(settlementCreationService.createSettlement(
-            member.getMemberId(), request
+            member.getMemberId(), appointmentId, idempotencyKey, request
         ));
     }
 
@@ -86,7 +89,7 @@ public class SettlementController {
      *
      * 인증된 회원이 참여한 정산의 금액, 상태 및 항목 정보를 조회합니다.
      */
-    @GetMapping("/{settlementId}")
+    @GetMapping("/settlements/{settlementId}")
     public ApiResponse<SettlementDetailResponse> getSettlement(
         @AuthenticationPrincipal AuthenticatedMember member,
         @PathVariable Long settlementId
@@ -101,7 +104,7 @@ public class SettlementController {
      *
      * 인증된 회원의 정산 부담금 결제를 처리합니다.
      */
-    @PostMapping("/{settlementId}/payments")
+    @PostMapping("/settlements/{settlementId}/payments")
     public ApiResponse<Void> paySettlement(
         @AuthenticationPrincipal AuthenticatedMember member,
         @PathVariable Long settlementId
@@ -110,12 +113,22 @@ public class SettlementController {
         return ApiResponse.success();
     }
 
+    /** 생성자가 DRAFT 정산을 참여자에게 요청합니다. */
+    @PostMapping("/settlements/{settlementId}/request")
+    public ApiResponse<Void> requestSettlement(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long settlementId
+    ) {
+        settlementCreationService.requestSettlement(member.getMemberId(), settlementId);
+        return ApiResponse.success();
+    }
+
     /**
      * 정산 취소
      *
      * 인증된 회원이 생성한 정산 요청을 취소합니다.
      */
-    @PostMapping("/{settlementId}/cancel")
+    @PostMapping("/settlements/{settlementId}/cancel")
     public ApiResponse<Void> cancelSettlement(
         @AuthenticationPrincipal AuthenticatedMember member,
         @PathVariable Long settlementId

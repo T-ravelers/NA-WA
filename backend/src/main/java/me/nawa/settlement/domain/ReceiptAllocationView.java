@@ -12,6 +12,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReceiptAllocationView {
+    private Long appointmentMemberId;
     private Long memberId;
     private BigDecimal allocatedAmount;
 }

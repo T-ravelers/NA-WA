@@ -27,15 +27,23 @@ public class GameSettlementCreator implements SettlementCreationHandler {
     public String getType() { return "GAME"; }
 
     @Override
-    public SettlementCreateResponse create(Long memberId, CreateSettlementRequest request, SettlementSource source) {
+    public SettlementCreateResponse create(
+        Long memberId,
+        CreateSettlementRequest request,
+        SettlementSource source,
+        String idempotencyKey,
+        String requestFingerprint
+    ) {
         GameCreateRequest gameRequest = request.getGame();
         List<SettlementMember> participants = settlementMapper.findActiveMembers(source.getAppointmentId());
         if (gameRequest == null || gameRequest.getType() == null || gameRequest.getType().isBlank() || gameRequest.getLiableCount() == null
-            || gameRequest.getLiableCount() <= 0 || gameRequest.getLiableCount() >= participants.size() || !Set.copyOf(request.getParticipantIds())
-            .equals(participants.stream().map(SettlementMember::getMemberId).collect(java.util.stream.Collectors.toSet())))
+            || gameRequest.getLiableCount() <= 0 || gameRequest.getLiableCount() >= participants.size()
+            || !Set.copyOf(request.getParticipantAppointmentMemberIds()).equals(participants.stream()
+                .map(SettlementMember::getAppointmentMemberId).collect(java.util.stream.Collectors.toSet())))
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_GAME_INVALID);
         Settlement settlement = Settlement.builder().appointmentId(source.getAppointmentId()).createdByMemberId(memberId)
-            .payerMemberId(source.getPayerMemberId()).sourceTransferId(source.getTransferId()).settlementStatus("DRAFT")
+            .payerMemberId(source.getPayerMemberId()).sourceTransferId(source.getTransferId())
+            .idempotencyKey(idempotencyKey).requestFingerprint(requestFingerprint).settlementStatus("DRAFT")
             .splitMethod(getType()).totalAmount(source.getAmount()).payerShareAmount(source.getAmount())
             .receivableAmount(BigDecimal.ZERO).requestedAt(null).build();
         settlementMapper.insertSettlement(settlement);

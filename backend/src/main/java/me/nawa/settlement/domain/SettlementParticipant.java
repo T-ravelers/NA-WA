@@ -11,6 +11,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SettlementParticipant {
+    private Long appointmentMemberId;
     private Long memberId;
     private String displayName;
 }

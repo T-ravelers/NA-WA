@@ -345,7 +345,15 @@ class SwaggerConfigTest {
 
         @Bean
         SettlementCreationService settlementCreationService() {
-            return (memberId, request) -> { throw new UnsupportedOperationException(); };
+            return new SettlementCreationService() {
+                @Override public me.nawa.settlement.dto.response.SettlementCreateResponse createSettlement(
+                    Long memberId, Long appointmentId, String idempotencyKey,
+                    me.nawa.settlement.dto.request.CreateSettlementRequest request
+                ) { throw new UnsupportedOperationException(); }
+                @Override public void requestSettlement(Long memberId, Long settlementId) {
+                    throw new UnsupportedOperationException();
+                }
+            };
         }
 
         @Bean

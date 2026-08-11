@@ -1,3 +1,18 @@
+ALTER TABLE settlements
+    ADD COLUMN idempotency_key VARCHAR(100) NULL AFTER source_transfer_id,
+    ADD COLUMN request_fingerprint CHAR(64) NULL AFTER idempotency_key;
+
+UPDATE settlements
+SET idempotency_key = CONCAT('legacy-', settlement_id),
+    request_fingerprint = SHA2(CONCAT('legacy-settlement-', settlement_id), 256)
+WHERE idempotency_key IS NULL;
+
+ALTER TABLE settlements
+    MODIFY COLUMN idempotency_key VARCHAR(100) NOT NULL,
+    MODIFY COLUMN request_fingerprint CHAR(64) NOT NULL,
+    ADD CONSTRAINT uq_settlements_creator_idempotency
+        UNIQUE (created_by_member_id, idempotency_key);
+
 CREATE TABLE receipt_analyses (
     receipt_analysis_id BIGINT NOT NULL AUTO_INCREMENT,
     source_transfer_id BIGINT NOT NULL,

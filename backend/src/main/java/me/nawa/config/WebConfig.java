@@ -24,6 +24,53 @@ public class WebConfig extends AbstractAnnotationConfigDispatcherServletInitiali
         return new String[]{"/"};
     }
 
+    @Override
+    protected void customizeRegistration(ServletRegistration.Dynamic registration) {
+        registration.setMultipartConfig(multipartConfigElement());
+    }
+
+    MultipartConfigElement multipartConfigElement() {
+        long maxFileSize = longSetting(
+            "settlement.receipt.max-file-size-bytes",
+            "SETTLEMENT_RECEIPT_MAX_FILE_SIZE_BYTES",
+            5L * 1024 * 1024
+        );
+        long maxRequestSize = longSetting(
+            "settlement.receipt.max-request-size-bytes",
+            "SETTLEMENT_RECEIPT_MAX_REQUEST_SIZE_BYTES",
+            6L * 1024 * 1024
+        );
+        int threshold = Math.toIntExact(longSetting(
+            "settlement.receipt.file-size-threshold-bytes",
+            "SETTLEMENT_RECEIPT_FILE_SIZE_THRESHOLD_BYTES",
+            0L
+        ));
+        String location = setting(
+            "settlement.receipt.upload-temp-dir",
+            "SETTLEMENT_RECEIPT_UPLOAD_TEMP_DIR",
+            System.getProperty("java.io.tmpdir")
+        );
+        return new MultipartConfigElement(location, maxFileSize, maxRequestSize, threshold);
+    }
+
+    private long longSetting(String systemProperty, String environmentVariable, long defaultValue) {
+        String value = setting(systemProperty, environmentVariable, Long.toString(defaultValue));
+        long parsed = Long.parseLong(value);
+        if (parsed < 0) {
+            throw new IllegalArgumentException(systemProperty + " must not be negative");
+        }
+        return parsed;
+    }
+
+    private String setting(String systemProperty, String environmentVariable, String defaultValue) {
+        String systemValue = System.getProperty(systemProperty);
+        if (systemValue != null && !systemValue.isBlank()) {
+            return systemValue;
+        }
+        String environmentValue = System.getenv(environmentVariable);
+        return environmentValue == null || environmentValue.isBlank() ? defaultValue : environmentValue;
+    }
+
     // POST body 문자 인코딩 필터 설정 - UTF-8 설정
 //    protected Filter[] getServletFilters() {
 //        CharacterEncodingFilter characterEncodingFilter = new CharacterEncodingFilter();

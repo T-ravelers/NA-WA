@@ -55,6 +55,8 @@ erDiagram
         BIGINT created_by_member_id FK
         BIGINT payer_member_id FK
         BIGINT source_transfer_id FK, UK
+        VARCHAR idempotency_key UK
+        CHAR request_fingerprint
         ENUM settlement_status
         DECIMAL total_amount
     }
@@ -146,6 +148,8 @@ erDiagram
 ```
 
 - 정산은 약속의 참가자 집합과 원거래를 기준으로 생성합니다.
+- 정산 생성 멱등성은 `(created_by_member_id, idempotency_key)` UNIQUE와 요청 지문으로
+  보장합니다. `source_transfer_id`도 UNIQUE이므로 취소한 원거래를 재정산하지 않습니다.
 - DB는 행별 금액과 수량이 음수가 되지 않도록 검증합니다. 항목·참가자 간 합계
   일치는 후속 서비스 트랜잭션에서 검증합니다.
 - 영수증 항목과 배분은 `ALLOCATED` 상태에서 정산 항목·항목별 분담으로 복제되어, 이후

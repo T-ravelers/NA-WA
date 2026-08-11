@@ -36,6 +36,10 @@ public class SettlementGameServiceImpl implements SettlementGameService {
         if (game == null || !"WAITING_CONSENT".equals(game.getGameStatus())
             || settlementMapper.updateGameConsent(settlementId, memberId, request.getStatus()) != 1)
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_GAME_INVALID);
+        if ("DECLINED".equals(request.getStatus())
+            && settlementMapper.cancelGameAndSettlement(settlementId) != 1) {
+            throw new BusinessException(SettlementErrorCode.SETTLEMENT_GAME_INVALID);
+        }
     }
 
     @Override @Transactional
@@ -115,7 +119,7 @@ public class SettlementGameServiceImpl implements SettlementGameService {
 
     private SettlementParticipantResponse participant(SettlementGameMember member, Map<Long, String> names) {
         String name = names.get(member.getMemberId());
-        return SettlementParticipantResponse.builder().id(member.getMemberId()).name(name)
+        return SettlementParticipantResponse.builder().id(member.getAppointmentMemberId()).name(name)
             .initials(name == null || name.isBlank() ? "?" : name.substring(0, 1).toUpperCase())
             .consentStatus(member.getConsentStatus()).build();
     }

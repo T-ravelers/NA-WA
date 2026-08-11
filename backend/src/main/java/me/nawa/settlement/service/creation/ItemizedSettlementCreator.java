@@ -1,8 +1,8 @@
 package me.nawa.settlement.service.creation;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
@@ -27,27 +27,51 @@ public class ItemizedSettlementCreator implements SettlementCreationHandler {
     public String getType() { return "ITEMIZED"; }
 
     @Override
-    public SettlementCreateResponse create(Long memberId, CreateSettlementRequest request, SettlementSource source) {
+    public SettlementCreateResponse create(
+        Long memberId,
+        CreateSettlementRequest request,
+        SettlementSource source,
+        String idempotencyKey,
+        String requestFingerprint
+    ) {
         if (request.getReceiptAnalysisId() == null) throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID);
         ReceiptAnalysis analysis = settlementMapper.findReceiptAnalysisForUpdate(request.getReceiptAnalysisId());
         if (analysis == null || !"ALLOCATED".equals(analysis.getAnalysisStatus()) || !source.getTransferId().equals(analysis.getSourceTransferId())
             || !memberId.equals(analysis.getCreatedByMemberId())) throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID);
-        java.util.Map<Long, BigDecimal> amounts = settlementMapper.findReceiptAllocationViews(analysis.getReceiptAnalysisId()).stream()
-            .collect(java.util.stream.Collectors.toMap(ReceiptAllocationView::getMemberId, ReceiptAllocationView::getAllocatedAmount));
-        if (!Set.copyOf(request.getParticipantIds()).equals(amounts.keySet()) || amounts.values().stream()
-            .reduce(BigDecimal.ZERO, BigDecimal::add).compareTo(analysis.getRecognizedTotal()) != 0)
+        List<ReceiptAllocationView> allocationViews = settlementMapper.findReceiptAllocationViews(
+            analysis.getReceiptAnalysisId()
+        );
+        Map<Long, BigDecimal> amounts = allocationViews.stream().collect(java.util.stream.Collectors.toMap(
+            ReceiptAllocationView::getAppointmentMemberId,
+            ReceiptAllocationView::getAllocatedAmount
+        ));
+        BigDecimal allocationTotal = amounts.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal lineTotal = settlementMapper.sumReceiptItemLineTotals(analysis.getReceiptAnalysisId());
+        if (!Set.copyOf(request.getParticipantAppointmentMemberIds()).equals(amounts.keySet())
+            || source.getAmount().compareTo(analysis.getRecognizedTotal()) != 0
+            || lineTotal == null || lineTotal.compareTo(analysis.getRecognizedTotal()) != 0
+            || allocationTotal.compareTo(analysis.getRecognizedTotal()) != 0) {
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID);
-        BigDecimal payerShare = amounts.getOrDefault(memberId, BigDecimal.ZERO);
+        }
+        BigDecimal payerShare = allocationViews.stream()
+            .filter(view -> memberId.equals(view.getMemberId()))
+            .map(ReceiptAllocationView::getAllocatedAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
         Settlement settlement = Settlement.builder().appointmentId(source.getAppointmentId()).createdByMemberId(memberId)
-            .payerMemberId(source.getPayerMemberId()).sourceTransferId(source.getTransferId()).settlementStatus("REQUESTED")
-            .splitMethod(getType()).totalAmount(analysis.getRecognizedTotal()).payerShareAmount(payerShare)
-            .receivableAmount(analysis.getRecognizedTotal().subtract(payerShare)).requestedAt(LocalDateTime.now()).build();
+            .payerMemberId(source.getPayerMemberId()).sourceTransferId(source.getTransferId())
+            .idempotencyKey(idempotencyKey).requestFingerprint(requestFingerprint).settlementStatus("DRAFT")
+            .splitMethod(getType()).totalAmount(source.getAmount()).payerShareAmount(payerShare)
+            .receivableAmount(source.getAmount().subtract(payerShare)).requestedAt(null).build();
         settlementMapper.insertSettlement(settlement);
         List<SettlementMember> members = settlementMapper.findActiveMembers(source.getAppointmentId()).stream()
-            .filter(member -> amounts.containsKey(member.getMemberId())).peek(member -> {
-                member.setSettlementId(settlement.getSettlementId()); member.setShareAmount(amounts.get(member.getMemberId()));
-                member.setRequestStatus(memberId.equals(member.getMemberId()) ? "NOT_REQUESTED" : "PENDING");
+            .filter(member -> amounts.containsKey(member.getAppointmentMemberId())).peek(member -> {
+                member.setSettlementId(settlement.getSettlementId());
+                member.setShareAmount(amounts.get(member.getAppointmentMemberId()));
+                member.setRequestStatus("NOT_REQUESTED");
             }).toList();
+        if (members.size() != amounts.size()) {
+            throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID);
+        }
         settlementMapper.insertSettlementMembers(members);
         settlementMapper.copyReceiptItemsToSettlement(analysis.getReceiptAnalysisId(), settlement.getSettlementId());
         settlementMapper.copyReceiptItemSharesToSettlement(analysis.getReceiptAnalysisId(), settlement.getSettlementId());

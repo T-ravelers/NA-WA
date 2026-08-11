@@ -65,6 +65,30 @@ public enum SettlementErrorCode implements ErrorCode {
         HttpStatus.CONFLICT,
         "SETTLEMENT-008",
         "현재 상태에서는 게임 정산을 진행할 수 없습니다."
+    ),
+
+    SETTLEMENT_IDEMPOTENCY_CONFLICT(
+        HttpStatus.CONFLICT,
+        "SETTLEMENT-009",
+        "같은 멱등성 키로 다른 정산 생성 요청을 처리할 수 없습니다."
+    ),
+
+    SETTLEMENT_SOURCE_ALREADY_USED(
+        HttpStatus.CONFLICT,
+        "SETTLEMENT-010",
+        "이미 정산에 사용된 원거래입니다."
+    ),
+
+    SETTLEMENT_REQUEST_NOT_ALLOWED(
+        HttpStatus.CONFLICT,
+        "SETTLEMENT-011",
+        "현재 상태에서는 정산을 요청할 수 없습니다."
+    ),
+
+    SETTLEMENT_RECEIPT_STATE_CONFLICT(
+        HttpStatus.CONFLICT,
+        "SETTLEMENT-012",
+        "이미 배분되었거나 사용된 영수증 분석은 다시 업로드할 수 없습니다."
     );
 
     private final HttpStatus status;

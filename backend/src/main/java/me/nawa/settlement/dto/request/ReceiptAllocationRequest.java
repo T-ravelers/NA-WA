@@ -16,6 +16,6 @@ import lombok.Setter;
 public class ReceiptAllocationRequest {
 
     private Long itemId;
-    private Long participantId;
+    private Long appointmentMemberId;
     private BigDecimal quantity;
 }

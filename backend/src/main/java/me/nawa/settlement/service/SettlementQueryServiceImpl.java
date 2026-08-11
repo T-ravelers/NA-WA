@@ -57,7 +57,8 @@ public class SettlementQueryServiceImpl implements SettlementQueryService {
     }
 
     private List<SettlementParticipantResponse> toParticipantResponses(List<SettlementParticipant> participants) {
-        return participants.stream().map(participant -> SettlementParticipantResponse.builder().id(participant.getMemberId())
+        return participants.stream().map(participant -> SettlementParticipantResponse.builder()
+            .id(participant.getAppointmentMemberId())
             .name(participant.getDisplayName()).initials(participant.getDisplayName() == null || participant.getDisplayName().isBlank()
                 ? "?" : participant.getDisplayName().substring(0, 1).toUpperCase()).consentStatus(null).build()).toList();
     }

@@ -17,6 +17,7 @@ public class SettlementSource {
     private Long appointmentId;
     private Long payerMemberId;
     private BigDecimal amount;
+    private Integer currencyDecimalPlaces;
     private String journeyName;
     private String gatheringName;
     private String merchantName;

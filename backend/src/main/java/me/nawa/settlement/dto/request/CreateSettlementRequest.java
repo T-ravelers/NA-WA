@@ -17,7 +17,7 @@ public class CreateSettlementRequest {
 
     private Long sourceTransferId;
     private String type;
-    private List<Long> participantIds;
+    private List<Long> participantAppointmentMemberIds;
     private GameCreateRequest game;
     private Long receiptAnalysisId;
 }

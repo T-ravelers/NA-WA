@@ -113,6 +113,7 @@ dependencies {
     testImplementation platform("org.junit:junit-bom:${junitVersion}")
     testImplementation "org.junit.jupiter:junit-jupiter"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+    testImplementation 'org.apache.tomcat.embed:tomcat-embed-core:9.0.120'
 
     // Stripe
     // 구현 시점에 최신 안정 버전 확인

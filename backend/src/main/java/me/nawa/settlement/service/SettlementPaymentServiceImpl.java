@@ -38,8 +38,13 @@ public class SettlementPaymentServiceImpl implements SettlementPaymentService {
     public void cancelSettlement(Long memberId, Long settlementId) {
         Settlement settlement = settlementMapper.findByIdForUpdate(settlementId);
         if (settlement == null) throw new BusinessException(SettlementErrorCode.SETTLEMENT_NOT_FOUND);
-        if (!memberId.equals(settlement.getCreatedByMemberId()) || !"REQUESTED".equals(settlement.getSettlementStatus())
+        if (!memberId.equals(settlement.getCreatedByMemberId())
+            || !("DRAFT".equals(settlement.getSettlementStatus()) || "REQUESTED".equals(settlement.getSettlementStatus()))
             || settlementMapper.cancelSettlement(settlementId, memberId) != 1)
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_CANCEL_NOT_ALLOWED);
+        if ("GAME".equals(settlement.getSplitMethod())
+            && settlementMapper.cancelGame(settlementId) != 1) {
+            throw new BusinessException(SettlementErrorCode.SETTLEMENT_CANCEL_NOT_ALLOWED);
+        }
     }
 }

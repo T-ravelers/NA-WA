@@ -50,6 +50,13 @@ public interface SettlementMapper {
 
     Settlement findById(@Param("settlementId") Long settlementId);
 
+    Settlement findByCreatorAndIdempotencyKey(
+        @Param("createdByMemberId") Long createdByMemberId,
+        @Param("idempotencyKey") String idempotencyKey
+    );
+
+    Settlement findBySourceTransferId(@Param("sourceTransferId") Long sourceTransferId);
+
     List<SettlementMember> findMembersBySettlementIdForUpdate(
         @Param("settlementId") Long settlementId
     );
@@ -60,9 +67,29 @@ public interface SettlementMapper {
 
     void insertSettlementItems(@Param("items") List<SettlementItem> items);
 
+    int markSettlementRequested(
+        @Param("settlementId") Long settlementId,
+        @Param("memberId") Long memberId
+    );
+
+    int markSettlementMembersRequested(
+        @Param("settlementId") Long settlementId,
+        @Param("memberId") Long memberId
+    );
+
     ReceiptAnalysis findReceiptAnalysisForUpdate(@Param("receiptAnalysisId") Long receiptAnalysisId);
 
+    ReceiptAnalysis findReceiptAnalysisBySourceAndCreatorForUpdate(
+        @Param("sourceTransferId") Long sourceTransferId,
+        @Param("createdByMemberId") Long createdByMemberId
+    );
+
     void insertReceiptAnalysis(ReceiptAnalysis receiptAnalysis);
+
+    void resetDraftReceiptAnalysis(
+        @Param("receiptAnalysisId") Long receiptAnalysisId,
+        @Param("originalFileName") String originalFileName
+    );
 
     void deleteReceiptItems(@Param("receiptAnalysisId") Long receiptAnalysisId);
 
@@ -82,6 +109,8 @@ public interface SettlementMapper {
     void markReceiptAllocated(@Param("receiptAnalysisId") Long receiptAnalysisId);
 
     List<ReceiptAllocationView> findReceiptAllocationViews(@Param("receiptAnalysisId") Long receiptAnalysisId);
+
+    java.math.BigDecimal sumReceiptItemLineTotals(@Param("receiptAnalysisId") Long receiptAnalysisId);
 
     void copyReceiptItemsToSettlement(
         @Param("receiptAnalysisId") Long receiptAnalysisId,
@@ -108,6 +137,10 @@ public interface SettlementMapper {
         @Param("memberId") Long memberId,
         @Param("consentStatus") String consentStatus
     );
+
+    int cancelGameAndSettlement(@Param("settlementId") Long settlementId);
+
+    int cancelGame(@Param("settlementId") Long settlementId);
 
     List<SettlementGameMember> findGameMembersForUpdate(@Param("settlementId") Long settlementId);
 
