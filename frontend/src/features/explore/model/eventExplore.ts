@@ -16,8 +16,9 @@ export interface EventSummary {
   region3: string | null
   latitude: number | null
   longitude: number | null
-  startDate: string
-  endDate: string
+  // `EventSummaryResponse`의 `LocalDate`는 널을 허용한다. 실제로 종료일이 없는 Event가 있다.
+  startDate: string | null
+  endDate: string | null
 }
 
 export interface EventListResponse {

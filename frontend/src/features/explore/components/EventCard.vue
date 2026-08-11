@@ -49,11 +49,14 @@ const regionLabel = computed(() =>
   [event.region1, event.region2, event.region3].filter(Boolean).join(' · '),
 )
 
-function formatDate(value: string): string {
-  return value.replace(/-/g, '.')
+function formatDate(value: string | null): string {
+  return value ? value.replace(/-/g, '.') : ''
 }
 
-const periodLabel = computed(() => `${formatDate(event.startDate)} ~ ${formatDate(event.endDate)}`)
+// 한쪽 날짜만 있으면 구분자 없이 그 날짜만 보인다. `EventDetailView`와 같은 방식이다.
+const periodLabel = computed(() =>
+  [formatDate(event.startDate), formatDate(event.endDate)].filter(Boolean).join(' ~ '),
+)
 
 function openEvent(): void {
   emit('open', event.itemId)
@@ -135,7 +138,7 @@ function handleKeydown(event: KeyboardEvent): void {
 
         <div class="mt-auto flex flex-col gap-1 text-caption text-ink-3">
           <span v-if="regionLabel">{{ regionLabel }}</span>
-          <span>{{ periodLabel }}</span>
+          <span v-if="periodLabel">{{ periodLabel }}</span>
           <AppBadge
             :tone="statusTone"
             dot
