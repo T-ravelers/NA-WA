@@ -60,11 +60,19 @@ kit `qgv6efy`는 가변 폰트 하나(`sztos-variable`)를 로마자·이탤릭 
 | `wght` | 100–700 | 400    | Thin … Bold                 |
 | `wdth` | 100–200 | 100    | Normal(100) · Expanded(200) |
 
-**축 이름에 `Condensed`는 없지만 기본 폭이 시안의 좁은 비율이다.** `wdth 100`에서
-`WALLET`(100px)의 폭이 294.61px, `wdth 200`에서 567px로 거의 두 배가 된다. 즉 Adobe가
-`Normal`이라 부르는 100이 제거된 `BoldCondensed`·`ExtraBoldCondensed`의 자리를
-대신하고, 200은 그보다 훨씬 넓은 별도 폭이다. **`font-variation-settings`로 `wdth`를
-건드리지 않는다.** 기본값이 곧 시안이다.
+**기본 폭 `wdth 100`은 Condensed 컷이다. 시안 폭은 `wdth 200`이다.** Adobe가 100을
+`Normal`, 200을 `Expanded`라 부르지만 이름과 실제가 어긋난다. 시안 텍스트 폭과 비교하면
+분명하다.
+
+| 요소                        | 시안  | `wdth 100` | `wdth 200` |
+| --------------------------- | ----- | ---------- | ---------- |
+| `Your trip, on record` 40px | 297px | 138.4px    | 295.7px    |
+| `Journeys` 34px             | 256px | 143.5px    | 259.3px    |
+
+그래서 `index.css`의 `.font-display`가 `font-stretch: 200%`로 폭을 고정한다.
+`font-stretch`는 상속되므로 자식까지 함께 적용되며, Body 폰트 `Noto Sans`는 `wdth`
+상한이 100이라 상속돼도 기본 폭 그대로다. `font-stretch: expanded`(125%)는 부족하니
+**퍼센트로 200%를 적는다.**
 
 ### Display 굵기 상한은 700이다
 

@@ -109,8 +109,9 @@
    * Adobe가 kit CSS에 그 이름으로 `@font-face`를 선언하므로 `Sztos`라고 적으면
    * 매칭되지 않고 `Noto Sans`로 폴백한다.
    *
-   * kit이 제공하는 축은 `wght 100–700`, `wdth 100–200`이다. 기본 폭(100)이 시안의
-   * 좁은 비율이므로 `wdth`를 건드리지 않는다. `wght`는 800을 요청해도 700으로 잘린다.
+   * kit이 제공하는 축은 `wght 100–700`, `wdth 100–200`이다. **기본 폭 100은 Condensed
+   * 컷이라 시안과 다르다.** 폭은 `index.css`의 `.font-display`가 `font-stretch: 200%`로
+   * 맞춘다. `wght`는 800을 요청해도 700으로 잘린다.
    * 자세한 내용은 `public/fonts/README.md`의 「Display 폰트」 절 참조. */
   --font-display: 'sztos-variable', 'Noto Sans', sans-serif;
   --font-body: 'Noto Sans', sans-serif;

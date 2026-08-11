@@ -44,8 +44,14 @@ const router = useRouter()
           <span class="font-display text-caption tracking-wide text-on-category/65 uppercase">
             {{ t('auth.welcome.passLabel') }}
           </span>
-          <!-- 시안은 ExtraBold(800)이지만 Sztos Variable의 wght 축이 700에서 끝난다. -->
-          <span class="font-display text-section-header text-on-category uppercase">
+          <!--
+            시안은 ExtraBold(800)이지만 Sztos Variable의 wght 축이 700에서 끝난다.
+            시안에서도 이 제목은 티켓 폭을 꽉 채우는 한 줄이다(텍스트 257px / 프레임 250px).
+            줄바꿈을 허용하면 티켓 밖으로 흘러넘치므로 한 줄로 고정한다.
+          -->
+          <span
+            class="font-display text-section-header whitespace-nowrap text-on-category uppercase"
+          >
             {{ t('auth.welcome.passTitle') }}
           </span>
         </div>

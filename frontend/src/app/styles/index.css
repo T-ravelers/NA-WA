@@ -27,6 +27,22 @@
  */
 
 @layer base {
+  /*
+   * Display 폰트의 폭을 시안에 맞춘다.
+   *
+   * `Sztos Variable`의 `wdth` 축은 100–200이고 기본값은 100이다. Adobe는 100을
+   * `Normal`, 200을 `Expanded`라 부르지만 **실제로는 100이 Condensed 컷이다.**
+   * 시안의 `Your trip, on record`(40px) 텍스트 폭이 297px인데 `wdth 100`에서는
+   * 138.4px, `wdth 200`에서는 295.7px로 렌더된다. `Journeys`(34px)도 시안 256px에
+   * `wdth 200`이 259.3px로 맞는다.
+   *
+   * `font-stretch`는 상속되므로 자식까지 함께 적용된다. Body 폰트 `Noto Sans`는
+   * `wdth` 상한이 100이라 상속돼도 기본 폭 그대로다.
+   */
+  .font-display {
+    font-stretch: 200%;
+  }
+
   html {
     background-color: var(--color-canvas);
     -webkit-text-size-adjust: 100%;
