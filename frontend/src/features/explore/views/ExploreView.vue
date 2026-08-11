@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { IconChevronDown, IconSearch } from '@tabler/icons-vue'
 
+import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
@@ -621,13 +622,11 @@ function addQueryList(
       <h1 class="font-display text-screen-title uppercase text-ink-display">
         {{ t('explore.title') }}
       </h1>
-      <button
-        type="button"
-        class="flex size-12 items-center justify-center rounded-pill bg-surface-2 text-ink"
-        :aria-label="
-          t(selectedTab === 'events' ? 'explore.search.open' : 'explore.search.placeOpen')
-        "
-        :aria-pressed="searchOpen"
+      <IconOrb
+        :label="t(selectedTab === 'events' ? 'explore.search.open' : 'explore.search.placeOpen')"
+        size="lg"
+        variant="surface"
+        :pressed="searchOpen"
         @click="searchOpen = !searchOpen"
       >
         <IconSearch
@@ -635,7 +634,7 @@ function addQueryList(
           :stroke-width="1.8"
           aria-hidden="true"
         />
-      </button>
+      </IconOrb>
     </header>
 
     <div

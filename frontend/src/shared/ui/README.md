@@ -21,7 +21,7 @@
 | `TextInput`                                  | 라벨·도움말·오류가 묶인 텍스트·날짜 입력                  |
 | `AmountInput`                                | 통화 접두 + 우측 정렬 금액 입력                           |
 | `SegmentedControl`                           | `Ongoing \| Past` 형태의 배타 선택                        |
-| `IconOrb`                                    | 44×44 원형 아이콘 버튼                                    |
+| `IconOrb`                                    | 44×44 기본·48×48 헤더용 원형 아이콘 버튼                  |
 | `GaugeBar`                                   | 예산·진행률 막대                                          |
 | `ImagePlaceholder`                           | 이미지 결측 대체 면                                       |
 | `BottomNav`                                  | 하단 탭                                                   |

@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+import IconOrb from '@/shared/ui/IconOrb.vue'
 import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
@@ -62,17 +63,17 @@ function retry(): void {
         (34px 기준 256px)으로 커졌을 때 버튼이 화면 밖으로 밀린다.
         같은 구조의 `ExploreView` 헤더와 크기·모양을 맞춘다.
       -->
-      <button
-        type="button"
-        class="flex size-12 items-center justify-center rounded-pill bg-surface-2 text-ink"
-        :aria-label="t('journey.list.add')"
+      <IconOrb
+        :label="t('journey.list.add')"
+        size="lg"
+        variant="surface"
         @click="goToCreate"
       >
         <IconPlus
           :size="24"
           aria-hidden="true"
         />
-      </button>
+      </IconOrb>
     </header>
 
     <SegmentedControl

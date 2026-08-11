@@ -40,8 +40,8 @@ Display 폰트는 `Sztos`이며 **Adobe Fonts(Typekit)에서 받는다.** 재배
 `index.css`의 `@font-face` 두 블록을 제거했고(#122), 그 자리를 CDN 로더가 대신한다.
 
 로더는 `index.html`의 `<link rel="stylesheet">`이며 kit ID는 `qgv6efy`다. **kit ID는
-비밀값이 아니다.** 공개 페이지의 `<link>`에 그대로 노출되는 값이고, 접근 제어는 Adobe
-쪽 도메인 허용 목록이 한다.
+비밀값이 아니다.** 공개 페이지의 `<link>`에 그대로 노출되며 Adobe Fonts 웹 프로젝트는
+도메인 허용 목록을 사용하지 않는다.
 
 **셀프 호스팅 `woff2`를 다시 추가하지 않는다.**
 
@@ -69,10 +69,11 @@ kit `qgv6efy`는 가변 폰트 하나(`sztos-variable`)를 로마자·이탤릭 
 | `Your trip, on record` 40px | 297px | 138.4px    | 295.7px    |
 | `Journeys` 34px             | 256px | 143.5px    | 259.3px    |
 
-그래서 `index.css`의 `.font-display`가 `font-stretch: 200%`로 폭을 고정한다.
-`font-stretch`는 상속되므로 자식까지 함께 적용되며, Body 폰트 `Noto Sans`는 `wdth`
-상한이 100이라 상속돼도 기본 폭 그대로다. `font-stretch: expanded`(125%)는 부족하니
-**퍼센트로 200%를 적는다.**
+그래서 `index.css`의 `.font-display`가 `font-stretch: 200%`와
+`font-variation-settings: 'wdth' 200`으로 폭을 고정한다. Adobe kit CSS가
+`@font-face`의 stretch 범위를 `normal`로만 선언해 표준 속성만으로는 Chromium에서만
+축이 움직이므로, Firefox·WebKit까지 같은 결과를 내기 위해 `wdth`를 직접 지정한다.
+두 속성은 상속되며 Body 폰트 `Noto Sans`의 `wdth` 상한은 100이라 기본 폭으로 제한된다.
 
 ### Display 굵기 상한은 700이다
 
@@ -106,11 +107,13 @@ grep -rn 'font-display' src --include='*.vue'
 헤더(`text-section-header`), 그리고 온보딩 `WelcomeView`의 40px 헤드라인
 (`--text-welcome-headline`)이 여기 해당한다. **티켓 스탬프도 같은 토큰을 쓴다.**
 
-### 도메인 허용 목록
+### 운영 소유권
 
-Adobe Fonts kit는 등록된 도메인에서만 로드된다. `localhost`, 운영 도메인, 그리고
-**배포마다 URL이 바뀌는 프리뷰 도메인**이 등록돼 있어야 한다. 프리뷰가 빠지면 PR
-프리뷰와 스냅샷 검증에서만 폴백으로 보이고 운영에서는 정상이라, 원인을 찾기 어렵다.
+Adobe Fonts 웹 프로젝트는 도메인 허용 목록을 사용하지 않아 같은 embed code를 어느
+도메인에서든 불러올 수 있다. 대신 kit을 소유한 계정의 Creative Cloud 구독이 끝나면
+웹폰트 제공도 중단되고 `Noto Sans`로 폴백한다. 현재는 개인 계정 소유 kit을 운영
+의존성으로 사용하는 결정을 수용한다. 계정 이전·구독 종료 시에는 새 kit의 embed code로
+교체하며, 계정 이메일이나 결제 정보는 공개 저장소에 기록하지 않는다.
 
 ## 로고
 
@@ -138,6 +141,7 @@ Sztos 로드 여부와 관계없이 워드마크 모양이 유지되고 추가 �
   저장소와 빌드 산출물에 넣지 않는다.
 - **Sztos**: 디자인 번들에 라이선스 파일이 없어 재배포 권한을 확인할 수 없었다. 셀프
   호스팅 파일을 제거하고(#122) Adobe Fonts 웹폰트 사용권으로 대체했다. 사용 조건은
-  [Typekit 이용약관](http://www.adobe.com/products/eulas/tou_typekit)을 따른다.
+  [Adobe Fonts 웹폰트 라이선스](https://helpx.adobe.com/fonts/using/webfont-licensing.html)를
+  따른다.
   이 저장소는 공개이므로 `public/` 아래에 둔 폰트는 빌드 산출물과 배포본에서 누구나
   내려받을 수 있다. **권한이 확인되지 않은 서체 파일을 여기에 두지 않는다.**

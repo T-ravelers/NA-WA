@@ -36,11 +36,16 @@
    * 138.4px, `wdth 200`에서는 295.7px로 렌더된다. `Journeys`(34px)도 시안 256px에
    * `wdth 200`이 259.3px로 맞는다.
    *
-   * `font-stretch`는 상속되므로 자식까지 함께 적용된다. Body 폰트 `Noto Sans`는
-   * `wdth` 상한이 100이라 상속돼도 기본 폭 그대로다.
+   * Adobe kit CSS는 가변 폰트의 `wdth` 축을 싣고도 `@font-face`의 stretch 범위를
+   * `normal`로만 선언한다. 그래서 `font-stretch: 200%`만으로는 Chromium에서만 축이
+   * 움직이고 Firefox·WebKit에서는 기본 폭에 머문다. 표준 속성으로 의도를 남기되,
+   * 세 엔진에서 같은 결과를 내도록 `font-variation-settings`로 `wdth`를 직접 지정한다.
+   * 두 속성은 상속되며 Body 폰트 `Noto Sans`의 `wdth` 상한은 100이라 기본 폭으로
+   * 제한된다.
    */
   .font-display {
     font-stretch: 200%;
+    font-variation-settings: 'wdth' 200;
   }
 
   html {

@@ -16,6 +16,21 @@ describe('IconOrb', () => {
     expect(wrapper.get('button').classes()).toContain('size-11')
   })
 
+  it('supports the 48px header size without changing the default', () => {
+    const wrapper = mount(IconOrb, { props: { label: 'Search', size: 'lg' } })
+
+    expect(wrapper.get('button').classes()).toContain('size-12')
+    expect(wrapper.get('button').classes()).not.toContain('size-11')
+  })
+
+  it('exposes pressed state only for toggle buttons', () => {
+    const regular = mount(IconOrb, { props: { label: 'Go back' } })
+    const toggle = mount(IconOrb, { props: { label: 'Search', pressed: false } })
+
+    expect(regular.get('button').attributes('aria-pressed')).toBeUndefined()
+    expect(toggle.get('button').attributes('aria-pressed')).toBe('false')
+  })
+
   it('renders the icon passed in the slot', () => {
     const wrapper = mount(IconOrb, {
       props: { label: 'Go back' },
