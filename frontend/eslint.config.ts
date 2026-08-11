@@ -62,6 +62,25 @@ export default withVueTs(
   },
 
   {
+    name: 'app/shared-boundaries',
+    files: ['src/shared/**/*.{ts,tsx,vue}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/features/*', '@/features/*/**'],
+              message:
+                'Shared는 Feature를 import할 수 없습니다. Feature 조합은 app에서 처리하세요.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
     ...pluginPlaywright.configs['flat/recommended'],
     name: 'app/playwright-rules',
     files: ['e2e/**/*.{test,spec}.{js,ts,jsx,tsx}'],
