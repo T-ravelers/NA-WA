@@ -93,54 +93,10 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             throw new BusinessException(WalletErrorCode.WALLET_NOT_FOUND);
         }
 
-        //qr_token으로 검색
+        // QR 검증, 검증 객체 return
         QrPaymentResolveTarget target =
-            qrPaymentCodeMapper.findResolveTargetByToken(request.qrToken().trim());
+            findAndValidateActiveQr(payerWallet, request.qrToken());
 
-        //1. 생성되었었던 qr인가
-        if(target == null){
-            throw new BusinessException(WalletErrorCode.QR_PAYMENT_NOT_FOUND);
-        }
-
-        // 2. 완료된 QR은 만료 여부보다 먼저 안내
-        if(target.getCompletedTransferId() != null
-            || target.getPaymentStatus() == QrPaymentStatus.COMPLETED) {
-            throw new BusinessException(WalletErrorCode.QR_PAYMENT_ALREADY_COMPLETED);
-        }
-
-        // 3. 만료된 QR인지
-        if(target.getPaymentStatus() == QrPaymentStatus.EXPIRED){
-            throw new BusinessException(WalletErrorCode.QR_PAYMENT_EXPIRED);
-        }
-
-        // 4. 비활성된 QR인지
-        if(target.getPaymentStatus() != QrPaymentStatus.ACTIVE){
-            throw new BusinessException(WalletErrorCode.QR_PAYMENT_NOT_ACTIVE);
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-
-        // 5. ACTIVE로 남아 있어도 시간상 만료되었다면 EXPIRED로 변경
-        if(target.getExpiresAt() == null || !now.isBefore(target.getExpiresAt())){
-            qrPaymentCodeMapper.markExpiredIfActive(
-                target.getQrPaymentCodeId(),
-                now
-            );
-
-            throw new BusinessException(WalletErrorCode.QR_PAYMENT_EXPIRED);
-        }
-
-        // 6. 자기 자신에 대한 결제일 때
-        if(payerWallet.getWalletId().equals(target.getPayeeWalletId())){
-            throw new BusinessException(WalletErrorCode.QR_SELF_PAYMENT_NOT_ALLOWED);
-        }
-
-        // 7. 결제를 받는 사람의 지갑이 유효하지 않을 때
-        if(!"ACTIVE".equals(target.getPayeeWalletStatus())){
-            throw new BusinessException(WalletErrorCode.QR_PAYEE_WALLET_NOT_ACTIVE);
-        }
-
-        // 8. 모든 예외 케이스에서 걸리지 않는다면 정상적으로 응답
         return new QrPaymentResolveResponse(
             target.getQrPaymentCodeId(),
             target.getPayeeName(),
@@ -187,4 +143,65 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
     }
+
+    // resolve, preview가 사용할 QR 검증 함수
+    private QrPaymentResolveTarget findAndValidateActiveQr(
+        Wallet payerWallet,
+        String qrToken
+    ){
+        //qr_token으로 검색
+        QrPaymentResolveTarget target =
+            qrPaymentCodeMapper.findResolveTargetByToken(qrToken.trim());
+
+        //1. 생성되었었던 qr인가
+        if(target == null){
+            throw new BusinessException(WalletErrorCode.QR_PAYMENT_NOT_FOUND);
+        }
+
+        // 2. 완료된 QR은 만료 여부보다 먼저 안내
+        if(target.getCompletedTransferId() != null
+            || target.getPaymentStatus() == QrPaymentStatus.COMPLETED) {
+            throw new BusinessException(WalletErrorCode.QR_PAYMENT_ALREADY_COMPLETED);
+        }
+
+        // 3. 만료된 QR인지
+        if(target.getPaymentStatus() == QrPaymentStatus.EXPIRED){
+            throw new BusinessException(WalletErrorCode.QR_PAYMENT_EXPIRED);
+        }
+
+        // 4. 비활성된 QR인지
+        if(target.getPaymentStatus() != QrPaymentStatus.ACTIVE){
+            throw new BusinessException(WalletErrorCode.QR_PAYMENT_NOT_ACTIVE);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // 5. ACTIVE로 남아 있어도 시간상 만료되었다면 EXPIRED로 변경
+        if(target.getExpiresAt() == null || !now.isBefore(target.getExpiresAt())){
+            qrPaymentCodeMapper.markExpiredIfActive(
+                target.getQrPaymentCodeId(),
+                now
+            );
+
+            throw new BusinessException(WalletErrorCode.QR_PAYMENT_EXPIRED);
+        }
+
+        // 6. 결제자 자신의 지갑이 유효하지 않을 때
+        if(!"ACTIVE".equals(payerWallet.getWalletStatus())){
+            throw new BusinessException(WalletErrorCode.WALLET_NOT_ACTIVE);
+        }
+
+        // 7. 자기 자신에 대한 결제일 때
+        if(payerWallet.getWalletId().equals(target.getPayeeWalletId())){
+            throw new BusinessException(WalletErrorCode.QR_SELF_PAYMENT_NOT_ALLOWED);
+        }
+
+        // 8. 결제를 받는 사람의 지갑이 유효하지 않을 때
+        if(!"ACTIVE".equals(target.getPayeeWalletStatus())){
+            throw new BusinessException(WalletErrorCode.QR_PAYEE_WALLET_NOT_ACTIVE);
+        }
+
+        return target;
+    }
+
 }
