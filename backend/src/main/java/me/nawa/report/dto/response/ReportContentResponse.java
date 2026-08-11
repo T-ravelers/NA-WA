@@ -14,4 +14,5 @@ public class ReportContentResponse {
 
     private ReportContentJourneyResponse journey;
     private List<ReportContentDayResponse> days;
+    private ReportAnalyticsResponse analytics;
 }

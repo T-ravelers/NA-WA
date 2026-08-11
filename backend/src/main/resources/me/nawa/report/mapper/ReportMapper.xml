@@ -73,6 +73,76 @@
                  ti.trip_item_id ASC
     </select>
 
+    <sql id="eligibleExpenseColumns">
+        t.transfer_id,
+        le.ledger_entry_id,
+        le.amount,
+        DATE(t.completed_at) AS occurred_on,
+        COALESCE(NULLIF(t.spending_category, ''), 'OTHER') AS category,
+        t.memo
+    </sql>
+
+    <select id="findExpenseCandidates"
+            resultType="me.nawa.report.domain.ReportExpense">
+        SELECT <include refid="eligibleExpenseColumns" />,
+               CASE WHEN tel.trip_id = #{tripId} THEN TRUE ELSE FALSE END AS selected
+        FROM wallet_ledger_entries le
+        JOIN wallet_transfers t ON t.transfer_id = le.transfer_id
+        JOIN wallets w ON w.wallet_id = le.wallet_id AND w.deleted_at IS NULL
+        JOIN wallet_owners wo ON wo.wallet_owner_id = w.wallet_owner_id
+            AND wo.member_id = #{memberId} AND wo.deleted_at IS NULL
+        JOIN trips tr ON tr.trip_id = #{tripId} AND tr.member_id = #{memberId}
+            AND tr.deleted_at IS NULL
+        LEFT JOIN trip_expense_links tel ON tel.ledger_entry_id = le.ledger_entry_id
+            AND tel.deleted_at IS NULL
+        WHERE le.entry_type = 'DEBIT' AND le.deleted_at IS NULL
+          AND t.initiator_member_id = #{memberId} AND t.deleted_at IS NULL
+          AND t.currency_code = 'KRW' AND t.transfer_status = 'COMPLETED'
+          AND t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')
+          AND DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date
+          AND (tel.trip_id IS NULL OR tel.trip_id = #{tripId})
+        ORDER BY t.completed_at ASC, t.transfer_id ASC
+    </select>
+
+    <select id="findEligibleExpensesForUpdate"
+            resultType="me.nawa.report.domain.ReportExpense">
+        SELECT <include refid="eligibleExpenseColumns" />,
+               FALSE AS selected
+        FROM wallet_ledger_entries le
+        JOIN wallet_transfers t ON t.transfer_id = le.transfer_id
+        JOIN wallets w ON w.wallet_id = le.wallet_id AND w.deleted_at IS NULL
+        JOIN wallet_owners wo ON wo.wallet_owner_id = w.wallet_owner_id
+            AND wo.member_id = #{memberId} AND wo.deleted_at IS NULL
+        JOIN trips tr ON tr.trip_id = #{tripId} AND tr.member_id = #{memberId}
+            AND tr.deleted_at IS NULL
+        WHERE le.entry_type = 'DEBIT' AND le.deleted_at IS NULL
+          AND t.initiator_member_id = #{memberId} AND t.deleted_at IS NULL
+          AND t.currency_code = 'KRW' AND t.transfer_status = 'COMPLETED'
+          AND t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')
+          AND DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date
+          AND t.transfer_id IN
+          <foreach collection="transferIds" item="transferId" open="(" separator="," close=")">
+              #{transferId}
+          </foreach>
+        FOR UPDATE
+    </select>
+
+    <select id="findLinkedLedgerEntryIdsByTripId" resultType="long">
+        SELECT ledger_entry_id FROM trip_expense_links
+        WHERE trip_id = #{tripId} AND deleted_at IS NULL
+        ORDER BY ledger_entry_id ASC
+    </select>
+
+    <select id="findLinkedTripIdByLedgerEntryId" resultType="long">
+        SELECT trip_id FROM trip_expense_links
+        WHERE ledger_entry_id = #{ledgerEntryId} AND deleted_at IS NULL
+    </select>
+
+    <insert id="insertTripExpenseLink">
+        INSERT INTO trip_expense_links (trip_id, ledger_entry_id)
+        VALUES (#{tripId}, #{ledgerEntryId})
+    </insert>
+
     <insert id="insertReport" useGeneratedKeys="true" keyProperty="reportId">
         INSERT INTO reports
             (trip_id, generation_status, locale, report_content, generated_at)

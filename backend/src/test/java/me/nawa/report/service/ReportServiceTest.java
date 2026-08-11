@@ -128,6 +128,23 @@ class ReportServiceTest {
     }
 
     @Test
+    void createReport_rejectsDuplicateSelectedTransferIdsBeforeReadingJourney() {
+        ReportCreateRequest request = new ReportCreateRequest();
+        request.setTransferIds(List.of(10L, 10L));
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> reportService.createReport(1L, 1L, request)
+        );
+
+        assertEquals(
+            ReportErrorCode.INVALID_REPORT_EXPENSE,
+            exception.getErrorCode()
+        );
+        verify(reportMapper, never()).findJourneyForUpdate(1L);
+    }
+
+    @Test
     void createReport_rejectsJourneyThatHasNotEndedInKorea() {
         ReportJourney journey = ReportJourney.builder()
             .tripId(1L)

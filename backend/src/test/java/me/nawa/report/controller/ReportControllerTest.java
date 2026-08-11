@@ -26,6 +26,7 @@ import me.nawa.report.dto.response.ReportContentItemResponse;
 import me.nawa.report.dto.response.ReportContentJourneyResponse;
 import me.nawa.report.dto.response.ReportContentResponse;
 import me.nawa.report.dto.response.ReportDetailResponse;
+import me.nawa.report.dto.response.ReportExpenseCandidateResponse;
 import me.nawa.report.dto.response.ReportSummaryResponse;
 import me.nawa.report.exception.ReportErrorCode;
 import me.nawa.report.service.ReportService;
@@ -121,6 +122,31 @@ class ReportControllerTest {
         assertTrue(body.path("success").asBoolean());
         assertTrue(body.path("data").isArray());
         assertEquals(0, body.path("data").size());
+    }
+
+    @Test
+    void getExpenseCandidates_returnsOwnedCandidates() throws Exception {
+        when(reportService.getExpenseCandidates(1L, 10L)).thenReturn(List.of(
+            ReportExpenseCandidateResponse.builder()
+                .transferId(99L)
+                .amount(new java.math.BigDecimal("12000"))
+                .occurredOn(LocalDate.of(2026, 8, 2))
+                .category("FOOD")
+                .memo("Lunch")
+                .selected(false)
+                .build()
+        ));
+
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/10/report-expense-candidates")
+            )
+            .andExpect(status().isOk())
+            .andReturn().getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode candidate = objectMapper.readTree(responseBody).path("data").get(0);
+        assertEquals(99L, candidate.path("transferId").asLong());
+        assertEquals("FOOD", candidate.path("category").asText());
     }
 
     @Test
