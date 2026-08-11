@@ -68,6 +68,8 @@ export interface AppointmentMember {
   isHost: boolean
 }
 
+export type AppointmentAttendanceStatus = AppointmentMember['attendanceStatus']
+
 export interface AppointmentDetail extends AppointmentSummary {
   meetingAddress: string | null
   description: string | null

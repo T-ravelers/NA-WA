@@ -113,5 +113,22 @@ export default {
       confirm: 'Pay ₩{amount}',
       cancel: 'Cancel',
     },
+    attendance: {
+      title: 'After the appointment',
+      subtitle: 'Confirm attendance',
+      members: 'Appointment members',
+      status: {
+        PENDING: 'Pending',
+        ATTENDED: 'Attended',
+        NO_SHOW: 'No-show',
+      },
+      toggle: 'Toggle attendance for {name}',
+      save: 'Attendance checked',
+      savePending: 'Attendance saving will be connected separately.',
+      invalidTitle: 'Attendance could not be loaded',
+      invalidDescription: 'The appointment link is invalid.',
+      loadFailed: 'Attendance could not be loaded',
+      loadFailedDescription: 'Please try again in a moment.',
+    },
   },
 }
