@@ -5,6 +5,11 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
 
+/**
+ * 게임 정산 상태 응답
+ *
+ * 게임형 정산의 진행 상태, 참여자 동의 및 확정 부담자 정보를 반환합니다.
+ */
 @Getter
 @Builder
 public class SettlementGameResponse {
