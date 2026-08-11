@@ -47,7 +47,7 @@ const membersQuery = useQuery({
 const appointment = computed(() => detailQuery.data.value)
 const members = computed(() =>
   (membersQuery.data.value ?? appointment.value?.members ?? []).filter(
-    (member) => member.attendanceStatus === 'ATTENDED',
+    (member) => member.membershipStatus === 'ACTIVE',
   ),
 )
 
@@ -275,7 +275,7 @@ function closeDepositSheet(): void {
           id="appointment-members-heading"
           class="text-title text-ink"
         >
-          {{ t('appointment.members.attending') }}
+          {{ t('appointment.members.title') }}
         </h2>
 
         <StateLoading

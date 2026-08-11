@@ -5,7 +5,7 @@ import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
-import type { AppointmentMember } from '../api/appointmentApi'
+import type { AppointmentAttendanceStatus, AppointmentMember } from '../api/appointmentApi'
 
 interface Props {
   members: AppointmentMember[]
@@ -17,6 +17,12 @@ const { t } = useI18n()
 
 function initials(displayName: string): string {
   return displayName.trim().charAt(0).toUpperCase() || '?'
+}
+
+function attendanceTone(status: AppointmentAttendanceStatus) {
+  if (status === 'ATTENDED') return 'settlement'
+  if (status === 'PENDING') return 'pending'
+  return 'onPaper'
 }
 </script>
 
@@ -54,6 +60,9 @@ function initials(displayName: string): string {
             <p class="mt-1 text-caption text-ink-3">
               {{ t(`appointment.languages.${member.preferredLanguage}`) }}
             </p>
+            <AppBadge :tone="attendanceTone(member.attendanceStatus)">
+              {{ t(`appointment.attendance.status.${member.attendanceStatus}`) }}
+            </AppBadge>
           </div>
 
           <AppButton

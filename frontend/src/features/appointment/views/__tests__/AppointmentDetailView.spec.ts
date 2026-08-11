@@ -59,6 +59,17 @@ const members = [
   },
 ]
 
+const leftMember = {
+  appointmentMemberId: 3,
+  memberId: 13,
+  displayName: 'Jamie Lee',
+  profileImageUrl: null,
+  preferredLanguage: 'vi' as const,
+  membershipStatus: 'LEFT' as const,
+  attendanceStatus: 'NO_SHOW' as const,
+  isHost: false,
+}
+
 async function mountView() {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -103,7 +114,7 @@ describe('AppointmentDetailView', () => {
     fetchAppointment.mockReset()
     fetchAppointmentMembers.mockReset()
     fetchAppointment.mockResolvedValue(appointment)
-    fetchAppointmentMembers.mockResolvedValue(members)
+    fetchAppointmentMembers.mockResolvedValue([...members, leftMember])
   })
 
   it('renders appointment details, members, and opens deposit confirmation', async () => {
@@ -112,8 +123,10 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).toContain('Seongsu K-Beauty Tour')
     expect(wrapper.text()).toContain('Seongsu Beauty Lab')
     expect(wrapper.text()).toContain('Mina Park')
+    expect(wrapper.text()).toContain('Alex Kim')
+    expect(wrapper.text()).toContain('Not attended')
     expect(wrapper.text()).toContain('Host')
-    expect(wrapper.text()).not.toContain('Alex Kim')
+    expect(wrapper.text()).not.toContain('Jamie Lee')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
@@ -133,7 +146,7 @@ describe('AppointmentDetailView', () => {
     const { wrapper, router } = await mountView()
 
     expect(wrapper.text()).not.toContain('View all')
-    expect(wrapper.findAll('button').filter((button) => button.text() === 'Visit')).toHaveLength(1)
+    expect(wrapper.findAll('button').filter((button) => button.text() === 'Visit')).toHaveLength(2)
 
     await wrapper
       .findAll('button')

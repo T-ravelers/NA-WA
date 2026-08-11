@@ -28,6 +28,7 @@ describe('AppointmentMemberList', () => {
     expect(wrapper.text()).toContain('Mina Park')
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).toContain('English')
+    expect(wrapper.text()).toContain('Not attended')
     expect(wrapper.text()).toContain('Visit')
   })
 
