@@ -97,17 +97,18 @@ describe('ReportDetailView', () => {
     queryClients.splice(0).forEach((client) => client.clear())
   })
 
-  it('renders the immutable snapshot and text-table analytics without excluded controls', async () => {
+  it('renders the immutable snapshot and accessible dashboard analytics without excluded controls', async () => {
     const { wrapper } = await mountView()
 
     expect(fetchReport).toHaveBeenCalledWith(100)
     expect(wrapper.get('h1').text()).toBe('Final report')
     expect(wrapper.text()).toContain('Jeju Night Market · EVENT · ADDED')
     expect(wrapper.text()).toContain('₩1,284,500')
-    expect(wrapper.text()).toContain('77.85%')
+    expect(wrapper.text()).toContain('78%')
     expect(wrapper.text()).toContain('2026.07.19')
     expect(wrapper.text()).toContain('₩0')
-    expect(wrapper.findAll('table')).toHaveLength(2)
+    expect(wrapper.find('polyline').exists()).toBe(true)
+    expect(wrapper.findAll('table')).toHaveLength(0)
     expect(wrapper.find('button[aria-label="Share"]').exists()).toBe(false)
     expect(wrapper.findAll('button').some((button) => button.text() === 'Group')).toBe(false)
     expect(wrapper.text()).not.toContain('similar travelers')

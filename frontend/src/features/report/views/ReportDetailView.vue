@@ -8,15 +8,17 @@ import AppCard from '@/shared/ui/AppCard.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
+import ReportCategoryBreakdown from '../components/presentation/ReportCategoryBreakdown.vue'
+import ReportDailyTrend from '../components/presentation/ReportDailyTrend.vue'
+import ReportKpiCard from '../components/presentation/ReportKpiCard.vue'
+import type {
+  ReportCategoryBreakdownItem,
+  ReportDailyTrendPoint,
+  ReportKpiData,
+} from '../components/presentation/types'
 import { useReportDetailQuery } from '../composables/useReportQueries'
 import { isReportForbidden, isReportNotFound, reportErrorMessageKey } from '../model/reportErrors'
-import {
-  formatKrwAmount,
-  formatPercentage,
-  formatReportDate,
-  isZeroAmount,
-  parsePositiveRouteId,
-} from '../model/reportModel'
+import { formatReportDate, isZeroAmount, parsePositiveRouteId } from '../model/reportModel'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,6 +36,34 @@ const errorDescription = computed(() =>
 )
 const isZeroSpending = computed(
   () => report.value?.analytics !== null && isZeroAmount(report.value?.analytics.totalSpent ?? '0'),
+)
+const reportKpi = computed<ReportKpiData | null>(() => {
+  const analytics = report.value?.analytics
+
+  if (analytics === null || analytics === undefined) {
+    return null
+  }
+
+  return {
+    totalSpent: Number(analytics.totalSpent),
+    dailyAverage: Number(analytics.dailyAverage),
+    currency: 'KRW',
+  }
+})
+const reportCategories = computed<ReportCategoryBreakdownItem[]>(() =>
+  (report.value?.analytics?.categoryBreakdown ?? []).map((row) => ({
+    category: row.category,
+    label: row.category,
+    amount: Number(row.amount),
+    percentage: Number(row.percentage),
+  })),
+)
+const reportTrend = computed<ReportDailyTrendPoint[]>(() =>
+  (report.value?.analytics?.dailyTrend ?? []).map((row) => ({
+    date: row.date,
+    label: formatReportDate(row.date),
+    amount: Number(row.amount),
+  })),
 )
 
 function goBack(): void {
@@ -163,7 +193,8 @@ function retry(): void {
       </section>
 
       <section
-        class="flex flex-col gap-4"
+        v-if="report.analytics === null"
+        class="flex flex-col gap-3"
         aria-labelledby="report-analysis-title"
       >
         <h2
@@ -172,138 +203,47 @@ function retry(): void {
         >
           {{ t('report.detail.analysis') }}
         </h2>
-
-        <AppCard v-if="report.analytics === null">
+        <AppCard>
           <h3 class="text-title text-ink">{{ t('report.detail.legacyTitle') }}</h3>
           <p class="mt-2 text-body-sm text-ink-3">
             {{ t('report.detail.legacyDescription') }}
           </p>
         </AppCard>
-
-        <template v-else>
-          <AppCard tone="paper">
-            <dl class="grid grid-cols-2 gap-4">
-              <div>
-                <dt class="text-label">{{ t('report.detail.totalSpent') }}</dt>
-                <dd class="mt-1 text-title">{{ formatKrwAmount(report.analytics.totalSpent) }}</dd>
-              </div>
-              <div>
-                <dt class="text-label">{{ t('report.detail.dailyAverage') }}</dt>
-                <dd class="mt-1 text-title">
-                  {{ formatKrwAmount(report.analytics.dailyAverage) }}
-                </dd>
-              </div>
-            </dl>
-          </AppCard>
-
-          <AppCard v-if="isZeroSpending">
-            <h3 class="text-title text-ink">{{ t('report.detail.zeroTitle') }}</h3>
-            <p class="mt-2 text-body-sm text-ink-3">
-              {{ t('report.detail.zeroDescription') }}
-            </p>
-          </AppCard>
-
-          <section
-            class="flex flex-col gap-3"
-            aria-labelledby="report-category-title"
-          >
-            <h3
-              id="report-category-title"
-              class="text-title text-ink"
-            >
-              {{ t('report.detail.categoryTitle') }}
-            </h3>
-            <p
-              v-if="report.analytics.categoryBreakdown.length === 0"
-              class="text-body-sm text-ink-3"
-            >
-              {{ t('report.detail.categoryEmpty') }}
-            </p>
-            <div
-              v-else
-              class="overflow-x-auto"
-            >
-              <table class="w-full border-collapse text-left text-body-sm">
-                <thead>
-                  <tr class="border-b border-hairline text-ink-3">
-                    <th class="p-2 font-medium">{{ t('report.detail.category') }}</th>
-                    <th class="p-2 text-right font-medium">{{ t('report.detail.amount') }}</th>
-                    <th class="p-2 text-right font-medium">{{ t('report.detail.share') }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="row in report.analytics.categoryBreakdown"
-                    :key="row.category"
-                    class="border-b border-hairline"
-                  >
-                    <th
-                      scope="row"
-                      class="p-2 font-medium text-ink"
-                    >
-                      {{ row.category }}
-                    </th>
-                    <td class="p-2 text-right text-ink">
-                      {{ formatKrwAmount(row.amount) }}
-                    </td>
-                    <td class="p-2 text-right text-ink">
-                      {{ formatPercentage(row.percentage) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section
-            class="flex flex-col gap-3"
-            aria-labelledby="report-trend-title"
-          >
-            <h3
-              id="report-trend-title"
-              class="text-title text-ink"
-            >
-              {{ t('report.detail.trendTitle') }}
-            </h3>
-            <p
-              v-if="report.analytics.dailyTrend.length === 0"
-              class="text-body-sm text-ink-3"
-            >
-              {{ t('report.detail.trendEmpty') }}
-            </p>
-            <div
-              v-else
-              class="overflow-x-auto"
-            >
-              <table class="w-full border-collapse text-left text-body-sm">
-                <thead>
-                  <tr class="border-b border-hairline text-ink-3">
-                    <th class="p-2 font-medium">{{ t('report.detail.date') }}</th>
-                    <th class="p-2 text-right font-medium">{{ t('report.detail.amount') }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="row in report.analytics.dailyTrend"
-                    :key="row.date"
-                    class="border-b border-hairline"
-                  >
-                    <th
-                      scope="row"
-                      class="p-2 font-medium text-ink"
-                    >
-                      {{ formatReportDate(row.date) }}
-                    </th>
-                    <td class="p-2 text-right text-ink">
-                      {{ formatKrwAmount(row.amount) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </template>
       </section>
+
+      <template v-else-if="reportKpi !== null">
+        <ReportKpiCard
+          :heading="t('report.detail.analysis')"
+          :data="reportKpi"
+          :total-label="t('report.detail.totalSpent')"
+          :daily-average-label="t('report.detail.dailyAverage')"
+        />
+
+        <AppCard v-if="isZeroSpending">
+          <h2 class="text-title text-ink">{{ t('report.detail.zeroTitle') }}</h2>
+          <p class="mt-2 text-body-sm text-ink-3">
+            {{ t('report.detail.zeroDescription') }}
+          </p>
+        </AppCard>
+
+        <ReportCategoryBreakdown
+          :heading="t('report.detail.categoryTitle')"
+          :items="reportCategories"
+          currency="KRW"
+          :description="t('report.detail.categoryDescription')"
+          :empty-title="t('report.detail.categoryTitle')"
+          :empty-description="t('report.detail.categoryEmpty')"
+        />
+
+        <ReportDailyTrend
+          :heading="t('report.detail.trendTitle')"
+          :points="reportTrend"
+          currency="KRW"
+          :description="t('report.detail.trendDescription')"
+          :empty-title="t('report.detail.trendTitle')"
+          :empty-description="t('report.detail.trendEmpty')"
+        />
+      </template>
     </template>
   </main>
 </template>
