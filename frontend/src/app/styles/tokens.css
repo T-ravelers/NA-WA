@@ -115,10 +115,15 @@
   --font-display: 'sztos-variable', 'Noto Sans', sans-serif;
   --font-body: 'Noto Sans', sans-serif;
 
-  /* ── 타이포 스케일 ── */
+  /* ── 타이포 스케일 ──
+   * Display 토큰의 굵기 상한은 **700**이다. 시안은 화면 제목과 티켓 제목에
+   * `Sztos ExtraBold`(800)를 지정하지만, Adobe Fonts가 싣고 있는 `Sztos Variable`의
+   * `wght` 축이 700에서 끝난다. Adobe Fonts에 정적 `Sztos` 패밀리는 없다. 800을 적어도
+   * 700으로 잘리므로, 렌더되지 않는 값을 토큰에 남기지 않는다. Body 폰트(`Noto Sans`,
+   * `wght 100–900`)를 쓰는 곳은 이 상한과 무관하다. */
   --text-screen-title: 34px;
   --text-screen-title--line-height: 35.7px;
-  --text-screen-title--font-weight: 800;
+  --text-screen-title--font-weight: 700;
   --text-screen-title--letter-spacing: 0.2px;
 
   --text-section-header: 22px;
@@ -135,10 +140,10 @@
   --text-welcome-stamp--line-height: 1.2;
   --text-welcome-stamp--letter-spacing: 0.5px;
 
-  /* 여정 티켓 제목. 1줄, 초과 시 말줄임. */
+  /* 여정 티켓 제목. 1줄, 초과 시 말줄임. 아직 쓰는 화면이 없다. */
   --text-trip-ticket-title: 24px;
   --text-trip-ticket-title--line-height: 1.15;
-  --text-trip-ticket-title--font-weight: 800;
+  --text-trip-ticket-title--font-weight: 700;
 
   /* 카테고리 티켓 제목. */
   --text-category-ticket-title: 18px;

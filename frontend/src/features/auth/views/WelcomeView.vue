@@ -44,7 +44,8 @@ const router = useRouter()
           <span class="font-display text-caption tracking-wide text-on-category/65 uppercase">
             {{ t('auth.welcome.passLabel') }}
           </span>
-          <span class="font-display text-section-header font-extrabold text-on-category uppercase">
+          <!-- 시안은 ExtraBold(800)이지만 Sztos Variable의 wght 축이 700에서 끝난다. -->
+          <span class="font-display text-section-header text-on-category uppercase">
             {{ t('auth.welcome.passTitle') }}
           </span>
         </div>

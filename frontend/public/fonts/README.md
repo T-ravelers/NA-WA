@@ -66,10 +66,24 @@ kit `qgv6efy`는 가변 폰트 하나(`sztos-variable`)를 로마자·이탤릭 
 대신하고, 200은 그보다 훨씬 넓은 별도 폭이다. **`font-variation-settings`로 `wdth`를
 건드리지 않는다.** 기본값이 곧 시안이다.
 
-`wght` 상한은 700이라 800을 요청하는 곳(`--text-screen-title--font-weight`,
-`WelcomeView`의 `font-extrabold`)은 700으로 잘린다. Chromium에서 700과 800의 렌더 폭이
-294.61px로 같아 **합성 볼드는 얹히지 않는다**(2026-08-11 실측). 다른 엔진은 확인하지
-않았다.
+### Display 굵기 상한은 700이다
+
+**시안의 `Sztos ExtraBold`(800)는 쓸 수 없다.** Adobe Fonts가 싣고 있는 패밀리는
+`Sztos Variable` 하나뿐이고 `wght` 축이 700에서 끝난다. 정적 `Sztos` 패밀리는
+Adobe Fonts에 존재하지 않는다(`fonts.adobe.com/fonts/sztos`는 404). 시안의 ExtraBold은
+디자이너 데스크톱 폰트에서 온 것이며, 그 파일은 라이선스상 셀프 호스팅할 수 없다.
+
+800을 적어도 브라우저가 700으로 자른다. Chromium에서 700과 800의 렌더 폭이 294.61px로
+같아 합성 볼드는 얹히지 않았다(2026-08-11 실측). 다른 엔진은 확인하지 않았다.
+
+**그래서 Display 토큰의 굵기 상한을 700으로 확정했다.** 렌더되지 않는 값을 토큰에
+남기지 않는다. 시안이 요구하는 ExtraLight(200)와 Bold(700)는 모두 정상 동작한다.
+
+이 상한은 `--font-display`를 쓰는 곳에만 적용된다. Body 폰트 `Noto Sans`는
+`wght 100–900`이라 지갑 금액처럼 `font-extrabold`(800)를 쓰는 곳은 영향이 없다.
+
+800을 되살리려면 제작사 [Capitalics](https://capitalics.wtf)에서 웹폰트 라이선스를
+직접 구매해야 한다. Adobe Fonts kit에 웨이트를 추가하는 방법으로는 해결되지 않는다.
 
 ### 어디에 영향이 있는가
 
