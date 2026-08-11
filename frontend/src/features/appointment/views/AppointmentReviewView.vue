@@ -84,6 +84,9 @@ const reviewMutation = useMutation({
     failedMemberId.value = null
     expandedMemberId.value = null
   },
+  onError: (_error, variables) => {
+    failedMemberId.value = variables.request.reviewedAppointmentMemberId
+  },
   onSettled: () => {
     pendingMemberId.value = null
   },
