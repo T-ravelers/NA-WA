@@ -7,6 +7,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/AppointmentListView.vue'),
     meta: { requiresAuth: true, hideBottomNav: true },
   },
+  {
+    path: '/appointments/new',
+    name: 'appointment-create',
+    component: () => import('./views/AppointmentCreateView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
 ]
 
 export default routes
