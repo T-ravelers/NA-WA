@@ -32,6 +32,7 @@ class ReportMapperXmlTest {
 
         String namespace = "me.nawa.report.mapper.ReportMapper.";
         assertTrue(configuration.hasStatement(namespace + "findJourneyForUpdate"));
+        assertTrue(configuration.hasStatement(namespace + "findJourneyById"));
         assertTrue(configuration.hasStatement(namespace + "findActiveReportByTripId"));
         assertTrue(configuration.hasStatement(namespace + "findTimelineItemsByTripId"));
         assertTrue(configuration.hasStatement(namespace + "insertReport"));
@@ -49,6 +50,45 @@ class ReportMapperXmlTest {
         assertTrue(lockSql.contains("FROM trips"));
         assertTrue(lockSql.contains("deleted_at IS NULL"));
         assertTrue(lockSql.endsWith("FOR UPDATE"));
+
+        MappedStatement readStatement = configuration.getMappedStatement(
+            namespace + "findJourneyById"
+        );
+        String readSql = readStatement
+            .getBoundSql(Map.of("tripId", 1L))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+        assertTrue(readSql.contains("FROM trips"));
+        assertTrue(readSql.contains("deleted_at IS NULL"));
+        assertTrue(!readSql.contains("FOR UPDATE"));
+
+        MappedStatement candidateStatement = configuration.getMappedStatement(
+            namespace + "findExpenseCandidates"
+        );
+        String candidateSql = candidateStatement
+            .getBoundSql(Map.of("tripId", 1L, "memberId", 1L))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+        assertTrue(candidateSql.contains(
+            "LEFT JOIN trip_expense_links tel ON "
+                + "tel.ledger_entry_id = le.ledger_entry_id"
+        ));
+        assertTrue(candidateSql.contains("tel.ledger_entry_id IS NULL"));
+        assertTrue(candidateSql.contains(
+            "tel.trip_id = ? AND tel.deleted_at IS NULL"
+        ));
+
+        MappedStatement linkedTripStatement = configuration.getMappedStatement(
+            namespace + "findLinkedTripIdByLedgerEntryId"
+        );
+        String linkedTripSql = linkedTripStatement
+            .getBoundSql(Map.of("ledgerEntryId", 1L))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+        assertTrue(!linkedTripSql.contains("deleted_at"));
 
         MappedStatement timelineStatement = configuration.getMappedStatement(
             namespace + "findTimelineItemsByTripId"

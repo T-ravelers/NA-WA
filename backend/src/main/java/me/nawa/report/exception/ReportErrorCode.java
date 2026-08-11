@@ -43,6 +43,18 @@ public enum ReportErrorCode implements ErrorCode {
         HttpStatus.NOT_FOUND,
         "REPORT-006",
         "Journey was not found."
+    ),
+
+    INVALID_REPORT_EXPENSE(
+        HttpStatus.BAD_REQUEST,
+        "REPORT-007",
+        "Selected expense is invalid."
+    ),
+
+    REPORT_EXPENSE_ALREADY_LINKED(
+        HttpStatus.CONFLICT,
+        "REPORT-008",
+        "Selected expense is already linked to a Journey."
     );
 
     private final HttpStatus status;
