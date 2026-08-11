@@ -6,7 +6,7 @@ import me.nawa.common.response.ApiResponse;
 import me.nawa.settlement.dto.request.ReceiptAllocationUpdateRequest;
 import me.nawa.settlement.dto.request.ReceiptItemUpdateRequest;
 import me.nawa.settlement.dto.response.ReceiptAnalysisResponse;
-import me.nawa.settlement.service.SettlementService;
+import me.nawa.settlement.service.ReceiptAnalysisService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,16 +21,16 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * 영수증 정산 분석 API
+ * 영수증 기반 정산 생성 화면의 API다.
  *
- * 영수증 분석 결과의 생성, 항목 수정 및 참여자별 배분 확정 요청을 처리합니다.
+ * 사용자가 영수증 파일을 선택하고, 인식 항목을 수정한 뒤 참여자별 수량 배분을 확정할 때 사용한다.
  */
 @RestController
 @RequestMapping("/api/v1/settlements/receipt-analyses")
 @RequiredArgsConstructor
 public class SettlementReceiptAnalysisController {
 
-    private final SettlementService settlementService;
+    private final ReceiptAnalysisService receiptAnalysisService;
 
     /**
      * 영수증 분석
@@ -44,7 +44,7 @@ public class SettlementReceiptAnalysisController {
         @RequestParam Long sourceTransferId,
         @RequestPart MultipartFile file
     ) {
-        return ApiResponse.success(settlementService.analyzeReceipt(
+        return ApiResponse.success(receiptAnalysisService.analyzeReceipt(
             member.getMemberId(), sourceTransferId, file
         ));
     }
@@ -60,7 +60,7 @@ public class SettlementReceiptAnalysisController {
         @PathVariable Long receiptAnalysisId,
         @RequestBody ReceiptItemUpdateRequest request
     ) {
-        return ApiResponse.success(settlementService.updateReceiptItems(
+        return ApiResponse.success(receiptAnalysisService.updateReceiptItems(
             member.getMemberId(), receiptAnalysisId, request
         ));
     }
@@ -76,7 +76,7 @@ public class SettlementReceiptAnalysisController {
         @PathVariable Long receiptAnalysisId,
         @RequestBody ReceiptAllocationUpdateRequest request
     ) {
-        settlementService.updateReceiptAllocations(
+        receiptAnalysisService.updateReceiptAllocations(
             member.getMemberId(), receiptAnalysisId, request
         );
         return ApiResponse.success();

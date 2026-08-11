@@ -6,7 +6,7 @@ import me.nawa.common.response.ApiResponse;
 import me.nawa.settlement.dto.request.GameConsentRequest;
 import me.nawa.settlement.dto.response.SettlementGameResponse;
 import me.nawa.settlement.dto.response.SettlementGameResultResponse;
-import me.nawa.settlement.service.SettlementService;
+import me.nawa.settlement.service.SettlementGameService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,16 +16,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 정산 게임 API
+ * 게임형 정산의 동의·대기·결과 화면 API다.
  *
- * 게임형 정산의 동의, 진행 상태, 시작 및 결과 조회 요청을 처리합니다.
+ * 참여자의 동의 또는 거절, 생성자의 게임 시작, 게임 대기와 결과 화면 진입 시 사용한다.
  */
 @RestController
 @RequestMapping("/api/v1/settlements/{settlementId}/game")
 @RequiredArgsConstructor
 public class SettlementGameController {
 
-    private final SettlementService settlementService;
+    private final SettlementGameService settlementGameService;
 
     /**
      * 게임 동의 제출
@@ -38,7 +38,7 @@ public class SettlementGameController {
         @PathVariable Long settlementId,
         @RequestBody GameConsentRequest request
     ) {
-        settlementService.submitGameConsent(
+        settlementGameService.submitGameConsent(
             member.getMemberId(), settlementId, request
         );
         return ApiResponse.success();
@@ -54,7 +54,7 @@ public class SettlementGameController {
         @AuthenticationPrincipal AuthenticatedMember member,
         @PathVariable Long settlementId
     ) {
-        return ApiResponse.success(settlementService.getGame(
+        return ApiResponse.success(settlementGameService.getGame(
             member.getMemberId(), settlementId
         ));
     }
@@ -69,7 +69,7 @@ public class SettlementGameController {
         @AuthenticationPrincipal AuthenticatedMember member,
         @PathVariable Long settlementId
     ) {
-        settlementService.startGame(member.getMemberId(), settlementId);
+        settlementGameService.startGame(member.getMemberId(), settlementId);
         return ApiResponse.success();
     }
 
@@ -83,7 +83,7 @@ public class SettlementGameController {
         @AuthenticationPrincipal AuthenticatedMember member,
         @PathVariable Long settlementId
     ) {
-        return ApiResponse.success(settlementService.getGameResult(
+        return ApiResponse.success(settlementGameService.getGameResult(
             member.getMemberId(), settlementId
         ));
     }

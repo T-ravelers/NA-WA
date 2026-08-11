@@ -22,7 +22,11 @@ import me.nawa.settlement.dto.request.GameConsentRequest;
 import me.nawa.settlement.dto.request.ReceiptAllocationUpdateRequest;
 import me.nawa.settlement.dto.request.ReceiptItemUpdateRequest;
 import me.nawa.settlement.dto.response.SettlementCreateResponse;
-import me.nawa.settlement.service.SettlementService;
+import me.nawa.settlement.service.ReceiptAnalysisService;
+import me.nawa.settlement.service.SettlementCreationService;
+import me.nawa.settlement.service.SettlementGameService;
+import me.nawa.settlement.service.SettlementPaymentService;
+import me.nawa.settlement.service.SettlementQueryService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +45,15 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class SettlementControllerTest {
 
     @Mock
-    private SettlementService settlementService;
+    private SettlementQueryService settlementQueryService;
+    @Mock
+    private SettlementCreationService settlementCreationService;
+    @Mock
+    private SettlementPaymentService settlementPaymentService;
+    @Mock
+    private ReceiptAnalysisService receiptAnalysisService;
+    @Mock
+    private SettlementGameService settlementGameService;
 
     @Mock
     private MockMvc mockMvc;
@@ -51,9 +63,9 @@ class SettlementControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new SettlementController(settlementService),
-                new SettlementReceiptAnalysisController(settlementService),
-                new SettlementGameController(settlementService)
+                new SettlementController(settlementQueryService, settlementCreationService, settlementPaymentService),
+                new SettlementReceiptAnalysisController(receiptAnalysisService),
+                new SettlementGameController(settlementGameService)
             )
             .setControllerAdvice(new GlobalExceptionHandler())
             .setCustomArgumentResolvers(
@@ -77,7 +89,7 @@ class SettlementControllerTest {
 
     @Test
     void createSettlement_returns201WithServerGeneratedId() throws Exception {
-        when(settlementService.createSettlement(
+        when(settlementCreationService.createSettlement(
             eq(1L), any(CreateSettlementRequest.class)
         )).thenReturn(SettlementCreateResponse.builder().id(69L).build());
 
