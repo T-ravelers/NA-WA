@@ -83,15 +83,6 @@ function retry(): void {
   void membersQuery.refetch()
   void profileQuery.refetch()
 }
-
-function saveAttendance(): void {
-  if (appointmentId.value === null) return
-
-  void router.push({
-    name: 'appointment-detail',
-    params: { appointmentId: appointmentId.value },
-  })
-}
 </script>
 
 <template>
@@ -138,6 +129,7 @@ function saveAttendance(): void {
     <template v-else-if="detailQuery.data.value !== undefined">
       <section class="flex flex-col gap-4">
         <p class="text-caption text-ink-3">{{ t('appointment.attendance.subtitle') }}</p>
+        <p class="text-caption text-ink-3">{{ t('appointment.attendance.saveUnavailable') }}</p>
         <h2 class="font-display text-screen-title text-ink-display">
           {{ detailQuery.data.value.appointmentName }}
         </h2>
@@ -215,7 +207,8 @@ function saveAttendance(): void {
       >
         <AppButton
           block
-          @click="saveAttendance"
+          disabled
+          :title="t('appointment.attendance.saveUnavailable')"
         >
           {{ t('appointment.attendance.save') }}
         </AppButton>

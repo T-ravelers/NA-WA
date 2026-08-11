@@ -165,6 +165,7 @@ export default {
       },
       toggle: 'Toggle attendance for {name}',
       save: 'Attendance checked',
+      saveUnavailable: 'Attendance saving will be available when the API is connected.',
       invalidTitle: 'Attendance could not be loaded',
       invalidDescription: 'The appointment link is invalid.',
       accessDeniedTitle: 'Host access required',

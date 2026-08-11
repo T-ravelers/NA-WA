@@ -118,7 +118,7 @@ describe('AppointmentAttendanceView', () => {
     useAppointmentMemberProfileMock.mockReturnValue(profileQuery)
   })
 
-  it('renders attendance controls with an enabled save action', async () => {
+  it('renders attendance controls with a disabled save action', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Confirm attendance')
@@ -130,7 +130,10 @@ describe('AppointmentAttendanceView', () => {
         .findAll('button')
         .find((button) => button.text() === 'Attendance checked')
         ?.attributes('disabled'),
-    ).toBeUndefined()
+    ).toBeDefined()
+    expect(wrapper.text()).toContain(
+      'Attendance saving will be available when the API is connected.',
+    )
   })
 
   it('toggles a pending member to attended locally', async () => {
@@ -144,16 +147,16 @@ describe('AppointmentAttendanceView', () => {
     expect(wrapper.text()).toContain('Attended')
   })
 
-  it('returns to the appointment detail after the host checks attendance', async () => {
+  it('keeps the host on the attendance screen until saving is supported', async () => {
     const { wrapper, router } = await mountView()
-    const saveButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Attendance checked')
 
-    await saveButton?.trigger('click')
-    await flushPromises()
-
-    expect(router.currentRoute.value.name).toBe('appointment-detail')
+    expect(router.currentRoute.value.name).toBe('appointment-attendance')
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Attendance checked')
+        ?.attributes('disabled'),
+    ).toBeDefined()
   })
 
   it('hides attendance controls from non-host members', async () => {
