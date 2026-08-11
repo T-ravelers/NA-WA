@@ -20,14 +20,34 @@
 
 /*
  * Display 폰트 `Sztos`의 `@font-face`는 여기 있었다. 재배포 권한이 확인되지 않아
- * 셀프 호스팅 파일을 제거했다(#122). 셀프 호스팅으로 되돌리지 않는다.
+ * 셀프 호스팅 파일을 제거했고(#122), 지금은 Adobe Fonts가 `@font-face`를 제공한다.
+ * 로더는 `index.html`에 있다. **셀프 호스팅으로 되돌리지 않는다.**
  *
- * `--font-display`는 이름을 그대로 두었으므로 현재는 `Noto Sans`로 폴백한다.
- * CDN이 연결되면 그 로더만 추가하면 되고 이 파일은 손대지 않아도 된다.
  * 자세한 내용은 `public/fonts/README.md`의 「Display 폰트」 절 참조.
  */
 
 @layer base {
+  /*
+   * Display 폰트의 폭을 시안에 맞춘다.
+   *
+   * `Sztos Variable`의 `wdth` 축은 100–200이고 기본값은 100이다. Adobe는 100을
+   * `Normal`, 200을 `Expanded`라 부르지만 **실제로는 100이 Condensed 컷이다.**
+   * 시안의 `Your trip, on record`(40px) 텍스트 폭이 297px인데 `wdth 100`에서는
+   * 138.4px, `wdth 200`에서는 295.7px로 렌더된다. `Journeys`(34px)도 시안 256px에
+   * `wdth 200`이 259.3px로 맞는다.
+   *
+   * Adobe kit CSS는 가변 폰트의 `wdth` 축을 싣고도 `@font-face`의 stretch 범위를
+   * `normal`로만 선언한다. 그래서 `font-stretch: 200%`만으로는 Chromium에서만 축이
+   * 움직이고 Firefox·WebKit에서는 기본 폭에 머문다. 표준 속성으로 의도를 남기되,
+   * 세 엔진에서 같은 결과를 내도록 `font-variation-settings`로 `wdth`를 직접 지정한다.
+   * 두 속성은 상속되며 Body 폰트 `Noto Sans`의 `wdth` 상한은 100이라 기본 폭으로
+   * 제한된다.
+   */
+  .font-display {
+    font-stretch: 200%;
+    font-variation-settings: 'wdth' 200;
+  }
+
   html {
     background-color: var(--color-canvas);
     -webkit-text-size-adjust: 100%;

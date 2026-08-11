@@ -104,17 +104,27 @@
    * 폴백한다. `NAWA` 워드마크는 Ria Sans 조판을 SVG 패스로 고정하므로 이 토큰을
    * 사용하지 않는다.
    *
-   * `Sztos`는 현재 어디에서도 로드되지 않는다(#122). 재배포 권한이 확인되지 않아
-   * 셀프 호스팅을 제거했고, CDN은 아직 연결하지 않았다. 이름을 그대로 둔 것은
-   * 디자인 의도가 바뀐 것이 아니기 때문이며, CDN을 연결하면 이 줄을 고치지 않아도
-   * 바로 적용된다. 지금은 `Noto Sans`로 폴백한다. */
-  --font-display: 'Sztos', 'Noto Sans', sans-serif;
+   * Sztos는 셀프 호스팅을 제거하고(#122) Adobe Fonts에서 받는다. 로더는
+   * `index.html`에 있다. **패밀리 이름은 `Sztos`가 아니라 `sztos-variable`이다.**
+   * Adobe가 kit CSS에 그 이름으로 `@font-face`를 선언하므로 `Sztos`라고 적으면
+   * 매칭되지 않고 `Noto Sans`로 폴백한다.
+   *
+   * kit이 제공하는 축은 `wght 100–700`, `wdth 100–200`이다. **기본 폭 100은 Condensed
+   * 컷이라 시안과 다르다.** 폭은 `index.css`의 `.font-display`가 `font-stretch: 200%`로
+   * 맞춘다. `wght`는 800을 요청해도 700으로 잘린다.
+   * 자세한 내용은 `public/fonts/README.md`의 「Display 폰트」 절 참조. */
+  --font-display: 'sztos-variable', 'Noto Sans', sans-serif;
   --font-body: 'Noto Sans', sans-serif;
 
-  /* ── 타이포 스케일 ── */
+  /* ── 타이포 스케일 ──
+   * Display 토큰의 굵기 상한은 **700**이다. 시안은 화면 제목과 티켓 제목에
+   * `Sztos ExtraBold`(800)를 지정하지만, Adobe Fonts가 싣고 있는 `Sztos Variable`의
+   * `wght` 축이 700에서 끝난다. Adobe Fonts에 정적 `Sztos` 패밀리는 없다. 800을 적어도
+   * 700으로 잘리므로, 렌더되지 않는 값을 토큰에 남기지 않는다. Body 폰트(`Noto Sans`,
+   * `wght 100–900`)를 쓰는 곳은 이 상한과 무관하다. */
   --text-screen-title: 34px;
   --text-screen-title--line-height: 35.7px;
-  --text-screen-title--font-weight: 800;
+  --text-screen-title--font-weight: 700;
   --text-screen-title--letter-spacing: 0.2px;
 
   --text-section-header: 22px;
@@ -131,10 +141,10 @@
   --text-welcome-stamp--line-height: 1.2;
   --text-welcome-stamp--letter-spacing: 0.5px;
 
-  /* 여정 티켓 제목. 1줄, 초과 시 말줄임. */
+  /* 여정 티켓 제목. 1줄, 초과 시 말줄임. 아직 쓰는 화면이 없다. */
   --text-trip-ticket-title: 24px;
   --text-trip-ticket-title--line-height: 1.15;
-  --text-trip-ticket-title--font-weight: 800;
+  --text-trip-ticket-title--font-weight: 700;
 
   /* 카테고리 티켓 제목. */
   --text-category-ticket-title: 18px;
