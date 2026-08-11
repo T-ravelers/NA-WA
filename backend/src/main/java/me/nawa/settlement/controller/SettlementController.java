@@ -9,7 +9,9 @@ import me.nawa.settlement.dto.response.SettlementCandidateResponse;
 import me.nawa.settlement.dto.response.SettlementCreateResponse;
 import me.nawa.settlement.dto.response.SettlementDetailResponse;
 import me.nawa.settlement.dto.response.SettlementListResponse;
-import me.nawa.settlement.service.SettlementService;
+import me.nawa.settlement.service.SettlementCreationService;
+import me.nawa.settlement.service.SettlementPaymentService;
+import me.nawa.settlement.service.SettlementQueryService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,16 +23,19 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 정산 요청 API
+ * 정산 목록·생성·상세 화면의 API다.
  *
- * 정산 목록·후보·상세 조회와 생성, 결제 및 취소 요청을 처리합니다.
+ * 목록 화면 진입 시 목록을, “Create settlement” 클릭 시 후보를 조회한다. 생성 완료,
+ * 상세 화면의 “Pay”와 “Cancel” 클릭은 각각 전용 정산 작업으로 위임한다.
  */
 @RestController
 @RequestMapping("/api/v1/settlements")
 @RequiredArgsConstructor
 public class SettlementController {
 
-    private final SettlementService settlementService;
+    private final SettlementQueryService settlementQueryService;
+    private final SettlementCreationService settlementCreationService;
+    private final SettlementPaymentService settlementPaymentService;
 
     /**
      * 정산 목록 조회
@@ -42,7 +47,7 @@ public class SettlementController {
         @AuthenticationPrincipal AuthenticatedMember member
     ) {
         return ApiResponse.success(
-            settlementService.getSettlements(member.getMemberId())
+            settlementQueryService.getSettlements(member.getMemberId())
         );
     }
 
@@ -56,7 +61,7 @@ public class SettlementController {
         @AuthenticationPrincipal AuthenticatedMember member
     ) {
         return ApiResponse.success(
-            settlementService.getCandidates(member.getMemberId())
+            settlementQueryService.getCandidates(member.getMemberId())
         );
     }
 
@@ -71,7 +76,7 @@ public class SettlementController {
         @AuthenticationPrincipal AuthenticatedMember member,
         @RequestBody CreateSettlementRequest request
     ) {
-        return ApiResponse.success(settlementService.createSettlement(
+        return ApiResponse.success(settlementCreationService.createSettlement(
             member.getMemberId(), request
         ));
     }
@@ -86,7 +91,7 @@ public class SettlementController {
         @AuthenticationPrincipal AuthenticatedMember member,
         @PathVariable Long settlementId
     ) {
-        return ApiResponse.success(settlementService.getSettlement(
+        return ApiResponse.success(settlementQueryService.getSettlement(
             member.getMemberId(), settlementId
         ));
     }
@@ -101,7 +106,7 @@ public class SettlementController {
         @AuthenticationPrincipal AuthenticatedMember member,
         @PathVariable Long settlementId
     ) {
-        settlementService.paySettlement(member.getMemberId(), settlementId);
+        settlementPaymentService.paySettlement(member.getMemberId(), settlementId);
         return ApiResponse.success();
     }
 
@@ -115,7 +120,7 @@ public class SettlementController {
         @AuthenticationPrincipal AuthenticatedMember member,
         @PathVariable Long settlementId
     ) {
-        settlementService.cancelSettlement(member.getMemberId(), settlementId);
+        settlementPaymentService.cancelSettlement(member.getMemberId(), settlementId);
         return ApiResponse.success();
     }
 }

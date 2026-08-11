@@ -30,6 +30,9 @@ import me.nawa.settlement.dto.request.GameCreateRequest;
 import me.nawa.settlement.dto.response.SettlementGameResultResponse;
 import me.nawa.settlement.dto.response.SettlementGameResponse;
 import me.nawa.settlement.mapper.SettlementMapper;
+import me.nawa.settlement.service.creation.EqualSettlementCreator;
+import me.nawa.settlement.service.creation.GameSettlementCreator;
+import me.nawa.settlement.service.creation.ItemizedSettlementCreator;
 import me.nawa.wallet.service.WalletTransferService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,7 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
-class SettlementServiceImplTest {
+class SettlementServiceBoundaryTest {
 
     @Mock
     private SettlementMapper settlementMapper;
@@ -69,9 +72,8 @@ class SettlementServiceImplTest {
         request.setType("EQUAL");
         request.setParticipantIds(List.of(1L, 2L, 3L));
 
-        SettlementCreateResponse response = new SettlementServiceImpl(
-            settlementMapper, walletTransferService
-        ).createSettlement(1L, request);
+        SettlementCreateResponse response = creationService()
+            .createSettlement(1L, request);
 
         assertEquals(90L, response.getId());
         ArgumentCaptor<Settlement> settlement = ArgumentCaptor.forClass(Settlement.class);
@@ -95,7 +97,7 @@ class SettlementServiceImplTest {
         when(settlementMapper.findByIdForUpdate(90L)).thenReturn(settlement);
         when(settlementMapper.cancelSettlement(90L, 1L)).thenReturn(1);
 
-        new SettlementServiceImpl(settlementMapper, walletTransferService).cancelSettlement(1L, 90L);
+        new SettlementPaymentServiceImpl(settlementMapper, walletTransferService).cancelSettlement(1L, 90L);
 
         verify(settlementMapper).cancelSettlement(90L, 1L);
     }
@@ -112,7 +114,7 @@ class SettlementServiceImplTest {
         when(walletTransferService.transfer(2L, 2L, 1L, new BigDecimal("20.00"), "Settlement #90")).thenReturn(700L);
         when(settlementMapper.markSettlementMemberPaid(401L, 700L)).thenReturn(1);
 
-        new SettlementServiceImpl(settlementMapper, walletTransferService).paySettlement(2L, 90L);
+        new SettlementPaymentServiceImpl(settlementMapper, walletTransferService).paySettlement(2L, 90L);
 
         verify(settlementMapper).completeSettlementIfNoPendingPayments(90L);
     }
@@ -126,9 +128,7 @@ class SettlementServiceImplTest {
             new SettlementSummary(11L, "Museum", new BigDecimal("10.00"), "ITEMIZED", "COMPLETED")
         ));
 
-        SettlementListResponse response = new SettlementServiceImpl(
-            settlementMapper, walletTransferService
-        ).getSettlements(2L);
+        SettlementListResponse response = new SettlementQueryServiceImpl(settlementMapper).getSettlements(2L);
 
         assertEquals(10L, response.getReceived().get(0).getId());
         assertEquals(11L, response.getSent().get(0).getId());
@@ -151,9 +151,7 @@ class SettlementServiceImplTest {
             new SettlementParticipant(2L, "Mina")
         ));
 
-        List<SettlementCandidateResponse> response = new SettlementServiceImpl(
-            settlementMapper, walletTransferService
-        ).getCandidates(1L);
+        List<SettlementCandidateResponse> response = new SettlementQueryServiceImpl(settlementMapper).getCandidates(1L);
 
         assertEquals(50L, response.get(0).getTransferId());
         assertEquals("Mina", response.get(0).getParticipants().get(1).getName());
@@ -167,9 +165,7 @@ class SettlementServiceImplTest {
         ));
         when(settlementMapper.findItemNames(90L)).thenReturn(List.of("Soup", "Tea"));
 
-        SettlementDetailResponse response = new SettlementServiceImpl(
-            settlementMapper, walletTransferService
-        ).getSettlement(2L, 90L);
+        SettlementDetailResponse response = new SettlementQueryServiceImpl(settlementMapper).getSettlement(2L, 90L);
 
         assertEquals("ITEMIZED", response.getType());
         assertEquals(List.of("Soup", "Tea"), response.getItems());
@@ -191,9 +187,7 @@ class SettlementServiceImplTest {
             return null;
         }).when(settlementMapper).insertReceiptAnalysis(any(me.nawa.settlement.domain.ReceiptAnalysis.class));
 
-        ReceiptAnalysisResponse response = new SettlementServiceImpl(
-            settlementMapper, walletTransferService
-        ).analyzeReceipt(1L, 50L, file);
+        ReceiptAnalysisResponse response = new ReceiptAnalysisServiceImpl(settlementMapper).analyzeReceipt(1L, 50L, file);
 
         assertEquals(15L, response.getReceiptAnalysisId());
         assertEquals(List.of(), response.getItems());
@@ -211,9 +205,8 @@ class SettlementServiceImplTest {
         ReceiptItemUpdateRequest request = new ReceiptItemUpdateRequest();
         request.setItems(List.of(item));
 
-        ReceiptAnalysisResponse response = new SettlementServiceImpl(
-            settlementMapper, walletTransferService
-        ).updateReceiptItems(1L, 15L, request);
+        ReceiptAnalysisResponse response = new ReceiptAnalysisServiceImpl(settlementMapper)
+            .updateReceiptItems(1L, 15L, request);
 
         assertEquals(new BigDecimal("9.00"), response.getRecognizedTotal());
         verify(settlementMapper).deleteReceiptItems(15L);
@@ -238,7 +231,7 @@ class SettlementServiceImplTest {
         ReceiptAllocationUpdateRequest request = new ReceiptAllocationUpdateRequest();
         request.setAllocations(List.of(allocation));
 
-        new SettlementServiceImpl(settlementMapper, walletTransferService)
+        new ReceiptAnalysisServiceImpl(settlementMapper)
             .updateReceiptAllocations(1L, 15L, request);
 
         verify(settlementMapper).insertReceiptAllocations(any());
@@ -264,7 +257,7 @@ class SettlementServiceImplTest {
         request.setSourceTransferId(50L); request.setType("ITEMIZED"); request.setReceiptAnalysisId(15L);
         request.setParticipantIds(List.of(1L, 2L));
 
-        SettlementCreateResponse response = new SettlementServiceImpl(settlementMapper, walletTransferService)
+        SettlementCreateResponse response = creationService()
             .createSettlement(1L, request);
 
         assertEquals(91L, response.getId());
@@ -282,7 +275,7 @@ class SettlementServiceImplTest {
         GameConsentRequest request = new GameConsentRequest();
         request.setStatus("AGREED");
 
-        new SettlementServiceImpl(settlementMapper, walletTransferService).submitGameConsent(2L, 70L, request);
+        new SettlementGameServiceImpl(settlementMapper).submitGameConsent(2L, 70L, request);
 
         verify(settlementMapper).updateGameConsent(70L, 2L, "AGREED");
     }
@@ -302,7 +295,7 @@ class SettlementServiceImplTest {
         request.setSourceTransferId(50L); request.setType("GAME"); request.setParticipantIds(List.of(1L, 2L));
         GameCreateRequest game = new GameCreateRequest(); game.setType("RANDOM"); game.setLiableCount(1); request.setGame(game);
 
-        SettlementCreateResponse response = new SettlementServiceImpl(settlementMapper, walletTransferService)
+        SettlementCreateResponse response = creationService()
             .createSettlement(1L, request);
 
         assertEquals(71L, response.getId());
@@ -326,7 +319,7 @@ class SettlementServiceImplTest {
             new me.nawa.settlement.domain.SettlementGameMember(71L, 72L, 2L, "AGREED", false)
         ));
 
-        new SettlementServiceImpl(settlementMapper, walletTransferService).startGame(1L, 71L);
+        new SettlementGameServiceImpl(settlementMapper).startGame(1L, 71L);
 
         verify(settlementMapper).insertSettlementMembers(any());
         verify(settlementMapper).completeGame(eq(71L), any());
@@ -351,7 +344,7 @@ class SettlementServiceImplTest {
             new SettlementParticipant(1L, "Alex"), new SettlementParticipant(2L, "Mina")
         ));
 
-        SettlementGameResultResponse response = new SettlementServiceImpl(settlementMapper, walletTransferService)
+        SettlementGameResultResponse response = new SettlementGameServiceImpl(settlementMapper)
             .getGameResult(2L, 71L);
 
         assertEquals(1, response.getLiableParticipants().size());
@@ -377,10 +370,21 @@ class SettlementServiceImplTest {
             new SettlementParticipant(1L, "Alex"), new SettlementParticipant(2L, "Mina")
         ));
 
-        SettlementGameResponse response = new SettlementServiceImpl(settlementMapper, walletTransferService)
+        SettlementGameResponse response = new SettlementGameServiceImpl(settlementMapper)
             .getGame(2L, 71L);
 
         assertEquals(1, response.getAgreementCount());
         assertEquals("PARTICIPANT", response.getViewerRole());
+    }
+
+    private SettlementCreationService creationService() {
+        return new SettlementCreationServiceImpl(
+            settlementMapper,
+            List.of(
+                new EqualSettlementCreator(settlementMapper),
+                new ItemizedSettlementCreator(settlementMapper),
+                new GameSettlementCreator(settlementMapper)
+            )
+        );
     }
 }
