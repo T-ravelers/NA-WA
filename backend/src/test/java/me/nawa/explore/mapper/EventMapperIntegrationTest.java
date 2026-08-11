@@ -52,7 +52,13 @@ class EventMapperIntegrationTest {
         ));
 
         SqlSessionFactory sqlSessionFactory = factoryBean.getObject();
-        sqlSessionFactory.getConfiguration().addMapper(EventMapper.class);
+        // XML의 namespace가 이미 인터페이스를 등록하므로 그대로 addMapper를 부르면
+        // MapperRegistry가 중복 등록으로 BindingException을 던진다.
+        if (!sqlSessionFactory.getConfiguration().hasMapper(
+            EventMapper.class
+        )) {
+            sqlSessionFactory.getConfiguration().addMapper(EventMapper.class);
+        }
         mapper = new SqlSessionTemplate(sqlSessionFactory)
             .getMapper(EventMapper.class);
     }
