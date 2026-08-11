@@ -171,7 +171,7 @@ function goBack(): void {
 
 function openAppointments(): void {
   const itemId = place.value?.itemId
-  if (!Number.isSafeInteger(itemId) || itemId <= 0) return
+  if (itemId === undefined || !Number.isSafeInteger(itemId) || itemId <= 0) return
 
   void router.push({
     name: 'appointment-list',
