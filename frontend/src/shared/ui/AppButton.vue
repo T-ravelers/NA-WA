@@ -31,7 +31,7 @@ interface Props {
    * 넣으면 라벨이 먼저 잘린다. 높이와 라운드는 그대로 두고 여백만 좁힌다.
    */
   compact?: boolean
-  /** 카드 안의 짧은 동작 버튼에 사용하는 낮은 높이. */
+  /** 카드 안의 짧은 동작 버튼에 사용하는 높이. 최소 터치 영역(44px)은 유지한다. */
   dense?: boolean
 }
 
@@ -81,7 +81,7 @@ function handleClick(): void {
     class="relative inline-flex shrink-0 items-center justify-center text-title-sm transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
     :class="[
       VARIANT_CLASS[variant],
-      dense ? 'h-10' : HEIGHT_CLASS[variant],
+      dense ? 'h-11' : HEIGHT_CLASS[variant],
       block ? 'w-full' : '',
       compact ? 'px-3' : 'px-6',
     ]"

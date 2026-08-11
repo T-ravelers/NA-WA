@@ -32,6 +32,18 @@ describe('AppointmentReviewCard', () => {
     ).toBeDefined()
   })
 
+  it('keeps score controls at the minimum touch target', () => {
+    const wrapper = mount(AppointmentReviewCard, {
+      props: { member },
+      global: { plugins: [i18n] },
+    })
+
+    const scoreButtons = wrapper.findAll('button').filter((button) => button.text() === '★')
+
+    expect(scoreButtons).toHaveLength(15)
+    expect(scoreButtons.every((button) => button.classes().includes('size-11'))).toBe(true)
+  })
+
   it('emits three scores and optional keywords', async () => {
     const wrapper = mount(AppointmentReviewCard, {
       props: { member },

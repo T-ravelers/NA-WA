@@ -150,7 +150,7 @@ function submit(): void {
                 v-for="score in 5"
                 :key="score"
                 type="button"
-                class="flex size-7 items-center justify-center text-title text-ink-3"
+                class="flex size-11 items-center justify-center text-title text-ink-3"
                 :class="
                   scores[category] !== null && score <= scores[category] ? 'text-settlement' : ''
                 "
