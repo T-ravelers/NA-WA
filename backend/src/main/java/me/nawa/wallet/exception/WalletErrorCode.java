@@ -109,6 +109,42 @@ public enum WalletErrorCode implements ErrorCode {
         HttpStatus.FORBIDDEN,
         "WALLET-017",
         "지갑이 활성 상태가 아닙니다."
+    ),
+
+    QR_PAYMENT_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+    "WALLET-015",
+        "QR 결제 정보를 찾을 수 없습니다."
+    ),
+
+    QR_PAYMENT_EXPIRED(
+        HttpStatus.GONE,
+    "WALLET-016",
+        "만료된 QR 결제입니다."
+    ),
+
+    QR_PAYMENT_ALREADY_COMPLETED(
+        HttpStatus.CONFLICT,
+    "WALLET-017",
+        "이미 결제가 완료된 QR입니다."
+    ),
+
+    QR_PAYMENT_NOT_ACTIVE(
+        HttpStatus.CONFLICT,
+    "WALLET-018",
+        "현재 사용할 수 없는 QR 결제입니다."
+    ),
+
+    QR_SELF_PAYMENT_NOT_ALLOWED(
+        HttpStatus.BAD_REQUEST,
+    "WALLET-019",
+        "본인에게 결제할 수 없습니다."
+    ),
+
+    QR_PAYEE_WALLET_NOT_ACTIVE(
+        HttpStatus.CONFLICT,
+    "WALLET-020",
+        "수취인의 지갑을 현재 사용할 수 없습니다."
     );
 
     private final HttpStatus status;

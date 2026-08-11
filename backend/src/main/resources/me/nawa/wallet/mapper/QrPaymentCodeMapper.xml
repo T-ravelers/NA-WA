@@ -28,4 +28,39 @@
                    #{expiresAt}
                )
     </insert>
+
+    <select id="findResolveTargetByToken" resultType="me.nawa.wallet.domain.QrPaymentResolveTarget">
+        SELECT
+            q.qr_payment_code_id,
+            q.payee_wallet_id,
+            q.completed_transfer_id,
+            q.amount,
+            q.memo,
+            q.payment_status,
+            q.expires_at,
+            m.display_name AS payee_name,
+            w.currency_code,
+            w.wallet_status AS payee_wallet_status
+        FROM qr_payment_codes q
+                 LEFT JOIN wallets w
+                           ON w.wallet_id = q.payee_wallet_id
+                               AND w.deleted_at IS NULL
+                 LEFT JOIN wallet_owners wo
+                           ON wo.wallet_owner_id = w.wallet_owner_id
+                               AND wo.deleted_at IS NULL
+                 LEFT JOIN members m
+                           ON m.member_id = wo.member_id
+                               AND m.deleted_at IS NULL
+        WHERE q.qr_token = #{qrToken}
+          AND q.deleted_at IS NULL
+        LIMIT 1
+    </select>
+
+    <update id="markExpiredIfActive">
+        UPDATE qr_payment_codes
+        SET payment_status = 'EXPIRED'
+        WHERE qr_payment_code_id = #{qrPaymentCodeId}
+          AND payment_status = 'ACTIVE'
+          AND expires_at &lt;= #{now}
+    </update>
 </mapper>

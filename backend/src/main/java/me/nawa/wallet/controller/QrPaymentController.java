@@ -5,7 +5,9 @@ import lombok.RequiredArgsConstructor;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.wallet.dto.request.QrPaymentCreateRequest;
+import me.nawa.wallet.dto.request.QrPaymentResolveRequest;
 import me.nawa.wallet.dto.response.QrPaymentCreateResponse;
+import me.nawa.wallet.dto.response.QrPaymentResolveResponse;
 import me.nawa.wallet.service.QrPaymentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +32,16 @@ public class QrPaymentController {
         ){
         return ApiResponse.success(
             qrPaymentService.createPaymentQr(member.getMemberId(), request)
+        );
+    }
+
+    @PostMapping("/resolve")
+    public ApiResponse<QrPaymentResolveResponse> resolvePaymentQr(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @RequestBody QrPaymentResolveRequest request
+    ) {
+        return ApiResponse.success(
+            qrPaymentService.resolvePaymentQr(member.getMemberId(), request)
         );
     }
 
