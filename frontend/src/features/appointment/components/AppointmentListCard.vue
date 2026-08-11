@@ -97,7 +97,6 @@ function formatDeposit(value: string): string {
             block
             compact
             dense
-            :disabled="appointment.appointmentStatus !== 'RECRUITING'"
             @click="openDetail"
           >
             {{ t('appointment.list.view') }}

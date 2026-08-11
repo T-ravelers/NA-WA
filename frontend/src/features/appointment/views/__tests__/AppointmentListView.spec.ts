@@ -99,4 +99,26 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
   })
+
+  it('opens completed appointment details from the list', async () => {
+    fetchAppointments.mockResolvedValueOnce({
+      content: [{ ...appointment, appointmentStatus: 'COMPLETED' as const }],
+      page: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+      hasNext: false,
+    })
+
+    const { wrapper, router } = await mountView()
+    const viewButton = wrapper.findAll('button').find((button) => button.text() === 'View')
+
+    expect(viewButton?.attributes('disabled')).toBeUndefined()
+
+    await viewButton?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
+    expect(router.currentRoute.value.params.appointmentId).toBe('7')
+  })
 })
