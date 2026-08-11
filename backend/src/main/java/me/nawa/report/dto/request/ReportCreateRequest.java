@@ -15,7 +15,8 @@ import lombok.Setter;
 public class ReportCreateRequest {
 
     @ApiModelProperty(
-        value = "Report content locale",
+        value = "Report request locale metadata. In this MVP, snapshot "
+            + "titles keep their current source values and are not translated.",
         example = "en"
     )
     private String locale;

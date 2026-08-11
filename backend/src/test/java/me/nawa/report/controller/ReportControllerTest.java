@@ -99,6 +99,7 @@ class ReportControllerTest {
         JsonNode body = objectMapper.readTree(responseBody);
         assertTrue(body.path("success").asBoolean());
         assertEquals(100L, body.path("data").path("reportId").asLong());
+        assertExactDetailDates(body.path("data"));
         assertEquals(
             "Example event",
             body.path("data").path("reportContent").path("days")
@@ -147,7 +148,31 @@ class ReportControllerTest {
         JsonNode report = objectMapper.readTree(responseBody)
             .path("data").get(0);
         assertEquals("COMPLETED", report.path("generationStatus").asText());
+        assertEquals("2026-08-01", report.path("startDate").asText());
+        assertEquals("2026-08-05", report.path("endDate").asText());
+        assertEquals(
+            "2026-08-09T12:00:00",
+            report.path("generatedAt").asText()
+        );
+        assertEquals(
+            "2026-08-09T12:00:00",
+            report.path("createdAt").asText()
+        );
         assertFalse(report.has("reportContent"));
+    }
+
+    @Test
+    void getReport_returnsExactIsoDateStrings() throws Exception {
+        when(reportService.getReport(1L, 100L)).thenReturn(detailResponse());
+
+        String responseBody = mockMvc.perform(get("/api/v1/reports/100"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode data = objectMapper.readTree(responseBody).path("data");
+        assertExactDetailDates(data);
     }
 
     @Test
@@ -219,5 +244,31 @@ class ReportControllerTest {
                     .build()))
                 .build())
             .build();
+    }
+
+    private void assertExactDetailDates(JsonNode data) {
+        assertEquals("2026-08-01", data.path("startDate").asText());
+        assertEquals("2026-08-05", data.path("endDate").asText());
+        assertEquals(
+            "2026-08-09T12:00:00",
+            data.path("generatedAt").asText()
+        );
+        assertEquals(
+            "2026-08-09T12:00:00",
+            data.path("createdAt").asText()
+        );
+        JsonNode content = data.path("reportContent");
+        assertEquals(
+            "2026-08-01",
+            content.path("journey").path("startDate").asText()
+        );
+        assertEquals(
+            "2026-08-05",
+            content.path("journey").path("endDate").asText()
+        );
+        assertEquals(
+            "2026-08-02",
+            content.path("days").get(0).path("visitDate").asText()
+        );
     }
 }
