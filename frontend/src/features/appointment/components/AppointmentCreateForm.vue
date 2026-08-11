@@ -17,7 +17,9 @@ import {
   MIN_APPOINTMENT_DEPOSIT,
   MIN_APPOINTMENT_MEMBERS,
   toAppointmentCreateRequest,
-  validateAppointmentForm,
+  validateAppointmentBasics,
+  validateAppointmentSchedule,
+  validateAppointmentSettings,
   type AppointmentFormDraft,
   type AppointmentFormErrors,
 } from '../model/appointmentForm'
@@ -39,6 +41,7 @@ const {
 const emit = defineEmits<{ submit: [request: AppointmentCreateRequest] }>()
 const { t } = useI18n()
 
+const step = ref<1 | 2 | 3>(1)
 const errors = ref<AppointmentFormErrors>({})
 const confirmationOpen = ref(false)
 const draft = reactive<AppointmentFormDraft>({
@@ -55,7 +58,7 @@ const draft = reactive<AppointmentFormDraft>({
   joinDeadline: '',
 })
 
-const languageOptions: AppointmentLanguage[] = ['en', 'ja', 'zh-CN', 'zh-TW', 'vi']
+const languageOptions: AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
 const memberOptions = Array.from(
   { length: MAX_APPOINTMENT_MEMBERS - MIN_APPOINTMENT_MEMBERS + 1 },
   (_, index) => index + MIN_APPOINTMENT_MEMBERS,
@@ -65,15 +68,47 @@ function translatedError(key?: string): string | undefined {
   return key === undefined ? undefined : t(key)
 }
 
-function submit(): void {
+function continueToSettings(): void {
+  const nextErrors = validateAppointmentBasics(draft)
+  errors.value = nextErrors
+
+  if (Object.keys(nextErrors).length === 0) step.value = 2
+}
+
+function backToBasics(): void {
+  step.value = 1
+  errors.value = {}
+}
+
+function backToSettings(): void {
+  step.value = 2
+  errors.value = {}
+}
+
+function continueToSchedule(): void {
   if (pending) return
 
-  const nextErrors = validateAppointmentForm(draft)
+  const nextErrors = validateAppointmentSettings(draft)
+  errors.value = nextErrors
+
+  if (Object.keys(nextErrors).length === 0) step.value = 3
+}
+
+function submitSchedule(): void {
+  if (pending) return
+
+  const nextErrors = validateAppointmentSchedule(draft)
   errors.value = nextErrors
 
   if (Object.keys(nextErrors).length > 0) return
 
   confirmationOpen.value = true
+}
+
+function handleSubmit(): void {
+  if (step.value === 1) continueToSettings()
+  else if (step.value === 2) continueToSchedule()
+  else submitSchedule()
 }
 
 function cancelConfirmation(): void {
@@ -88,11 +123,61 @@ function confirmCreation(): void {
 
 <template>
   <form
-    class="flex flex-col gap-6"
+    class="flex min-h-[calc(100dvh-8rem)] flex-col gap-8 pb-28"
     :aria-busy="pending"
     novalidate
-    @submit.prevent="submit"
+    @submit.prevent="handleSubmit"
   >
+    <ol
+      class="flex items-center gap-2"
+      :aria-label="t('appointment.create.stepLabel')"
+    >
+      <li
+        class="flex items-center gap-2 text-micro uppercase tracking-[0.12em]"
+        :class="step === 1 ? 'text-ink' : 'text-ink-3'"
+      >
+        <span
+          class="flex size-6 items-center justify-center rounded-pill"
+          :class="step === 1 ? 'bg-paper-fill text-on-paper' : 'bg-surface-2 text-ink-3'"
+        >
+          1
+        </span>
+        {{ t('appointment.create.basicsStep') }}
+      </li>
+      <li
+        class="h-px flex-1 bg-hairline"
+        aria-hidden="true"
+      />
+      <li
+        class="flex items-center gap-2 text-micro uppercase tracking-[0.12em]"
+        :class="step === 2 ? 'text-ink' : 'text-ink-3'"
+      >
+        <span
+          class="flex size-6 items-center justify-center rounded-pill"
+          :class="step === 2 ? 'bg-paper-fill text-on-paper' : 'bg-surface-2 text-ink-3'"
+        >
+          2
+        </span>
+        {{ t('appointment.create.settingsStep') }}
+      </li>
+      <li
+        class="h-px flex-1 bg-hairline"
+        aria-hidden="true"
+      />
+      <li
+        class="flex items-center gap-2 text-micro uppercase tracking-[0.12em]"
+        :class="step === 3 ? 'text-ink' : 'text-ink-3'"
+      >
+        <span
+          class="flex size-6 items-center justify-center rounded-pill"
+          :class="step === 3 ? 'bg-paper-fill text-on-paper' : 'bg-surface-2 text-ink-3'"
+        >
+          3
+        </span>
+        {{ t('appointment.create.scheduleStep') }}
+      </li>
+    </ol>
+
     <p
       v-if="errorMessage !== undefined"
       class="text-body-sm text-danger"
@@ -110,122 +195,160 @@ function confirmCreation(): void {
     </p>
 
     <fieldset
-      class="flex flex-col gap-5"
+      class="flex flex-col gap-6"
       :disabled="pending"
     >
-      <legend class="sr-only">{{ t('appointment.create.title') }}</legend>
+      <legend class="sr-only">
+        {{
+          step === 1
+            ? t('appointment.create.basicsHeading')
+            : step === 2
+              ? t('appointment.create.settingsHeading')
+              : t('appointment.create.scheduleHeading')
+        }}
+      </legend>
 
-      <TextInput
-        v-model="draft.appointmentName"
-        :label="t('appointment.create.name')"
-        :placeholder="t('appointment.create.namePlaceholder')"
-        :error="translatedError(errors.appointmentName)"
-      />
-
-      <div class="flex flex-col gap-2">
-        <label
-          for="appointment-max-members"
-          class="text-caption text-ink-2"
-        >
-          {{ t('appointment.create.maxMembers') }}
-        </label>
-        <select
-          id="appointment-max-members"
-          v-model.number="draft.maxMembers"
-          class="h-13 w-full rounded-sm border-2 border-transparent bg-surface-2 px-4 text-body text-ink outline-none focus-visible:border-ink"
-          :aria-invalid="errors.maxMembers !== undefined"
-        >
-          <option
-            v-for="memberCount in memberOptions"
-            :key="memberCount"
-            :value="memberCount"
+      <template v-if="step === 1">
+        <h2 class="font-display text-section-header text-ink-display">
+          {{ t('appointment.create.basicsHeading') }}
+        </h2>
+        <TextInput
+          v-model="draft.appointmentName"
+          :label="t('appointment.create.name')"
+          :placeholder="t('appointment.create.namePlaceholder')"
+          :error="translatedError(errors.appointmentName)"
+        />
+        <div class="flex flex-col gap-2">
+          <label
+            for="appointment-max-members"
+            class="text-caption text-ink-2"
           >
-            {{ memberCount }}
-          </option>
-        </select>
-        <p
-          v-if="errors.maxMembers !== undefined"
-          class="text-caption text-danger"
-        >
-          {{ translatedError(errors.maxMembers) }}
-        </p>
-      </div>
-
-      <fieldset class="flex flex-col gap-2">
-        <legend class="text-caption text-ink-2">{{ t('appointment.create.language') }}</legend>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="language in languageOptions"
-            :key="language"
-            type="button"
-            class="rounded-pill border px-4 py-2 text-caption"
-            :class="
-              draft.languageCode === language
-                ? 'border-paper-fill bg-paper-fill text-on-paper'
-                : 'border-hairline-strong text-ink-2'
-            "
-            :aria-pressed="draft.languageCode === language"
-            @click="draft.languageCode = language"
+            {{ t('appointment.create.maxMembers') }}
+          </label>
+          <select
+            id="appointment-max-members"
+            v-model.number="draft.maxMembers"
+            class="h-13 w-full rounded-sm border-2 border-transparent bg-surface-2 px-4 text-body text-ink outline-none focus-visible:border-ink"
+            :aria-invalid="errors.maxMembers !== undefined"
           >
-            {{ t(`appointment.languages.${language}`) }}
-          </button>
+            <option
+              v-for="memberCount in memberOptions"
+              :key="memberCount"
+              :value="memberCount"
+            >
+              {{ memberCount }}
+            </option>
+          </select>
+          <p
+            v-if="errors.maxMembers !== undefined"
+            class="text-caption text-danger"
+          >
+            {{ translatedError(errors.maxMembers) }}
+          </p>
         </div>
-      </fieldset>
+        <fieldset class="flex flex-col gap-5">
+          <legend class="text-caption text-ink-2">{{ t('appointment.create.language') }}</legend>
+          <div class="flex flex-wrap gap-3 pt-4">
+            <button
+              v-for="language in languageOptions"
+              :key="language"
+              type="button"
+              class="rounded-pill border px-4 py-2 text-caption"
+              :class="
+                draft.languageCode === language
+                  ? 'border-paper-fill bg-paper-fill text-on-paper'
+                  : 'border-hairline-strong text-ink-2'
+              "
+              :aria-pressed="draft.languageCode === language"
+              @click="draft.languageCode = language"
+            >
+              {{ t(`appointment.languages.${language}`) }}
+            </button>
+          </div>
+        </fieldset>
+      </template>
 
-      <AmountInput
-        v-model="draft.depositAmount"
-        :label="t('appointment.create.deposit')"
-        :helper="
-          t('appointment.create.depositHelper', {
-            min: MIN_APPOINTMENT_DEPOSIT.toLocaleString('en-US'),
-            max: MAX_APPOINTMENT_DEPOSIT.toLocaleString('en-US'),
-          })
-        "
-        :error="translatedError(errors.depositAmount)"
-      />
-
-      <TextInput
-        v-model="draft.meetingPlace"
-        :label="t('appointment.create.meetingPlace')"
-        :placeholder="t('appointment.create.meetingPlacePlaceholder')"
-        :error="translatedError(errors.meetingPlace)"
-      />
-
-      <TextInput
-        v-model="draft.meetingAddress"
-        :label="t('appointment.create.meetingAddress')"
-        :placeholder="t('appointment.create.meetingAddressPlaceholder')"
-      />
-
-      <div class="grid gap-4">
-        <TextInput
-          v-model="draft.activityStartAt"
-          type="datetime-local"
-          :label="t('appointment.create.startAt')"
-          :error="translatedError(errors.activityStartAt)"
+      <template v-else-if="step === 2">
+        <h2 class="font-display text-section-header text-ink-display">
+          {{ t('appointment.create.settingsHeading') }}
+        </h2>
+        <AmountInput
+          v-model="draft.depositAmount"
+          :label="t('appointment.create.deposit')"
+          :helper="
+            t('appointment.create.depositHelper', {
+              min: MIN_APPOINTMENT_DEPOSIT.toLocaleString('en-US'),
+              max: MAX_APPOINTMENT_DEPOSIT.toLocaleString('en-US'),
+            })
+          "
+          :error="translatedError(errors.depositAmount)"
         />
         <TextInput
-          v-model="draft.activityEndAt"
-          type="datetime-local"
-          :label="t('appointment.create.endAt')"
-          :error="translatedError(errors.activityEndAt)"
+          v-model="draft.meetingPlace"
+          :label="t('appointment.create.meetingPlace')"
+          :placeholder="t('appointment.create.meetingPlacePlaceholder')"
+          :helper="t('appointment.create.meetingPlaceHelper')"
+          :error="translatedError(errors.meetingPlace)"
         />
         <TextInput
-          v-model="draft.joinDeadline"
-          type="datetime-local"
-          :label="t('appointment.create.joinDeadline')"
-          :error="translatedError(errors.joinDeadline)"
+          v-model="draft.meetingAddress"
+          :label="t('appointment.create.meetingAddress')"
+          :placeholder="t('appointment.create.meetingAddressPlaceholder')"
+          :helper="t('appointment.create.meetingAddressHelper')"
         />
-      </div>
+      </template>
+
+      <template v-else>
+        <h2 class="font-display text-section-header text-ink-display">
+          {{ t('appointment.create.scheduleHeading') }}
+        </h2>
+        <div class="grid gap-4">
+          <TextInput
+            v-model="draft.activityStartAt"
+            type="datetime-local"
+            :label="t('appointment.create.startAt')"
+            :error="translatedError(errors.activityStartAt)"
+          />
+          <TextInput
+            v-model="draft.activityEndAt"
+            type="datetime-local"
+            :label="t('appointment.create.endAt')"
+            :error="translatedError(errors.activityEndAt)"
+          />
+          <TextInput
+            v-model="draft.joinDeadline"
+            type="datetime-local"
+            :label="t('appointment.create.joinDeadline')"
+            :error="translatedError(errors.joinDeadline)"
+          />
+        </div>
+      </template>
     </fieldset>
 
-    <AppButton
-      block
-      type="submit"
-      :loading="pending"
+    <div
+      class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
     >
-      {{ t('appointment.create.submit') }}
-    </AppButton>
+      <div class="grid grid-cols-2 gap-3">
+        <AppButton
+          v-if="step > 1"
+          block
+          type="button"
+          variant="secondary"
+          :disabled="pending"
+          @click="step === 2 ? backToBasics() : backToSettings()"
+        >
+          {{ t('appointment.create.back') }}
+        </AppButton>
+        <AppButton
+          block
+          type="submit"
+          :loading="pending"
+          :class="step === 1 ? 'col-span-2' : ''"
+        >
+          {{ step === 3 ? t('appointment.create.submit') : t('appointment.create.continue') }}
+        </AppButton>
+      </div>
+    </div>
   </form>
 
   <div

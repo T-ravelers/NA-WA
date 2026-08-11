@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useMutation, useQuery } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -15,6 +15,7 @@ import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
 } from '../model/appointmentQueries'
+import { useAppointmentMemberProfile } from '../model/memberIntegration'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,6 +35,8 @@ const detailQuery = useQuery({
   retry: false,
 })
 
+const profileQuery = useAppointmentMemberProfile()
+
 const membersQuery = useQuery({
   ...appointmentMembersQueryOptions(appointmentId),
   enabled: computed(() => appointmentId.value !== null),
@@ -42,12 +45,31 @@ const membersQuery = useQuery({
 
 const reviewableMembers = computed(() =>
   (membersQuery.data.value ?? []).filter(
-    (member) => member.membershipStatus === 'ACTIVE' && !member.isHost,
+    (member) =>
+      member.membershipStatus === 'ACTIVE' &&
+      profileQuery.data.value?.memberId !== undefined &&
+      member.memberId !== profileQuery.data.value.memberId,
   ),
 )
 const completedMemberIds = reactive(new Set<number>())
 const pendingMemberId = ref<number | null>(null)
 const failedMemberId = ref<number | null>(null)
+const expandedMemberId = ref<number | null>(null)
+const allReviewsComplete = computed(
+  () =>
+    reviewableMembers.value.length > 0 &&
+    reviewableMembers.value.every((member) => completedMemberIds.has(member.appointmentMemberId)),
+)
+
+watch(
+  reviewableMembers,
+  (members) => {
+    if (expandedMemberId.value === null && members.length > 0 && completedMemberIds.size === 0) {
+      expandedMemberId.value = members[0]?.appointmentMemberId ?? null
+    }
+  },
+  { immediate: true },
+)
 
 const reviewMutation = useMutation({
   mutationFn: ({
@@ -60,6 +82,7 @@ const reviewMutation = useMutation({
   onSuccess: (_data, variables) => {
     completedMemberIds.add(variables.request.reviewedAppointmentMemberId)
     failedMemberId.value = null
+    expandedMemberId.value = null
   },
   onSettled: () => {
     pendingMemberId.value = null
@@ -80,22 +103,32 @@ function errorMessage(memberId: number): string | undefined {
     : undefined
 }
 
+function toggleMember(memberId: number): void {
+  expandedMemberId.value = expandedMemberId.value === memberId ? null : memberId
+}
+
 function goBack(): void {
   if (window.history.length > 1) {
     void router.back()
     return
   }
-  void router.push({ name: 'appointment-members', params: { appointmentId: appointmentId.value } })
+  void router.push({ name: 'appointment-detail', params: { appointmentId: appointmentId.value } })
 }
 
 function retry(): void {
   void detailQuery.refetch()
   void membersQuery.refetch()
+  void profileQuery.refetch()
+}
+
+function finishReviews(): void {
+  if (!allReviewsComplete.value) return
+  void router.push({ name: 'appointment-detail', params: { appointmentId: appointmentId.value } })
 }
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col gap-6 px-screen py-6">
+  <main class="flex min-h-dvh w-full flex-col gap-8 px-screen pb-28 pt-6">
     <header class="flex items-center gap-3">
       <AppButton
         compact
@@ -116,11 +149,15 @@ function retry(): void {
       :description="t('appointment.review.invalidDescription')"
     />
     <StateLoading
-      v-else-if="detailQuery.isPending.value || membersQuery.isPending.value"
+      v-else-if="
+        detailQuery.isPending.value || membersQuery.isPending.value || profileQuery.isPending.value
+      "
       :label="t('state.loading')"
     />
     <StateError
-      v-else-if="detailQuery.isError.value || membersQuery.isError.value"
+      v-else-if="
+        detailQuery.isError.value || membersQuery.isError.value || profileQuery.isError.value
+      "
       :title="t('appointment.review.loadFailed')"
       :description="t('appointment.review.loadFailedDescription')"
       :action-label="t('action.retry')"
@@ -141,7 +178,7 @@ function retry(): void {
       />
       <section
         v-else
-        class="flex flex-col gap-4"
+        class="flex flex-col gap-5"
         aria-labelledby="appointment-review-heading"
       >
         <h2
@@ -154,12 +191,24 @@ function retry(): void {
           v-for="member in reviewableMembers"
           :key="member.appointmentMemberId"
           :member="member"
+          :expanded="expandedMemberId === member.appointmentMemberId"
           :pending="pendingMemberId === member.appointmentMemberId"
           :completed="completedMemberIds.has(member.appointmentMemberId)"
           :error-message="errorMessage(member.appointmentMemberId)"
           @submit="submit"
+          @toggle="toggleMember(member.appointmentMemberId)"
         />
       </section>
+
+      <div class="sticky bottom-0 z-10 mt-auto bg-canvas/95 py-3 backdrop-blur">
+        <AppButton
+          block
+          :disabled="!allReviewsComplete"
+          @click="finishReviews"
+        >
+          {{ t('appointment.review.finish') }}
+        </AppButton>
+      </div>
     </template>
   </main>
 </template>

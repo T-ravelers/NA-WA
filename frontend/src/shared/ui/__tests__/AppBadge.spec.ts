@@ -15,6 +15,8 @@ describe('AppBadge', () => {
   it.each([
     ['ongoing', 'bg-status-ongoing'],
     ['scheduled', 'bg-status-scheduled'],
+    ['pending', 'bg-status-scheduled'],
+    ['completed', 'bg-status-ongoing'],
   ] as const)('codes the %s dot from tokens', (tone, expected) => {
     const dot = mountBadge({ tone, dot: true }).get('[aria-hidden="true"]')
 

@@ -2,16 +2,22 @@ import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { computed, ref } from 'vue'
 
 import { i18n } from '@/app/i18n'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
+const useAppointmentMemberProfileMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
   fetchAppointment: (appointmentId: number) => fetchAppointment(appointmentId),
   fetchAppointmentMembers: (appointmentId: number) => fetchAppointmentMembers(appointmentId),
+}))
+
+vi.mock('../../model/memberIntegration', () => ({
+  useAppointmentMemberProfile: () => useAppointmentMemberProfileMock(),
 }))
 
 const AppointmentAttendanceView = (await import('../AppointmentAttendanceView.vue')).default
@@ -59,6 +65,14 @@ const members = [
   },
 ]
 
+const profileMemberId = ref(11)
+const profileQuery = {
+  data: computed(() => ({ memberId: profileMemberId.value })),
+  isPending: ref(false),
+  isError: ref(false),
+  refetch: vi.fn().mockResolvedValue(undefined),
+}
+
 async function mountView() {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -69,9 +83,14 @@ async function mountView() {
         component: AppointmentAttendanceView,
       },
       {
-        path: '/appointments/:appointmentId/members',
-        name: 'appointment-members',
-        component: { template: '<div>Members</div>' },
+        path: '/appointments/:appointmentId',
+        name: 'appointment-detail',
+        component: { template: '<div>Detail</div>' },
+      },
+      {
+        path: '/appointments/:appointmentId/reviews',
+        name: 'appointment-reviews',
+        component: { template: '<div>Reviews</div>' },
       },
     ],
   })
@@ -85,7 +104,7 @@ async function mountView() {
     },
   })
   await flushPromises()
-  return wrapper
+  return { wrapper, router }
 }
 
 describe('AppointmentAttendanceView', () => {
@@ -94,29 +113,54 @@ describe('AppointmentAttendanceView', () => {
     fetchAppointmentMembers.mockReset()
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue(members)
+    profileMemberId.value = 11
+    useAppointmentMemberProfileMock.mockReset()
+    useAppointmentMemberProfileMock.mockReturnValue(profileQuery)
   })
 
-  it('renders attendance controls and keeps the save action disabled', async () => {
-    const wrapper = await mountView()
+  it('renders attendance controls with an enabled save action', async () => {
+    const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Confirm attendance')
     expect(wrapper.text()).toContain('Mina Park')
     expect(wrapper.text()).toContain('Attended')
-    expect(wrapper.text()).toContain('Pending')
+    expect(wrapper.text()).toContain('Not attended')
     expect(
       wrapper
         .findAll('button')
         .find((button) => button.text() === 'Attendance checked')
         ?.attributes('disabled'),
-    ).toBeDefined()
+    ).toBeUndefined()
   })
 
   it('toggles a pending member to attended locally', async () => {
-    const wrapper = await mountView()
-    const pendingButton = wrapper.findAll('button').find((button) => button.text() === 'Pending')
+    const { wrapper } = await mountView()
+    const pendingButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Not attended')
 
     await pendingButton?.trigger('click')
 
     expect(wrapper.text()).toContain('Attended')
+  })
+
+  it('returns to the appointment detail after the host checks attendance', async () => {
+    const { wrapper, router } = await mountView()
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Attendance checked')
+
+    await saveButton?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
+  })
+
+  it('hides attendance controls from non-host members', async () => {
+    profileMemberId.value = 12
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Host access required')
+    expect(wrapper.text()).not.toContain('Attendance checked')
   })
 })

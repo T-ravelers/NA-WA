@@ -45,7 +45,7 @@ function toDateTimeRequest(value: string): string {
   return value.length === 16 ? `${value}:00` : value
 }
 
-export function validateAppointmentForm(draft: AppointmentFormDraft): AppointmentFormErrors {
+export function validateAppointmentBasics(draft: AppointmentFormDraft): AppointmentFormErrors {
   const errors: AppointmentFormErrors = {}
 
   if (
@@ -76,6 +76,12 @@ export function validateAppointmentForm(draft: AppointmentFormDraft): Appointmen
     errors.languageCode = 'appointment.create.validation.languageRequired'
   }
 
+  return errors
+}
+
+export function validateAppointmentSettings(draft: AppointmentFormDraft): AppointmentFormErrors {
+  const errors: AppointmentFormErrors = {}
+
   if (
     draft.depositAmount === null ||
     !Number.isSafeInteger(draft.depositAmount) ||
@@ -88,6 +94,12 @@ export function validateAppointmentForm(draft: AppointmentFormDraft): Appointmen
   if (draft.meetingPlace.trim() === '') {
     errors.meetingPlace = 'appointment.create.validation.meetingPlaceRequired'
   }
+
+  return errors
+}
+
+export function validateAppointmentSchedule(draft: AppointmentFormDraft): AppointmentFormErrors {
+  const errors: AppointmentFormErrors = {}
 
   if (draft.activityStartAt === '') {
     errors.activityStartAt = 'appointment.create.validation.startRequired'
@@ -106,6 +118,14 @@ export function validateAppointmentForm(draft: AppointmentFormDraft): Appointmen
   }
 
   return errors
+}
+
+export function validateAppointmentForm(draft: AppointmentFormDraft): AppointmentFormErrors {
+  return {
+    ...validateAppointmentBasics(draft),
+    ...validateAppointmentSettings(draft),
+    ...validateAppointmentSchedule(draft),
+  }
 }
 
 export function toAppointmentCreateRequest(draft: AppointmentFormDraft): AppointmentCreateRequest {

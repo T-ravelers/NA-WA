@@ -16,8 +16,8 @@ describe('appointment routes', () => {
         meta: { requiresAuth: true, hideBottomNav: true },
       }),
       expect.objectContaining({
-        path: '/appointments/:appointmentId/members',
-        name: 'appointment-members',
+        path: '/appointments/:appointmentId/members/:memberId',
+        name: 'appointment-member-profile',
         meta: { requiresAuth: true, hideBottomNav: true },
       }),
       expect.objectContaining({

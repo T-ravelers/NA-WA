@@ -14,9 +14,9 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, hideBottomNav: true },
   },
   {
-    path: '/appointments/:appointmentId/members',
-    name: 'appointment-members',
-    component: () => import('./views/AppointmentMembersView.vue'),
+    path: '/appointments/:appointmentId/members/:memberId',
+    name: 'appointment-member-profile',
+    component: () => import('./views/AppointmentMemberProfileView.vue'),
     meta: { requiresAuth: true, hideBottomNav: true },
   },
   {

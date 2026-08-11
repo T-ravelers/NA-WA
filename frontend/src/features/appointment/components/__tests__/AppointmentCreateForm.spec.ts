@@ -11,18 +11,35 @@ function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
   return button
 }
 
-async function fillForm(wrapper: ReturnType<typeof mount>): Promise<void> {
-  const textInputs = wrapper.findAll('input[type="text"]')
-  await textInputs[0]?.setValue('Seongsu K-Beauty Tour')
-  await textInputs[2]?.setValue('Seongsu Beauty Lab')
+async function fillBasics(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await wrapper
+    .find('input[placeholder="e.g. Seongsu K-Beauty Tour"]')
+    .setValue('Seongsu K-Beauty Tour')
+  await wrapper.get('form').trigger('submit')
+}
+
+async function fillSettings(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await wrapper.find('input[inputmode="numeric"]').setValue('10000')
+  await wrapper.find('input[placeholder="e.g. Seongsu Beauty Lab"]').setValue('Seongsu Beauty Lab')
+}
+
+async function fillSchedule(wrapper: ReturnType<typeof mount>): Promise<void> {
   await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T18:30')
   await wrapper.findAll('input[type="datetime-local"]')[1]?.setValue('2026-08-08T22:00')
   await wrapper.findAll('input[type="datetime-local"]')[2]?.setValue('2026-08-08T17:30')
-  const amountInput = wrapper.find('input[inputmode="numeric"]')
-  await amountInput.setValue('10000')
 }
 
 describe('AppointmentCreateForm', () => {
+  it('offers Traditional Chinese without a Simplified Chinese option', () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT' },
+      global: { plugins: [i18n] },
+    })
+
+    expect(wrapper.text()).toContain('Chinese (Traditional)')
+    expect(wrapper.text()).not.toContain('Chinese (Simplified)')
+  })
+
   it('shows validation errors before opening confirmation', async () => {
     const wrapper = mount(AppointmentCreateForm, {
       props: { itemId: 42, itemType: 'EVENT' },
@@ -32,8 +49,26 @@ describe('AppointmentCreateForm', () => {
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.text()).toContain('Enter an appointment name.')
-    expect(wrapper.text()).toContain('Choose a deposit between ₩5,000 and ₩50,000.')
+    expect(wrapper.text()).not.toContain('Choose a deposit between ₩5,000 and ₩50,000.')
+    expect(wrapper.text()).toContain('Start with your appointment details')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('moves between the basics and settings steps', async () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT' },
+      global: { plugins: [i18n] },
+    })
+
+    await fillBasics(wrapper)
+
+    expect(wrapper.text()).toContain('Set your appointment details')
+    expect(wrapper.find('input[placeholder="e.g. Seongsu Beauty Lab"]').exists()).toBe(true)
+
+    await buttonByText(wrapper, 'Back').trigger('click')
+
+    expect(wrapper.text()).toContain('Start with your appointment details')
+    expect(wrapper.find('input[placeholder="e.g. Seongsu K-Beauty Tour"]').exists()).toBe(true)
   })
 
   it('emits a normalized request after confirming valid details', async () => {
@@ -42,7 +77,12 @@ describe('AppointmentCreateForm', () => {
       global: { plugins: [i18n] },
     })
 
-    await fillForm(wrapper)
+    await fillBasics(wrapper)
+    await fillSettings(wrapper)
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.text()).toContain('Set the appointment schedule')
+    await fillSchedule(wrapper)
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
@@ -69,7 +109,8 @@ describe('AppointmentCreateForm', () => {
       global: { plugins: [i18n] },
     })
 
-    await fillForm(wrapper)
+    await fillBasics(wrapper)
+    await fillSettings(wrapper)
     await wrapper.find('input[inputmode="numeric"]').setValue('0')
     await wrapper.get('form').trigger('submit')
 

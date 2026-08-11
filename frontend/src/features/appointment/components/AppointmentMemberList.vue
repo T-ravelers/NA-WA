@@ -2,6 +2,7 @@
 import { useI18n } from 'vue-i18n'
 
 import AppBadge from '@/shared/ui/AppBadge.vue'
+import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import type { AppointmentMember } from '../api/appointmentApi'
@@ -11,6 +12,7 @@ interface Props {
 }
 
 const { members } = defineProps<Props>()
+const emit = defineEmits<{ select: [member: AppointmentMember] }>()
 const { t } = useI18n()
 
 function initials(displayName: string): string {
@@ -54,9 +56,15 @@ function initials(displayName: string): string {
             </p>
           </div>
 
-          <AppBadge :tone="member.membershipStatus === 'ACTIVE' ? 'neutral' : 'onPaper'">
-            {{ t(`appointment.members.status.${member.membershipStatus}`) }}
-          </AppBadge>
+          <AppButton
+            compact
+            dense
+            variant="primary"
+            :aria-label="t('appointment.members.viewProfile', { name: member.displayName })"
+            @click="emit('select', member)"
+          >
+            {{ t('appointment.members.visit') }}
+          </AppButton>
         </article>
       </AppCard>
     </li>

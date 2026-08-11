@@ -89,16 +89,20 @@ function formatDeposit(value: string): string {
       </p>
 
       <div class="flex items-center justify-between gap-3">
-        <p class="text-caption text-ink-3">
+        <p class="min-w-0 truncate text-caption text-ink-3">
           {{ t('appointment.list.deposit', { amount: formatDeposit(appointment.depositAmount) }) }}
         </p>
-        <AppButton
-          compact
-          :disabled="appointment.appointmentStatus !== 'RECRUITING'"
-          @click="openDetail"
-        >
-          {{ t('appointment.list.view') }}
-        </AppButton>
+        <div class="w-24 shrink-0">
+          <AppButton
+            block
+            compact
+            dense
+            :disabled="appointment.appointmentStatus !== 'RECRUITING'"
+            @click="openDetail"
+          >
+            {{ t('appointment.list.view') }}
+          </AppButton>
+        </div>
       </div>
     </article>
   </AppCard>

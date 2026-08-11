@@ -59,14 +59,7 @@ const title = computed(() =>
       : t('appointment.list.title'),
 )
 
-const languageOptions: Array<'ALL' | AppointmentLanguage> = [
-  'ALL',
-  'en',
-  'ja',
-  'zh-CN',
-  'zh-TW',
-  'vi',
-]
+const languageOptions: Array<'ALL' | AppointmentLanguage> = ['ALL', 'en', 'ja', 'zh-TW', 'vi']
 
 function goBack(): void {
   if (window.history.length > 1) {
@@ -93,7 +86,7 @@ function retry(): void {
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col gap-5 px-screen py-6">
+  <main class="flex min-h-dvh w-full flex-col gap-8 px-screen pb-28 pt-6">
     <header class="flex items-center gap-3">
       <button
         type="button"
@@ -143,10 +136,10 @@ function retry(): void {
     </div>
 
     <section
-      class="flex flex-1 flex-col gap-3"
+      class="flex flex-1 flex-col gap-5"
       aria-labelledby="appointment-list-heading"
     >
-      <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center justify-between gap-4">
         <h2
           id="appointment-list-heading"
           class="text-title text-ink"
@@ -157,12 +150,6 @@ function retry(): void {
             })
           }}
         </h2>
-        <AppButton
-          compact
-          @click="goToCreate"
-        >
-          {{ t('appointment.list.create') }}
-        </AppButton>
       </div>
 
       <StateLoading
@@ -182,8 +169,6 @@ function retry(): void {
         v-else-if="appointments.length === 0"
         :title="t('appointment.list.emptyTitle')"
         :description="t('appointment.list.emptyDescription')"
-        :action-label="t('appointment.list.create')"
-        @action="goToCreate"
       />
 
       <ul
@@ -198,5 +183,16 @@ function retry(): void {
         </li>
       </ul>
     </section>
+
+    <div
+      class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
+    >
+      <AppButton
+        block
+        @click="goToCreate"
+      >
+        {{ t('appointment.list.create') }}
+      </AppButton>
+    </div>
   </main>
 </template>

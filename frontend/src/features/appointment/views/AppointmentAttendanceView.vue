@@ -16,6 +16,7 @@ import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
 } from '../model/appointmentQueries'
+import { useAppointmentMemberProfile } from '../model/memberIntegration'
 
 const route = useRoute()
 const router = useRouter()
@@ -41,7 +42,15 @@ const membersQuery = useQuery({
   retry: false,
 })
 
+const profileQuery = useAppointmentMemberProfile()
 const members = computed(() => membersQuery.data.value ?? [])
+const isHost = computed(() => {
+  const currentMemberId = profileQuery.data.value?.memberId
+  return (
+    currentMemberId !== undefined &&
+    members.value.some((member) => member.memberId === currentMemberId && member.isHost)
+  )
+})
 const attendanceDraft = reactive<Record<number, AppointmentAttendanceStatus>>({})
 
 function initials(displayName: string): string {
@@ -66,17 +75,27 @@ function goBack(): void {
     void router.back()
     return
   }
-  void router.push({ name: 'appointment-members', params: { appointmentId: appointmentId.value } })
+  void router.push({ name: 'appointment-detail', params: { appointmentId: appointmentId.value } })
 }
 
 function retry(): void {
   void detailQuery.refetch()
   void membersQuery.refetch()
+  void profileQuery.refetch()
+}
+
+function saveAttendance(): void {
+  if (appointmentId.value === null) return
+
+  void router.push({
+    name: 'appointment-detail',
+    params: { appointmentId: appointmentId.value },
+  })
 }
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col gap-6 px-screen py-6">
+  <main class="flex min-h-dvh w-full flex-col gap-8 px-screen pb-28 pt-6">
     <header class="flex items-center gap-3">
       <AppButton
         compact
@@ -97,18 +116,27 @@ function retry(): void {
       :description="t('appointment.attendance.invalidDescription')"
     />
     <StateLoading
-      v-else-if="detailQuery.isPending.value || membersQuery.isPending.value"
+      v-else-if="
+        detailQuery.isPending.value || membersQuery.isPending.value || profileQuery.isPending.value
+      "
       :label="t('state.loading')"
     />
     <StateError
-      v-else-if="detailQuery.isError.value || membersQuery.isError.value"
+      v-else-if="
+        detailQuery.isError.value || membersQuery.isError.value || profileQuery.isError.value
+      "
       :title="t('appointment.attendance.loadFailed')"
       :description="t('appointment.attendance.loadFailedDescription')"
       :action-label="t('action.retry')"
       @retry="retry"
     />
+    <StateEmpty
+      v-else-if="!isHost"
+      :title="t('appointment.attendance.accessDeniedTitle')"
+      :description="t('appointment.attendance.accessDeniedDescription')"
+    />
     <template v-else-if="detailQuery.data.value !== undefined">
-      <section class="flex flex-col gap-2">
+      <section class="flex flex-col gap-4">
         <p class="text-caption text-ink-3">{{ t('appointment.attendance.subtitle') }}</p>
         <h2 class="font-display text-screen-title text-ink-display">
           {{ detailQuery.data.value.appointmentName }}
@@ -154,31 +182,44 @@ function retry(): void {
                 </div>
 
                 <AppBadge
-                  :tone="attendanceStatus(member) === 'ATTENDED' ? 'settlement' : 'onPaper'"
+                  :tone="
+                    attendanceStatus(member) === 'ATTENDED'
+                      ? 'settlement'
+                      : attendanceStatus(member) === 'PENDING'
+                        ? 'pending'
+                        : 'onPaper'
+                  "
                 >
                   {{ statusLabel(attendanceStatus(member)) }}
                 </AppBadge>
-                <AppButton
-                  compact
-                  :variant="attendanceStatus(member) === 'ATTENDED' ? 'settle' : 'primary'"
-                  :aria-label="t('appointment.attendance.toggle', { name: member.displayName })"
-                  @click="toggleAttendance(member)"
-                >
-                  {{ statusLabel(attendanceStatus(member)) }}
-                </AppButton>
+                <div class="w-24 shrink-0">
+                  <AppButton
+                    block
+                    compact
+                    dense
+                    :variant="attendanceStatus(member) === 'ATTENDED' ? 'settle' : 'primary'"
+                    :aria-label="t('appointment.attendance.toggle', { name: member.displayName })"
+                    @click="toggleAttendance(member)"
+                  >
+                    {{ statusLabel(attendanceStatus(member)) }}
+                  </AppButton>
+                </div>
               </div>
             </AppCard>
           </li>
         </ul>
       </section>
 
-      <AppButton
-        block
-        disabled
-        :title="t('appointment.attendance.savePending')"
+      <div
+        class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
-        {{ t('appointment.attendance.save') }}
-      </AppButton>
+        <AppButton
+          block
+          @click="saveAttendance"
+        >
+          {{ t('appointment.attendance.save') }}
+        </AppButton>
+      </div>
     </template>
   </main>
 </template>

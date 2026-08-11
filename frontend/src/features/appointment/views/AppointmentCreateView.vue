@@ -62,7 +62,7 @@ function goBack(): void {
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col gap-6 px-screen py-6">
+  <main class="flex min-h-dvh w-full flex-col gap-8 px-screen pb-28 pt-6">
     <header class="flex items-center gap-3">
       <AppButton
         compact

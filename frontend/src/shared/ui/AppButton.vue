@@ -31,6 +31,8 @@ interface Props {
    * 넣으면 라벨이 먼저 잘린다. 높이와 라운드는 그대로 두고 여백만 좁힌다.
    */
   compact?: boolean
+  /** 카드 안의 짧은 동작 버튼에 사용하는 낮은 높이. */
+  dense?: boolean
 }
 
 const {
@@ -40,6 +42,7 @@ const {
   loading = false,
   type = 'button',
   compact = false,
+  dense = false,
 } = defineProps<Props>()
 
 const emit = defineEmits<{ click: [] }>()
@@ -47,10 +50,17 @@ const emit = defineEmits<{ click: [] }>()
 const { t } = useI18n()
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
-  primary: 'h-13 rounded-sm bg-paper-fill text-on-paper',
-  secondary: 'h-12 rounded-sm border border-hairline-strong bg-transparent text-ink',
-  tertiary: 'h-11 text-ink underline underline-offset-4',
-  settle: 'h-12 rounded-sm bg-settlement text-on-paper',
+  primary: 'rounded-sm bg-paper-fill text-on-paper',
+  secondary: 'rounded-sm border border-hairline-strong bg-transparent text-ink',
+  tertiary: 'text-ink underline underline-offset-4',
+  settle: 'rounded-sm bg-settlement text-on-paper',
+}
+
+const HEIGHT_CLASS: Record<ButtonVariant, string> = {
+  primary: 'h-13',
+  secondary: 'h-12',
+  tertiary: 'h-11',
+  settle: 'h-12',
 }
 
 function handleClick(): void {
@@ -69,7 +79,12 @@ function handleClick(): void {
     :disabled="disabled || loading"
     :aria-busy="loading"
     class="relative inline-flex shrink-0 items-center justify-center text-title-sm transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
-    :class="[VARIANT_CLASS[variant], block ? 'w-full' : '', compact ? 'px-3' : 'px-6']"
+    :class="[
+      VARIANT_CLASS[variant],
+      dense ? 'h-10' : HEIGHT_CLASS[variant],
+      block ? 'w-full' : '',
+      compact ? 'px-3' : 'px-6',
+    ]"
     @click="handleClick"
   >
     <span :class="loading ? 'sr-only' : 'truncate'">
