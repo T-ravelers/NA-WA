@@ -69,11 +69,12 @@ const members = [
 ]
 
 const profileQuery = {
-  data: computed(() => ({ memberId: 11 })),
+  data: computed(() => ({ memberId: profileMemberId.value })),
   isPending: ref(false),
   isError: ref(false),
   refetch: vi.fn().mockResolvedValue(undefined),
 }
+const profileMemberId = ref(11)
 
 async function mountView() {
   const router = createRouter({
@@ -112,6 +113,7 @@ describe('AppointmentReviewView', () => {
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue(members)
     submitAppointmentReview.mockRejectedValue(new Error('save failed'))
+    profileMemberId.value = 11
     useAppointmentMemberProfileMock.mockReset()
     useAppointmentMemberProfileMock.mockReturnValue(profileQuery)
   })
@@ -131,5 +133,21 @@ describe('AppointmentReviewView', () => {
 
     expect(wrapper.get('[role="alert"]').text()).toContain('Review could not be saved')
     expect(wrapper.text()).toContain('Alex Kim')
+  })
+
+  it('blocks reviews for members who are not active participants', async () => {
+    profileMemberId.value = 99
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Participant access required')
+    expect(wrapper.text()).not.toContain('Save review')
+  })
+
+  it('blocks reviews until the appointment is completed', async () => {
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'RECRUITING' })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Reviews are not available yet')
+    expect(wrapper.text()).not.toContain('Save review')
   })
 })

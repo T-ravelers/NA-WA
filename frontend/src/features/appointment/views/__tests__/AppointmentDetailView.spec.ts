@@ -1,12 +1,20 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { appointmentMemberIntegrationKey } from '../../model/memberIntegration'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
+const profileQuery = {
+  data: ref({ memberId: 11 }),
+  isPending: ref(false),
+  isError: ref(false),
+  refetch: vi.fn().mockResolvedValue(undefined),
+}
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
@@ -103,6 +111,11 @@ async function mountView() {
   const wrapper = mount(AppointmentDetailView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+      provide: {
+        [appointmentMemberIntegrationKey as symbol]: {
+          useMemberProfile: () => profileQuery,
+        },
+      },
     },
   })
   await flushPromises()
@@ -127,6 +140,8 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).toContain('Not attended')
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).not.toContain('Jamie Lee')
+    expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Confirm attendance')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
@@ -158,6 +173,7 @@ describe('AppointmentDetailView', () => {
   })
 
   it('opens the attendance screen from the appointment detail', async () => {
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
     const { wrapper, router } = await mountView()
 
     await wrapper
@@ -170,6 +186,7 @@ describe('AppointmentDetailView', () => {
   })
 
   it('opens the attendance and reviews screens from the detail menu', async () => {
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
     const { wrapper, router } = await mountView()
 
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')

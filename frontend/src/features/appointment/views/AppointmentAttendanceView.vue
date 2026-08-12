@@ -51,6 +51,9 @@ const isHost = computed(() => {
     members.value.some((member) => member.memberId === currentMemberId && member.isHost)
   )
 })
+const appointmentCompleted = computed(
+  () => detailQuery.data.value?.appointmentStatus === 'COMPLETED',
+)
 const attendanceDraft = reactive<Record<number, AppointmentAttendanceStatus>>({})
 
 function initials(displayName: string): string {
@@ -120,6 +123,11 @@ function retry(): void {
       :description="t('appointment.attendance.loadFailedDescription')"
       :action-label="t('action.retry')"
       @retry="retry"
+    />
+    <StateEmpty
+      v-else-if="!appointmentCompleted"
+      :title="t('appointment.attendance.notCompletedTitle')"
+      :description="t('appointment.attendance.notCompletedDescription')"
     />
     <StateEmpty
       v-else-if="!isHost"

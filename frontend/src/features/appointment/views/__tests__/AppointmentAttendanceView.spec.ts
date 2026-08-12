@@ -166,4 +166,12 @@ describe('AppointmentAttendanceView', () => {
     expect(wrapper.text()).toContain('Host access required')
     expect(wrapper.text()).not.toContain('Attendance checked')
   })
+
+  it('blocks attendance before the appointment is completed', async () => {
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'RECRUITING' })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Attendance is not available yet')
+    expect(wrapper.text()).not.toContain('Attendance checked')
+  })
 })

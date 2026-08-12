@@ -51,6 +51,19 @@ const reviewableMembers = computed(() =>
       member.memberId !== profileQuery.data.value.memberId,
   ),
 )
+const appointmentCompleted = computed(
+  () => detailQuery.data.value?.appointmentStatus === 'COMPLETED',
+)
+const isActiveParticipant = computed(() => {
+  const currentMemberId = profileQuery.data.value?.memberId
+  return (
+    currentMemberId !== undefined &&
+    (membersQuery.data.value ?? []).some(
+      (member) => member.memberId === currentMemberId && member.membershipStatus === 'ACTIVE',
+    )
+  )
+})
+const canReview = computed(() => appointmentCompleted.value && isActiveParticipant.value)
 const completedMemberIds = reactive(new Set<number>())
 const pendingMemberId = ref<number | null>(null)
 const failedMemberId = ref<number | null>(null)
@@ -93,7 +106,7 @@ const reviewMutation = useMutation({
 })
 
 function submit(request: AppointmentReviewRequest): void {
-  if (appointmentId.value === null || reviewMutation.isPending.value) return
+  if (appointmentId.value === null || !canReview.value || reviewMutation.isPending.value) return
 
   pendingMemberId.value = request.reviewedAppointmentMemberId
   failedMemberId.value = null
@@ -125,7 +138,7 @@ function retry(): void {
 }
 
 function finishReviews(): void {
-  if (!allReviewsComplete.value) return
+  if (!canReview.value || !allReviewsComplete.value) return
   void router.push({ name: 'appointment-detail', params: { appointmentId: appointmentId.value } })
 }
 </script>
@@ -165,6 +178,16 @@ function finishReviews(): void {
       :description="t('appointment.review.loadFailedDescription')"
       :action-label="t('action.retry')"
       @retry="retry"
+    />
+    <StateEmpty
+      v-else-if="!appointmentCompleted"
+      :title="t('appointment.review.notCompletedTitle')"
+      :description="t('appointment.review.notCompletedDescription')"
+    />
+    <StateEmpty
+      v-else-if="!isActiveParticipant"
+      :title="t('appointment.review.accessDeniedTitle')"
+      :description="t('appointment.review.accessDeniedDescription')"
     />
     <template v-else-if="detailQuery.data.value !== undefined">
       <section class="flex flex-col gap-2">

@@ -20,6 +20,7 @@ import {
   appointmentMembersQueryOptions,
 } from '../model/appointmentQueries'
 import { parseAppointmentDateTime } from '../model/appointmentDateTime'
+import { useAppointmentMemberProfile } from '../model/memberIntegration'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,6 +52,7 @@ const members = computed(() =>
     (member) => member.membershipStatus === 'ACTIVE',
   ),
 )
+const profileQuery = useAppointmentMemberProfile()
 
 const depositSheetOpen = ref(false)
 const menuOpen = ref(false)
@@ -60,6 +62,21 @@ const statusTone = computed(() =>
 )
 
 const isJoinAvailable = computed(() => appointment.value?.appointmentStatus === 'RECRUITING')
+const isCompleted = computed(() => appointment.value?.appointmentStatus === 'COMPLETED')
+const currentMemberId = computed(() => profileQuery.data.value?.memberId)
+const isHost = computed(
+  () =>
+    currentMemberId.value !== undefined &&
+    members.value.some((member) => member.memberId === currentMemberId.value && member.isHost),
+)
+const isActiveParticipant = computed(
+  () =>
+    currentMemberId.value !== undefined &&
+    members.value.some((member) => member.memberId === currentMemberId.value),
+)
+const canOpenAttendance = computed(() => isCompleted.value === true && isHost.value)
+const canOpenReviews = computed(() => isCompleted.value === true && isActiveParticipant.value)
+const canOpenPostEventMenu = computed(() => canOpenAttendance.value || canOpenReviews.value)
 
 function formatDateTime(value: string | null): string {
   if (!value) return t('appointment.detail.notProvided')
@@ -99,7 +116,7 @@ function openMemberProfile(member: { memberId: number }): void {
 }
 
 function openAttendance(): void {
-  if (appointmentId.value === null) return
+  if (appointmentId.value === null || !canOpenAttendance.value) return
 
   menuOpen.value = false
   void router.push({
@@ -109,7 +126,7 @@ function openAttendance(): void {
 }
 
 function openReviews(): void {
-  if (appointmentId.value === null) return
+  if (appointmentId.value === null || !canOpenReviews.value) return
 
   menuOpen.value = false
   void router.push({
@@ -147,6 +164,7 @@ function closeDepositSheet(): void {
         {{ t('appointment.detail.title') }}
       </h1>
       <AppButton
+        v-if="canOpenPostEventMenu"
         compact
         variant="secondary"
         :aria-label="t('appointment.detail.openMenu')"
@@ -167,6 +185,7 @@ function closeDepositSheet(): void {
         class="absolute right-0 top-14 z-30 flex w-48 flex-col gap-1 rounded-sm border border-hairline bg-surface-1 p-2 shadow-sheet"
       >
         <button
+          v-if="canOpenAttendance"
           type="button"
           role="menuitem"
           class="rounded-xs px-3 py-3 text-left text-body-sm text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
@@ -175,6 +194,7 @@ function closeDepositSheet(): void {
           {{ t('appointment.detail.menu.attendance') }}
         </button>
         <button
+          v-if="canOpenReviews"
           type="button"
           role="menuitem"
           class="rounded-xs px-3 py-3 text-left text-body-sm text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
@@ -304,6 +324,7 @@ function closeDepositSheet(): void {
         />
 
         <AppButton
+          v-if="canOpenAttendance"
           block
           variant="secondary"
           @click="openAttendance"
