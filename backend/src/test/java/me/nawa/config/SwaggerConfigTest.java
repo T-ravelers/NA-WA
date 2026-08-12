@@ -8,6 +8,7 @@ import me.nawa.auth.oauth.callback.OAuthCallbackResult;
 import me.nawa.auth.oauth.callback.OAuthCallbackService;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
+import me.nawa.appointment.service.AppointmentService;
 import me.nawa.common.exception.ErrorCode;
 import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
@@ -72,6 +73,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.TopupTestConfig.class,
         SwaggerConfigTest.TransactionTestConfig.class,
         SwaggerConfigTest.MemberTestConfig.class,
+        SwaggerConfigTest.AppointmentTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -322,6 +324,15 @@ class SwaggerConfigTest {
         @Bean
         JourneyService journeyService() {
             return new JourneyService(null);
+        }
+    }
+
+    @Configuration
+    static class AppointmentTestConfig {
+
+        @Bean
+        AppointmentService appointmentService() {
+            return new AppointmentService(null, null);
         }
     }
 

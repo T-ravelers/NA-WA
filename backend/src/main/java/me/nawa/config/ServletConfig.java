@@ -11,6 +11,7 @@ import org.springframework.web.servlet.config.annotation.*;
 @ComponentScan(basePackages = {
     "me.nawa.common.exception",
     "me.nawa.auth.controller",
+    "me.nawa.appointment.controller",
     "me.nawa.member.controller",
     "me.nawa.explore.controller",
     "me.nawa.journey.controller",
