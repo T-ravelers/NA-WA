@@ -160,6 +160,80 @@
           AND host.deleted_at IS NULL
     </select>
 
+    <select id="findAppointmentByIdForUpdate"
+            resultType="me.nawa.appointment.domain.Appointment">
+        SELECT
+            <include refid="appointmentColumns"/>
+        FROM appointments a
+        JOIN explore_items ei
+          ON ei.item_id = a.item_id
+        JOIN members host
+          ON host.member_id = a.host_member_id
+        WHERE a.appointment_id = #{appointmentId}
+          AND a.deleted_at IS NULL
+          AND ei.deleted_at IS NULL
+          AND host.deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="findMemberByAppointmentAndMemberForUpdate"
+            resultType="me.nawa.appointment.domain.AppointmentMember">
+        SELECT
+            appointment_member_id,
+            appointment_id,
+            member_id,
+            trip_id,
+            membership_status,
+            attendance_status,
+            joined_at,
+            left_at,
+            attendance_confirmed_at
+        FROM appointment_members
+        WHERE appointment_id = #{appointmentId}
+          AND member_id = #{memberId}
+          AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="countParticipatingMembers" resultType="int">
+        SELECT COUNT(*)
+        FROM appointment_members
+        WHERE appointment_id = #{appointmentId}
+          AND membership_status IN ('PENDING', 'ACTIVE')
+          AND deleted_at IS NULL
+    </select>
+
+    <update id="markMemberLeft">
+        UPDATE appointment_members
+        SET membership_status = 'LEFT',
+            left_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status IN ('PENDING', 'ACTIVE')
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="confirmAttendance">
+        UPDATE appointment_members
+        SET attendance_status = #{attendanceStatus},
+            attendance_confirmed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = #{appointmentId}
+          AND member_id = #{memberId}
+          AND membership_status = 'ACTIVE'
+          AND attendance_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="completeAppointment">
+        UPDATE appointments
+        SET appointment_status = 'COMPLETED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = #{appointmentId}
+          AND appointment_status = 'IN_PROGRESS'
+          AND deleted_at IS NULL
+    </update>
+
     <select id="findActiveMembersByAppointmentId"
             resultType="me.nawa.appointment.domain.AppointmentMember">
         SELECT

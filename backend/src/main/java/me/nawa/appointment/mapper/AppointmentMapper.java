@@ -30,6 +30,33 @@ public interface AppointmentMapper {
             @Param("appointmentId") Long appointmentId
     );
 
+    Appointment findAppointmentByIdForUpdate(
+            @Param("appointmentId") Long appointmentId
+    );
+
+    AppointmentMember findMemberByAppointmentAndMemberForUpdate(
+            @Param("appointmentId") Long appointmentId,
+            @Param("memberId") Long memberId
+    );
+
+    int countParticipatingMembers(
+            @Param("appointmentId") Long appointmentId
+    );
+
+    int markMemberLeft(
+            @Param("appointmentMemberId") Long appointmentMemberId
+    );
+
+    int confirmAttendance(
+            @Param("appointmentId") Long appointmentId,
+            @Param("memberId") Long memberId,
+            @Param("attendanceStatus") String attendanceStatus
+    );
+
+    int completeAppointment(
+            @Param("appointmentId") Long appointmentId
+    );
+
     List<AppointmentMember> findActiveMembersByAppointmentId(
             @Param("appointmentId") Long appointmentId
     );
