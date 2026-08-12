@@ -3,6 +3,7 @@ import type { NavigationGuard, RouteLocationNormalized } from 'vue-router'
 import { syncLocaleWithProfile } from '@/features/member/model/localeSync'
 import { ensureMemberProfile } from '@/features/member/model/memberQueries'
 import { AUTHENTICATED_HOME_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
+import { isSignOutBarrierActive } from '@/shared/api/signOutBarrier'
 
 /**
  * 인증 정책은 이 guard 하나로만 처리한다.
@@ -28,6 +29,10 @@ function resolveReturnPath(to: RouteLocationNormalized): string | undefined {
 export const authGuard: NavigationGuard = async (to) => {
   if (to.meta.requiresAuth !== true && to.meta.guestOnly !== true) {
     return true
+  }
+
+  if (isSignOutBarrierActive()) {
+    return to.meta.requiresAuth === true ? { path: SIGN_IN_PATH } : true
   }
 
   // members/me는 미인증이면 401이므로 이 호출 하나가 세션 확인을 겸한다.

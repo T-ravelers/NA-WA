@@ -7,7 +7,11 @@ import { i18n } from '@/app/i18n'
 import { bootstrapLocale } from '@/app/i18n/applyLocale'
 import { queryClient } from '@/app/query/client'
 import { router } from '@/app/router'
-import { handleSessionExpired, handleSignedOut } from '@/app/session/sessionHandlers'
+import {
+  handleSessionExpired,
+  handleSignedOut,
+  handleSignOutBarrier,
+} from '@/app/session/sessionHandlers'
 import { addJourneyItem } from '@/features/journey/api/journeyApi'
 import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
 import {
@@ -19,6 +23,7 @@ import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIn
 import '@/app/styles/index.css'
 import { setSessionExpiredHandler } from '@/shared/api/sessionRecovery'
 import { setSignedOutHandler } from '@/shared/api/sessionSignOut'
+import { subscribeSignOutBarrier } from '@/shared/api/signOutBarrier'
 import { assertApiBaseUrlConfigured } from '@/shared/config/apiBaseUrl'
 
 // 설정이 빠진 채로 뜨면 모든 요청이 조용히 앱 셸 HTML을 받는다. 화면을 그리기 전에 끊는다.
@@ -31,6 +36,11 @@ assertApiBaseUrlConfigured(import.meta.env.VITE_API_BASE_URL)
  */
 setSessionExpiredHandler(handleSessionExpired)
 setSignedOutHandler(handleSignedOut)
+subscribeSignOutBarrier((active) => {
+  if (active) {
+    handleSignOutBarrier()
+  }
+})
 
 bootstrapLocale()
 

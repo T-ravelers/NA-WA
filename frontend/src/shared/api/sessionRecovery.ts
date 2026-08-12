@@ -1,6 +1,7 @@
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
 
 import { clearCsrfToken } from './csrf'
+import { isSignOutBarrierActive } from './signOutBarrier'
 
 const REFRESH_ENDPOINT = '/api/v1/auth/refresh'
 
@@ -46,7 +47,7 @@ export function setSessionExpiredHandler(handler: SessionExpiredHandler): void {
 }
 
 function isRecoverable(config: RetriableConfig | undefined): config is RetriableConfig {
-  if (config === undefined || config.__sessionRetried === true) {
+  if (config === undefined || config.__sessionRetried === true || isSignOutBarrierActive()) {
     return false
   }
 

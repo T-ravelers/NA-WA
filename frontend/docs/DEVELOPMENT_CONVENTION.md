@@ -184,6 +184,11 @@ export const journeyKeys = {
 세션이 완전히 끊겼을 때의 화면 이동은 `src/main.ts`가 `setSessionExpiredHandler`로
 주입합니다. `shared`는 router와 feature를 import하지 않습니다.
 
+로그아웃 요청 전에 `nawa.auth.signOutBarrier` 장벽을 세웁니다. 응답이 불확실하면
+새로고침과 탭 이동 뒤에도 보호 경로와 401 refresh 복구를 차단하며, 서버 로그아웃 성공
+응답 또는 오류 없는 새 로그인 callback에서만 해제합니다. 이 값은 인증정보가 아니라
+사용자의 로그아웃 의도만 나타냅니다.
+
 Axios 인스턴스가 `withCredentials: true`를 사용하므로 서버 CORS는 실제 프론트엔드
 Origin과 credentials를 함께 허용해야 합니다.
 

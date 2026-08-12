@@ -67,6 +67,7 @@ const authRequired = {
 
 describe('httpClient', () => {
   beforeEach(() => {
+    localStorage.clear()
     vi.resetModules()
     vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.test')
   })
@@ -155,6 +156,18 @@ describe('httpClient', () => {
     expect(response.data).toEqual({ balance: '10' })
     expect(countCalls(calls, 'post', '/api/v1/auth/refresh')).toBe(1)
     expect(countCalls(calls, 'get', '/api/v1/wallet')).toBe(2)
+  })
+
+  it('does not refresh or retry while the sign-out barrier is active', async () => {
+    localStorage.setItem('nawa.auth.signOutBarrier', 'active')
+    const { httpClient, calls } = await loadClient({
+      'get /api/v1/wallet': [{ status: 401, body: authRequired }],
+      'post /api/v1/auth/refresh': [{ status: 200, body: { success: true } }],
+    })
+
+    await expect(httpClient.get('/api/v1/wallet')).rejects.toMatchObject({ code: 'AUTH-003' })
+    expect(countCalls(calls, 'post', '/api/v1/auth/refresh')).toBe(0)
+    expect(countCalls(calls, 'get', '/api/v1/wallet')).toBe(1)
   })
 
   // 회귀: refresh는 POST라 CSRF 헤더가 없으면 백엔드가 403 AUTH-005로 거부한다.
