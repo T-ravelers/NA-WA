@@ -27,18 +27,47 @@ public class WalletProvisioningServiceImpl implements WalletProvisioningService 
             DEFAULT_CURRENCY_CODE
         );
 
-        //1. 지갑 소유자(wallet_owners) 생성 — uq_wallet_owners_member로 회원당 1행이 보장된다
-        if (walletMapper.insertMemberWalletOwner(provision) != 1
-            || provision.getWalletOwnerId() <= 0) {
-            throw new IllegalStateException("Failed to insert wallet owner");
-        }
+        //1. 지갑 소유자(wallet_owners) 확보 — uq_wallet_owners_member로 회원당 1행이 보장된다
+        ensureWalletOwner(provision);
 
-        //2. 생성된 소유자에 지갑(wallets) 생성 — 잔액 0 / ACTIVE는 스키마 기본값
-        if (walletMapper.insertMemberWallet(provision) != 1
-            || provision.getWalletId() <= 0) {
-            throw new IllegalStateException("Failed to insert wallet");
-        }
+        //2. 확보한 소유자에 지갑(wallets) 확보 — 잔액 0 / ACTIVE는 스키마 기본값
+        ensureWallet(provision);
 
         return provision.getWalletId();
+    }
+
+    // UNIQUE 제약에 deleted_at이 없어 "삭제 후 재생성"이 불가능하다. 남아 있는 행은 되살려서 쓴다.
+    // 성공 판정은 affected rows가 아니라 확보한 ID로 한다. 복구가 이미 끝난 행에는 UPDATE가 0행을 남긴다.
+    private void ensureWalletOwner(MemberWalletProvision provision) {
+        Long existingWalletOwnerId = walletMapper.findWalletOwnerIdIncludingDeleted(
+            provision.getMemberId()
+        );
+        if (existingWalletOwnerId != null) {
+            walletMapper.restoreWalletOwner(existingWalletOwnerId);
+            provision.setWalletOwnerId(existingWalletOwnerId);
+        } else {
+            walletMapper.insertMemberWalletOwner(provision);
+        }
+
+        if (provision.getWalletOwnerId() <= 0) {
+            throw new IllegalStateException("Failed to resolve wallet owner");
+        }
+    }
+
+    // 기존 지갑을 되살릴 때 잔액·wallet_status·원장 이력은 그대로 둔다. 통화도 기존 값을 유지한다.
+    private void ensureWallet(MemberWalletProvision provision) {
+        Long existingWalletId = walletMapper.findWalletIdIncludingDeleted(
+            provision.getWalletOwnerId()
+        );
+        if (existingWalletId != null) {
+            walletMapper.restoreWallet(existingWalletId);
+            provision.setWalletId(existingWalletId);
+        } else {
+            walletMapper.insertMemberWallet(provision);
+        }
+
+        if (provision.getWalletId() <= 0) {
+            throw new IllegalStateException("Failed to resolve wallet");
+        }
     }
 }
