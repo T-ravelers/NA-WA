@@ -29,6 +29,12 @@ public class OAuthMemberTransactionImpl implements OAuthMemberTransaction {
         );
         OAuthLoginAccount existing = findAccount(requiredProfile);
         if (existing != null) {
+            // 탈퇴·정지 계정의 지갑은 재가입 정책이 확정되기 전까지 복구하지 않는다.
+            if (canRestoreWallet(existing)) {
+                walletProvisioningService.provisionForMember(
+                        existing.getMemberId()
+                );
+            }
             return existing;
         }
 
@@ -74,6 +80,12 @@ public class OAuthMemberTransactionImpl implements OAuthMemberTransaction {
                 profile.getProvider().getRegistrationId(),
                 profile.getProviderUserId()
         );
+    }
+
+    private boolean canRestoreWallet(OAuthLoginAccount account) {
+        return "ACTIVE".equals(account.getMemberStatus())
+                && !account.isMemberDeleted()
+                && !account.isSocialAccountDeleted();
     }
 
     private String normalizeProviderEmail(String value) {

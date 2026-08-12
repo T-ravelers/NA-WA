@@ -161,9 +161,9 @@ class WalletProvisioningIntegrationTest {
     }
 
     // #94 — uq_wallet_owners_member·uq_wallets_owner에 deleted_at이 없어 재생성이 불가능하다.
-    // soft-delete된 행이 남은 회원에게 provisionForMember를 다시 돌려도 같은 지갑이 살아나야 한다.
+    // soft-delete된 행이 남은 ACTIVE 회원이 다시 로그인하면 같은 지갑이 살아나야 한다.
     @Test
-    void softDeletedWallet_isRestoredWithSameIdentityAndBalance() {
+    void existingActiveMemberLogin_restoresSoftDeletedWalletWithSameIdentityAndBalance() {
         OAuthUserProfile profile = newProfile();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         WalletProvisioningServiceImpl provisioning = new WalletProvisioningServiceImpl(
@@ -196,12 +196,12 @@ class WalletProvisioningIntegrationTest {
                     "soft-delete된 지갑은 조회 경로에서 사라져야 한다 (교착의 전제)"
             );
 
-            long restoredWalletId = provisioning.provisionForMember(memberId);
+            OAuthLoginAccount reloggedIn = transaction.resolveOrCreate(profile);
 
             assertEquals(
-                    originalWalletId,
-                    restoredWalletId,
-                    "새 지갑을 만들지 않고 기존 wallet_id를 되살려야 한다"
+                    memberId,
+                    reloggedIn.getMemberId(),
+                    "기존 ACTIVE 회원 로그인이 같은 계정을 반환해야 한다"
             );
             assertEquals(
                     1,
