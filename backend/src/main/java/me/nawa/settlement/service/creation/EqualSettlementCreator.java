@@ -89,6 +89,8 @@ public class EqualSettlementCreator implements SettlementCreationHandler {
         Long payerMemberId
     ) {
         if (members.stream().noneMatch(member -> payerMemberId.equals(member.getMemberId()))
+            || members.stream().noneMatch(member -> !payerMemberId.equals(member.getMemberId())
+                && member.getShareAmount() != null && member.getShareAmount().signum() > 0)
             || members.stream().anyMatch(member -> !payerMemberId.equals(member.getMemberId())
                 && (member.getShareAmount() == null || member.getShareAmount().signum() <= 0))) {
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID);

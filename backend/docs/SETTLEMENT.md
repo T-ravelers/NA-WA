@@ -42,6 +42,11 @@
 `PENDING`, `PAID`만 사용한다. `REQUESTED` 정산에서 `PENDING`인 모든 구성원이
 `PAID`가 되면 settlement는 `COMPLETED`로 전이한다.
 
+원결제자는 반드시 `participantAppointmentMemberIds`에 포함해야 하며, 원결제자 외에도
+양수 부담금(`shareAmount > 0`)을 가진 지급 대상자가 최소 한 명 있어야 한다. 원결제자만
+선택한 요청은 `SETTLEMENT-005`(400)으로 거절한다. 원결제자 외 선택한 모든 참여자는
+양수 부담금을 가져야 한다.
+
 ## 멱등성
 
 생성 멱등성은 `(created_by_member_id, idempotency_key)`와 요청 지문으로 보장한다.

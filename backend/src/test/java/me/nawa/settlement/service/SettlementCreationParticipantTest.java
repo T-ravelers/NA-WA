@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +63,19 @@ class SettlementCreationParticipantTest {
         );
 
         assertEquals("SETTLEMENT-005", exception.getErrorCode().getCode());
+    }
+
+    @Test
+    void createEqual_onlyPayerSelected_rejectsBeforeSettlementInsert() {
+        when(settlementMapper.findActiveMembers(7L)).thenReturn(activeMembers());
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+            new EqualSettlementCreator(settlementMapper, new SettlementAmountAllocator())
+                .create(1L, request(List.of(71L)), source(), "equal-key", "fingerprint")
+        );
+
+        assertEquals("SETTLEMENT-005", exception.getErrorCode().getCode());
+        verify(settlementMapper, never()).insertSettlement(any(Settlement.class));
     }
 
     @Test

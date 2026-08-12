@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -110,6 +111,24 @@ class SettlementItemizedCreationTest {
         );
 
         assertEquals("SETTLEMENT-005", exception.getErrorCode().getCode());
+    }
+
+    @Test
+    void create_onlyPayerSelectedAndAllocated_rejectsBeforeSettlementInsert() {
+        when(settlementMapper.findActiveMembers(7L)).thenReturn(activeMembers());
+        CreateSettlementRequest request = new CreateSettlementRequest();
+        request.setSourceTransferId(50L);
+        request.setType("ITEMIZED");
+        request.setParticipantAppointmentMemberIds(List.of(71L));
+        request.setItems(List.of(item("meal", "10.00", "1", allocation(71L, "1"))));
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+            new ItemizedSettlementCreator(settlementMapper)
+                .create(1L, request, source("10.00", 2), "key", "fingerprint")
+        );
+
+        assertEquals("SETTLEMENT-005", exception.getErrorCode().getCode());
+        verify(settlementMapper, never()).insertSettlement(any(Settlement.class));
     }
 
     @Test
