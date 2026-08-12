@@ -270,6 +270,7 @@ public enum MemberErrorCode implements ErrorCode {
 | `APPOINTMENT_FORBIDDEN` | `APPOINTMENT-004` | 403 | 약속 처리 권한 없음 |
 | `APPOINTMENT_MEMBER_NOT_FOUND` | `APPOINTMENT-005` | 404 | 참여 정보를 찾을 수 없음 |
 | `INVALID_ATTENDANCE_CONFIRMATION` | `APPOINTMENT-006` | 409 | 출석 확정 조건 불충족 |
+| `CANCELLATION_NOT_AVAILABLE` | `APPOINTMENT-007` | 409 | 약속 참여 취소 조건 불충족 |
 
 후기 도메인에는 다음 오류 코드가 구현돼 있습니다.
 

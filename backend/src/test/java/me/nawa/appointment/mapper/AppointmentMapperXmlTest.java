@@ -51,6 +51,15 @@ class AppointmentMapperXmlTest {
                 "me.nawa.appointment.mapper.AppointmentMapper.findMemberByAppointmentAndMemberForUpdate"
         ));
         assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.findMemberByAppointmentAndMember"
+        ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.findHostSuccessorForUpdate"
+        ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.updateHostMember"
+        ));
+        assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.findMemberByIdForUpdate"
         ));
         assertTrue(configuration.hasStatement(

@@ -37,6 +37,11 @@ public enum AppointmentErrorCode implements ErrorCode {
             HttpStatus.CONFLICT,
             "APPOINTMENT-006",
             "출석 확정 조건을 충족하지 않습니다."
+    ),
+    CANCELLATION_NOT_AVAILABLE(
+            HttpStatus.CONFLICT,
+            "APPOINTMENT-007",
+            "현재 참여를 취소할 수 없습니다."
     );
 
     private final HttpStatus status;

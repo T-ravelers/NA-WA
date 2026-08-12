@@ -37,10 +37,12 @@ API 계약을 정의합니다. 모든 경로는 인증이 필요하며 공통 `A
 
 - `GET /api/v1/appointments/{appointmentId}`
 - `GET /api/v1/appointments/{appointmentId}/members`
+- `GET /api/v1/appointments/{appointmentId}/members/me`
 
 상세 응답에는 약속 정보와 현재 `ACTIVE`인 회원 목록이 포함됩니다. 회원 목록 API도
 같은 활성 회원 계약을 사용합니다. `PAYMENT_PENDING`, `CANCELLED` 약속은 방장만 상세
 조회할 수 있으며 다른 회원에게는 `APPOINTMENT-001`을 반환합니다.
+`members/me`는 현재 로그인 회원의 참여 여부, 참여·출석 상태와 방장 여부를 반환합니다.
 
 ## 약속 생성
 
@@ -74,9 +76,14 @@ API 계약을 정의합니다. 모든 경로는 인증이 필요하며 공통 `A
 정원은 `PENDING + ACTIVE` 회원 수로 판단합니다. 방장이나 과거 `LEFT` 회원을 포함해
 이미 참여 이력이 있으면 재참여할 수 없습니다.
 
-방장은 참여 취소 API를 사용할 수 없습니다. 결제 대기 참가자가 취소하면 참가 상태를
-`LEFT`, 보증금을 `CANCELLED`로 변경합니다. `IN_PROGRESS`, `COMPLETED`, `CANCELLED`
-약속에서는 참여 취소할 수 없습니다.
+`PENDING`, `ACTIVE` 회원은 참여를 취소할 수 있습니다. `PENDING` 회원이 취소하면
+참가 상태를 `LEFT`, 대기 중인 보증금을 `CANCELLED`로 변경합니다. 이미 예치된 보증금의
+처리는 결제·정산 기능의 계약을 따릅니다.
+
+방장이 취소하면 가입 시각이 가장 빠른 `PENDING` 또는 `ACTIVE` 회원에게 방장 권한을
+자동으로 이전합니다. 동일한 가입 시각이면 참여 ID가 작은 회원을 우선합니다. 승계할
+회원 없이 방장만 참여 중인 약속은 취소할 수 없습니다. `IN_PROGRESS`, `COMPLETED`,
+`CANCELLED` 약속에서도 참여를 취소할 수 없습니다.
 
 ## 출석 확정
 

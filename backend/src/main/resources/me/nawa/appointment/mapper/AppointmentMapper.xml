@@ -195,6 +195,59 @@
         FOR UPDATE
     </select>
 
+    <select id="findMemberByAppointmentAndMember"
+            resultType="me.nawa.appointment.domain.AppointmentMember">
+        SELECT
+            am.appointment_member_id,
+            am.appointment_id,
+            am.member_id,
+            am.trip_id,
+            am.membership_status,
+            am.attendance_status,
+            (a.host_member_id = am.member_id) AS host,
+            am.joined_at,
+            am.left_at,
+            am.attendance_confirmed_at
+        FROM appointment_members am
+        JOIN appointments a
+          ON a.appointment_id = am.appointment_id
+         AND a.deleted_at IS NULL
+        WHERE am.appointment_id = #{appointmentId}
+          AND am.member_id = #{memberId}
+          AND am.deleted_at IS NULL
+    </select>
+
+    <select id="findHostSuccessorForUpdate"
+            resultType="me.nawa.appointment.domain.AppointmentMember">
+        SELECT
+            appointment_member_id,
+            appointment_id,
+            member_id,
+            trip_id,
+            membership_status,
+            attendance_status,
+            joined_at,
+            left_at,
+            attendance_confirmed_at
+        FROM appointment_members
+        WHERE appointment_id = #{appointmentId}
+          AND member_id &lt;&gt; #{hostMemberId}
+          AND membership_status IN ('PENDING', 'ACTIVE')
+          AND deleted_at IS NULL
+        ORDER BY joined_at ASC, appointment_member_id ASC
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <update id="updateHostMember">
+        UPDATE appointments
+        SET host_member_id = #{nextHostMemberId},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = #{appointmentId}
+          AND host_member_id = #{currentHostMemberId}
+          AND deleted_at IS NULL
+    </update>
+
     <select id="findMemberByIdForUpdate"
             resultType="me.nawa.appointment.domain.AppointmentMember">
         SELECT

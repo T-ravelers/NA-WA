@@ -11,6 +11,7 @@ import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import me.nawa.appointment.dto.response.AppointmentDetailResponse;
 import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
+import me.nawa.appointment.dto.response.AppointmentParticipationResponse;
 import me.nawa.appointment.dto.response.AppointmentSummaryResponse;
 import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.appointment.mapper.AppointmentMapper;
@@ -170,19 +171,17 @@ public class AppointmentService {
     public void leaveAppointment(Long memberId, Long appointmentId) {
         validateIdentifiers(memberId, appointmentId);
         Appointment appointment = requireAppointmentForUpdate(appointmentId);
-        if (memberId.equals(appointment.getHostMemberId())) {
-            throw new BusinessException(
-                    AppointmentErrorCode.APPOINTMENT_FORBIDDEN
-            );
-        }
-
         AppointmentMember member = appointmentMapper
                 .findMemberByAppointmentAndMemberForUpdate(
                         appointmentId,
                         memberId
                 );
-        if (member == null
-                || member.getMembershipStatus() == MembershipStatus.LEFT) {
+        if (member == null) {
+            throw new BusinessException(
+                    AppointmentErrorCode.APPOINTMENT_MEMBER_NOT_FOUND
+            );
+        }
+        if (member.getMembershipStatus() == MembershipStatus.LEFT) {
             throw new BusinessException(
                     AppointmentErrorCode.APPOINTMENT_MEMBER_NOT_FOUND
             );
@@ -194,10 +193,23 @@ public class AppointmentService {
                 || appointment.getAppointmentStatus()
                 == AppointmentStatus.CANCELLED) {
             throw new BusinessException(
-                    AppointmentErrorCode.JOIN_NOT_AVAILABLE
+                    AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
             );
         }
 
+        if (memberId.equals(appointment.getHostMemberId())) {
+            AppointmentMember successor = appointmentMapper
+                    .findHostSuccessorForUpdate(appointmentId, memberId);
+            if (successor == null || appointmentMapper.updateHostMember(
+                    appointmentId,
+                    memberId,
+                    successor.getMemberId()
+            ) != 1) {
+                throw new BusinessException(
+                        AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
+                );
+            }
+        }
         if (member.getMembershipStatus() == MembershipStatus.PENDING) {
             cancelPendingDeposit(member.getAppointmentMemberId());
         }
@@ -208,6 +220,33 @@ public class AppointmentService {
                     CommonErrorCode.INTERNAL_SERVER_ERROR
             );
         }
+    }
+
+    @Transactional(readOnly = true)
+    public AppointmentParticipationResponse getMyParticipation(
+            Long memberId,
+            Long appointmentId) {
+        validateIdentifiers(memberId, appointmentId);
+        if (appointmentMapper.findAppointmentById(appointmentId) == null) {
+            throw new BusinessException(
+                    AppointmentErrorCode.APPOINTMENT_NOT_FOUND
+            );
+        }
+        AppointmentMember member = appointmentMapper
+                .findMemberByAppointmentAndMember(
+                        appointmentId,
+                        memberId
+                );
+        if (member == null) {
+            return AppointmentParticipationResponse.notJoined();
+        }
+        return AppointmentParticipationResponse.builder()
+                .joined(true)
+                .appointmentMemberId(member.getAppointmentMemberId())
+                .membershipStatus(member.getMembershipStatus())
+                .attendanceStatus(member.getAttendanceStatus())
+                .host(Boolean.TRUE.equals(member.getHost()))
+                .build();
     }
 
     @Transactional

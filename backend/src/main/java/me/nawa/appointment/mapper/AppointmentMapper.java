@@ -39,6 +39,22 @@ public interface AppointmentMapper {
             @Param("memberId") Long memberId
     );
 
+    AppointmentMember findMemberByAppointmentAndMember(
+            @Param("appointmentId") Long appointmentId,
+            @Param("memberId") Long memberId
+    );
+
+    AppointmentMember findHostSuccessorForUpdate(
+            @Param("appointmentId") Long appointmentId,
+            @Param("hostMemberId") Long hostMemberId
+    );
+
+    int updateHostMember(
+            @Param("appointmentId") Long appointmentId,
+            @Param("currentHostMemberId") Long currentHostMemberId,
+            @Param("nextHostMemberId") Long nextHostMemberId
+    );
+
     AppointmentMember findMemberByIdForUpdate(
             @Param("appointmentId") Long appointmentId,
             @Param("appointmentMemberId") Long appointmentMemberId

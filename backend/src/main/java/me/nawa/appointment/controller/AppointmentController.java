@@ -8,6 +8,7 @@ import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import me.nawa.appointment.dto.response.AppointmentDetailResponse;
 import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
+import me.nawa.appointment.dto.response.AppointmentParticipationResponse;
 import me.nawa.appointment.service.AppointmentService;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
@@ -101,6 +102,19 @@ public class AppointmentController {
                 appointmentId
         );
         return ApiResponse.success();
+    }
+
+    @GetMapping("/{appointmentId}/members/me")
+    @ApiOperation("내 약속 참여 상태 조회")
+    public ApiResponse<AppointmentParticipationResponse> getMyParticipation(
+            @AuthenticationPrincipal AuthenticatedMember member,
+            @PathVariable Long appointmentId) {
+        return ApiResponse.success(
+                appointmentService.getMyParticipation(
+                        member.getMemberId(),
+                        appointmentId
+                )
+        );
     }
 
     @PatchMapping("/{appointmentId}/attendance")
