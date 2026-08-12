@@ -169,16 +169,6 @@ function goBack(): void {
   void router.push({ name: 'explore' })
 }
 
-function openAppointments(): void {
-  const itemId = place.value?.itemId
-  if (itemId === undefined || !Number.isSafeInteger(itemId) || itemId <= 0) return
-
-  void router.push({
-    name: 'appointment-list',
-    query: { itemId: String(itemId), itemType: 'PLACE' },
-  })
-}
-
 async function sharePlace(): Promise<void> {
   const current = place.value
   if (!current) return
@@ -498,7 +488,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
             block
             variant="secondary"
             class="h-12 whitespace-nowrap border-success px-2 text-success"
-            @click="openAppointments"
+            disabled
           >
             {{ t('explore.placeDetail.findCompanions') }}
           </AppButton>

@@ -174,16 +174,14 @@ describe('EventDetailView', () => {
     expect(router.currentRoute.value.name).toBe('journey-detail')
   })
 
-  it('opens the Event appointment list from Find companions', async () => {
+  it('keeps Find companions disabled until the Appointment API is available', async () => {
     const { wrapper, router } = await mountView()
 
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Find companions')
-      ?.trigger('click')
-    await flushPromises()
+    const button = wrapper.findAll('button').find((button) => button.text() === 'Find companions')
 
-    expect(router.currentRoute.value.name).toBe('appointment-list')
-    expect(router.currentRoute.value.query).toEqual({ itemId: '42', itemType: 'EVENT' })
+    expect(button?.attributes('disabled')).toBeDefined()
+    await button?.trigger('click')
+
+    expect(router.currentRoute.value.name).toBe('explore-event-detail')
   })
 })

@@ -135,20 +135,18 @@ describe('PlaceDetailView', () => {
         .findAll('button')
         .find((button) => button.text() === 'Find companions')
         ?.attributes('disabled'),
-    ).toBeUndefined()
+    ).toBeDefined()
   })
 
-  it('opens the Place appointment list from Find companions', async () => {
+  it('keeps Find companions disabled until the Appointment API is available', async () => {
     const { wrapper, router } = await mountView()
 
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Find companions')
-      ?.trigger('click')
-    await flushPromises()
+    const button = wrapper.findAll('button').find((button) => button.text() === 'Find companions')
 
-    expect(router.currentRoute.value.name).toBe('appointment-list')
-    expect(router.currentRoute.value.query).toEqual({ itemId: '42', itemType: 'PLACE' })
+    expect(button?.attributes('disabled')).toBeDefined()
+    await button?.trigger('click')
+
+    expect(router.currentRoute.value.name).toBe('explore-place-detail')
   })
 
   it('opens the journey selector from Add to journey', async () => {
