@@ -487,8 +487,8 @@ async function confirmJourneyDate(date: string): Promise<void> {
           <AppButton
             block
             variant="secondary"
-            disabled
             class="h-12 whitespace-nowrap border-success px-2 text-success"
+            disabled
           >
             {{ t('explore.placeDetail.findCompanions') }}
           </AppButton>

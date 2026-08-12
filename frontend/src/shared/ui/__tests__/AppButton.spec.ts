@@ -27,6 +27,10 @@ describe('AppButton', () => {
     expect(mountButton({ variant }).get('button').classes()).toContain(expected)
   })
 
+  it('keeps the minimum touch target for dense buttons', () => {
+    expect(mountButton({ dense: true }).get('button').classes()).toContain('h-11')
+  })
+
   it('emits click when enabled', async () => {
     const wrapper = mountButton()
 
