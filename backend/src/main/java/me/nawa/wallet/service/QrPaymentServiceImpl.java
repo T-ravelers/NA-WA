@@ -229,7 +229,11 @@ public class QrPaymentServiceImpl implements QrPaymentService {
     ) {
         validateExecuteRequest(idempotencyKey, request);
 
-        // 1. 이미 완료된 동일 요청이면 기존 결과 반환
+        // 1. 이미 완료된 동일 요청이면 기존 결과 반환 (빠른 경로, 잠금 없음).
+        // 아직 QR 잠금을 잡기 전이라 여기서 FOR UPDATE를 쓰면 안 된다 — 존재하지 않는 키의 갭 락은
+        // 트랜잭션끼리 서로 막지 않아서, 두 요청이 동시에 이 갭 락을 쥔 채로 진행하다가 QR 잠금과
+        // insert 사이에서 교착 상태에 빠질 수 있다(findByIdempotencyKeyForUpdate 주석 참고).
+        // 최종 판단은 QR 잠금을 잡은 뒤(2번)에 내린다.
         WalletTransfer existing =
             walletTransferMapper.findByIdempotencyKey(idempotencyKey);
 
@@ -252,7 +256,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         }
 
         // QR을 기다리는 동안 동일 Idempotency-Key 요청이 끝났을 수 있으므로 재확인
-        existing = walletTransferMapper.findByIdempotencyKey(idempotencyKey);
+        existing = walletTransferMapper.findByIdempotencyKeyForUpdate(idempotencyKey);
         if (existing != null) {
             return getIdempotentResult(memberId, request, existing);
         }
@@ -309,7 +313,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         }
 
         // 지갑 잠금을 기다리는 동안 다른 QR 요청이 같은 키로 결제를 끝냈을 수 있다.
-        existing = walletTransferMapper.findByIdempotencyKey(idempotencyKey);
+        existing = walletTransferMapper.findByIdempotencyKeyForUpdate(idempotencyKey);
         if (existing != null) {
             return getIdempotentResult(memberId, request, existing);
         }
@@ -369,7 +373,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             walletTransferMapper.insert(transfer);
         } catch (DuplicateKeyException exception) {
             WalletTransfer concurrent =
-                walletTransferMapper.findByIdempotencyKey(idempotencyKey);
+                walletTransferMapper.findByIdempotencyKeyForUpdate(idempotencyKey);
 
             if (concurrent != null) {
                 return getIdempotentResult(memberId, request, concurrent);
@@ -748,8 +752,10 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         // 8. 최초 결제 때 생성된 결제자 DEBIT 원장을 조회한다.
         // 현재 잔액이 아니라, 결제 직후의 balancedAfter를 응답해야
         // 최초 요청의 결제 결과와 동일한 응답을 돌려줄 수 있아
+        // FOR UPDATE로 조회한다 — 다른 트랜잭션이 방금 커밋한 원장 행이라 일반 SELECT로는
+        // 이 트랜잭션의 스냅샷에 안 보일 수 있다(findByIdempotencyKeyForUpdate 주석 참고).
         WalletLedgerEntry debitEntry =
-            walletLedgerMapper.findByTransferIdAndWalletId(
+            walletLedgerMapper.findByTransferIdAndWalletIdForUpdate(
                 transfer.getTransferId(),
                 payerWallet.getWalletId()
             );

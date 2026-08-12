@@ -30,6 +30,16 @@ public interface WalletLedgerMapper {
         @Param("walletId") Long walletId
     );
 
+    // findByTransferIdAndWalletId의 잠금 버전. QrPaymentServiceImpl.getIdempotentResult처럼
+    // 다른 트랜잭션이 방금 커밋한 원장 행을 읽어야 하는 곳에서만 쓴다 — 일반 SELECT는 이
+    // 트랜잭션의 첫 조회가 만든 REPEATABLE READ 스냅샷에 묶여 그 행이 안 보일 수 있다
+    // (WalletTransferMapper.findByIdempotencyKeyForUpdate 주석 참고). 같은 트랜잭션 안에서
+    // 방금 만든 자기 행을 읽을 때는 이 문제가 없으므로 일반 버전을 그대로 쓰면 된다.
+    WalletLedgerEntry findByTransferIdAndWalletIdForUpdate(
+        @Param("transferId") Long transferId,
+        @Param("walletId") Long walletId
+    );
+
     TransactionCounterparty findCounterpartyByTransferId(
       @Param("transferId") Long transferId,
       @Param("walletId") Long walletId

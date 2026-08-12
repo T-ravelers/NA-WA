@@ -13,24 +13,38 @@
           AND deleted_at IS NULL
     </select>
 
+    <sql id="walletTransferColumns">
+        transfer_id,
+        initiator_member_id,
+        transfer_number,
+        transfer_type,
+        transfer_status,
+        amount,
+        memo,
+        spending_category,
+        spending_type,
+        completed_at,
+        created_at,
+        idempotency_key
+    </sql>
+
     <select id="findByIdempotencyKey" resultType="me.nawa.wallet.domain.WalletTransfer">
         SELECT
-            transfer_id,
-            initiator_member_id,
-            transfer_number,
-            transfer_type,
-            transfer_status,
-            amount,
-            memo,
-            spending_category,
-            spending_type,
-            completed_at,
-            created_at,
-            idempotency_key
+        <include refid="walletTransferColumns"/>
         FROM wallet_transfers
         WHERE idempotency_key = #{idempotencyKey}
           AND deleted_at IS NULL
             LIMIT 1
+    </select>
+
+    <select id="findByIdempotencyKeyForUpdate" resultType="me.nawa.wallet.domain.WalletTransfer">
+        SELECT
+        <include refid="walletTransferColumns"/>
+        FROM wallet_transfers
+        WHERE idempotency_key = #{idempotencyKey}
+          AND deleted_at IS NULL
+            LIMIT 1
+            FOR UPDATE
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="transferId">

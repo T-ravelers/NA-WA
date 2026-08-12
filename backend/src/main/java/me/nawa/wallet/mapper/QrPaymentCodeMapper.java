@@ -31,6 +31,12 @@ public interface  QrPaymentCodeMapper {
     // idempotency key 재요청 시 기존 transferId에 연결된 QR 정보를 조회한다
     // 이미 완료된 결제의 QR ID와 토큰을 찾아 기존 결제 결과를 반환하거나
     // 다른 요청에 같능 idempotency key를 재사용할 경우를 판별하는 데 사용한다
+    //
+    // getIdempotentResult에서만 호출하며, 그 시점엔 findByIdempotencyKeyForUpdate로 이미
+    // wallet_transfers 행을 찾은 뒤다 — 같은 트랜잭션에서 만든 이체와 QR의 completed_transfer_id는
+    // 항상 함께 커밋되므로 이 행도 이미 존재한다. FOR UPDATE로 조회해야 한다: 일반 SELECT는
+    // 이 트랜잭션의 첫 조회가 만든 REPEATABLE READ 스냅샷에 묶여, 동시에 커밋된 QR 갱신을
+    // 못 보고 null을 돌려줄 수 있다(findByIdempotencyKeyForUpdate 주석 참고).
     QrPaymentCode findByCompletedTransferId(
         @Param("transferId") Long transferId
     );

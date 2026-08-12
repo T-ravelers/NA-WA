@@ -111,6 +111,7 @@
         WHERE completed_transfer_id = #{transferId}
           AND deleted_at IS NULL
             LIMIT 1
+            FOR UPDATE
     </select>
 
     <select id="findActiveAppointmentMembershipForUpdate"

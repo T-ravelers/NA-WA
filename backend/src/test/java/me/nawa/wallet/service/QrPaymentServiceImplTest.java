@@ -689,7 +689,7 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_completesTransfer_whenPersonalAndSufficientBalance() {
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("ACTIVE", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
         when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
@@ -723,7 +723,7 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_linksTripExpense_whenSharedAndMembershipValid() {
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("ACTIVE", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
         when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
@@ -808,7 +808,7 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsAlreadyCompleted_whenQrCompletedTransferIdSet() {
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE"));
 
@@ -830,7 +830,7 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsExpired_whenActiveButPastDeadline() {
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE"));
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().minusSeconds(1), BigDecimal.valueOf(18500));
@@ -847,7 +847,7 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsSelfPaymentNotAllowed_whenPayerIsPayee() {
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE"));
 
@@ -869,7 +869,7 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsWalletNotActive_whenPayerWalletSuspendedAfterLock() {
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("SUSPENDED", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
 
@@ -886,7 +886,7 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsPayeeWalletNotActive_whenPayeeWalletSuspended() {
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("ACTIVE", "SUSPENDED");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
 
@@ -902,7 +902,7 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsInsufficientBalance_whenPayerBalanceTooLow() {
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(1000), "ACTIVE"));
         when(walletMapper.findByWalletIdForUpdate(PAYER_WALLET_ID))
@@ -924,7 +924,7 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsMembershipNotFound_whenSharedAndNoActiveMembership() {
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("ACTIVE", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
         when(qrPaymentCodeMapper.findActiveAppointmentMembershipForUpdate(MEMBER_ID, 55L)).thenReturn(null);
@@ -942,7 +942,7 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsQrPaymentNotActive_whenMarkCompletedAffectsNoRows() {
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("ACTIVE", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
         when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
@@ -981,7 +981,7 @@ class QrPaymentServiceImplTest {
         when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(qr);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(31500), "ACTIVE"));
-        when(walletLedgerMapper.findByTransferIdAndWalletId(999L, PAYER_WALLET_ID))
+        when(walletLedgerMapper.findByTransferIdAndWalletIdForUpdate(999L, PAYER_WALLET_ID))
             .thenReturn(ledgerEntry(BigDecimal.valueOf(31500), "DEBIT"));
 
         QrPaymentExecuteResponse response = qrPaymentService.executePayment(
@@ -1099,8 +1099,12 @@ class QrPaymentServiceImplTest {
     void executePayment_returnsOriginalResult_whenTransferInsertRacesOnIdempotencyKey() {
         WalletTransfer existing =
             transfer(999L, "QR_PAYMENT", "COMPLETED", BigDecimal.valueOf(18500), MEMBER_ID, "idem-1");
-        when(walletTransferMapper.findByIdempotencyKey("idem-1"))
-            .thenReturn(null, null, null, existing);
+        // 빠른 경로(findByIdempotencyKey)는 아직 아무것도 못 봤고, QR 잠금 이후의 재확인
+        // 두 번(findByIdempotencyKeyForUpdate)까지도 못 보다가, insert 충돌 이후 재조회에서야
+        // 동시 트랜잭션이 커밋한 결과를 본다.
+        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
+        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1"))
+            .thenReturn(null, null, existing);
         stubLockableWallets("ACTIVE", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
         when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
@@ -1112,7 +1116,7 @@ class QrPaymentServiceImplTest {
             "야경 투어", QrPaymentStatus.COMPLETED, LocalDateTime.now().plusMinutes(5)
         );
         when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(completedQr);
-        when(walletLedgerMapper.findByTransferIdAndWalletId(999L, PAYER_WALLET_ID))
+        when(walletLedgerMapper.findByTransferIdAndWalletIdForUpdate(999L, PAYER_WALLET_ID))
             .thenReturn(ledgerEntry(BigDecimal.valueOf(31500), "DEBIT"));
 
         QrPaymentExecuteResponse response = qrPaymentService.executePayment(
@@ -1137,7 +1141,7 @@ class QrPaymentServiceImplTest {
         when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(qr);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(31500), "ACTIVE"));
-        when(walletLedgerMapper.findByTransferIdAndWalletId(999L, PAYER_WALLET_ID))
+        when(walletLedgerMapper.findByTransferIdAndWalletIdForUpdate(999L, PAYER_WALLET_ID))
             .thenReturn(ledgerEntry(BigDecimal.valueOf(31500), "DEBIT"));
         when(tripExpenseLinkMapper.findAppointmentIdByLedgerEntryId(700L)).thenReturn(66L);
 
