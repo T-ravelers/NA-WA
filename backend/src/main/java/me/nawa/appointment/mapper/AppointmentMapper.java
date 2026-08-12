@@ -11,6 +11,12 @@ import java.util.List;
 @Mapper
 public interface AppointmentMapper {
 
+    String findAvailableItemType(@Param("itemId") Long itemId);
+
+    int insertAppointment(Appointment appointment);
+
+    int insertAppointmentMember(AppointmentMember appointmentMember);
+
     List<Appointment> searchAppointments(
             @Param("request") AppointmentSearchRequest request,
             @Param("offset") int offset

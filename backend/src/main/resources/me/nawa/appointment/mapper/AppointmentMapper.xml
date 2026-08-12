@@ -5,6 +5,63 @@
 
 <mapper namespace="me.nawa.appointment.mapper.AppointmentMapper">
 
+    <select id="findAvailableItemType" resultType="string">
+        SELECT ei.item_type
+        FROM explore_items ei
+        LEFT JOIN event e
+          ON e.event_id = ei.item_id
+         AND ei.item_type = 'EVENT'
+        LEFT JOIN place p
+          ON p.place_id = ei.item_id
+         AND ei.item_type = 'PLACE'
+        WHERE ei.item_id = #{itemId}
+          AND ei.approval_status = 'APPROVED'
+          AND ei.visibility_status = 'VISIBLE'
+          AND ei.deleted_at IS NULL
+          AND (
+              (ei.item_type = 'EVENT'
+                  AND e.event_id IS NOT NULL
+                  AND e.deleted_at IS NULL
+                  AND e.status IN ('SCHEDULED', 'ONGOING'))
+              OR (ei.item_type = 'PLACE'
+                  AND p.place_id IS NOT NULL
+                  AND p.deleted_at IS NULL
+                  AND p.is_active = TRUE)
+          )
+    </select>
+
+    <insert id="insertAppointment"
+            useGeneratedKeys="true"
+            keyProperty="appointmentId"
+            keyColumn="appointment_id">
+        INSERT INTO appointments
+            (item_id, host_member_id, language_code, appointment_name,
+             appointment_description, max_members, join_deadline,
+             deposit_amount, appointment_status, meeting_place,
+             meeting_address, meeting_latitude, meeting_longitude,
+             activity_start_at, activity_end_at)
+        VALUES
+            (#{itemId}, #{hostMemberId}, #{languageCode}, #{appointmentName},
+             #{appointmentDescription}, #{maxMembers}, #{joinDeadline},
+             #{depositAmount}, #{appointmentStatus}, #{meetingPlace},
+             #{meetingAddress}, #{meetingLatitude}, #{meetingLongitude},
+             #{activityStartAt}, #{activityEndAt})
+    </insert>
+
+    <insert id="insertAppointmentMember"
+            useGeneratedKeys="true"
+            keyProperty="appointmentMemberId"
+            keyColumn="appointment_member_id">
+        INSERT INTO appointment_members
+            (appointment_id, member_id, trip_id, membership_status,
+             attendance_status, joined_at, left_at,
+             attendance_confirmed_at)
+        VALUES
+            (#{appointmentId}, #{memberId}, #{tripId}, #{membershipStatus},
+             #{attendanceStatus}, CURRENT_TIMESTAMP, #{leftAt},
+             #{attendanceConfirmedAt})
+    </insert>
+
     <sql id="appointmentColumns">
         a.appointment_id,
         a.item_id,

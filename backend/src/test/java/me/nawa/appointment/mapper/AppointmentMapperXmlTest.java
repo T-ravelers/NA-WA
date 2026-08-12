@@ -24,6 +24,15 @@ class AppointmentMapperXmlTest {
         Configuration configuration = configuration();
 
         assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.findAvailableItemType"
+        ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.insertAppointment"
+        ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.insertAppointmentMember"
+        ));
+        assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.searchAppointments"
         ));
         assertTrue(configuration.hasStatement(
