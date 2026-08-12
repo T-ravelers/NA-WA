@@ -113,73 +113,73 @@ public enum WalletErrorCode implements ErrorCode {
 
     QR_PAYMENT_NOT_FOUND(
         HttpStatus.NOT_FOUND,
-    "WALLET-015",
+        "WALLET-018",
         "QR 결제 정보를 찾을 수 없습니다."
     ),
 
     QR_PAYMENT_EXPIRED(
         HttpStatus.GONE,
-    "WALLET-016",
+        "WALLET-019",
         "만료된 QR 결제입니다."
     ),
 
     QR_PAYMENT_ALREADY_COMPLETED(
         HttpStatus.CONFLICT,
-    "WALLET-017",
+        "WALLET-020",
         "이미 결제가 완료된 QR입니다."
     ),
 
     QR_PAYMENT_NOT_ACTIVE(
         HttpStatus.CONFLICT,
-    "WALLET-018",
+        "WALLET-021",
         "현재 사용할 수 없는 QR 결제입니다."
     ),
 
     QR_SELF_PAYMENT_NOT_ALLOWED(
         HttpStatus.BAD_REQUEST,
-    "WALLET-019",
+        "WALLET-022",
         "본인에게 결제할 수 없습니다."
     ),
 
     QR_PAYEE_WALLET_NOT_ACTIVE(
         HttpStatus.CONFLICT,
-    "WALLET-020",
+        "WALLET-023",
         "수취인의 지갑을 현재 사용할 수 없습니다."
     ),
 
     QR_PAYMENT_AMOUNT_REQUIRED(
         HttpStatus.BAD_REQUEST,
-        "WALLET-021",
+        "WALLET-024",
         "결제 금액을 입력해야 합니다."
     ),
 
     QR_PERSONAL_APPOINTMENT_NOT_ALLOWED(
         HttpStatus.BAD_REQUEST,
-        "WALLET-022",
+        "WALLET-025",
         "개인 소비에는 약속을 연결할 수 없습니다."
     ),
 
     QR_APPOINTMENT_MEMBERSHIP_NOT_FOUND(
         HttpStatus.NOT_FOUND,
-        "WALLET-023",
+        "WALLET-026",
         "약속 멤버십을 찾을 수 없습니다."
     ),
 
     QR_APPOINTMENT_TRIP_NOT_LINKED(
         HttpStatus.CONFLICT,
-        "WALLET-024",
+        "WALLET-027",
         "약속에 연결된 여행이 없습니다."
     ),
 
     QR_SHARED_APPOINTMENT_REQUIRED(
         HttpStatus.BAD_REQUEST,
-        "WALLET-025",
+        "WALLET-028",
         "공동 소비에는 약속 정보가 필요합니다."
     ),
 
     QR_PAYMENT_INSUFFICIENT_BALANCE(
         HttpStatus.CONFLICT,
-    "WALLET-026",
+        "WALLET-029",
         "결제 가능한 잔액이 부족합니다."
     );
 
