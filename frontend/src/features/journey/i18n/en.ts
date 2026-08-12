@@ -61,6 +61,8 @@ export default {
       saved: 'Saved',
       confirmed: 'Confirmed',
       note: 'Note: {note}',
+      viewReport: 'View final report',
+      createReport: 'Create final report',
       accessDeniedTitle: 'This journey is private',
       accessDeniedDescription: 'You do not have permission to view this journey.',
       invalidTitle: 'Invalid journey link',

@@ -1,10 +1,14 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
+
+import type { JourneyReportIntegration, JourneyReportSummary } from '../../model/reportIntegration'
+import { journeyReportIntegrationKey } from '../../model/reportIntegration'
 
 const fetchJourney = vi.fn()
 const fetchJourneyTimeline = vi.fn()
@@ -27,10 +31,27 @@ const journey = {
   regions: [{ regionCode: 'SEOUL', regionName: 'Seoul', displayOrder: 0 }],
 }
 
-async function mountWithRouter(path: string) {
+function createReportIntegration(reports: JourneyReportSummary[] = []): JourneyReportIntegration {
+  return {
+    useReportSummariesQuery: () => ({
+      data: ref<JourneyReportSummary[] | undefined>(reports),
+      isPending: ref(false),
+    }),
+  }
+}
+
+async function mountWithRouter(path: string, reports: JourneyReportSummary[] = []) {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/journeys/:tripId', name: 'journey-detail', component: JourneyDetailView }],
+    routes: [
+      { path: '/journeys/:tripId', name: 'journey-detail', component: JourneyDetailView },
+      { path: '/reports', name: 'report-list', component: { template: '<div>Reports</div>' } },
+      {
+        path: '/reports/:reportId',
+        name: 'report-detail',
+        component: { template: '<div>Report detail</div>' },
+      },
+    ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
@@ -40,6 +61,9 @@ async function mountWithRouter(path: string) {
   const wrapper = mount(JourneyDetailView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+      provide: {
+        [journeyReportIntegrationKey as symbol]: createReportIntegration(reports),
+      },
     },
   })
 
@@ -48,8 +72,8 @@ async function mountWithRouter(path: string) {
   return { wrapper, router }
 }
 
-async function mountAt(path: string) {
-  return (await mountWithRouter(path)).wrapper
+async function mountAt(path: string, reports: JourneyReportSummary[] = []) {
+  return (await mountWithRouter(path, reports)).wrapper
 }
 
 describe('JourneyDetailView', () => {
@@ -70,6 +94,52 @@ describe('JourneyDetailView', () => {
     expect(wrapper.text()).not.toContain('Visit regions')
     expect(wrapper.text()).not.toContain('No visit regions were added.')
     expect(wrapper.text()).toContain('No itinerary yet')
+  })
+
+  it('shows no report entry for an ongoing journey', async () => {
+    fetchJourney.mockResolvedValue({ ...journey, startDate: '2098-08-10', endDate: '2098-08-12' })
+    fetchJourneyTimeline.mockResolvedValue({ tripId: 7, timeline: [] })
+
+    const wrapper = await mountAt('/journeys/7')
+
+    expect(wrapper.text()).not.toContain('View final report')
+    expect(wrapper.text()).not.toContain('Create final report')
+  })
+
+  it('offers to create a final report for an ended journey without one', async () => {
+    fetchJourney.mockResolvedValue({ ...journey, startDate: '2020-08-10', endDate: '2020-08-12' })
+    fetchJourneyTimeline.mockResolvedValue({ tripId: 7, timeline: [] })
+
+    const { router, wrapper } = await mountWithRouter('/journeys/7')
+
+    const createButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Create final report')
+    expect(createButton).toBeDefined()
+    expect(wrapper.text()).not.toContain('View final report')
+
+    await createButton?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/reports?tripId=7')
+  })
+
+  it('links to the existing final report for an ended journey', async () => {
+    fetchJourney.mockResolvedValue({ ...journey, startDate: '2020-08-10', endDate: '2020-08-12' })
+    fetchJourneyTimeline.mockResolvedValue({ tripId: 7, timeline: [] })
+
+    const { router, wrapper } = await mountWithRouter('/journeys/7', [{ tripId: 7, reportId: 55 }])
+
+    const viewButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'View final report')
+    expect(viewButton).toBeDefined()
+    expect(wrapper.text()).not.toContain('Create final report')
+
+    await viewButton?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/reports/55')
   })
 
   it('renders EVENT and PLACE timeline entries', async () => {

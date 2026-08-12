@@ -2,7 +2,7 @@
 import { useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -24,10 +24,12 @@ import {
   formatKrwAmount,
   formatReportDate,
   getKoreaToday,
+  parsePositiveRouteId,
 } from '../model/reportModel'
 
 const i18n = useI18n()
 const { t } = i18n
+const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
 const hasMessage = (key: string): boolean => i18n.te(key)
@@ -92,6 +94,25 @@ function chooseJourney(tripId: number): void {
   hasUnresolvedConflict.value = false
   createMutation.reset()
 }
+
+let hasAppliedRouteTripId = false
+
+watch(
+  isListPending,
+  (pending) => {
+    if (pending || hasAppliedRouteTripId) {
+      return
+    }
+
+    hasAppliedRouteTripId = true
+    const tripId = parsePositiveRouteId(route.query.tripId)
+
+    if (tripId !== null && options.value.some((option) => option.tripId === tripId)) {
+      chooseJourney(tripId)
+    }
+  },
+  { immediate: true },
+)
 
 function toggleCandidate(candidate: ReportExpenseCandidate, event: Event): void {
   const input = event.target as HTMLInputElement
