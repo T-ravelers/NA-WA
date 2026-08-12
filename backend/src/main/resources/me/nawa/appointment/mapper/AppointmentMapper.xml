@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.appointment.mapper.AppointmentMapper">
+
+    <sql id="appointmentColumns">
+        a.appointment_id,
+        a.item_id,
+        ei.item_type,
+        a.host_member_id,
+        host.display_name AS host_display_name,
+        a.language_code,
+        a.appointment_name,
+        a.appointment_description,
+        a.max_members,
+        (
+            SELECT COUNT(*)
+            FROM appointment_members count_member
+            WHERE count_member.appointment_id = a.appointment_id
+              AND count_member.membership_status = 'ACTIVE'
+              AND count_member.deleted_at IS NULL
+        ) AS current_member_count,
+        a.join_deadline,
+        a.deposit_amount,
+        a.appointment_status,
+        a.meeting_place,
+        a.meeting_address,
+        a.meeting_latitude,
+        a.meeting_longitude,
+        a.activity_start_at,
+        a.activity_end_at,
+        a.created_at,
+        a.updated_at
+    </sql>
+
+    <sql id="appointmentListWhere">
+        a.deleted_at IS NULL
+        AND ei.deleted_at IS NULL
+        AND host.deleted_at IS NULL
+        <if test="request.itemId != null">
+            AND a.item_id = #{request.itemId}
+        </if>
+        <if test="request.itemType != null and request.itemType != ''">
+            AND ei.item_type = #{request.itemType}
+        </if>
+        <if test="request.language != null and request.language != ''">
+            AND a.language_code = #{request.language}
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            AND (
+                a.appointment_name LIKE CONCAT('%', #{request.keyword}, '%')
+                OR a.appointment_description LIKE CONCAT('%', #{request.keyword}, '%')
+                OR a.meeting_place LIKE CONCAT('%', #{request.keyword}, '%')
+            )
+        </if>
+        <if test="request.status != null">
+            AND a.appointment_status = #{request.status}
+        </if>
+    </sql>
+
+    <select id="searchAppointments"
+            resultType="me.nawa.appointment.domain.Appointment">
+        SELECT
+            <include refid="appointmentColumns"/>
+        FROM appointments a
+        JOIN explore_items ei
+          ON ei.item_id = a.item_id
+        JOIN members host
+          ON host.member_id = a.host_member_id
+        WHERE
+            <include refid="appointmentListWhere"/>
+        ORDER BY a.activity_start_at ASC, a.appointment_id DESC
+        LIMIT #{request.size}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countAppointments" resultType="long">
+        SELECT COUNT(*)
+        FROM appointments a
+        JOIN explore_items ei
+          ON ei.item_id = a.item_id
+        JOIN members host
+          ON host.member_id = a.host_member_id
+        WHERE
+            <include refid="appointmentListWhere"/>
+    </select>
+
+    <select id="findAppointmentById"
+            resultType="me.nawa.appointment.domain.Appointment">
+        SELECT
+            <include refid="appointmentColumns"/>
+        FROM appointments a
+        JOIN explore_items ei
+          ON ei.item_id = a.item_id
+        JOIN members host
+          ON host.member_id = a.host_member_id
+        WHERE a.appointment_id = #{appointmentId}
+          AND a.deleted_at IS NULL
+          AND ei.deleted_at IS NULL
+          AND host.deleted_at IS NULL
+    </select>
+
+    <select id="findActiveMembersByAppointmentId"
+            resultType="me.nawa.appointment.domain.AppointmentMember">
+        SELECT
+            am.appointment_member_id,
+            am.appointment_id,
+            am.member_id,
+            am.trip_id,
+            member.display_name,
+            member.profile_image_url,
+            member.preferred_language,
+            am.membership_status,
+            am.attendance_status,
+            (a.host_member_id = am.member_id) AS host,
+            am.joined_at,
+            am.left_at,
+            am.attendance_confirmed_at
+        FROM appointment_members am
+        JOIN appointments a
+          ON a.appointment_id = am.appointment_id
+         AND a.deleted_at IS NULL
+        JOIN members member
+          ON member.member_id = am.member_id
+         AND member.deleted_at IS NULL
+        WHERE am.appointment_id = #{appointmentId}
+          AND am.membership_status = 'ACTIVE'
+          AND am.deleted_at IS NULL
+        ORDER BY host DESC, am.joined_at ASC, am.appointment_member_id ASC
+    </select>
+
+</mapper>
