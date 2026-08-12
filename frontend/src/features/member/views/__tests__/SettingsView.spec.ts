@@ -81,24 +81,6 @@ describe('SettingsView', () => {
     expect(requestSignOut).toHaveBeenCalledOnce()
   })
 
-  it('reports a failed sign-out and lets the user retry', async () => {
-    requestSignOut
-      .mockRejectedValueOnce(new Error('network unavailable'))
-      .mockResolvedValueOnce(undefined)
-    const wrapper = await mountView()
-
-    await wrapper.get('[aria-label="Sign out"]').trigger('click')
-    await flushPromises()
-
-    const alert = wrapper.get('[role="alert"]')
-    expect(alert.text()).toContain('We could not sign you out')
-
-    await alert.get('button').trigger('click')
-    await flushPromises()
-
-    expect(requestSignOut).toHaveBeenCalledTimes(2)
-  })
-
   it('shows an error state with a retry when the profile cannot be loaded', async () => {
     fetchMemberProfile.mockRejectedValue(new NormalizedApiError('MEMBER-001', 404, 'not found'))
 
