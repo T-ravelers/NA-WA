@@ -12,6 +12,7 @@ NA-WA 백엔드는 Java 17과 Spring MVC로 구성한 WAR 애플리케이션입�
 | API 성공·실패 응답 계약 확인           | [API 응답 및 오류 코드 컨벤션](docs/API_RESPONSE_CONVENTION.md) |
 | 소셜 로그인 설정과 검증 방법 확인      | [소셜 로그인 운영 가이드](docs/AUTHENTICATION.md)               |
 | 탐색 목록 필터 요청과 결합 규칙 확인   | [탐색 API 계약](docs/EXPLORE_API.md)                             |
+| 정산 생성·상태·금액·영수증 계약 확인  | [정산 API 계약](docs/SETTLEMENT.md)                              |
 | 전체 DB 구조와 도메인별 ERD 확인       | [V7 데이터베이스 지도](docs/database/README.md)                 |
 | 프로젝트 전체 기술 경계 확인           | [기술 스택과 운영 경계](../docs/TECH_STACK.md)                  |
 
@@ -36,6 +37,9 @@ Windows PowerShell에서는 `.\gradlew.bat build --no-daemon`으로 실행하세
 
 API 계약을 변경했다면 단위·통합 테스트와 Swagger 또는 Postman 확인 결과를 PR에
 작성하세요.
+
+정산 영수증 업로드의 허용 형식과 multipart 크기 제한은
+[정산 API 계약](docs/SETTLEMENT.md#영수증과-multipart)의 환경 변수로 조정합니다.
 
 ## API 문서 확인
 

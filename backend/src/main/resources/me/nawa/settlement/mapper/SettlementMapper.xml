@@ -4,5 +4,301 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="me.nawa.settlement.mapper.SettlementMapper">
+    <select id="findDetail" resultType="me.nawa.settlement.domain.SettlementDetail">
+        SELECT s.settlement_id, s.split_method, s.total_amount, s.settlement_status,
+               s.created_by_member_id, vsm.share_amount AS viewer_share_amount,
+               vsm.request_status AS viewer_request_status,
+               EXISTS (
+                   SELECT 1 FROM settlement_members paid_sm
+                   WHERE paid_sm.settlement_id = s.settlement_id
+                     AND paid_sm.request_status = 'PAID'
+                     AND paid_sm.deleted_at IS NULL
+               ) AS paid_member_exists,
+               creator.display_name AS requested_by, a.appointment_name AS gathering_name,
+               COALESCE(t.memo, a.appointment_name) AS merchant_name,
+               t.transfer_number AS transaction_number, payer.display_name AS paid_by
+        FROM settlements s
+        JOIN appointments a ON a.appointment_id = s.appointment_id
+        JOIN wallet_transfers t ON t.transfer_id = s.source_transfer_id
+        JOIN members creator ON creator.member_id = s.created_by_member_id
+        JOIN members payer ON payer.member_id = s.payer_member_id
+        LEFT JOIN appointment_members vam ON vam.appointment_id = s.appointment_id
+            AND vam.member_id = #{memberId} AND vam.membership_status = 'ACTIVE'
+            AND vam.deleted_at IS NULL
+        LEFT JOIN settlement_members vsm ON vsm.settlement_id = s.settlement_id
+            AND vsm.appointment_member_id = vam.appointment_member_id
+            AND vsm.deleted_at IS NULL
+        WHERE s.settlement_id = #{settlementId} AND s.deleted_at IS NULL
+          AND (s.created_by_member_id = #{memberId} OR EXISTS (
+              SELECT 1 FROM settlement_members sm
+              JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+              WHERE sm.settlement_id = s.settlement_id AND am.member_id = #{memberId}
+                AND sm.deleted_at IS NULL AND am.deleted_at IS NULL
+          ))
+    </select>
 
+    <select id="findViewerItems" resultType="me.nawa.settlement.domain.SettlementViewerItem">
+        SELECT si.settlement_item_id, si.item_name AS name,
+               sis.allocated_quantity, sis.allocated_amount
+        FROM settlement_item_shares sis
+        JOIN settlement_items si ON si.settlement_item_id = sis.settlement_item_id
+        JOIN settlement_members sm ON sm.settlement_member_id = sis.settlement_member_id
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        WHERE si.settlement_id = #{settlementId}
+          AND am.member_id = #{memberId}
+          AND si.deleted_at IS NULL AND sis.deleted_at IS NULL
+          AND sm.deleted_at IS NULL AND am.deleted_at IS NULL
+        ORDER BY si.source_order, si.settlement_item_id
+    </select>
+
+    <select id="findCandidateSources" resultType="me.nawa.settlement.domain.SettlementSource">
+        SELECT DISTINCT t.transfer_id, am.appointment_id, t.initiator_member_id AS payer_member_id,
+               t.amount, c.decimal_places AS currency_decimal_places,
+               tr.title AS journey_name, a.appointment_name AS gathering_name,
+               a.appointment_name AS merchant_name, t.completed_at AS paid_at,
+               payer.display_name AS payer_name
+        FROM wallet_transfers t
+        JOIN wallet_ledger_entries le ON le.transfer_id = t.transfer_id AND le.entry_type = 'DEBIT'
+        JOIN trip_expense_links tel ON tel.ledger_entry_id = le.ledger_entry_id
+        JOIN appointment_members am ON am.appointment_member_id = tel.appointment_member_id
+        JOIN appointments a ON a.appointment_id = am.appointment_id
+        LEFT JOIN trips tr ON tr.trip_id = tel.trip_id
+        JOIN members payer ON payer.member_id = t.initiator_member_id
+        JOIN currencies c ON c.currency_code = t.currency_code
+        LEFT JOIN settlements s ON s.source_transfer_id = t.transfer_id AND s.deleted_at IS NULL
+        WHERE t.initiator_member_id = #{memberId} AND t.transfer_status = 'COMPLETED'
+          AND s.settlement_id IS NULL AND t.deleted_at IS NULL
+        ORDER BY t.completed_at DESC, t.transfer_id DESC
+    </select>
+
+    <select id="findParticipants" resultType="me.nawa.settlement.domain.SettlementParticipant">
+        SELECT am.appointment_member_id, am.member_id, m.display_name
+        FROM appointment_members am
+        JOIN members m ON m.member_id = am.member_id
+        WHERE am.appointment_id = #{appointmentId}
+          AND am.membership_status = 'ACTIVE' AND am.deleted_at IS NULL
+        ORDER BY am.appointment_member_id
+    </select>
+
+    <select id="findReceivedSummaries" resultType="me.nawa.settlement.domain.SettlementSummary">
+        SELECT s.settlement_id, a.appointment_name AS title,
+               s.total_amount, s.receivable_amount, s.split_method, s.settlement_status,
+               s.created_by_member_id, sm.share_amount AS viewer_share_amount,
+               sm.request_status AS viewer_request_status,
+               EXISTS (
+                   SELECT 1 FROM settlement_members paid_sm
+                   WHERE paid_sm.settlement_id = s.settlement_id
+                     AND paid_sm.request_status = 'PAID'
+                     AND paid_sm.deleted_at IS NULL
+               ) AS paid_member_exists
+        FROM settlement_members sm
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        JOIN settlements s ON s.settlement_id = sm.settlement_id
+        JOIN appointments a ON a.appointment_id = s.appointment_id
+        WHERE am.member_id = #{memberId}
+          AND s.created_by_member_id != #{memberId}
+          AND s.deleted_at IS NULL AND sm.deleted_at IS NULL
+        ORDER BY s.created_at DESC, s.settlement_id DESC
+    </select>
+
+    <select id="findSentSummaries" resultType="me.nawa.settlement.domain.SettlementSummary">
+        SELECT s.settlement_id, a.appointment_name AS title,
+               s.total_amount, s.receivable_amount, s.split_method, s.settlement_status,
+               s.created_by_member_id, sm.share_amount AS viewer_share_amount,
+               sm.request_status AS viewer_request_status,
+               EXISTS (
+                   SELECT 1 FROM settlement_members paid_sm
+                   WHERE paid_sm.settlement_id = s.settlement_id
+                     AND paid_sm.request_status = 'PAID'
+                     AND paid_sm.deleted_at IS NULL
+               ) AS paid_member_exists
+        FROM settlements s
+        JOIN appointments a ON a.appointment_id = s.appointment_id
+        LEFT JOIN appointment_members am ON am.appointment_id = s.appointment_id
+            AND am.member_id = #{memberId} AND am.membership_status = 'ACTIVE'
+            AND am.deleted_at IS NULL
+        LEFT JOIN settlement_members sm ON sm.settlement_id = s.settlement_id
+            AND sm.appointment_member_id = am.appointment_member_id AND sm.deleted_at IS NULL
+        WHERE s.created_by_member_id = #{memberId} AND s.deleted_at IS NULL
+        ORDER BY s.created_at DESC, s.settlement_id DESC
+    </select>
+
+    <select id="findSourceForCreate" resultType="me.nawa.settlement.domain.SettlementSource">
+        SELECT t.transfer_id, am.appointment_id, t.initiator_member_id AS payer_member_id,
+               t.amount, c.decimal_places AS currency_decimal_places
+        FROM wallet_transfers t
+        JOIN wallet_ledger_entries le ON le.transfer_id = t.transfer_id AND le.entry_type = 'DEBIT'
+        JOIN trip_expense_links tel ON tel.ledger_entry_id = le.ledger_entry_id
+        JOIN appointment_members am ON am.appointment_member_id = tel.appointment_member_id
+        JOIN currencies c ON c.currency_code = t.currency_code
+        WHERE t.transfer_id = #{sourceTransferId}
+          AND t.initiator_member_id = #{memberId}
+          AND t.transfer_status = 'COMPLETED'
+          AND t.deleted_at IS NULL
+          AND am.membership_status = 'ACTIVE'
+          AND am.deleted_at IS NULL
+        LIMIT 1
+    </select>
+
+    <select id="findActiveMembers" resultType="me.nawa.settlement.domain.SettlementMember">
+        SELECT appointment_member_id, member_id
+        FROM appointment_members
+        WHERE appointment_id = #{appointmentId}
+          AND membership_status = 'ACTIVE'
+          AND deleted_at IS NULL
+        ORDER BY appointment_member_id
+    </select>
+
+    <select id="findByIdForUpdate" resultType="me.nawa.settlement.domain.Settlement">
+        SELECT s.settlement_id, s.appointment_id, s.created_by_member_id, s.payer_member_id,
+               s.source_transfer_id, s.idempotency_key, s.request_fingerprint,
+               s.settlement_status, s.split_method, s.total_amount,
+               s.payer_share_amount, s.receivable_amount, s.memo, s.version,
+               c.decimal_places AS currency_decimal_places
+        FROM settlements s
+        JOIN wallet_transfers wt ON wt.transfer_id = s.source_transfer_id
+        JOIN currencies c ON c.currency_code = wt.currency_code
+        WHERE s.settlement_id = #{settlementId} AND s.deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="findById" resultType="me.nawa.settlement.domain.Settlement">
+        SELECT s.settlement_id, s.appointment_id, s.created_by_member_id, s.payer_member_id,
+               s.source_transfer_id, s.idempotency_key, s.request_fingerprint,
+               s.settlement_status, s.split_method, s.total_amount,
+               s.payer_share_amount, s.receivable_amount, s.memo, s.version,
+               c.decimal_places AS currency_decimal_places
+        FROM settlements s
+        JOIN wallet_transfers wt ON wt.transfer_id = s.source_transfer_id
+        JOIN currencies c ON c.currency_code = wt.currency_code
+        WHERE s.settlement_id = #{settlementId} AND s.deleted_at IS NULL
+    </select>
+
+    <select id="findByCreatorAndIdempotencyKey" resultType="me.nawa.settlement.domain.Settlement">
+        SELECT settlement_id, appointment_id, created_by_member_id, payer_member_id,
+               source_transfer_id, idempotency_key, request_fingerprint, settlement_status,
+               split_method, total_amount, payer_share_amount, receivable_amount, memo, version
+        FROM settlements
+        WHERE created_by_member_id = #{createdByMemberId}
+          AND idempotency_key = #{idempotencyKey}
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="findBySourceTransferId" resultType="me.nawa.settlement.domain.Settlement">
+        SELECT settlement_id, appointment_id, created_by_member_id, payer_member_id,
+               source_transfer_id, idempotency_key, request_fingerprint, settlement_status,
+               split_method, total_amount, payer_share_amount, receivable_amount, memo, version
+        FROM settlements
+        WHERE source_transfer_id = #{sourceTransferId}
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="findMembersBySettlementIdForUpdate" resultType="me.nawa.settlement.domain.SettlementMember">
+        SELECT sm.settlement_member_id, sm.settlement_id, sm.appointment_member_id,
+               am.member_id, sm.share_amount, sm.request_status, sm.paid_transfer_id,
+               sm.payment_idempotency_key
+        FROM settlement_members sm
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        WHERE sm.settlement_id = #{settlementId} AND sm.deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="findMemberBySettlementAndMember" resultType="me.nawa.settlement.domain.SettlementMember">
+        SELECT sm.settlement_member_id, sm.settlement_id, sm.appointment_member_id,
+               am.member_id, sm.share_amount, sm.request_status, sm.paid_transfer_id,
+               sm.payment_idempotency_key
+        FROM settlement_members sm
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        WHERE sm.settlement_id = #{settlementId}
+          AND am.member_id = #{memberId}
+          AND sm.deleted_at IS NULL AND am.deleted_at IS NULL
+    </select>
+
+    <select id="findMemberBySettlementAndMemberForUpdate" resultType="me.nawa.settlement.domain.SettlementMember">
+        SELECT sm.settlement_member_id, sm.settlement_id, sm.appointment_member_id,
+               am.member_id, sm.share_amount, sm.request_status, sm.paid_transfer_id,
+               sm.payment_idempotency_key
+        FROM settlement_members sm
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        WHERE sm.settlement_id = #{settlementId}
+          AND am.member_id = #{memberId}
+          AND sm.deleted_at IS NULL AND am.deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="existsPaidMember" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM settlement_members
+            WHERE settlement_id = #{settlementId}
+              AND request_status = 'PAID'
+              AND deleted_at IS NULL
+        )
+    </select>
+
+    <insert id="insertSettlement" useGeneratedKeys="true" keyProperty="settlementId">
+        INSERT INTO settlements (
+            appointment_id, created_by_member_id, payer_member_id, source_transfer_id,
+            idempotency_key, request_fingerprint, settlement_status, split_method,
+            total_amount, payer_share_amount, receivable_amount, memo
+        ) VALUES (
+            #{appointmentId}, #{createdByMemberId}, #{payerMemberId}, #{sourceTransferId},
+            #{idempotencyKey}, #{requestFingerprint}, #{settlementStatus}, #{splitMethod},
+            #{totalAmount}, #{payerShareAmount}, #{receivableAmount}, #{memo}
+        )
+    </insert>
+
+    <insert id="insertSettlementMembers">
+        INSERT INTO settlement_members (settlement_id, appointment_member_id, share_amount, request_status)
+        VALUES
+        <foreach collection="members" item="member" separator=",">
+            (#{member.settlementId}, #{member.appointmentMemberId}, #{member.shareAmount}, #{member.requestStatus})
+        </foreach>
+    </insert>
+
+    <insert id="insertSettlementItem" useGeneratedKeys="true" keyProperty="settlementItemId">
+        INSERT INTO settlement_items (settlement_id, item_name, unit_price, quantity, line_total, source_order)
+        VALUES (#{settlementId}, #{itemName}, #{unitPrice}, #{quantity}, #{lineTotal}, #{sourceOrder})
+    </insert>
+
+    <insert id="insertSettlementItemShares">
+        INSERT INTO settlement_item_shares (
+            settlement_item_id, settlement_member_id, allocated_quantity, allocated_amount
+        ) VALUES
+        <foreach collection="shares" item="share" separator=",">
+            (
+                #{share.settlementItemId},
+                (
+                    SELECT settlement_member_id
+                    FROM settlement_members
+                    WHERE settlement_id = #{settlementId}
+                      AND appointment_member_id = #{share.appointmentMemberId}
+                      AND deleted_at IS NULL
+                ),
+                #{share.allocatedQuantity}, #{share.allocatedAmount}
+            )
+        </foreach>
+    </insert>
+
+    <update id="markSettlementMemberPaid">
+        UPDATE settlement_members
+        SET request_status = 'PAID', paid_transfer_id = #{transferId},
+            payment_idempotency_key = #{idempotencyKey}, paid_at = CURRENT_TIMESTAMP
+        WHERE settlement_member_id = #{settlementMemberId}
+          AND request_status = 'PENDING' AND deleted_at IS NULL
+    </update>
+
+    <update id="completeSettlementIfNoPendingPayments">
+        UPDATE settlements s
+        SET settlement_status = 'COMPLETED', version = version + 1
+        WHERE s.settlement_id = #{settlementId}
+          AND s.settlement_status = 'REQUESTED'
+          AND s.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM settlement_members sm
+              WHERE sm.settlement_id = s.settlement_id
+                AND sm.request_status = 'PENDING'
+                AND sm.deleted_at IS NULL
+          )
+    </update>
 </mapper>

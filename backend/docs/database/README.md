@@ -1,10 +1,10 @@
-# V8 데이터베이스 지도
+# V9 데이터베이스 지도
 
-이 문서는 Flyway V8 적용 후의 NA-WA 데이터베이스를 도메인 단위로 보여줍니다.
+이 문서는 Flyway V9 적용 후의 NA-WA 데이터베이스를 도메인 단위로 보여줍니다.
 전체 구조를 먼저 이해한 뒤 필요한 상세 ERD로 이동할 수 있습니다.
 
-V8에는 서비스 테이블 36개가 있습니다. Flyway로 적용하면 관리용
-`flyway_schema_history`가 별도로 생성됩니다.
+V9는 정산 테이블을 축소된 계약으로 전환하며 새 서비스 테이블을 만들지 않습니다.
+Flyway로 적용하면 관리용 `flyway_schema_history`가 별도로 생성됩니다.
 
 ## 전체 도메인 관계
 
@@ -15,7 +15,7 @@ flowchart LR
     appointment["약속·참가·보증금<br/>5 tables"]
     journey["여정·일정·리포트<br/>5 tables"]
     wallet["지갑·거래·결제<br/>6 tables"]
-    settlement["정산·리뷰<br/>8 tables"]
+    settlement["정산·리뷰"]
 
     identity -->|회원 생성·검수·좋아요| explore
     identity -->|방장·참가자| appointment
@@ -50,7 +50,8 @@ flowchart LR
 5. `wallet_transfers`와 `wallet_ledger_entries`가 금액 이동의 원장입니다.
 6. 약속 완료 후 정산과 리뷰가 참가 이력을 참조합니다.
 
-DDL의 최종 기준은 `backend/src/main/resources/db/migration`의 V1~V8입니다. V7은
+DDL의 최종 기준은 `backend/src/main/resources/db/migration`의 V1~V9입니다. V7은
 Event·Place의 출처·상세·미디어 필드를 추가하고 사용하지 않는 번역 테이블을 제거합니다.
-V8은 KRW 통화와 회원 지갑을 채우는 데이터 시드라 구조를 바꾸지 않습니다.
-이 문서는 V8 적용 DB의 `information_schema`에서 테이블과 외래키를 대조해 갱신해야 합니다.
+V8은 KRW 통화와 회원 지갑을 채우는 데이터 시드라 구조를 바꾸지 않습니다. V9는 정산을
+EQUAL·ITEMIZED와 REQUESTED·COMPLETED 상태로 축소하고 생성·지급 멱등성 열을 추가합니다.
+이 문서는 V9 적용 DB의 `information_schema`에서 테이블과 외래키를 대조해 갱신해야 합니다.
