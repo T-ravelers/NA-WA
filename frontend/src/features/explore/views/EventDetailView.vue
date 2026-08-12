@@ -190,6 +190,19 @@ function openReservation(): void {
   if (reservationUrl.value) window.open(reservationUrl.value, '_blank', 'noopener,noreferrer')
 }
 
+function openAppointmentList(): void {
+  const current = event.value
+  if (!current) return
+
+  void router.push({
+    name: 'appointment-list',
+    query: {
+      itemId: String(current.eventId),
+      itemType: 'EVENT',
+    },
+  })
+}
+
 function toggleSaved(): void {
   const current = event.value
   if (current) savedEvents.toggle(current.eventId)
@@ -542,7 +555,7 @@ function retry(): void {
             block
             variant="secondary"
             class="h-12 whitespace-nowrap border-success px-2 text-success"
-            disabled
+            @click="openAppointmentList"
           >
             {{ t('explore.detail.findCompanions') }}
           </AppButton>

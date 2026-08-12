@@ -193,6 +193,19 @@ function retry(): void {
   void placeQuery.refetch()
 }
 
+function openAppointmentList(): void {
+  const current = place.value
+  if (!current) return
+
+  void router.push({
+    name: 'appointment-list',
+    query: {
+      itemId: String(current.itemId),
+      itemType: 'PLACE',
+    },
+  })
+}
+
 function openJourneyDateSheet(): void {
   journeyAddError.value = null
   selectedJourneyId.value = activeJourneyId.value
@@ -488,7 +501,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
             block
             variant="secondary"
             class="h-12 whitespace-nowrap border-success px-2 text-success"
-            disabled
+            @click="openAppointmentList"
           >
             {{ t('explore.placeDetail.findCompanions') }}
           </AppButton>
