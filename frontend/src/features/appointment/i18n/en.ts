@@ -93,6 +93,7 @@ export default {
       joinDeadline: 'Join deadline',
       notProvided: 'Not provided',
       join: 'Join appointment',
+      cancelParticipation: 'Cancel participation',
       joinUnavailable: 'This appointment is not open for joining.',
       attendance: 'Confirm attendance',
       openMenu: 'Open appointment menu',

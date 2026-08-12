@@ -8,12 +8,15 @@ import { i18n } from '@/app/i18n'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
+const confirmAppointmentAttendance = vi.fn()
 const useAppointmentMemberProfileMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
   fetchAppointment: (appointmentId: number) => fetchAppointment(appointmentId),
   fetchAppointmentMembers: (appointmentId: number) => fetchAppointmentMembers(appointmentId),
+  confirmAppointmentAttendance: (appointmentId: number, request: unknown) =>
+    confirmAppointmentAttendance(appointmentId, request),
 }))
 
 vi.mock('../../model/memberIntegration', () => ({
@@ -31,7 +34,7 @@ const appointment = {
   maxMembers: 4,
   currentMemberCount: 2,
   depositAmount: '10000',
-  appointmentStatus: 'COMPLETED' as const,
+  appointmentStatus: 'IN_PROGRESS' as const,
   meetingPlace: 'Seongsu Beauty Lab',
   activityStartAt: '2026-08-08T18:30:00',
   activityEndAt: '2026-08-08T22:00:00',
@@ -111,6 +114,7 @@ describe('AppointmentAttendanceView', () => {
   beforeEach(() => {
     fetchAppointment.mockReset()
     fetchAppointmentMembers.mockReset()
+    confirmAppointmentAttendance.mockReset()
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue(members)
     profileMemberId.value = 11
@@ -118,7 +122,7 @@ describe('AppointmentAttendanceView', () => {
     useAppointmentMemberProfileMock.mockReturnValue(profileQuery)
   })
 
-  it('renders attendance controls with a disabled save action', async () => {
+  it('renders attendance controls with a disabled save action until every member is decided', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Confirm attendance')
@@ -131,9 +135,6 @@ describe('AppointmentAttendanceView', () => {
         .find((button) => button.text() === 'Attendance checked')
         ?.attributes('disabled'),
     ).toBeDefined()
-    expect(wrapper.text()).toContain(
-      'Attendance saving will be available when the API is connected.',
-    )
   })
 
   it('toggles a pending member to attended locally', async () => {
@@ -147,7 +148,7 @@ describe('AppointmentAttendanceView', () => {
     expect(wrapper.text()).toContain('Attended')
   })
 
-  it('keeps the host on the attendance screen until saving is supported', async () => {
+  it('keeps the host on the attendance screen until every member is decided', async () => {
     const { wrapper, router } = await mountView()
 
     expect(router.currentRoute.value.name).toBe('appointment-attendance')
@@ -167,7 +168,7 @@ describe('AppointmentAttendanceView', () => {
     expect(wrapper.text()).not.toContain('Attendance checked')
   })
 
-  it('blocks attendance before the appointment is completed', async () => {
+  it('blocks attendance before the appointment is in progress', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'RECRUITING' })
     const { wrapper } = await mountView()
 
