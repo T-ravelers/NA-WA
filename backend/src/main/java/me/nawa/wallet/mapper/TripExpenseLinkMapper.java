@@ -11,5 +11,8 @@ public interface TripExpenseLinkMapper {
         @Param("ledgerEntryId") Long ledgerEntryId,
         @Param("appointmentMemberId") Long appointmentMemberId
     );
-}
 
+    Long findAppointmentIdByLedgerEntryId(
+        @Param("ledgerEntryId") Long ledgerEntryId
+    );
+}

@@ -16,11 +16,6 @@ public interface  QrPaymentCodeMapper {
         @Param("qrToken") String qrToken
     );
 
-    int markExpiredIfActive(
-        @Param("qrPaymentCodeId") Long qrPaymentCodeId,
-        @Param("now")LocalDateTime now
-        );
-
     QrPaymentAppointmentMembership findActiveAppointmentMembership(
         @Param(value = "memberId") Long memberId,
         @Param("appointmentId") Long appointmentId

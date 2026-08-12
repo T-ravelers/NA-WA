@@ -6,8 +6,8 @@
 <mapper namespace="me.nawa.wallet.mapper.WalletTransferMapper">
     <select id="findByTransferId" resultType="me.nawa.wallet.domain.WalletTransfer">
         SELECT
-            transfer_id, transfer_number, transfer_type, transfer_status,
-            amount, memo, spending_category, completed_at, created_at
+            transfer_id, initiator_member_id, transfer_number, transfer_type, transfer_status,
+            amount, memo, spending_category, spending_type, completed_at, created_at, idempotency_key
         FROM wallet_transfers
         WHERE transfer_id = #{transferId}
           AND deleted_at IS NULL
@@ -23,6 +23,7 @@
             amount,
             memo,
             spending_category,
+            spending_type,
             completed_at,
             created_at,
             idempotency_key
@@ -35,9 +36,9 @@
     <insert id="insert" useGeneratedKeys="true" keyProperty="transferId">
         INSERT INTO wallet_transfers
             (currency_code, initiator_member_id, transfer_number, transfer_type, transfer_status,
-             amount, memo, spending_category, completed_at, idempotency_key)
+             amount, memo, spending_category, spending_type, completed_at, idempotency_key)
         VALUES
             ('KRW', #{initiatorMemberId}, #{transferNumber}, #{transferType}, #{transferStatus},
-             #{amount}, #{memo}, #{spendingCategory}, #{completedAt}, #{idempotencyKey})
+             #{amount}, #{memo}, #{spendingCategory}, #{spendingType}, #{completedAt}, #{idempotencyKey})
     </insert>
 </mapper>

@@ -1,5 +1,6 @@
 package me.nawa.wallet.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import me.nawa.wallet.domain.enums.SpendingScope;
@@ -17,6 +18,7 @@ public record QrPaymentPreviewResponse(
     TripInfo trip,
     AppointmentInfo appointment,
     boolean canPay,
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime expiresAt
 ) {
 

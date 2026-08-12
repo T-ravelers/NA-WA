@@ -136,14 +136,6 @@
     FOR UPDATE
     </select>
 
-    <update id="markExpiredIfActive">
-        UPDATE qr_payment_codes
-        SET payment_status = 'EXPIRED'
-        WHERE qr_payment_code_id = #{qrPaymentCodeId}
-          AND payment_status = 'ACTIVE'
-          AND expires_at &lt;= #{now}
-    </update>
-
     <update id="markCompleted">
         UPDATE qr_payment_codes
         SET payment_status = 'COMPLETED',

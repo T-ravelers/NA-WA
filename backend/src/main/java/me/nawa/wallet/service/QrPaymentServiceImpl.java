@@ -1,6 +1,7 @@
 package me.nawa.wallet.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
@@ -32,6 +33,7 @@ import me.nawa.wallet.mapper.WalletMapper;
 import me.nawa.wallet.mapper.WalletTransferMapper;
 import me.nawa.wallet.util.QrTokenGenerator;
 import me.nawa.wallet.util.TransactionNumberGenerator;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,8 @@ public class QrPaymentServiceImpl implements QrPaymentService {
 
     private static final long QR_EXPIRATION_MINUTES = 5L;
     private static final int MAX_MEMO_LENGTH = 255;
+    private static final int AMOUNT_SCALE = 4;
+    private static final int MAX_AMOUNT_INTEGER_DIGITS = 15;
 
     private final WalletMapper walletMapper;
     private final QrPaymentCodeMapper qrPaymentCodeMapper;
@@ -74,12 +78,14 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         LocalDateTime expiresAt = LocalDateTime.now()
             .plusMinutes(QR_EXPIRATION_MINUTES);
 
+        BigDecimal amount = normalizeOptionalAmount(request.amount());
+
         QrPaymentCode qrPaymentCode = new QrPaymentCode(
             null,
             wallet.getWalletId(),
             null,
             qrToken,
-            request.amount(),
+            amount,
             memo,
             QrPaymentStatus.ACTIVE,
             expiresAt,
@@ -302,6 +308,12 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             throw new BusinessException(WalletErrorCode.UNSUPPORTED_CURRENCY);
         }
 
+        // 지갑 잠금을 기다리는 동안 다른 QR 요청이 같은 키로 결제를 끝냈을 수 있다.
+        existing = walletTransferMapper.findByIdempotencyKey(idempotencyKey);
+        if (existing != null) {
+            return getIdempotentResult(memberId, request, existing);
+        }
+
         BigDecimal payerBalanceAfter =
             payerWallet.getAvailableBalance().subtract(paymentAmount);
 
@@ -346,13 +358,28 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             paymentAmount,
             qrPayment.getMemo(),
             null,
+            request.spendingScope().name(),
             now,
             now,
             memberId,
             idempotencyKey
         );
 
-        walletTransferMapper.insert(transfer);
+        try {
+            walletTransferMapper.insert(transfer);
+        } catch (DuplicateKeyException exception) {
+            WalletTransfer concurrent =
+                walletTransferMapper.findByIdempotencyKey(idempotencyKey);
+
+            if (concurrent != null) {
+                return getIdempotentResult(memberId, request, concurrent);
+            }
+
+            throw new BusinessException(
+                WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT,
+                exception
+            );
+        }
 
         // 6. 양쪽 원장 생성
         walletLedgerMapper.insert(
@@ -479,10 +506,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         }
 
         // null은 결제자가 금액을 입력하는 QR이므로 허용
-        if(request.amount() != null
-            && request.amount().compareTo(BigDecimal.ZERO) <= 0){
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-        }
+        normalizeOptionalAmount(request.amount());
 
         if(request.memo() != null
             && request.memo().trim().length() > MAX_MEMO_LENGTH){
@@ -517,7 +541,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
     ){
         // 고정 금액: QR: 프론트가 보낸 amount는 신뢰하지 않고 DB 값을 사용
         if(qrAmount != null){
-            return qrAmount;
+            return normalizeAmount(qrAmount);
         }
 
         //금액 입력 QR: 결재자가 0보다 큰 금액을 반드시 입력
@@ -528,7 +552,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             );
         }
 
-        return requestAmount;
+        return normalizeAmount(requestAmount);
     }
 
     // 요청 형식 검증
@@ -587,13 +611,9 @@ public class QrPaymentServiceImpl implements QrPaymentService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        // 5. ACTIVE로 남아 있어도 시간상 만료되었다면 EXPIRED로 변경
+        // 5. ACTIVE로 남아 있어도 시간상 만료되었다면 결제를 차단한다.
+        // 만료 상태 갱신은 별도 배치에서 처리한다.
         if(target.getExpiresAt() == null || !now.isBefore(target.getExpiresAt())){
-            qrPaymentCodeMapper.markExpiredIfActive(
-                target.getQrPaymentCodeId(),
-                now
-            );
-
             throw new BusinessException(WalletErrorCode.QR_PAYMENT_EXPIRED);
         }
 
@@ -658,11 +678,6 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         }
 
         if (!now.isBefore(qrPayment.getExpiresAt())) {
-            qrPaymentCodeMapper.markExpiredIfActive(
-                qrPayment.getQrPaymentCodeId(),
-                now
-            );
-
             throw new BusinessException(WalletErrorCode.QR_PAYMENT_EXPIRED);
         }
 
@@ -716,11 +731,21 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
         }
 
-        // 6. 결제자의 지갑을 다시 조회
+        // 6. 소비 범위와 약속도 최초 요청과 같아야 한다.
+        // scope는 transfer에 저장하고, 공동 소비의 appointmentId는 비용 연결에서 확인한다.
+        if (!request.spendingScope().name().equals(transfer.getSpendingType())) {
+            throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
+        }
+
+        // 7. 결제자의 지갑을 다시 조회
         // 응답의 currencyCode와, 최초 결제 직후 잔액을 조회할 때 사용
         Wallet payerWallet = walletMapper.findByMemberId(memberId);
 
-        // 7. 최초 결제 딩기 생성된 결제자 DEBIT 원장을 조회한다.
+        if (payerWallet == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        // 8. 최초 결제 때 생성된 결제자 DEBIT 원장을 조회한다.
         // 현재 잔액이 아니라, 결제 직후의 balancedAfter를 응답해야
         // 최초 요청의 결제 결과와 동일한 응답을 돌려줄 수 있아
         WalletLedgerEntry debitEntry =
@@ -728,6 +753,21 @@ public class QrPaymentServiceImpl implements QrPaymentService {
                 transfer.getTransferId(),
                 payerWallet.getWalletId()
             );
+
+        if (debitEntry == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        if (request.spendingScope() == SpendingScope.SHARED) {
+            Long originalAppointmentId =
+                tripExpenseLinkMapper.findAppointmentIdByLedgerEntryId(
+                    debitEntry.getLedgerEntryId()
+                );
+
+            if (!request.appointmentId().equals(originalAppointmentId)) {
+                throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
+            }
+        }
 
         // 8. 새 이체, 원장, 잔액 변경 없이, 기존 완료 겲과를 그대로 반환
         return new QrPaymentExecuteResponse(
@@ -739,5 +779,20 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             payerWallet.getCurrencyCode(),
             transfer.getCompletedAt()
         );
+    }
+
+    private BigDecimal normalizeOptionalAmount(BigDecimal amount) {
+        return amount == null ? null : normalizeAmount(amount);
+    }
+
+    // DECIMAL(19,4)와 동일한 정밀도로 검증·정규화한 값만 계산과 저장에 사용한다.
+    private BigDecimal normalizeAmount(BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0
+            || amount.scale() > AMOUNT_SCALE
+            || amount.precision() - amount.scale() > MAX_AMOUNT_INTEGER_DIGITS) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
+        return amount.setScale(AMOUNT_SCALE, RoundingMode.UNNECESSARY);
     }
 }

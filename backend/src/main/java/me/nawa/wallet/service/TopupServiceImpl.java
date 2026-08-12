@@ -357,7 +357,7 @@ public class TopupServiceImpl implements TopupService {
         // 시스템 자동 처리라 initiatorMemberId는 null로 둔다 (DB 코멘트: "시스템 자동 이체는 NULL").
         WalletTransfer transfer = new WalletTransfer(
             null, transactionNumberGenerator.generate(), "TOPUP", "COMPLETED",
-            topup.getKrwAmount(), null, null, LocalDateTime.now(), LocalDateTime.now(),
+            topup.getKrwAmount(), null, null, null, LocalDateTime.now(), LocalDateTime.now(),
             null, topup.getIdempotencyKey()
         );
         walletTransferMapper.insert(transfer);

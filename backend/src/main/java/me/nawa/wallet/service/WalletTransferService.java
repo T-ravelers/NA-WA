@@ -55,7 +55,7 @@ public class WalletTransferService {
         BigDecimal payeeBalance = lockedPayee.getAvailableBalance().add(amount);
         WalletTransfer transfer = new WalletTransfer(
             null, transactionNumberGenerator.generate(), "SETTLEMENT", "COMPLETED", amount,
-            memo, null, LocalDateTime.now(), null, initiatorMemberId, null
+            memo, null, null, LocalDateTime.now(), null, initiatorMemberId, null
         );
         walletTransferMapper.insert(transfer);
 

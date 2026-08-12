@@ -75,7 +75,7 @@ class TransactionServiceImplTest {
         return new WalletTransfer(
             transferId, "TXN-20260805-0001", transferType, transferStatus,
             BigDecimal.valueOf(10000), "카드 충전", "FOOD",
-            completedAt, createdAt, null, null
+            null, completedAt, createdAt, null, null
         );
     }
 

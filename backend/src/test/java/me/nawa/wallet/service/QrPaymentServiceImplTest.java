@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -110,7 +111,7 @@ class QrPaymentServiceImplTest {
         Long initiatorMemberId, String idempotencyKey
     ) {
         return new WalletTransfer(
-            transferId, "TXN-1", transferType, transferStatus, amount, "야경 투어", null,
+            transferId, "TXN-1", transferType, transferStatus, amount, "야경 투어", null, "PERSONAL",
             LocalDateTime.now(), LocalDateTime.now(), initiatorMemberId, idempotencyKey
         );
     }
@@ -188,6 +189,56 @@ class QrPaymentServiceImplTest {
 
         assertEquals(me.nawa.common.exception.CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
         verifyNoInteractions(walletMapper);
+    }
+
+    @Test
+    void createPaymentQr_throwsInvalidInput_whenAmountExceedsDecimalScale() {
+        QrPaymentCreateRequest request =
+            new QrPaymentCreateRequest(new BigDecimal("1.00001"), null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> qrPaymentService.createPaymentQr(MEMBER_ID, request)
+        );
+
+        assertEquals(me.nawa.common.exception.CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
+        verifyNoInteractions(walletMapper);
+    }
+
+    @Test
+    void createPaymentQr_throwsInvalidInput_whenAmountExceedsIntegerDigits() {
+        QrPaymentCreateRequest request =
+            new QrPaymentCreateRequest(new BigDecimal("1000000000000000"), null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> qrPaymentService.createPaymentQr(MEMBER_ID, request)
+        );
+
+        assertEquals(me.nawa.common.exception.CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
+        verifyNoInteractions(walletMapper);
+    }
+
+    @Test
+    void previewPayment_throwsInvalidInput_whenPayerEnteredAmountExceedsDecimalScale() {
+        when(walletMapper.findByMemberId(MEMBER_ID))
+            .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE"));
+        QrPaymentResolveTarget target = resolveTarget(
+            10L, PAYEE_WALLET_ID, null, null,
+            QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), "ACTIVE"
+        );
+        when(qrPaymentCodeMapper.findResolveTargetByToken("token-abc")).thenReturn(target);
+
+        QrPaymentPreviewRequest request = new QrPaymentPreviewRequest(
+            "token-abc", new BigDecimal("1.00001"), SpendingScope.PERSONAL, null
+        );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> qrPaymentService.previewPayment(MEMBER_ID, request)
+        );
+
+        assertEquals(me.nawa.common.exception.CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
     }
 
     @Test
@@ -375,7 +426,7 @@ class QrPaymentServiceImplTest {
     }
 
     @Test
-    void resolvePaymentQr_marksExpiredAndThrows_whenActiveButPastDeadline() {
+    void resolvePaymentQr_throwsExpired_whenActiveButPastDeadline() {
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE"));
 
@@ -391,7 +442,6 @@ class QrPaymentServiceImplTest {
         );
 
         assertEquals(WalletErrorCode.QR_PAYMENT_EXPIRED, exception.getErrorCode());
-        verify(qrPaymentCodeMapper).markExpiredIfActive(eq(10L), any(LocalDateTime.class));
     }
 
     @Test
@@ -662,10 +712,12 @@ class QrPaymentServiceImplTest {
         assertEquals(0, BigDecimal.valueOf(18500).compareTo(response.amount()));
         assertEquals(0, BigDecimal.valueOf(31500).compareTo(response.balanceAfter()));
 
-        verify(walletLedgerMapper).insert(999L, PAYER_WALLET_ID, "DEBIT", BigDecimal.valueOf(18500), BigDecimal.valueOf(31500));
-        verify(walletLedgerMapper).insert(999L, PAYEE_WALLET_ID, "CREDIT", BigDecimal.valueOf(18500), BigDecimal.valueOf(21000));
-        verify(walletMapper).updateBalance(PAYER_WALLET_ID, BigDecimal.valueOf(31500));
-        verify(walletMapper).updateBalance(PAYEE_WALLET_ID, BigDecimal.valueOf(21000));
+        // normalizeAmount가 DECIMAL(19,4)에 맞춰 scale=4로 정규화하므로, 비교값도 같은 scale로 맞춘다
+        // (BigDecimal.equals()는 compareTo()와 달리 scale까지 비교한다).
+        verify(walletLedgerMapper).insert(999L, PAYER_WALLET_ID, "DEBIT", new BigDecimal("18500.0000"), new BigDecimal("31500.0000"));
+        verify(walletLedgerMapper).insert(999L, PAYEE_WALLET_ID, "CREDIT", new BigDecimal("18500.0000"), new BigDecimal("21000.0000"));
+        verify(walletMapper).updateBalance(PAYER_WALLET_ID, new BigDecimal("31500.0000"));
+        verify(walletMapper).updateBalance(PAYEE_WALLET_ID, new BigDecimal("21000.0000"));
         verifyNoInteractions(tripExpenseLinkMapper);
     }
 
@@ -777,7 +829,7 @@ class QrPaymentServiceImplTest {
     }
 
     @Test
-    void executePayment_marksExpiredAndThrows_whenActiveButPastDeadline() {
+    void executePayment_throwsExpired_whenActiveButPastDeadline() {
         when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE"));
@@ -791,7 +843,6 @@ class QrPaymentServiceImplTest {
         );
 
         assertEquals(WalletErrorCode.QR_PAYMENT_EXPIRED, exception.getErrorCode());
-        verify(qrPaymentCodeMapper).markExpiredIfActive(eq(10L), any(LocalDateTime.class));
     }
 
     @Test
@@ -1017,6 +1068,84 @@ class QrPaymentServiceImplTest {
         BusinessException exception = assertThrows(
             BusinessException.class,
             () -> qrPaymentService.executePayment(MEMBER_ID, "idem-1", differentAmountRequest)
+        );
+
+        assertEquals(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT, exception.getErrorCode());
+    }
+
+    @Test
+    void executePayment_throwsIdempotencyKeyConflict_whenSpendingScopeDoesNotMatch() {
+        WalletTransfer existing =
+            transfer(999L, "QR_PAYMENT", "COMPLETED", BigDecimal.valueOf(18500), MEMBER_ID, "idem-1");
+        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(existing);
+
+        QrPaymentCode qr = qrPaymentCode(
+            10L, PAYEE_WALLET_ID, 999L, "token-abc", BigDecimal.valueOf(18500),
+            "야경 투어", QrPaymentStatus.COMPLETED, LocalDateTime.now().plusMinutes(5)
+        );
+        when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(qr);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> qrPaymentService.executePayment(
+                MEMBER_ID, "idem-1", executeRequest("token-abc", SpendingScope.SHARED, 55L)
+            )
+        );
+
+        assertEquals(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT, exception.getErrorCode());
+    }
+
+    @Test
+    void executePayment_returnsOriginalResult_whenTransferInsertRacesOnIdempotencyKey() {
+        WalletTransfer existing =
+            transfer(999L, "QR_PAYMENT", "COMPLETED", BigDecimal.valueOf(18500), MEMBER_ID, "idem-1");
+        when(walletTransferMapper.findByIdempotencyKey("idem-1"))
+            .thenReturn(null, null, null, existing);
+        stubLockableWallets("ACTIVE", "ACTIVE");
+        stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
+        when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
+        doThrow(new org.springframework.dao.DuplicateKeyException("duplicate"))
+            .when(walletTransferMapper).insert(any());
+
+        QrPaymentCode completedQr = qrPaymentCode(
+            10L, PAYEE_WALLET_ID, 999L, "token-abc", BigDecimal.valueOf(18500),
+            "야경 투어", QrPaymentStatus.COMPLETED, LocalDateTime.now().plusMinutes(5)
+        );
+        when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(completedQr);
+        when(walletLedgerMapper.findByTransferIdAndWalletId(999L, PAYER_WALLET_ID))
+            .thenReturn(ledgerEntry(BigDecimal.valueOf(31500), "DEBIT"));
+
+        QrPaymentExecuteResponse response = qrPaymentService.executePayment(
+            MEMBER_ID, "idem-1", executeRequest("token-abc", SpendingScope.PERSONAL, null)
+        );
+
+        assertEquals(999L, response.transferId());
+        verify(walletTransferMapper).insert(any());
+    }
+
+    @Test
+    void executePayment_throwsIdempotencyKeyConflict_whenSharedAppointmentDoesNotMatch() {
+        WalletTransfer existing =
+            transfer(999L, "QR_PAYMENT", "COMPLETED", BigDecimal.valueOf(18500), MEMBER_ID, "idem-1");
+        existing.setSpendingType("SHARED");
+        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(existing);
+
+        QrPaymentCode qr = qrPaymentCode(
+            10L, PAYEE_WALLET_ID, 999L, "token-abc", BigDecimal.valueOf(18500),
+            "야경 투어", QrPaymentStatus.COMPLETED, LocalDateTime.now().plusMinutes(5)
+        );
+        when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(qr);
+        when(walletMapper.findByMemberId(MEMBER_ID))
+            .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(31500), "ACTIVE"));
+        when(walletLedgerMapper.findByTransferIdAndWalletId(999L, PAYER_WALLET_ID))
+            .thenReturn(ledgerEntry(BigDecimal.valueOf(31500), "DEBIT"));
+        when(tripExpenseLinkMapper.findAppointmentIdByLedgerEntryId(700L)).thenReturn(66L);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> qrPaymentService.executePayment(
+                MEMBER_ID, "idem-1", executeRequest("token-abc", SpendingScope.SHARED, 55L)
+            )
         );
 
         assertEquals(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT, exception.getErrorCode());
