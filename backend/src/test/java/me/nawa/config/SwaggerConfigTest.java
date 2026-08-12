@@ -12,9 +12,7 @@ import me.nawa.common.exception.ErrorCode;
 import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.service.MemberProfileService;
-import me.nawa.settlement.service.ReceiptAnalysisService;
 import me.nawa.settlement.service.SettlementCreationService;
-import me.nawa.settlement.service.SettlementGameService;
 import me.nawa.settlement.service.SettlementPaymentService;
 import me.nawa.settlement.service.SettlementQueryService;
 import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
@@ -350,36 +348,15 @@ class SwaggerConfigTest {
                     Long memberId, Long appointmentId, String idempotencyKey,
                     me.nawa.settlement.dto.request.CreateSettlementRequest request
                 ) { throw new UnsupportedOperationException(); }
-                @Override public void requestSettlement(Long memberId, Long settlementId) {
-                    throw new UnsupportedOperationException();
-                }
             };
         }
 
         @Bean
         SettlementPaymentService settlementPaymentService() {
             return new SettlementPaymentService() {
-                @Override public void paySettlement(Long memberId, Long settlementId) { throw new UnsupportedOperationException(); }
-                @Override public void cancelSettlement(Long memberId, Long settlementId) { throw new UnsupportedOperationException(); }
-            };
-        }
-
-        @Bean
-        ReceiptAnalysisService receiptAnalysisService() {
-            return new ReceiptAnalysisService() {
-                @Override public me.nawa.settlement.dto.response.ReceiptAnalysisResponse analyzeReceipt(Long memberId, Long sourceTransferId, org.springframework.web.multipart.MultipartFile file) { throw new UnsupportedOperationException(); }
-                @Override public me.nawa.settlement.dto.response.ReceiptAnalysisResponse updateReceiptItems(Long memberId, Long receiptAnalysisId, me.nawa.settlement.dto.request.ReceiptItemUpdateRequest request) { throw new UnsupportedOperationException(); }
-                @Override public void updateReceiptAllocations(Long memberId, Long receiptAnalysisId, me.nawa.settlement.dto.request.ReceiptAllocationUpdateRequest request) { throw new UnsupportedOperationException(); }
-            };
-        }
-
-        @Bean
-        SettlementGameService settlementGameService() {
-            return new SettlementGameService() {
-                @Override public void submitGameConsent(Long memberId, Long settlementId, me.nawa.settlement.dto.request.GameConsentRequest request) { throw new UnsupportedOperationException(); }
-                @Override public void startGame(Long memberId, Long settlementId) { throw new UnsupportedOperationException(); }
-                @Override public me.nawa.settlement.dto.response.SettlementGameResponse getGame(Long memberId, Long settlementId) { throw new UnsupportedOperationException(); }
-                @Override public me.nawa.settlement.dto.response.SettlementGameResultResponse getGameResult(Long memberId, Long settlementId) { throw new UnsupportedOperationException(); }
+                @Override public me.nawa.settlement.dto.response.SettlementMutationResponse paySettlement(
+                    Long memberId, Long settlementId, String idempotencyKey
+                ) { throw new UnsupportedOperationException(); }
             };
         }
     }

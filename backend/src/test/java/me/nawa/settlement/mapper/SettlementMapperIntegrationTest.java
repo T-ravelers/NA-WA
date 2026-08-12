@@ -6,9 +6,13 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import me.nawa.settlement.domain.Settlement;
+import me.nawa.settlement.domain.SettlementItem;
+import me.nawa.settlement.domain.SettlementItemShare;
+import me.nawa.settlement.domain.SettlementMember;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -63,18 +67,21 @@ class SettlementMapperIntegrationTest {
     }
 
     @Test
-    void cancelSettlement_draft_updatesCancelledState() {
+    void insertSettlement_requested_persistsV9CreationColumns() {
         Fixture fixture = createFixture();
         try {
-            Settlement settlement = settlement(fixture, "DRAFT");
+            Settlement settlement = settlement(fixture);
             mapper.insertSettlement(settlement);
 
-            int updated = mapper.cancelSettlement(settlement.getSettlementId(), fixture.memberId());
-
-            assertEquals(1, updated);
-            assertEquals("CANCELLED", jdbcTemplate.queryForObject(
+            assertEquals("REQUESTED", jdbcTemplate.queryForObject(
                 "SELECT settlement_status FROM settlements WHERE settlement_id = ?",
                 String.class,
+                settlement.getSettlementId()
+            ));
+            assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM settlements WHERE settlement_id = ? "
+                    + "AND idempotency_key IS NOT NULL AND request_fingerprint IS NOT NULL",
+                Integer.class,
                 settlement.getSettlementId()
             ));
         } finally {
@@ -83,29 +90,46 @@ class SettlementMapperIntegrationTest {
     }
 
     @Test
-    void markSettlementRequested_draft_updatesRequestedState() {
+    void insertSettlementItemShares_generatedItemId_linksActiveSettlementMember() {
         Fixture fixture = createFixture();
         try {
-            Settlement settlement = settlement(fixture, "DRAFT");
+            Settlement settlement = settlement(fixture);
             mapper.insertSettlement(settlement);
-
-            int updated = mapper.markSettlementRequested(
+            mapper.insertSettlementMembers(List.of(new SettlementMember(
+                null,
                 settlement.getSettlementId(),
-                fixture.memberId()
+                fixture.appointmentMemberId(),
+                fixture.memberId(),
+                new BigDecimal("100"),
+                "NOT_REQUESTED",
+                null
+            )));
+            SettlementItem item = new SettlementItem(
+                settlement.getSettlementId(), "Dinner", new BigDecimal("100"), BigDecimal.ONE,
+                new BigDecimal("100"), (short) 0
             );
+            mapper.insertSettlementItem(item);
+            mapper.insertSettlementItemShares(settlement.getSettlementId(), List.of(
+                new SettlementItemShare(
+                    null, item.getSettlementItemId(), fixture.appointmentMemberId(), BigDecimal.ONE,
+                    new BigDecimal("100")
+                )
+            ));
 
-            assertEquals(1, updated);
-            assertEquals("REQUESTED", jdbcTemplate.queryForObject(
-                "SELECT settlement_status FROM settlements WHERE settlement_id = ?",
-                String.class,
-                settlement.getSettlementId()
+            assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM settlement_item_shares WHERE settlement_item_id = ? "
+                    + "AND allocated_quantity = ? AND allocated_amount = ?",
+                Integer.class,
+                item.getSettlementItemId(),
+                BigDecimal.ONE,
+                new BigDecimal("100")
             ));
         } finally {
             deleteFixture(fixture);
         }
     }
 
-    private static Settlement settlement(Fixture fixture, String status) {
+    private static Settlement settlement(Fixture fixture) {
         return Settlement.builder()
             .appointmentId(fixture.appointmentId())
             .createdByMemberId(fixture.memberId())
@@ -113,7 +137,7 @@ class SettlementMapperIntegrationTest {
             .sourceTransferId(fixture.transferId())
             .idempotencyKey("settlement-it-" + UUID.randomUUID())
             .requestFingerprint("a".repeat(64))
-            .settlementStatus(status)
+            .settlementStatus("REQUESTED")
             .splitMethod("EQUAL")
             .totalAmount(new BigDecimal("100"))
             .payerShareAmount(new BigDecimal("100"))
@@ -169,6 +193,25 @@ class SettlementMapperIntegrationTest {
     }
 
     private static void deleteFixture(Fixture fixture) {
+        jdbcTemplate.update(
+            "DELETE sis FROM settlement_item_shares sis "
+                + "JOIN settlement_items si ON si.settlement_item_id = sis.settlement_item_id "
+                + "JOIN settlements s ON s.settlement_id = si.settlement_id "
+                + "WHERE s.source_transfer_id = ?",
+            fixture.transferId()
+        );
+        jdbcTemplate.update(
+            "DELETE si FROM settlement_items si "
+                + "JOIN settlements s ON s.settlement_id = si.settlement_id "
+                + "WHERE s.source_transfer_id = ?",
+            fixture.transferId()
+        );
+        jdbcTemplate.update(
+            "DELETE sm FROM settlement_members sm "
+                + "JOIN settlements s ON s.settlement_id = sm.settlement_id "
+                + "WHERE s.source_transfer_id = ?",
+            fixture.transferId()
+        );
         jdbcTemplate.update("DELETE FROM settlements WHERE source_transfer_id = ?", fixture.transferId());
         jdbcTemplate.update("DELETE FROM wallet_transfers WHERE transfer_id = ?", fixture.transferId());
         jdbcTemplate.update(

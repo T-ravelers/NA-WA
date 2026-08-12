@@ -2,30 +2,30 @@ package me.nawa.settlement.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.settlement.dto.request.CreateSettlementRequest;
-import me.nawa.settlement.dto.request.GameConsentRequest;
-import me.nawa.settlement.dto.request.ReceiptAllocationUpdateRequest;
-import me.nawa.settlement.dto.request.ReceiptItemUpdateRequest;
 import me.nawa.settlement.dto.response.SettlementCreateResponse;
-import me.nawa.settlement.service.ReceiptAnalysisService;
+import me.nawa.settlement.dto.response.SettlementDetailResponse;
+import me.nawa.settlement.dto.response.SettlementViewerResponse;
+import me.nawa.settlement.domain.SettlementAllowedAction;
 import me.nawa.settlement.service.SettlementCreationService;
-import me.nawa.settlement.service.SettlementGameService;
 import me.nawa.settlement.service.SettlementPaymentService;
 import me.nawa.settlement.service.SettlementQueryService;
 import org.junit.jupiter.api.AfterEach;
@@ -51,10 +51,6 @@ class SettlementControllerTest {
     private SettlementCreationService settlementCreationService;
     @Mock
     private SettlementPaymentService settlementPaymentService;
-    @Mock
-    private ReceiptAnalysisService receiptAnalysisService;
-    @Mock
-    private SettlementGameService settlementGameService;
 
     @Mock
     private MockMvc mockMvc;
@@ -64,9 +60,7 @@ class SettlementControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new SettlementController(settlementQueryService, settlementCreationService, settlementPaymentService),
-                new SettlementReceiptAnalysisController(receiptAnalysisService),
-                new SettlementGameController(settlementGameService)
+                new SettlementController(settlementQueryService, settlementCreationService, settlementPaymentService)
             )
             .setControllerAdvice(new GlobalExceptionHandler())
             .setCustomArgumentResolvers(
@@ -120,59 +114,71 @@ class SettlementControllerTest {
     }
 
     @Test
-    void analyzeReceipt_withoutFilePart_returnsBadRequest() throws Exception {
-        mockMvc.perform(multipart("/api/v1/settlements/receipt-analyses")
-                .param("sourceTransferId", "20"))
-            .andExpect(status().isBadRequest());
+    void getSettlement_serializesViewerAllowedActionsAsEnumNames() throws Exception {
+        when(settlementQueryService.getSettlement(1L, 69L)).thenReturn(
+            SettlementDetailResponse.builder()
+                .id(69L)
+                .type("EQUAL")
+                .totalAmount(new BigDecimal("100"))
+                .status("REQUESTED")
+                .viewerItems(List.of())
+                .viewer(SettlementViewerResponse.builder()
+                    .role("PARTICIPANT")
+                    .shareAmount(new BigDecimal("50"))
+                    .payableAmount(new BigDecimal("50"))
+                    .requestStatus("PENDING")
+                    .allowedActions(List.of(SettlementAllowedAction.PAY))
+                    .build())
+                .build()
+        );
+
+        String responseBody = mockMvc.perform(get("/api/v1/settlements/69"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode viewer = objectMapper.readTree(responseBody).path("data").path("viewer");
+        assertEquals("PARTICIPANT", viewer.path("role").asText());
+        assertEquals(50, viewer.path("payableAmount").asInt());
+        assertEquals("PAY", viewer.path("allowedActions").path(0).asText());
     }
 
     @Test
-    void settlementEndpoints_acceptFrontendContractPaths() throws Exception {
-        MockMultipartFile receipt = new MockMultipartFile(
-            "file", "receipt.jpg", MediaType.IMAGE_JPEG_VALUE, "receipt".getBytes()
-        );
-
+    void settlementEndpoints_exposesOnlyFiveSupportedPaths() throws Exception {
         mockMvc.perform(get("/api/v1/settlements"))
             .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/settlements/candidates"))
             .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/settlements/69"))
             .andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/settlements/69/payments"))
+        mockMvc.perform(post("/api/v1/settlements/69/members/me/pay")
+                .header("Idempotency-Key", "settlement-pay-1"))
             .andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/settlements/69/request"))
-            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/settlements/69/request")
+                .header("Idempotency-Key", "settlement-request-1"))
+            .andExpect(status().isNotFound());
         mockMvc.perform(post("/api/v1/settlements/69/cancel"))
-            .andExpect(status().isOk());
-        mockMvc.perform(multipart("/api/v1/settlements/receipt-analyses")
-                .file(receipt)
-                .param("sourceTransferId", "20"))
-            .andExpect(status().isCreated());
-        mockMvc.perform(put("/api/v1/settlements/receipt-analyses/10/items")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new ReceiptItemUpdateRequest())))
-            .andExpect(status().isOk());
-        mockMvc.perform(put("/api/v1/settlements/receipt-analyses/10/allocations")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new ReceiptAllocationUpdateRequest())))
-            .andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/settlements/69/game/consents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new GameConsentRequest())))
-            .andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/settlements/69/game"))
-            .andExpect(status().isOk());
+            .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/v1/settlements/receipt-analyses"))
+            .andExpect(status().isMethodNotAllowed());
         mockMvc.perform(post("/api/v1/settlements/69/game/start"))
-            .andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/settlements/69/game/result"))
-            .andExpect(status().isOk());
+            .andExpect(status().isNotFound());
     }
 
     @Test
-    void requestSettlement_requestsDraftThroughLifecycleEndpoint() throws Exception {
-        mockMvc.perform(post("/api/v1/settlements/69/request"))
-            .andExpect(status().isOk());
+    void controller_declaresNoRemovedLifecycleMethods() {
+        List<String> methodNames = Arrays.stream(SettlementController.class.getDeclaredMethods())
+            .map(method -> method.getName())
+            .toList();
 
-        verify(settlementCreationService).requestSettlement(1L, 69L);
+        assertFalse(methodNames.contains("requestSettlement"));
+        assertFalse(methodNames.contains("cancelSettlement"));
+    }
+
+    @Test
+    void lifecycleMutation_withoutIdempotencyKey_returnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/v1/settlements/69/members/me/pay"))
+            .andExpect(status().isBadRequest());
     }
 }

@@ -65,8 +65,8 @@ cd backend && ./gradlew build --no-daemon
 | 프론트엔드 구현 규칙 | [frontend/docs/DEVELOPMENT_CONVENTION.md](./frontend/docs/DEVELOPMENT_CONVENTION.md) |
 | 백엔드 구현 규칙     | [backend/docs/DEVELOPMENT_CONVENTION.md](./backend/docs/DEVELOPMENT_CONVENTION.md) |
 | API 응답·오류 코드   | [backend/docs/API_RESPONSE_CONVENTION.md](./backend/docs/API_RESPONSE_CONVENTION.md) |
+| 정산 API·상태·멱등성 | [backend/docs/SETTLEMENT.md](./backend/docs/SETTLEMENT.md)                  |
 | 소셜 로그인 운영     | [backend/docs/AUTHENTICATION.md](./backend/docs/AUTHENTICATION.md)          |
-| 정산 API·금액·업로드 | [backend/docs/SETTLEMENT.md](./backend/docs/SETTLEMENT.md)                  |
 | DB 지도·도메인 ERD   | [backend/docs/database/README.md](./backend/docs/database/README.md)         |
 
 문서와 코드가 어긋나면 **조용히 한쪽을 고르지 말고 보고합니다.** 우선순위는
