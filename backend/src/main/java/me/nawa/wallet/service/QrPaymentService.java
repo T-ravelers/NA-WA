@@ -8,6 +8,7 @@ import me.nawa.wallet.dto.response.QrPaymentCreateResponse;
 import me.nawa.wallet.dto.response.QrPaymentExecuteResponse;
 import me.nawa.wallet.dto.response.QrPaymentPreviewResponse;
 import me.nawa.wallet.dto.response.QrPaymentResolveResponse;
+import me.nawa.wallet.dto.response.QrPaymentStatusResponse;
 
 public interface QrPaymentService {
 
@@ -30,5 +31,10 @@ public interface QrPaymentService {
         Long memberId,
         String idempotencyKey,
         QrPaymentExecuteRequest request
+    );
+
+    QrPaymentStatusResponse getPaymentStatus(
+        Long memberId,
+        Long transferId
     );
 }

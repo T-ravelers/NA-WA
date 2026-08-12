@@ -23,6 +23,7 @@ import me.nawa.wallet.dto.response.QrPaymentPreviewResponse;
 import me.nawa.wallet.dto.response.QrPaymentPreviewResponse.AppointmentInfo;
 import me.nawa.wallet.dto.response.QrPaymentPreviewResponse.TripInfo;
 import me.nawa.wallet.dto.response.QrPaymentResolveResponse;
+import me.nawa.wallet.dto.response.QrPaymentStatusResponse;
 import me.nawa.wallet.exception.WalletErrorCode;
 import me.nawa.wallet.mapper.QrPaymentCodeMapper;
 import me.nawa.wallet.mapper.TripExpenseLinkMapper;
@@ -416,6 +417,59 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             payerBalanceAfter,
             payerWallet.getCurrencyCode(),
             now
+        );
+    }
+
+    @Override
+    public QrPaymentStatusResponse getPaymentStatus(Long memberId, Long transferId) {
+        // 1. PathVariable 기본 검증
+        if(transferId == null || transferId <= 0){
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
+        // 2. 로그인 사용자의 지갑 조회
+        Wallet payerWallet = walletMapper.findByMemberId(memberId);
+
+        if(payerWallet == null){
+            throw new BusinessException(WalletErrorCode.WALLET_NOT_FOUND);
+        }
+
+        // 3. 거래 자체 존재 여부 확인
+        WalletTransfer transfer =
+            walletTransferMapper.findByTransferId(transferId);
+
+        if(transfer == null){
+            throw new BusinessException(WalletErrorCode.TRANSACTION_NOT_FOUND);
+        }
+
+        // 4. QR 결제 거래만 이 API에서 조회할 수 있음
+        if(!"QR_PAYMENT".equals(transfer.getTransferType())){
+            throw new BusinessException(WalletErrorCode.TRANSACTION_NOT_FOUND);
+        }
+
+        // 5. 로그인 사용자의 원장을 확인한다.
+        // QR 결제에서 결제자는 DEBIT, 수취인은 CREDIT 원장을 가진다.
+        WalletLedgerEntry debitEntry =
+            walletLedgerMapper.findByTransferIdAndWalletId(
+                transferId,
+                payerWallet.getWalletId()
+            );
+
+        // 원장이 없거나 CREDIT라면 결제자가 아닌 것이므로 조회를 막는다.
+        if (debitEntry == null
+            || !"DEBIT".equals(debitEntry.getEntryType())) {
+            throw new BusinessException(WalletErrorCode.TRANSACTION_FORBIDDEN);
+        }
+
+        // 6. 결제 당시 DEBIT 원장의 balanceAfter를 반환한다.
+        // 현재 지갑 잔액은 이후 거래로 바뀌었을 수 있으므로 사용하면 안 된다.
+        return new QrPaymentStatusResponse(
+            transfer.getTransferId(),
+            transfer.getTransferStatus(),
+            transfer.getAmount(),
+            debitEntry.getBalanceAfter(),
+            payerWallet.getCurrencyCode(),
+            transfer.getCompletedAt()
         );
     }
 

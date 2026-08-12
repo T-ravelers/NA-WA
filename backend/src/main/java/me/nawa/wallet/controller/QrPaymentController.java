@@ -12,9 +12,12 @@ import me.nawa.wallet.dto.response.QrPaymentCreateResponse;
 import me.nawa.wallet.dto.response.QrPaymentExecuteResponse;
 import me.nawa.wallet.dto.response.QrPaymentPreviewResponse;
 import me.nawa.wallet.dto.response.QrPaymentResolveResponse;
+import me.nawa.wallet.dto.response.QrPaymentStatusResponse;
 import me.nawa.wallet.service.QrPaymentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -77,4 +80,16 @@ public class QrPaymentController {
         );
     }
 
+    @GetMapping("/payment/{transferId}")
+    public ApiResponse<QrPaymentStatusResponse> getPaymentStatus(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long transferId
+    ){
+        return ApiResponse.success(
+            qrPaymentService.getPaymentStatus(
+                member.getMemberId(),
+                transferId
+            )
+        );
+    }
 }
