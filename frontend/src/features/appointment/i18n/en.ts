@@ -31,7 +31,6 @@ export default {
       all: 'All',
       en: 'English',
       ja: 'Japanese',
-      'zh-CN': 'Chinese (Simplified)',
       'zh-TW': 'Chinese (Traditional)',
       vi: 'Vietnamese',
     },
