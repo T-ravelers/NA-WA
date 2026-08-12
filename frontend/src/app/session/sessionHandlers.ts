@@ -39,3 +39,11 @@ export function handleSignedOut(): void {
 
   void router.replace({ path: SIGN_IN_PATH })
 }
+
+/** 불확실한 로그아웃 의도도 보호 화면과 이전 계정 데이터를 즉시 닫는다. */
+export function handleSignOutBarrier(): void {
+  clearSessionData()
+  clearReturnPath()
+
+  void router.replace({ path: SIGN_IN_PATH })
+}

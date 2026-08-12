@@ -40,6 +40,7 @@ async function mountAt(fullPath: string) {
 
 describe('AuthCallbackView', () => {
   beforeEach(() => {
+    localStorage.clear()
     sessionStorage.clear()
     clear.mockReset()
   })
@@ -83,9 +84,12 @@ describe('AuthCallbackView', () => {
     })
 
     it('leaves the cache alone', async () => {
+      localStorage.setItem('nawa.auth.signOutBarrier', 'active')
+
       await mountAt('/auth/callback?error=AUTH-014')
 
       expect(clear).not.toHaveBeenCalled()
+      expect(localStorage.getItem('nawa.auth.signOutBarrier')).toBe('active')
     })
   })
 
@@ -112,9 +116,12 @@ describe('AuthCallbackView', () => {
      */
 
     it('drops responses cached before authentication', async () => {
+      localStorage.setItem('nawa.auth.signOutBarrier', 'active')
+
       await mountAt('/auth/callback')
 
       expect(clear).toHaveBeenCalled()
+      expect(localStorage.getItem('nawa.auth.signOutBarrier')).toBeNull()
     })
   })
 })

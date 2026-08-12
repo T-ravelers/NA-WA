@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 
 import { AUTHENTICATED_HOME_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import { clearSignOutBarrier } from '@/shared/api/signOutBarrier'
 
 import { queryClient } from '@/app/query/client'
 
@@ -62,6 +63,7 @@ onMounted(async () => {
    * 목적지의 guard가 로그인 화면으로 되돌리면서 복귀 경로를 query에 실어 준다.
    */
   queryClient.clear()
+  clearSignOutBarrier()
 
   await router.replace(consumeReturnPath() ?? AUTHENTICATED_HOME_PATH)
 })

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { IconLanguage } from '@tabler/icons-vue'
-import { computed, ref } from 'vue'
+import { useMutation } from '@tanstack/vue-query'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
@@ -9,6 +10,8 @@ import IconOrb from '@/shared/ui/IconOrb.vue'
 import LocaleSheet from '@/shared/ui/LocaleSheet.vue'
 import { resolveInitialLocale } from '@/shared/i18n/localePreference'
 import type { AppLocale } from '@/shared/i18n/locales'
+import { requestSignOut } from '@/shared/api/sessionSignOut'
+import { isSignOutBarrierActive, subscribeSignOutBarrier } from '@/shared/api/signOutBarrier'
 
 import { buildAuthorizationUrl } from '../api/authApi'
 import { storeReturnPath } from '../model/returnPath'
@@ -18,6 +21,18 @@ const route = useRoute()
 
 const isLocaleSheetOpen = ref(false)
 const selectedLocale = ref<AppLocale>(resolveInitialLocale())
+const signOutBarrierActive = ref(isSignOutBarrierActive())
+const signOutRetry = useMutation({ mutationFn: requestSignOut })
+
+let unsubscribeSignOutBarrier: (() => void) | undefined
+
+onMounted(() => {
+  unsubscribeSignOutBarrier = subscribeSignOutBarrier((active) => {
+    signOutBarrierActive.value = active
+  })
+})
+
+onUnmounted(() => unsubscribeSignOutBarrier?.())
 
 const NATIVE_LABEL: Record<AppLocale, string> = {
   en: 'English',
@@ -70,12 +85,32 @@ function signInWith(provider: 'google' | 'line'): void {
       <p class="text-caption text-ink-3">
         {{ t('auth.locale.current', { language: currentLocaleLabel }) }}
       </p>
+
+      <div
+        v-if="signOutBarrierActive"
+        role="alert"
+        class="mt-3 flex flex-col gap-3 rounded-sm border border-hairline-strong p-4"
+      >
+        <div class="flex flex-col gap-1">
+          <p class="text-title-sm text-ink-display">{{ t('auth.signOutBarrier.title') }}</p>
+          <p class="text-body-sm text-ink-2">{{ t('auth.signOutBarrier.description') }}</p>
+        </div>
+        <button
+          type="button"
+          class="h-11 rounded-sm bg-paper-fill text-title-sm text-on-paper disabled:opacity-50"
+          :disabled="signOutRetry.isPending.value"
+          @click="signOutRetry.mutate()"
+        >
+          {{ t('auth.signOutBarrier.retry') }}
+        </button>
+      </div>
     </div>
 
     <div class="flex flex-col gap-2.5">
       <button
         type="button"
         class="flex h-13 items-center justify-center gap-2 rounded-sm bg-paper-fill text-title-sm text-on-paper"
+        :disabled="signOutRetry.isPending.value"
         @click="signInWith('google')"
       >
         <span
@@ -90,6 +125,7 @@ function signInWith(provider: 'google' | 'line'): void {
       <button
         type="button"
         class="flex h-13 items-center justify-center gap-2 rounded-sm border border-hairline-strong text-title-sm text-ink-display"
+        :disabled="signOutRetry.isPending.value"
         @click="signInWith('line')"
       >
         <span

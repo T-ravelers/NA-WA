@@ -27,7 +27,8 @@ vi.mock('@/shared/api/csrf', () => ({
   clearCsrfToken: () => clearCsrfToken(),
 }))
 
-const { handleSessionExpired, handleSignedOut } = await import('../sessionHandlers')
+const { handleSessionExpired, handleSignedOut, handleSignOutBarrier } =
+  await import('../sessionHandlers')
 
 describe('sessionHandlers', () => {
   beforeEach(() => {
@@ -58,6 +59,16 @@ describe('sessionHandlers', () => {
 
   it('clears cached data and stale return paths after explicit sign-out', () => {
     handleSignedOut()
+
+    expect(clearMemberProfile).toHaveBeenCalledOnce()
+    expect(clearQueries).toHaveBeenCalledOnce()
+    expect(clearCsrfToken).toHaveBeenCalledOnce()
+    expect(clearReturnPath).toHaveBeenCalledOnce()
+    expect(replace).toHaveBeenCalledWith({ path: '/sign-in' })
+  })
+
+  it('closes protected data immediately when the sign-out barrier activates', () => {
+    handleSignOutBarrier()
 
     expect(clearMemberProfile).toHaveBeenCalledOnce()
     expect(clearQueries).toHaveBeenCalledOnce()

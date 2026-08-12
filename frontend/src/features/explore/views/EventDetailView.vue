@@ -541,8 +541,8 @@ function retry(): void {
           <AppButton
             block
             variant="secondary"
-            disabled
             class="h-12 whitespace-nowrap border-success px-2 text-success"
+            disabled
           >
             {{ t('explore.detail.findCompanions') }}
           </AppButton>
