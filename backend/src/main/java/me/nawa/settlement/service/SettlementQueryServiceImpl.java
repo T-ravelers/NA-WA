@@ -35,7 +35,10 @@ public class SettlementQueryServiceImpl implements SettlementQueryService {
     @Override @Transactional(readOnly = true)
     public List<SettlementCandidateResponse> getCandidates(Long memberId) {
         return settlementMapper.findCandidateSources(memberId).stream().map(source ->
-            SettlementCandidateResponse.builder().transferId(source.getTransferId()).journeyName(source.getJourneyName())
+            SettlementCandidateResponse.builder().transferId(source.getTransferId())
+                .appointmentId(source.getAppointmentId())
+                .payerAppointmentMemberId(source.getPayerAppointmentMemberId())
+                .journeyName(source.getJourneyName())
                 .gatheringName(source.getGatheringName()).merchantName(source.getMerchantName()).amount(source.getAmount())
                 .paidAt(source.getPaidAt()).payerName(source.getPayerName())
                 .participants(toParticipantResponses(settlementMapper.findParticipants(source.getAppointmentId()))).build()
