@@ -16,6 +16,7 @@ public class SettlementSource {
     private Long transferId;
     private Long appointmentId;
     private Long payerMemberId;
+    private Long payerAppointmentMemberId;
     private BigDecimal amount;
     private Integer currencyDecimalPlaces;
     private String journeyName;

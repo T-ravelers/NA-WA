@@ -53,6 +53,7 @@
 
     <select id="findCandidateSources" resultType="me.nawa.settlement.domain.SettlementSource">
         SELECT DISTINCT t.transfer_id, am.appointment_id, t.initiator_member_id AS payer_member_id,
+               payer_am.appointment_member_id AS payer_appointment_member_id,
                t.amount, c.decimal_places AS currency_decimal_places,
                tr.title AS journey_name, a.appointment_name AS gathering_name,
                a.appointment_name AS merchant_name, t.completed_at AS paid_at,
@@ -62,6 +63,9 @@
         JOIN trip_expense_links tel ON tel.ledger_entry_id = le.ledger_entry_id
         JOIN appointment_members am ON am.appointment_member_id = tel.appointment_member_id
         JOIN appointments a ON a.appointment_id = am.appointment_id
+        JOIN appointment_members payer_am ON payer_am.appointment_id = am.appointment_id
+            AND payer_am.member_id = t.initiator_member_id
+            AND payer_am.membership_status = 'ACTIVE' AND payer_am.deleted_at IS NULL
         LEFT JOIN trips tr ON tr.trip_id = tel.trip_id
         JOIN members payer ON payer.member_id = t.initiator_member_id
         JOIN currencies c ON c.currency_code = t.currency_code

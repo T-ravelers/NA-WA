@@ -7,7 +7,10 @@ import java.math.BigDecimal;
 import java.util.List;
 import me.nawa.settlement.domain.SettlementAllowedAction;
 import me.nawa.settlement.domain.SettlementDetail;
+import me.nawa.settlement.domain.SettlementParticipant;
+import me.nawa.settlement.domain.SettlementSource;
 import me.nawa.settlement.domain.SettlementSummary;
+import me.nawa.settlement.dto.response.SettlementCandidateResponse;
 import me.nawa.settlement.domain.SettlementViewerItem;
 import me.nawa.settlement.dto.response.SettlementDetailResponse;
 import me.nawa.settlement.dto.response.SettlementListResponse;
@@ -22,6 +25,28 @@ class SettlementQueryServiceTest {
 
     @Mock
     private SettlementMapper settlementMapper;
+
+    @Test
+    void getCandidates_preservesAppointmentAndPayerAppointmentMemberContext() {
+        SettlementSource source = new SettlementSource();
+        source.setTransferId(20L);
+        source.setAppointmentId(7L);
+        source.setPayerMemberId(1L);
+        source.setPayerAppointmentMemberId(71L);
+        when(settlementMapper.findCandidateSources(1L)).thenReturn(List.of(source));
+        when(settlementMapper.findParticipants(7L)).thenReturn(List.of(
+            new SettlementParticipant(71L, 1L, "Payer"),
+            new SettlementParticipant(72L, 2L, "Participant")
+        ));
+
+        SettlementCandidateResponse response = service().getCandidates(1L).get(0);
+
+        assertEquals(20L, response.getTransferId());
+        assertEquals(7L, response.getAppointmentId());
+        assertEquals(71L, response.getPayerAppointmentMemberId());
+        assertEquals(List.of(71L, 72L), response.getParticipants().stream()
+            .map(participant -> participant.getId()).toList());
+    }
 
     @Test
     void getSettlements_pendingParticipant_returnsViewerPaymentContract() {

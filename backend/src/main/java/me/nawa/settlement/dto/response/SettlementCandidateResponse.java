@@ -17,6 +17,8 @@ import lombok.Getter;
 public class SettlementCandidateResponse {
 
     private final Long transferId;
+    private final Long appointmentId;
+    private final Long payerAppointmentMemberId;
     private final String journeyName;
     private final String gatheringName;
     private final String merchantName;

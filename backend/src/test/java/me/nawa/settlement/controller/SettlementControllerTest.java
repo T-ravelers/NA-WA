@@ -22,7 +22,9 @@ import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.settlement.dto.request.CreateSettlementRequest;
 import me.nawa.settlement.dto.response.SettlementCreateResponse;
+import me.nawa.settlement.dto.response.SettlementCandidateResponse;
 import me.nawa.settlement.dto.response.SettlementDetailResponse;
+import me.nawa.settlement.dto.response.SettlementParticipantResponse;
 import me.nawa.settlement.dto.response.SettlementViewerResponse;
 import me.nawa.settlement.domain.SettlementAllowedAction;
 import me.nawa.settlement.service.SettlementCreationService;
@@ -111,6 +113,34 @@ class SettlementControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sourceTransferId\":20,\"type\":\"EQUAL\",\"participantAppointmentMemberIds\":[71,72]}"))
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getCandidates_serializesCreationContextWithPayerAmongParticipants() throws Exception {
+        when(settlementQueryService.getCandidates(1L)).thenReturn(List.of(
+            SettlementCandidateResponse.builder()
+                .transferId(20L)
+                .appointmentId(7L)
+                .payerAppointmentMemberId(71L)
+                .participants(List.of(
+                    SettlementParticipantResponse.builder().id(71L).name("Payer").initials("P").build(),
+                    SettlementParticipantResponse.builder().id(72L).name("Participant").initials("P").build()
+                ))
+                .build()
+        ));
+
+        String responseBody = mockMvc.perform(get("/api/v1/settlements/candidates"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode candidate = objectMapper.readTree(responseBody).path("data").get(0);
+        assertEquals(20L, candidate.path("transferId").asLong());
+        assertEquals(7L, candidate.path("appointmentId").asLong());
+        assertEquals(71L, candidate.path("payerAppointmentMemberId").asLong());
+        assertTrue(candidate.path("participants").findValuesAsText("id")
+            .contains(candidate.path("payerAppointmentMemberId").asText()));
     }
 
     @Test

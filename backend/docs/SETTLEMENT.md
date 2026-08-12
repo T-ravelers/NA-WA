@@ -15,6 +15,17 @@
 
 생성 요청과 지급 요청에는 각각 `Idempotency-Key` 헤더가 필요하며, 값은 1~100자다.
 
+## 정산 후보 생성 문맥
+
+`GET /api/v1/settlements/candidates`의 각 후보는 `transferId`, `appointmentId`,
+`payerAppointmentMemberId`, `participants`를 함께 반환한다. `appointmentId`는 정산 생성
+URL의 경로 변수이고, `transferId`는 생성 요청의 `sourceTransferId`다.
+
+`payerAppointmentMemberId`는 원결제자의 `appointment_member_id`이며 반드시 같은 후보의
+`participants[].id` 중 하나다. 클라이언트는 회원 ID를 약속 참가 ID로 바꾸거나 원결제자의
+참가 ID를 추론하지 않고, 이 값을 `participantAppointmentMemberIds`에 포함해 생성 요청을
+구성한다. `participants[].id`도 모두 `appointment_member_id`다.
+
 ## 생성·금액·상태
 
 생성 요청에는 `sourceTransferId`, `type`,
