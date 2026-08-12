@@ -212,6 +212,45 @@ describe('ReportsView', () => {
     expect(router.currentRoute.value.fullPath).toBe('/reports/100')
   })
 
+  it('shows the specific message when a selected expense is rejected', async () => {
+    fetchReports.mockResolvedValue([])
+    createReport.mockRejectedValue(
+      new NormalizedApiError('REPORT-007', 400, 'Selected expense is invalid'),
+    )
+    const { wrapper } = await mountView()
+
+    await findButton(wrapper, 'Choose expenses')?.trigger('click')
+    await flushPromises()
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      'We could not include one of the selected expenses. Refresh the list and choose again.',
+    )
+  })
+
+  it('keeps an already linked expense out of the existing-report conflict branch', async () => {
+    fetchReports.mockResolvedValue([])
+    createReport.mockRejectedValue(
+      new NormalizedApiError('REPORT-008', 409, 'Selected expense is already linked to a Journey'),
+    )
+    const { router, wrapper } = await mountView()
+
+    await findButton(wrapper, 'Choose expenses')?.trigger('click')
+    await flushPromises()
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    // REPORT-008도 409지만 기존 Report 충돌(REPORT-005)이 아니다. 목록을 다시 부르거나
+    // 상세로 보내지 않고, 이 코드의 문구를 그대로 보여줘야 한다.
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      'One of the selected expenses already belongs to another journey. Refresh the list and choose again.',
+    )
+    expect(wrapper.text()).not.toContain('A final report already exists')
+    expect(fetchReports).toHaveBeenCalledTimes(1)
+    expect(router.currentRoute.value.fullPath).toBe('/reports')
+  })
+
   it('renders list error and empty state branches', async () => {
     fetchReportJourneys.mockRejectedValueOnce(new NormalizedApiError('NETWORK', null, 'offline'))
     const failed = await mountView()

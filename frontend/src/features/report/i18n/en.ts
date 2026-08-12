@@ -71,6 +71,10 @@ export default {
       'REPORT-004': 'This journey has not ended yet.',
       'REPORT-005': 'A final report already exists for this journey.',
       'REPORT-006': 'This journey could not be found.',
+      'REPORT-007':
+        'We could not include one of the selected expenses. Refresh the list and choose again.',
+      'REPORT-008':
+        'One of the selected expenses already belongs to another journey. Refresh the list and choose again.',
     },
   },
 }
