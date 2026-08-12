@@ -218,7 +218,7 @@ class SettlementCreationConcurrencyIntegrationTest {
     }
 
     private static Fixture createFixture() {
-        String marker = "settlement-concurrency-" + UUID.randomUUID();
+        String marker = "st-" + UUID.randomUUID();
         long payerMemberId = insert("members", "member_id", Map.of("display_name", marker + "-payer"));
         long payeeMemberId = insert("members", "member_id", Map.of("display_name", marker + "-payee"));
         long tripId = insert("trips", "trip_id", Map.of(
