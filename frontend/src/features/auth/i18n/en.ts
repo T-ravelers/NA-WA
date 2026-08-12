@@ -41,7 +41,12 @@ export default {
       retry: 'Try signing in again',
     },
     signOut: 'Sign out',
-    signOutFailed: 'We could not sign you out. Please try again.',
+    signOutBarrier: {
+      title: 'We could not confirm that you signed out',
+      description:
+        'Your previous session is blocked on this device. Try signing out again or continue with a provider to sign in again.',
+      retry: 'Try signing out again',
+    },
     errorCode: {
       'AUTH-001': 'Your session has expired. Please sign in again.',
       'AUTH-002': 'Your session was ended for security reasons. Please sign in again.',
