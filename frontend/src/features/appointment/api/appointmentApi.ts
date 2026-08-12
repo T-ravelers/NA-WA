@@ -6,6 +6,8 @@ export type AppointmentItemType = 'EVENT' | 'PLACE'
 export type AppointmentLanguage = 'en' | 'ja' | 'zh-CN' | 'zh-TW' | 'vi'
 export type AppointmentStatus =
   'RECRUITING' | 'CLOSED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+/** Jackson LocalDateTime may be serialized as an ISO string or numeric components. */
+export type AppointmentDateTimeValue = string | readonly number[] | null
 
 export interface AppointmentSummary {
   appointmentId: number
@@ -18,9 +20,9 @@ export interface AppointmentSummary {
   depositAmount: string
   appointmentStatus: AppointmentStatus
   meetingPlace: string | null
-  activityStartAt: string
-  activityEndAt: string
-  joinDeadline: string | null
+  activityStartAt: AppointmentDateTimeValue
+  activityEndAt: AppointmentDateTimeValue
+  joinDeadline: AppointmentDateTimeValue
   hostDisplayName: string | null
 }
 

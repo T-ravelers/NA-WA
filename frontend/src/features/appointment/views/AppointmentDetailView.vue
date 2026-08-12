@@ -14,7 +14,7 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
-import { type AppointmentStatus } from '../api/appointmentApi'
+import { type AppointmentDateTimeValue, type AppointmentStatus } from '../api/appointmentApi'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
@@ -78,10 +78,10 @@ const canOpenAttendance = computed(() => isCompleted.value === true && isHost.va
 const canOpenReviews = computed(() => isCompleted.value === true && isActiveParticipant.value)
 const canOpenPostEventMenu = computed(() => canOpenAttendance.value || canOpenReviews.value)
 
-function formatDateTime(value: string | null): string {
+function formatDateTime(value: AppointmentDateTimeValue): string {
   if (!value) return t('appointment.detail.notProvided')
   const parsed = parseAppointmentDateTime(value)
-  if (!parsed) return value
+  if (!parsed) return typeof value === 'string' ? value : t('appointment.detail.notProvided')
   return new Intl.DateTimeFormat(locale.value, {
     dateStyle: 'medium',
     timeStyle: 'short',
