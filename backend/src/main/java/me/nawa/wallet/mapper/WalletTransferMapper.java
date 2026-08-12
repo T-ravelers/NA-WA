@@ -11,4 +11,9 @@ public interface WalletTransferMapper {
 
     // insert 후 MyBatis가 채워준 자동증가 PK를 transfer.transferId에 넣어준다 (WalletTransferMapper.xml의 useGeneratedKeys 참고)
     void insert(WalletTransfer transfer);
+
+    // 멱등성 조회
+    WalletTransfer findByIdempotencyKey(
+        @Param("idempotencyKey") String idempotencyKey
+    );
 }

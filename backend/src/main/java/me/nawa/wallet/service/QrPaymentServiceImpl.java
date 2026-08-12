@@ -9,20 +9,28 @@ import me.nawa.wallet.domain.QrPaymentAppointmentMembership;
 import me.nawa.wallet.domain.QrPaymentCode;
 import me.nawa.wallet.domain.QrPaymentResolveTarget;
 import me.nawa.wallet.domain.Wallet;
+import me.nawa.wallet.domain.WalletLedgerEntry;
+import me.nawa.wallet.domain.WalletTransfer;
 import me.nawa.wallet.domain.enums.QrPaymentStatus;
 import me.nawa.wallet.domain.enums.SpendingScope;
 import me.nawa.wallet.dto.request.QrPaymentCreateRequest;
+import me.nawa.wallet.dto.request.QrPaymentExecuteRequest;
 import me.nawa.wallet.dto.request.QrPaymentPreviewRequest;
 import me.nawa.wallet.dto.request.QrPaymentResolveRequest;
 import me.nawa.wallet.dto.response.QrPaymentCreateResponse;
+import me.nawa.wallet.dto.response.QrPaymentExecuteResponse;
 import me.nawa.wallet.dto.response.QrPaymentPreviewResponse;
 import me.nawa.wallet.dto.response.QrPaymentPreviewResponse.AppointmentInfo;
 import me.nawa.wallet.dto.response.QrPaymentPreviewResponse.TripInfo;
 import me.nawa.wallet.dto.response.QrPaymentResolveResponse;
 import me.nawa.wallet.exception.WalletErrorCode;
 import me.nawa.wallet.mapper.QrPaymentCodeMapper;
+import me.nawa.wallet.mapper.TripExpenseLinkMapper;
+import me.nawa.wallet.mapper.WalletLedgerMapper;
 import me.nawa.wallet.mapper.WalletMapper;
+import me.nawa.wallet.mapper.WalletTransferMapper;
 import me.nawa.wallet.util.QrTokenGenerator;
+import me.nawa.wallet.util.TransactionNumberGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +46,10 @@ public class QrPaymentServiceImpl implements QrPaymentService {
     private final WalletMapper walletMapper;
     private final QrPaymentCodeMapper qrPaymentCodeMapper;
     private final QrTokenGenerator qrTokenGenerator;
+    private final WalletTransferMapper walletTransferMapper;
+    private final WalletLedgerMapper walletLedgerMapper;
+    private final TransactionNumberGenerator transactionNumberGenerator;
+    private final TripExpenseLinkMapper tripExpenseLinkMapper;
 
     @Override
     @Transactional
@@ -201,6 +213,212 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         );
     }
 
+    @Override
+    @Transactional
+    public QrPaymentExecuteResponse executePayment(
+        Long memberId,
+        String idempotencyKey,
+        QrPaymentExecuteRequest request
+    ) {
+        validateExecuteRequest(idempotencyKey, request);
+
+        // 1. 이미 완료된 동일 요청이면 기존 결과 반환
+        WalletTransfer existing =
+            walletTransferMapper.findByIdempotencyKey(idempotencyKey);
+
+        if (existing != null) {
+            return getIdempotentResult(memberId, request, existing);
+        }
+
+        // 결제자 지갑 ID를 확인하기 위한 일반 조회
+        Wallet payerSnapshot = walletMapper.findByMemberId(memberId);
+        if (payerSnapshot == null) {
+            throw new BusinessException(WalletErrorCode.WALLET_NOT_FOUND);
+        }
+
+        // 2. QR을 먼저 잠근다.
+        QrPaymentCode qrPayment =
+            qrPaymentCodeMapper.findByQrTokenForUpdate(request.qrToken().trim());
+
+        if (qrPayment == null) {
+            throw new BusinessException(WalletErrorCode.QR_PAYMENT_NOT_FOUND);
+        }
+
+        // QR을 기다리는 동안 동일 Idempotency-Key 요청이 끝났을 수 있으므로 재확인
+        existing = walletTransferMapper.findByIdempotencyKey(idempotencyKey);
+        if (existing != null) {
+            return getIdempotentResult(memberId, request, existing);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        validateExecutableQr(qrPayment, payerSnapshot, now);
+
+        BigDecimal paymentAmount = resolvePaymentAmount(
+            qrPayment.getAmount(),
+            request.amount()
+        );
+
+        // 3. 두 지갑을 항상 walletId 오름차순으로 잠근다.
+        // 반대 방향 동시 결제에서 데드락이 나는 것을 줄인다.
+        Long payerWalletId = payerSnapshot.getWalletId();
+        Long payeeWalletId = qrPayment.getPayeeWalletId();
+
+        Long firstWalletId = payerWalletId < payeeWalletId
+            ? payerWalletId
+            : payeeWalletId;
+
+        Long secondWalletId = payerWalletId < payeeWalletId
+            ? payeeWalletId
+            : payerWalletId;
+
+        Wallet firstLockedWallet =
+            walletMapper.findByWalletIdForUpdate(firstWalletId);
+        Wallet secondLockedWallet =
+            walletMapper.findByWalletIdForUpdate(secondWalletId);
+
+        if (firstLockedWallet == null || secondLockedWallet == null) {
+            throw new BusinessException(WalletErrorCode.WALLET_NOT_FOUND);
+        }
+
+        Wallet payerWallet = payerWalletId.equals(firstLockedWallet.getWalletId())
+            ? firstLockedWallet
+            : secondLockedWallet;
+
+        Wallet payeeWallet = payeeWalletId.equals(firstLockedWallet.getWalletId())
+            ? firstLockedWallet
+            : secondLockedWallet;
+
+        if (!"ACTIVE".equals(payerWallet.getWalletStatus())) {
+            throw new BusinessException(WalletErrorCode.WALLET_NOT_ACTIVE);
+        }
+
+        if (!"ACTIVE".equals(payeeWallet.getWalletStatus())) {
+            throw new BusinessException(WalletErrorCode.QR_PAYEE_WALLET_NOT_ACTIVE);
+        }
+
+        if (!payerWallet.getCurrencyCode().equals(payeeWallet.getCurrencyCode())) {
+            throw new BusinessException(WalletErrorCode.UNSUPPORTED_CURRENCY);
+        }
+
+        BigDecimal payerBalanceAfter =
+            payerWallet.getAvailableBalance().subtract(paymentAmount);
+
+        if (payerBalanceAfter.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException(
+                WalletErrorCode.QR_PAYMENT_INSUFFICIENT_BALANCE
+            );
+        }
+
+        BigDecimal payeeBalanceAfter =
+            payeeWallet.getAvailableBalance().add(paymentAmount);
+
+        // 4. 공동 소비라면 실행 시점에도 활성 멤버십을 잠금 조회
+        QrPaymentAppointmentMembership membership = null;
+
+        if (request.spendingScope() == SpendingScope.SHARED) {
+            membership =
+                qrPaymentCodeMapper.findActiveAppointmentMembershipForUpdate(
+                    memberId,
+                    request.appointmentId()
+                );
+
+            if (membership == null) {
+                throw new BusinessException(
+                    WalletErrorCode.QR_APPOINTMENT_MEMBERSHIP_NOT_FOUND
+                );
+            }
+
+            if (membership.getTripId() == null) {
+                throw new BusinessException(
+                    WalletErrorCode.QR_APPOINTMENT_TRIP_NOT_LINKED
+                );
+            }
+        }
+
+        // 5. 이체 생성
+        WalletTransfer transfer = new WalletTransfer(
+            null,
+            transactionNumberGenerator.generate(),
+            "QR_PAYMENT",
+            "COMPLETED",
+            paymentAmount,
+            qrPayment.getMemo(),
+            null,
+            now,
+            now,
+            memberId,
+            idempotencyKey
+        );
+
+        walletTransferMapper.insert(transfer);
+
+        // 6. 양쪽 원장 생성
+        walletLedgerMapper.insert(
+            transfer.getTransferId(),
+            payerWallet.getWalletId(),
+            "DEBIT",
+            paymentAmount,
+            payerBalanceAfter
+        );
+
+        walletLedgerMapper.insert(
+            transfer.getTransferId(),
+            payeeWallet.getWalletId(),
+            "CREDIT",
+            paymentAmount,
+            payeeBalanceAfter
+        );
+
+        // 7. 양쪽 지갑 잔액 반영
+        walletMapper.updateBalance(
+            payerWallet.getWalletId(),
+            payerBalanceAfter
+        );
+
+        walletMapper.updateBalance(
+            payeeWallet.getWalletId(),
+            payeeBalanceAfter
+        );
+
+        // 8. QR 소진. 결과가 1이 아니면 상태가 달라졌다는 뜻이므로 롤백
+        int updated = qrPaymentCodeMapper.markCompleted(
+            qrPayment.getQrPaymentCodeId(),
+            transfer.getTransferId(),
+            now,
+            now
+        );
+
+        if (updated != 1) {
+            throw new BusinessException(WalletErrorCode.QR_PAYMENT_NOT_ACTIVE);
+        }
+
+        // 9. 공동 소비는 결제자 DEBIT 원장만 여행 비용으로 연결
+        if (membership != null) {
+            WalletLedgerEntry debitEntry =
+                walletLedgerMapper.findByTransferIdAndWalletId(
+                    transfer.getTransferId(),
+                    payerWallet.getWalletId()
+                );
+
+            tripExpenseLinkMapper.insert(
+                membership.getTripId(),
+                debitEntry.getLedgerEntryId(),
+                membership.getAppointmentMemberId()
+            );
+        }
+
+        return new QrPaymentExecuteResponse(
+            transfer.getTransferId(),
+            qrPayment.getQrPaymentCodeId(),
+            "COMPLETED",
+            paymentAmount,
+            payerBalanceAfter,
+            payerWallet.getCurrencyCode(),
+            now
+        );
+    }
+
     private void validateRequest(QrPaymentCreateRequest request){
         if(request == null){
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
@@ -343,4 +561,129 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         return target;
     }
 
+    // 멱등성 키 검증
+    private void validateExecuteRequest(
+        String idempotencyKey,
+        QrPaymentExecuteRequest request
+    ){
+        if (idempotencyKey == null
+            || idempotencyKey.isBlank()
+            || idempotencyKey.length() > 100) {
+            throw new BusinessException(
+                WalletErrorCode.IDEMPOTENCY_KEY_REQUIRED
+            );
+        }
+
+        // preview와 같은 소비 범위/약속 검증
+        validatePreviewRequest(
+            new QrPaymentPreviewRequest(
+                request.qrToken(),
+                request.amount(),
+                request.spendingScope(),
+                request.appointmentId()
+            )
+        );
+    }
+
+    // QR 잠금 후 QR 상태를 검증하는 함수
+    private void validateExecutableQr(
+        QrPaymentCode qrPayment,
+        Wallet payerWallet,
+        LocalDateTime now
+    ) {
+        // 1. 해당 qr 결제 요청이 유효한지
+        if (qrPayment.getCompletedTransferId() != null
+            || qrPayment.getPaymentStatus() == QrPaymentStatus.COMPLETED) {
+            throw new BusinessException(
+                WalletErrorCode.QR_PAYMENT_ALREADY_COMPLETED
+            );
+        }
+
+        if (qrPayment.getPaymentStatus() != QrPaymentStatus.ACTIVE) {
+            throw new BusinessException(WalletErrorCode.QR_PAYMENT_NOT_ACTIVE);
+        }
+
+        if (!now.isBefore(qrPayment.getExpiresAt())) {
+            qrPaymentCodeMapper.markExpiredIfActive(
+                qrPayment.getQrPaymentCodeId(),
+                now
+            );
+
+            throw new BusinessException(WalletErrorCode.QR_PAYMENT_EXPIRED);
+        }
+
+        // 2. 셀프 결제를 막기 위한 조건
+        if (payerWallet.getWalletId().equals(qrPayment.getPayeeWalletId())) {
+            throw new BusinessException(
+                WalletErrorCode.QR_SELF_PAYMENT_NOT_ALLOWED
+            );
+        }
+    }
+
+    // 같은 idempotecny Key로 결제 요청이 다시 들어왔을 때,
+    // 새 결제를 만들지 않고 최초 결제 결과를 그대로 돌려줌
+    private QrPaymentExecuteResponse getIdempotentResult(
+        Long memberId,
+        QrPaymentExecuteRequest request,
+        WalletTransfer transfer
+    )
+    {
+         // 1. 해당 키가 현재 사용자의 "완료된 QR 결제"에 사용된 키인지 확인
+        if (!"QR_PAYMENT".equals(transfer.getTransferType())
+            || !memberId.equals(transfer.getInitiatorMemberId())
+            || !"COMPLETED".equals(transfer.getTransferStatus())) {
+            throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
+        }
+
+        // 2. 기존 거래와 연결된 QR을 조회
+        QrPaymentCode qrPayment =
+            qrPaymentCodeMapper.findByCompletedTransferId(
+                transfer.getTransferId()
+            );
+
+        // 3. 기존 거래의 QR과 이번 요청의 QR token이 같은지 확인
+        // 같은 키를 다른 QR 결제에 재사용하는 실수를 막는다
+        if(qrPayment == null
+            || !qrPayment.getQrToken().equals(request.qrToken().trim())){
+            throw  new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
+        }
+
+        // 4. 이번 요청의 최종 결제 금액을 다시 계산
+        // 고정 금액 QR은 DB의 QR 금액을 사용하고,
+        // 금액 입력 QR은 이번 요청의 amount를 사용한다
+        BigDecimal requestedAmount = resolvePaymentAmount(
+            qrPayment.getAmount(),
+            request.amount()
+        );
+
+        // 5. 최초 결제 금액과 재요청 금액이 같은지 확인
+        // 같은 키로 다른 금액 결제를 시도하면 기존 결과를 반환하면 안 된다
+        if(transfer.getAmount().compareTo(requestedAmount) != 0){
+            throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
+        }
+
+        // 6. 결제자의 지갑을 다시 조회
+        // 응답의 currencyCode와, 최초 결제 직후 잔액을 조회할 때 사용
+        Wallet payerWallet = walletMapper.findByMemberId(memberId);
+
+        // 7. 최초 결제 딩기 생성된 결제자 DEBIT 원장을 조회한다.
+        // 현재 잔액이 아니라, 결제 직후의 balancedAfter를 응답해야
+        // 최초 요청의 결제 결과와 동일한 응답을 돌려줄 수 있아
+        WalletLedgerEntry debitEntry =
+            walletLedgerMapper.findByTransferIdAndWalletId(
+                transfer.getTransferId(),
+                payerWallet.getWalletId()
+            );
+
+        // 8. 새 이체, 원장, 잔액 변경 없이, 기존 완료 겲과를 그대로 반환
+        return new QrPaymentExecuteResponse(
+            transfer.getTransferId(),
+            qrPayment.getQrPaymentCodeId(),
+            transfer.getTransferStatus(),
+            transfer.getAmount(),
+            debitEntry.getBalanceAfter(),
+            payerWallet.getCurrencyCode(),
+            transfer.getCompletedAt()
+        );
+    }
 }

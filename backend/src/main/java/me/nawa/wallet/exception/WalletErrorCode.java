@@ -175,6 +175,12 @@ public enum WalletErrorCode implements ErrorCode {
         HttpStatus.BAD_REQUEST,
         "WALLET-025",
         "공동 소비에는 약속 정보가 필요합니다."
+    ),
+
+    QR_PAYMENT_INSUFFICIENT_BALANCE(
+        HttpStatus.CONFLICT,
+    "WALLET-026",
+        "결제 가능한 잔액이 부족합니다."
     );
 
     private final HttpStatus status;

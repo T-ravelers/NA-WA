@@ -5,9 +5,11 @@ import lombok.RequiredArgsConstructor;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.wallet.dto.request.QrPaymentCreateRequest;
+import me.nawa.wallet.dto.request.QrPaymentExecuteRequest;
 import me.nawa.wallet.dto.request.QrPaymentPreviewRequest;
 import me.nawa.wallet.dto.request.QrPaymentResolveRequest;
 import me.nawa.wallet.dto.response.QrPaymentCreateResponse;
+import me.nawa.wallet.dto.response.QrPaymentExecuteResponse;
 import me.nawa.wallet.dto.response.QrPaymentPreviewResponse;
 import me.nawa.wallet.dto.response.QrPaymentResolveResponse;
 import me.nawa.wallet.service.QrPaymentService;
@@ -15,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -55,6 +58,22 @@ public class QrPaymentController {
     ) {
         return ApiResponse.success(
             qrPaymentService.previewPayment(member.getMemberId(), request)
+        );
+    }
+
+    @PostMapping("/payment/execute")
+    public ApiResponse<QrPaymentExecuteResponse> executePayment(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @RequestHeader(value = "Idempotency-Key", required = false)
+        String idempotencyKey,
+        @RequestBody QrPaymentExecuteRequest request
+        ){
+        return ApiResponse.success(
+            qrPaymentService.executePayment(
+                member.getMemberId(),
+                idempotencyKey,
+                request
+            )
         );
     }
 

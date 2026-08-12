@@ -13,6 +13,25 @@
           AND deleted_at IS NULL
     </select>
 
+    <select id="findByIdempotencyKey" resultType="me.nawa.wallet.domain.WalletTransfer">
+        SELECT
+            transfer_id,
+            initiator_member_id,
+            transfer_number,
+            transfer_type,
+            transfer_status,
+            amount,
+            memo,
+            spending_category,
+            completed_at,
+            created_at,
+            idempotency_key
+        FROM wallet_transfers
+        WHERE idempotency_key = #{idempotencyKey}
+          AND deleted_at IS NULL
+            LIMIT 1
+    </select>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="transferId">
         INSERT INTO wallet_transfers
             (currency_code, initiator_member_id, transfer_number, transfer_type, transfer_status,
