@@ -156,6 +156,109 @@ function stubJourneyList(page) {
   )
 }
 
+function stubReportApis(page) {
+  const detail = {
+    reportId: 101,
+    tripId: 9,
+    title: 'Jeju Island',
+    startDate: '2021-07-18',
+    endDate: '2021-07-27',
+    generationStatus: 'COMPLETED',
+    locale: 'en',
+    generatedAt: '2021-07-28T09:00:00',
+    createdAt: '2021-07-28T09:00:00',
+    reportContent: {
+      journey: {
+        tripId: 9,
+        title: 'Jeju Island',
+        startDate: '2021-07-18',
+        endDate: '2021-07-27',
+      },
+      days: [
+        {
+          visitDate: '2021-07-18',
+          items: [
+            {
+              tripItemId: 1,
+              itemId: 101,
+              itemType: 'EVENT',
+              title: 'Jeju Night Market',
+              status: 'ADDED',
+            },
+          ],
+        },
+      ],
+      analytics: {
+        totalSpent: 1284500,
+        dailyAverage: 128450,
+        categoryBreakdown: [
+          { category: 'FOOD', amount: 1000000, percentage: 77.85 },
+          { category: 'OTHER', amount: 284500, percentage: 22.15 },
+        ],
+        dailyTrend: [
+          { date: '2021-07-18', amount: 1284500 },
+          { date: '2021-07-19', amount: 0 },
+        ],
+      },
+    },
+  }
+
+  return Promise.all([
+    page.route('**/api/v1/journeys', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: [
+            {
+              tripId: 9,
+              title: 'Jeju Island',
+              startDate: '2021-07-18',
+              endDate: '2021-07-27',
+            },
+            {
+              tripId: 7,
+              title: 'Busan Weekender',
+              startDate: '2020-08-10',
+              endDate: '2020-08-12',
+            },
+          ],
+        }),
+      }),
+    ),
+    page.route('**/api/v1/reports', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: [
+            {
+              reportId: 101,
+              tripId: 9,
+              title: 'Jeju Island',
+              startDate: '2021-07-18',
+              endDate: '2021-07-27',
+              generationStatus: 'COMPLETED',
+              locale: 'en',
+              generatedAt: '2021-07-28T09:00:00',
+              createdAt: '2021-07-28T09:00:00',
+            },
+          ],
+        }),
+      }),
+    ),
+    page.route('**/api/v1/reports/101', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: detail }),
+      }),
+    ),
+  ])
+}
+
 /**
  * 지갑 홈 응답을 세운다.
  *
@@ -366,6 +469,16 @@ const SCREENS = [
     name: '07-journey-detail',
     path: '/journeys/42',
     setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetail(page)]),
+  },
+  {
+    name: '17-report-list',
+    path: '/reports',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubReportApis(page)]),
+  },
+  {
+    name: '18-report-detail',
+    path: '/reports/101',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubReportApis(page)]),
   },
   {
     name: '08-wallet',
