@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 interface StubReply {
   status: number
   body?: unknown
+  waitFor?: Promise<void>
 }
 
 interface RecordedCall {
@@ -20,7 +21,7 @@ interface RecordedCall {
 function createStubAdapter(handlers: Record<string, StubReply[]>) {
   const calls: RecordedCall[] = []
 
-  const adapter: AxiosAdapter = (config) => {
+  const adapter: AxiosAdapter = async (config) => {
     const method = (config.method ?? 'get').toLowerCase()
     const url = config.url ?? ''
     const key = `${method} ${url}`
@@ -35,6 +36,8 @@ function createStubAdapter(handlers: Record<string, StubReply[]>) {
     const reply = (queue !== undefined && queue.length > 1 ? queue.shift() : queue?.[0]) ?? {
       status: 404,
     }
+
+    await reply.waitFor
 
     const response: AxiosResponse = {
       data: reply.body,
@@ -167,6 +170,35 @@ describe('httpClient', () => {
 
     await expect(httpClient.get('/api/v1/wallet')).rejects.toMatchObject({ code: 'AUTH-003' })
     expect(countCalls(calls, 'post', '/api/v1/auth/refresh')).toBe(0)
+    expect(countCalls(calls, 'get', '/api/v1/wallet')).toBe(1)
+  })
+
+  it('does not retry the original request when the barrier activates during refresh', async () => {
+    let finishRefresh: (() => void) | undefined
+    const refreshPending = new Promise<void>((resolve) => {
+      finishRefresh = resolve
+    })
+    const { httpClient, calls } = await loadClient({
+      'get /api/v1/wallet': [
+        { status: 401, body: authRequired },
+        { status: 200, body: { success: true, data: { balance: '10' } } },
+      ],
+      'post /api/v1/auth/refresh': [
+        { status: 200, body: { success: true }, waitFor: refreshPending },
+      ],
+    })
+    const request = httpClient.get('/api/v1/wallet')
+
+    await vi.waitFor(() => {
+      expect(countCalls(calls, 'post', '/api/v1/auth/refresh')).toBe(1)
+    })
+
+    const { activateSignOutBarrier } = await import('../signOutBarrier')
+    activateSignOutBarrier()
+    finishRefresh?.()
+
+    await expect(request).rejects.toMatchObject({ code: 'AUTH-003' })
+    expect(countCalls(calls, 'post', '/api/v1/auth/refresh')).toBe(1)
     expect(countCalls(calls, 'get', '/api/v1/wallet')).toBe(1)
   })
 

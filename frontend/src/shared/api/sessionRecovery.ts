@@ -104,6 +104,11 @@ export async function recoverAndRetry(
 
   const refreshed = await refreshOnce(client)
 
+  // 갱신 대기 중 로그아웃 장벽이 활성화됐으면 성공한 갱신도 원 요청을 되살리지 않는다.
+  if (isSignOutBarrierActive()) {
+    return null
+  }
+
   if (!refreshed) {
     clearCsrfToken()
 
