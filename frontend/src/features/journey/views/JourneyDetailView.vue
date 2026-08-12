@@ -52,7 +52,7 @@ function retryAll(): void {
 </script>
 
 <template>
-  <main class="flex w-full flex-col gap-8 px-screen py-8">
+  <main class="flex w-full flex-col gap-6 px-screen py-8">
     <section
       v-if="tripId === null"
       role="alert"
@@ -95,7 +95,7 @@ function retryAll(): void {
       >
         <h2
           id="journey-timeline-title"
-          class="text-title text-ink"
+          class="font-display text-section-header uppercase text-ink-display"
         >
           {{ t('journey.detail.timeline') }}
         </h2>

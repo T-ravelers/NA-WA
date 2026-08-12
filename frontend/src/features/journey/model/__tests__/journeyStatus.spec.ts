@@ -35,6 +35,6 @@ describe('journeyStatus', () => {
   })
 
   it('formats API date-only values without timezone conversion', () => {
-    expect(formatJourneyDate('2026-08-09')).toBe('2026.08.09')
+    expect(formatJourneyDate('2026-08-09', 'en')).toBe('Aug 9, 2026')
   })
 })

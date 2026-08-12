@@ -55,7 +55,7 @@ function retry(): void {
 <template>
   <main class="flex w-full flex-col gap-6 px-screen py-8">
     <header class="flex items-center justify-between gap-4">
-      <h1 class="font-display text-screen-title font-bold text-ink-display">
+      <h1 class="font-display text-screen-title uppercase text-ink-display">
         {{ t('journey.list.title') }}
       </h1>
       <!--
@@ -86,7 +86,7 @@ function retry(): void {
     <section aria-labelledby="journey-list-section-title">
       <h2
         id="journey-list-section-title"
-        class="text-section-header text-ink"
+        class="font-display text-section-header uppercase text-ink-display"
       >
         {{ activeTab === 'ongoing' ? t('journey.list.ongoingTitle') : t('journey.list.pastTitle') }}
       </h2>
@@ -119,9 +119,13 @@ function retry(): void {
           :description="t('journey.list.tabEmptyDescription', { status: activeTabLabel })"
         />
 
+        <!--
+          시안 J1은 273px 고정폭 가로 스냅 캐러셀이다. 현재 목록은 세로 스크롤이고
+          스크롤·포커스 동작을 바꾸지 않기로 했으므로 세로 배치를 유지한다.
+        -->
         <ul
           v-else
-          class="flex flex-col gap-3"
+          class="flex flex-col gap-4"
         >
           <JourneyListCard
             v-for="journey in visibleJourneys"

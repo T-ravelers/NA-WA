@@ -363,6 +363,20 @@ const SCREENS = [
     setup: (page) => stubMemberProfile(page),
   },
   {
+    // 생성 2단계는 1단계를 채워야만 나온다. 예산·동행 입력의 디자인은 여기서만 찍힌다.
+    name: '06b-journey-create-preferences',
+    path: '/journeys/new',
+    setup: (page) => stubMemberProfile(page),
+    prepare: async (page) => {
+      // `getByLabel`은 이 환경에서 걸리지 않는다. 폼 구조로 직접 잡는다.
+      await page.locator('input[type="text"]').first().fill('Seoul Foodie Week')
+      await page.locator('input[type="date"]').nth(0).fill('2026-08-10')
+      await page.locator('input[type="date"]').nth(1).fill('2026-08-12')
+      await page.getByRole('button', { name: 'Next' }).click()
+      await page.getByText('Step 2 of 2').waitFor()
+    },
+  },
+  {
     name: '07-journey-detail',
     path: '/journeys/42',
     setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetail(page)]),

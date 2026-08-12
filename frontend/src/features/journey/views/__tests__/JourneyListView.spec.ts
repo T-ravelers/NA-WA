@@ -82,14 +82,14 @@ describe('JourneyListView', () => {
 
     expect(wrapper.get('h1').text()).toBe('Journeys')
     expect(wrapper.text()).toContain('Seoul Foodie Week')
-    expect(wrapper.text()).toContain('2098.08.10')
+    expect(wrapper.text()).toContain('Aug 10, 2098')
     expect(wrapper.text()).not.toContain('Busan Weekender')
     expect(wrapper.find('ul[aria-live]').exists()).toBe(false)
 
     await wrapper.findAll('[role="radio"]')[1]?.trigger('click')
 
     expect(wrapper.text()).toContain('Busan Weekender')
-    expect(wrapper.text()).toContain('2020.08.12')
+    expect(wrapper.text()).toContain('Aug 12, 2020')
     expect(wrapper.text()).not.toContain('Seoul Foodie Week')
   })
 

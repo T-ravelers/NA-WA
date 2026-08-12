@@ -52,6 +52,7 @@ export default {
       companions: 'Travel party',
       noCompanions: 'No preference set',
       timeline: 'Itinerary',
+      dayLabel: 'Day {index}',
       timelineLoading: 'Loading itinerary',
       timelineEmptyTitle: 'No itinerary yet',
       timelineEmptyDescription: 'Saved events and places will appear here after they are added.',
