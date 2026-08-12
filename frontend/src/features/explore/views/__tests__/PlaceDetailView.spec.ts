@@ -83,6 +83,11 @@ async function mountView() {
         name: 'journey-detail',
         component: { template: '<div>Journey detail</div>' },
       },
+      {
+        path: '/appointments',
+        name: 'appointment-list',
+        component: { template: '<div>Appointments</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -112,7 +117,7 @@ describe('PlaceDetailView', () => {
     addJourneyItem.mockResolvedValue({})
   })
 
-  it('renders Place details and keeps unavailable actions disabled', async () => {
+  it('renders Place details and keeps Directions disabled', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Seongsu Onsil')
@@ -131,6 +136,17 @@ describe('PlaceDetailView', () => {
         .find((button) => button.text() === 'Find companions')
         ?.attributes('disabled'),
     ).toBeDefined()
+  })
+
+  it('keeps Find companions disabled until the Appointment API is available', async () => {
+    const { wrapper, router } = await mountView()
+
+    const button = wrapper.findAll('button').find((button) => button.text() === 'Find companions')
+
+    expect(button?.attributes('disabled')).toBeDefined()
+    await button?.trigger('click')
+
+    expect(router.currentRoute.value.name).toBe('explore-place-detail')
   })
 
   it('opens the journey selector from Add to journey', async () => {

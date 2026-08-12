@@ -12,6 +12,7 @@ import {
   handleSignedOut,
   handleSignOutBarrier,
 } from '@/app/session/sessionHandlers'
+import { appointmentMemberIntegrationKey } from '@/features/appointment/model/memberIntegration'
 import { addJourneyItem } from '@/features/journey/api/journeyApi'
 import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
 import {
@@ -19,6 +20,7 @@ import {
   readActiveJourneyId,
   storeActiveJourneyId,
 } from '@/features/journey/model/activeJourney'
+import { useMemberProfile } from '@/features/member/model/memberQueries'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
 import '@/app/styles/index.css'
 import { setSessionExpiredHandler } from '@/shared/api/sessionRecovery'
@@ -57,5 +59,6 @@ app.provide(exploreJourneyIntegrationKey, {
   readActiveJourneyId,
   storeActiveJourneyId,
 })
+app.provide(appointmentMemberIntegrationKey, { useMemberProfile })
 
 app.mount('#app')

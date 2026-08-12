@@ -104,6 +104,11 @@ async function mountView() {
         name: 'journey-detail',
         component: { template: '<div>Journey detail</div>' },
       },
+      {
+        path: '/appointments',
+        name: 'appointment-list',
+        component: { template: '<div>Appointments</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -167,5 +172,16 @@ describe('EventDetailView', () => {
       visitDate: expect.any(String),
     })
     expect(router.currentRoute.value.name).toBe('journey-detail')
+  })
+
+  it('keeps Find companions disabled until the Appointment API is available', async () => {
+    const { wrapper, router } = await mountView()
+
+    const button = wrapper.findAll('button').find((button) => button.text() === 'Find companions')
+
+    expect(button?.attributes('disabled')).toBeDefined()
+    await button?.trigger('click')
+
+    expect(router.currentRoute.value.name).toBe('explore-event-detail')
   })
 })
