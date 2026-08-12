@@ -195,6 +195,25 @@
         FOR UPDATE
     </select>
 
+    <select id="findMemberByIdForUpdate"
+            resultType="me.nawa.appointment.domain.AppointmentMember">
+        SELECT
+            appointment_member_id,
+            appointment_id,
+            member_id,
+            trip_id,
+            membership_status,
+            attendance_status,
+            joined_at,
+            left_at,
+            attendance_confirmed_at
+        FROM appointment_members
+        WHERE appointment_id = #{appointmentId}
+          AND appointment_member_id = #{appointmentMemberId}
+          AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
     <select id="countParticipatingMembers" resultType="int">
         SELECT COUNT(*)
         FROM appointment_members

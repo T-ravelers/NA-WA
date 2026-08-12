@@ -39,6 +39,11 @@ public interface AppointmentMapper {
             @Param("memberId") Long memberId
     );
 
+    AppointmentMember findMemberByIdForUpdate(
+            @Param("appointmentId") Long appointmentId,
+            @Param("appointmentMemberId") Long appointmentMemberId
+    );
+
     int countParticipatingMembers(
             @Param("appointmentId") Long appointmentId
     );

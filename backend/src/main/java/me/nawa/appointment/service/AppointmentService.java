@@ -309,6 +309,13 @@ public class AppointmentService {
         return toDetailResponse(appointment, members);
     }
 
+    @Transactional(readOnly = true)
+    public List<AppointmentMemberResponse> getAppointmentMembers(
+            Long memberId,
+            Long appointmentId) {
+        return getAppointment(memberId, appointmentId).getMembers();
+    }
+
     private static void normalizeAndValidateSearch(
             AppointmentSearchRequest request) {
         if (request == null) {

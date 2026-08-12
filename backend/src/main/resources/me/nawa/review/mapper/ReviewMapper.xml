@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.review.mapper.ReviewMapper">
+    <select id="countReviewPair" resultType="int">
+        SELECT COUNT(*)
+        FROM member_reviews
+        WHERE appointment_id = #{appointmentId}
+          AND reviewer_appointment_member_id = #{reviewerAppointmentMemberId}
+          AND reviewed_appointment_member_id = #{reviewedAppointmentMemberId}
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="countActiveKeywords" resultType="int">
+        SELECT COUNT(*)
+        FROM member_review_keywords
+        WHERE keyword_code IN
+        <foreach collection="keywordCodes" item="code"
+                 open="(" separator="," close=")">
+            #{code}
+        </foreach>
+          AND is_active = TRUE
+          AND deleted_at IS NULL
+    </select>
+
+    <insert id="insertReview"
+            useGeneratedKeys="true"
+            keyProperty="reviewId"
+            keyColumn="review_id">
+        INSERT INTO member_reviews
+            (appointment_id, reviewer_appointment_member_id,
+             reviewed_appointment_member_id, visibility_status)
+        VALUES
+            (#{appointmentId}, #{reviewerAppointmentMemberId},
+             #{reviewedAppointmentMemberId}, 'VISIBLE')
+    </insert>
+
+    <insert id="insertScores">
+        INSERT INTO member_review_scores
+            (review_id, review_category, rating)
+        VALUES
+        <foreach collection="scores" index="category" item="rating"
+                 separator=",">
+            (#{reviewId}, #{category}, #{rating})
+        </foreach>
+    </insert>
+
+    <insert id="insertKeywordSelections">
+        INSERT INTO member_review_keyword_selections
+            (review_id, keyword_id)
+        SELECT #{reviewId}, keyword_id
+        FROM member_review_keywords
+        WHERE keyword_code IN
+        <foreach collection="keywordCodes" item="code"
+                 open="(" separator="," close=")">
+            #{code}
+        </foreach>
+          AND is_active = TRUE
+          AND deleted_at IS NULL
+    </insert>
+</mapper>

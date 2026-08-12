@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/appointments")
 @RequiredArgsConstructor
@@ -48,6 +50,19 @@ public class AppointmentController {
                 member.getMemberId(),
                 appointmentId
         ));
+    }
+
+    @GetMapping("/{appointmentId}/members")
+    @ApiOperation("약속 활성 회원 목록 조회")
+    public ApiResponse<List<AppointmentMemberResponse>> getMembers(
+            @AuthenticationPrincipal AuthenticatedMember member,
+            @PathVariable Long appointmentId) {
+        return ApiResponse.success(
+                appointmentService.getAppointmentMembers(
+                        member.getMemberId(),
+                        appointmentId
+                )
+        );
     }
 
     @PostMapping
