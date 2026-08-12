@@ -9,6 +9,7 @@ import me.nawa.settlement.dto.response.SettlementCandidateResponse;
 import me.nawa.settlement.dto.response.SettlementCreateResponse;
 import me.nawa.settlement.dto.response.SettlementDetailResponse;
 import me.nawa.settlement.dto.response.SettlementListResponse;
+import me.nawa.settlement.dto.response.SettlementMutationResponse;
 import me.nawa.settlement.service.SettlementCreationService;
 import me.nawa.settlement.service.SettlementPaymentService;
 import me.nawa.settlement.service.SettlementQueryService;
@@ -26,8 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 정산 목록·생성·상세 화면의 API다.
  *
- * 목록 화면 진입 시 목록을, “Create settlement” 클릭 시 후보를 조회한다. 생성 완료,
- * 상세 화면의 “Pay”와 “Cancel” 클릭은 각각 전용 정산 작업으로 위임한다.
+ * 목록 화면 진입 시 목록을, “Create settlement” 클릭 시 후보를 조회한다.
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -104,36 +104,15 @@ public class SettlementController {
      *
      * 인증된 회원의 정산 부담금 결제를 처리합니다.
      */
-    @PostMapping("/settlements/{settlementId}/payments")
-    public ApiResponse<Void> paySettlement(
+    @PostMapping("/settlements/{settlementId}/members/me/pay")
+    public ApiResponse<SettlementMutationResponse> paySettlement(
         @AuthenticationPrincipal AuthenticatedMember member,
-        @PathVariable Long settlementId
+        @PathVariable Long settlementId,
+        @RequestHeader("Idempotency-Key") String idempotencyKey
     ) {
-        settlementPaymentService.paySettlement(member.getMemberId(), settlementId);
-        return ApiResponse.success();
+        return ApiResponse.success(settlementPaymentService.paySettlement(
+            member.getMemberId(), settlementId, idempotencyKey
+        ));
     }
 
-    /** 생성자가 DRAFT 정산을 참여자에게 요청합니다. */
-    @PostMapping("/settlements/{settlementId}/request")
-    public ApiResponse<Void> requestSettlement(
-        @AuthenticationPrincipal AuthenticatedMember member,
-        @PathVariable Long settlementId
-    ) {
-        settlementCreationService.requestSettlement(member.getMemberId(), settlementId);
-        return ApiResponse.success();
-    }
-
-    /**
-     * 정산 취소
-     *
-     * 인증된 회원이 생성한 정산 요청을 취소합니다.
-     */
-    @PostMapping("/settlements/{settlementId}/cancel")
-    public ApiResponse<Void> cancelSettlement(
-        @AuthenticationPrincipal AuthenticatedMember member,
-        @PathVariable Long settlementId
-    ) {
-        settlementPaymentService.cancelSettlement(member.getMemberId(), settlementId);
-        return ApiResponse.success();
-    }
 }

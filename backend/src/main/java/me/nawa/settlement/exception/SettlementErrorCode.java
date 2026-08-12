@@ -49,24 +49,6 @@ public enum SettlementErrorCode implements ErrorCode {
         "정산 생성 정보가 올바르지 않습니다."
     ),
 
-    SETTLEMENT_CANCEL_NOT_ALLOWED(
-        HttpStatus.CONFLICT,
-        "SETTLEMENT-006",
-        "현재 상태에서는 정산을 취소할 수 없습니다."
-    ),
-
-    SETTLEMENT_RECEIPT_INVALID(
-        HttpStatus.BAD_REQUEST,
-        "SETTLEMENT-007",
-        "영수증 파일 정보가 올바르지 않습니다."
-    ),
-
-    SETTLEMENT_GAME_INVALID(
-        HttpStatus.CONFLICT,
-        "SETTLEMENT-008",
-        "현재 상태에서는 게임 정산을 진행할 수 없습니다."
-    ),
-
     SETTLEMENT_IDEMPOTENCY_CONFLICT(
         HttpStatus.CONFLICT,
         "SETTLEMENT-009",
@@ -79,16 +61,16 @@ public enum SettlementErrorCode implements ErrorCode {
         "이미 정산에 사용된 원거래입니다."
     ),
 
-    SETTLEMENT_REQUEST_NOT_ALLOWED(
+    SETTLEMENT_PAYMENT_IDEMPOTENCY_CONFLICT(
         HttpStatus.CONFLICT,
-        "SETTLEMENT-011",
-        "현재 상태에서는 정산을 요청할 수 없습니다."
+        "SETTLEMENT-014",
+        "정산 결제가 이미 다른 멱등성 키로 처리되었습니다."
     ),
 
-    SETTLEMENT_RECEIPT_STATE_CONFLICT(
-        HttpStatus.CONFLICT,
-        "SETTLEMENT-012",
-        "이미 배분되었거나 사용된 영수증 분석은 다시 업로드할 수 없습니다."
+    SETTLEMENT_IDEMPOTENCY_KEY_INVALID(
+        HttpStatus.BAD_REQUEST,
+        "SETTLEMENT-015",
+        "멱등성 키가 올바르지 않습니다."
     );
 
     private final HttpStatus status;

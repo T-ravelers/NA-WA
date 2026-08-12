@@ -16,12 +16,13 @@ public class SettlementDetailResponse {
 
     private final Long id;
     private final String type;
-    private final BigDecimal amount;
+    private final BigDecimal totalAmount;
     private final String status;
     private final String requestedBy;
     private final String gatheringName;
     private final String merchantName;
-    private final List<String> items;
+    private final List<SettlementViewerItemResponse> viewerItems;
     private final String transactionId;
     private final String paidBy;
+    private final SettlementViewerResponse viewer;
 }

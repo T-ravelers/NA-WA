@@ -1,27 +1,19 @@
 package me.nawa.settlement.mapper;
 
 import java.util.List;
-import me.nawa.settlement.domain.ReceiptAnalysis;
 import me.nawa.settlement.domain.Settlement;
-import me.nawa.settlement.domain.SettlementGame;
-import me.nawa.settlement.domain.SettlementGameMember;
+import me.nawa.settlement.domain.SettlementDetail;
 import me.nawa.settlement.domain.SettlementItem;
+import me.nawa.settlement.domain.SettlementItemShare;
 import me.nawa.settlement.domain.SettlementMember;
+import me.nawa.settlement.domain.SettlementParticipant;
 import me.nawa.settlement.domain.SettlementSource;
 import me.nawa.settlement.domain.SettlementSummary;
-import me.nawa.settlement.domain.SettlementParticipant;
-import me.nawa.settlement.domain.SettlementDetail;
-import me.nawa.settlement.domain.ReceiptAnalysisItem;
-import me.nawa.settlement.domain.ReceiptItemAllocation;
-import me.nawa.settlement.domain.ReceiptAllocationView;
+import me.nawa.settlement.domain.SettlementViewerItem;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-/**
- * 정산 영속성 매퍼
- *
- * 정산 도메인 데이터를 조회하고 저장하는 MyBatis 매퍼를 정의합니다.
- */
+/** V9 축소 정산 스키마의 조회·생성·지급 영속성 계약이다. */
 @Mapper
 public interface SettlementMapper {
     SettlementDetail findDetail(
@@ -29,7 +21,10 @@ public interface SettlementMapper {
         @Param("memberId") Long memberId
     );
 
-    List<String> findItemNames(@Param("settlementId") Long settlementId);
+    List<SettlementViewerItem> findViewerItems(
+        @Param("settlementId") Long settlementId,
+        @Param("memberId") Long memberId
+    );
 
     List<SettlementSource> findCandidateSources(@Param("memberId") Long memberId);
 
@@ -61,113 +56,34 @@ public interface SettlementMapper {
         @Param("settlementId") Long settlementId
     );
 
+    SettlementMember findMemberBySettlementAndMember(
+        @Param("settlementId") Long settlementId,
+        @Param("memberId") Long memberId
+    );
+
+    SettlementMember findMemberBySettlementAndMemberForUpdate(
+        @Param("settlementId") Long settlementId,
+        @Param("memberId") Long memberId
+    );
+
+    boolean existsPaidMember(@Param("settlementId") Long settlementId);
+
     void insertSettlement(Settlement settlement);
 
     void insertSettlementMembers(@Param("members") List<SettlementMember> members);
 
-    void insertSettlementItems(@Param("items") List<SettlementItem> items);
+    void insertSettlementItem(SettlementItem item);
 
-    int markSettlementRequested(
+    void insertSettlementItemShares(
         @Param("settlementId") Long settlementId,
-        @Param("memberId") Long memberId
+        @Param("shares") List<SettlementItemShare> shares
     );
-
-    int markSettlementMembersRequested(
-        @Param("settlementId") Long settlementId,
-        @Param("memberId") Long memberId
-    );
-
-    ReceiptAnalysis findReceiptAnalysisForUpdate(@Param("receiptAnalysisId") Long receiptAnalysisId);
-
-    ReceiptAnalysis findReceiptAnalysisBySourceAndCreatorForUpdate(
-        @Param("sourceTransferId") Long sourceTransferId,
-        @Param("createdByMemberId") Long createdByMemberId
-    );
-
-    void insertReceiptAnalysis(ReceiptAnalysis receiptAnalysis);
-
-    void resetDraftReceiptAnalysis(
-        @Param("receiptAnalysisId") Long receiptAnalysisId,
-        @Param("originalFileName") String originalFileName
-    );
-
-    void deleteReceiptItems(@Param("receiptAnalysisId") Long receiptAnalysisId);
-
-    void insertReceiptItems(@Param("items") List<ReceiptAnalysisItem> items);
-
-    void updateReceiptTotal(
-        @Param("receiptAnalysisId") Long receiptAnalysisId,
-        @Param("recognizedTotal") java.math.BigDecimal recognizedTotal
-    );
-
-    List<ReceiptAnalysisItem> findReceiptItemsForUpdate(@Param("receiptAnalysisId") Long receiptAnalysisId);
-
-    void deleteReceiptAllocations(@Param("receiptAnalysisId") Long receiptAnalysisId);
-
-    void insertReceiptAllocations(@Param("allocations") List<ReceiptItemAllocation> allocations);
-
-    void markReceiptAllocated(@Param("receiptAnalysisId") Long receiptAnalysisId);
-
-    List<ReceiptAllocationView> findReceiptAllocationViews(@Param("receiptAnalysisId") Long receiptAnalysisId);
-
-    java.math.BigDecimal sumReceiptItemLineTotals(@Param("receiptAnalysisId") Long receiptAnalysisId);
-
-    void copyReceiptItemsToSettlement(
-        @Param("receiptAnalysisId") Long receiptAnalysisId,
-        @Param("settlementId") Long settlementId
-    );
-
-    void copyReceiptItemSharesToSettlement(
-        @Param("receiptAnalysisId") Long receiptAnalysisId,
-        @Param("settlementId") Long settlementId
-    );
-
-    void markReceiptUsed(@Param("receiptAnalysisId") Long receiptAnalysisId);
-
-    void insertSettlementGame(SettlementGame settlementGame);
-
-    void insertSettlementGameMembers(@Param("members") List<SettlementGameMember> members);
-
-    SettlementGame findSettlementGameForUpdate(@Param("settlementId") Long settlementId);
-
-    SettlementGame findSettlementGame(@Param("settlementId") Long settlementId);
-
-    int updateGameConsent(
-        @Param("settlementId") Long settlementId,
-        @Param("memberId") Long memberId,
-        @Param("consentStatus") String consentStatus
-    );
-
-    int cancelGameAndSettlement(@Param("settlementId") Long settlementId);
-
-    int cancelGame(@Param("settlementId") Long settlementId);
-
-    List<SettlementGameMember> findGameMembersForUpdate(@Param("settlementId") Long settlementId);
-
-    List<SettlementGameMember> findGameMembers(@Param("settlementId") Long settlementId);
-
-    void assignGameLiables(
-        @Param("settlementId") Long settlementId,
-        @Param("appointmentMemberIds") List<Long> appointmentMemberIds
-    );
-
-    void activateGameSettlement(
-        @Param("settlementId") Long settlementId,
-        @Param("payerShareAmount") java.math.BigDecimal payerShareAmount,
-        @Param("receivableAmount") java.math.BigDecimal receivableAmount
-    );
-
-    void completeGame(@Param("settlementId") Long settlementId, @Param("randomSeed") String randomSeed);
 
     int markSettlementMemberPaid(
         @Param("settlementMemberId") Long settlementMemberId,
-        @Param("transferId") Long transferId
+        @Param("transferId") Long transferId,
+        @Param("idempotencyKey") String idempotencyKey
     );
 
     int completeSettlementIfNoPendingPayments(@Param("settlementId") Long settlementId);
-
-    int cancelSettlement(
-        @Param("settlementId") Long settlementId,
-        @Param("memberId") Long memberId
-    );
 }

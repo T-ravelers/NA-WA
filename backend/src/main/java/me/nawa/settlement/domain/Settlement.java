@@ -1,7 +1,6 @@
 package me.nawa.settlement.domain;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,7 +22,7 @@ public class Settlement {
     private BigDecimal totalAmount;
     private BigDecimal payerShareAmount;
     private BigDecimal receivableAmount;
-    private LocalDateTime requestedAt;
+    private Integer currencyDecimalPlaces;
     private String memo;
     private Long version;
 
@@ -32,7 +31,7 @@ public class Settlement {
             Long sourceTransferId, String idempotencyKey, String requestFingerprint,
             String settlementStatus, String splitMethod,
             BigDecimal totalAmount, BigDecimal payerShareAmount, BigDecimal receivableAmount,
-            LocalDateTime requestedAt, String memo) {
+            String memo) {
         this.appointmentId = appointmentId;
         this.createdByMemberId = createdByMemberId;
         this.payerMemberId = payerMemberId;
@@ -44,7 +43,6 @@ public class Settlement {
         this.totalAmount = totalAmount;
         this.payerShareAmount = payerShareAmount;
         this.receivableAmount = receivableAmount;
-        this.requestedAt = requestedAt;
         this.memo = memo;
     }
 }

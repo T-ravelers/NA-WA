@@ -15,7 +15,9 @@ public class SettlementSummaryResponse {
 
     private final Long id;
     private final String title;
-    private final BigDecimal amount;
+    private final BigDecimal totalAmount;
+    private final BigDecimal receivableAmount;
     private final String type;
     private final String status;
+    private final SettlementViewerResponse viewer;
 }

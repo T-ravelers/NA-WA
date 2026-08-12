@@ -8,7 +8,7 @@ import lombok.Setter;
 /**
  * 정산 생성 요청
  *
- * 원거래, 정산 유형, 참여자와 선택한 게임 또는 영수증 분석 정보를 전달합니다.
+ * 원거래, 정산 유형, 참여자와 항목별 입력을 전달합니다.
  */
 @Getter
 @Setter
@@ -18,6 +18,5 @@ public class CreateSettlementRequest {
     private Long sourceTransferId;
     private String type;
     private List<Long> participantAppointmentMemberIds;
-    private GameCreateRequest game;
-    private Long receiptAnalysisId;
+    private List<ItemizedSettlementItemRequest> items;
 }

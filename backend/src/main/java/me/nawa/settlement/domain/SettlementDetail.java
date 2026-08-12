@@ -1,7 +1,6 @@
 package me.nawa.settlement.domain;
 
 import java.math.BigDecimal;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -10,7 +9,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class SettlementDetail {
     private Long settlementId;
     private String splitMethod;
@@ -21,4 +19,29 @@ public class SettlementDetail {
     private String merchantName;
     private String transactionNumber;
     private String paidBy;
+    private Long createdByMemberId;
+    private BigDecimal viewerShareAmount;
+    private String viewerRequestStatus;
+
+    public SettlementDetail(
+        Long settlementId,
+        String splitMethod,
+        BigDecimal totalAmount,
+        String settlementStatus,
+        String requestedBy,
+        String gatheringName,
+        String merchantName,
+        String transactionNumber,
+        String paidBy
+    ) {
+        this.settlementId = settlementId;
+        this.splitMethod = splitMethod;
+        this.totalAmount = totalAmount;
+        this.settlementStatus = settlementStatus;
+        this.requestedBy = requestedBy;
+        this.gatheringName = gatheringName;
+        this.merchantName = merchantName;
+        this.transactionNumber = transactionNumber;
+        this.paidBy = paidBy;
+    }
 }

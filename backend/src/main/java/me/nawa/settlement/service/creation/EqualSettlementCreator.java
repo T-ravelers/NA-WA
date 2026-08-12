@@ -1,9 +1,10 @@
 package me.nawa.settlement.service.creation;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Set;
 import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.settlement.domain.Settlement;
@@ -13,16 +14,20 @@ import me.nawa.settlement.dto.request.CreateSettlementRequest;
 import me.nawa.settlement.dto.response.SettlementCreateResponse;
 import me.nawa.settlement.exception.SettlementErrorCode;
 import me.nawa.settlement.mapper.SettlementMapper;
+import me.nawa.settlement.service.SettlementAmountAllocator;
 import org.springframework.stereotype.Component;
 
-/** 균등 정산의 금액 계산과 참여자별 부담금 생성을 담당한다. */
+/** 균등 정산을 통화 최소 단위까지 결정적으로 배분해 즉시 요청 상태로 생성한다. */
 @Component
 @RequiredArgsConstructor
 public class EqualSettlementCreator implements SettlementCreationHandler {
     private final SettlementMapper settlementMapper;
+    private final SettlementAmountAllocator amountAllocator;
 
     @Override
-    public String getType() { return "EQUAL"; }
+    public String getType() {
+        return "EQUAL";
+    }
 
     @Override
     public SettlementCreateResponse create(
@@ -32,53 +37,83 @@ public class EqualSettlementCreator implements SettlementCreationHandler {
         String idempotencyKey,
         String requestFingerprint
     ) {
-        List<SettlementMember> members = settlementMapper.findActiveMembers(source.getAppointmentId());
-        Set<Long> requested = Set.copyOf(request.getParticipantAppointmentMemberIds());
-        if (requested.size() != members.size() || !members.stream().map(SettlementMember::getAppointmentMemberId)
-            .collect(java.util.stream.Collectors.toSet()).equals(requested))
-            throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID);
-        if (source.getCurrencyDecimalPlaces() == null || source.getCurrencyDecimalPlaces() < 0) {
-            throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID);
-        }
-        members = members.stream()
-            .sorted(Comparator.comparing(SettlementMember::getAppointmentMemberId))
-            .toList();
-        int scale = source.getCurrencyDecimalPlaces();
-        BigDecimal unit = source.getAmount().divide(
-            BigDecimal.valueOf(members.size()),
-            scale,
-            java.math.RoundingMode.DOWN
+        List<SettlementMember> members = selectedActiveMembers(request, source);
+        Map<Long, BigDecimal> allocations = amountAllocator.allocate(
+            source.getAmount(),
+            members.stream().map(SettlementMember::getAppointmentMemberId).toList(),
+            source.getCurrencyDecimalPlaces()
         );
-        BigDecimal minimumUnit = BigDecimal.ONE.movePointLeft(scale);
-        int remainderUnits;
-        try {
-            remainderUnits = source.getAmount()
-                .subtract(unit.multiply(BigDecimal.valueOf(members.size())))
-                .movePointRight(scale)
-                .intValueExact();
-        } catch (ArithmeticException exception) {
-            throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID, exception);
-        }
-        for (int index = 0; index < members.size(); index++) {
-            SettlementMember member = members.get(index);
-            member.setShareAmount(index < remainderUnits ? unit.add(minimumUnit) : unit);
-        }
+        members.forEach(member -> member.setShareAmount(
+            allocations.get(member.getAppointmentMemberId())
+        ));
+        validatePayerAndPendingAmounts(members, source.getPayerMemberId());
+
         BigDecimal payerShare = members.stream()
             .filter(member -> source.getPayerMemberId().equals(member.getMemberId()))
             .map(SettlementMember::getShareAmount)
             .findFirst()
             .orElseThrow(() -> new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID));
-        Settlement settlement = Settlement.builder().appointmentId(source.getAppointmentId()).createdByMemberId(memberId)
-            .payerMemberId(source.getPayerMemberId()).sourceTransferId(source.getTransferId())
-            .idempotencyKey(idempotencyKey).requestFingerprint(requestFingerprint).settlementStatus("DRAFT")
-            .splitMethod(getType()).totalAmount(source.getAmount()).payerShareAmount(payerShare)
-            .receivableAmount(source.getAmount().subtract(payerShare)).requestedAt(null).build();
+        Settlement settlement = newSettlement(
+            memberId, source, idempotencyKey, requestFingerprint, payerShare
+        );
         settlementMapper.insertSettlement(settlement);
         members.forEach(member -> {
             member.setSettlementId(settlement.getSettlementId());
-            member.setRequestStatus("NOT_REQUESTED");
+            member.setRequestStatus(source.getPayerMemberId().equals(member.getMemberId())
+                ? "NOT_REQUESTED" : "PENDING");
         });
         settlementMapper.insertSettlementMembers(members);
         return SettlementCreateResponse.builder().id(settlement.getSettlementId()).build();
+    }
+
+    private List<SettlementMember> selectedActiveMembers(
+        CreateSettlementRequest request,
+        SettlementSource source
+    ) {
+        if (source.getCurrencyDecimalPlaces() == null || source.getCurrencyDecimalPlaces() < 0) {
+            throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID);
+        }
+        Set<Long> requested = Set.copyOf(request.getParticipantAppointmentMemberIds());
+        List<SettlementMember> members = settlementMapper.findActiveMembers(source.getAppointmentId()).stream()
+            .filter(member -> requested.contains(member.getAppointmentMemberId()))
+            .sorted(Comparator.comparing(SettlementMember::getAppointmentMemberId))
+            .toList();
+        if (members.size() != requested.size()) {
+            throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID);
+        }
+        return members;
+    }
+
+    static void validatePayerAndPendingAmounts(
+        List<SettlementMember> members,
+        Long payerMemberId
+    ) {
+        if (members.stream().noneMatch(member -> payerMemberId.equals(member.getMemberId()))
+            || members.stream().anyMatch(member -> !payerMemberId.equals(member.getMemberId())
+                && (member.getShareAmount() == null || member.getShareAmount().signum() <= 0))) {
+            throw new BusinessException(SettlementErrorCode.SETTLEMENT_CREATE_INVALID);
+        }
+    }
+
+    static Settlement newSettlement(
+        Long memberId,
+        SettlementSource source,
+        String idempotencyKey,
+        String requestFingerprint,
+        BigDecimal payerShare
+    ) {
+        return Settlement.builder()
+            .appointmentId(source.getAppointmentId())
+            .createdByMemberId(memberId)
+            .payerMemberId(source.getPayerMemberId())
+            .sourceTransferId(source.getTransferId())
+            .idempotencyKey(idempotencyKey)
+            .requestFingerprint(requestFingerprint)
+            .settlementStatus("REQUESTED")
+            .splitMethod("EQUAL")
+            .totalAmount(source.getAmount())
+            .payerShareAmount(payerShare)
+            .receivableAmount(source.getAmount().subtract(payerShare))
+            .build();
     }
 }
