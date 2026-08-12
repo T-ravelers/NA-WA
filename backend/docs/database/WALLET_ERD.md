@@ -87,3 +87,23 @@ erDiagram
 - `wallet_transfers`가 비즈니스 거래를 기록하고 원장 행이 차변·대변을 구성합니다.
 - `wallet_owners`는 회원 지갑과 시스템 지갑을 같은 구조로 표현합니다.
 - 충전과 QR 결제는 완료 시 생성된 transfer를 선택적으로 연결합니다.
+
+## 회원은 지갑 정체성을 하나만 가집니다
+
+`uq_wallet_owners_member (member_id)`와 `uq_wallets_owner (wallet_owner_id)`에는
+`deleted_at`이 들어 있지 않습니다. 그래서 soft-delete된 행이 남아 있으면 같은 회원으로
+새 지갑을 만들 수 없습니다. 반면 조회 경로(`WalletMapper.findByMemberId`)는
+`deleted_at IS NULL`인 지갑만 봅니다.
+
+`WalletProvisioningServiceImpl.provisionForMember()`는 이 교착을 다음 규칙으로 풉니다.
+
+- 행이 없으면 만듭니다. 남아 있으면 `deleted_at`만 `NULL`로 되돌립니다.
+- `wallet_id`, 잔액, `wallet_status`, 통화, 원장·거래 이력은 그대로 둡니다.
+  `wallet_status`를 `ACTIVE`로 되돌리지 않는 이유는 `SUSPENDED`·`CLOSED` 지갑을
+  재가입으로 우회시키지 않기 위해서입니다.
+- 성공 판정은 UPDATE의 변경 행 수가 아니라 확보한 ID로 합니다. 이미 `deleted_at`이
+  `NULL`인 행에는 복구 UPDATE가 0행을 남기기 때문입니다.
+
+**탈퇴 회원의 재활성화 정책은 여기서 정하지 않습니다.** 잔액 승계, 소셜 계정 복원,
+UNIQUE 제약 변경 여부는 탈퇴 기능을 도입하는 시점에 별도로 결정합니다. 현재 `main`에는
+`wallets`·`wallet_owners`의 `deleted_at`을 세팅하는 코드가 없습니다.
