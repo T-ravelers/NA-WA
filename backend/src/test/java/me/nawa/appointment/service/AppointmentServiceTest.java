@@ -5,6 +5,10 @@ import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.domain.AppointmentStatus;
 import me.nawa.appointment.domain.MembershipStatus;
 import me.nawa.appointment.dto.request.AppointmentCreateRequest;
+import me.nawa.appointment.dto.request.AppointmentSearchRequest;
+import me.nawa.appointment.dto.response.AppointmentDetailResponse;
+import me.nawa.appointment.dto.response.AppointmentListResponse;
+import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.deposit.domain.Deposit;
@@ -19,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -105,6 +110,69 @@ class AppointmentServiceTest {
         verify(appointmentMapper, never()).findAvailableItemType(any());
     }
 
+    @Test
+    void searchAppointments_returnsPagedSummaries() {
+        AppointmentSearchRequest request = new AppointmentSearchRequest();
+        request.setPage(1);
+        request.setSize(2);
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        when(appointmentMapper.searchAppointments(request, 2))
+                .thenReturn(List.of(appointment));
+        when(appointmentMapper.countAppointments(request)).thenReturn(5L);
+
+        AppointmentListResponse result =
+                appointmentService.searchAppointments(request);
+
+        assertEquals(1, result.getContent().size());
+        assertEquals(10L, result.getContent().get(0).getAppointmentId());
+        assertEquals(3, result.getTotalPages());
+        assertEquals(true, result.isHasNext());
+    }
+
+    @Test
+    void getAppointment_returnsActiveMembers() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        AppointmentMember host = AppointmentMember.builder()
+                .appointmentMemberId(20L)
+                .appointmentId(10L)
+                .memberId(1L)
+                .displayName("Host")
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .host(true)
+                .build();
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of(host));
+
+        AppointmentDetailResponse result =
+                appointmentService.getAppointment(2L, 10L);
+
+        assertEquals(10L, result.getAppointmentId());
+        assertEquals(1, result.getMembers().size());
+        assertEquals(true, result.getMembers().get(0).isHost());
+    }
+
+    @Test
+    void getAppointment_paymentPendingForNonHost_returnsNotFound() {
+        Appointment appointment = appointment(
+                10L,
+                AppointmentStatus.PAYMENT_PENDING
+        );
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(appointment);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.getAppointment(2L, 10L)
+        );
+
+        assertEquals(AppointmentErrorCode.APPOINTMENT_NOT_FOUND,
+                exception.getErrorCode());
+        verify(appointmentMapper, never())
+                .findActiveMembersByAppointmentId(any());
+    }
+
     private static AppointmentCreateRequest validRequest() {
         AppointmentCreateRequest request = new AppointmentCreateRequest();
         request.setItemId(100L);
@@ -119,5 +187,27 @@ class AppointmentServiceTest {
         request.setActivityStartAt(LocalDateTime.of(2026, 8, 21, 18, 30));
         request.setActivityEndAt(LocalDateTime.of(2026, 8, 21, 22, 0));
         return request;
+    }
+
+    private static Appointment appointment(
+            Long appointmentId,
+            AppointmentStatus status) {
+        return Appointment.builder()
+                .appointmentId(appointmentId)
+                .itemId(100L)
+                .itemType("EVENT")
+                .hostMemberId(1L)
+                .hostDisplayName("Host")
+                .languageCode("en")
+                .appointmentName("Seongsu K-Beauty Tour")
+                .maxMembers(5)
+                .currentMemberCount(1)
+                .depositAmount(BigDecimal.valueOf(10_000))
+                .appointmentStatus(status)
+                .meetingPlace("Olive Young N Seongsu")
+                .activityStartAt(LocalDateTime.of(2026, 8, 21, 18, 30))
+                .activityEndAt(LocalDateTime.of(2026, 8, 21, 22, 0))
+                .joinDeadline(LocalDateTime.of(2026, 8, 20, 18, 0))
+                .build();
     }
 }

@@ -96,6 +96,7 @@
         a.deleted_at IS NULL
         AND ei.deleted_at IS NULL
         AND host.deleted_at IS NULL
+        AND a.appointment_status &lt;&gt; 'PAYMENT_PENDING'
         <if test="request.itemId != null">
             AND a.item_id = #{request.itemId}
         </if>
