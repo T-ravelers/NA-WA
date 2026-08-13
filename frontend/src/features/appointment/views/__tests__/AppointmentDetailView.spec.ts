@@ -137,7 +137,7 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).toContain('Seongsu Beauty Lab')
     expect(wrapper.text()).toContain('Mina Park')
     expect(wrapper.text()).toContain('Alex Kim')
-    expect(wrapper.text()).toContain('Not attended')
+    expect(wrapper.text()).not.toContain('Not attended')
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).not.toContain('Jamie Lee')
     expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(false)
