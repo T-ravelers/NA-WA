@@ -64,7 +64,7 @@ const createdDetail = {
 const mountedWrappers: VueWrapper[] = []
 const queryClients: QueryClient[] = []
 
-async function mountView() {
+async function mountView(path = '/reports') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -80,7 +80,7 @@ async function mountView() {
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   })
   queryClients.push(queryClient)
-  await router.push('/reports')
+  await router.push(path)
   await router.isReady()
 
   const wrapper = mount(ReportsView, {
@@ -264,5 +264,52 @@ describe('ReportsView', () => {
     fetchReports.mockResolvedValueOnce([])
     const empty = await mountView()
     expect(empty.wrapper.text()).toContain('No ended journeys yet')
+  })
+
+  it('preselects the journey named by a valid ?tripId query param', async () => {
+    const { wrapper } = await mountView('/reports?tripId=9')
+
+    expect(wrapper.text()).toContain('Choose report expenses')
+    expect(wrapper.text()).toContain('Jeju Island · Select completed KRW expenses')
+  })
+
+  it('silently ignores an invalid or unknown ?tripId query param', async () => {
+    const missing = await mountView('/reports?tripId=999')
+    expect(missing.wrapper.text()).not.toContain('Choose report expenses')
+
+    const malformed = await mountView('/reports?tripId=not-a-number')
+    expect(malformed.wrapper.text()).not.toContain('Choose report expenses')
+  })
+
+  it('does not preselect an ongoing journey named by ?tripId', async () => {
+    const { wrapper } = await mountView('/reports?tripId=42')
+
+    expect(wrapper.text()).not.toContain('Choose report expenses')
+  })
+
+  it('sends a ?tripId with an existing report straight to its detail instead of the generate flow', async () => {
+    const { router, wrapper } = await mountView('/reports?tripId=7')
+
+    expect(wrapper.text()).not.toContain('Choose report expenses')
+    expect(router.currentRoute.value.fullPath).toBe('/reports/100')
+  })
+
+  it('recovers the ?tripId auto-selection after retrying a failed initial load', async () => {
+    fetchReportJourneys.mockReset()
+    fetchReportJourneys.mockRejectedValueOnce(new NormalizedApiError('NETWORK', null, 'offline'))
+    fetchReportJourneys.mockResolvedValue(journeys)
+
+    const { wrapper } = await mountView('/reports?tripId=9')
+
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      'We could not load your reports. Please try again.',
+    )
+    expect(wrapper.text()).not.toContain('Choose report expenses')
+
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Choose report expenses')
+    expect(wrapper.text()).toContain('Jeju Island · Select completed KRW expenses')
   })
 })

@@ -2,7 +2,7 @@
 import { useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -24,10 +24,12 @@ import {
   formatKrwAmount,
   formatReportDate,
   getKoreaToday,
+  parsePositiveRouteId,
 } from '../model/reportModel'
 
 const i18n = useI18n()
 const { t } = i18n
+const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
 const hasMessage = (key: string): boolean => i18n.te(key)
@@ -56,6 +58,7 @@ const candidates = computed(() => candidatesQuery.data.value?.candidates ?? [])
 const selectedIds = computed(() => [...selectedTransferIds.value].sort((a, b) => a - b))
 const isListPending = computed(() => journeysQuery.isPending.value || reportsQuery.isPending.value)
 const listError = computed(() => journeysQuery.error.value ?? reportsQuery.error.value)
+const isListReady = computed(() => !isListPending.value && listError.value === null)
 const listErrorDescription = computed(() => t(reportErrorMessageKey(listError.value, hasMessage)))
 const candidateErrorDescription = computed(() =>
   t(reportErrorMessageKey(candidatesQuery.error.value, hasMessage)),
@@ -92,6 +95,33 @@ function chooseJourney(tripId: number): void {
   hasUnresolvedConflict.value = false
   createMutation.reset()
 }
+
+let hasAppliedRouteTripId = false
+
+watch(
+  isListReady,
+  (ready) => {
+    if (!ready || hasAppliedRouteTripId) {
+      return
+    }
+
+    hasAppliedRouteTripId = true
+    const tripId = parsePositiveRouteId(route.query.tripId)
+    const option = options.value.find((candidate) => candidate.tripId === tripId)
+
+    if (option === undefined) {
+      return
+    }
+
+    if (option.report !== null) {
+      void router.replace({ name: 'report-detail', params: { reportId: option.report.reportId } })
+      return
+    }
+
+    chooseJourney(option.tripId)
+  },
+  { immediate: true },
+)
 
 function toggleCandidate(candidate: ReportExpenseCandidate, event: Event): void {
   const input = event.target as HTMLInputElement

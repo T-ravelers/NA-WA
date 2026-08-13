@@ -34,7 +34,7 @@ export default {
   nav: {
     label: 'Main navigation',
     home: 'Home',
-    calendar: 'Calendar',
+    report: 'Report',
     profile: 'Profile',
     wallet: 'Wallet',
     journey: 'Journeys',

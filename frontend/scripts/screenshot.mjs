@@ -130,6 +130,20 @@ function stubJourneyDetail(page) {
   ])
 }
 
+/**
+ * Journey 상세는 종료 여부와 무관하게 `/api/v1/reports`를 항상 부른다. 스텁이 없으면
+ * 이 요청이 목킹되지 않아 화면이 pending에 머무르거나 실제 백엔드를 친다.
+ */
+function stubEmptyReportList(page) {
+  return page.route('**/api/v1/reports', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: [] }),
+    }),
+  )
+}
+
 function stubJourneyList(page) {
   return page.route('**/api/v1/journeys', (route) =>
     route.fulfill({
@@ -468,7 +482,8 @@ const SCREENS = [
   {
     name: '07-journey-detail',
     path: '/journeys/42',
-    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetail(page)]),
+    setup: (page) =>
+      Promise.all([stubMemberProfile(page), stubJourneyDetail(page), stubEmptyReportList(page)]),
   },
   {
     name: '17-report-list',
@@ -478,6 +493,13 @@ const SCREENS = [
   {
     name: '18-report-detail',
     path: '/reports/101',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubReportApis(page)]),
+  },
+  {
+    // tripId 9는 이미 report(101)가 있다. 리스트가 아니라 상세로 바로 넘어간 화면이
+    // 찍혀야 `?tripId=` 자동선택이 기존 Report를 다시 생성하려 들지 않는다는 증거가 된다.
+    name: '19-report-preselect-existing',
+    path: '/reports?tripId=9',
     setup: (page) => Promise.all([stubMemberProfile(page), stubReportApis(page)]),
   },
   {

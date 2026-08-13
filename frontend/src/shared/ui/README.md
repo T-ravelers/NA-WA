@@ -24,7 +24,7 @@
 | `IconOrb`                                    | 44×44 기본·48×48 헤더용 원형 아이콘 버튼                  |
 | `GaugeBar`                                   | 예산·진행률 막대                                          |
 | `ImagePlaceholder`                           | 이미지 결측 대체 면                                       |
-| `BottomNav`                                  | 하단 탭                                                   |
+| `BottomNav`                                  | 하단 탭. 2번째 탭은 Report(`/reports`)로 이동             |
 | `StateEmpty` / `StateError` / `StateLoading` | 빈·오류·로딩 상태                                         |
 | `LocaleSheet`                                | 로케일 선택 시트                                          |
 
