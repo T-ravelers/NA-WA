@@ -99,6 +99,17 @@ class AppointmentMapperXmlTest {
         assertTrue(sql.contains("am.deleted_at IS NULL"));
     }
 
+    @Test
+    void hostSuccessorList_usesPendingMembersOnly() throws Exception {
+        String sql = boundSql(
+                "findHostSuccessorForUpdate",
+                Map.of("appointmentId", 1L, "hostMemberId", 2L)
+        );
+
+        assertTrue(sql.contains("membership_status = 'PENDING'"));
+        assertFalse(sql.contains("membership_status IN ('PENDING', 'ACTIVE')"));
+    }
+
     private static Configuration configuration() throws Exception {
         Configuration configuration = new Configuration();
         try (InputStream input = Resources.getResourceAsStream(MAPPER_RESOURCE)) {

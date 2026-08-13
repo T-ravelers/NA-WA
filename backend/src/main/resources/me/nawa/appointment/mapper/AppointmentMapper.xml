@@ -232,7 +232,7 @@
         FROM appointment_members
         WHERE appointment_id = #{appointmentId}
           AND member_id &lt;&gt; #{hostMemberId}
-          AND membership_status IN ('PENDING', 'ACTIVE')
+          AND membership_status = 'PENDING'
           AND deleted_at IS NULL
         ORDER BY joined_at ASC, appointment_member_id ASC
         LIMIT 1
