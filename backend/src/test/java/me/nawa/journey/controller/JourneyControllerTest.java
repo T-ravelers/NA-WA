@@ -24,6 +24,7 @@ import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
+import me.nawa.journey.dto.response.JourneyTimelineAppointmentResponse;
 import me.nawa.journey.dto.response.JourneyTimelineDayResponse;
 import me.nawa.journey.dto.response.JourneyTimelineEventDetailResponse;
 import me.nawa.journey.dto.response.JourneyTimelineExploreItemResponse;
@@ -311,5 +312,46 @@ class JourneyControllerTest {
         assertTrue(responseItem.path("note").isNull());
         assertFalse(responseItem.has("placeDetail"));
         assertFalse(responseItem.has("appointment"));
+    }
+
+    @Test
+    void getTimeline_returns200WithAppointmentId() throws Exception {
+        JourneyTimelineItemResponse item = JourneyTimelineItemResponse.builder()
+            .tripItemId(103L)
+            .itemId(203L)
+            .status("CONFIRMED")
+            .displayOrder(0)
+            .exploreItem(JourneyTimelineExploreItemResponse.builder()
+                .itemType("PLACE")
+                .title("Gwangjang Market")
+                .imageUrls(List.of())
+                .build())
+            .appointment(JourneyTimelineAppointmentResponse.builder()
+                .appointmentId(900L)
+                .appointmentStatus("CONFIRMED")
+                .build())
+            .build();
+        JourneyTimelineResponse response = JourneyTimelineResponse.builder()
+            .tripId(20L)
+            .timeline(List.of(JourneyTimelineDayResponse.builder()
+                .visitDate(LocalDate.of(2026, 4, 2))
+                .items(List.of(item))
+                .build()))
+            .build();
+        when(journeyService.getTimeline(1L, 20L)).thenReturn(response);
+
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/20/timeline")
+            )
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        JsonNode responseItem = body.path("data").path("timeline")
+            .get(0).path("items").get(0);
+        assertEquals(900L, responseItem.path("appointment")
+            .path("appointmentId").asLong());
     }
 }

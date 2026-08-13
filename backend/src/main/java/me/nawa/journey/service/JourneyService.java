@@ -296,6 +296,7 @@ public class JourneyService {
             return null;
         }
         return JourneyTimelineAppointmentResponse.builder()
+            .appointmentId(item.getAppointmentId())
             .activityStartAt(item.getActivityStartAt())
             .activityEndAt(item.getActivityEndAt())
             .appointmentStatus(item.getAppointmentStatus())
