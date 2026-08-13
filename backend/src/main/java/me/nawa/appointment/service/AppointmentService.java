@@ -110,7 +110,8 @@ public class AppointmentService {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
 
-        appointment.setCurrentMemberCount(0);
+        // The host is inserted as the first ACTIVE member during creation.
+        appointment.setCurrentMemberCount(1);
         return appointment;
     }
 

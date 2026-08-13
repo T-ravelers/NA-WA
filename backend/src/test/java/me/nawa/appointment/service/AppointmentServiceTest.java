@@ -69,7 +69,7 @@ class AppointmentServiceTest {
         assertEquals(10L, result.getAppointmentId());
         assertEquals(AppointmentStatus.RECRUITING,
                 result.getAppointmentStatus());
-        assertEquals(0, result.getCurrentMemberCount());
+        assertEquals(1, result.getCurrentMemberCount());
 
         ArgumentCaptor<AppointmentMember> memberCaptor =
                 ArgumentCaptor.forClass(AppointmentMember.class);
