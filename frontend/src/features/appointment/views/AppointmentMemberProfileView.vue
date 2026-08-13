@@ -12,6 +12,7 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import type { AppointmentMember } from '../api/appointmentApi'
+import { useAppointmentMemberStats } from '../model/memberIntegration'
 import { appointmentMembersQueryOptions } from '../model/appointmentQueries'
 
 const route = useRoute()
@@ -36,6 +37,20 @@ const membersQuery = useQuery({
 const member = computed<AppointmentMember | undefined>(() =>
   membersQuery.data.value?.find((value) => value.memberId === memberId.value),
 )
+
+const profileStatsQuery = useAppointmentMemberStats(memberId)
+
+const profileStats = computed(() => profileStatsQuery.data.value)
+
+function indicatorValue(indicator: 'completionRate' | 'noShowCount' | 'averageRating'): string {
+  const stats = profileStats.value
+  if (!stats) return 'Unavailable'
+  if (indicator === 'completionRate')
+    return stats.completionRate === null ? 'No data yet' : `${stats.completionRate}%`
+  if (indicator === 'averageRating')
+    return stats.averageRating === null ? 'No ratings yet' : `${stats.averageRating.toFixed(1)} / 5`
+  return String(stats.noShowCount)
+}
 
 function initials(displayName: string): string {
   return displayName.trim().charAt(0).toUpperCase() || '?'
@@ -116,7 +131,11 @@ function goBack(): void {
               {{ t(`appointment.languages.${member.preferredLanguage}`) }}
             </p>
             <p class="mt-1 text-caption text-ink-3">
-              {{ t('appointment.profile.ratingUnavailable') }}
+              {{
+                profileStats?.reviewCount
+                  ? `${profileStats.reviewCount} reviews`
+                  : t('appointment.profile.ratingUnavailable')
+              }}
             </p>
           </div>
         </section>
@@ -135,7 +154,7 @@ function goBack(): void {
             <span class="text-body-sm text-ink-2">
               {{ t(`appointment.profile.${indicator}`) }}
             </span>
-            <span class="text-title-sm text-ink">{{ t('appointment.profile.unavailable') }}</span>
+            <span class="text-title-sm text-ink">{{ indicatorValue(indicator) }}</span>
           </div>
         </AppCard>
       </section>

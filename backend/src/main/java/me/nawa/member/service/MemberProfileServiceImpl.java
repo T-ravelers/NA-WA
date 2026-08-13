@@ -5,6 +5,7 @@ import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.member.domain.MemberProfile;
 import me.nawa.member.dto.MemberProfileResponse;
+import me.nawa.member.dto.MemberAppointmentProfileResponse;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.exception.MemberErrorCode;
 import me.nawa.member.mapper.MemberMapper;
@@ -30,6 +31,13 @@ public class MemberProfileServiceImpl implements MemberProfileService {
     @Transactional(readOnly = true)
     public MemberProfileResponse getProfile(long memberId) {
         return new MemberProfileResponse(loadActiveProfile(memberId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public MemberAppointmentProfileResponse getAppointmentProfile(long memberId) {
+        loadActiveProfile(memberId);
+        return memberMapper.findAppointmentProfile(memberId);
     }
 
     @Override

@@ -11,6 +11,7 @@ import me.nawa.auth.token.AuthTokens;
 import me.nawa.appointment.service.AppointmentService;
 import me.nawa.common.exception.ErrorCode;
 import me.nawa.member.dto.MemberProfileResponse;
+import me.nawa.member.dto.MemberAppointmentProfileResponse;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.service.MemberProfileService;
 import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
@@ -280,6 +281,11 @@ class SwaggerConfigTest {
                 @Override
                 public MemberProfileResponse updateProfile(
                         long memberId, UpdateMemberProfileRequest request) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public MemberAppointmentProfileResponse getAppointmentProfile(long memberId) {
                     throw new UnsupportedOperationException();
                 }
             };

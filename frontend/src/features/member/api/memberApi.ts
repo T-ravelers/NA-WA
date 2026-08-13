@@ -16,6 +16,22 @@ export interface UpdateMemberProfilePayload {
   preferredCurrencyCode?: string
 }
 
+export interface MemberAppointmentProfile extends MemberProfile {
+  completionRate: number | null
+  noShowCount: number
+  averageRating: number | null
+  reviewCount: number
+}
+
+export async function fetchMemberAppointmentProfile(
+  memberId: number,
+): Promise<MemberAppointmentProfile> {
+  const response = await httpClient.get<MemberAppointmentProfile>(
+    `/api/v1/members/${memberId}/appointment-profile`,
+  )
+  return response.data
+}
+
 /**
  * 현재 회원 프로필.
  *

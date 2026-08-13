@@ -20,7 +20,10 @@ import {
   readActiveJourneyId,
   storeActiveJourneyId,
 } from '@/features/journey/model/activeJourney'
-import { useMemberProfile } from '@/features/member/model/memberQueries'
+import {
+  useMemberAppointmentProfile,
+  useMemberProfile,
+} from '@/features/member/model/memberQueries'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
 import '@/app/styles/index.css'
 import { setSessionExpiredHandler } from '@/shared/api/sessionRecovery'
@@ -59,6 +62,9 @@ app.provide(exploreJourneyIntegrationKey, {
   readActiveJourneyId,
   storeActiveJourneyId,
 })
-app.provide(appointmentMemberIntegrationKey, { useMemberProfile })
+app.provide(appointmentMemberIntegrationKey, {
+  useMemberProfile,
+  useMemberStats: useMemberAppointmentProfile,
+})
 
 app.mount('#app')
