@@ -38,6 +38,17 @@ route는 `features/<domain>/routes.ts`, 문구는 `features/<domain>/i18n/<local
 **feature에서 재시도 로직을 다시 만들지 마세요.** 백엔드의 refresh 재사용 감지에
 걸립니다. 오류 분기는 메시지가 아니라 `error.code`로 합니다.
 
+성공 응답의 DTO 모양을 확인해야 하는 요청만 Axios config의 `responseSchema`에 자기
+feature `api/` 폴더가 소유한 Zod 스키마를 지정합니다. shared는 스키마를 등록하거나
+feature를 import하지 않으며, 스키마가 성공해도 Zod가 변환·제거한 값이 아니라 서버의
+원본 `data`를 반환합니다. 설정하지 않은 기존 호출은 응답 검증 없이 이전과 동일하게
+동작하고, 이 config는 401 refresh와 AUTH-005 CSRF 재시도에서 원 요청과 함께 유지됩니다.
+
+검증 실패는 `UNKNOWN`/HTTP status의 `NormalizedApiError`로 정규화합니다. 로그에는 URL·
+method·상태와 issue path/code/expected만 기록하며 response body, issue message/input,
+인증·개인정보와 Axios error 전체를 기록하지 않습니다. feature API 테스트는
+`responseSchema` 전달을 확인하고, 스키마 fixture 테스트로 실제 검증도 별도로 증명합니다.
+
 ## 문구 — 한국어는 서비스 locale이 아니다
 
 지원 locale은 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
