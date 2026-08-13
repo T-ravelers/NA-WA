@@ -24,6 +24,10 @@ export interface JourneySummary {
   title: string
   startDate: string
   endDate: string
+  /** 여정에 담긴 EVENT 항목 수. 원본이 삭제된 항목은 빠져 있다. */
+  eventCount: number
+  /** 여정에 담긴 PLACE 항목 수. 원본이 삭제된 항목은 빠져 있다. */
+  placeCount: number
 }
 
 export interface JourneyRegion {

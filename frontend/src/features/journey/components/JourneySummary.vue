@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
+import AppCard from '@/shared/ui/AppCard.vue'
+
 import type { Journey } from '../api/journeyApi'
+import { formatJourneyDate } from '../model/journeyStatus'
 
 interface Props {
   journey: Journey
@@ -10,13 +13,6 @@ interface Props {
 defineProps<Props>()
 
 const { locale, t } = useI18n()
-
-function formatDate(value: string): string {
-  const [year, month, day] = value.split('-').map(Number)
-  return new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeZone: 'UTC' }).format(
-    new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1)),
-  )
-}
 
 function formatBudget(value: number | null): string {
   if (value === null) {
@@ -47,25 +43,38 @@ function formatCompanionPreference(value: string | null): string {
 </script>
 
 <template>
-  <header class="flex flex-col gap-2">
-    <h1 class="font-display text-screen-title font-bold text-ink-display">{{ journey.title }}</h1>
-    <p class="text-body-sm text-ink-3">
-      <time :datetime="journey.startDate">{{ formatDate(journey.startDate) }}</time>
+  <header class="flex flex-col gap-1">
+    <h1 class="font-display text-screen-title uppercase text-ink-display">{{ journey.title }}</h1>
+    <p class="text-body-sm font-medium tabular-nums text-ink-2">
+      <time :datetime="journey.startDate">{{ formatJourneyDate(journey.startDate, locale) }}</time>
       –
-      <time :datetime="journey.endDate">{{ formatDate(journey.endDate) }}</time>
+      <time :datetime="journey.endDate">{{ formatJourneyDate(journey.endDate, locale) }}</time>
     </p>
   </header>
 
-  <dl class="grid gap-4 rounded-card bg-surface-1 p-4">
-    <div class="flex flex-col gap-1">
-      <dt class="text-caption text-ink-3">{{ t('journey.detail.budget') }}</dt>
-      <dd class="text-data-lg text-ink">{{ formatBudget(journey.budgetAmount) }}</dd>
-    </div>
-    <div class="flex flex-col gap-1">
-      <dt class="text-caption text-ink-3">{{ t('journey.detail.companions') }}</dt>
-      <dd class="text-body text-ink">
-        {{ formatCompanionPreference(journey.companionPreference) }}
-      </dd>
-    </div>
-  </dl>
+  <!--
+    시안 J2의 예산 블록은 `Total / Left`와 소진 게이지, 소비영역 범례를 함께 보여준다.
+    상세 API(`Journey`)에는 지출 합계가 없어 게이지와 `Left`를 채울 값이 없으므로,
+    같은 카드 조형에 현재 값인 예산과 동행 인원만 좌우로 놓는다.
+  -->
+  <AppCard padding="lg">
+    <dl class="flex items-end justify-between gap-4">
+      <div class="min-w-0">
+        <dt class="text-caption uppercase tracking-wide text-ink-3">
+          {{ t('journey.detail.budget') }}
+        </dt>
+        <dd class="mt-1 text-data-lg tabular-nums text-ink">
+          {{ formatBudget(journey.budgetAmount) }}
+        </dd>
+      </div>
+      <div class="min-w-0 text-right">
+        <dt class="text-caption uppercase tracking-wide text-ink-3">
+          {{ t('journey.detail.companions') }}
+        </dt>
+        <dd class="mt-1 text-title text-ink">
+          {{ formatCompanionPreference(journey.companionPreference) }}
+        </dd>
+      </div>
+    </dl>
+  </AppCard>
 </template>
