@@ -49,6 +49,10 @@ method·상태와 issue path/code/expected만 기록하며 response body, issue 
 인증·개인정보와 Axios error 전체를 기록하지 않습니다. feature API 테스트는
 `responseSchema` 전달을 확인하고, 스키마 fixture 테스트로 실제 검증도 별도로 증명합니다.
 
+정산 화면은 모든 환경에서 API 계약만 호출합니다. API 오류나 빈 응답을 예시 데이터로
+대체하지 않습니다. 테스트와 화면 캡처는 production source의 데이터 분기를 만들지 말고
+API mock 또는 Playwright route stub을 사용합니다.
+
 ## 문구 — 한국어는 서비스 locale이 아니다
 
 지원 locale은 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.

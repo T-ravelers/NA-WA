@@ -76,7 +76,7 @@ const ACTIVITY_ICON: Record<ActivityKind, Component> = {
   UNKNOWN: IconReceipt,
 }
 
-/* QR은 이번 작업에서 화면을 붙였고, 정산은 아직 후속 화면이 없다. */
+/* QR은 내 QR 화면으로, 정산은 정산 요청 목록으로 연결한다. */
 const quickActions = computed(() => [
   {
     id: 'topUp',
@@ -94,7 +94,7 @@ const quickActions = computed(() => [
     id: 'settlement',
     label: t('wallet.home.quickActions.settlement'),
     variant: 'settle' as const,
-    disabled: true,
+    disabled: false,
   },
 ])
 
@@ -105,6 +105,10 @@ function handleQuickAction(id: string): void {
 
   if (id === 'qr') {
     void router.push({ name: 'wallet-qr' })
+  }
+
+  if (id === 'settlement') {
+    void router.push({ name: 'settlements' })
   }
 }
 
@@ -154,7 +158,6 @@ const errorDescription = computed(() => {
       <div
         role="group"
         :aria-label="t('wallet.home.quickActions.label')"
-        aria-describedby="wallet-actions-hint"
         class="mt-4 grid grid-cols-3 gap-2"
       >
         <AppButton
@@ -169,13 +172,6 @@ const errorDescription = computed(() => {
           {{ action.label }}
         </AppButton>
       </div>
-
-      <p
-        id="wallet-actions-hint"
-        class="mt-2 text-caption text-ink-3"
-      >
-        {{ t('wallet.home.quickActions.comingSoon') }}
-      </p>
 
       <div class="mt-10 flex items-end justify-between gap-4">
         <h2 class="font-display text-section-header text-ink-display uppercase">

@@ -26,6 +26,7 @@ function createTestRouter(): Router {
         name: 'wallet-transactions',
         component: { template: '<div />' },
       },
+      { path: '/settlements', name: 'settlements', component: { template: '<div />' } },
     ],
   })
 }
@@ -120,16 +121,21 @@ describe('WalletHomeView', () => {
     expect(wrapper.text()).toContain('Deposit held')
   })
 
-  it('정산 버튼만 아직 비활성이고 QR 버튼은 사용할 수 있다', async () => {
-    const wrapper = await mountLoaded()
+  it('QR과 정산 버튼을 사용할 수 있고 정산 화면으로 이동한다', async () => {
+    const router = createTestRouter()
+    const wrapper = await mountLoaded(router)
+    const pushSpy = vi.spyOn(router, 'push')
 
     const buttons = wrapper.findAll('button')
     const qrButton = buttons.find((button) => button.text() === 'QR')
     const settlementButton = buttons.find((button) => button.text() === 'Settle up')
 
     expect(qrButton?.attributes('disabled')).toBeUndefined()
-    expect(settlementButton?.attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('These become available in a later release.')
+    expect(settlementButton?.attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).not.toContain('These become available in a later release.')
+
+    await settlementButton?.trigger('click')
+    expect(pushSpy).toHaveBeenCalledWith({ name: 'settlements' })
   })
 
   it('QR 버튼을 누르면 내 QR 화면으로 이동한다', async () => {
