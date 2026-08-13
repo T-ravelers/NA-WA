@@ -87,6 +87,18 @@ function backToSettings(): void {
   errors.value = {}
 }
 
+function goToPreviousStep(): boolean {
+  if (step.value === 3) {
+    backToSettings()
+    return true
+  }
+  if (step.value === 2) {
+    backToBasics()
+    return true
+  }
+  return false
+}
+
 function continueToSchedule(): void {
   if (pending) return
 
@@ -122,6 +134,8 @@ function confirmCreation(): void {
   confirmationOpen.value = false
   emit('submit', toAppointmentCreateRequest(draft))
 }
+
+defineExpose({ goToPreviousStep })
 </script>
 
 <template>

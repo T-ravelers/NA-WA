@@ -65,6 +65,31 @@ async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> 
 }
 
 describe('AppointmentCreateView', () => {
+  it('moves to the previous form step before leaving the route', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .find('input[placeholder="e.g. Seongsu K-Beauty Tour"]')
+      .setValue('Seongsu K-Beauty Tour')
+    await wrapper.get('form').trigger('submit')
+
+    await wrapper.find('input[inputmode="numeric"]').setValue('10000')
+    await wrapper
+      .find('input[placeholder="e.g. Seongsu Beauty Lab"]')
+      .setValue('Seongsu Beauty Lab')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.text()).toContain('Set the appointment schedule')
+
+    await wrapper.find('header button').trigger('click')
+    expect(wrapper.text()).toContain('Set your appointment details')
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+
+    await wrapper.find('header button').trigger('click')
+    expect(wrapper.text()).toContain('Start with your appointment details')
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+  })
+
   it('keeps creation confirmation disabled until payment integration is available', async () => {
     const { wrapper, router } = await mountView()
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -26,7 +26,15 @@ function readItemType(value: unknown): AppointmentItemType | undefined {
 const itemId = computed(() => readPositiveInteger(route.query.itemId))
 const itemType = computed(() => readItemType(route.query.itemType))
 
+type AppointmentCreateFormExposed = {
+  goToPreviousStep: () => boolean
+}
+
+const createForm = ref<AppointmentCreateFormExposed | null>(null)
+
 function goBack(): void {
+  if (createForm.value?.goToPreviousStep()) return
+
   if (window.history.length > 1) {
     void router.back()
     return
@@ -52,6 +60,7 @@ function goBack(): void {
     </header>
 
     <AppointmentCreateForm
+      ref="createForm"
       :item-id="itemId"
       :item-type="itemType"
       payment-unavailable
