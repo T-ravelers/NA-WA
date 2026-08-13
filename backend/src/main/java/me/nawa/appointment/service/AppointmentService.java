@@ -452,19 +452,16 @@ public class AppointmentService {
         requireGeneratedId(persistedDeposit.getDepositId());
 
         LocalDateTime heldAt = LocalDateTime.now();
-        WalletTransfer transfer = new WalletTransfer(
-                null,
-                transactionNumberGenerator.generate(),
-                "DEPOSIT_HOLD",
-                "COMPLETED",
-                persistedDeposit.getAmount(),
-                "Appointment deposit #" + appointment.getAppointmentId(),
-                null,
-                heldAt,
-                heldAt,
-                memberId,
-                "appointment-deposit-" + appointmentMemberId
-        );
+        WalletTransfer transfer = new WalletTransfer();
+        transfer.setTransferNumber(transactionNumberGenerator.generate());
+        transfer.setTransferType("DEPOSIT_HOLD");
+        transfer.setTransferStatus("COMPLETED");
+        transfer.setAmount(persistedDeposit.getAmount());
+        transfer.setMemo("Appointment deposit #" + appointment.getAppointmentId());
+        transfer.setCompletedAt(heldAt);
+        transfer.setCreatedAt(heldAt);
+        transfer.setInitiatorMemberId(memberId);
+        transfer.setIdempotencyKey("appointment-deposit-" + appointmentMemberId);
         walletTransferMapper.insert(transfer);
         requireGeneratedId(transfer.getTransferId());
 
