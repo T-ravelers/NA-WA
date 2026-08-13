@@ -54,6 +54,11 @@ async function mountView() {
         name: 'appointment-detail',
         component: { template: '<div>Detail</div>' },
       },
+      {
+        path: '/appointments',
+        name: 'appointment-list',
+        component: { template: '<div>List</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -92,7 +97,7 @@ describe('AppointmentCreateView', () => {
     createAppointment.mockResolvedValue(createdAppointment)
   })
 
-  it('submits the form and navigates to the created appointment', async () => {
+  it('submits the form and navigates to the appointment list', async () => {
     const { wrapper, router } = await mountView()
 
     await fillAndConfirm(wrapper)
@@ -111,7 +116,6 @@ describe('AppointmentCreateView', () => {
       activityStartAt: '2026-08-08T18:30:00',
       activityEndAt: '2026-08-08T22:00:00',
     })
-    expect(router.currentRoute.value.name).toBe('appointment-detail')
-    expect(router.currentRoute.value.params.appointmentId).toBe('7')
+    expect(router.currentRoute.value.name).toBe('appointment-list')
   })
 })

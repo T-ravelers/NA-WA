@@ -37,10 +37,8 @@ const createMutation = useMutation({
   mutationFn: createAppointment,
   onSuccess: async (appointment) => {
     queryClient.setQueryData(appointmentKeys.detail(appointment.appointmentId), appointment)
-    await router.push({
-      name: 'appointment-detail',
-      params: { appointmentId: appointment.appointmentId },
-    })
+    await queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() })
+    await router.push({ name: 'appointment-list' })
   },
 })
 
