@@ -45,13 +45,50 @@ class WalletProvisioningServiceImplTest {
     }
 
     @Test
-    void provisionForMember_walletInsertNotApplied_fails() {
-        mapper.walletInsertResult = 0;
+    void provisionForMember_walletInsertProducesNoKey_fails() {
+        mapper.generatedWalletId = 0L;
 
         assertThrows(
             IllegalStateException.class,
             () -> service.provisionForMember(77L)
         );
+    }
+
+    // soft-delete된 행이 남아 있으면 UNIQUE 제약 때문에 새로 만들 수 없다. 기존 정체성을 되살려야 한다.
+    @Test
+    void provisionForMember_existingSoftDeletedRows_areRestoredInsteadOfInserted() {
+        mapper.existingWalletOwnerId = 41L;
+        mapper.existingWalletId = 42L;
+
+        long walletId = service.provisionForMember(77L);
+
+        assertEquals(42L, walletId);
+        assertEquals(
+            List.of("restoreOwner", "restoreWallet"),
+            mapper.callOrder,
+            "INSERT 없이 기존 행만 복구돼야 한다"
+        );
+    }
+
+    @Test
+    void provisionForMember_ownerSurvivedButWalletMissing_insertsOnlyWallet() {
+        mapper.existingWalletOwnerId = 41L;
+
+        long walletId = service.provisionForMember(77L);
+
+        assertEquals(6L, walletId);
+        assertEquals(List.of("restoreOwner", "wallet"), mapper.callOrder);
+        assertEquals(41L, mapper.provision.getWalletOwnerId());
+    }
+
+    // 복구 UPDATE는 이미 deleted_at IS NULL인 행에 0을 돌려준다. 그것을 실패로 보면 안 된다.
+    @Test
+    void provisionForMember_restoreAffectsNoRow_stillSucceeds() {
+        mapper.existingWalletOwnerId = 41L;
+        mapper.existingWalletId = 42L;
+        mapper.restoreResult = 0;
+
+        assertEquals(42L, service.provisionForMember(77L));
     }
 
     @Test
@@ -68,7 +105,9 @@ class WalletProvisioningServiceImplTest {
         private MemberWalletProvision provision;
         private long generatedWalletOwnerId = 5L;
         private long generatedWalletId = 6L;
-        private int walletInsertResult = 1;
+        private Long existingWalletOwnerId;
+        private Long existingWalletId;
+        private int restoreResult = 1;
 
         @Override
         public Wallet findByMemberId(Long memberId) {
@@ -86,8 +125,31 @@ class WalletProvisioningServiceImplTest {
         @Override
         public int insertMemberWallet(MemberWalletProvision provision) {
             callOrder.add("wallet");
+            this.provision = provision;
             provision.setWalletId(generatedWalletId);
-            return walletInsertResult;
+            return 1;
+        }
+
+        @Override
+        public Long findWalletOwnerIdIncludingDeleted(long memberId) {
+            return existingWalletOwnerId;
+        }
+
+        @Override
+        public Long findWalletIdIncludingDeleted(long walletOwnerId) {
+            return existingWalletId;
+        }
+
+        @Override
+        public int restoreWalletOwner(long walletOwnerId) {
+            callOrder.add("restoreOwner");
+            return restoreResult;
+        }
+
+        @Override
+        public int restoreWallet(long walletId) {
+            callOrder.add("restoreWallet");
+            return restoreResult;
         }
 
         @Override

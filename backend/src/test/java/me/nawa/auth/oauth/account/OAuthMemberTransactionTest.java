@@ -31,7 +31,7 @@ class OAuthMemberTransactionTest {
     }
 
     @Test
-    void resolveOrCreate_existingAccount_doesNotInsertAnotherMember() {
+    void resolveOrCreate_existingActiveAccount_restoresWalletWithoutInsertingMember() {
         mapper.foundAccount = OAuthLoginAccount.newActive(42L);
 
         OAuthLoginAccount result = transaction.resolveOrCreate(
@@ -41,6 +41,28 @@ class OAuthMemberTransactionTest {
         assertEquals(42L, result.getMemberId());
         assertEquals(0, mapper.insertMemberCalls);
         assertEquals(0, mapper.insertSocialAccountCalls);
+        assertEquals(
+                List.of(42L),
+                walletProvisioningService.provisionedMemberIds
+        );
+    }
+
+    @Test
+    void resolveOrCreate_inactiveOrDeletedAccount_doesNotRestoreWallet() {
+        List<OAuthLoginAccount> blockedAccounts = List.of(
+                account(42L, "SUSPENDED", false, false),
+                account(42L, "WITHDRAWN", false, false),
+                account(42L, "ACTIVE", true, false),
+                account(42L, "ACTIVE", false, true)
+        );
+
+        for (OAuthLoginAccount account : blockedAccounts) {
+            mapper.foundAccount = account;
+            transaction.resolveOrCreate(
+                    googleProfile("traveler@example.com", "Traveler")
+            );
+        }
+
         assertTrue(walletProvisioningService.provisionedMemberIds.isEmpty());
     }
 
@@ -138,6 +160,19 @@ class OAuthMemberTransactionTest {
                 displayName,
                 "https://images.example/profile.png"
         );
+    }
+
+    private OAuthLoginAccount account(
+            long memberId,
+            String status,
+            boolean memberDeleted,
+            boolean socialAccountDeleted) {
+        OAuthLoginAccount account = new OAuthLoginAccount();
+        account.setMemberId(memberId);
+        account.setMemberStatus(status);
+        account.setMemberDeleted(memberDeleted);
+        account.setSocialAccountDeleted(socialAccountDeleted);
+        return account;
     }
 
     private static final class TestOAuthUserProfile extends OAuthUserProfile {

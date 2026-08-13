@@ -31,6 +31,8 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
 - 커밋 메시지에 `Co-Authored-By` 트레일러를 넣지 않습니다. 기존 이력에도 없습니다.
 - 관련 없는 프론트엔드/백엔드 변경을 한 PR에 섞지 않습니다.
 - **API·환경 변수·배포·공통 계약을 바꾸면 같은 PR에서 관련 문서와 이 파일도 고칩니다.**
+- 로그아웃 응답이 불확실할 때는 브라우저 장벽이 보호 경로와 refresh를 함께 차단합니다.
+  장벽은 서버 로그아웃 성공 또는 새 로그인 callback 성공에서만 해제합니다.
 
 ## 검증
 
@@ -65,6 +67,7 @@ cd backend && ./gradlew build --no-daemon
 | 프론트엔드 구현 규칙 | [frontend/docs/DEVELOPMENT_CONVENTION.md](./frontend/docs/DEVELOPMENT_CONVENTION.md) |
 | 백엔드 구현 규칙     | [backend/docs/DEVELOPMENT_CONVENTION.md](./backend/docs/DEVELOPMENT_CONVENTION.md) |
 | API 응답·오류 코드   | [backend/docs/API_RESPONSE_CONVENTION.md](./backend/docs/API_RESPONSE_CONVENTION.md) |
+| 정산 API·상태·멱등성 | [backend/docs/SETTLEMENT.md](./backend/docs/SETTLEMENT.md)                  |
 | 소셜 로그인 운영     | [backend/docs/AUTHENTICATION.md](./backend/docs/AUTHENTICATION.md)          |
 | DB 지도·도메인 ERD   | [backend/docs/database/README.md](./backend/docs/database/README.md)         |
 

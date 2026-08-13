@@ -8,12 +8,13 @@
  * 상태를 색으로만 말하지 않는다. 모든 tone이 텍스트 라벨을 함께 요구하고, 점은
  * 라벨을 보조하는 장식으로만 붙는다.
  */
-type BadgeTone = 'ongoing' | 'scheduled' | 'settlement' | 'onPaper' | 'neutral'
+type BadgeTone =
+  'ongoing' | 'scheduled' | 'pending' | 'completed' | 'settlement' | 'onPaper' | 'neutral'
 
 interface Props {
   tone?: BadgeTone
   /**
-   * 앞에 상태 점을 붙인다. `ongoing`·`scheduled`에서 쓴다.
+   * 앞에 상태 점을 붙인다. `ongoing`·`scheduled`·`pending`에서 쓴다.
    */
   dot?: boolean
 }
@@ -27,6 +28,8 @@ const { tone = 'neutral', dot = false } = defineProps<Props>()
 const TONE_CLASS: Record<BadgeTone, string> = {
   ongoing: 'bg-canvas/70 text-ink',
   scheduled: 'bg-canvas/70 text-ink',
+  pending: 'border border-status-scheduled/40 bg-status-scheduled/10 text-status-scheduled',
+  completed: 'border border-status-ongoing/40 bg-status-ongoing/10 text-status-ongoing',
   settlement: 'border border-settlement bg-transparent text-settlement',
   onPaper: 'border border-on-paper/30 bg-transparent text-on-paper/75',
   neutral: 'border border-hairline bg-transparent text-ink-2',
@@ -35,6 +38,8 @@ const TONE_CLASS: Record<BadgeTone, string> = {
 const DOT_CLASS: Record<BadgeTone, string> = {
   ongoing: 'bg-status-ongoing',
   scheduled: 'bg-status-scheduled',
+  pending: 'bg-status-scheduled',
+  completed: 'bg-status-ongoing',
   settlement: 'bg-settlement',
   onPaper: 'bg-on-paper/50',
   neutral: 'bg-ink-3',

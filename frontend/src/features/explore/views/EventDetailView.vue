@@ -21,17 +21,10 @@ import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
-import { addJourneyItem } from '@/features/journey/api/journeyApi'
-import {
-  parseJourneyRouteQuery,
-  readActiveJourneyId,
-  storeActiveJourneyId,
-} from '@/features/journey/model/activeJourney'
 
 import { useEventDetailQuery } from '../composables/useEventDetailQuery'
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
 import JourneySelectSheet from '../components/JourneySelectSheet.vue'
-import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
 import {
   resolveHomepageUrl,
   resolveReservationUrl,
@@ -40,11 +33,19 @@ import {
   toStringList,
   type DetailEntry,
 } from '../model/eventDetail'
+import { useExploreJourneyIntegration } from '../model/journeyIntegration'
 import { useSavedEventsStore } from '../model/savedEvents'
 
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
+const {
+  addJourneyItem,
+  parseJourneyRouteQuery,
+  readActiveJourneyId,
+  storeActiveJourneyId,
+  useJourneyListQuery,
+} = useExploreJourneyIntegration()
 
 const eventId = computed(() => String(route.params.eventId ?? ''))
 const eventQuery = useEventDetailQuery(eventId, locale)
@@ -540,8 +541,8 @@ function retry(): void {
           <AppButton
             block
             variant="secondary"
-            disabled
             class="h-12 whitespace-nowrap border-success px-2 text-success"
+            disabled
           >
             {{ t('explore.detail.findCompanions') }}
           </AppButton>

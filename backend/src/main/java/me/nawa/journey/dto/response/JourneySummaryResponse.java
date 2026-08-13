@@ -1,6 +1,7 @@
 package me.nawa.journey.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import io.swagger.annotations.ApiModelProperty;
 import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,4 +23,16 @@ public class JourneySummaryResponse {
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate endDate;
+
+    @ApiModelProperty(
+        value = "여정에 담긴 EVENT 항목 수 (원본이 삭제된 항목은 제외)",
+        example = "3"
+    )
+    private long eventCount;
+
+    @ApiModelProperty(
+        value = "여정에 담긴 PLACE 항목 수 (원본이 삭제된 항목은 제외)",
+        example = "5"
+    )
+    private long placeCount;
 }

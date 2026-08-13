@@ -1,13 +1,20 @@
+import { VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { queryClient } from '@/app/query/client'
 
 const applyLocale = vi.fn()
+const requestSignOut = vi.fn()
 
 vi.mock('@/app/i18n/applyLocale', () => ({
   applyLocale: (...args: unknown[]) => applyLocale(...args),
+}))
+
+vi.mock('@/shared/api/sessionSignOut', () => ({
+  requestSignOut: () => requestSignOut(),
 }))
 
 const SignInView = (await import('../SignInView.vue')).default
@@ -25,7 +32,9 @@ async function mountView() {
   await router.push('/sign-in')
   await router.isReady()
 
-  const wrapper = mount(SignInView, { global: { plugins: [i18n, router] } })
+  const wrapper = mount(SignInView, {
+    global: { plugins: [i18n, router, [VueQueryPlugin, { queryClient }]] },
+  })
 
   await flushPromises()
 
@@ -35,7 +44,11 @@ async function mountView() {
 describe('SignInView', () => {
   beforeEach(() => {
     localStorage.clear()
+    queryClient.clear()
+    queryClient.setDefaultOptions({ mutations: { retry: false } })
     applyLocale.mockReset()
+    requestSignOut.mockReset()
+    requestSignOut.mockResolvedValue(undefined)
   })
 
   it('offers both providers', async () => {
@@ -43,6 +56,38 @@ describe('SignInView', () => {
 
     expect(text).toContain('Continue with Google')
     expect(text).toContain('Continue with LINE')
+  })
+
+  it('explains an uncertain sign-out and offers a retry', async () => {
+    localStorage.setItem('nawa.auth.signOutBarrier', 'active')
+    const wrapper = await mountView()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      'We could not confirm that you signed out',
+    )
+
+    await wrapper.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+
+    expect(requestSignOut).toHaveBeenCalledOnce()
+  })
+
+  it('prevents a provider redirect while sign-out retry is pending', async () => {
+    localStorage.setItem('nawa.auth.signOutBarrier', 'active')
+    requestSignOut.mockImplementation(() => new Promise(() => undefined))
+    const wrapper = await mountView()
+
+    await wrapper.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+
+    const providerButtons = wrapper
+      .findAll('button')
+      .filter((button) => /Google|LINE/.test(button.text()))
+
+    expect(providerButtons).toHaveLength(2)
+    expect(providerButtons.every((button) => button.attributes('disabled') !== undefined)).toBe(
+      true,
+    )
   })
 
   // LINE 로그인은 백엔드가 이미 지원한다. 안내만 붙이고 버튼은 살려 둔다.

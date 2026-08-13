@@ -7,6 +7,7 @@ import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.report.dto.request.ReportCreateRequest;
 import me.nawa.report.dto.response.ReportDetailResponse;
+import me.nawa.report.dto.response.ReportExpenseCandidateResponse;
 import me.nawa.report.dto.response.ReportSummaryResponse;
 import me.nawa.report.service.ReportService;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,17 @@ public class ReportController {
     ) {
         return ApiResponse.success(
             reportService.createReport(member.getMemberId(), tripId, request)
+        );
+    }
+
+    @GetMapping("/journeys/{tripId}/report-expense-candidates")
+    @ApiOperation("List eligible Wallet expenses for a Report")
+    public ApiResponse<List<ReportExpenseCandidateResponse>> getExpenseCandidates(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long tripId
+    ) {
+        return ApiResponse.success(
+            reportService.getExpenseCandidates(member.getMemberId(), tripId)
         );
     }
 

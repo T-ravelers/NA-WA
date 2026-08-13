@@ -23,6 +23,7 @@ const next = vi.fn()
 
 describe('authGuard', () => {
   beforeEach(() => {
+    localStorage.clear()
     ensureMemberProfile.mockReset()
     syncLocaleWithProfile.mockReset()
     syncLocaleWithProfile.mockResolvedValue(undefined)
@@ -30,6 +31,24 @@ describe('authGuard', () => {
 
   it('allows routes that declare no auth policy without checking the session', async () => {
     const result = await authGuard(routeTo('/auth/callback', {}), from, next)
+
+    expect(result).toBe(true)
+    expect(ensureMemberProfile).not.toHaveBeenCalled()
+  })
+
+  it('blocks protected routes without probing the session while sign-out is uncertain', async () => {
+    localStorage.setItem('nawa.auth.signOutBarrier', 'active')
+
+    const result = await authGuard(routeTo('/wallet', { requiresAuth: true }), from, next)
+
+    expect(result).toEqual({ path: '/sign-in' })
+    expect(ensureMemberProfile).not.toHaveBeenCalled()
+  })
+
+  it('allows the sign-in route without probing the session while the barrier is active', async () => {
+    localStorage.setItem('nawa.auth.signOutBarrier', 'active')
+
+    const result = await authGuard(routeTo('/sign-in', { guestOnly: true }), from, next)
 
     expect(result).toBe(true)
     expect(ensureMemberProfile).not.toHaveBeenCalled()
