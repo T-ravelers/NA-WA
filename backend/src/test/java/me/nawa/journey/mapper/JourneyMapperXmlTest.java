@@ -104,7 +104,12 @@ class JourneyMapperXmlTest {
             .trim();
         assertTrue(availableItemSql.contains("ei.approval_status = 'APPROVED'"));
         assertTrue(availableItemSql.contains("ei.visibility_status = 'VISIBLE'"));
-        assertTrue(availableItemSql.contains("e.status IN ('SCHEDULED', 'ONGOING')"));
+        assertTrue(availableItemSql.contains(
+            "(e.end_date IS NULL OR e.end_date >= CURRENT_DATE())"
+        ));
+        assertFalse(availableItemSql.contains(
+            "e.status IN ('SCHEDULED', 'ONGOING')"
+        ));
         assertTrue(availableItemSql.contains("p.is_active = TRUE"));
         assertTrue(availableItemSql.contains("e.deleted_at IS NULL"));
         assertTrue(availableItemSql.contains("p.deleted_at IS NULL"));
