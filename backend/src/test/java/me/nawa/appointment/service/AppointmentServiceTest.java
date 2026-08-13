@@ -46,7 +46,7 @@ class AppointmentServiceTest {
     private AppointmentService appointmentService;
 
     @Test
-    void createAppointment_createsPendingHostAndDeposit() {
+    void createAppointment_createsRecruitingHostAndDeposit() {
         AppointmentCreateRequest request = validRequest();
         when(appointmentMapper.findAvailableItemType(100L))
                 .thenReturn("EVENT");
@@ -67,7 +67,7 @@ class AppointmentServiceTest {
         Appointment result = appointmentService.createAppointment(1L, request);
 
         assertEquals(10L, result.getAppointmentId());
-        assertEquals(AppointmentStatus.PAYMENT_PENDING,
+        assertEquals(AppointmentStatus.RECRUITING,
                 result.getAppointmentStatus());
         assertEquals(0, result.getCurrentMemberCount());
 
@@ -76,7 +76,7 @@ class AppointmentServiceTest {
         verify(appointmentMapper).insertAppointmentMember(
                 memberCaptor.capture()
         );
-        assertEquals(MembershipStatus.PENDING,
+        assertEquals(MembershipStatus.ACTIVE,
                 memberCaptor.getValue().getMembershipStatus());
 
         ArgumentCaptor<Deposit> depositCaptor =

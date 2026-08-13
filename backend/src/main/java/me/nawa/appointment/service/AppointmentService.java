@@ -82,7 +82,8 @@ public class AppointmentService {
                 .maxMembers(request.getMaxMembers())
                 .joinDeadline(request.getJoinDeadline())
                 .depositAmount(request.getDepositAmount())
-                .appointmentStatus(AppointmentStatus.PAYMENT_PENDING)
+                // 결제 API 연결 전까지 생성 확인을 결제 완료로 간주합니다.
+                .appointmentStatus(AppointmentStatus.RECRUITING)
                 .meetingPlace(request.getMeetingPlace().trim())
                 .meetingAddress(normalizeOptional(request.getMeetingAddress()))
                 .activityStartAt(request.getActivityStartAt())
@@ -94,7 +95,7 @@ public class AppointmentService {
         AppointmentMember host = AppointmentMember.builder()
                 .appointmentId(appointment.getAppointmentId())
                 .memberId(memberId)
-                .membershipStatus(MembershipStatus.PENDING)
+                .membershipStatus(MembershipStatus.ACTIVE)
                 .attendanceStatus(AttendanceStatus.PENDING)
                 .host(true)
                 .build();
