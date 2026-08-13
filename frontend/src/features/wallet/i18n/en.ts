@@ -170,7 +170,7 @@ export default {
         myQr: 'My QR',
         scan: 'Scan QR',
       },
-      validity: 'NA-WA · Valid until {time}',
+      validity: 'NA-WA · Expires in {time}',
       balance: 'Available balance {amount} P',
       balanceUnavailable: 'Available balance unavailable',
       emptyTitle: 'No QR code yet',

@@ -123,7 +123,7 @@ describe('WalletQrView', () => {
     expect(wrapper.text()).toContain('Seoul Food Tour')
   })
 
-  it('shows the most recent active QR image and its real amount, memo, and expiry', async () => {
+  it('shows the most recent active QR image and its real amount, memo, and expiry countdown', async () => {
     vi.mocked(listActiveQrPayments).mockResolvedValue([seoulFoodTour])
 
     const { wrapper } = await mountView()
@@ -132,15 +132,10 @@ describe('WalletQrView', () => {
       if (!wrapper.find('img').exists()) throw new Error('QR image not rendered yet')
     })
 
-    const expectedTime = new Intl.DateTimeFormat('en', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date('2026-08-13T14:32:00'))
-
     expect(wrapper.text()).toContain('Payment request QR')
     expect(wrapper.text()).toContain('₩18,500')
     expect(wrapper.text()).toContain('Seoul Food Tour')
-    expect(wrapper.text()).toContain(`NA-WA · Valid until ${expectedTime}`)
+    expect(wrapper.text()).toMatch(/NA-WA · Expires in \d+:\d{2}/)
     expect(wrapper.text()).toContain('Available balance 128,500 P')
 
     const image = wrapper.get('img')

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useMutation, useQuery } from '@tanstack/vue-query'
 import { IconChevronLeft } from '@tabler/icons-vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -118,10 +118,26 @@ const goBack = (): void => {
   void router.push({ name: 'wallet-qr-scan' })
 }
 
+const idempotencyKey = ref<string | null>(null)
+
+// 요청 내용이 바뀌면(다른 결제 시도) 새 키를 쓴다. 재시도(내용 동일)는 키를 재사용한다.
+watch(
+  () =>
+    [
+      session.value?.qrToken,
+      finalAmount.value,
+      spendingScope.value,
+      selectedAppointmentId.value,
+    ] as const,
+  () => {
+    idempotencyKey.value = null
+  },
+)
+
 const completePayment = (): void => {
   if (!canPay.value || session.value === null || finalAmount.value === null) return
 
-  const idempotencyKey =
+  idempotencyKey.value ??=
     globalThis.crypto?.randomUUID?.() ?? `qr-payment-${Date.now()}-${Math.random()}`
 
   executeMutation.mutate(
@@ -132,10 +148,11 @@ const completePayment = (): void => {
         spendingScope: toQrPaymentSpendingScope(spendingScope.value),
         appointmentId: null,
       },
-      idempotencyKey,
+      idempotencyKey: idempotencyKey.value,
     },
     {
       onSuccess: (response) => {
+        idempotencyKey.value = null
         qrPaymentSession.clearSession()
         void router.push({
           name: 'wallet-qr-payment-complete',

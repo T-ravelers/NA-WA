@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useQuery } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { IconChevronLeft } from '@tabler/icons-vue'
 import QRCode from 'qrcode'
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -14,21 +14,58 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { listActiveQrPayments } from '../api/qrPaymentApi'
 import { formatKrw, qrPaymentKeys, type QrPaymentCreateResponse } from '../model/qrPayment'
+import { parseServerDateTime } from '../model/walletHome'
 import { useWalletHome } from '../model/walletQueries'
 
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const walletQuery = useWalletHome()
+const queryClient = useQueryClient()
 
 const activeQrQuery = useQuery({
   queryKey: qrPaymentKeys.active(),
   queryFn: listActiveQrPayments,
 })
 
+const now = ref(Date.now())
+const nowTimer = setInterval(() => {
+  now.value = Date.now()
+}, 1000)
+
+let expiryRefetchTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 목록 중 가장 빨리 만료되는 QR 시점에 맞춰 재조회한다. 화면을 열어둔 채로 TTL이 지나도 만료된 QR이 남지 않게. */
+function scheduleExpiryRefetch(list: QrPaymentCreateResponse[]): void {
+  if (expiryRefetchTimer !== null) {
+    clearTimeout(expiryRefetchTimer)
+    expiryRefetchTimer = null
+  }
+
+  const expiryTimes = list
+    .map((qr) => parseServerDateTime(qr.expiresAt))
+    .filter((date): date is Date => date !== null)
+    .map((date) => date.getTime())
+
+  if (expiryTimes.length === 0) return
+
+  const delay = Math.max(Math.min(...expiryTimes) - Date.now(), 0)
+
+  expiryRefetchTimer = setTimeout(() => {
+    void queryClient.invalidateQueries({ queryKey: qrPaymentKeys.active() })
+  }, delay)
+}
+
+onUnmounted(() => {
+  clearInterval(nowTimer)
+  if (expiryRefetchTimer !== null) clearTimeout(expiryRefetchTimer)
+})
+
 const isMyQrActive = computed(() => route.name === 'wallet-qr')
 
 const activeQrList = computed(() => activeQrQuery.data.value ?? [])
+
+watch(activeQrList, scheduleExpiryRefetch, { immediate: true })
 
 /** 방금 만든 QR(목록의 맨 앞)을 기본으로 보여주고, 다른 항목을 탭하면 그걸로 바꾼다. */
 const selectedQrToken = ref<string | null>(null)
@@ -60,10 +97,14 @@ const expiresAtLabel = computed(() => {
 
   if (expiresAt === undefined) return null
 
-  const formattedTime = new Intl.DateTimeFormat(locale.value, {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(expiresAt))
+  const parsedExpiresAt = parseServerDateTime(expiresAt)
+
+  if (parsedExpiresAt === null) return null
+
+  const remainingSeconds = Math.max(0, Math.ceil((parsedExpiresAt.getTime() - now.value) / 1000))
+  const minutes = Math.floor(remainingSeconds / 60)
+  const seconds = remainingSeconds % 60
+  const formattedTime = `${minutes}:${String(seconds).padStart(2, '0')}`
 
   return t('wallet.qr.validity', { time: formattedTime })
 })
