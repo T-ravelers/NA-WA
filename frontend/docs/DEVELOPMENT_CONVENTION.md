@@ -32,6 +32,11 @@ src/
 - `shared`는 `features`와 `app`을 import하지 않습니다.
 - 여러 feature에서 사용하더라도 도메인 의미가 있다면 `shared`로 옮기지 않습니다.
 
+ESLint는 alias와 상대경로를 모두 해석해 이 경계를 검사합니다. `import type`, re-export와
+동적 `import()`도 같은 정책을 따릅니다. 같은 feature 내부의 상대경로 import는 허용하지만,
+다른 feature의 구현이 필요하면 `app`에서 주입하거나 합의된 계약을 적절한 상위 계층에
+둡니다. 경계를 피하려고 alias를 상대경로로 바꾸지 않습니다.
+
 feature에는 필요한 폴더만 만드세요.
 
 ```text
