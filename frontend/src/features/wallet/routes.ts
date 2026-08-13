@@ -20,6 +20,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, hideBottomNav: true },
   },
   {
+    path: '/wallet/qr/create',
+    name: 'wallet-qr-create',
+    component: () => import('./views/WalletQrCreateView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
+  {
     path: '/wallet/qr/scan',
     name: 'wallet-qr-scan',
     component: () => import('./views/WalletQrScanView.vue'),

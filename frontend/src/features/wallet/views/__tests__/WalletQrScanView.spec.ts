@@ -12,6 +12,11 @@ function createTestRouter(): Router {
     routes: [
       { path: '/wallet', name: 'wallet', component: { template: '<div />' } },
       { path: '/wallet/qr', name: 'wallet-qr', component: { template: '<div />' } },
+      {
+        path: '/wallet/qr/create',
+        name: 'wallet-qr-create',
+        component: { template: '<div />' },
+      },
       { path: '/wallet/qr/scan', name: 'wallet-qr-scan', component: { template: '<div />' } },
       {
         path: '/wallet/qr/payment/preview',
