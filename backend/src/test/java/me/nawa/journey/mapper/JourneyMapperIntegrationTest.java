@@ -178,6 +178,41 @@ class JourneyMapperIntegrationTest {
             );
             softDeleteEvent(deletedOriginalEventItem);
 
+            long deletedExploreItemTripId =
+                insertTrip(memberId, marker + "-deleted-explore-item");
+            tripIds.add(deletedExploreItemTripId);
+            long deletedExploreEventItem = insertExploreItem(memberId, "EVENT");
+            long deletedExplorePlaceItem = insertExploreItem(memberId, "PLACE");
+            eventItemIds.add(deletedExploreEventItem);
+            placeItemIds.add(deletedExplorePlaceItem);
+            insertEvent(deletedExploreEventItem, marker);
+            insertPlace(deletedExplorePlaceItem, marker);
+            insertTripItem(
+                deletedExploreItemTripId,
+                deletedExploreEventItem,
+                visitDate
+            );
+            insertTripItem(
+                deletedExploreItemTripId,
+                deletedExplorePlaceItem,
+                visitDate
+            );
+            softDeleteExploreItem(deletedExploreEventItem);
+            softDeleteExploreItem(deletedExplorePlaceItem);
+
+            long deletedOriginalPlaceTripId =
+                insertTrip(memberId, marker + "-deleted-original-place");
+            tripIds.add(deletedOriginalPlaceTripId);
+            long deletedOriginalPlaceItem = insertExploreItem(memberId, "PLACE");
+            placeItemIds.add(deletedOriginalPlaceItem);
+            insertPlace(deletedOriginalPlaceItem, marker);
+            insertTripItem(
+                deletedOriginalPlaceTripId,
+                deletedOriginalPlaceItem,
+                visitDate
+            );
+            softDeletePlace(deletedOriginalPlaceItem);
+
             List<Journey> journeys = mapper.findJourneysByMemberId(memberId);
 
             assertJourneyCounts(journeys, eventOnlyTripId, 2L, 0L);
@@ -186,6 +221,8 @@ class JourneyMapperIntegrationTest {
             assertJourneyCounts(journeys, emptyTripId, 0L, 0L);
             assertJourneyCounts(journeys, softDeletedItemTripId, 0L, 0L);
             assertJourneyCounts(journeys, deletedOriginalTripId, 0L, 0L);
+            assertJourneyCounts(journeys, deletedExploreItemTripId, 0L, 0L);
+            assertJourneyCounts(journeys, deletedOriginalPlaceTripId, 0L, 0L);
         } finally {
             deleteCountFixture(memberId, tripIds, eventItemIds, placeItemIds);
         }
@@ -390,6 +427,21 @@ class JourneyMapperIntegrationTest {
     private static void softDeleteEvent(long itemId) {
         jdbcTemplate.update(
             "UPDATE event SET deleted_at = CURRENT_TIMESTAMP WHERE event_id = ?",
+            itemId
+        );
+    }
+
+    private static void softDeleteExploreItem(long itemId) {
+        jdbcTemplate.update(
+            "UPDATE explore_items SET deleted_at = CURRENT_TIMESTAMP "
+                + "WHERE item_id = ?",
+            itemId
+        );
+    }
+
+    private static void softDeletePlace(long itemId) {
+        jdbcTemplate.update(
+            "UPDATE place SET deleted_at = CURRENT_TIMESTAMP WHERE place_id = ?",
             itemId
         );
     }
