@@ -6,7 +6,6 @@ import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -61,10 +60,6 @@ public interface AppointmentMapper {
             @Param("appointmentMemberId") Long appointmentMemberId
     );
 
-    int countParticipatingMembers(
-            @Param("appointmentId") Long appointmentId
-    );
-
     int markMemberLeft(
             @Param("appointmentMemberId") Long appointmentMemberId
     );
@@ -83,30 +78,4 @@ public interface AppointmentMapper {
             @Param("appointmentId") Long appointmentId
     );
 
-    List<Appointment> findLifecycleCandidates(
-            @Param("now") LocalDateTime now
-    );
-
-    int updateStatus(
-            @Param("appointmentId") Long appointmentId,
-            @Param("expectedStatus") String expectedStatus,
-            @Param("nextStatus") String nextStatus
-    );
-
-    int countActiveMembers(
-            @Param("appointmentId") Long appointmentId
-    );
-
-    int countHeldDepositsForActiveMembers(
-            @Param("appointmentId") Long appointmentId
-    );
-
-    int markPendingMembersLeft(
-            @Param("appointmentId") Long appointmentId
-    );
-
-    int markPendingDepositsCancelled(
-            @Param("appointmentId") Long appointmentId,
-            @Param("resolvedAt") LocalDateTime resolvedAt
-    );
 }

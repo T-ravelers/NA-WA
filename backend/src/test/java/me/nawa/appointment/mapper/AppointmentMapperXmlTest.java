@@ -66,31 +66,10 @@ class AppointmentMapperXmlTest {
                 "me.nawa.appointment.mapper.AppointmentMapper.markMemberLeft"
         ));
         assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.countParticipatingMembers"
-        ));
-        assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.confirmAttendance"
         ));
         assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.completeAppointment"
-        ));
-        assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.findLifecycleCandidates"
-        ));
-        assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.updateStatus"
-        ));
-        assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.countActiveMembers"
-        ));
-        assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.countHeldDepositsForActiveMembers"
-        ));
-        assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.markPendingMembersLeft"
-        ));
-        assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.markPendingDepositsCancelled"
         ));
     }
 
