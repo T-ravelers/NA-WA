@@ -58,6 +58,7 @@ const candidates = computed(() => candidatesQuery.data.value?.candidates ?? [])
 const selectedIds = computed(() => [...selectedTransferIds.value].sort((a, b) => a - b))
 const isListPending = computed(() => journeysQuery.isPending.value || reportsQuery.isPending.value)
 const listError = computed(() => journeysQuery.error.value ?? reportsQuery.error.value)
+const isListReady = computed(() => !isListPending.value && listError.value === null)
 const listErrorDescription = computed(() => t(reportErrorMessageKey(listError.value, hasMessage)))
 const candidateErrorDescription = computed(() =>
   t(reportErrorMessageKey(candidatesQuery.error.value, hasMessage)),
@@ -98,18 +99,26 @@ function chooseJourney(tripId: number): void {
 let hasAppliedRouteTripId = false
 
 watch(
-  isListPending,
-  (pending) => {
-    if (pending || hasAppliedRouteTripId) {
+  isListReady,
+  (ready) => {
+    if (!ready || hasAppliedRouteTripId) {
       return
     }
 
     hasAppliedRouteTripId = true
     const tripId = parsePositiveRouteId(route.query.tripId)
+    const option = options.value.find((candidate) => candidate.tripId === tripId)
 
-    if (tripId !== null && options.value.some((option) => option.tripId === tripId)) {
-      chooseJourney(tripId)
+    if (option === undefined) {
+      return
     }
+
+    if (option.report !== null) {
+      void router.replace({ name: 'report-detail', params: { reportId: option.report.reportId } })
+      return
+    }
+
+    chooseJourney(option.tripId)
   },
   { immediate: true },
 )

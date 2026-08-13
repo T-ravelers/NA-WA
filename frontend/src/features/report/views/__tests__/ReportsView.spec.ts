@@ -286,4 +286,30 @@ describe('ReportsView', () => {
 
     expect(wrapper.text()).not.toContain('Choose report expenses')
   })
+
+  it('sends a ?tripId with an existing report straight to its detail instead of the generate flow', async () => {
+    const { router, wrapper } = await mountView('/reports?tripId=7')
+
+    expect(wrapper.text()).not.toContain('Choose report expenses')
+    expect(router.currentRoute.value.fullPath).toBe('/reports/100')
+  })
+
+  it('recovers the ?tripId auto-selection after retrying a failed initial load', async () => {
+    fetchReportJourneys.mockReset()
+    fetchReportJourneys.mockRejectedValueOnce(new NormalizedApiError('NETWORK', null, 'offline'))
+    fetchReportJourneys.mockResolvedValue(journeys)
+
+    const { wrapper } = await mountView('/reports?tripId=9')
+
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      'We could not load your reports. Please try again.',
+    )
+    expect(wrapper.text()).not.toContain('Choose report expenses')
+
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Choose report expenses')
+    expect(wrapper.text()).toContain('Jeju Island · Select completed KRW expenses')
+  })
 })

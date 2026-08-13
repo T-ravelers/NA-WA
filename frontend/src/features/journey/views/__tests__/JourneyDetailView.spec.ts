@@ -31,16 +31,27 @@ const journey = {
   regions: [{ regionCode: 'SEOUL', regionName: 'Seoul', displayOrder: 0 }],
 }
 
-function createReportIntegration(reports: JourneyReportSummary[] = []): JourneyReportIntegration {
+interface ReportIntegrationOptions {
+  reports?: JourneyReportSummary[]
+  isPending?: boolean
+  isError?: boolean
+  refetch?: () => Promise<unknown>
+}
+
+function createReportIntegration(options: ReportIntegrationOptions = {}): JourneyReportIntegration {
+  const { reports = [], isPending = false, isError = false, refetch = vi.fn() } = options
+
   return {
     useReportSummariesQuery: () => ({
       data: ref<JourneyReportSummary[] | undefined>(reports),
-      isPending: ref(false),
+      isPending: ref(isPending),
+      isError: ref(isError),
+      refetch,
     }),
   }
 }
 
-async function mountWithRouter(path: string, reports: JourneyReportSummary[] = []) {
+async function mountWithRouter(path: string, reportOptions: ReportIntegrationOptions = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -62,7 +73,7 @@ async function mountWithRouter(path: string, reports: JourneyReportSummary[] = [
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
       provide: {
-        [journeyReportIntegrationKey as symbol]: createReportIntegration(reports),
+        [journeyReportIntegrationKey as symbol]: createReportIntegration(reportOptions),
       },
     },
   })
@@ -72,8 +83,8 @@ async function mountWithRouter(path: string, reports: JourneyReportSummary[] = [
   return { wrapper, router }
 }
 
-async function mountAt(path: string, reports: JourneyReportSummary[] = []) {
-  return (await mountWithRouter(path, reports)).wrapper
+async function mountAt(path: string, reportOptions: ReportIntegrationOptions = {}) {
+  return (await mountWithRouter(path, reportOptions)).wrapper
 }
 
 describe('JourneyDetailView', () => {
@@ -128,7 +139,9 @@ describe('JourneyDetailView', () => {
     fetchJourney.mockResolvedValue({ ...journey, startDate: '2020-08-10', endDate: '2020-08-12' })
     fetchJourneyTimeline.mockResolvedValue({ tripId: 7, timeline: [] })
 
-    const { router, wrapper } = await mountWithRouter('/journeys/7', [{ tripId: 7, reportId: 55 }])
+    const { router, wrapper } = await mountWithRouter('/journeys/7', {
+      reports: [{ tripId: 7, reportId: 55 }],
+    })
 
     const viewButton = wrapper
       .findAll('button')
@@ -140,6 +153,33 @@ describe('JourneyDetailView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.fullPath).toBe('/reports/55')
+  })
+
+  it('shows a loading state instead of a CTA while the report list is pending', async () => {
+    fetchJourney.mockResolvedValue({ ...journey, startDate: '2020-08-10', endDate: '2020-08-12' })
+    fetchJourneyTimeline.mockResolvedValue({ tripId: 7, timeline: [] })
+
+    const wrapper = await mountAt('/journeys/7', { isPending: true })
+
+    expect(wrapper.text()).toContain('Checking final report status')
+    expect(wrapper.text()).not.toContain('View final report')
+    expect(wrapper.text()).not.toContain('Create final report')
+  })
+
+  it('shows a retryable error instead of a CTA when the report list fails to load', async () => {
+    fetchJourney.mockResolvedValue({ ...journey, startDate: '2020-08-10', endDate: '2020-08-12' })
+    fetchJourneyTimeline.mockResolvedValue({ tripId: 7, timeline: [] })
+
+    const refetch = vi.fn()
+    const wrapper = await mountAt('/journeys/7', { isError: true, refetch })
+
+    expect(wrapper.text()).toContain('Report status unavailable')
+    expect(wrapper.text()).not.toContain('View final report')
+    expect(wrapper.text()).not.toContain('Create final report')
+
+    await wrapper.get('button').trigger('click')
+
+    expect(refetch).toHaveBeenCalledTimes(1)
   })
 
   it('renders EVENT and PLACE timeline entries', async () => {

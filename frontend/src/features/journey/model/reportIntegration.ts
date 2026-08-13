@@ -8,6 +8,8 @@ export interface JourneyReportSummary {
 export interface JourneyReportSummariesQuery {
   data: Ref<JourneyReportSummary[] | undefined>
   isPending: Ref<boolean>
+  isError: Ref<boolean>
+  refetch: () => Promise<unknown>
 }
 
 export interface JourneyReportIntegration {

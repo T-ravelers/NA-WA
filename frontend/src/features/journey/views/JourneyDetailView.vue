@@ -122,8 +122,21 @@ function createReport(): void {
       <JourneySummary :journey="detailQuery.data.value" />
 
       <section v-if="journeyEnded">
+        <StateLoading
+          v-if="reportsQuery.isPending.value"
+          :label="t('journey.detail.reportChecking')"
+        />
+
+        <StateError
+          v-else-if="reportsQuery.isError.value"
+          :title="t('journey.detail.reportLoadFailed')"
+          :description="t('journey.detail.reportLoadFailedDescription')"
+          :action-label="t('action.retry')"
+          @retry="reportsQuery.refetch"
+        />
+
         <AppButton
-          v-if="matchingReport !== null"
+          v-else-if="matchingReport !== null"
           variant="secondary"
           block
           @click="viewReport(matchingReport.reportId)"
