@@ -22,4 +22,6 @@ public class Journey {
     private LocalDate endDate;
     private BigDecimal budgetAmount;
     private String companionPreference;
+    private long eventCount;
+    private long placeCount;
 }

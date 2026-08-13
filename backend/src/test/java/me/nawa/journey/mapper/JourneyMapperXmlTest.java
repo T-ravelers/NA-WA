@@ -53,6 +53,27 @@ class JourneyMapperXmlTest {
             namespace + "findJourneyItemById"
         ));
 
+        MappedStatement journeysStatement = configuration.getMappedStatement(
+            namespace + "findJourneysByMemberId"
+        );
+        String journeysSql = journeysStatement
+            .getBoundSql(Map.of("memberId", 1L))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+
+        assertTrue(journeysSql.contains("AS event_count"));
+        assertTrue(journeysSql.contains("AS place_count"));
+        assertTrue(journeysSql.contains("JOIN event e"));
+        assertTrue(journeysSql.contains("JOIN place p"));
+        assertTrue(journeysSql.contains("ei.item_type = 'EVENT'"));
+        assertTrue(journeysSql.contains("ei.item_type = 'PLACE'"));
+        assertTrue(journeysSql.contains("ti.trip_id = trips.trip_id"));
+        assertTrue(journeysSql.contains("ti.deleted_at IS NULL"));
+        assertTrue(journeysSql.contains("ei.deleted_at IS NULL"));
+        assertTrue(journeysSql.contains("e.deleted_at IS NULL"));
+        assertTrue(journeysSql.contains("p.deleted_at IS NULL"));
+
         MappedStatement timelineStatement = configuration.getMappedStatement(
             namespace + "findTimelineItemsByTripId"
         );

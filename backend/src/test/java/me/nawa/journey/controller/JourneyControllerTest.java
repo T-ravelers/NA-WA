@@ -213,6 +213,8 @@ class JourneyControllerTest {
                 .title("Seoul Foodie Week")
                 .startDate(LocalDate.of(2026, 3, 28))
                 .endDate(LocalDate.of(2026, 4, 1))
+                .eventCount(3L)
+                .placeCount(5L)
                 .build()
         ));
 
@@ -231,6 +233,14 @@ class JourneyControllerTest {
         assertEquals(
             "2026-03-28",
             body.path("data").get(0).path("startDate").asText()
+        );
+        assertEquals(
+            3L,
+            body.path("data").get(0).path("eventCount").asLong()
+        );
+        assertEquals(
+            5L,
+            body.path("data").get(0).path("placeCount").asLong()
         );
     }
 
