@@ -138,11 +138,26 @@ function stubJourneyList(page) {
       body: JSON.stringify({
         success: true,
         data: [
+          // 목록은 가로 스냅 캐러셀이다. ongoing이 한 장뿐이면 스냅도 다음 카드
+          // 엿보기도 화면에 나타나지 않아 캡처가 조형을 증명하지 못한다. 진행 중
+          // 여정을 세 장 둔다.
           {
             tripId: 42,
             title: 'Seoul Foodie Week',
             startDate: '2098-08-10',
             endDate: '2098-08-12',
+          },
+          {
+            tripId: 43,
+            title: 'Jeju Island Escape',
+            startDate: '2098-09-02',
+            endDate: '2098-09-07',
+          },
+          {
+            tripId: 44,
+            title: 'Gangneung Coast Run',
+            startDate: '2098-10-11',
+            endDate: '2098-10-13',
           },
           {
             tripId: 7,

@@ -189,4 +189,63 @@ describe('JourneyListView', () => {
 
     expect(wrapper.text()).toContain('No Ongoing journeys')
   })
+
+  it('lays the journey list out as a labelled horizontal snap carousel', async () => {
+    fetchJourneys.mockResolvedValue(journeys)
+    const { wrapper } = await mountView()
+
+    const carousel = wrapper.get('ul')
+
+    // 스냅 캐러셀 셋: 축·강도·스냅포트 시작점(화면 20px 여백).
+    expect(carousel.classes()).toEqual(
+      expect.arrayContaining([
+        'flex',
+        'overflow-x-auto',
+        'snap-x',
+        'snap-mandatory',
+        'scroll-ps-screen',
+      ]),
+    )
+
+    // full-bleed는 목록에만 건다. 빈·오류 상태를 감싸는 래퍼의 여백을 건드리면 안 된다.
+    expect(carousel.classes()).toEqual(expect.arrayContaining(['-mx-screen', 'px-screen']))
+
+    // 동작 줄이기에서는 부드러운 스크롤만 끄고 스냅은 남긴다.
+    expect(carousel.classes()).toContain('motion-safe:scroll-smooth')
+    expect(carousel.classes()).not.toContain('scroll-smooth')
+
+    // preflight가 list-style을 지워 목록 시맨틱이 사라지므로 role을 명시한다.
+    expect(carousel.attributes('role')).toBe('list')
+    expect(carousel.attributes('aria-labelledby')).toBe('journey-list-section-title')
+    expect(wrapper.get('#journey-list-section-title').text()).toBe('Ongoing journeys')
+
+    // 스크롤 컨테이너 자체는 탭 스톱이 되면 안 된다. 카드 링크가 이미 초점을 받는다.
+    expect(carousel.attributes('tabindex')).toBeUndefined()
+
+    // 카드는 고정폭 스냅 아이템이다.
+    const cards = wrapper.findAll('li')
+    expect(cards).toHaveLength(1)
+    expect(cards[0]?.classes()).toEqual(expect.arrayContaining(['w-68', 'shrink-0', 'snap-start']))
+
+    // 초점 순서는 카드당 링크 하나 그대로다. 말단에 버튼을 덧붙이지 않았다.
+    expect(carousel.findAll('a')).toHaveLength(1)
+    expect(carousel.findAll('button')).toHaveLength(0)
+  })
+
+  it('restarts the carousel at the first card when the tab changes', async () => {
+    fetchJourneys.mockResolvedValue(journeys)
+    const { wrapper } = await mountView()
+
+    // jsdom에는 레이아웃이 없어 scrollLeft로는 검증할 수 없다(항상 0이다). 실제 보증은
+    // 탭이 바뀔 때 `ul`이 재생성되어 이전 가로 스크롤 위치가 남지 않는다는 것이다.
+    const before = wrapper.get('ul').element
+
+    await wrapper.findAll('[role="radio"]')[1]?.trigger('click')
+
+    const after = wrapper.get('ul').element
+
+    expect(after).not.toBe(before)
+    expect(wrapper.get('#journey-list-section-title').text()).toBe('Past journeys')
+    expect(wrapper.text()).toContain('Busan Weekender')
+  })
 })
