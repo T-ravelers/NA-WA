@@ -114,6 +114,18 @@ class AppointmentServiceTest {
     }
 
     @Test
+    void createAppointment_missingItemType_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        request.setItemType(null);
+
+        assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+        verify(appointmentMapper, never()).findAvailableItemType(any());
+    }
+
+    @Test
     void searchAppointments_returnsPagedSummaries() {
         AppointmentSearchRequest request = new AppointmentSearchRequest();
         request.setPage(1);
@@ -360,8 +372,50 @@ class AppointmentServiceTest {
 
         appointmentService.leaveAppointment(2L, 10L);
 
-        verify(depositMapper, never()).findByAppointmentMemberId(any());
+        verify(depositMapper).findByAppointmentMemberId(30L);
+        verify(depositMapper, never()).markCancelled(any(), any());
         verify(appointmentMapper).markMemberLeft(30L);
+    }
+
+    @Test
+    void leaveAppointment_activeHostWithPendingDeposit_cancelsDeposit() {
+        Appointment appointment = appointment(
+                10L,
+                AppointmentStatus.RECRUITING
+        );
+        AppointmentMember host = AppointmentMember.builder()
+                .appointmentMemberId(20L)
+                .appointmentId(10L)
+                .memberId(1L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .build();
+        AppointmentMember successor = AppointmentMember.builder()
+                .appointmentMemberId(30L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .build();
+        Deposit deposit = mock(Deposit.class);
+        when(deposit.getDepositId()).thenReturn(40L);
+        when(deposit.isPending()).thenReturn(true);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
+                10L, 1L
+        )).thenReturn(host);
+        when(appointmentMapper.findHostSuccessorForUpdate(10L, 1L))
+                .thenReturn(successor);
+        when(appointmentMapper.updateHostMember(10L, 1L, 2L))
+                .thenReturn(1);
+        when(depositMapper.findByAppointmentMemberId(20L))
+                .thenReturn(deposit);
+        when(depositMapper.markCancelled(eq(40L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberLeft(20L)).thenReturn(1);
+
+        appointmentService.leaveAppointment(1L, 10L);
+
+        verify(depositMapper).markCancelled(eq(40L), any());
+        verify(appointmentMapper).updateHostMember(10L, 1L, 2L);
     }
 
     @Test

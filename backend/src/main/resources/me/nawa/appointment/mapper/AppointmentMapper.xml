@@ -335,4 +335,89 @@
         ORDER BY host DESC, am.joined_at ASC, am.appointment_member_id ASC
     </select>
 
+    <select id="findLifecycleCandidates"
+            resultType="me.nawa.appointment.domain.Appointment">
+        SELECT
+            <include refid="appointmentColumns"/>
+        FROM appointments a
+        JOIN explore_items ei
+          ON ei.item_id = a.item_id
+        JOIN members host
+          ON host.member_id = a.host_member_id
+        WHERE a.deleted_at IS NULL
+          AND ei.deleted_at IS NULL
+          AND host.deleted_at IS NULL
+          AND (
+              (a.appointment_status = 'RECRUITING'
+                  AND (
+                      a.join_deadline &lt;= #{now}
+                      OR (
+                          SELECT COUNT(*)
+                          FROM appointment_members count_member
+                          WHERE count_member.appointment_id = a.appointment_id
+                            AND count_member.membership_status IN ('PENDING','ACTIVE')
+                            AND count_member.deleted_at IS NULL
+                      ) &gt;= a.max_members
+                  ))
+              OR a.appointment_status = 'CLOSED'
+              OR (a.appointment_status = 'CONFIRMED'
+                  AND a.activity_start_at &lt;= #{now})
+          )
+    </select>
+
+    <update id="updateStatus">
+        UPDATE appointments
+        SET appointment_status = #{nextStatus},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = #{appointmentId}
+          AND appointment_status = #{expectedStatus}
+          AND deleted_at IS NULL
+    </update>
+
+    <select id="countActiveMembers" resultType="int">
+        SELECT COUNT(*)
+        FROM appointment_members
+        WHERE appointment_id = #{appointmentId}
+          AND membership_status = 'ACTIVE'
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="countHeldDepositsForActiveMembers" resultType="int">
+        SELECT COUNT(*)
+        FROM deposits d
+        JOIN appointment_members am
+          ON am.appointment_member_id = d.appointment_member_id
+         AND am.deleted_at IS NULL
+        WHERE am.appointment_id = #{appointmentId}
+          AND am.membership_status = 'ACTIVE'
+          AND d.deposit_status = 'HELD'
+          AND d.deleted_at IS NULL
+    </select>
+
+    <update id="markPendingMembersLeft">
+        UPDATE appointment_members
+        SET membership_status = 'LEFT',
+            left_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = #{appointmentId}
+          AND membership_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markPendingDepositsCancelled">
+        UPDATE deposits d
+        JOIN appointment_members am
+          ON am.appointment_member_id = d.appointment_member_id
+         AND am.deleted_at IS NULL
+        SET d.held_transfer_id = NULL,
+            d.held_at          = NULL,
+            d.resolved_at      = #{resolvedAt},
+            d.deposit_status   = 'CANCELLED',
+            d.updated_at       = CURRENT_TIMESTAMP
+        WHERE am.appointment_id = #{appointmentId}
+          AND am.membership_status = 'PENDING'
+          AND d.deposit_status = 'PENDING'
+          AND d.deleted_at IS NULL
+    </update>
+
 </mapper>

@@ -11,6 +11,7 @@ import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.dto.response.AppointmentSummaryResponse;
 import me.nawa.appointment.service.AppointmentService;
+import me.nawa.appointment.service.AppointmentLifecycleService;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.AfterEach;
@@ -45,6 +46,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AppointmentControllerTest {
     @Mock
     private AppointmentService appointmentService;
+    @Mock
+    private AppointmentLifecycleService appointmentLifecycleService;
 
     private MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper()
@@ -53,7 +56,10 @@ class AppointmentControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AppointmentController(appointmentService))
+                .standaloneSetup(new AppointmentController(
+                        appointmentService,
+                        appointmentLifecycleService
+                ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver()
@@ -139,6 +145,53 @@ class AppointmentControllerTest {
 
         assertEquals(10L, objectMapper.readTree(responseBody)
                 .path("data").path("appointmentId").asLong());
+    }
+
+    @Test
+    void createAppointment_serviceValidationFailure_returnsBadRequest()
+            throws Exception {
+        when(appointmentService.createAppointment(
+                eq(1L),
+                any(AppointmentCreateRequest.class)
+        )).thenThrow(new me.nawa.common.exception.BusinessException(
+                me.nawa.common.exception.CommonErrorCode.INVALID_INPUT
+        ));
+
+        String request = "{"
+                + "\"itemId\":100,"
+                + "\"languageCode\":\"en\","
+                + "\"appointmentName\":\"Seongsu Tour\","
+                + "\"maxMembers\":5,"
+                + "\"depositAmount\":10000,"
+                + "\"meetingPlace\":\"Seongsu\","
+                + "\"joinDeadline\":\"2026-08-20T18:00:00\","
+                + "\"activityStartAt\":\"2026-08-21T18:30:00\","
+                + "\"activityEndAt\":\"2026-08-21T22:00:00\"}"
+                ;
+
+        mockMvc.perform(post("/api/v1/appointments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void advanceStatus_returnsUpdatedAppointment() throws Exception {
+        when(appointmentLifecycleService.advanceAppointment(10L))
+                .thenReturn(AppointmentStatus.CONFIRMED);
+        when(appointmentService.getAppointment(1L, 10L))
+                .thenReturn(detailResponse());
+
+        JsonNode body = objectMapper.readTree(mockMvc.perform(
+                        post("/api/v1/appointments/10/status/transition")
+                )
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8));
+
+        assertTrue(body.path("success").asBoolean());
+        assertEquals(10L, body.path("data").path("appointmentId").asLong());
     }
 
     private JsonNode performGet(String path) throws Exception {

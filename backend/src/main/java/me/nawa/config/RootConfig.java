@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import javax.sql.DataSource;
@@ -54,6 +55,7 @@ import javax.sql.DataSource;
     "me.nawa.settlement.service",
     "me.nawa.deposit.service"})
 @EnableTransactionManagement
+@EnableScheduling
 public class RootConfig {
     @Value("${jdbc.driver}")
     private String driver;

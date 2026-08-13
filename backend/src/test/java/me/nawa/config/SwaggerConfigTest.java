@@ -346,6 +346,11 @@ class SwaggerConfigTest {
         AppointmentService appointmentService() {
             return new AppointmentService(null, null);
         }
+
+        @Bean
+        me.nawa.appointment.service.AppointmentLifecycleService appointmentLifecycleService() {
+            return new me.nawa.appointment.service.AppointmentLifecycleService(null);
+        }
     }
 
     @Configuration

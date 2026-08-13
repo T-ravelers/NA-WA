@@ -212,8 +212,11 @@ public class AppointmentService {
                 );
             }
         }
-        if (member.getMembershipStatus() == MembershipStatus.PENDING) {
-            cancelPendingDeposit(member.getAppointmentMemberId());
+        Deposit deposit = depositMapper.findByAppointmentMemberId(
+                member.getAppointmentMemberId()
+        );
+        if (deposit != null && deposit.isPending()) {
+            cancelPendingDeposit(deposit);
         }
         if (appointmentMapper.markMemberLeft(
                 member.getAppointmentMemberId()
@@ -406,12 +409,8 @@ public class AppointmentService {
         return appointment;
     }
 
-    private void cancelPendingDeposit(Long appointmentMemberId) {
-        Deposit deposit = depositMapper.findByAppointmentMemberId(
-                appointmentMemberId
-        );
-        if (deposit == null || !deposit.isPending()
-                || depositMapper.markCancelled(
+    private void cancelPendingDeposit(Deposit deposit) {
+        if (depositMapper.markCancelled(
                 deposit.getDepositId(),
                 LocalDateTime.now()
         ) != 1) {
@@ -550,7 +549,11 @@ public class AppointmentService {
             AppointmentCreateRequest request) {
         if (memberId == null || memberId <= 0 || request == null
                 || request.getItemId() == null || request.getItemId() <= 0
-                || !ITEM_TYPES.contains(request.getItemType())
+                || request.getItemType() == null
+                || request.getLanguageCode() == null) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        if (!ITEM_TYPES.contains(request.getItemType())
                 || !LANGUAGES.contains(request.getLanguageCode())
                 || isBlank(request.getAppointmentName())
                 || request.getAppointmentName().trim().length() > 100

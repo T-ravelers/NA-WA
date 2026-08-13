@@ -150,4 +150,15 @@ describe('AppointmentReviewView', () => {
     expect(wrapper.text()).toContain('Reviews are not available yet')
     expect(wrapper.text()).not.toContain('Save review')
   })
+
+  it('does not offer reviews for members marked as no-show', async () => {
+    fetchAppointmentMembers.mockResolvedValueOnce([
+      members[0],
+      { ...members[1], attendanceStatus: 'NO_SHOW' as const },
+    ])
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('No reviews to write')
+    expect(wrapper.text()).not.toContain('Alex Kim')
+  })
 })

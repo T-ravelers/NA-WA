@@ -47,6 +47,7 @@ const reviewableMembers = computed(() =>
   (membersQuery.data.value ?? []).filter(
     (member) =>
       member.membershipStatus === 'ACTIVE' &&
+      member.attendanceStatus === 'ATTENDED' &&
       profileQuery.data.value?.memberId !== undefined &&
       member.memberId !== profileQuery.data.value.memberId,
   ),
@@ -59,7 +60,10 @@ const isActiveParticipant = computed(() => {
   return (
     currentMemberId !== undefined &&
     (membersQuery.data.value ?? []).some(
-      (member) => member.memberId === currentMemberId && member.membershipStatus === 'ACTIVE',
+      (member) =>
+        member.memberId === currentMemberId &&
+        member.membershipStatus === 'ACTIVE' &&
+        member.attendanceStatus === 'ATTENDED',
     )
   )
 })

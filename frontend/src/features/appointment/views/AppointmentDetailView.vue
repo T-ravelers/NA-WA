@@ -16,6 +16,7 @@ import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
 import {
   cancelAppointmentParticipation,
+  joinAppointment,
   type AppointmentDateTimeValue,
   type AppointmentStatus,
 } from '../api/appointmentApi'
@@ -73,8 +74,11 @@ const statusTone = computed(() =>
   appointment.value?.appointmentStatus === 'RECRUITING' ? 'ongoing' : 'neutral',
 )
 
-const isJoinAvailable = computed(() => appointment.value?.appointmentStatus === 'RECRUITING')
-const isCompleted = computed(() => appointment.value?.appointmentStatus === 'COMPLETED')
+const isJoinAvailable = computed(() => {
+  if (appointment.value?.appointmentStatus !== 'RECRUITING') return false
+  const deadline = parseAppointmentDateTime(appointment.value.joinDeadline)
+  return deadline !== null && Date.now() < deadline.getTime()
+})
 const currentMemberId = computed(() => profileQuery.data.value?.memberId)
 const isHost = computed(
   () =>
@@ -84,7 +88,12 @@ const isHost = computed(
 const isActiveParticipant = computed(
   () =>
     currentMemberId.value !== undefined &&
-    members.value.some((member) => member.memberId === currentMemberId.value),
+    members.value.some(
+      (member) =>
+        member.memberId === currentMemberId.value &&
+        member.membershipStatus === 'ACTIVE' &&
+        member.attendanceStatus === 'ATTENDED',
+    ),
 )
 const canCancelParticipation = computed(() => {
   const status = participationQuery.data.value?.membershipStatus
@@ -101,8 +110,22 @@ const cancelMutation = useMutation({
     await queryClient.invalidateQueries({ queryKey: appointmentKeys.all })
   },
 })
-const canOpenAttendance = computed(() => isCompleted.value === true && isHost.value)
-const canOpenReviews = computed(() => isCompleted.value === true && isActiveParticipant.value)
+const joinMutation = useMutation({
+  mutationFn: () => {
+    if (appointmentId.value === null) throw new Error('Invalid appointment id')
+    return joinAppointment(appointmentId.value)
+  },
+  onSuccess: async () => {
+    depositSheetOpen.value = false
+    await queryClient.invalidateQueries({ queryKey: appointmentKeys.all })
+  },
+})
+const canOpenAttendance = computed(
+  () => appointment.value?.appointmentStatus === 'IN_PROGRESS' && isHost.value,
+)
+const canOpenReviews = computed(
+  () => appointment.value?.appointmentStatus === 'COMPLETED' && isActiveParticipant.value,
+)
 const canOpenPostEventMenu = computed(() => canOpenAttendance.value || canOpenReviews.value)
 
 function formatDateTime(value: AppointmentDateTimeValue): string {
@@ -178,6 +201,11 @@ function openDepositSheet(): void {
 
 function closeDepositSheet(): void {
   depositSheetOpen.value = false
+}
+
+function confirmJoin(): void {
+  if (!isJoinAvailable.value || joinMutation.isPending.value) return
+  joinMutation.mutate()
 }
 
 function cancelParticipation(): void {
@@ -397,8 +425,9 @@ function cancelParticipation(): void {
         v-if="depositSheetOpen"
         :appointment-name="appointment.appointmentName"
         :deposit-amount="appointment.depositAmount"
-        confirm-disabled
+        :confirm-disabled="joinMutation.isPending.value || !isJoinAvailable"
         @close="closeDepositSheet"
+        @confirm="confirmJoin"
       />
     </template>
   </main>

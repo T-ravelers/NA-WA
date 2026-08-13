@@ -9,6 +9,7 @@ import { appointmentMemberIntegrationKey } from '../../model/memberIntegration'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
+const joinAppointment = vi.fn()
 const profileQuery = {
   data: ref({ memberId: 11 }),
   isPending: ref(false),
@@ -20,6 +21,7 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
   fetchAppointment: (appointmentId: number) => fetchAppointment(appointmentId),
   fetchAppointmentMembers: (appointmentId: number) => fetchAppointmentMembers(appointmentId),
+  joinAppointment: (appointmentId: number) => joinAppointment(appointmentId),
 }))
 
 const AppointmentDetailView = (await import('../AppointmentDetailView.vue')).default
@@ -36,9 +38,9 @@ const appointment = {
   appointmentStatus: 'RECRUITING' as const,
   meetingPlace: 'Seongsu Beauty Lab',
   meetingAddress: 'Seongsu-ro 12',
-  activityStartAt: '2026-08-08T18:30:00',
-  activityEndAt: '2026-08-08T22:00:00',
-  joinDeadline: '2026-08-08T17:30:00',
+  activityStartAt: '2099-08-08T18:30:00',
+  activityEndAt: '2099-08-08T22:00:00',
+  joinDeadline: '2099-08-08T17:30:00',
   hostDisplayName: 'Mina Park',
   description: null,
   members: [],
@@ -126,8 +128,10 @@ describe('AppointmentDetailView', () => {
   beforeEach(() => {
     fetchAppointment.mockReset()
     fetchAppointmentMembers.mockReset()
+    joinAppointment.mockReset()
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue([...members, leftMember])
+    joinAppointment.mockResolvedValue(members[1])
   })
 
   it('renders appointment details, members, and opens deposit confirmation', async () => {
@@ -154,7 +158,13 @@ describe('AppointmentDetailView', () => {
         .findAll('button')
         .find((button) => button.text().includes('Pay'))
         ?.attributes('disabled'),
-    ).toBeDefined()
+    ).toBeUndefined()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Pay'))
+      ?.trigger('click')
+    expect(joinAppointment).toHaveBeenCalledWith(7)
   })
 
   it('renders the member cards directly without a View all action', async () => {
@@ -173,7 +183,7 @@ describe('AppointmentDetailView', () => {
   })
 
   it('opens the attendance screen from the appointment detail', async () => {
-    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'IN_PROGRESS' })
     const { wrapper, router } = await mountView()
 
     await wrapper
@@ -185,26 +195,26 @@ describe('AppointmentDetailView', () => {
     expect(router.currentRoute.value.name).toBe('appointment-attendance')
   })
 
-  it('opens the attendance and reviews screens from the detail menu', async () => {
+  it('opens reviews from the detail menu after completion', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
     const { wrapper, router } = await mountView()
 
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    expect(wrapper.get('[role="menu"]').text()).toContain('Attendance')
     expect(wrapper.get('[role="menu"]').text()).toContain('Reviews')
+    expect(wrapper.get('[role="menu"]').text()).not.toContain('Attendance')
 
     await wrapper.get('[role="menuitem"]').trigger('click')
     await flushPromises()
-    expect(router.currentRoute.value.name).toBe('appointment-attendance')
-
-    await router.push('/appointments/7')
-    await flushPromises()
-    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    await wrapper
-      .findAll('[role="menuitem"]')
-      .find((button) => button.text() === 'Reviews')
-      ?.trigger('click')
-    await flushPromises()
     expect(router.currentRoute.value.name).toBe('appointment-reviews')
+  })
+
+  it('does not expose attendance from a completed appointment', async () => {
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    expect(wrapper.get('[role="menu"]').text()).not.toContain('Attendance')
+    expect(wrapper.text()).not.toContain('Confirm attendance')
   })
 })
