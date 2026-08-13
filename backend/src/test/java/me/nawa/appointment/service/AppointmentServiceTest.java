@@ -9,12 +9,16 @@ import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import me.nawa.appointment.dto.response.AppointmentDetailResponse;
 import me.nawa.appointment.dto.response.AppointmentListResponse;
+import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.deposit.domain.Deposit;
 import me.nawa.deposit.domain.DepositStatus;
 import me.nawa.deposit.mapper.DepositMapper;
+import me.nawa.wallet.domain.WalletTransfer;
+import me.nawa.wallet.mapper.WalletTransferMapper;
+import me.nawa.wallet.util.TransactionNumberGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -42,6 +46,10 @@ class AppointmentServiceTest {
     private AppointmentMapper appointmentMapper;
     @Mock
     private DepositMapper depositMapper;
+    @Mock
+    private WalletTransferMapper walletTransferMapper;
+    @Mock
+    private TransactionNumberGenerator transactionNumberGenerator;
     @InjectMocks
     private AppointmentService appointmentService;
 
@@ -63,6 +71,22 @@ class AppointmentServiceTest {
                 any(AppointmentMember.class)
         );
         when(depositMapper.insert(any(Deposit.class))).thenReturn(1);
+        Deposit persistedDeposit = mock(Deposit.class);
+        when(persistedDeposit.getDepositId()).thenReturn(40L);
+        when(persistedDeposit.getAmount()).thenReturn(
+                BigDecimal.valueOf(10_000)
+        );
+        when(depositMapper.findByAppointmentMemberId(20L))
+                .thenReturn(persistedDeposit);
+        when(transactionNumberGenerator.generate())
+                .thenReturn("TXN-APPOINTMENT-1");
+        doAnswer(invocation -> {
+            WalletTransfer transfer = invocation.getArgument(0);
+            transfer.setTransferId(50L);
+            return null;
+        }).when(walletTransferMapper).insert(any(WalletTransfer.class));
+        when(depositMapper.markHeld(eq(40L), eq(50L), any()))
+                .thenReturn(1);
 
         Appointment result = appointmentService.createAppointment(1L, request);
 
@@ -86,6 +110,7 @@ class AppointmentServiceTest {
                 depositCaptor.getValue().getDepositStatus());
         assertEquals(BigDecimal.valueOf(10_000),
                 depositCaptor.getValue().getAmount());
+        verify(depositMapper).markHeld(eq(40L), eq(50L), any());
     }
 
     @Test
@@ -189,7 +214,7 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void joinAppointment_createsPendingMemberAndDeposit() {
+    void joinAppointment_holdsDepositAndActivatesMember() {
         Appointment appointment = appointment(
                 10L,
                 AppointmentStatus.RECRUITING
@@ -210,17 +235,40 @@ class AppointmentServiceTest {
                 any(AppointmentMember.class)
         );
         when(depositMapper.insert(any(Deposit.class))).thenReturn(1);
+        Deposit persistedDeposit = mock(Deposit.class);
+        when(persistedDeposit.getDepositId()).thenReturn(40L);
+        when(persistedDeposit.getAmount()).thenReturn(
+                BigDecimal.valueOf(10_000)
+        );
+        when(depositMapper.findByAppointmentMemberId(30L))
+                .thenReturn(persistedDeposit);
+        when(transactionNumberGenerator.generate())
+                .thenReturn("TXN-APPOINTMENT-2");
+        doAnswer(invocation -> {
+            WalletTransfer transfer = invocation.getArgument(0);
+            transfer.setTransferId(51L);
+            return null;
+        }).when(walletTransferMapper).insert(any(WalletTransfer.class));
+        when(depositMapper.markHeld(eq(40L), eq(51L), any()))
+                .thenReturn(1);
+        when(appointmentMapper.markMemberActive(30L)).thenReturn(1);
 
-        appointmentService.joinAppointment(2L, 10L);
+        AppointmentMemberResponse result = appointmentService.joinAppointment(
+                2L,
+                10L
+        );
 
         ArgumentCaptor<AppointmentMember> memberCaptor =
                 ArgumentCaptor.forClass(AppointmentMember.class);
         verify(appointmentMapper).insertAppointmentMember(
                 memberCaptor.capture()
         );
-        assertEquals(MembershipStatus.PENDING,
+        assertEquals(MembershipStatus.ACTIVE,
                 memberCaptor.getValue().getMembershipStatus());
         verify(depositMapper).insert(any(Deposit.class));
+        verify(depositMapper).markHeld(eq(40L), eq(51L), any());
+        verify(appointmentMapper).markMemberActive(30L);
+        assertEquals(MembershipStatus.ACTIVE, result.getMembershipStatus());
     }
 
     @Test

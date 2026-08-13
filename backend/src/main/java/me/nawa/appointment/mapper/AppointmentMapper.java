@@ -69,6 +69,10 @@ public interface AppointmentMapper {
             @Param("appointmentMemberId") Long appointmentMemberId
     );
 
+    int markMemberActive(
+            @Param("appointmentMemberId") Long appointmentMemberId
+    );
+
     int confirmAttendance(
             @Param("appointmentId") Long appointmentId,
             @Param("memberId") Long memberId,

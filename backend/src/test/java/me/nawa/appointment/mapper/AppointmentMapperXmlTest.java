@@ -66,6 +66,9 @@ class AppointmentMapperXmlTest {
                 "me.nawa.appointment.mapper.AppointmentMapper.markMemberLeft"
         ));
         assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.markMemberActive"
+        ));
+        assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.countParticipatingMembers"
         ));
         assertTrue(configuration.hasStatement(

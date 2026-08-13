@@ -20,6 +20,9 @@ import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.deposit.domain.AttendanceStatus;
 import me.nawa.deposit.domain.Deposit;
 import me.nawa.deposit.mapper.DepositMapper;
+import me.nawa.wallet.domain.WalletTransfer;
+import me.nawa.wallet.mapper.WalletTransferMapper;
+import me.nawa.wallet.util.TransactionNumberGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +62,8 @@ public class AppointmentService {
 
     private final AppointmentMapper appointmentMapper;
     private final DepositMapper depositMapper;
+    private final WalletTransferMapper walletTransferMapper;
+    private final TransactionNumberGenerator transactionNumberGenerator;
 
     @Transactional
     public Appointment createAppointment(
@@ -109,6 +114,7 @@ public class AppointmentService {
         if (depositMapper.insert(deposit) != 1) {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
+        holdDeposit(memberId, host.getAppointmentMemberId(), appointment);
 
         // The host is inserted as the first ACTIVE member during creation.
         appointment.setCurrentMemberCount(1);
@@ -165,6 +171,14 @@ public class AppointmentService {
                     CommonErrorCode.INTERNAL_SERVER_ERROR
             );
         }
+
+        holdDeposit(memberId, member.getAppointmentMemberId(), appointment);
+        if (appointmentMapper.markMemberActive(
+                member.getAppointmentMemberId()
+        ) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        member.setMembershipStatus(MembershipStatus.ACTIVE);
 
         return toMemberResponse(member);
     }
@@ -417,6 +431,49 @@ public class AppointmentService {
             throw new BusinessException(
                     CommonErrorCode.INTERNAL_SERVER_ERROR
             );
+        }
+    }
+
+    /**
+     * 결제 연동 전 생성 확인을 완료 결제로 간주하는 임시 예치 경로입니다.
+     * 거래 원장을 먼저 만들고 보증금을 HELD로 확정해야 상태 전이 조건을
+     * 만족할 수 있습니다. 실제 지갑 차감은 결제 연동 시 이 경로를 대체합니다.
+     */
+    private void holdDeposit(
+            Long memberId,
+            Long appointmentMemberId,
+            Appointment appointment) {
+        Deposit persistedDeposit = depositMapper.findByAppointmentMemberId(
+                appointmentMemberId
+        );
+        if (persistedDeposit == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        requireGeneratedId(persistedDeposit.getDepositId());
+
+        LocalDateTime heldAt = LocalDateTime.now();
+        WalletTransfer transfer = new WalletTransfer(
+                null,
+                transactionNumberGenerator.generate(),
+                "DEPOSIT_HOLD",
+                "COMPLETED",
+                persistedDeposit.getAmount(),
+                "Appointment deposit #" + appointment.getAppointmentId(),
+                null,
+                heldAt,
+                heldAt,
+                memberId,
+                "appointment-deposit-" + appointmentMemberId
+        );
+        walletTransferMapper.insert(transfer);
+        requireGeneratedId(transfer.getTransferId());
+
+        if (depositMapper.markHeld(
+                persistedDeposit.getDepositId(),
+                transfer.getTransferId(),
+                heldAt
+        ) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 

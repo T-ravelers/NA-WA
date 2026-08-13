@@ -90,9 +90,11 @@ erDiagram
 
 - 약속은 이벤트와 장소를 포함하는 `explore_items`를 참조합니다.
 - 결제 API가 연결되기 전까지는 생성 확인을 결제 완료로 간주하므로 약속 생성 직후
-  `RECRUITING`, 방장 `ACTIVE`로 기록합니다. 결제 연동 후에는 필요에 따라
-  `PAYMENT_PENDING` 전이를 적용합니다.
-- 참가자는 보증금 예치 전 `PENDING`, 예치 완료 후 `ACTIVE`이며, 나간 참가자는
-  `LEFT`로 기록합니다. 같은 약속에는 재참여할 수 없습니다.
+  `RECRUITING`, 방장 `ACTIVE`, 방장 보증금 `HELD`로 기록합니다. 결제 연동 후에는
+  결제 성공 콜백에서 동일한 `PENDING` → `HELD` 및 `PENDING` → `ACTIVE` 전이를
+  수행합니다.
+- 참여 확인도 현재는 결제 완료로 간주하여 참가자 보증금 `HELD`, 참가자 상태
+  `ACTIVE`로 기록합니다. 나간 참가자는 `LEFT`로 기록하며 같은 약속에는
+  재참여할 수 없습니다.
 - 한 참가 이력에는 보증금 행을 최대 하나만 연결합니다.
 - 약속별 payout batch는 하나이며, 실제 금액 이동은 `wallet_transfers`가 기록합니다.

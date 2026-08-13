@@ -285,6 +285,16 @@
           AND deleted_at IS NULL
     </update>
 
+    <update id="markMemberActive">
+        UPDATE appointment_members
+        SET membership_status = 'ACTIVE',
+            left_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
     <update id="confirmAttendance">
         UPDATE appointment_members
         SET attendance_status = #{attendanceStatus},

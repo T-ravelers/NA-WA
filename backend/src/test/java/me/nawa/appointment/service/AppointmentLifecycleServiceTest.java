@@ -45,6 +45,26 @@ class AppointmentLifecycleServiceTest {
     }
 
     @Test
+    void recruitingAtDeadlineWithHeldMembers_becomesConfirmed() {
+        Appointment appointment = appointment(AppointmentStatus.RECRUITING);
+        appointment.setJoinDeadline(LocalDateTime.now().minusMinutes(1));
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.updateStatus(10L, "RECRUITING", "CLOSED"))
+                .thenReturn(1);
+        when(appointmentMapper.updateStatus(10L, "CLOSED", "CONFIRMED"))
+                .thenReturn(1);
+        when(appointmentMapper.countActiveMembers(10L)).thenReturn(2);
+        when(appointmentMapper.countHeldDepositsForActiveMembers(10L))
+                .thenReturn(2);
+
+        assertEquals(
+                AppointmentStatus.CONFIRMED,
+                lifecycleService.advanceAppointment(10L)
+        );
+    }
+
+    @Test
     void closedWithAllActiveDepositsHeld_becomesConfirmed() {
         Appointment appointment = appointment(AppointmentStatus.CLOSED);
         when(appointmentMapper.findAppointmentByIdForUpdate(10L))
