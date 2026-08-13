@@ -185,6 +185,7 @@ export default {
       description: 'Set the amount and memo before showing your payment QR.',
       amount: 'Amount',
       amountHelper: 'Enter the amount for this payment request.',
+      amountPlaceholder: '18,500',
       payerAmountTitle: 'The payer will enter the amount',
       payerAmountDescription: 'The payer can choose the amount after scanning this QR.',
       payerEntersAmount: 'Let the payer enter the amount',

@@ -65,13 +65,28 @@ describe('WalletQrCreateView', () => {
     )
   })
 
-  it('shows the QR request form', async () => {
+  it('shows the QR request form with empty amount and memo placeholders', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.get('h1').text()).toBe('CREATE PAYMENT QR')
     expect(wrapper.text()).toContain('Create a payment request')
     expect(wrapper.text()).toContain('Let the payer enter the amount')
     expect(wrapper.text()).toContain('Create QR')
+    expect(wrapper.get('input[inputmode="numeric"]').attributes('placeholder')).toBe('18,500')
+    expect(wrapper.get('input[type="text"]:not([inputmode])').attributes('placeholder')).toBe(
+      'e.g. Seoul Night Tour',
+    )
+  })
+
+  it('disables QR creation until a fixed amount is entered', async () => {
+    const { wrapper } = await mountView()
+
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Create QR')
+        ?.attributes('disabled'),
+    ).toBeDefined()
   })
 
   it('creates the QR via the API, refreshes the active QR list, and returns to My QR', async () => {
@@ -79,6 +94,7 @@ describe('WalletQrCreateView', () => {
     const pushSpy = vi.spyOn(router, 'push')
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
+    await wrapper.get('input[inputmode="numeric"]').setValue('18500')
     await wrapper.get('input[type="text"]:not([inputmode])').setValue('Seoul Food Tour')
     await wrapper
       .findAll('button')
@@ -94,7 +110,7 @@ describe('WalletQrCreateView', () => {
     expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr' })
   })
 
-  it('supports a request where the payer enters the amount', async () => {
+  it('supports a request where the payer enters the amount, with no memo required', async () => {
     const { wrapper } = await mountView()
 
     await wrapper.get('input[type="checkbox"]').setValue(true)
@@ -106,14 +122,14 @@ describe('WalletQrCreateView', () => {
 
     expect(vi.mocked(createPaymentQr).mock.calls[0]?.[0]).toEqual({
       amount: null,
-      memo: 'Seoul Night Tour',
+      memo: null,
     })
   })
 
-  it('sends a cleared memo as null', async () => {
+  it('sends a blank memo as null', async () => {
     const { wrapper } = await mountView()
 
-    await wrapper.get('input[type="text"]:not([inputmode])').setValue('')
+    await wrapper.get('input[inputmode="numeric"]').setValue('18500')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Create QR')
@@ -132,6 +148,7 @@ describe('WalletQrCreateView', () => {
     const { router, wrapper } = await mountView()
     const pushSpy = vi.spyOn(router, 'push')
 
+    await wrapper.get('input[inputmode="numeric"]').setValue('18500')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Create QR')
@@ -140,19 +157,6 @@ describe('WalletQrCreateView', () => {
 
     expect(wrapper.text()).toContain('We could not create this QR code. Please try again.')
     expect(pushSpy).not.toHaveBeenCalled()
-  })
-
-  it('disables QR creation when a fixed amount is empty', async () => {
-    const { wrapper } = await mountView()
-
-    await wrapper.get('input[inputmode="numeric"]').setValue('')
-
-    expect(
-      wrapper
-        .findAll('button')
-        .find((button) => button.text() === 'Create QR')
-        ?.attributes('disabled'),
-    ).toBeDefined()
   })
 
   it('disables QR creation when the amount exceeds the safe integer range', async () => {

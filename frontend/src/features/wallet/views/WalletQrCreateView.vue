@@ -19,8 +19,8 @@ const { t } = i18n
 const router = useRouter()
 const queryClient = useQueryClient()
 
-const amount = ref<number | null>(18_500)
-const memo = ref('Seoul Night Tour')
+const amount = ref<number | null>(null)
+const memo = ref('')
 const payerEntersAmount = ref(false)
 
 const createMutation = useMutation({ mutationFn: createPaymentQr })
@@ -112,6 +112,7 @@ const createQr = (): void => {
             v-model="amount"
             :label="t('wallet.qrCreate.amount')"
             :helper="t('wallet.qrCreate.amountHelper')"
+            :placeholder="t('wallet.qrCreate.amountPlaceholder')"
           />
 
           <div
