@@ -24,6 +24,7 @@ import type { Category } from '@/shared/ui/category'
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
 import JourneySelectSheet from '../components/JourneySelectSheet.vue'
 import { usePlaceDetailQuery } from '../composables/usePlaceDetailQuery'
+import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
 import { normalizePlaceKind, type PlaceKind } from '../model/placeExplore'
 import { toClosedDays, toDetailEntries } from '../model/placeDetail'
@@ -31,13 +32,9 @@ import { toClosedDays, toDetailEntries } from '../model/placeDetail'
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
-const {
-  addJourneyItem,
-  parseJourneyRouteQuery,
-  readActiveJourneyId,
-  storeActiveJourneyId,
-  useJourneyListQuery,
-} = useExploreJourneyIntegration()
+const { addJourneyItem, parseJourneyRouteQuery, useJourneyListQuery } =
+  useExploreJourneyIntegration()
+const returnContext = useExploreReturnContextStore()
 
 const placeId = computed(() => String(route.params.placeId ?? ''))
 const placeQuery = usePlaceDetailQuery(placeId, locale)
@@ -141,7 +138,7 @@ const menuItems = computed(() => {
 })
 
 const activeJourneyId = computed(
-  () => parseJourneyRouteQuery(route.query.journeyId) ?? readActiveJourneyId(),
+  () => parseJourneyRouteQuery(route.query.journeyId) ?? returnContext.journeyId,
 )
 const journeyListQuery = useJourneyListQuery(journeySelectSheetOpen)
 const journeys = computed(() => journeyListQuery.data.value ?? [])
@@ -205,7 +202,8 @@ function closeJourneySelectSheet(): void {
 
 function selectJourney(journeyId: number): void {
   selectedJourneyId.value = journeyId
-  storeActiveJourneyId(journeyId)
+  returnContext.setJourneyId(journeyId)
+  journeyDate.value = returnContext.visitDate
   journeySelectSheetOpen.value = false
   journeyDateSheetOpen.value = true
 }
@@ -232,11 +230,13 @@ async function confirmJourneyDate(date: string): Promise<void> {
       itemId: current.itemId,
       visitDate: date,
     })
-    storeActiveJourneyId(journeyId)
+    returnContext.setJourneyId(journeyId)
     journeyDate.value = date
     journeyAdded.value = true
     journeyDateSheetOpen.value = false
-    await router.push({ name: 'journey-detail', params: { tripId: journeyId } })
+    await router.push(
+      returnContext.returnTo ?? { name: 'journey-detail', params: { tripId: journeyId } },
+    )
   } catch {
     journeyAddError.value = 'failed'
   } finally {

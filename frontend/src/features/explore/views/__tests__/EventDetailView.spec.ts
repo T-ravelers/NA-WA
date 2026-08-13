@@ -84,8 +84,6 @@ function createJourneyIntegration(): ExploreJourneyIntegration {
   return {
     addJourneyItem,
     parseJourneyRouteQuery: () => null,
-    readActiveJourneyId: () => null,
-    storeActiveJourneyId: vi.fn(),
     useJourneyListQuery: () => query,
   }
 }

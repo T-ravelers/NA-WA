@@ -1,5 +1,6 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -17,8 +18,6 @@ vi.mock('../../model/journeyIntegration', async () => {
       addJourneyItem: (journeyId: number, request: { itemId: number; visitDate: string }) =>
         addJourneyItem(journeyId, request),
       parseJourneyRouteQuery: () => null,
-      readActiveJourneyId: () => null,
-      storeActiveJourneyId: vi.fn(),
       useJourneyListQuery: (enabled: import('vue').MaybeRefOrGetter<boolean>) =>
         useQuery({
           queryKey: ['journeys', 'review-test'],
@@ -97,7 +96,7 @@ async function mountView() {
 
   const wrapper = mount(PlaceDetailView, {
     global: {
-      plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+      plugins: [i18n, router, createPinia(), [VueQueryPlugin, { queryClient }]],
     },
   })
 

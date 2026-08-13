@@ -15,11 +15,7 @@ import {
 import { appointmentMemberIntegrationKey } from '@/features/appointment/model/memberIntegration'
 import { addJourneyItem } from '@/features/journey/api/journeyApi'
 import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
-import {
-  parseJourneyRouteQuery,
-  readActiveJourneyId,
-  storeActiveJourneyId,
-} from '@/features/journey/model/activeJourney'
+import { parseJourneyRouteQuery } from '@/features/journey/model/journeyRouteQuery'
 import { useMemberProfile } from '@/features/member/model/memberQueries'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
 import { journeyReportIntegrationKey } from '@/features/journey/model/reportIntegration'
@@ -58,8 +54,6 @@ app.provide(exploreJourneyIntegrationKey, {
   useJourneyListQuery,
   addJourneyItem,
   parseJourneyRouteQuery,
-  readActiveJourneyId,
-  storeActiveJourneyId,
 })
 app.provide(appointmentMemberIntegrationKey, { useMemberProfile })
 app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
