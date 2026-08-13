@@ -34,7 +34,7 @@ class FlywayMigrationIntegrationTest {
 
         MigrationInfo current = flyway.info().current();
         assertNotNull(current);
-        assertEquals("9", current.getVersion().getVersion());
+        assertEquals("10", current.getVersion().getVersion());
         assertTrue(current.getState().isApplied());
 
         verifyAppointmentParticipationSchema(flyway);

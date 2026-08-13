@@ -16,7 +16,12 @@ export interface UpdateMemberProfilePayload {
   preferredCurrencyCode?: string
 }
 
-export interface MemberAppointmentProfile extends MemberProfile {
+/** Appointment profile response contains only the public member fields below. */
+export interface MemberAppointmentProfile {
+  memberId: number
+  displayName: string
+  profileImageUrl: string | null
+  preferredLanguage: string
   completionRate: number | null
   noShowCount: number
   averageRating: number | null

@@ -265,7 +265,7 @@ public enum MemberErrorCode implements ErrorCode {
 | enum 상수 | 오류 코드 | HTTP 상태 | 의미 |
 | --- | --- | ---: | --- |
 | `APPOINTMENT_NOT_FOUND` | `APPOINTMENT-001` | 404 | 약속을 찾을 수 없음 |
-| `JOIN_NOT_AVAILABLE` | `APPOINTMENT-002` | 409 | 현재 상태·기한·정원상 참여 또는 취소 불가 |
+| `JOIN_NOT_AVAILABLE` | `APPOINTMENT-002` | 409 | 현재 상태·기한·정원상 참여 불가 |
 | `ALREADY_JOINED` | `APPOINTMENT-003` | 409 | 기존 참여 이력이 있어 재참여 불가 |
 | `APPOINTMENT_FORBIDDEN` | `APPOINTMENT-004` | 403 | 약속 처리 권한 없음 |
 | `APPOINTMENT_MEMBER_NOT_FOUND` | `APPOINTMENT-005` | 404 | 참여 정보를 찾을 수 없음 |

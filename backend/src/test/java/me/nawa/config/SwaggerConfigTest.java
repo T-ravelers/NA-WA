@@ -36,6 +36,7 @@ import me.nawa.explore.service.PlaceService;
 import me.nawa.journey.service.JourneyService;
 import me.nawa.report.controller.ReportController;
 import me.nawa.report.service.ReportService;
+import me.nawa.review.service.ReviewService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -79,6 +80,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.TransactionTestConfig.class,
         SwaggerConfigTest.MemberTestConfig.class,
         SwaggerConfigTest.AppointmentTestConfig.class,
+        SwaggerConfigTest.ReviewTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -343,6 +345,15 @@ class SwaggerConfigTest {
         @Bean
         AppointmentService appointmentService() {
             return new AppointmentService(null, null);
+        }
+    }
+
+    @Configuration
+    static class ReviewTestConfig {
+
+        @Bean
+        ReviewService reviewService() {
+            return new ReviewService(null, null);
         }
     }
 
