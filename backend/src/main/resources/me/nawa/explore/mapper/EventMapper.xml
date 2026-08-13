@@ -24,6 +24,11 @@
                 typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
     </resultMap>
 
+    <!-- Event의 저장 status는 스냅샷 생성 시점 값이므로 현재 종료 여부에는 사용하지 않는다. -->
+    <sql id="eventNotEndedCondition">
+        (e.end_date IS NULL OR e.end_date &gt;= CURRENT_DATE())
+    </sql>
+
     <select id="findEventDetail"
             resultMap="eventDetailResultMap">
         SELECT
@@ -72,7 +77,7 @@
           AND ei.visibility_status = 'VISIBLE'
           AND ei.deleted_at IS NULL
           AND e.deleted_at IS NULL
-          AND e.status IN ('SCHEDULED', 'ONGOING')
+          AND <include refid="eventNotEndedCondition"/>
     </select>
 
     <select id="findEventActivities"
@@ -121,7 +126,7 @@
         AND ei.visibility_status = 'VISIBLE'
         AND ei.deleted_at IS NULL
         AND e.deleted_at IS NULL
-        AND e.status IN ('SCHEDULED', 'ONGOING')
+        AND <include refid="eventNotEndedCondition"/>
 
         <if test="request.eventKinds != null and request.eventKinds.size() > 0">
             AND e.event_kind IN
@@ -197,10 +202,10 @@
 
         <choose>
             <when test="request.datePreset == 'ONGOING'">
-                AND e.status = 'ONGOING'
+                AND e.start_date &lt;= CURRENT_DATE()
             </when>
             <when test="request.datePreset == 'OPENING_SOON'">
-                AND e.status = 'SCHEDULED'
+                AND e.start_date &gt; CURRENT_DATE()
             </when>
             <when test="request.datePreset == 'THIS_WEEKEND'">
                 AND e.start_date &lt;= DATE_ADD(

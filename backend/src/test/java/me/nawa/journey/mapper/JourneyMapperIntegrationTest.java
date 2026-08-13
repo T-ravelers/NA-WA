@@ -2,6 +2,7 @@ package me.nawa.journey.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import me.nawa.journey.domain.Journey;
+import me.nawa.journey.domain.JourneyExploreItem;
 import me.nawa.journey.domain.JourneyItem;
 import me.nawa.journey.domain.JourneyTimelineItem;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -104,6 +106,61 @@ class JourneyMapperIntegrationTest {
             result.stream().sorted(timelineOrder).toList(),
             result
         );
+    }
+
+    @Test
+    void findAvailableExploreItemById_excludesEndedEventByDate() {
+        String marker = "j-event-" + UUID.randomUUID();
+        long memberId = insertMember(marker);
+        List<Long> eventItemIds = new ArrayList<>();
+        LocalDate today = jdbcTemplate.queryForObject(
+            "SELECT CURRENT_DATE()",
+            LocalDate.class
+        );
+
+        try {
+            long endedEventId = insertExploreItem(memberId, "EVENT");
+            eventItemIds.add(endedEventId);
+            insertEvent(
+                endedEventId,
+                marker + "-ended",
+                today.minusDays(2),
+                today.minusDays(1),
+                "SCHEDULED"
+            );
+
+            long activeEventId = insertExploreItem(memberId, "EVENT");
+            eventItemIds.add(activeEventId);
+            insertEvent(
+                activeEventId,
+                marker + "-active",
+                today.minusDays(1),
+                today,
+                "ENDED"
+            );
+
+            assertNull(mapper.findAvailableExploreItemById(endedEventId));
+            JourneyExploreItem active = mapper.findAvailableExploreItemById(
+                activeEventId
+            );
+            assertNotNull(active);
+            assertEquals("EVENT", active.getItemType());
+        } finally {
+            for (Long eventItemId : eventItemIds) {
+                jdbcTemplate.update(
+                    "DELETE FROM event WHERE event_id = ?",
+                    eventItemId
+                );
+                jdbcTemplate.update(
+                    "DELETE FROM explore_items WHERE item_id = ?",
+                    eventItemId
+                );
+            }
+            jdbcTemplate.update(
+                "DELETE FROM members WHERE member_id = ?",
+                memberId
+            );
+        }
     }
 
     @Test
@@ -383,6 +440,25 @@ class JourneyMapperIntegrationTest {
                 + "VALUES (?, ?, '2026-08-01', '2026-08-02')",
             itemId,
             marker
+        );
+    }
+
+    private static void insertEvent(
+        long itemId,
+        String marker,
+        LocalDate startDate,
+        LocalDate endDate,
+        String status
+    ) {
+        jdbcTemplate.update(
+            "INSERT INTO event "
+                + "(event_id, title, start_date, end_date, status) "
+                + "VALUES (?, ?, ?, ?, ?)",
+            itemId,
+            marker,
+            startDate,
+            endDate,
+            status
         );
     }
 

@@ -203,7 +203,7 @@
               (ei.item_type = 'EVENT'
                   AND e.event_id IS NOT NULL
                   AND e.deleted_at IS NULL
-                  AND e.status IN ('SCHEDULED', 'ONGOING'))
+                  AND (e.end_date IS NULL OR e.end_date &gt;= CURRENT_DATE()))
               OR (ei.item_type = 'PLACE'
                   AND p.place_id IS NOT NULL
                   AND p.deleted_at IS NULL

@@ -27,7 +27,8 @@
     "vue": "^3.5.40",
     "vue-i18n": "^11.4.8",
     "vue-qrcode-reader": "^5.7.3",
-    "vue-router": "^5.2.0"
+    "vue-router": "^5.2.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
