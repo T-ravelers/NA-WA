@@ -23,6 +23,7 @@
 | `region2Other` | boolean | `region1`이 선택된 경우, `region2`가 비어 있거나 분류되지 않은 Event를 포함합니다. `region1` 없이 사용하면 결과를 만들지 않습니다. |
 | `region3` | 반복 가능한 문자열 목록 | 세부 지역을 같은 종류 안에서 OR로 필터링합니다. |
 | `keyword` | 문자열 | 제목·부제목·설명에 대해 부분 일치 검색을 적용합니다. |
+| `datePreset` | `ONGOING`, `OPENING_SOON`, `THIS_WEEKEND`, `THIS_MONTH` | DB의 현재 날짜를 기준으로 Event 기간을 필터링합니다. `startDate`·`endDate`와 함께 사용할 수 없습니다. |
 | `startDate`, `endDate` | `yyyy-MM-dd` | 기간 조건입니다. |
 | `freeOnly` | boolean | 무료 Event만 조회합니다. |
 | `openWeekendOnly` | boolean | 주말 운영 Event만 조회합니다. |
@@ -39,10 +40,24 @@
 - 같은 종류의 다중 값은 OR 조건으로 적용합니다.
 - 지역, Sector, Activity, 검색어, 옵션처럼 서로 다른 종류의 필터는 AND 조건으로 적용합니다.
 - 여러 Activity에 연결된 Event도 목록에는 한 번만 반환합니다.
-- 공개 상태가 `APPROVED`·`VISIBLE`이고 Event 상태가 `SCHEDULED` 또는 `ONGOING`인
-  데이터만 목록 대상입니다.
+- `APPROVED`·`VISIBLE`이며 삭제되지 않은 Event 중 `end_date`가 없거나 DB의 현재 날짜
+  (`CURRENT_DATE()`) 이후인 데이터만 목록과 상세에 반환합니다. 종료일 당일은 공개합니다.
+- 저장된 `status`는 응답 필드로 유지하지만, 현재 공개 여부와 날짜 프리셋 판정에는
+  사용하지 않습니다.
 - `savedOnly`는 저장 API 계약이 준비되기 전까지 공개 목록 요청에서 사용하지 않습니다.
   프론트엔드도 저장 정렬/필터를 노출하지 않습니다.
+
+### 날짜 프리셋
+
+| 값 | 기준 |
+| --- | --- |
+| `ONGOING` | `start_date`가 오늘 이전 또는 오늘이며, 공통 공개 조건상 아직 종료되지 않은 Event |
+| `OPENING_SOON` | `start_date`가 오늘 이후인 Event |
+| `THIS_WEEKEND` | 다가오는 토요일·일요일과 기간이 겹치는 Event |
+| `THIS_MONTH` | 현재 달과 기간이 겹치는 Event |
+
+모든 프리셋에는 공통 공개 조건인
+`end_date IS NULL OR end_date >= CURRENT_DATE()`가 함께 적용됩니다.
 
 ### 응답 및 페이지 표시
 
