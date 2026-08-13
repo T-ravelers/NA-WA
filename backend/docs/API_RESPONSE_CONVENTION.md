@@ -162,6 +162,8 @@ enum 상수 이름을 외부 오류 코드로 직접 사용하지 마세요.
 | 탐색   | `EXPLORE-001` |
 | 지도   | `MAP-001`     |
 | 지갑   | `WALLET-001`  |
+| 약속   | `APPOINTMENT-001` |
+| 후기   | `REVIEW-001`  |
 
 - 같은 오류에는 항상 같은 코드를 사용합니다.
 - 프론트엔드에서 다르게 처리할 오류는 코드를 분리합니다.
@@ -257,6 +259,26 @@ public enum MemberErrorCode implements ErrorCode {
 `PATCH /api/v1/members/me`가 `preferredLanguage`·`preferredCurrencyCode`를
 부분 수정할 때 사용합니다. 언어 allow-list는 `en`, `ja`, `zh-CN`, `zh-TW`,
 `vi`이며 이 백엔드 목록이 정본입니다.
+
+약속 도메인에는 다음 오류 코드가 구현돼 있습니다.
+
+| enum 상수 | 오류 코드 | HTTP 상태 | 의미 |
+| --- | --- | ---: | --- |
+| `APPOINTMENT_NOT_FOUND` | `APPOINTMENT-001` | 404 | 약속을 찾을 수 없음 |
+| `JOIN_NOT_AVAILABLE` | `APPOINTMENT-002` | 409 | 현재 상태·기한·정원상 참여 불가 |
+| `ALREADY_JOINED` | `APPOINTMENT-003` | 409 | 기존 참여 이력이 있어 재참여 불가 |
+| `APPOINTMENT_FORBIDDEN` | `APPOINTMENT-004` | 403 | 약속 처리 권한 없음 |
+| `APPOINTMENT_MEMBER_NOT_FOUND` | `APPOINTMENT-005` | 404 | 참여 정보를 찾을 수 없음 |
+| `INVALID_ATTENDANCE_CONFIRMATION` | `APPOINTMENT-006` | 409 | 출석 확정 조건 불충족 |
+| `CANCELLATION_NOT_AVAILABLE` | `APPOINTMENT-007` | 409 | 약속 참여 취소 조건 불충족 |
+| `PAYMENT_INTEGRATION_REQUIRED` | `APPOINTMENT-008` | 409 | 결제 연동 전에는 약속 생성·참여·출석 확정 불가 |
+
+후기 도메인에는 다음 오류 코드가 구현돼 있습니다.
+
+| enum 상수 | 오류 코드 | HTTP 상태 | 의미 |
+| --- | --- | ---: | --- |
+| `REVIEW_NOT_ALLOWED` | `REVIEW-001` | 403 | 후기 작성 자격 또는 상태 조건 불충족 |
+| `REVIEW_DUPLICATE` | `REVIEW-002` | 409 | 동일 회원에게 이미 후기를 작성함 |
 
 ## BusinessException 발생시키기
 
@@ -378,6 +400,9 @@ API 응답에 다음 정보를 포함하지 마세요.
 | 지원하지 않는 언어        | 400       | `MEMBER-002`                 |
 | Event를 찾을 수 없음      | 404       | `EXPLORE-001`                |
 | Place를 찾을 수 없음      | 404       | `EXPLORE-002`                |
+| 약속을 찾을 수 없음       | 404       | `APPOINTMENT-001`            |
+| 약속 재참여 요청          | 409       | `APPOINTMENT-003`            |
+| 후기 중복 작성            | 409       | `REVIEW-002`                 |
 | 변경할 항목 없음          | 400       | `MEMBER-004`                 |
 | 지원하지 않는 HTTP Method | 405       | `COMMON-003`                 |
 | 예상하지 못한 서버 오류   | 500       | `COMMON-999`                 |

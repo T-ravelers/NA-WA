@@ -31,6 +31,37 @@
         LIMIT 1
     </select>
 
+    <select id="findAppointmentProfile"
+            resultType="me.nawa.member.dto.MemberAppointmentProfileResponse">
+        SELECT m.member_id, m.display_name, m.profile_image_url, m.preferred_language,
+               CASE WHEN COALESCE(att.confirmed_count, 0) = 0 THEN NULL
+                    ELSE ROUND(att.attended_count * 100.0 / att.confirmed_count) END AS completion_rate,
+               COALESCE(att.no_show_count, 0) AS no_show_count,
+               AVG(CASE WHEN rs.deleted_at IS NULL THEN rs.rating END) AS average_rating,
+               COUNT(DISTINCT CASE WHEN mr.deleted_at IS NULL AND mr.visibility_status = 'VISIBLE'
+                                   THEN mr.review_id END) AS review_count
+        FROM members m
+        LEFT JOIN (
+            SELECT am.member_id,
+                   SUM(am.attendance_status IN ('ATTENDED','NO_SHOW')) AS confirmed_count,
+                   SUM(am.attendance_status = 'ATTENDED') AS attended_count,
+                   SUM(am.attendance_status = 'NO_SHOW') AS no_show_count
+            FROM appointment_members am
+            WHERE am.deleted_at IS NULL
+            GROUP BY am.member_id
+        ) att ON att.member_id = m.member_id
+        LEFT JOIN appointment_members reviewed_am
+               ON reviewed_am.member_id = m.member_id AND reviewed_am.deleted_at IS NULL
+        LEFT JOIN member_reviews mr
+               ON mr.reviewed_appointment_member_id = reviewed_am.appointment_member_id
+              AND mr.deleted_at IS NULL AND mr.visibility_status = 'VISIBLE'
+        LEFT JOIN member_review_scores rs ON rs.review_id = mr.review_id
+        WHERE m.member_id = #{memberId} AND m.deleted_at IS NULL
+        GROUP BY m.member_id, m.display_name, m.profile_image_url, m.preferred_language,
+                 att.confirmed_count, att.attended_count, att.no_show_count
+        LIMIT 1
+    </select>
+
     <select id="existsActiveCurrency" resultType="boolean">
         SELECT EXISTS (
             SELECT 1

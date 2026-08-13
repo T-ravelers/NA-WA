@@ -50,6 +50,16 @@ async function mountView() {
         name: 'appointment-create',
         component: { template: '<div>Create</div>' },
       },
+      {
+        path: '/explore/events/:eventId',
+        name: 'explore-event-detail',
+        component: { template: '<div>Event</div>' },
+      },
+      {
+        path: '/explore/places/:placeId',
+        name: 'explore-place-detail',
+        component: { template: '<div>Place</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -120,5 +130,14 @@ describe('AppointmentListView', () => {
 
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
+  })
+
+  it('returns to the Event detail from the contextual list', async () => {
+    const { wrapper, router } = await mountView()
+    await wrapper.find('header button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('explore-event-detail')
+    expect(router.currentRoute.value.params.eventId).toBe('42')
   })
 })

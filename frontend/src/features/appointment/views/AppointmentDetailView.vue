@@ -45,7 +45,6 @@ const membersQuery = useQuery({
   enabled: computed(() => appointmentId.value !== null),
   retry: false,
 })
-
 const appointment = computed(() => detailQuery.data.value)
 const members = computed(() =>
   (membersQuery.data.value ?? appointment.value?.members ?? []).filter(
@@ -61,8 +60,11 @@ const statusTone = computed(() =>
   appointment.value?.appointmentStatus === 'RECRUITING' ? 'ongoing' : 'neutral',
 )
 
-const isJoinAvailable = computed(() => appointment.value?.appointmentStatus === 'RECRUITING')
-const isCompleted = computed(() => appointment.value?.appointmentStatus === 'COMPLETED')
+const isJoinAvailable = computed(() => {
+  if (appointment.value?.appointmentStatus !== 'RECRUITING') return false
+  const deadline = parseAppointmentDateTime(appointment.value.joinDeadline)
+  return deadline !== null && Date.now() < deadline.getTime()
+})
 const currentMemberId = computed(() => profileQuery.data.value?.memberId)
 const isHost = computed(
   () =>
@@ -72,10 +74,19 @@ const isHost = computed(
 const isActiveParticipant = computed(
   () =>
     currentMemberId.value !== undefined &&
-    members.value.some((member) => member.memberId === currentMemberId.value),
+    members.value.some(
+      (member) =>
+        member.memberId === currentMemberId.value &&
+        member.membershipStatus === 'ACTIVE' &&
+        member.attendanceStatus === 'ATTENDED',
+    ),
 )
-const canOpenAttendance = computed(() => isCompleted.value === true && isHost.value)
-const canOpenReviews = computed(() => isCompleted.value === true && isActiveParticipant.value)
+const canOpenAttendance = computed(
+  () => appointment.value?.appointmentStatus === 'IN_PROGRESS' && isHost.value,
+)
+const canOpenReviews = computed(
+  () => appointment.value?.appointmentStatus === 'COMPLETED' && isActiveParticipant.value,
+)
 const canOpenPostEventMenu = computed(() => canOpenAttendance.value || canOpenReviews.value)
 
 function formatDateTime(value: AppointmentDateTimeValue): string {
@@ -99,11 +110,16 @@ function statusLabel(status: AppointmentStatus): string {
 }
 
 function goBack(): void {
-  if (window.history.length > 1) {
-    void router.back()
+  const current = appointment.value
+  if (current?.itemType === 'EVENT' || current?.itemType === 'PLACE') {
+    void router.push({
+      name: 'explore',
+      query: { tab: current.itemType === 'PLACE' ? 'places' : 'events' },
+    })
     return
   }
-  void router.push({ name: 'appointment-list' })
+
+  void router.push({ name: 'explore' })
 }
 
 function openMemberProfile(member: { memberId: number }): void {
@@ -145,6 +161,10 @@ function openDepositSheet(): void {
 }
 
 function closeDepositSheet(): void {
+  depositSheetOpen.value = false
+}
+
+function confirmJoin(): void {
   depositSheetOpen.value = false
 }
 </script>
@@ -352,6 +372,7 @@ function closeDepositSheet(): void {
         :deposit-amount="appointment.depositAmount"
         confirm-disabled
         @close="closeDepositSheet"
+        @confirm="confirmJoin"
       />
     </template>
   </main>

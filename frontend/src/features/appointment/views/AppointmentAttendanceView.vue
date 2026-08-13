@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -51,22 +51,15 @@ const isHost = computed(() => {
     members.value.some((member) => member.memberId === currentMemberId && member.isHost)
   )
 })
-const appointmentCompleted = computed(
-  () => detailQuery.data.value?.appointmentStatus === 'COMPLETED',
+const appointmentInProgress = computed(
+  () => detailQuery.data.value?.appointmentStatus === 'IN_PROGRESS',
 )
-const attendanceDraft = reactive<Record<number, AppointmentAttendanceStatus>>({})
-
 function initials(displayName: string): string {
   return displayName.trim().charAt(0).toUpperCase() || '?'
 }
 
 function attendanceStatus(member: AppointmentMember): AppointmentAttendanceStatus {
-  return attendanceDraft[member.appointmentMemberId] ?? member.attendanceStatus
-}
-
-function toggleAttendance(member: AppointmentMember): void {
-  const current = attendanceStatus(member)
-  attendanceDraft[member.appointmentMemberId] = current === 'ATTENDED' ? 'PENDING' : 'ATTENDED'
+  return member.attendanceStatus
 }
 
 function statusLabel(status: AppointmentAttendanceStatus): string {
@@ -125,7 +118,7 @@ function retry(): void {
       @retry="retry"
     />
     <StateEmpty
-      v-else-if="!appointmentCompleted"
+      v-else-if="!appointmentInProgress"
       :title="t('appointment.attendance.notCompletedTitle')"
       :description="t('appointment.attendance.notCompletedDescription')"
     />
@@ -199,7 +192,7 @@ function retry(): void {
                     dense
                     :variant="attendanceStatus(member) === 'ATTENDED' ? 'settle' : 'primary'"
                     :aria-label="t('appointment.attendance.toggle', { name: member.displayName })"
-                    @click="toggleAttendance(member)"
+                    :disabled="true"
                   >
                     {{ statusLabel(attendanceStatus(member)) }}
                   </AppButton>

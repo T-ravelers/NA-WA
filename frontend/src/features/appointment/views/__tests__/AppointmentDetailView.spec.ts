@@ -36,9 +36,9 @@ const appointment = {
   appointmentStatus: 'RECRUITING' as const,
   meetingPlace: 'Seongsu Beauty Lab',
   meetingAddress: 'Seongsu-ro 12',
-  activityStartAt: '2026-08-08T18:30:00',
-  activityEndAt: '2026-08-08T22:00:00',
-  joinDeadline: '2026-08-08T17:30:00',
+  activityStartAt: '2099-08-08T18:30:00',
+  activityEndAt: '2099-08-08T22:00:00',
+  joinDeadline: '2099-08-08T17:30:00',
   hostDisplayName: 'Mina Park',
   description: null,
   members: [],
@@ -137,7 +137,7 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).toContain('Seongsu Beauty Lab')
     expect(wrapper.text()).toContain('Mina Park')
     expect(wrapper.text()).toContain('Alex Kim')
-    expect(wrapper.text()).toContain('Not attended')
+    expect(wrapper.text()).not.toContain('Not attended')
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).not.toContain('Jamie Lee')
     expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(false)
@@ -173,7 +173,7 @@ describe('AppointmentDetailView', () => {
   })
 
   it('opens the attendance screen from the appointment detail', async () => {
-    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'IN_PROGRESS' })
     const { wrapper, router } = await mountView()
 
     await wrapper
@@ -185,26 +185,26 @@ describe('AppointmentDetailView', () => {
     expect(router.currentRoute.value.name).toBe('appointment-attendance')
   })
 
-  it('opens the attendance and reviews screens from the detail menu', async () => {
+  it('opens reviews from the detail menu after completion', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
     const { wrapper, router } = await mountView()
 
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    expect(wrapper.get('[role="menu"]').text()).toContain('Attendance')
     expect(wrapper.get('[role="menu"]').text()).toContain('Reviews')
+    expect(wrapper.get('[role="menu"]').text()).not.toContain('Attendance')
 
     await wrapper.get('[role="menuitem"]').trigger('click')
     await flushPromises()
-    expect(router.currentRoute.value.name).toBe('appointment-attendance')
-
-    await router.push('/appointments/7')
-    await flushPromises()
-    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    await wrapper
-      .findAll('[role="menuitem"]')
-      .find((button) => button.text() === 'Reviews')
-      ?.trigger('click')
-    await flushPromises()
     expect(router.currentRoute.value.name).toBe('appointment-reviews')
+  })
+
+  it('does not expose attendance from a completed appointment', async () => {
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    expect(wrapper.get('[role="menu"]').text()).not.toContain('Attendance')
+    expect(wrapper.text()).not.toContain('Confirm attendance')
   })
 })

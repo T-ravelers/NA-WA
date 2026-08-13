@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import javax.sql.DataSource;
@@ -24,6 +25,8 @@ import javax.sql.DataSource;
 @PropertySource("classpath:/application.properties")
 @Import({RedisConfig.class, SecurityConfig.class})
 @MapperScan(basePackages = {"me.nawa.auth.mapper",
+    "me.nawa.appointment.mapper",
+    "me.nawa.review.mapper",
     "me.nawa.explore.mapper",
     "me.nawa.journey.mapper",
     "me.nawa.report.mapper",
@@ -39,6 +42,8 @@ import javax.sql.DataSource;
     "me.nawa.auth.token",
     "me.nawa.auth.cookie",
     "me.nawa.auth.security",
+    "me.nawa.appointment.service",
+    "me.nawa.review.service",
     "me.nawa.explore.service",
     "me.nawa.journey.service",
     "me.nawa.report.service",
@@ -50,6 +55,7 @@ import javax.sql.DataSource;
     "me.nawa.settlement.service",
     "me.nawa.deposit.service"})
 @EnableTransactionManagement
+@EnableScheduling
 public class RootConfig {
     @Value("${jdbc.driver}")
     private String driver;

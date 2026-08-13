@@ -1,12 +1,29 @@
+import { computed, type Ref } from 'vue'
 import { useQuery, type UseQueryReturnType } from '@tanstack/vue-query'
 
 import { queryClient } from '@/app/query/client'
 
-import { fetchMemberProfile, type MemberProfile } from '../api/memberApi'
+import {
+  fetchMemberAppointmentProfile,
+  fetchMemberProfile,
+  type MemberAppointmentProfile,
+  type MemberProfile,
+} from '../api/memberApi'
 
 export const memberQueryKeys = {
   all: ['member'] as const,
   profile: () => [...memberQueryKeys.all, 'profile'] as const,
+  appointmentProfile: (memberId: number | null) =>
+    [...memberQueryKeys.all, 'appointment-profile', memberId] as const,
+}
+
+export function useMemberAppointmentProfile(memberId: Ref<number | null>) {
+  return useQuery<MemberAppointmentProfile>({
+    queryKey: computed(() => memberQueryKeys.appointmentProfile(memberId.value)),
+    queryFn: () => fetchMemberAppointmentProfile(memberId.value as number),
+    enabled: computed(() => memberId.value !== null),
+    retry: false,
+  })
 }
 
 /**
