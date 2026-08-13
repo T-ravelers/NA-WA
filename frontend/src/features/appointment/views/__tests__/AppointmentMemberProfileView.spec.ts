@@ -1,9 +1,12 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+
+import { appointmentMemberIntegrationKey } from '../../model/memberIntegration'
 
 const fetchAppointmentMembers = vi.fn()
 
@@ -45,6 +48,20 @@ async function mountView() {
   const wrapper = mount(AppointmentMemberProfileView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+      provide: {
+        [appointmentMemberIntegrationKey as symbol]: {
+          useMemberStats: () => ({
+            data: ref({
+              completionRate: null,
+              noShowCount: 0,
+              averageRating: null,
+              reviewCount: 0,
+            }),
+            isPending: ref(false),
+            isError: ref(false),
+          }),
+        },
+      },
     },
   })
   await flushPromises()
