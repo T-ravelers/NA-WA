@@ -16,6 +16,10 @@ RUN ./gradlew war --no-daemon -x test
 # ---- Runtime stage ----
 FROM tomcat:9.0-jre17-temurin
 
+# LocalDateTime.now()가 컨테이너 기본값(UTC)이 아니라 서비스 기준 시간대로 찍히게 한다.
+# JDBC URL의 serverTimezone=Asia/Seoul과 맞춰야 프론트가 그대로 로컬 시각으로 파싱해도 어긋나지 않는다.
+ENV TZ=Asia/Seoul
+
 RUN rm -rf /usr/local/tomcat/webapps/*
 COPY --from=build /workspace/build/libs/*.war /usr/local/tomcat/webapps/ROOT.war
 
