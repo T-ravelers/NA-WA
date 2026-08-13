@@ -46,7 +46,7 @@ function indicatorValue(indicator: 'completionRate' | 'noShowCount' | 'averageRa
   const stats = profileStats.value
   if (!stats) return 'Unavailable'
   if (indicator === 'completionRate')
-    return stats.completionRate === null ? 'No data yet' : `${stats.completionRate}%`
+    return stats.completionRate === null ? 'No ratings yet' : `${stats.completionRate}%`
   if (indicator === 'averageRating')
     return stats.averageRating === null ? 'No ratings yet' : `${stats.averageRating.toFixed(1)} / 5`
   return String(stats.noShowCount)
