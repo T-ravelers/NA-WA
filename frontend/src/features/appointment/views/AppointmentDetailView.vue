@@ -126,11 +126,16 @@ function statusLabel(status: AppointmentStatus): string {
 }
 
 function goBack(): void {
-  if (window.history.length > 1) {
-    void router.back()
+  const current = appointment.value
+  if (current?.itemType === 'EVENT' || current?.itemType === 'PLACE') {
+    void router.push({
+      name: 'explore',
+      query: { tab: current.itemType === 'PLACE' ? 'places' : 'events' },
+    })
     return
   }
-  void router.push({ name: 'appointment-list' })
+
+  void router.push({ name: 'explore' })
 }
 
 function openMemberProfile(member: { memberId: number }): void {
