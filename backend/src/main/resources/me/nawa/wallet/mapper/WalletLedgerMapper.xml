@@ -74,11 +74,6 @@
         <include refid="walletLedgerEntryByTransferAndWalletWhere"/>
     </select>
 
-    <select id="findByTransferIdAndWalletIdForUpdate" resultType="me.nawa.wallet.domain.WalletLedgerEntry">
-        <include refid="walletLedgerEntryByTransferAndWalletWhere"/>
-        FOR UPDATE
-    </select>
-
     <select id="findCounterpartyByTransferId" resultType="me.nawa.wallet.domain.TransactionCounterparty">
         SELECT wo.owner_type, m.display_name, wo.system_code
         FROM wallet_ledger_entries e

@@ -35,6 +35,7 @@ import me.nawa.wallet.util.QrTokenGenerator;
 import me.nawa.wallet.util.TransactionNumberGenerator;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 // QR 생성/검증/결제 미리보기/결제 실행 4개를 담당할 서비스 (아직 미구현).
@@ -220,8 +221,23 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         );
     }
 
+    // 이 트랜잭션은 REPEATABLE READ(기본값) 대신 READ COMMITTED로 실행한다.
+    //
+    // REPEATABLE READ에서는 트랜잭션의 첫 조회가 만든 스냅샷이 커밋 전까지 고정돼, 이후의
+    // 일반 SELECT는 그 사이 다른 트랜잭션이 커밋한 행을 못 볼 수 있다. 이 메서드는 QR/지갑
+    // 잠금을 기다리는 동안 다른 요청이 같은 idempotency key로 먼저 결제를 끝낼 수 있어서,
+    // 그 결과를 곧바로 봐야 한다 — READ COMMITTED는 매 statement마다 최신 커밋을 다시 읽으므로
+    // 별도의 FOR UPDATE 없이 일반 SELECT만으로 이 문제가 해결된다.
+    //
+    // 그리고 idempotency_key는 NULL을 허용하는 유니크 컬럼이라, InnoDB가 "유니크 인덱스 검색이
+    // 정확히 한 행을 특정하면 갭 락 없이 레코드 락만 건다"는 최적화를 이 컬럼에는 적용하지
+    // 못한다 — 그래서 이 컬럼을 FOR UPDATE로 잠금 조회하면 격리 수준과 무관하게 존재하지 않는
+    // 키에 갭 락이 걸릴 수 있고, 서로 다른 QR을 같은 key로 동시 실행하면 그 갭 락과 지갑
+    // FOR UPDATE 락이 얽혀 교착 상태에 빠질 수 있다(QrPaymentConcurrencyIntegrationTest로
+    // 재현됨). 그래서 idempotency_key는 절대 FOR UPDATE로 조회하지 않는다 — 승자 판정은
+    // 전부 아래 insert의 유니크 제약(DuplicateKeyException)에 맡긴다.
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public QrPaymentExecuteResponse executePayment(
         Long memberId,
         String idempotencyKey,
@@ -230,10 +246,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         validateExecuteRequest(idempotencyKey, request);
 
         // 1. 이미 완료된 동일 요청이면 기존 결과 반환 (빠른 경로, 잠금 없음).
-        // 아직 QR 잠금을 잡기 전이라 여기서 FOR UPDATE를 쓰면 안 된다 — 존재하지 않는 키의 갭 락은
-        // 트랜잭션끼리 서로 막지 않아서, 두 요청이 동시에 이 갭 락을 쥔 채로 진행하다가 QR 잠금과
-        // insert 사이에서 교착 상태에 빠질 수 있다(findByIdempotencyKeyForUpdate 주석 참고).
-        // 최종 판단은 QR 잠금을 잡은 뒤(2번)에 내린다.
+        // 최종 판단은 아래 insert 시도 결과로 내린다.
         WalletTransfer existing =
             walletTransferMapper.findByIdempotencyKey(idempotencyKey);
 
@@ -255,10 +268,20 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             throw new BusinessException(WalletErrorCode.QR_PAYMENT_NOT_FOUND);
         }
 
-        // QR을 기다리는 동안 동일 Idempotency-Key 요청이 끝났을 수 있으므로 재확인
-        existing = walletTransferMapper.findByIdempotencyKeyForUpdate(idempotencyKey);
-        if (existing != null) {
-            return getIdempotentResult(memberId, request, existing);
+        // QR 잠금을 기다리는 동안 같은 QR·같은 key로 다른 요청이 결제를 끝냈을 수 있다.
+        // idempotency_key를 다시 조회하는 대신, 방금 최신값으로 읽은 QR 행 자체의
+        // completed_transfer_id(FK, NULL 허용 아님)로 판단한다. 일반 SELECT로 충분하다 —
+        // READ COMMITTED라 이 statement가 실행되는 시점의 최신 커밋을 그대로 본다.
+        if (qrPayment.getCompletedTransferId() != null) {
+            WalletTransfer completedTransfer =
+                walletTransferMapper.findByTransferId(qrPayment.getCompletedTransferId());
+
+            if (completedTransfer != null
+                && idempotencyKey.equals(completedTransfer.getIdempotencyKey())) {
+                return getIdempotentResult(memberId, request, completedTransfer);
+            }
+            // 다른 key로 이미 완료된 QR을 다시 쓰려는 경우 — 아래 validateExecutableQr가
+            // QR_PAYMENT_ALREADY_COMPLETED로 정확히 거절한다.
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -310,12 +333,6 @@ public class QrPaymentServiceImpl implements QrPaymentService {
 
         if (!payerWallet.getCurrencyCode().equals(payeeWallet.getCurrencyCode())) {
             throw new BusinessException(WalletErrorCode.UNSUPPORTED_CURRENCY);
-        }
-
-        // 지갑 잠금을 기다리는 동안 다른 QR 요청이 같은 키로 결제를 끝냈을 수 있다.
-        existing = walletTransferMapper.findByIdempotencyKeyForUpdate(idempotencyKey);
-        if (existing != null) {
-            return getIdempotentResult(memberId, request, existing);
         }
 
         BigDecimal payerBalanceAfter =
@@ -372,8 +389,10 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         try {
             walletTransferMapper.insert(transfer);
         } catch (DuplicateKeyException exception) {
+            // 여기 도달했다는 건 경쟁한 트랜잭션이 이미 커밋했다는 뜻이라 일반 SELECT로
+            // 충분하다(READ COMMITTED). idempotency_key는 FOR UPDATE로 조회하지 않는다.
             WalletTransfer concurrent =
-                walletTransferMapper.findByIdempotencyKeyForUpdate(idempotencyKey);
+                walletTransferMapper.findByIdempotencyKey(idempotencyKey);
 
             if (concurrent != null) {
                 return getIdempotentResult(memberId, request, concurrent);
@@ -752,10 +771,10 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         // 8. 최초 결제 때 생성된 결제자 DEBIT 원장을 조회한다.
         // 현재 잔액이 아니라, 결제 직후의 balancedAfter를 응답해야
         // 최초 요청의 결제 결과와 동일한 응답을 돌려줄 수 있아
-        // FOR UPDATE로 조회한다 — 다른 트랜잭션이 방금 커밋한 원장 행이라 일반 SELECT로는
-        // 이 트랜잭션의 스냅샷에 안 보일 수 있다(findByIdempotencyKeyForUpdate 주석 참고).
+        // 일반 SELECT로 충분하다 — READ COMMITTED라 다른 트랜잭션이 방금 커밋한 원장 행도
+        // 그대로 보인다(executePayment의 @Transactional(isolation) 주석 참고).
         WalletLedgerEntry debitEntry =
-            walletLedgerMapper.findByTransferIdAndWalletIdForUpdate(
+            walletLedgerMapper.findByTransferIdAndWalletId(
                 transfer.getTransferId(),
                 payerWallet.getWalletId()
             );

@@ -689,7 +689,6 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_completesTransfer_whenPersonalAndSufficientBalance() {
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("ACTIVE", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
         when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
@@ -723,7 +722,6 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_linksTripExpense_whenSharedAndMembershipValid() {
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("ACTIVE", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
         when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
@@ -808,7 +806,6 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsAlreadyCompleted_whenQrCompletedTransferIdSet() {
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE"));
 
@@ -817,6 +814,9 @@ class QrPaymentServiceImplTest {
             "야경 투어", QrPaymentStatus.COMPLETED, LocalDateTime.now().plusMinutes(5)
         );
         when(qrPaymentCodeMapper.findByQrTokenForUpdate("token-abc")).thenReturn(qr);
+        // findByTransferId(900L)는 스텁하지 않는다 — 다른 key로 이미 완료된 QR을
+        // 다시 쓰는 상황이라, 조회 결과와 무관하게(여기서는 기본값 null) 아래 검증에서
+        // ALREADY_COMPLETED로 거절돼야 한다.
 
         BusinessException exception = assertThrows(
             BusinessException.class,
@@ -829,8 +829,36 @@ class QrPaymentServiceImplTest {
     }
 
     @Test
+    void executePayment_returnsOriginalResult_whenSameQrAndSameKeyRetriedAfterQrLockWait() {
+        // QR 잠금을 기다리는 동안 동일 QR·동일 key로 다른 요청이 결제를 끝낸 상황.
+        // 빠른 경로(findByIdempotencyKey)는 아직 그 커밋을 못 봤지만, QR 잠금을 잡고 나서
+        // 읽은 최신 QR 행에는 completed_transfer_id가 채워져 있어야 한다.
+        when(walletMapper.findByMemberId(MEMBER_ID))
+            .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE"));
+
+        QrPaymentCode qr = qrPaymentCode(
+            10L, PAYEE_WALLET_ID, 999L, "token-abc", BigDecimal.valueOf(18500),
+            "야경 투어", QrPaymentStatus.COMPLETED, LocalDateTime.now().plusMinutes(5)
+        );
+        when(qrPaymentCodeMapper.findByQrTokenForUpdate("token-abc")).thenReturn(qr);
+
+        WalletTransfer existing =
+            transfer(999L, "QR_PAYMENT", "COMPLETED", BigDecimal.valueOf(18500), MEMBER_ID, "idem-1");
+        when(walletTransferMapper.findByTransferId(999L)).thenReturn(existing);
+        when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(qr);
+        when(walletLedgerMapper.findByTransferIdAndWalletId(999L, PAYER_WALLET_ID))
+            .thenReturn(ledgerEntry(BigDecimal.valueOf(31500), "DEBIT"));
+
+        QrPaymentExecuteResponse response = qrPaymentService.executePayment(
+            MEMBER_ID, "idem-1", executeRequest("token-abc", SpendingScope.PERSONAL, null)
+        );
+
+        assertEquals(999L, response.transferId());
+        verify(walletTransferMapper, never()).insert(any());
+    }
+
+    @Test
     void executePayment_throwsExpired_whenActiveButPastDeadline() {
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE"));
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().minusSeconds(1), BigDecimal.valueOf(18500));
@@ -847,7 +875,6 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsSelfPaymentNotAllowed_whenPayerIsPayee() {
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE"));
 
@@ -869,7 +896,6 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsWalletNotActive_whenPayerWalletSuspendedAfterLock() {
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("SUSPENDED", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
 
@@ -886,7 +912,6 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsPayeeWalletNotActive_whenPayeeWalletSuspended() {
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("ACTIVE", "SUSPENDED");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
 
@@ -902,7 +927,6 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsInsufficientBalance_whenPayerBalanceTooLow() {
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(1000), "ACTIVE"));
         when(walletMapper.findByWalletIdForUpdate(PAYER_WALLET_ID))
@@ -924,7 +948,6 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsMembershipNotFound_whenSharedAndNoActiveMembership() {
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("ACTIVE", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
         when(qrPaymentCodeMapper.findActiveAppointmentMembershipForUpdate(MEMBER_ID, 55L)).thenReturn(null);
@@ -942,7 +965,6 @@ class QrPaymentServiceImplTest {
 
     @Test
     void executePayment_throwsQrPaymentNotActive_whenMarkCompletedAffectsNoRows() {
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1")).thenReturn(null);
         stubLockableWallets("ACTIVE", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
         when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
@@ -981,7 +1003,7 @@ class QrPaymentServiceImplTest {
         when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(qr);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(31500), "ACTIVE"));
-        when(walletLedgerMapper.findByTransferIdAndWalletIdForUpdate(999L, PAYER_WALLET_ID))
+        when(walletLedgerMapper.findByTransferIdAndWalletId(999L, PAYER_WALLET_ID))
             .thenReturn(ledgerEntry(BigDecimal.valueOf(31500), "DEBIT"));
 
         QrPaymentExecuteResponse response = qrPaymentService.executePayment(
@@ -1099,12 +1121,10 @@ class QrPaymentServiceImplTest {
     void executePayment_returnsOriginalResult_whenTransferInsertRacesOnIdempotencyKey() {
         WalletTransfer existing =
             transfer(999L, "QR_PAYMENT", "COMPLETED", BigDecimal.valueOf(18500), MEMBER_ID, "idem-1");
-        // 빠른 경로(findByIdempotencyKey)는 아직 아무것도 못 봤고, QR 잠금 이후의 재확인
-        // 두 번(findByIdempotencyKeyForUpdate)까지도 못 보다가, insert 충돌 이후 재조회에서야
-        // 동시 트랜잭션이 커밋한 결과를 본다.
-        when(walletTransferMapper.findByIdempotencyKey("idem-1")).thenReturn(null);
-        when(walletTransferMapper.findByIdempotencyKeyForUpdate("idem-1"))
-            .thenReturn(null, null, existing);
+        // 빠른 경로(1번째 호출)는 아직 아무것도 못 봤고, insert가 유니크 제약 충돌로 실패한
+        // 뒤(catch 블록, 2번째 호출)에야 동시 트랜잭션이 커밋한 결과를 본다.
+        when(walletTransferMapper.findByIdempotencyKey("idem-1"))
+            .thenReturn(null, existing);
         stubLockableWallets("ACTIVE", "ACTIVE");
         stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
         when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
@@ -1116,7 +1136,7 @@ class QrPaymentServiceImplTest {
             "야경 투어", QrPaymentStatus.COMPLETED, LocalDateTime.now().plusMinutes(5)
         );
         when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(completedQr);
-        when(walletLedgerMapper.findByTransferIdAndWalletIdForUpdate(999L, PAYER_WALLET_ID))
+        when(walletLedgerMapper.findByTransferIdAndWalletId(999L, PAYER_WALLET_ID))
             .thenReturn(ledgerEntry(BigDecimal.valueOf(31500), "DEBIT"));
 
         QrPaymentExecuteResponse response = qrPaymentService.executePayment(
@@ -1141,7 +1161,7 @@ class QrPaymentServiceImplTest {
         when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(qr);
         when(walletMapper.findByMemberId(MEMBER_ID))
             .thenReturn(wallet(PAYER_WALLET_ID, BigDecimal.valueOf(31500), "ACTIVE"));
-        when(walletLedgerMapper.findByTransferIdAndWalletIdForUpdate(999L, PAYER_WALLET_ID))
+        when(walletLedgerMapper.findByTransferIdAndWalletId(999L, PAYER_WALLET_ID))
             .thenReturn(ledgerEntry(BigDecimal.valueOf(31500), "DEBIT"));
         when(tripExpenseLinkMapper.findAppointmentIdByLedgerEntryId(700L)).thenReturn(66L);
 

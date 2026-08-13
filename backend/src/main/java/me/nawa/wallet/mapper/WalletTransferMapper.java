@@ -12,22 +12,18 @@ public interface WalletTransferMapper {
     // insert 후 MyBatis가 채워준 자동증가 PK를 transfer.transferId에 넣어준다 (WalletTransferMapper.xml의 useGeneratedKeys 참고)
     void insert(WalletTransfer transfer);
 
-    // 멱등성 조회(빠른 경로). QR 잠금을 잡기 전, 다른 잠금 없이 먼저 확인만 해본다.
-    // 일반 SELECT라 REPEATABLE READ 스냅샷에 묶이므로 이 결과만으로는 최종 판단을 내리지 않는다
-    // — QR 잠금을 잡은 뒤 findByIdempotencyKeyForUpdate로 다시 확인한다.
-    WalletTransfer findByIdempotencyKey(
-        @Param("idempotencyKey") String idempotencyKey
-    );
-
-    // 멱등성 조회(잠금 경로). QR 행 잠금을 이미 잡은 뒤에만 호출해야 한다.
+    // 멱등성 조회. idempotency_key는 NULL을 허용하는 유니크 컬럼이라, InnoDB가 "유니크 인덱스
+    // 검색이 정확히 한 행을 특정하면 갭 락 없이 레코드 락만 건다"는 최적화를 이 컬럼에는
+    // 적용하지 못한다 — 그래서 이 메서드는 절대 FOR UPDATE로 잠금 조회하지 않는다(과거에
+    // 그렇게 시도했다가 서로 다른 QR을 같은 key로 동시 실행할 때 갭 락과 지갑 FOR UPDATE 락이
+    // 얽혀 교착 상태에 빠지는 걸 QrPaymentConcurrencyIntegrationTest로 확인했다).
     //
-    // 존재하지 않는 키에 FOR UPDATE를 걸면 InnoDB가 갭 락을 잡는데, 갭 락은 다른 트랜잭션의
-    // 갭 락과 서로 배타적이지 않다. 그래서 QR 잠금을 잡기 *전에* 두 트랜잭션이 동시에 이 메서드로
-    // 같은(존재하지 않는) 키를 조회하면 둘 다 갭 락을 쥔 채로 진행하다가, 한쪽은 QR 행 잠금을 들고
-    // insert를 시도하고(같은 갭에 insert 의도 락 필요) 다른 한쪽은 그 QR 행 잠금을 기다리는
-    // 교착 상태에 빠진다 — 실제로 QrPaymentConcurrencyIntegrationTest에서 재현됐다.
-    // QR 잠금 뒤에는 그 잠금 하나가 이미 두 트랜잭션을 직렬화해 두었으므로 안전하다.
-    WalletTransfer findByIdempotencyKeyForUpdate(
+    // 동시 요청 사이의 최종 승자 판정은 항상 insert의 유니크 제약(DuplicateKeyException)에
+    // 맡긴다. 이 조회는 그 판정 전후로 호출되는데, QrPaymentServiceImpl.executePayment가
+    // READ COMMITTED로 실행되므로 매 statement가 최신 커밋을 다시 읽어 별도의 잠금 없이도
+    // 다른 트랜잭션이 방금 커밋한 결과를 정확히 본다(executePayment의
+    // @Transactional(isolation) 주석 참고).
+    WalletTransfer findByIdempotencyKey(
         @Param("idempotencyKey") String idempotencyKey
     );
 }
