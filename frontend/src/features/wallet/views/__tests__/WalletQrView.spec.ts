@@ -1,11 +1,13 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
 import { fetchWalletHome } from '../../api/walletApi'
+import { useQrRequestDraftStore } from '../../model/qrRequestDraft'
 import WalletQrView from '../WalletQrView.vue'
 
 vi.mock('../../api/walletApi', () => ({
@@ -30,6 +32,7 @@ function createTestRouter(): Router {
 
 async function mountView(): Promise<{ router: Router; wrapper: ReturnType<typeof mount> }> {
   const router = createTestRouter()
+  setActivePinia(createPinia())
   await router.push('/wallet/qr')
   await router.isReady()
 
@@ -78,11 +81,15 @@ describe('WalletQrView', () => {
 
   it('shows local payment request values from the create screen', async () => {
     const router = createTestRouter()
-    await router.push({
-      name: 'wallet-qr',
-      query: { amount: '18500', amountMode: 'fixed', memo: 'Seoul Food Tour' },
-    })
+    setActivePinia(createPinia())
+    await router.push('/wallet/qr')
     await router.isReady()
+
+    useQrRequestDraftStore().setDraft({
+      amount: 18_500,
+      memo: 'Seoul Food Tour',
+      payerEntersAmount: false,
+    })
 
     const wrapper = mount(WalletQrView, {
       global: {
@@ -108,11 +115,15 @@ describe('WalletQrView', () => {
 
   it('shows that the payer can enter an unset amount', async () => {
     const router = createTestRouter()
-    await router.push({
-      name: 'wallet-qr',
-      query: { amount: 'payer', amountMode: 'payer' },
-    })
+    setActivePinia(createPinia())
+    await router.push('/wallet/qr')
     await router.isReady()
+
+    useQrRequestDraftStore().setDraft({
+      amount: null,
+      memo: '',
+      payerEntersAmount: true,
+    })
 
     const wrapper = mount(WalletQrView, {
       global: {

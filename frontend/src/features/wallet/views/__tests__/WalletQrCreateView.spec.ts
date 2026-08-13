@@ -1,9 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
+import { useQrRequestDraftStore } from '../../model/qrRequestDraft'
 import WalletQrCreateView from '../WalletQrCreateView.vue'
 
 function createTestRouter(): Router {
@@ -23,6 +25,7 @@ function createTestRouter(): Router {
 
 async function mountView(): Promise<{ router: Router; wrapper: ReturnType<typeof mount> }> {
   const router = createTestRouter()
+  setActivePinia(createPinia())
   await router.push('/wallet/qr/create')
   await router.isReady()
 
@@ -43,7 +46,7 @@ describe('WalletQrCreateView', () => {
     expect(wrapper.text()).toContain('Create QR')
   })
 
-  it('passes the entered amount and memo to the local QR result route', async () => {
+  it('saves the entered amount and memo as the local QR request draft, without a URL query', async () => {
     const { router, wrapper } = await mountView()
     const pushSpy = vi.spyOn(router, 'push')
 
@@ -54,10 +57,12 @@ describe('WalletQrCreateView', () => {
       ?.trigger('click')
     await flushPromises()
 
-    expect(pushSpy).toHaveBeenCalledWith({
-      name: 'wallet-qr',
-      query: { amount: '18500', amountMode: 'fixed', memo: 'Seoul Food Tour' },
+    expect(useQrRequestDraftStore().draft).toEqual({
+      amount: 18_500,
+      memo: 'Seoul Food Tour',
+      payerEntersAmount: false,
     })
+    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr' })
   })
 
   it('supports a request where the payer enters the amount', async () => {
@@ -71,16 +76,44 @@ describe('WalletQrCreateView', () => {
       ?.trigger('click')
     await flushPromises()
 
-    expect(pushSpy).toHaveBeenCalledWith({
-      name: 'wallet-qr',
-      query: { amount: 'payer', amountMode: 'payer', memo: 'Seoul Night Tour' },
+    expect(useQrRequestDraftStore().draft).toEqual({
+      amount: null,
+      memo: 'Seoul Night Tour',
+      payerEntersAmount: true,
     })
+    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr' })
   })
 
   it('disables QR creation when a fixed amount is empty', async () => {
     const { wrapper } = await mountView()
 
     await wrapper.get('input[inputmode="numeric"]').setValue('')
+
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Create QR')
+        ?.attributes('disabled'),
+    ).toBeDefined()
+  })
+
+  it('disables QR creation when the amount exceeds the safe integer range', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper.get('input[inputmode="numeric"]').setValue('99999999999999999')
+
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Create QR')
+        ?.attributes('disabled'),
+    ).toBeDefined()
+  })
+
+  it('disables QR creation when the amount overflows to Infinity', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper.get('input[inputmode="numeric"]').setValue('9'.repeat(400))
 
     expect(
       wrapper

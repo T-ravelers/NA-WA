@@ -9,34 +9,36 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import TextInput from '@/shared/ui/TextInput.vue'
 
+import { useQrRequestDraftStore } from '../model/qrRequestDraft'
+
 const { t } = useI18n()
 const router = useRouter()
+const qrRequestDraft = useQrRequestDraftStore()
 
 const amount = ref<number | null>(18_500)
 const memo = ref('Seoul Night Tour')
 const payerEntersAmount = ref(false)
 
-const canCreate = computed(
-  () => payerEntersAmount.value || (amount.value !== null && amount.value > 0),
-)
+const isValidFixedAmount = (value: number | null): value is number =>
+  value !== null && Number.isFinite(value) && Number.isSafeInteger(value) && value > 0
+
+const canCreate = computed(() => payerEntersAmount.value || isValidFixedAmount(amount.value))
 
 const goBack = (): void => {
   void router.push({ name: 'wallet' })
 }
 
-/** API 연동 전까지는 입력값을 라우트에 전달하는 로컬 목업 흐름으로 연결한다. */
+/** API 연동 전까지는 입력값을 세션 메모리 상태로 넘기는 로컬 목업 흐름으로 연결한다. */
 const createMockQr = (): void => {
   if (!canCreate.value) return
 
-  const query: Record<string, string> = {
-    amount: payerEntersAmount.value ? 'payer' : String(amount.value),
-    amountMode: payerEntersAmount.value ? 'payer' : 'fixed',
-  }
-  const trimmedMemo = memo.value.trim()
+  qrRequestDraft.setDraft({
+    amount: payerEntersAmount.value ? null : amount.value,
+    memo: memo.value.trim(),
+    payerEntersAmount: payerEntersAmount.value,
+  })
 
-  if (trimmedMemo !== '') query.memo = trimmedMemo
-
-  void router.push({ name: 'wallet-qr', query })
+  void router.push({ name: 'wallet-qr' })
 }
 </script>
 

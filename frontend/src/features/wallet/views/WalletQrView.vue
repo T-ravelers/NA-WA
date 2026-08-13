@@ -8,6 +8,7 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import { formatKrw } from '../model/qrPayment'
+import { useQrRequestDraftStore } from '../model/qrRequestDraft'
 import { useWalletHome } from '../model/walletQueries'
 
 const QR_SIZE = 21
@@ -72,19 +73,18 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const walletQuery = useWalletHome()
+const qrRequestDraft = useQrRequestDraftStore()
 const qrCells = createQrCells()
 
 const isMyQrActive = computed(() => route.name === 'wallet-qr')
 
 const qrRequest = computed(() => {
-  const rawAmount = route.query.amount
-  const payerEntersAmount = route.query.amountMode === 'payer' || rawAmount === 'payer'
-  const parsedAmount =
-    typeof rawAmount === 'string' && /^\d+$/.test(rawAmount) ? Number(rawAmount) : 18_500
-  const memo = typeof route.query.memo === 'string' ? route.query.memo : 'Seoul Night Tour'
+  const draft = qrRequestDraft.draft
+  const payerEntersAmount = draft?.payerEntersAmount ?? false
+  const memo = draft?.memo === undefined || draft.memo === '' ? 'Seoul Night Tour' : draft.memo
 
   return {
-    amount: payerEntersAmount ? null : parsedAmount,
+    amount: payerEntersAmount ? null : (draft?.amount ?? 18_500),
     memo,
     payerEntersAmount,
   }
