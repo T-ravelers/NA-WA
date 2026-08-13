@@ -8,6 +8,12 @@ import {
   toPlaceSearchParams,
   toSearchParams,
 } from '../exploreApi'
+import {
+  eventDetailResponseSchema,
+  eventListResponseSchema,
+  placeDetailResponseSchema,
+  placeListResponseSchema,
+} from '../exploreResponseSchemas'
 
 const { get } = vi.hoisted(() => ({ get: vi.fn() }))
 
@@ -58,6 +64,7 @@ describe('exploreApi', () => {
     await expect(fetchEventList({ sort: 'LATEST' })).resolves.toEqual(data)
     expect(get).toHaveBeenCalledWith('/api/v1/explore/events', {
       params: expect.any(URLSearchParams),
+      responseSchema: eventListResponseSchema,
     })
   })
 
@@ -97,6 +104,7 @@ describe('exploreApi', () => {
     await expect(fetchPlaceList({ sort: 'LATEST' })).resolves.toEqual({ ...data, content: [] })
     expect(get).toHaveBeenCalledWith('/api/v1/explore/places', {
       params: expect.any(URLSearchParams),
+      responseSchema: placeListResponseSchema,
     })
   })
 
@@ -107,6 +115,7 @@ describe('exploreApi', () => {
     await expect(fetchEventDetail(42, 'en')).resolves.toEqual(data)
     expect(get).toHaveBeenCalledWith('/api/v1/explore/events/42', {
       params: { language: 'en' },
+      responseSchema: eventDetailResponseSchema,
     })
   })
 
@@ -133,6 +142,7 @@ describe('exploreApi', () => {
     })
     expect(get).toHaveBeenCalledWith('/api/v1/explore/places/880001', {
       params: { language: 'en' },
+      responseSchema: placeDetailResponseSchema,
     })
   })
 })

@@ -3,6 +3,7 @@ import axios, { type AxiosError, type AxiosResponse } from 'axios'
 import { normalizeApiError } from './apiError'
 import { isApiResponse } from './apiResponse'
 import { attachCsrfToken, clearCsrfToken } from './csrf'
+import { validateResponseData } from './responseSchema'
 import { recoverAndRetry } from './sessionRecovery'
 
 const HTTP_TIMEOUT_MS = 10_000
@@ -50,6 +51,8 @@ httpClient.interceptors.response.use(
     }
 
     if (body.success) {
+      validateResponseData(response.config, response.status, body.data)
+
       return { ...response, data: body.data }
     }
 

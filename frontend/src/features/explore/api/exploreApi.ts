@@ -3,6 +3,12 @@ import { httpClient } from '@/shared/api/httpClient'
 import type { EventDetail } from '../model/eventDetail'
 import type { EventListResponse, EventSearchFilters } from '../model/eventExplore'
 import {
+  eventDetailResponseSchema,
+  eventListResponseSchema,
+  placeDetailResponseSchema,
+  placeListResponseSchema,
+} from './exploreResponseSchemas'
+import {
   normalizePlaceListResponse,
   type PlaceListResponse,
   type PlaceSearchFilters,
@@ -108,6 +114,7 @@ function toPlaceSearchParams(filters: PlaceSearchFilters): URLSearchParams {
 export async function fetchEventList(filters: EventSearchFilters = {}): Promise<EventListResponse> {
   const response = await httpClient.get<EventListResponse>(EVENT_LIST_PATH, {
     params: toSearchParams(filters),
+    responseSchema: eventListResponseSchema,
   })
 
   return response.data
@@ -119,6 +126,7 @@ export async function fetchEventDetail(
 ): Promise<EventDetail> {
   const response = await httpClient.get<EventDetail>(`${EVENT_DETAIL_PATH}/${eventId}`, {
     params: { language },
+    responseSchema: eventDetailResponseSchema,
   })
 
   return response.data
@@ -127,6 +135,7 @@ export async function fetchEventDetail(
 export async function fetchPlaceList(filters: PlaceSearchFilters = {}): Promise<PlaceListResponse> {
   const response = await httpClient.get<PlaceListResponsePayload>(PLACE_LIST_PATH, {
     params: toPlaceSearchParams(filters),
+    responseSchema: placeListResponseSchema,
   })
 
   return normalizePlaceListResponse(response.data)
@@ -138,6 +147,7 @@ export async function fetchPlaceDetail(
 ): Promise<PlaceDetail> {
   const response = await httpClient.get<PlaceDetailResponse>(`${PLACE_DETAIL_PATH}/${placeId}`, {
     params: { language },
+    responseSchema: placeDetailResponseSchema,
   })
 
   return normalizePlaceDetail(response.data)

@@ -1,5 +1,6 @@
 import axios, { AxiosError, type AxiosAdapter, type AxiosResponse } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 interface StubReply {
   status: number
@@ -112,6 +113,51 @@ describe('httpClient', () => {
     expect(response.data).toEqual({ balance: '1000' })
   })
 
+  it('validates configured response data without returning a transformed Zod payload', async () => {
+    const { httpClient } = await loadClient({
+      'get /api/v1/wallet': [
+        {
+          status: 200,
+          body: { success: true, data: { balance: 1000, serverAdded: 'kept' } },
+        },
+      ],
+    })
+    const responseSchema = z.object({ balance: z.number() })
+
+    const response = await httpClient.get('/api/v1/wallet', { responseSchema })
+
+    expect(response.data).toEqual({ balance: 1000, serverAdded: 'kept' })
+  })
+
+  it('normalizes a schema mismatch with sanitized metadata only', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { httpClient } = await loadClient({
+      'get /api/v1/wallet': [
+        {
+          status: 200,
+          body: { success: true, data: { balance: 'not-a-number', secret: 'do-not-log' } },
+        },
+      ],
+    })
+    const responseSchema = z.object({ balance: z.number() })
+
+    await expect(httpClient.get('/api/v1/wallet', { responseSchema })).rejects.toMatchObject({
+      code: 'UNKNOWN',
+      status: 200,
+      message: 'Internal response validation error',
+      messageKey: 'error.unknown',
+    })
+
+    expect(consoleError).toHaveBeenCalledWith('API response validation failed', {
+      url: '/api/v1/wallet',
+      method: 'GET',
+      status: 200,
+      issues: [{ path: ['balance'], code: 'invalid_type', expected: 'number' }],
+    })
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain('do-not-log')
+    consoleError.mockRestore()
+  })
+
   it('turns a failed envelope into a normalized error with a message key', async () => {
     const { httpClient } = await loadClient({
       'get /api/v1/wallet': [{ status: 200, body: authRequired }],
@@ -159,6 +205,22 @@ describe('httpClient', () => {
     expect(response.data).toEqual({ balance: '10' })
     expect(countCalls(calls, 'post', '/api/v1/auth/refresh')).toBe(1)
     expect(countCalls(calls, 'get', '/api/v1/wallet')).toBe(2)
+  })
+
+  it('keeps the response schema on the final 401 refresh retry', async () => {
+    const { httpClient } = await loadClient({
+      'get /api/v1/wallet': [
+        { status: 401, body: authRequired },
+        { status: 200, body: { success: true, data: { balance: 'invalid-after-refresh' } } },
+      ],
+      'post /api/v1/auth/refresh': [{ status: 200, body: { success: true } }],
+    })
+    const responseSchema = z.object({ balance: z.number() })
+
+    await expect(httpClient.get('/api/v1/wallet', { responseSchema })).rejects.toMatchObject({
+      code: 'UNKNOWN',
+      status: 200,
+    })
   })
 
   it('does not refresh or retry while the sign-out barrier is active', async () => {
@@ -405,6 +467,34 @@ describe('httpClient', () => {
     expect(response.data).toEqual({ amount: '50000' })
     expect(countCalls(calls, 'get', '/api/v1/auth/csrf')).toBe(2)
     expect(countCalls(calls, 'post', '/api/v1/topups/preview')).toBe(2)
+  })
+
+  it('keeps the response schema on the final AUTH-005 CSRF retry', async () => {
+    const invalidCsrf = {
+      success: false,
+      error: { code: 'AUTH-005', message: 'invalid csrf token' },
+    }
+    const { httpClient } = await loadClient({
+      'get /api/v1/auth/csrf': [
+        {
+          status: 200,
+          body: { success: true, data: { token: 'csrf-token', headerName: 'X-CSRF-TOKEN' } },
+        },
+        {
+          status: 200,
+          body: { success: true, data: { token: 'fresh-csrf-token', headerName: 'X-CSRF-TOKEN' } },
+        },
+      ],
+      'post /api/v1/topups/preview': [
+        { status: 403, body: invalidCsrf },
+        { status: 200, body: { success: true, data: { amount: 'invalid-after-csrf' } } },
+      ],
+    })
+    const responseSchema = z.object({ amount: z.number() })
+
+    await expect(
+      httpClient.post('/api/v1/topups/preview', { amount: 50000 }, { responseSchema }),
+    ).rejects.toMatchObject({ code: 'UNKNOWN', status: 200 })
   })
 
   it('keeps axios importable for consumers that need error helpers', () => {
