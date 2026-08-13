@@ -23,7 +23,7 @@ const errorKey = computed(() => resolveSettlementError(settlementQuery.error.val
 </script>
 
 <template>
-  <section class="flex min-h-dvh flex-col px-screen pt-8 pb-8">
+  <section class="flex min-h-dvh flex-col px-screen pt-8 pb-32">
     <SettlementPageHeader
       :title="t('settlement.title')"
       :back-label="t('settlement.backToWallet')"

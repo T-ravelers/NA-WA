@@ -13,6 +13,35 @@ vi.mock('../../api/settlementGateway', () => ({ settlementGateway: { getSettleme
 describe('SettlementListView', () => {
   beforeEach(() => getSettlements.mockReset())
 
+  it('reserves space for the fixed bottom navigation below the create button', async () => {
+    getSettlements.mockResolvedValue({ received: [], sent: [] })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/settlements', name: 'settlements', component: SettlementListView },
+        { path: '/settlements/new', name: 'settlement-new', component: { template: '<div />' } },
+        { path: '/wallet', name: 'wallet', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/settlements')
+    await router.isReady()
+    const wrapper = mount(SettlementListView, {
+      global: {
+        plugins: [
+          i18n,
+          router,
+          [
+            VueQueryPlugin,
+            { queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          ],
+        ],
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('section').classes()).toContain('pb-32')
+  })
+
   it('renders the server amount and opens every supported settlement in its detail route', async () => {
     getSettlements.mockResolvedValue({
       received: [
