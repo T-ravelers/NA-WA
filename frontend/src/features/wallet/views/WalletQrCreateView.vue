@@ -1,49 +1,67 @@
 <script setup lang="ts">
+import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { IconChevronLeft } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+import { NormalizedApiError } from '@/shared/api/apiError'
 import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import TextInput from '@/shared/ui/TextInput.vue'
 
-import { MAX_QR_PAYMENT_AMOUNT } from '../model/qrPayment'
-import { useQrRequestDraftStore } from '../model/qrRequestDraft'
+import { createPaymentQr } from '../api/qrPaymentApi'
+import { isValidQrPaymentAmount, qrPaymentKeys } from '../model/qrPayment'
 
-const { t } = useI18n()
+const i18n = useI18n()
+const { t } = i18n
 const router = useRouter()
-const qrRequestDraft = useQrRequestDraftStore()
+const queryClient = useQueryClient()
 
 const amount = ref<number | null>(18_500)
 const memo = ref('Seoul Night Tour')
 const payerEntersAmount = ref(false)
 
-const isValidFixedAmount = (value: number | null): value is number =>
-  value !== null &&
-  Number.isFinite(value) &&
-  Number.isSafeInteger(value) &&
-  value > 0 &&
-  value <= MAX_QR_PAYMENT_AMOUNT
+const createMutation = useMutation({ mutationFn: createPaymentQr })
 
-const canCreate = computed(() => payerEntersAmount.value || isValidFixedAmount(amount.value))
+const canCreate = computed(
+  () =>
+    (payerEntersAmount.value || isValidQrPaymentAmount(amount.value)) &&
+    !createMutation.isPending.value,
+)
+
+const errorMessage = computed(() => {
+  const error = createMutation.error.value
+
+  if (!(error instanceof NormalizedApiError) || !i18n.te(error.messageKey)) {
+    return t('wallet.qrCreate.createError')
+  }
+
+  return t(error.messageKey)
+})
 
 const goBack = (): void => {
   void router.push({ name: 'wallet' })
 }
 
-/** API 연동 전까지는 입력값을 세션 메모리 상태로 넘기는 로컬 목업 흐름으로 연결한다. */
-const createMockQr = (): void => {
+const createQr = (): void => {
   if (!canCreate.value) return
 
-  qrRequestDraft.setDraft({
-    amount: payerEntersAmount.value ? null : amount.value,
-    memo: memo.value.trim(),
-    payerEntersAmount: payerEntersAmount.value,
-  })
+  const trimmedMemo = memo.value.trim()
 
-  void router.push({ name: 'wallet-qr' })
+  createMutation.mutate(
+    {
+      amount: payerEntersAmount.value ? null : amount.value,
+      memo: trimmedMemo === '' ? null : trimmedMemo,
+    },
+    {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: qrPaymentKeys.active() })
+        void router.push({ name: 'wallet-qr' })
+      },
+    },
+  )
 }
 </script>
 
@@ -135,16 +153,24 @@ const createMockQr = (): void => {
         />
       </AppCard>
 
-      <p class="rounded-xs bg-surface-2 px-3 py-2 text-caption text-ink-2">
-        {{ t('wallet.qrCreate.mockNotice') }}
+      <p
+        v-if="createMutation.isError.value"
+        role="alert"
+        class="rounded-sm bg-surface-3 px-3.5 py-3 text-body-sm text-ink-2"
+      >
+        {{ errorMessage }}
       </p>
 
       <AppButton
         block
         :disabled="!canCreate"
-        @click="createMockQr"
+        @click="createQr"
       >
-        {{ t('wallet.qrCreate.create') }}
+        {{
+          createMutation.isPending.value
+            ? t('wallet.qrCreate.creating')
+            : t('wallet.qrCreate.create')
+        }}
       </AppButton>
     </section>
   </main>

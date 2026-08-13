@@ -18,6 +18,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.wallet.domain.QrPaymentAppointmentMembership;
 import me.nawa.wallet.domain.QrPaymentCode;
@@ -283,6 +284,61 @@ class QrPaymentServiceImplTest {
         );
 
         assertEquals(WalletErrorCode.WALLET_NOT_ACTIVE, exception.getErrorCode());
+        verifyNoInteractions(qrPaymentCodeMapper);
+    }
+
+    // ===== listActivePaymentQrs =====
+
+    @Test
+    void listActivePaymentQrs_returnsActiveQrs_mappedToCreateResponse() {
+        Wallet wallet = wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(MEMBER_ID)).thenReturn(wallet);
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(1);
+        QrPaymentCode active = qrPaymentCode(
+            10L, PAYER_WALLET_ID, null, "token-abc",
+            BigDecimal.valueOf(18500), "서울 야경 투어", QrPaymentStatus.ACTIVE, expiresAt
+        );
+        when(qrPaymentCodeMapper.findActiveByPayeeWalletId(eq(PAYER_WALLET_ID), any()))
+            .thenReturn(List.of(active));
+
+        List<QrPaymentCreateResponse> responses =
+            qrPaymentService.listActivePaymentQrs(MEMBER_ID);
+
+        assertEquals(1, responses.size());
+        QrPaymentCreateResponse response = responses.get(0);
+        assertEquals(10L, response.qrPaymentCodeId());
+        assertEquals("token-abc", response.qrToken());
+        assertEquals(0, BigDecimal.valueOf(18500).compareTo(response.amount()));
+        assertEquals("서울 야경 투어", response.memo());
+        assertEquals("ACTIVE", response.status());
+        assertEquals("KRW", response.currencyCode());
+        assertEquals(expiresAt, response.expiresAt());
+    }
+
+    @Test
+    void listActivePaymentQrs_returnsEmptyList_whenNoneActive() {
+        Wallet wallet = wallet(PAYER_WALLET_ID, BigDecimal.valueOf(50000), "ACTIVE");
+        when(walletMapper.findByMemberId(MEMBER_ID)).thenReturn(wallet);
+        when(qrPaymentCodeMapper.findActiveByPayeeWalletId(eq(PAYER_WALLET_ID), any()))
+            .thenReturn(List.of());
+
+        List<QrPaymentCreateResponse> responses =
+            qrPaymentService.listActivePaymentQrs(MEMBER_ID);
+
+        assertTrue(responses.isEmpty());
+    }
+
+    @Test
+    void listActivePaymentQrs_throwsWalletNotFound_whenNoWallet() {
+        when(walletMapper.findByMemberId(MEMBER_ID)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> qrPaymentService.listActivePaymentQrs(MEMBER_ID)
+        );
+
+        assertEquals(WalletErrorCode.WALLET_NOT_FOUND, exception.getErrorCode());
         verifyNoInteractions(qrPaymentCodeMapper);
     }
 

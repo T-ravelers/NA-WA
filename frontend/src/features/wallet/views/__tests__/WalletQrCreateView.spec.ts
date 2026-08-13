@@ -1,12 +1,17 @@
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
-import { useQrRequestDraftStore } from '../../model/qrRequestDraft'
+import { createPaymentQr } from '../../api/qrPaymentApi'
+import { qrPaymentKeys } from '../../model/qrPayment'
 import WalletQrCreateView from '../WalletQrCreateView.vue'
+
+vi.mock('../../api/qrPaymentApi', () => ({
+  createPaymentQr: vi.fn(),
+}))
 
 function createTestRouter(): Router {
   return createRouter({
@@ -23,21 +28,44 @@ function createTestRouter(): Router {
   })
 }
 
-async function mountView(): Promise<{ router: Router; wrapper: ReturnType<typeof mount> }> {
+async function mountView(): Promise<{
+  router: Router
+  wrapper: ReturnType<typeof mount>
+  queryClient: QueryClient
+}> {
   const router = createTestRouter()
-  setActivePinia(createPinia())
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   await router.push('/wallet/qr/create')
   await router.isReady()
 
   const wrapper = mount(WalletQrCreateView, {
-    global: { plugins: [i18n, router] },
+    global: {
+      plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+    },
   })
 
-  return { router, wrapper }
+  return { router, wrapper, queryClient }
 }
 
 describe('WalletQrCreateView', () => {
-  it('shows the local QR request form', async () => {
+  beforeEach(() => {
+    vi.mocked(createPaymentQr).mockReset()
+    vi.mocked(createPaymentQr).mockImplementation((request) =>
+      Promise.resolve({
+        qrPaymentCodeId: 1,
+        qrToken: 'tok-abc',
+        amount: request.amount,
+        memo: request.memo,
+        status: 'ACTIVE',
+        currencyCode: 'KRW',
+        expiresAt: '2026-08-13T12:00:00',
+      }),
+    )
+  })
+
+  it('shows the QR request form', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.get('h1').text()).toBe('CREATE PAYMENT QR')
@@ -46,9 +74,10 @@ describe('WalletQrCreateView', () => {
     expect(wrapper.text()).toContain('Create QR')
   })
 
-  it('saves the entered amount and memo as the local QR request draft, without a URL query', async () => {
-    const { router, wrapper } = await mountView()
+  it('creates the QR via the API, refreshes the active QR list, and returns to My QR', async () => {
+    const { router, wrapper, queryClient } = await mountView()
     const pushSpy = vi.spyOn(router, 'push')
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
     await wrapper.get('input[type="text"]:not([inputmode])').setValue('Seoul Food Tour')
     await wrapper
@@ -57,17 +86,16 @@ describe('WalletQrCreateView', () => {
       ?.trigger('click')
     await flushPromises()
 
-    expect(useQrRequestDraftStore().draft).toEqual({
+    expect(vi.mocked(createPaymentQr).mock.calls[0]?.[0]).toEqual({
       amount: 18_500,
       memo: 'Seoul Food Tour',
-      payerEntersAmount: false,
     })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: qrPaymentKeys.active() })
     expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr' })
   })
 
   it('supports a request where the payer enters the amount', async () => {
-    const { router, wrapper } = await mountView()
-    const pushSpy = vi.spyOn(router, 'push')
+    const { wrapper } = await mountView()
 
     await wrapper.get('input[type="checkbox"]').setValue(true)
     await wrapper
@@ -76,12 +104,42 @@ describe('WalletQrCreateView', () => {
       ?.trigger('click')
     await flushPromises()
 
-    expect(useQrRequestDraftStore().draft).toEqual({
+    expect(vi.mocked(createPaymentQr).mock.calls[0]?.[0]).toEqual({
       amount: null,
       memo: 'Seoul Night Tour',
-      payerEntersAmount: true,
     })
-    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr' })
+  })
+
+  it('sends a cleared memo as null', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper.get('input[type="text"]:not([inputmode])').setValue('')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Create QR')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(createPaymentQr).mock.calls[0]?.[0]).toEqual({
+      amount: 18_500,
+      memo: null,
+    })
+  })
+
+  it('shows an error message and keeps the form when QR creation fails', async () => {
+    vi.mocked(createPaymentQr).mockRejectedValue(new Error('network down'))
+
+    const { router, wrapper } = await mountView()
+    const pushSpy = vi.spyOn(router, 'push')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Create QR')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('We could not create this QR code. Please try again.')
+    expect(pushSpy).not.toHaveBeenCalled()
   })
 
   it('disables QR creation when a fixed amount is empty', async () => {
@@ -134,22 +192,5 @@ describe('WalletQrCreateView', () => {
         .find((button) => button.text() === 'Create QR')
         ?.attributes('disabled'),
     ).toBeDefined()
-  })
-
-  it('saves a cleared memo as an empty string rather than the placeholder default', async () => {
-    const { wrapper } = await mountView()
-
-    await wrapper.get('input[type="text"]:not([inputmode])').setValue('')
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Create QR')
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(useQrRequestDraftStore().draft).toEqual({
-      amount: 18_500,
-      memo: '',
-      payerEntersAmount: false,
-    })
   })
 })

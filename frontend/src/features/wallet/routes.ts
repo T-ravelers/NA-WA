@@ -38,7 +38,7 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, hideBottomNav: true },
   },
   {
-    path: '/wallet/qr/payment/complete',
+    path: '/wallet/qr/payment/complete/:transferId',
     name: 'wallet-qr-payment-complete',
     component: () => import('./views/WalletQrPaymentCompleteView.vue'),
     meta: { requiresAuth: true, hideBottomNav: true },

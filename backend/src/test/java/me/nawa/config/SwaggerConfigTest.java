@@ -233,6 +233,13 @@ class SwaggerConfigTest {
                 }
 
                 @Override
+                public java.util.List<QrPaymentCreateResponse> listActivePaymentQrs(
+                    Long memberId
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
                 public QrPaymentResolveResponse resolvePaymentQr(
                     Long memberId, QrPaymentResolveRequest request
                 ) {

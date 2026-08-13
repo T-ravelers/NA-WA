@@ -1,25 +1,38 @@
 <script setup lang="ts">
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import { IconChevronLeft } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+import { NormalizedApiError } from '@/shared/api/apiError'
+import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
+import StateEmpty from '@/shared/ui/StateEmpty.vue'
 
+import { executeQrPayment, previewQrPayment } from '../api/qrPaymentApi'
 import {
   ACTIVE_APPOINTMENTS,
   formatKrw,
-  QR_PAYMENT_PREVIEW,
+  isValidQrPaymentAmount,
+  qrPaymentKeys,
+  toQrPaymentSpendingScope,
   type SpendingScope,
 } from '../model/qrPayment'
+import { useQrPaymentSessionStore } from '../model/qrPaymentSession'
 
-const { t } = useI18n()
+const i18n = useI18n()
+const { t } = i18n
 const router = useRouter()
+const qrPaymentSession = useQrPaymentSessionStore()
+
+const session = computed(() => qrPaymentSession.session)
 
 const spendingScope = ref<SpendingScope>('personal')
 const selectedAppointmentId = ref('')
+const enteredAmount = ref<number | null>(null)
 
 const spendingOptions = computed(() => [
   { value: 'personal', label: t('wallet.qrPayment.personal') },
@@ -30,8 +43,75 @@ const isSharedExpense = computed(() => spendingScope.value === 'shared')
 const selectedAppointment = computed(() =>
   ACTIVE_APPOINTMENTS.find((appointment) => appointment.id === selectedAppointmentId.value),
 )
+
+const finalAmount = computed<number | null>(() => {
+  const resolved = session.value?.resolved
+
+  if (resolved === undefined) return null
+
+  return resolved.amountInputRequired ? enteredAmount.value : resolved.amount
+})
+
+const isPreviewReady = computed(
+  () =>
+    session.value !== null &&
+    spendingScope.value === 'personal' &&
+    isValidQrPaymentAmount(finalAmount.value),
+)
+
+const previewQuery = useQuery({
+  queryKey: computed(() =>
+    qrPaymentKeys.preview(
+      session.value?.qrToken ?? '',
+      finalAmount.value ?? 0,
+      toQrPaymentSpendingScope(spendingScope.value),
+    ),
+  ),
+  queryFn: () =>
+    previewQrPayment({
+      qrToken: session.value?.qrToken ?? '',
+      amount: finalAmount.value ?? 0,
+      spendingScope: toQrPaymentSpendingScope(spendingScope.value),
+      appointmentId: null,
+    }),
+  enabled: isPreviewReady,
+})
+
+const previewErrorMessage = computed(() => {
+  const error = previewQuery.error.value
+
+  if (!(error instanceof NormalizedApiError) || !i18n.te(error.messageKey)) {
+    return t('wallet.qrPayment.previewError')
+  }
+
+  return t(error.messageKey)
+})
+
+const executeMutation = useMutation({
+  mutationFn: ({
+    request,
+    idempotencyKey,
+  }: {
+    request: Parameters<typeof executeQrPayment>[0]
+    idempotencyKey: string
+  }) => executeQrPayment(request, idempotencyKey),
+})
+
+const executeErrorMessage = computed(() => {
+  const error = executeMutation.error.value
+
+  if (!(error instanceof NormalizedApiError) || !i18n.te(error.messageKey)) {
+    return t('wallet.qrPayment.executeError')
+  }
+
+  return t(error.messageKey)
+})
+
 const canPay = computed(
-  () => spendingScope.value === 'personal' || selectedAppointment.value !== undefined,
+  () =>
+    spendingScope.value === 'personal' &&
+    previewQuery.data.value?.canPay === true &&
+    !executeMutation.isPending.value,
 )
 
 const goBack = (): void => {
@@ -39,15 +119,31 @@ const goBack = (): void => {
 }
 
 const completePayment = (): void => {
-  if (!canPay.value) return
+  if (!canPay.value || session.value === null || finalAmount.value === null) return
 
-  void router.push({
-    name: 'wallet-qr-payment-complete',
-    query: {
-      scope: spendingScope.value,
-      ...(selectedAppointment.value ? { appointment: selectedAppointment.value.id } : {}),
+  const idempotencyKey =
+    globalThis.crypto?.randomUUID?.() ?? `qr-payment-${Date.now()}-${Math.random()}`
+
+  executeMutation.mutate(
+    {
+      request: {
+        qrToken: session.value.qrToken,
+        amount: finalAmount.value,
+        spendingScope: toQrPaymentSpendingScope(spendingScope.value),
+        appointmentId: null,
+      },
+      idempotencyKey,
     },
-  })
+    {
+      onSuccess: (response) => {
+        qrPaymentSession.clearSession()
+        void router.push({
+          name: 'wallet-qr-payment-complete',
+          params: { transferId: String(response.transferId) },
+        })
+      },
+    },
+  )
 }
 </script>
 
@@ -76,6 +172,26 @@ const completePayment = (): void => {
     </header>
 
     <section
+      v-if="session === null"
+      class="pt-6"
+      aria-labelledby="wallet-qr-payment-preview-heading"
+    >
+      <h2
+        id="wallet-qr-payment-preview-heading"
+        class="sr-only"
+      >
+        {{ t('wallet.qrPayment.previewHeading') }}
+      </h2>
+      <StateEmpty
+        :title="t('wallet.qrPayment.noSessionTitle')"
+        :description="t('wallet.qrPayment.noSessionDescription')"
+        :action-label="t('wallet.qrScan.rescan')"
+        @action="goBack"
+      />
+    </section>
+
+    <section
+      v-else
       class="space-y-4 pt-6"
       aria-labelledby="wallet-qr-payment-preview-heading"
     >
@@ -90,28 +206,63 @@ const completePayment = (): void => {
         <h3 class="text-title-sm">{{ t('wallet.qrPayment.previewHeading') }}</h3>
 
         <dl class="mt-4 divide-y divide-hairline">
-          <div class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+          <div class="flex items-center justify-between gap-4 py-3 first:pt-0">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.recipient') }}</dt>
             <dd class="text-right text-body-sm font-semibold">
-              {{ QR_PAYMENT_PREVIEW.recipient }}
+              {{ session.resolved.payeeName }}
             </dd>
           </div>
+        </dl>
+
+        <div
+          v-if="session.resolved.amountInputRequired"
+          class="mt-1"
+        >
+          <AmountInput
+            v-model="enteredAmount"
+            :label="t('wallet.qrPayment.amount')"
+            :helper="t('wallet.qrPayment.amountInputHelper')"
+          />
+        </div>
+        <dl
+          v-else
+          class="divide-y divide-hairline"
+        >
           <div class="flex items-center justify-between gap-4 py-3">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.amount') }}</dt>
             <dd class="text-body-sm font-semibold">
-              {{ formatKrw(QR_PAYMENT_PREVIEW.amount) }}
+              {{ formatKrw(session.resolved.amount ?? 0) }}
             </dd>
           </div>
+        </dl>
+
+        <p
+          v-if="previewQuery.isPending.value"
+          class="mt-3 text-body-sm text-ink-2"
+        >
+          {{ t('wallet.qrPayment.loadingPreview') }}
+        </p>
+        <p
+          v-else-if="previewQuery.isError.value"
+          role="alert"
+          class="mt-3 rounded-sm bg-surface-3 px-3.5 py-3 text-body-sm text-ink-2"
+        >
+          {{ previewErrorMessage }}
+        </p>
+        <dl
+          v-else-if="previewQuery.data.value"
+          class="mt-1 divide-y divide-hairline"
+        >
           <div class="flex items-center justify-between gap-4 py-3">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.currentBalance') }}</dt>
             <dd class="text-body-sm font-semibold">
-              {{ formatKrw(QR_PAYMENT_PREVIEW.currentBalance) }}
+              {{ formatKrw(previewQuery.data.value.currentBalance) }}
             </dd>
           </div>
           <div class="flex items-center justify-between gap-4 py-3 last:pb-0">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.balanceAfter') }}</dt>
             <dd class="text-body-sm font-semibold">
-              {{ formatKrw(QR_PAYMENT_PREVIEW.balanceAfter) }}
+              {{ formatKrw(previewQuery.data.value.balanceAfter) }}
             </dd>
           </div>
         </dl>
@@ -173,8 +324,20 @@ const completePayment = (): void => {
           >
             {{ t('wallet.qrPayment.selectAppointment') }}
           </p>
+
+          <p class="mt-3 text-caption text-ink-3">
+            {{ t('wallet.qrPayment.sharedUnavailable') }}
+          </p>
         </fieldset>
       </AppCard>
+
+      <p
+        v-if="executeMutation.isError.value"
+        role="alert"
+        class="rounded-sm bg-surface-3 px-3.5 py-3 text-body-sm text-ink-2"
+      >
+        {{ executeErrorMessage }}
+      </p>
 
       <div class="grid grid-cols-2 gap-3 pt-1">
         <AppButton
@@ -190,7 +353,11 @@ const completePayment = (): void => {
           :disabled="!canPay"
           @click="completePayment"
         >
-          {{ t('wallet.qrPayment.pay') }}
+          {{
+            executeMutation.isPending.value
+              ? t('wallet.qrPayment.executing')
+              : t('wallet.qrPayment.pay')
+          }}
         </AppButton>
       </div>
     </section>

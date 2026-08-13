@@ -1,22 +1,71 @@
 <script setup lang="ts">
-import { IconChevronLeft, IconInfoCircle } from '@tabler/icons-vue'
-import { computed } from 'vue'
+import { useMutation } from '@tanstack/vue-query'
+import { IconChevronLeft } from '@tabler/icons-vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { QrcodeStream, type DetectedBarcode, type EmittedError } from 'vue-qrcode-reader'
 
+import { NormalizedApiError } from '@/shared/api/apiError'
+import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
-const { t } = useI18n()
+import { resolvePaymentQr } from '../api/qrPaymentApi'
+import { useQrPaymentSessionStore } from '../model/qrPaymentSession'
+
+const i18n = useI18n()
+const { t } = i18n
 const route = useRoute()
 const router = useRouter()
+const qrPaymentSession = useQrPaymentSessionStore()
 
 const isScanQrActive = computed(() => route.name === 'wallet-qr-scan')
+
+const paused = ref(false)
+const cameraError = ref<'denied' | 'unsupported' | null>(null)
+
+const resolveMutation = useMutation({ mutationFn: resolvePaymentQr })
+
+const resolveErrorMessage = computed(() => {
+  const error = resolveMutation.error.value
+
+  if (!(error instanceof NormalizedApiError) || !i18n.te(error.messageKey)) {
+    return t('wallet.qrScan.resolveErrorGeneric')
+  }
+
+  return t(error.messageKey)
+})
+
+const onDetect = (detectedCodes: DetectedBarcode[]): void => {
+  if (paused.value) return
+
+  const qrToken = detectedCodes[0]?.rawValue
+
+  if (qrToken === undefined || qrToken === '') return
+
+  paused.value = true
+  resolveMutation.mutate(qrToken, {
+    onSuccess: (resolved) => {
+      qrPaymentSession.setSession({ qrToken, resolved })
+    },
+  })
+}
+
+const onCameraError = (error: EmittedError): void => {
+  cameraError.value = error.name === 'NotAllowedError' ? 'denied' : 'unsupported'
+}
+
+const rescan = (): void => {
+  resolveMutation.reset()
+  cameraError.value = null
+  paused.value = false
+}
 
 const goBack = (): void => {
   void router.push({ name: 'wallet' })
 }
 
-const openPaymentPreview = (): void => {
+const continueToPreview = (): void => {
   void router.push({ name: 'wallet-qr-payment-preview' })
 }
 </script>
@@ -83,40 +132,71 @@ const openPaymentPreview = (): void => {
         padding="lg"
         class="text-center"
       >
-        <div
-          class="relative mx-auto aspect-square w-full max-w-[240px] rounded-card border-2 border-hairline-strong bg-surface-1"
-          role="img"
-          :aria-label="t('wallet.qrScan.imageLabel')"
+        <template v-if="cameraError !== null">
+          <p class="text-body-sm font-semibold text-ink-2">
+            {{
+              cameraError === 'denied'
+                ? t('wallet.qrScan.cameraDenied')
+                : t('wallet.qrScan.cameraUnavailable')
+            }}
+          </p>
+        </template>
+
+        <template v-else-if="resolveMutation.isSuccess.value && qrPaymentSession.session !== null">
+          <p class="text-body-sm text-ink-2">{{ t('wallet.qrScan.resolvedTitle') }}</p>
+          <p class="mt-2 text-title-sm font-semibold">
+            {{ qrPaymentSession.session.resolved.payeeName }}
+          </p>
+          <AppButton
+            block
+            class="mt-5"
+            @click="continueToPreview"
+          >
+            {{ t('wallet.qrScan.continue') }}
+          </AppButton>
+        </template>
+
+        <template v-else>
+          <div
+            class="relative mx-auto aspect-square w-full max-w-[240px] overflow-hidden rounded-card border-2 border-hairline-strong bg-surface-1"
+            role="img"
+            :aria-label="t('wallet.qrScan.imageLabel')"
+          >
+            <QrcodeStream
+              :paused="paused"
+              :formats="['qr_code']"
+              @detect="onDetect"
+              @error="onCameraError"
+            />
+          </div>
+
+          <p class="mt-4 text-body-sm text-ink-2">
+            {{
+              resolveMutation.isPending.value
+                ? t('wallet.qrScan.resolving')
+                : t('wallet.qrScan.instruction')
+            }}
+          </p>
+
+          <p
+            v-if="resolveMutation.isError.value"
+            role="alert"
+            class="mt-3 rounded-sm bg-surface-3 px-3.5 py-3 text-body-sm text-ink-2"
+          >
+            {{ resolveErrorMessage }}
+          </p>
+        </template>
+
+        <AppButton
+          v-if="cameraError !== null || resolveMutation.isError.value"
+          variant="secondary"
+          block
+          class="mt-3"
+          @click="rescan"
         >
-          <span
-            class="absolute left-1/2 top-1/2 size-8 -translate-x-1/2 -translate-y-1/2 rounded-xs bg-surface-2"
-            aria-hidden="true"
-          />
-        </div>
-
-        <p class="mt-4 text-body-sm text-ink-2">
-          {{ t('wallet.qrScan.instruction') }}
-        </p>
+          {{ t('wallet.qrScan.rescan') }}
+        </AppButton>
       </AppCard>
-
-      <div
-        class="mt-3 flex items-center gap-2 rounded-xs bg-surface-2 px-3 py-2 text-caption text-ink-2"
-      >
-        <IconInfoCircle
-          :size="16"
-          :stroke-width="1.75"
-          aria-hidden="true"
-        />
-        <p>{{ t('wallet.qrScan.sandboxNotice') }}</p>
-      </div>
-
-      <button
-        type="button"
-        class="mt-3 flex min-h-12 items-center justify-center rounded-sm border border-hairline-strong px-4 text-body-sm text-ink-2"
-        @click="openPaymentPreview"
-      >
-        {{ t('wallet.qrScan.detected') }}
-      </button>
     </section>
   </main>
 </template>
