@@ -95,6 +95,11 @@ async function mountView() {
     history: createMemoryHistory(),
     routes: [
       {
+        path: '/explore',
+        name: 'explore',
+        component: { template: '<div>Explore</div>' },
+      },
+      {
         path: '/explore/events/:eventId',
         name: 'explore-event-detail',
         component: EventDetailView,
@@ -142,6 +147,17 @@ describe('EventDetailView', () => {
 
     expect(wrapper.text()).toContain('Seoul concert')
     expect(wrapper.text()).toContain('Seoul · Seocho-gu')
+  })
+
+  it('returns to the Event list from the detail screen', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('button[aria-label="Back to events"]').trigger('click')
+    await flushPromises()
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('explore')
+    expect(router.currentRoute.value.query).toEqual({ tab: 'events' })
   })
 
   it('adds the Event to the selected journey for the chosen date', async () => {

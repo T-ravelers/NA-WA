@@ -159,11 +159,10 @@ function showNextImage(): void {
 }
 
 function goBack(): void {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  void router.push({ name: 'explore' })
+  void router.push({
+    name: 'explore',
+    query: { tab: 'events' },
+  })
 }
 
 async function shareEvent(): Promise<void> {

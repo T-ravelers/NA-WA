@@ -74,6 +74,11 @@ async function mountView() {
     history: createMemoryHistory(),
     routes: [
       {
+        path: '/explore',
+        name: 'explore',
+        component: { template: '<div>Explore</div>' },
+      },
+      {
         path: '/explore/places/:placeId',
         name: 'explore-place-detail',
         component: PlaceDetailView,
@@ -136,6 +141,17 @@ describe('PlaceDetailView', () => {
         .find((button) => button.text() === 'Find companions')
         ?.attributes('disabled'),
     ).toBeUndefined()
+  })
+
+  it('returns to the Place list from the detail screen', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('button[aria-label="Back to places"]').trigger('click')
+    await flushPromises()
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('explore')
+    expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
   })
 
   it('opens the Place appointment list with the Place filter', async () => {
