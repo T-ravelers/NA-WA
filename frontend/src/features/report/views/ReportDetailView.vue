@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { IconArrowLeft } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
@@ -77,14 +78,18 @@ function retry(): void {
 
 <template>
   <main class="flex w-full flex-col gap-6 px-screen py-8">
-    <header class="flex flex-col gap-3">
-      <AppButton
-        variant="tertiary"
-        class="self-start"
+    <header class="flex items-center gap-3">
+      <IconOrb
+        :label="t('report.detail.back')"
+        size="lg"
+        variant="surface"
         @click="goBack"
       >
-        {{ t('report.detail.back') }}
-      </AppButton>
+        <IconArrowLeft
+          :size="24"
+          aria-hidden="true"
+        />
+      </IconOrb>
       <h1 class="font-display text-screen-title font-bold text-ink-display">
         {{ t('report.detail.title') }}
       </h1>
@@ -128,70 +133,6 @@ function retry(): void {
     />
 
     <template v-else-if="report !== null">
-      <AppCard>
-        <section
-          class="flex flex-col gap-3"
-          aria-labelledby="report-journey-title"
-        >
-          <div>
-            <p class="text-label text-ink-3">{{ t('report.detail.journeySnapshot') }}</p>
-            <h2
-              id="report-journey-title"
-              class="mt-1 text-title text-ink"
-            >
-              {{ report.reportContent.journey.title }}
-            </h2>
-          </div>
-          <p class="text-body-sm text-ink-3">
-            {{ formatReportDate(report.reportContent.journey.startDate) }}–{{
-              formatReportDate(report.reportContent.journey.endDate)
-            }}
-          </p>
-          <p class="text-body-sm text-ink-3">
-            {{ t('report.detail.status', { status: report.generationStatus }) }}
-          </p>
-        </section>
-      </AppCard>
-
-      <section
-        class="flex flex-col gap-3"
-        aria-labelledby="report-itinerary-title"
-      >
-        <h2
-          id="report-itinerary-title"
-          class="text-section-header text-ink"
-        >
-          {{ t('report.detail.itinerary') }}
-        </h2>
-        <p
-          v-if="report.reportContent.days.length === 0"
-          class="text-body-sm text-ink-3"
-        >
-          {{ t('report.detail.itineraryEmpty') }}
-        </p>
-        <ol
-          v-else
-          class="flex flex-col gap-3"
-        >
-          <li
-            v-for="day in report.reportContent.days"
-            :key="day.visitDate"
-          >
-            <AppCard>
-              <h3 class="text-title-sm text-ink">{{ formatReportDate(day.visitDate) }}</h3>
-              <ul class="mt-2 flex flex-col gap-1 text-body-sm text-ink-3">
-                <li
-                  v-for="item in day.items"
-                  :key="item.tripItemId"
-                >
-                  {{ item.title }} · {{ item.itemType }} · {{ item.status }}
-                </li>
-              </ul>
-            </AppCard>
-          </li>
-        </ol>
-      </section>
-
       <section
         v-if="report.analytics === null"
         class="flex flex-col gap-3"
@@ -244,6 +185,78 @@ function retry(): void {
           :empty-description="t('report.detail.trendEmpty')"
         />
       </template>
+
+      <section
+        class="flex flex-col gap-3"
+        aria-labelledby="report-journey-snapshot-title"
+      >
+        <h2
+          id="report-journey-snapshot-title"
+          class="font-display text-section-header uppercase text-ink"
+        >
+          {{ t('report.detail.journeySnapshot') }}
+        </h2>
+        <AppCard>
+          <div
+            class="flex flex-col gap-3"
+            aria-labelledby="report-journey-title"
+          >
+            <h3
+              id="report-journey-title"
+              class="text-title text-ink"
+            >
+              {{ report.reportContent.journey.title }}
+            </h3>
+            <p class="text-body-sm text-ink-3">
+              {{ formatReportDate(report.reportContent.journey.startDate) }}–{{
+                formatReportDate(report.reportContent.journey.endDate)
+              }}
+            </p>
+            <p class="text-body-sm text-ink-3">
+              {{ t('report.detail.status', { status: report.generationStatus }) }}
+            </p>
+          </div>
+        </AppCard>
+      </section>
+
+      <section
+        class="flex flex-col gap-3"
+        aria-labelledby="report-itinerary-title"
+      >
+        <h2
+          id="report-itinerary-title"
+          class="font-display text-section-header uppercase text-ink"
+        >
+          {{ t('report.detail.itinerary') }}
+        </h2>
+        <p
+          v-if="report.reportContent.days.length === 0"
+          class="text-body-sm text-ink-3"
+        >
+          {{ t('report.detail.itineraryEmpty') }}
+        </p>
+        <ol
+          v-else
+          class="flex flex-col gap-3"
+        >
+          <li
+            v-for="day in report.reportContent.days"
+            :key="day.visitDate"
+          >
+            <AppCard>
+              <h3 class="text-title-sm text-ink">{{ formatReportDate(day.visitDate) }}</h3>
+              <ul class="mt-2 flex flex-col gap-1 text-body-sm text-ink-3">
+                <li
+                  v-for="item in day.items"
+                  :key="item.tripItemId"
+                >
+                  {{ item.title }} · {{ item.itemType }} · {{ item.status }}
+                </li>
+              </ul>
+            </AppCard>
+          </li>
+        </ol>
+      </section>
     </template>
   </main>
 </template>

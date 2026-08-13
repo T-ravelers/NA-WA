@@ -25,9 +25,38 @@ vi.mock('../../api/reportApi', async (importOriginal) => ({
 const ReportsView = (await import('../ReportsView.vue')).default
 
 const journeys = [
-  { tripId: 42, title: 'Future Journey', startDate: '2098-08-10', endDate: '2098-08-12' },
-  { tripId: 9, title: 'Jeju Island', startDate: '2021-07-18', endDate: '2021-07-27' },
-  { tripId: 7, title: 'Busan Weekender', startDate: '2020-08-10', endDate: '2020-08-12' },
+  {
+    tripId: 42,
+    title: 'Future Journey',
+    startDate: '2098-08-10',
+    endDate: '2098-08-12',
+    eventCount: 2,
+    placeCount: 1,
+  },
+  {
+    tripId: 9,
+    title: 'Jeju Island',
+    startDate: '2021-07-18',
+    endDate: '2021-07-27',
+    eventCount: 5,
+    placeCount: 9,
+  },
+  {
+    tripId: 7,
+    title: 'Busan Weekender',
+    startDate: '2020-08-10',
+    endDate: '2020-08-12',
+    eventCount: 0,
+    placeCount: 0,
+  },
+  {
+    tripId: 8,
+    title: 'Gyeongju Day Trip',
+    startDate: '2019-05-01',
+    endDate: '2019-05-03',
+    eventCount: 0,
+    placeCount: 3,
+  },
 ]
 
 const summary = {
@@ -118,6 +147,10 @@ describe('ReportsView', () => {
     expect(wrapper.get('h1').text()).toBe('Reports')
     expect(wrapper.text()).toContain('Jeju Island')
     expect(wrapper.text()).toContain('Busan Weekender')
+    expect(wrapper.text()).toContain('5 events · 9 places')
+    expect(wrapper.text()).toContain('3 places')
+    expect(wrapper.text()).not.toContain('0 events')
+    expect(wrapper.text()).not.toContain('0 places')
     expect(wrapper.text()).not.toContain('Future Journey')
 
     await findButton(wrapper, 'View final report')?.trigger('click')

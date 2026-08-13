@@ -27,9 +27,30 @@ describe('reportModel', () => {
   it('joins reports to ended journeys and keeps deterministic newest-first order', () => {
     const options = buildReportJourneyOptions(
       [
-        { tripId: 42, title: 'Future', startDate: '2098-08-10', endDate: '2098-08-12' },
-        { tripId: 7, title: 'Busan Weekender', startDate: '2020-08-10', endDate: '2020-08-12' },
-        { tripId: 9, title: 'Jeju Island', startDate: '2021-07-18', endDate: '2021-07-27' },
+        {
+          tripId: 42,
+          title: 'Future',
+          startDate: '2098-08-10',
+          endDate: '2098-08-12',
+          eventCount: 1,
+          placeCount: 2,
+        },
+        {
+          tripId: 7,
+          title: 'Busan Weekender',
+          startDate: '2020-08-10',
+          endDate: '2020-08-12',
+          eventCount: 3,
+          placeCount: 4,
+        },
+        {
+          tripId: 9,
+          title: 'Jeju Island',
+          startDate: '2021-07-18',
+          endDate: '2021-07-27',
+          eventCount: 5,
+          placeCount: 6,
+        },
       ],
       [report],
       '2026-08-11',

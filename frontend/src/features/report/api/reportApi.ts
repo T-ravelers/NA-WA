@@ -1,13 +1,18 @@
 import { httpClient } from '@/shared/api/httpClient'
 
-export interface ReportJourneySummary {
+export interface ReportJourneyReference {
   tripId: number
   title: string
   startDate: string
   endDate: string
 }
 
-export interface ReportSummary extends ReportJourneySummary {
+export interface ReportJourneySummary extends ReportJourneyReference {
+  eventCount: number
+  placeCount: number
+}
+
+export interface ReportSummary extends ReportJourneyReference {
   reportId: number
   generationStatus: string
   locale: string
@@ -29,7 +34,7 @@ export interface ReportSnapshotDay {
 }
 
 export interface ReportSnapshot {
-  journey: ReportJourneySummary
+  journey: ReportJourneyReference
   days: ReportSnapshotDay[]
 }
 
