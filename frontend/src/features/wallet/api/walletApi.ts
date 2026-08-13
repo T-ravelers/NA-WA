@@ -5,6 +5,11 @@ import type {
   TransactionListResponse,
   TransactionSearchParams,
 } from '../model/walletHome'
+import {
+  transactionDetailResponseSchema,
+  transactionListResponseSchema,
+  walletHomeResponseSchema,
+} from './walletResponseSchemas'
 
 /**
  * 거래 1건. 백엔드 `TransactionSummaryResponse`와 1:1이다.
@@ -13,8 +18,9 @@ import type {
  * `string | number`로 열어 두지 않는다. 열어 두면 화면이 `String()`으로 강제 변환하게 되고,
  * 자릿수 구분과 부호 처리가 전부 문자열 조작으로 흘러간다.
  *
- * `transferType`·`entryType`은 서버 enum이지만 여기서는 좁히지 않는다. 모르는 값이
- * 내려왔을 때 화면이 깨지지 않도록 좁히는 일은 model이 담당한다.
+ * `transferType`은 서버 enum이지만 새 값이 내려와도 model의 UNKNOWN 표시 경로가 안전하게
+ * 동작하므로 열어 둔다. `entryType`은 금액 부호를 결정하므로 `DEBIT`·`CREDIT`만
+ * response schema에서 허용한다.
  *
  * `createdAt`은 `LocalDateTime`이며 지금은 **숫자 배열**로 내려온다. 해석 규칙은
  * `model/walletHome.ts`에 있다.
@@ -48,11 +54,13 @@ export type ServerDateTime = string | number[] | null
 export interface WalletHome {
   balance: number
   availabilityStatus: string
-  recentTransactions: WalletTransaction[]
+  recentTransactions: WalletTransaction[] | null
 }
 
 export async function fetchWalletHome(): Promise<WalletHome> {
-  const { data } = await httpClient.get<WalletHome>('/api/v1/wallet')
+  const { data } = await httpClient.get<WalletHome>('/api/v1/wallet', {
+    responseSchema: walletHomeResponseSchema,
+  })
 
   return data
 }
@@ -62,6 +70,7 @@ export async function getTransactions(
 ): Promise<TransactionListResponse> {
   const { data } = await httpClient.get<TransactionListResponse>('/api/v1/me/transactions', {
     params,
+    responseSchema: transactionListResponseSchema,
   })
 
   return data
@@ -72,6 +81,7 @@ export async function getTransactionDetail(
 ): Promise<TransactionDetailResponse> {
   const { data } = await httpClient.get<TransactionDetailResponse>(
     `/api/v1/me/transactions/${transactionId}`,
+    { responseSchema: transactionDetailResponseSchema },
   )
 
   return data
