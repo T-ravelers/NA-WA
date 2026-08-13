@@ -187,15 +187,12 @@ function createReport(): void {
           @retry="retryAll"
         />
 
-        <StateEmpty
-          v-else-if="timelineQuery.data.value?.timeline.length === 0"
-          :title="t('journey.detail.timelineEmptyTitle')"
-          :description="t('journey.detail.timelineEmptyDescription')"
-        />
-
         <JourneyTimelineList
           v-else-if="timelineQuery.data.value !== undefined"
           :days="timelineQuery.data.value.timeline"
+          :trip-id="detailQuery.data.value.tripId"
+          :start-date="detailQuery.data.value.startDate"
+          :end-date="detailQuery.data.value.endDate"
         />
       </section>
     </template>

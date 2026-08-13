@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
+import { IconPlus } from '@tabler/icons-vue'
 
 import AppBadge from '@/shared/ui/AppBadge.vue'
 
@@ -8,11 +10,16 @@ import type { JourneyTimelineDay, JourneyTimelineItem } from '../api/journeyApi'
 
 interface Props {
   days: JourneyTimelineDay[]
+  tripId: number
+  startDate: string
+  endDate: string
 }
 
 const props = defineProps<Props>()
 
 const { locale, t } = useI18n()
+
+const MS_PER_DAY = 86_400_000
 
 const dateFormatter = computed(
   () =>
@@ -68,25 +75,79 @@ function typeLabel(item: JourneyTimelineItem): string {
     : t('journey.detail.place')
 }
 
-const displayDays = computed(() =>
-  props.days.map((day, dayIndex) => ({
-    visitDate: day.visitDate,
-    dateLabel: formatDate(day.visitDate),
-    /* 시안 J2는 날짜 앞에 `Day 1` 순번을 둔다. 목록 순서에서 그대로 나온다. */
-    dayLabel: t('journey.detail.dayLabel', { index: dayIndex + 1 }),
-    items: day.items.map((item) => ({
-      tripItemId: item.tripItemId,
-      timeLabel: formatTime(item),
-      confirmed: item.status === 'CONFIRMED',
-      statusLabel:
-        item.status === 'CONFIRMED' ? t('journey.detail.confirmed') : t('journey.detail.saved'),
-      title: item.exploreItem.title,
-      typeLabel: typeLabel(item),
-      location: formatLocation(item),
-      note: item.note,
-    })),
-  })),
-)
+/** 여정 기간의 날짜를 `YYYY-MM-DD`로 하루씩 늘어놓는다. 계산은 UTC 기준이다. */
+function journeyDates(startDate: string, endDate: string): string[] {
+  const start = toUtcDate(`${startDate}T00:00:00`).getTime()
+  const end = toUtcDate(`${endDate}T00:00:00`).getTime()
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return []
+
+  const dates: string[] = []
+  for (let time = start; time <= end; time += MS_PER_DAY) {
+    dates.push(new Date(time).toISOString().slice(0, 10))
+  }
+
+  return dates
+}
+
+/**
+ * Discover는 이미 `startDate`/`endDate`와 `tab`을 읽고(`ExploreView`), explore 상세는
+ * `journeyId`를 읽는다(`EventDetailView`·`PlaceDetailView`의 `parseJourneyRouteQuery`).
+ * 셋 다 기존 키다. 새 쿼리 키를 만들지 않는다. Events가 기본 탭이므로 `tab`을 붙이지 않는다.
+ *
+ * Places 목록은 아직 날짜로 걸러지지 않는다. place에는 시간 값이 없어 검색 API에도 날짜
+ * 파라미터가 없다. 그쪽 날짜는 필터가 아니라 "어느 여정의 어느 날에 담는가"라는 맥락이다.
+ * `journeyId`와 함께 그 맥락을 store로 옮겨 담아 담기 시트에 프리필하는 일은 #192가 맡는다.
+ */
+function exploreLink(visitDate: string, tab: 'events' | 'places'): RouteLocationRaw {
+  const journeyId = String(props.tripId)
+
+  return {
+    name: 'explore',
+    query:
+      tab === 'places'
+        ? { tab: 'places', journeyId, startDate: visitDate, endDate: visitDate }
+        : { journeyId, startDate: visitDate, endDate: visitDate },
+  }
+}
+
+const displayDays = computed(() => {
+  const itemsByDate = new Map(props.days.map((day) => [day.visitDate, day.items]))
+  /* 시안 J2는 날짜 앞에 `Day 1` 순번을 둔다. 여정 시작일로부터 몇 번째 날인지다. */
+  const dayNumbers = new Map(
+    journeyDates(props.startDate, props.endDate).map((visitDate, index) => [visitDate, index + 1]),
+  )
+  /* 타임라인 응답은 항목이 있는 날짜만 내려주므로 빈 날짜는 여기서 채운다. 반대로 기간
+     밖으로 밀려난 항목도 화면에서 감추지 않는다. `YYYY-MM-DD`는 사전순이 곧 날짜순이다. */
+  const visitDates = [...new Set([...dayNumbers.keys(), ...itemsByDate.keys()])].sort()
+
+  return visitDates.map((visitDate) => {
+    const dayNumber = dayNumbers.get(visitDate)
+    const dateLabel = formatDate(visitDate)
+
+    return {
+      visitDate,
+      dateLabel,
+      /* 기간 밖 날짜에는 붙일 순번이 없다. 날짜만 보여준다. */
+      dayLabel: dayNumber === undefined ? null : t('journey.detail.dayLabel', { index: dayNumber }),
+      addEventTo: exploreLink(visitDate, 'events'),
+      addPlaceTo: exploreLink(visitDate, 'places'),
+      /* 날짜마다 같은 라벨이 반복되므로 접근 가능한 이름에 날짜를 넣어 구분한다. */
+      addEventLabel: t('journey.detail.addEventForDate', { date: dateLabel }),
+      addPlaceLabel: t('journey.detail.addPlaceForDate', { date: dateLabel }),
+      items: (itemsByDate.get(visitDate) ?? []).map((item) => ({
+        tripItemId: item.tripItemId,
+        timeLabel: formatTime(item),
+        confirmed: item.status === 'CONFIRMED',
+        statusLabel:
+          item.status === 'CONFIRMED' ? t('journey.detail.confirmed') : t('journey.detail.saved'),
+        title: item.exploreItem.title,
+        typeLabel: typeLabel(item),
+        location: formatLocation(item),
+        note: item.note,
+      })),
+    }
+  })
+})
 </script>
 
 <template>
@@ -97,7 +158,11 @@ const displayDays = computed(() =>
       class="flex flex-col gap-3"
     >
       <h3 class="flex items-baseline gap-2">
-        <span class="font-display text-title uppercase text-ink-display">{{ day.dayLabel }}</span>
+        <span
+          v-if="day.dayLabel !== null"
+          class="font-display text-title uppercase text-ink-display"
+          >{{ day.dayLabel }}</span
+        >
         <time
           :datetime="day.visitDate"
           class="text-body-sm font-medium tabular-nums text-ink-3"
@@ -105,7 +170,10 @@ const displayDays = computed(() =>
         >
       </h3>
 
-      <ol class="flex flex-col">
+      <ol
+        v-if="day.items.length > 0"
+        class="flex flex-col"
+      >
         <li
           v-for="item in day.items"
           :key="item.tripItemId"
@@ -151,6 +219,34 @@ const displayDays = computed(() =>
           </article>
         </li>
       </ol>
+
+      <!-- 하루에 여러 개를 담는 것이 정상 흐름이라 항목이 있는 날에도 그대로 둔다. -->
+      <div class="flex gap-2">
+        <RouterLink
+          :to="day.addEventTo"
+          :aria-label="day.addEventLabel"
+          class="flex min-h-13 flex-1 items-center justify-center gap-2 rounded-sm border-2 border-dashed border-hairline-2 text-body-sm font-semibold text-ink-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          <IconPlus
+            :size="18"
+            :stroke-width="1.75"
+            aria-hidden="true"
+          />
+          {{ t('journey.detail.addEvent') }}
+        </RouterLink>
+        <RouterLink
+          :to="day.addPlaceTo"
+          :aria-label="day.addPlaceLabel"
+          class="flex min-h-13 flex-1 items-center justify-center gap-2 rounded-sm border-2 border-dashed border-hairline-2 text-body-sm font-semibold text-ink-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          <IconPlus
+            :size="18"
+            :stroke-width="1.75"
+            aria-hidden="true"
+          />
+          {{ t('journey.detail.addPlace') }}
+        </RouterLink>
+      </div>
     </li>
   </ol>
 </template>
