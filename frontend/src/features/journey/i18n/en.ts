@@ -8,6 +8,8 @@ export default {
       past: 'Past',
       ongoingTitle: 'Ongoing journeys',
       pastTitle: 'Past journeys',
+      eventCount: '{count} events',
+      placeCount: '{count} places',
       fullEmptyTitle: 'No journeys yet',
       fullEmptyDescription: 'Create your first journey to start planning.',
       tabEmptyTitle: 'No {status} journeys',

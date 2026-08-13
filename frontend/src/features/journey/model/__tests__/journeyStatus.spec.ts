@@ -26,8 +26,22 @@ describe('journeyStatus', () => {
 
   it('filters journeys into the selected tab', () => {
     const journeys = [
-      { tripId: 1, title: 'Past journey', startDate: '2026-08-01', endDate: '2026-08-08' },
-      { tripId: 2, title: 'Current journey', startDate: '2026-08-09', endDate: '2026-08-09' },
+      {
+        tripId: 1,
+        title: 'Past journey',
+        startDate: '2026-08-01',
+        endDate: '2026-08-08',
+        eventCount: 2,
+        placeCount: 1,
+      },
+      {
+        tripId: 2,
+        title: 'Current journey',
+        startDate: '2026-08-09',
+        endDate: '2026-08-09',
+        eventCount: 0,
+        placeCount: 0,
+      },
     ]
 
     expect(filterJourneysByStatus(journeys, 'past', '2026-08-09')).toEqual([journeys[0]])

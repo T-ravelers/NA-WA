@@ -21,12 +21,17 @@ const journeys = [
     title: 'Seoul Foodie Week',
     startDate: '2098-08-10',
     endDate: '2098-08-12',
+    eventCount: 8,
+    placeCount: 4,
   },
   {
+    // 장소만 담은 여정. `0 events`가 붙지 않는지 확인하는 데 쓴다.
     tripId: 7,
     title: 'Busan Weekender',
     startDate: '2020-08-10',
     endDate: '2020-08-12',
+    eventCount: 0,
+    placeCount: 3,
   },
 ]
 
@@ -247,5 +252,38 @@ describe('JourneyListView', () => {
     expect(after).not.toBe(before)
     expect(wrapper.get('#journey-list-section-title').text()).toBe('Past journeys')
     expect(wrapper.text()).toContain('Busan Weekender')
+  })
+
+  it('shows EVENT and PLACE counts separately and hides the zero side', async () => {
+    fetchJourneys.mockResolvedValue(journeys)
+    const { wrapper } = await mountView()
+
+    // 둘 다 있으면 가운뎃점으로 잇는다. 시안은 `12 events`로 통칭했지만 API가 두 종류를
+    // 따로 주므로 분리한다.
+    expect(wrapper.text()).toContain('8 events · 4 places')
+
+    await wrapper.findAll('[role="radio"]')[1]?.trigger('click')
+
+    // 장소만 담은 여정에 `0 events`가 붙으면 비어 있다는 인상을 준다.
+    expect(wrapper.text()).toContain('3 places')
+    expect(wrapper.text()).not.toContain('0 events')
+  })
+
+  it('hides the count line entirely when a journey holds nothing yet', async () => {
+    fetchJourneys.mockResolvedValue([
+      {
+        tripId: 99,
+        title: 'Empty Draft',
+        startDate: '2098-08-10',
+        endDate: '2098-08-12',
+        eventCount: 0,
+        placeCount: 0,
+      },
+    ])
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Empty Draft')
+    expect(wrapper.text()).not.toContain('events')
+    expect(wrapper.text()).not.toContain('places')
   })
 })

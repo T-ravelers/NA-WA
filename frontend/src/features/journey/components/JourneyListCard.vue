@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 
@@ -17,16 +18,34 @@ interface Props {
 
 const { journey, status, statusLabel } = defineProps<Props>()
 
-const { locale } = useI18n()
+const { locale, t } = useI18n()
+
+/** 값이 0인 종류는 빼고 담는다. 둘 다 0이면 빈 배열이 되어 줄이 통째로 사라진다. */
+const itemCounts = computed(() => {
+  const counts: string[] = []
+
+  if (journey.eventCount > 0) {
+    counts.push(t('journey.list.eventCount', { count: journey.eventCount }))
+  }
+
+  if (journey.placeCount > 0) {
+    counts.push(t('journey.list.placeCount', { count: journey.placeCount }))
+  }
+
+  return counts
+})
 </script>
 
 <template>
   <li>
     <!--
       시안 J1의 여정 카드는 상단 커버 154px + 하단 종이 스텁으로 나뉜 티켓이다.
-      목록 API(`JourneySummary`)는 `tripId·title·startDate·endDate`만 준다. 시안의 커버
-      사진·인원수·소비영역 칩·이벤트 수·`View report`는 받쳐 줄 값이 없으므로 넣지 않고,
-      커버 자리만 `ImagePlaceholder`로 채운다.
+      시안의 커버 사진·인원수·소비영역 칩·`View report`는 목록 API에 받쳐 줄 값이 없어
+      넣지 않고, 커버 자리만 `ImagePlaceholder`로 채운다.
+
+      항목 수는 시안이 `12 events`로 통칭했지만 API가 EVENT와 PLACE를 따로 주므로
+      분리해서 적는다. 0인 쪽은 숨긴다 — 장소만 담은 여정에 `0 events`가 붙으면
+      비어 있다는 인상을 준다. 둘 다 0이면 줄 자체를 감춘다.
 
       티켓 바깥을 링크로 감싸지 않는다(`shared/ui/README.md`). 중첩 인터랙티브가 되지
       않도록 탭 동작은 스텁 안에 둔다.
@@ -64,6 +83,12 @@ const { locale } = useI18n()
             <time :datetime="journey.endDate">{{
               formatJourneyDate(journey.endDate, locale)
             }}</time>
+          </p>
+          <p
+            v-if="itemCounts.length > 0"
+            class="text-caption font-semibold tabular-nums text-on-paper/65"
+          >
+            {{ itemCounts.join(' · ') }}
           </p>
         </RouterLink>
       </template>
