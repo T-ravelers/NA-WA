@@ -277,27 +277,6 @@
           AND deleted_at IS NULL
     </update>
 
-    <update id="confirmAttendance">
-        UPDATE appointment_members
-        SET attendance_status = #{attendanceStatus},
-            attendance_confirmed_at = CURRENT_TIMESTAMP,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE appointment_id = #{appointmentId}
-          AND member_id = #{memberId}
-          AND membership_status = 'ACTIVE'
-          AND attendance_status = 'PENDING'
-          AND deleted_at IS NULL
-    </update>
-
-    <update id="completeAppointment">
-        UPDATE appointments
-        SET appointment_status = 'COMPLETED',
-            updated_at = CURRENT_TIMESTAMP
-        WHERE appointment_id = #{appointmentId}
-          AND appointment_status = 'IN_PROGRESS'
-          AND deleted_at IS NULL
-    </update>
-
     <select id="findActiveMembersByAppointmentId"
             resultType="me.nawa.appointment.domain.AppointmentMember">
         SELECT

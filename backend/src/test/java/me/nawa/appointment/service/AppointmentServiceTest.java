@@ -338,9 +338,6 @@ class AppointmentServiceTest {
 
         assertEquals(AppointmentErrorCode.PAYMENT_INTEGRATION_REQUIRED,
                 exception.getErrorCode());
-        verify(appointmentMapper, never()).confirmAttendance(
-                any(), any(), any()
-        );
     }
 
     @Test

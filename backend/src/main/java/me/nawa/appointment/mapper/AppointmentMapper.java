@@ -64,16 +64,6 @@ public interface AppointmentMapper {
             @Param("appointmentMemberId") Long appointmentMemberId
     );
 
-    int confirmAttendance(
-            @Param("appointmentId") Long appointmentId,
-            @Param("memberId") Long memberId,
-            @Param("attendanceStatus") String attendanceStatus
-    );
-
-    int completeAppointment(
-            @Param("appointmentId") Long appointmentId
-    );
-
     List<AppointmentMember> findActiveMembersByAppointmentId(
             @Param("appointmentId") Long appointmentId
     );
