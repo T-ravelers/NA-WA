@@ -60,7 +60,7 @@
         LIMIT #{limit}
     </select>
 
-    <select id="findByTransferIdAndWalletId" resultType="me.nawa.wallet.domain.WalletLedgerEntry">
+    <sql id="walletLedgerEntryByTransferAndWalletWhere">
         SELECT e.ledger_entry_id, e.transfer_id, t.transfer_type, e.entry_type,
                e.amount, e.balance_after, t.memo, e.created_at
         FROM wallet_ledger_entries e
@@ -68,6 +68,10 @@
         WHERE e.transfer_id = #{transferId}
           AND e.wallet_id = #{walletId}
           AND e.deleted_at IS NULL
+    </sql>
+
+    <select id="findByTransferIdAndWalletId" resultType="me.nawa.wallet.domain.WalletLedgerEntry">
+        <include refid="walletLedgerEntryByTransferAndWalletWhere"/>
     </select>
 
     <select id="findCounterpartyByTransferId" resultType="me.nawa.wallet.domain.TransactionCounterparty">

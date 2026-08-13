@@ -26,6 +26,16 @@ import me.nawa.wallet.dto.response.TopupMethodsResponse;
 import me.nawa.wallet.dto.response.TopupPreviewResponse;
 import me.nawa.wallet.dto.response.TransactionDetailResponse;
 import me.nawa.wallet.dto.response.TransactionListResponse;
+import me.nawa.wallet.dto.request.QrPaymentCreateRequest;
+import me.nawa.wallet.dto.request.QrPaymentExecuteRequest;
+import me.nawa.wallet.dto.request.QrPaymentPreviewRequest;
+import me.nawa.wallet.dto.request.QrPaymentResolveRequest;
+import me.nawa.wallet.dto.response.QrPaymentCreateResponse;
+import me.nawa.wallet.dto.response.QrPaymentExecuteResponse;
+import me.nawa.wallet.dto.response.QrPaymentPreviewResponse;
+import me.nawa.wallet.dto.response.QrPaymentResolveResponse;
+import me.nawa.wallet.dto.response.QrPaymentStatusResponse;
+import me.nawa.wallet.service.QrPaymentService;
 import me.nawa.wallet.service.TopupService;
 import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
@@ -69,6 +79,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfig.class,
         SwaggerConfigTest.AuthTestConfig.class,
         SwaggerConfigTest.WalletTestConfig.class,
+        SwaggerConfigTest.QrPaymentTestConfig.class,
         SwaggerConfigTest.ExploreTestConfig.class,
         SwaggerConfigTest.JourneyTestConfig.class,
         SwaggerConfigTest.ReportTestConfig.class,
@@ -204,6 +215,50 @@ class SwaggerConfigTest {
         WalletService walletService() {
             return memberId -> {
                 throw new UnsupportedOperationException();
+            };
+        }
+    }
+
+    @Configuration
+    static class QrPaymentTestConfig {
+
+        @Bean
+        QrPaymentService qrPaymentService() {
+            return new QrPaymentService() {
+                @Override
+                public QrPaymentCreateResponse createPaymentQr(
+                    Long memberId, QrPaymentCreateRequest request
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public QrPaymentResolveResponse resolvePaymentQr(
+                    Long memberId, QrPaymentResolveRequest request
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public QrPaymentPreviewResponse previewPayment(
+                    Long memberId, QrPaymentPreviewRequest request
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public QrPaymentExecuteResponse executePayment(
+                    Long memberId, String idempotencyKey, QrPaymentExecuteRequest request
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public QrPaymentStatusResponse getPaymentStatus(
+                    Long memberId, Long transferId
+                ) {
+                    throw new UnsupportedOperationException();
+                }
             };
         }
     }

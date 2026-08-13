@@ -25,6 +25,9 @@ public interface WalletLedgerMapper {
         @Param("limit") int limit
     );
 
+    // QrPaymentServiceImpl.executePayment/getIdempotentResult에서도 쓴다. 그 트랜잭션이
+    // READ COMMITTED로 실행되므로, 다른 트랜잭션이 방금 커밋한 원장 행도 일반 SELECT로
+    // 그대로 보인다(QrPaymentServiceImpl의 @Transactional(isolation) 주석 참고).
     WalletLedgerEntry findByTransferIdAndWalletId(
         @Param("transferId") Long transferId,
         @Param("walletId") Long walletId

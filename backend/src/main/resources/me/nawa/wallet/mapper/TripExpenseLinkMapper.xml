@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.wallet.mapper.TripExpenseLinkMapper">
+
+    <insert id="insert">
+        INSERT INTO trip_expense_links (
+            trip_id,
+            ledger_entry_id,
+            appointment_member_id
+        ) VALUES (
+                     #{tripId},
+                     #{ledgerEntryId},
+                     #{appointmentMemberId}
+                 )
+    </insert>
+
+    <select id="findAppointmentIdByLedgerEntryId" resultType="java.lang.Long">
+        SELECT am.appointment_id
+        FROM trip_expense_links tel
+        JOIN appointment_members am
+          ON am.appointment_member_id = tel.appointment_member_id
+        WHERE tel.ledger_entry_id = #{ledgerEntryId}
+          AND tel.deleted_at IS NULL
+          AND am.deleted_at IS NULL
+        LIMIT 1
+    </select>
+
+</mapper>

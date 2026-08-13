@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.wallet.mapper.QrPaymentCodeMapper">
+
+    <insert
+        id="insert"
+        useGeneratedKeys="true"
+        keyProperty="qrPaymentCodeId"
+        keyColumn="qr_payment_code_id"
+    >
+        INSERT INTO qr_payment_codes (
+            payee_wallet_id,
+            qr_token,
+            amount,
+            memo,
+            payment_status,
+            expires_at
+        )
+        VALUES (
+                   #{payeeWalletId},
+                   #{qrToken},
+                   #{amount},
+                   #{memo},
+                   #{paymentStatus},
+                   #{expiresAt}
+               )
+    </insert>
+
+    <select id="findResolveTargetByToken" resultType="me.nawa.wallet.domain.QrPaymentResolveTarget">
+        SELECT
+            q.qr_payment_code_id,
+            q.payee_wallet_id,
+            q.completed_transfer_id,
+            q.amount,
+            q.memo,
+            q.payment_status,
+            q.expires_at,
+            m.display_name AS payee_name,
+            w.currency_code,
+            w.wallet_status AS payee_wallet_status
+        FROM qr_payment_codes q
+                 LEFT JOIN wallets w
+                           ON w.wallet_id = q.payee_wallet_id
+                               AND w.deleted_at IS NULL
+                 LEFT JOIN wallet_owners wo
+                           ON wo.wallet_owner_id = w.wallet_owner_id
+                               AND wo.deleted_at IS NULL
+                 LEFT JOIN members m
+                           ON m.member_id = wo.member_id
+                               AND m.deleted_at IS NULL
+        WHERE q.qr_token = #{qrToken}
+          AND q.deleted_at IS NULL
+        LIMIT 1
+    </select>
+
+    <select id="findActiveAppointmentMembership"
+            resultType="me.nawa.wallet.domain.QrPaymentAppointmentMembership">
+        SELECT
+            am.appointment_id,
+            am.trip_id,
+            a.appointment_name,
+            t.title AS trip_title
+        FROM appointment_members am
+                 JOIN appointments a
+                      ON a.appointment_id = am.appointment_id
+                          AND a.deleted_at IS NULL
+                 LEFT JOIN trips t
+                           ON t.trip_id = am.trip_id
+                               AND t.deleted_at IS NULL
+        WHERE am.member_id = #{memberId}
+          AND am.appointment_id = #{appointmentId}
+          AND am.membership_status = 'ACTIVE'
+          AND am.deleted_at IS NULL
+            LIMIT 1
+    </select>
+
+    <select id="findByQrTokenForUpdate" resultType="me.nawa.wallet.domain.QrPaymentCode">
+        SELECT
+            qr_payment_code_id,
+            payee_wallet_id,
+            completed_transfer_id,
+            qr_token,
+            amount,
+            memo,
+            payment_status,
+            expires_at,
+            completed_at,
+            created_at,
+            updated_at
+        FROM qr_payment_codes
+        WHERE qr_token = #{qrToken}
+          AND deleted_at IS NULL
+            FOR UPDATE
+    </select>
+
+    <select id="findByCompletedTransferId" resultType="me.nawa.wallet.domain.QrPaymentCode">
+        SELECT
+            qr_payment_code_id,
+            payee_wallet_id,
+            completed_transfer_id,
+            qr_token,
+            amount,
+            memo,
+            payment_status,
+            expires_at,
+            completed_at
+        FROM qr_payment_codes
+        WHERE completed_transfer_id = #{transferId}
+          AND deleted_at IS NULL
+            LIMIT 1
+    </select>
+
+    <select id="findActiveAppointmentMembershipForUpdate"
+            resultType="me.nawa.wallet.domain.QrPaymentAppointmentMembership">
+        SELECT
+            am.appointment_member_id,
+            am.appointment_id,
+            am.trip_id,
+            a.appointment_name,
+            t.title AS trip_title
+        FROM appointment_members am
+                 JOIN appointments a
+                      ON a.appointment_id = am.appointment_id
+                          AND a.deleted_at IS NULL
+                 LEFT JOIN trips t
+                           ON t.trip_id = am.trip_id
+                               AND t.deleted_at IS NULL
+        WHERE am.member_id = #{memberId}
+          AND am.appointment_id = #{appointmentId}
+          AND am.membership_status = 'ACTIVE'
+          AND am.deleted_at IS NULL
+            LIMIT 1
+    FOR UPDATE
+    </select>
+
+    <update id="markCompleted">
+        UPDATE qr_payment_codes
+        SET payment_status = 'COMPLETED',
+            completed_transfer_id = #{transferId},
+            completed_at = #{completedAt}
+        WHERE qr_payment_code_id = #{qrPaymentCodeId}
+          AND payment_status = 'ACTIVE'
+          AND expires_at &gt; #{now}
+    </update>
+</mapper>
