@@ -10,7 +10,6 @@ import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.dto.response.AppointmentParticipationResponse;
 import me.nawa.appointment.service.AppointmentService;
-import me.nawa.appointment.service.AppointmentLifecycleService;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import org.springframework.http.HttpStatus;
@@ -33,7 +32,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AppointmentController {
     private final AppointmentService appointmentService;
-    private final AppointmentLifecycleService appointmentLifecycleService;
 
     @GetMapping
     @ApiOperation("약속 목록 조회")
@@ -133,15 +131,4 @@ public class AppointmentController {
         return ApiResponse.success();
     }
 
-    @PostMapping("/{appointmentId}/status/transition")
-    @ApiOperation("약속 상태 전이 반영")
-    public ApiResponse<AppointmentDetailResponse> advanceStatus(
-            @AuthenticationPrincipal AuthenticatedMember member,
-            @PathVariable Long appointmentId) {
-        appointmentLifecycleService.advanceAppointment(appointmentId);
-        return ApiResponse.success(appointmentService.getAppointment(
-                member.getMemberId(),
-                appointmentId
-        ));
-    }
 }

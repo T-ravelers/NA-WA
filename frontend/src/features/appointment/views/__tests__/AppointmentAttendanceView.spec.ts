@@ -8,15 +8,12 @@ import { i18n } from '@/app/i18n'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
-const confirmAppointmentAttendance = vi.fn()
 const useAppointmentMemberProfileMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
   fetchAppointment: (appointmentId: number) => fetchAppointment(appointmentId),
   fetchAppointmentMembers: (appointmentId: number) => fetchAppointmentMembers(appointmentId),
-  confirmAppointmentAttendance: (appointmentId: number, request: unknown) =>
-    confirmAppointmentAttendance(appointmentId, request),
 }))
 
 vi.mock('../../model/memberIntegration', () => ({
@@ -114,7 +111,6 @@ describe('AppointmentAttendanceView', () => {
   beforeEach(() => {
     fetchAppointment.mockReset()
     fetchAppointmentMembers.mockReset()
-    confirmAppointmentAttendance.mockReset()
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue(members)
     profileMemberId.value = 11
@@ -137,7 +133,7 @@ describe('AppointmentAttendanceView', () => {
     ).toBeDefined()
   })
 
-  it('toggles a pending member to attended locally', async () => {
+  it('keeps member status controls disabled until payment integration is available', async () => {
     const { wrapper } = await mountView()
     const pendingButton = wrapper
       .findAll('button')
@@ -145,7 +141,8 @@ describe('AppointmentAttendanceView', () => {
 
     await pendingButton?.trigger('click')
 
-    expect(wrapper.text()).toContain('Attended')
+    expect(wrapper.text()).toContain('Not attended')
+    expect(pendingButton?.attributes('disabled')).toBeDefined()
   })
 
   it('keeps the host on the attendance screen until every member is decided', async () => {

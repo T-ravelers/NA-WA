@@ -17,21 +17,15 @@ import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
-import me.nawa.deposit.domain.AttendanceStatus;
 import me.nawa.deposit.domain.Deposit;
 import me.nawa.deposit.mapper.DepositMapper;
-import me.nawa.wallet.domain.WalletTransfer;
-import me.nawa.wallet.mapper.WalletTransferMapper;
-import me.nawa.wallet.util.TransactionNumberGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -62,63 +56,15 @@ public class AppointmentService {
 
     private final AppointmentMapper appointmentMapper;
     private final DepositMapper depositMapper;
-    private final WalletTransferMapper walletTransferMapper;
-    private final TransactionNumberGenerator transactionNumberGenerator;
 
     @Transactional
     public Appointment createAppointment(
             Long memberId,
             AppointmentCreateRequest request) {
         validateCreateRequest(memberId, request);
-
-        String storedItemType = appointmentMapper.findAvailableItemType(
-                request.getItemId()
+        throw new BusinessException(
+                AppointmentErrorCode.PAYMENT_INTEGRATION_REQUIRED
         );
-        if (!request.getItemType().equals(storedItemType)) {
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-        }
-
-        Appointment appointment = Appointment.builder()
-                .itemId(request.getItemId())
-                .itemType(storedItemType)
-                .hostMemberId(memberId)
-                .languageCode(request.getLanguageCode())
-                .appointmentName(request.getAppointmentName().trim())
-                .maxMembers(request.getMaxMembers())
-                .joinDeadline(request.getJoinDeadline())
-                .depositAmount(request.getDepositAmount())
-                // 결제 API 연결 전까지 생성 확인을 결제 완료로 간주합니다.
-                .appointmentStatus(AppointmentStatus.RECRUITING)
-                .meetingPlace(request.getMeetingPlace().trim())
-                .meetingAddress(normalizeOptional(request.getMeetingAddress()))
-                .activityStartAt(request.getActivityStartAt())
-                .activityEndAt(request.getActivityEndAt())
-                .build();
-        appointmentMapper.insertAppointment(appointment);
-        requireGeneratedId(appointment.getAppointmentId());
-
-        AppointmentMember host = AppointmentMember.builder()
-                .appointmentId(appointment.getAppointmentId())
-                .memberId(memberId)
-                .membershipStatus(MembershipStatus.ACTIVE)
-                .attendanceStatus(AttendanceStatus.PENDING)
-                .host(true)
-                .build();
-        appointmentMapper.insertAppointmentMember(host);
-        requireGeneratedId(host.getAppointmentMemberId());
-
-        Deposit deposit = Deposit.pending(
-                host.getAppointmentMemberId(),
-                request.getDepositAmount()
-        );
-        if (depositMapper.insert(deposit) != 1) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
-        }
-        holdDeposit(memberId, host.getAppointmentMemberId(), appointment);
-
-        // The host is inserted as the first ACTIVE member during creation.
-        appointment.setCurrentMemberCount(1);
-        return appointment;
     }
 
     public AppointmentDetailResponse toCreatedResponse(
@@ -131,56 +77,9 @@ public class AppointmentService {
             Long memberId,
             Long appointmentId) {
         validateIdentifiers(memberId, appointmentId);
-        Appointment appointment = requireAppointmentForUpdate(appointmentId);
-        LocalDateTime now = LocalDateTime.now();
-
-        if (appointment.getAppointmentStatus()
-                != AppointmentStatus.RECRUITING
-                || !now.isBefore(appointment.getJoinDeadline())
-                || appointmentMapper.countParticipatingMembers(appointmentId)
-                >= appointment.getMaxMembers()) {
-            throw new BusinessException(
-                    AppointmentErrorCode.JOIN_NOT_AVAILABLE
-            );
-        }
-        if (appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
-                appointmentId,
-                memberId
-        ) != null) {
-            throw new BusinessException(
-                    AppointmentErrorCode.ALREADY_JOINED
-            );
-        }
-
-        AppointmentMember member = AppointmentMember.builder()
-                .appointmentId(appointmentId)
-                .memberId(memberId)
-                .membershipStatus(MembershipStatus.PENDING)
-                .attendanceStatus(AttendanceStatus.PENDING)
-                .host(false)
-                .build();
-        appointmentMapper.insertAppointmentMember(member);
-        requireGeneratedId(member.getAppointmentMemberId());
-
-        Deposit deposit = Deposit.pending(
-                member.getAppointmentMemberId(),
-                appointment.getDepositAmount()
+        throw new BusinessException(
+                AppointmentErrorCode.PAYMENT_INTEGRATION_REQUIRED
         );
-        if (depositMapper.insert(deposit) != 1) {
-            throw new BusinessException(
-                    CommonErrorCode.INTERNAL_SERVER_ERROR
-            );
-        }
-
-        holdDeposit(memberId, member.getAppointmentMemberId(), appointment);
-        if (appointmentMapper.markMemberActive(
-                member.getAppointmentMemberId()
-        ) != 1) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
-        }
-        member.setMembershipStatus(MembershipStatus.ACTIVE);
-
-        return toMemberResponse(member);
     }
 
     @Transactional
@@ -200,6 +99,11 @@ public class AppointmentService {
         if (member.getMembershipStatus() == MembershipStatus.LEFT) {
             throw new BusinessException(
                     AppointmentErrorCode.APPOINTMENT_MEMBER_NOT_FOUND
+            );
+        }
+        if (member.getMembershipStatus() != MembershipStatus.PENDING) {
+            throw new BusinessException(
+                    AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
             );
         }
         if (appointment.getAppointmentStatus()
@@ -274,43 +178,9 @@ public class AppointmentService {
             Long appointmentId,
             AppointmentAttendanceRequest request) {
         validateIdentifiers(hostMemberId, appointmentId);
-        Appointment appointment = requireAppointmentForUpdate(appointmentId);
-        if (!hostMemberId.equals(appointment.getHostMemberId())) {
-            throw new BusinessException(
-                    AppointmentErrorCode.APPOINTMENT_FORBIDDEN
-            );
-        }
-        if (appointment.getAppointmentStatus()
-                != AppointmentStatus.IN_PROGRESS) {
-            throw new BusinessException(
-                    AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
-            );
-        }
-
-        List<AppointmentMember> activeMembers = appointmentMapper
-                .findActiveMembersByAppointmentId(appointmentId);
-        Map<Long, AttendanceStatus> attendanceByMember =
-                validateAttendanceRequest(request, activeMembers);
-
-        for (AppointmentMember member : activeMembers) {
-            AttendanceStatus status = attendanceByMember.get(
-                    member.getMemberId()
-            );
-            if (appointmentMapper.confirmAttendance(
-                    appointmentId,
-                    member.getMemberId(),
-                    status.name()
-            ) != 1) {
-                throw new BusinessException(
-                        AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
-                );
-            }
-        }
-        if (appointmentMapper.completeAppointment(appointmentId) != 1) {
-            throw new BusinessException(
-                    AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
-            );
-        }
+        throw new BusinessException(
+                AppointmentErrorCode.PAYMENT_INTEGRATION_REQUIRED
+        );
     }
 
     @Transactional(readOnly = true)
@@ -432,80 +302,6 @@ public class AppointmentService {
                     CommonErrorCode.INTERNAL_SERVER_ERROR
             );
         }
-    }
-
-    /**
-     * 결제 연동 전 생성 확인을 완료 결제로 간주하는 임시 예치 경로입니다.
-     * 거래 원장을 먼저 만들고 보증금을 HELD로 확정해야 상태 전이 조건을
-     * 만족할 수 있습니다. 실제 지갑 차감은 결제 연동 시 이 경로를 대체합니다.
-     */
-    private void holdDeposit(
-            Long memberId,
-            Long appointmentMemberId,
-            Appointment appointment) {
-        Deposit persistedDeposit = depositMapper.findByAppointmentMemberId(
-                appointmentMemberId
-        );
-        if (persistedDeposit == null) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
-        }
-        requireGeneratedId(persistedDeposit.getDepositId());
-
-        LocalDateTime heldAt = LocalDateTime.now();
-        WalletTransfer transfer = new WalletTransfer();
-        transfer.setTransferNumber(transactionNumberGenerator.generate());
-        transfer.setTransferType("DEPOSIT_HOLD");
-        transfer.setTransferStatus("COMPLETED");
-        transfer.setAmount(persistedDeposit.getAmount());
-        transfer.setMemo("Appointment deposit #" + appointment.getAppointmentId());
-        transfer.setCompletedAt(heldAt);
-        transfer.setCreatedAt(heldAt);
-        transfer.setInitiatorMemberId(memberId);
-        transfer.setIdempotencyKey("appointment-deposit-" + appointmentMemberId);
-        walletTransferMapper.insert(transfer);
-        requireGeneratedId(transfer.getTransferId());
-
-        if (depositMapper.markHeld(
-                persistedDeposit.getDepositId(),
-                transfer.getTransferId(),
-                heldAt
-        ) != 1) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    private static Map<Long, AttendanceStatus> validateAttendanceRequest(
-            AppointmentAttendanceRequest request,
-            List<AppointmentMember> activeMembers) {
-        if (request == null || request.getMembers() == null
-                || activeMembers == null
-                || request.getMembers().size() != activeMembers.size()) {
-            throw new BusinessException(
-                    AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
-            );
-        }
-
-        Set<Long> activeMemberIds = activeMembers.stream()
-                .map(AppointmentMember::getMemberId)
-                .collect(java.util.stream.Collectors.toSet());
-        Map<Long, AttendanceStatus> result = new HashMap<>();
-        for (AppointmentAttendanceRequest.MemberAttendance attendance
-                : request.getMembers()) {
-            if (attendance == null || attendance.getMemberId() == null
-                    || !activeMemberIds.contains(attendance.getMemberId())
-                    || attendance.getAttendanceStatus() == null
-                    || attendance.getAttendanceStatus()
-                    == AttendanceStatus.PENDING
-                    || result.put(
-                    attendance.getMemberId(),
-                    attendance.getAttendanceStatus()
-            ) != null) {
-                throw new BusinessException(
-                        AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
-                );
-            }
-        }
-        return result;
     }
 
     private static void validateIdentifiers(
@@ -646,9 +442,4 @@ public class AppointmentService {
         return isBlank(value) ? null : value.trim();
     }
 
-    private static void requireGeneratedId(Long id) {
-        if (id == null || id <= 0) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
 }

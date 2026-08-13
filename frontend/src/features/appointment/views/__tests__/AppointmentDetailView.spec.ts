@@ -9,7 +9,6 @@ import { appointmentMemberIntegrationKey } from '../../model/memberIntegration'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
-const joinAppointment = vi.fn()
 const profileQuery = {
   data: ref({ memberId: 11 }),
   isPending: ref(false),
@@ -21,7 +20,6 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
   fetchAppointment: (appointmentId: number) => fetchAppointment(appointmentId),
   fetchAppointmentMembers: (appointmentId: number) => fetchAppointmentMembers(appointmentId),
-  joinAppointment: (appointmentId: number) => joinAppointment(appointmentId),
 }))
 
 const AppointmentDetailView = (await import('../AppointmentDetailView.vue')).default
@@ -128,10 +126,8 @@ describe('AppointmentDetailView', () => {
   beforeEach(() => {
     fetchAppointment.mockReset()
     fetchAppointmentMembers.mockReset()
-    joinAppointment.mockReset()
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue([...members, leftMember])
-    joinAppointment.mockResolvedValue(members[1])
   })
 
   it('renders appointment details, members, and opens deposit confirmation', async () => {
@@ -158,13 +154,7 @@ describe('AppointmentDetailView', () => {
         .findAll('button')
         .find((button) => button.text().includes('Pay'))
         ?.attributes('disabled'),
-    ).toBeUndefined()
-    await wrapper
-      .get('[role="dialog"]')
-      .findAll('button')
-      .find((button) => button.text().includes('Pay'))
-      ?.trigger('click')
-    expect(joinAppointment).toHaveBeenCalledWith(7)
+    ).toBeDefined()
   })
 
   it('renders the member cards directly without a View all action', async () => {

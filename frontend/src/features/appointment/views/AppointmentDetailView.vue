@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { IconMenu2 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { useQuery } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -14,24 +14,16 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
-import {
-  cancelAppointmentParticipation,
-  joinAppointment,
-  type AppointmentDateTimeValue,
-  type AppointmentStatus,
-} from '../api/appointmentApi'
+import { type AppointmentDateTimeValue, type AppointmentStatus } from '../api/appointmentApi'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
-  appointmentParticipationQueryOptions,
 } from '../model/appointmentQueries'
-import { appointmentKeys } from '../model/appointmentKeys'
 import { parseAppointmentDateTime } from '../model/appointmentDateTime'
 import { useAppointmentMemberProfile } from '../model/memberIntegration'
 
 const route = useRoute()
 const router = useRouter()
-const queryClient = useQueryClient()
 const { locale, t } = useI18n()
 
 const appointmentId = computed(() => {
@@ -53,12 +45,6 @@ const membersQuery = useQuery({
   enabled: computed(() => appointmentId.value !== null),
   retry: false,
 })
-const participationQuery = useQuery({
-  ...appointmentParticipationQueryOptions(appointmentId),
-  enabled: computed(() => appointmentId.value !== null),
-  retry: false,
-})
-
 const appointment = computed(() => detailQuery.data.value)
 const members = computed(() =>
   (membersQuery.data.value ?? appointment.value?.members ?? []).filter(
@@ -95,31 +81,6 @@ const isActiveParticipant = computed(
         member.attendanceStatus === 'ATTENDED',
     ),
 )
-const canCancelParticipation = computed(() => {
-  const status = participationQuery.data.value?.membershipStatus
-  return (
-    participationQuery.data.value?.joined === true && (status === 'PENDING' || status === 'ACTIVE')
-  )
-})
-const cancelMutation = useMutation({
-  mutationFn: () => {
-    if (appointmentId.value === null) throw new Error('Invalid appointment id')
-    return cancelAppointmentParticipation(appointmentId.value)
-  },
-  onSuccess: async () => {
-    await queryClient.invalidateQueries({ queryKey: appointmentKeys.all })
-  },
-})
-const joinMutation = useMutation({
-  mutationFn: () => {
-    if (appointmentId.value === null) throw new Error('Invalid appointment id')
-    return joinAppointment(appointmentId.value)
-  },
-  onSuccess: async () => {
-    depositSheetOpen.value = false
-    await queryClient.invalidateQueries({ queryKey: appointmentKeys.all })
-  },
-})
 const canOpenAttendance = computed(
   () => appointment.value?.appointmentStatus === 'IN_PROGRESS' && isHost.value,
 )
@@ -204,13 +165,7 @@ function closeDepositSheet(): void {
 }
 
 function confirmJoin(): void {
-  if (!isJoinAvailable.value || joinMutation.isPending.value) return
-  joinMutation.mutate()
-}
-
-function cancelParticipation(): void {
-  if (!canCancelParticipation.value || cancelMutation.isPending.value) return
-  cancelMutation.mutate()
+  depositSheetOpen.value = false
 }
 </script>
 
@@ -402,16 +357,6 @@ function cancelParticipation(): void {
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
         <AppButton
-          v-if="canCancelParticipation"
-          block
-          variant="secondary"
-          :disabled="cancelMutation.isPending.value"
-          @click="cancelParticipation"
-        >
-          {{ t('appointment.detail.cancelParticipation') }}
-        </AppButton>
-        <AppButton
-          v-else
           block
           :disabled="!isJoinAvailable"
           :title="!isJoinAvailable ? t('appointment.detail.joinUnavailable') : undefined"
@@ -425,7 +370,7 @@ function cancelParticipation(): void {
         v-if="depositSheetOpen"
         :appointment-name="appointment.appointmentName"
         :deposit-amount="appointment.depositAmount"
-        :confirm-disabled="joinMutation.isPending.value || !isJoinAvailable"
+        confirm-disabled
         @close="closeDepositSheet"
         @confirm="confirmJoin"
       />

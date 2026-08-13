@@ -42,6 +42,11 @@ public enum AppointmentErrorCode implements ErrorCode {
             HttpStatus.CONFLICT,
             "APPOINTMENT-007",
             "현재 참여를 취소할 수 없습니다."
+    ),
+    PAYMENT_INTEGRATION_REQUIRED(
+            HttpStatus.CONFLICT,
+            "APPOINTMENT-008",
+            "보증금 결제 연동 후 이용할 수 있습니다."
     );
 
     private final HttpStatus status;

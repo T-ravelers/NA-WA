@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { computed } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -11,21 +11,15 @@ import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
-import {
-  confirmAppointmentAttendance,
-  type AppointmentAttendanceStatus,
-  type AppointmentMember,
-} from '../api/appointmentApi'
+import { type AppointmentAttendanceStatus, type AppointmentMember } from '../api/appointmentApi'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
 } from '../model/appointmentQueries'
 import { useAppointmentMemberProfile } from '../model/memberIntegration'
-import { appointmentKeys } from '../model/appointmentKeys'
 
 const route = useRoute()
 const router = useRouter()
-const queryClient = useQueryClient()
 const { t } = useI18n()
 
 const appointmentId = computed(() => {
@@ -60,54 +54,12 @@ const isHost = computed(() => {
 const appointmentInProgress = computed(
   () => detailQuery.data.value?.appointmentStatus === 'IN_PROGRESS',
 )
-const attendanceDraft = reactive<Record<number, AppointmentAttendanceStatus>>({})
-
 function initials(displayName: string): string {
   return displayName.trim().charAt(0).toUpperCase() || '?'
 }
 
 function attendanceStatus(member: AppointmentMember): AppointmentAttendanceStatus {
-  return attendanceDraft[member.appointmentMemberId] ?? member.attendanceStatus
-}
-
-function toggleAttendance(member: AppointmentMember): void {
-  const current = attendanceStatus(member)
-  attendanceDraft[member.appointmentMemberId] =
-    current === 'PENDING' ? 'ATTENDED' : current === 'ATTENDED' ? 'NO_SHOW' : 'PENDING'
-}
-
-const canSave = computed(
-  () =>
-    members.value.length > 0 &&
-    members.value.every((member) => {
-      const status = attendanceStatus(member)
-      return status === 'ATTENDED' || status === 'NO_SHOW'
-    }),
-)
-
-const attendanceMutation = useMutation({
-  mutationFn: () => {
-    if (appointmentId.value === null) throw new Error('Invalid appointment id')
-    return confirmAppointmentAttendance(appointmentId.value, {
-      members: members.value.map((member) => ({
-        memberId: member.memberId,
-        attendanceStatus: attendanceStatus(member) as 'ATTENDED' | 'NO_SHOW',
-      })),
-    })
-  },
-  onSuccess: async () => {
-    if (appointmentId.value === null) return
-    await queryClient.invalidateQueries({ queryKey: appointmentKeys.all })
-    await router.push({
-      name: 'appointment-detail',
-      params: { appointmentId: appointmentId.value },
-    })
-  },
-})
-
-function saveAttendance(): void {
-  if (!canSave.value || attendanceMutation.isPending.value) return
-  attendanceMutation.mutate()
+  return member.attendanceStatus
 }
 
 function statusLabel(status: AppointmentAttendanceStatus): string {
@@ -240,7 +192,7 @@ function retry(): void {
                     dense
                     :variant="attendanceStatus(member) === 'ATTENDED' ? 'settle' : 'primary'"
                     :aria-label="t('appointment.attendance.toggle', { name: member.displayName })"
-                    @click="toggleAttendance(member)"
+                    :disabled="true"
                   >
                     {{ statusLabel(attendanceStatus(member)) }}
                   </AppButton>
@@ -256,9 +208,8 @@ function retry(): void {
       >
         <AppButton
           block
-          :disabled="!canSave || attendanceMutation.isPending.value"
-          :title="!canSave ? t('appointment.attendance.saveUnavailable') : undefined"
-          @click="saveAttendance"
+          disabled
+          :title="t('appointment.attendance.saveUnavailable')"
         >
           {{ t('appointment.attendance.save') }}
         </AppButton>

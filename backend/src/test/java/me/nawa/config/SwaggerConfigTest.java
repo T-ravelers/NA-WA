@@ -344,12 +344,7 @@ class SwaggerConfigTest {
 
         @Bean
         AppointmentService appointmentService() {
-            return new AppointmentService(null, null, null, null);
-        }
-
-        @Bean
-        me.nawa.appointment.service.AppointmentLifecycleService appointmentLifecycleService() {
-            return new me.nawa.appointment.service.AppointmentLifecycleService(null);
+            return new AppointmentService(null, null);
         }
     }
 

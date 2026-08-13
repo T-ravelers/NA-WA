@@ -1,38 +1,11 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
-const createAppointment = vi.fn()
-
-vi.mock('../../api/appointmentApi', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
-  createAppointment: (request: unknown) => createAppointment(request),
-}))
-
 const AppointmentCreateView = (await import('../AppointmentCreateView.vue')).default
-
-const createdAppointment = {
-  appointmentId: 7,
-  itemId: 42,
-  itemType: 'EVENT' as const,
-  appointmentName: 'Seongsu K-Beauty Tour',
-  languageCode: 'en' as const,
-  maxMembers: 4,
-  currentMemberCount: 1,
-  depositAmount: '10000',
-  appointmentStatus: 'RECRUITING' as const,
-  meetingPlace: 'Seongsu Beauty Lab',
-  activityStartAt: '2026-08-08T18:30:00',
-  activityEndAt: '2026-08-08T22:00:00',
-  joinDeadline: '2026-08-08T17:30:00',
-  hostDisplayName: 'Mina Park',
-  meetingAddress: null,
-  description: null,
-  members: [],
-}
 
 function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
   const button = wrapper.findAll('button').find((candidate) => candidate.text().includes(text))
@@ -92,30 +65,14 @@ async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> 
 }
 
 describe('AppointmentCreateView', () => {
-  beforeEach(() => {
-    createAppointment.mockReset()
-    createAppointment.mockResolvedValue(createdAppointment)
-  })
-
-  it('submits the form and navigates to the appointment list', async () => {
+  it('keeps creation confirmation disabled until payment integration is available', async () => {
     const { wrapper, router } = await mountView()
 
     await fillAndConfirm(wrapper)
     await flushPromises()
 
-    expect(createAppointment).toHaveBeenCalledWith({
-      itemId: 42,
-      itemType: 'EVENT',
-      languageCode: 'en',
-      appointmentName: 'Seongsu K-Beauty Tour',
-      maxMembers: 4,
-      joinDeadline: '2026-08-08T17:30:00',
-      depositAmount: '10000',
-      meetingPlace: 'Seongsu Beauty Lab',
-      meetingAddress: undefined,
-      activityStartAt: '2026-08-08T18:30:00',
-      activityEndAt: '2026-08-08T22:00:00',
-    })
-    expect(router.currentRoute.value.name).toBe('appointment-list')
+    expect(wrapper.text()).toContain('Payment integration is required')
+    expect(buttonByText(wrapper, 'Confirm').attributes('disabled')).toBeDefined()
+    expect(router.currentRoute.value.name).toBe('appointment-create')
   })
 })
