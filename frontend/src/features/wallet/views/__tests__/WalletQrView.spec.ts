@@ -146,6 +146,40 @@ describe('WalletQrView', () => {
     expect(wrapper.text()).toContain('Amount entered by payer')
   })
 
+  it('shows no memo when the create screen submitted a cleared memo, instead of the placeholder default', async () => {
+    const router = createTestRouter()
+    setActivePinia(createPinia())
+    await router.push('/wallet/qr')
+    await router.isReady()
+
+    useQrRequestDraftStore().setDraft({
+      amount: 18_500,
+      memo: '',
+      payerEntersAmount: false,
+    })
+
+    const wrapper = mount(WalletQrView, {
+      global: {
+        plugins: [
+          i18n,
+          router,
+          [
+            VueQueryPlugin,
+            {
+              queryClient: new QueryClient({
+                defaultOptions: { queries: { retry: false } },
+              }),
+            },
+          ],
+        ],
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No memo')
+    expect(wrapper.text()).not.toContain('Seoul Night Tour')
+  })
+
   it('opens the QR creation screen from the My QR tab', async () => {
     const { router, wrapper } = await mountView()
     const pushSpy = vi.spyOn(router, 'push')

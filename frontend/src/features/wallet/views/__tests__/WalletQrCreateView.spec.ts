@@ -122,4 +122,34 @@ describe('WalletQrCreateView', () => {
         ?.attributes('disabled'),
     ).toBeDefined()
   })
+
+  it('disables QR creation when the amount exceeds the DB column max (DECIMAL(19,4))', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper.get('input[inputmode="numeric"]').setValue('1000000000000000')
+
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Create QR')
+        ?.attributes('disabled'),
+    ).toBeDefined()
+  })
+
+  it('saves a cleared memo as an empty string rather than the placeholder default', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper.get('input[type="text"]:not([inputmode])').setValue('')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Create QR')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(useQrRequestDraftStore().draft).toEqual({
+      amount: 18_500,
+      memo: '',
+      payerEntersAmount: false,
+    })
+  })
 })

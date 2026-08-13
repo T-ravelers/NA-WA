@@ -81,11 +81,10 @@ const isMyQrActive = computed(() => route.name === 'wallet-qr')
 const qrRequest = computed(() => {
   const draft = qrRequestDraft.draft
   const payerEntersAmount = draft?.payerEntersAmount ?? false
-  const memo = draft?.memo === undefined || draft.memo === '' ? 'Seoul Night Tour' : draft.memo
 
   return {
     amount: payerEntersAmount ? null : (draft?.amount ?? 18_500),
-    memo,
+    memo: draft?.memo ?? 'Seoul Night Tour',
     payerEntersAmount,
   }
 })

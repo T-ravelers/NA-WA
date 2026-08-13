@@ -9,6 +9,7 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import TextInput from '@/shared/ui/TextInput.vue'
 
+import { MAX_QR_PAYMENT_AMOUNT } from '../model/qrPayment'
 import { useQrRequestDraftStore } from '../model/qrRequestDraft'
 
 const { t } = useI18n()
@@ -20,7 +21,11 @@ const memo = ref('Seoul Night Tour')
 const payerEntersAmount = ref(false)
 
 const isValidFixedAmount = (value: number | null): value is number =>
-  value !== null && Number.isFinite(value) && Number.isSafeInteger(value) && value > 0
+  value !== null &&
+  Number.isFinite(value) &&
+  Number.isSafeInteger(value) &&
+  value > 0 &&
+  value <= MAX_QR_PAYMENT_AMOUNT
 
 const canCreate = computed(() => payerEntersAmount.value || isValidFixedAmount(amount.value))
 
