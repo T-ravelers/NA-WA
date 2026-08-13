@@ -40,7 +40,33 @@
             start_date,
             end_date,
             budget_amount,
-            companion_preference
+            companion_preference,
+            (
+                SELECT COUNT(*)
+                FROM trip_items ti
+                JOIN explore_items ei
+                  ON ei.item_id = ti.item_id
+                 AND ei.deleted_at IS NULL
+                JOIN event e
+                  ON e.event_id = ti.item_id
+                 AND e.deleted_at IS NULL
+                WHERE ti.trip_id = trips.trip_id
+                  AND ti.deleted_at IS NULL
+                  AND ei.item_type = 'EVENT'
+            ) AS event_count,
+            (
+                SELECT COUNT(*)
+                FROM trip_items ti
+                JOIN explore_items ei
+                  ON ei.item_id = ti.item_id
+                 AND ei.deleted_at IS NULL
+                JOIN place p
+                  ON p.place_id = ti.item_id
+                 AND p.deleted_at IS NULL
+                WHERE ti.trip_id = trips.trip_id
+                  AND ti.deleted_at IS NULL
+                  AND ei.item_type = 'PLACE'
+            ) AS place_count
         FROM trips
         WHERE member_id = #{memberId}
           AND deleted_at IS NULL

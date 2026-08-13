@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IconCalendar, IconCompass, IconRoute, IconUser, IconWallet } from '@tabler/icons-vue'
+import { IconChartPie, IconCompass, IconRoute, IconUser, IconWallet } from '@tabler/icons-vue'
 import type { Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
@@ -23,7 +23,7 @@ const route = useRoute()
  */
 const items: NavItem[] = [
   { key: 'home', icon: IconCompass, labelKey: 'nav.home', to: '/explore' },
-  { key: 'calendar', icon: IconCalendar, labelKey: 'nav.calendar', to: null },
+  { key: 'report', icon: IconChartPie, labelKey: 'nav.report', to: '/reports' },
   { key: 'profile', icon: IconUser, labelKey: 'nav.profile', to: '/settings' },
   { key: 'wallet', icon: IconWallet, labelKey: 'nav.wallet', to: '/wallet' },
   { key: 'journey', icon: IconRoute, labelKey: 'nav.journey', to: '/journeys' },

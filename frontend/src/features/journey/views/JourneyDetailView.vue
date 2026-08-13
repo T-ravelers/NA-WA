@@ -2,8 +2,9 @@
 import { computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
+import AppButton from '@/shared/ui/AppButton.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
@@ -11,11 +12,14 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 import JourneySummary from '../components/JourneySummary.vue'
 import JourneyTimelineList from '../components/JourneyTimelineList.vue'
 import { journeyErrorMessageKey, isJourneyForbidden } from '../model/journeyErrors'
+import { getJourneyStatus } from '../model/journeyStatus'
 import { journeyDetailQueryOptions, journeyTimelineQueryOptions } from '../model/journeyQueries'
+import { useJourneyReportIntegration } from '../model/reportIntegration'
 
 const i18n = useI18n()
 const { t } = i18n
 const route = useRoute()
+const router = useRouter()
 const hasMessage = (key: string): boolean => i18n.te(key)
 
 const tripId = computed(() => {
@@ -45,14 +49,42 @@ const requestErrorDescription = computed(() =>
   t(journeyErrorMessageKey(requestError.value, hasMessage)),
 )
 
+const { useReportSummariesQuery } = useJourneyReportIntegration()
+const reportsQuery = useReportSummariesQuery()
+const journeyEnded = computed(() => {
+  const journey = detailQuery.data.value
+  return journey !== undefined && getJourneyStatus(journey.endDate) === 'past'
+})
+const matchingReport = computed(() => {
+  const journey = detailQuery.data.value
+  if (journey === undefined) {
+    return null
+  }
+
+  return reportsQuery.data.value?.find((report) => report.tripId === journey.tripId) ?? null
+})
+
 function retryAll(): void {
   void detailQuery.refetch()
   void timelineQuery.refetch()
 }
+
+function viewReport(reportId: number): void {
+  void router.push({ name: 'report-detail', params: { reportId } })
+}
+
+function createReport(): void {
+  const journey = detailQuery.data.value
+  if (journey === undefined) {
+    return
+  }
+
+  void router.push({ name: 'report-list', query: { tripId: journey.tripId } })
+}
 </script>
 
 <template>
-  <main class="flex w-full flex-col gap-8 px-screen py-8">
+  <main class="flex w-full flex-col gap-6 px-screen py-8">
     <section
       v-if="tripId === null"
       role="alert"
@@ -89,13 +121,45 @@ function retryAll(): void {
     <template v-else-if="detailQuery.data.value !== undefined">
       <JourneySummary :journey="detailQuery.data.value" />
 
+      <section v-if="journeyEnded">
+        <StateLoading
+          v-if="reportsQuery.isPending.value"
+          :label="t('journey.detail.reportChecking')"
+        />
+
+        <StateError
+          v-else-if="reportsQuery.isError.value"
+          :title="t('journey.detail.reportLoadFailed')"
+          :description="t('journey.detail.reportLoadFailedDescription')"
+          :action-label="t('action.retry')"
+          @retry="reportsQuery.refetch"
+        />
+
+        <AppButton
+          v-else-if="matchingReport !== null"
+          variant="secondary"
+          block
+          @click="viewReport(matchingReport.reportId)"
+        >
+          {{ t('journey.detail.viewReport') }}
+        </AppButton>
+        <AppButton
+          v-else
+          variant="secondary"
+          block
+          @click="createReport"
+        >
+          {{ t('journey.detail.createReport') }}
+        </AppButton>
+      </section>
+
       <section
         class="flex flex-col gap-4"
         aria-labelledby="journey-timeline-title"
       >
         <h2
           id="journey-timeline-title"
-          class="text-title text-ink"
+          class="font-display text-section-header uppercase text-ink-display"
         >
           {{ t('journey.detail.timeline') }}
         </h2>

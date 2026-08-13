@@ -130,6 +130,20 @@ function stubJourneyDetail(page) {
   ])
 }
 
+/**
+ * Journey 상세는 종료 여부와 무관하게 `/api/v1/reports`를 항상 부른다. 스텁이 없으면
+ * 이 요청이 목킹되지 않아 화면이 pending에 머무르거나 실제 백엔드를 친다.
+ */
+function stubEmptyReportList(page) {
+  return page.route('**/api/v1/reports', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: [] }),
+    }),
+  )
+}
+
 function stubJourneyList(page) {
   return page.route('**/api/v1/journeys', (route) =>
     route.fulfill({
@@ -138,22 +152,148 @@ function stubJourneyList(page) {
       body: JSON.stringify({
         success: true,
         data: [
+          // 목록은 가로 스냅 캐러셀이다. ongoing이 한 장뿐이면 스냅도 다음 카드
+          // 엿보기도 화면에 나타나지 않아 캡처가 조형을 증명하지 못한다. 진행 중
+          // 여정을 세 장 둔다.
           {
             tripId: 42,
             title: 'Seoul Foodie Week',
             startDate: '2098-08-10',
             endDate: '2098-08-12',
+            eventCount: 8,
+            placeCount: 4,
+          },
+          {
+            tripId: 43,
+            title: 'Jeju Island Escape',
+            startDate: '2098-09-02',
+            endDate: '2098-09-07',
+            eventCount: 5,
+            placeCount: 9,
+          },
+          {
+            tripId: 44,
+            title: 'Gangneung Coast Run',
+            startDate: '2098-10-11',
+            endDate: '2098-10-13',
+            eventCount: 0,
+            placeCount: 6,
           },
           {
             tripId: 7,
             title: 'Busan Weekender',
             startDate: '2020-08-10',
             endDate: '2020-08-12',
+            eventCount: 4,
+            placeCount: 2,
           },
         ],
       }),
     }),
   )
+}
+
+function stubReportApis(page) {
+  const detail = {
+    reportId: 101,
+    tripId: 9,
+    title: 'Jeju Island',
+    startDate: '2021-07-18',
+    endDate: '2021-07-27',
+    generationStatus: 'COMPLETED',
+    locale: 'en',
+    generatedAt: '2021-07-28T09:00:00',
+    createdAt: '2021-07-28T09:00:00',
+    reportContent: {
+      journey: {
+        tripId: 9,
+        title: 'Jeju Island',
+        startDate: '2021-07-18',
+        endDate: '2021-07-27',
+      },
+      days: [
+        {
+          visitDate: '2021-07-18',
+          items: [
+            {
+              tripItemId: 1,
+              itemId: 101,
+              itemType: 'EVENT',
+              title: 'Jeju Night Market',
+              status: 'ADDED',
+            },
+          ],
+        },
+      ],
+      analytics: {
+        totalSpent: 1284500,
+        dailyAverage: 128450,
+        categoryBreakdown: [
+          { category: 'FOOD', amount: 1000000, percentage: 77.85 },
+          { category: 'OTHER', amount: 284500, percentage: 22.15 },
+        ],
+        dailyTrend: [
+          { date: '2021-07-18', amount: 1284500 },
+          { date: '2021-07-19', amount: 0 },
+        ],
+      },
+    },
+  }
+
+  return Promise.all([
+    page.route('**/api/v1/journeys', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: [
+            {
+              tripId: 9,
+              title: 'Jeju Island',
+              startDate: '2021-07-18',
+              endDate: '2021-07-27',
+            },
+            {
+              tripId: 7,
+              title: 'Busan Weekender',
+              startDate: '2020-08-10',
+              endDate: '2020-08-12',
+            },
+          ],
+        }),
+      }),
+    ),
+    page.route('**/api/v1/reports', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: [
+            {
+              reportId: 101,
+              tripId: 9,
+              title: 'Jeju Island',
+              startDate: '2021-07-18',
+              endDate: '2021-07-27',
+              generationStatus: 'COMPLETED',
+              locale: 'en',
+              generatedAt: '2021-07-28T09:00:00',
+              createdAt: '2021-07-28T09:00:00',
+            },
+          ],
+        }),
+      }),
+    ),
+    page.route('**/api/v1/reports/101', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: detail }),
+      }),
+    ),
+  ])
 }
 
 /**
@@ -363,9 +503,41 @@ const SCREENS = [
     setup: (page) => stubMemberProfile(page),
   },
   {
+    // 생성 2단계는 1단계를 채워야만 나온다. 예산·동행 입력의 디자인은 여기서만 찍힌다.
+    name: '06b-journey-create-preferences',
+    path: '/journeys/new',
+    setup: (page) => stubMemberProfile(page),
+    prepare: async (page) => {
+      // `getByLabel`은 이 환경에서 걸리지 않는다. 폼 구조로 직접 잡는다.
+      await page.locator('input[type="text"]').first().fill('Seoul Foodie Week')
+      await page.locator('input[type="date"]').nth(0).fill('2026-08-10')
+      await page.locator('input[type="date"]').nth(1).fill('2026-08-12')
+      await page.getByRole('button', { name: 'Next' }).click()
+      await page.getByText('Step 2 of 2').waitFor()
+    },
+  },
+  {
     name: '07-journey-detail',
     path: '/journeys/42',
-    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetail(page)]),
+    setup: (page) =>
+      Promise.all([stubMemberProfile(page), stubJourneyDetail(page), stubEmptyReportList(page)]),
+  },
+  {
+    name: '17-report-list',
+    path: '/reports',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubReportApis(page)]),
+  },
+  {
+    name: '18-report-detail',
+    path: '/reports/101',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubReportApis(page)]),
+  },
+  {
+    // tripId 9는 이미 report(101)가 있다. 리스트가 아니라 상세로 바로 넘어간 화면이
+    // 찍혀야 `?tripId=` 자동선택이 기존 Report를 다시 생성하려 들지 않는다는 증거가 된다.
+    name: '19-report-preselect-existing',
+    path: '/reports?tripId=9',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubReportApis(page)]),
   },
   {
     name: '08-wallet',

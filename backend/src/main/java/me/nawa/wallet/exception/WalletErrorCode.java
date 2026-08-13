@@ -85,6 +85,24 @@ public enum WalletErrorCode implements ErrorCode {
         HttpStatus.BAD_REQUEST,
         "WALLET-013",
         "Webhook 서명 검증에 실패했습니다."
+    ),
+
+    INVALID_SETTLEMENT_TRANSFER(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-014",
+        "정산 이체 금액 또는 대상이 올바르지 않습니다."
+    ),
+
+    INSUFFICIENT_BALANCE(
+        HttpStatus.CONFLICT,
+        "WALLET-015",
+        "지갑 잔액이 부족합니다."
+    ),
+
+    SETTLEMENT_WALLET_NOT_ACTIVE(
+        HttpStatus.FORBIDDEN,
+        "WALLET-016",
+        "현재 지갑 상태에서는 정산 이체를 할 수 없습니다."
     );
 
     private final HttpStatus status;

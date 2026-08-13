@@ -45,6 +45,34 @@
         )
     </insert>
 
+    <!-- 복구 대상인지 판정하려면 soft-delete된 행도 보여야 한다 (uq_wallet_owners_member에 deleted_at이 없다) -->
+    <select id="findWalletOwnerIdIncludingDeleted" resultType="java.lang.Long">
+        SELECT wallet_owner_id
+        FROM wallet_owners
+        WHERE member_id = #{memberId}
+    </select>
+
+    <select id="findWalletIdIncludingDeleted" resultType="java.lang.Long">
+        SELECT wallet_id
+        FROM wallets
+        WHERE wallet_owner_id = #{walletOwnerId}
+    </select>
+
+    <update id="restoreWalletOwner">
+        UPDATE wallet_owners
+        SET deleted_at = NULL
+        WHERE wallet_owner_id = #{walletOwnerId}
+            AND deleted_at IS NOT NULL
+    </update>
+
+    <!-- wallet_status는 그대로 둔다. SUSPENDED·CLOSED 지갑을 복구로 우회시키지 않기 위해서다 -->
+    <update id="restoreWallet">
+        UPDATE wallets
+        SET deleted_at = NULL
+        WHERE wallet_id = #{walletId}
+            AND deleted_at IS NOT NULL
+    </update>
+
     <select id="findByWalletIdForUpdate" resultType="me.nawa.wallet.domain.Wallet">
         SELECT wallet_id, currency_code, available_balance, wallet_status
         FROM wallets

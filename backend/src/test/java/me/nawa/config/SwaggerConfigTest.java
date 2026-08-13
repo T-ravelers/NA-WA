@@ -14,6 +14,9 @@ import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.MemberAppointmentProfileResponse;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.service.MemberProfileService;
+import me.nawa.settlement.service.SettlementCreationService;
+import me.nawa.settlement.service.SettlementPaymentService;
+import me.nawa.settlement.service.SettlementQueryService;
 import me.nawa.wallet.dto.request.StripeIntentCreateRequest;
 import me.nawa.wallet.dto.request.TopupPreviewRequest;
 import me.nawa.wallet.dto.request.TransactionSearchCondition;
@@ -71,6 +74,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.ExploreTestConfig.class,
         SwaggerConfigTest.JourneyTestConfig.class,
         SwaggerConfigTest.ReportTestConfig.class,
+        SwaggerConfigTest.SettlementTestConfig.class,
         SwaggerConfigTest.TopupTestConfig.class,
         SwaggerConfigTest.TransactionTestConfig.class,
         SwaggerConfigTest.MemberTestConfig.class,
@@ -339,6 +343,38 @@ class SwaggerConfigTest {
         @Bean
         AppointmentService appointmentService() {
             return new AppointmentService(null, null);
+        }
+    }
+
+    @Configuration
+    static class SettlementTestConfig {
+
+        @Bean
+        SettlementQueryService settlementQueryService() {
+            return new SettlementQueryService() {
+                @Override public me.nawa.settlement.dto.response.SettlementListResponse getSettlements(Long memberId) { throw new UnsupportedOperationException(); }
+                @Override public java.util.List<me.nawa.settlement.dto.response.SettlementCandidateResponse> getCandidates(Long memberId) { throw new UnsupportedOperationException(); }
+                @Override public me.nawa.settlement.dto.response.SettlementDetailResponse getSettlement(Long memberId, Long settlementId) { throw new UnsupportedOperationException(); }
+            };
+        }
+
+        @Bean
+        SettlementCreationService settlementCreationService() {
+            return new SettlementCreationService() {
+                @Override public me.nawa.settlement.dto.response.SettlementCreateResponse createSettlement(
+                    Long memberId, Long appointmentId, String idempotencyKey,
+                    me.nawa.settlement.dto.request.CreateSettlementRequest request
+                ) { throw new UnsupportedOperationException(); }
+            };
+        }
+
+        @Bean
+        SettlementPaymentService settlementPaymentService() {
+            return new SettlementPaymentService() {
+                @Override public me.nawa.settlement.dto.response.SettlementMutationResponse paySettlement(
+                    Long memberId, Long settlementId, String idempotencyKey
+                ) { throw new UnsupportedOperationException(); }
+            };
         }
     }
 

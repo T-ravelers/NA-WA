@@ -489,6 +489,8 @@ class JourneyServiceTest {
                 .title("Seoul Foodie Week")
                 .startDate(LocalDate.of(2026, 3, 28))
                 .endDate(LocalDate.of(2026, 4, 1))
+                .eventCount(3L)
+                .placeCount(5L)
                 .build()
         ));
 
@@ -498,6 +500,8 @@ class JourneyServiceTest {
         assertEquals(20L, result.get(0).getTripId());
         assertEquals("Seoul Foodie Week", result.get(0).getTitle());
         assertEquals(LocalDate.of(2026, 3, 28), result.get(0).getStartDate());
+        assertEquals(3L, result.get(0).getEventCount());
+        assertEquals(5L, result.get(0).getPlaceCount());
     }
 
     @Test

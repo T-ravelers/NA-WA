@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { IconCheck, IconUsers } from '@tabler/icons-vue'
 import { reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -105,25 +106,40 @@ function submit(): void {
     novalidate
     @submit.prevent="submit"
   >
-    <ol
-      class="flex items-center gap-3 text-caption text-ink-3"
-      :aria-label="t('journey.create.stepLabel')"
-    >
-      <li :aria-current="step === 1 ? 'step' : undefined">
-        {{ t('journey.create.stepOne') }}
-      </li>
-      <li aria-hidden="true">/</li>
-      <li :aria-current="step === 2 ? 'step' : undefined">
-        {{ t('journey.create.stepTwo') }}
-      </li>
-    </ol>
+    <!--
+      시안 J3/J3b의 단계 표시는 현재 단계가 24×6 알약, 지난·남은 단계가 6px 점이다.
+      지난 단계 점은 `ink-2`, 아직 오지 않은 단계 점은 `hairline`으로 밝기가 다르다.
+      단계 이름은 화면에서 빠지지만 각 단계의 접근 가능한 이름으로 남겨 두고,
+      `aria-current="step"`도 그대로 둔다.
+    -->
+    <div class="flex items-center gap-1.5">
+      <ol
+        class="flex items-center gap-1.5"
+        :aria-label="t('journey.create.stepLabel')"
+      >
+        <li
+          class="h-1.5 rounded-pill"
+          :class="step === 1 ? 'w-6 bg-ink' : 'w-1.5 bg-ink-2'"
+          :aria-current="step === 1 ? 'step' : undefined"
+        >
+          <span class="sr-only">{{ t('journey.create.stepOne') }}</span>
+        </li>
+        <li
+          class="h-1.5 rounded-pill"
+          :class="step === 2 ? 'w-6 bg-ink' : 'w-1.5 bg-hairline'"
+          :aria-current="step === 2 ? 'step' : undefined"
+        >
+          <span class="sr-only">{{ t('journey.create.stepTwo') }}</span>
+        </li>
+      </ol>
 
-    <p
-      class="text-caption text-ink-3"
-      aria-live="polite"
-    >
-      {{ t('journey.create.stepCount', { current: step }) }}
-    </p>
+      <p
+        class="ml-1.5 text-caption tabular-nums text-ink-3"
+        aria-live="polite"
+      >
+        {{ t('journey.create.stepCount', { current: step }) }}
+      </p>
+    </div>
 
     <p
       v-if="errorMessage !== undefined"
@@ -184,32 +200,66 @@ function submit(): void {
         />
 
         <fieldset class="flex flex-col gap-3">
-          <legend class="text-title-sm text-ink">
+          <legend class="text-caption text-ink-2">
             {{ t('journey.create.companions') }}
             <span class="text-caption text-ink-3">
               · {{ t('journey.create.companionsOptional') }}
             </span>
           </legend>
 
+          <!--
+            시안 J3b의 선택 상태는 `success` 링과 같은 색 14% 틴트다. 미선택 행은 보더
+            없이 `surface-1` 면만 둔다. 색만으로 선택을 말하지 않도록 `aria-pressed`와
+            체크 아이콘을 함께 둔다.
+          -->
           <button
             v-for="option in companionOptions"
             :key="option.value"
             type="button"
-            class="flex min-h-16 items-center justify-between rounded-sm border px-4 text-left"
+            class="flex min-h-16 items-center gap-3 rounded-sm border px-4 py-3.5 text-left"
             :class="
               draft.companionPreference === option.value
-                ? 'border-ink bg-surface-2'
-                : 'border-hairline-strong bg-surface-1'
+                ? 'border-success bg-success/15'
+                : 'border-transparent bg-surface-1'
             "
             :aria-pressed="draft.companionPreference === option.value"
             @click="toggleCompanion(option.value)"
           >
-            <span class="flex flex-col gap-1">
-              <span class="text-title-sm text-ink">{{ t(option.labelKey) }}</span>
-              <span class="text-body-sm text-ink-3">{{ t(option.descriptionKey) }}</span>
+            <!-- 시안 J3b의 좌측 원형 아이콘. 장식이므로 접근성 트리에서 감춘다. -->
+            <span
+              aria-hidden="true"
+              class="flex size-11 shrink-0 items-center justify-center rounded-pill"
+              :class="
+                draft.companionPreference === option.value
+                  ? 'bg-success text-ink'
+                  : 'bg-surface-2 text-icon-muted'
+              "
+            >
+              <IconUsers
+                :size="22"
+                :stroke-width="1.75"
+              />
             </span>
-            <span aria-hidden="true">
-              {{ draft.companionPreference === option.value ? '✓' : '' }}
+
+            <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span class="text-title-sm text-ink">{{ t(option.labelKey) }}</span>
+              <span class="text-body-sm text-ink-2">{{ t(option.descriptionKey) }}</span>
+            </span>
+
+            <span
+              aria-hidden="true"
+              class="flex size-6 shrink-0 items-center justify-center rounded-pill border"
+              :class="
+                draft.companionPreference === option.value
+                  ? 'border-transparent bg-status-ongoing text-on-category'
+                  : 'border-hairline-2'
+              "
+            >
+              <IconCheck
+                v-if="draft.companionPreference === option.value"
+                :size="14"
+                :stroke-width="2.5"
+              />
             </span>
           </button>
         </fieldset>

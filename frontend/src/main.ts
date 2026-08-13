@@ -25,6 +25,8 @@ import {
   useMemberProfile,
 } from '@/features/member/model/memberQueries'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
+import { journeyReportIntegrationKey } from '@/features/journey/model/reportIntegration'
+import { useReportSummariesQuery } from '@/features/report/composables/useReportQueries'
 import '@/app/styles/index.css'
 import { setSessionExpiredHandler } from '@/shared/api/sessionRecovery'
 import { setSignedOutHandler } from '@/shared/api/sessionSignOut'
@@ -66,5 +68,6 @@ app.provide(appointmentMemberIntegrationKey, {
   useMemberProfile,
   useMemberStats: useMemberAppointmentProfile,
 })
+app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
 
 app.mount('#app')

@@ -38,7 +38,7 @@ function submit(input: JourneyCreateInput): void {
 
 <template>
   <main class="flex w-full flex-col gap-6 px-screen py-8">
-    <h1 class="font-display text-screen-title font-bold text-ink-display">
+    <h1 class="font-display text-screen-title uppercase text-ink-display">
       {{ t('journey.create.title') }}
     </h1>
     <JourneyCreateForm

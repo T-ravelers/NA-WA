@@ -325,6 +325,8 @@ public class JourneyService {
                 .title(journey.getTitle())
                 .startDate(journey.getStartDate())
                 .endDate(journey.getEndDate())
+                .eventCount(journey.getEventCount())
+                .placeCount(journey.getPlaceCount())
                 .build())
             .toList();
     }
