@@ -138,6 +138,23 @@ export const useExploreReturnContextStore = defineStore('explore-return-context'
     persist()
   }
 
+  /**
+   * 복귀 위치를 돌려주면서 일회성 맥락을 비운다. 항목을 담아 흐름이 끝난 시점에 부른다.
+   *
+   * 방문 날짜와 복귀 위치는 한 번 쓰고 끝나는 값이다. 남겨두면 다음에 하단 탭으로 그냥
+   * 들어왔을 때 지난 흐름의 날짜가 다시 프리필된다. 반대로 대상 여정은 원래도 화면 사이에
+   * 유지되던 선택이라 그대로 둔다.
+   */
+  function consumeReturn(): ExploreReturnLocation | null {
+    const destination = returnTo.value
+
+    visitDate.value = null
+    returnTo.value = null
+    persist()
+
+    return destination
+  }
+
   function clear(): void {
     journeyId.value = null
     visitDate.value = null
@@ -145,5 +162,5 @@ export const useExploreReturnContextStore = defineStore('explore-return-context'
     persist()
   }
 
-  return { journeyId, visitDate, returnTo, capture, setJourneyId, clear }
+  return { journeyId, visitDate, returnTo, capture, setJourneyId, consumeReturn, clear }
 })

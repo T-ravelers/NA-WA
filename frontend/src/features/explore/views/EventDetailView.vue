@@ -248,9 +248,8 @@ async function confirmJourneyDate(date: string): Promise<void> {
     journeyDate.value = date
     journeyAdded.value = true
     journeyDateSheetOpen.value = false
-    await router.push(
-      returnContext.returnTo ?? { name: 'journey-detail', params: { tripId: journeyId } },
-    )
+    const destination = returnContext.consumeReturn()
+    await router.push(destination ?? { name: 'journey-detail', params: { tripId: journeyId } })
   } catch {
     journeyAddError.value = 'failed'
   } finally {

@@ -112,6 +112,40 @@ describe('useExploreReturnContextStore', () => {
     expect(store.returnTo).toBeNull()
   })
 
+  it('hands back the return location and drops the one-shot context', () => {
+    const store = useExploreReturnContextStore()
+    store.capture({ journeyId: '7', startDate: '2026-09-03', endDate: '2026-09-03' })
+
+    expect(store.consumeReturn()).toEqual({ name: 'journey-detail', params: { tripId: '7' } })
+    expect(store.visitDate).toBeNull()
+    expect(store.returnTo).toBeNull()
+    expect(store.journeyId).toBe(7)
+  })
+
+  it('has nothing left to consume the second time', () => {
+    const store = useExploreReturnContextStore()
+    store.capture({ journeyId: '7', startDate: '2026-09-03', endDate: '2026-09-03' })
+    store.consumeReturn()
+
+    expect(store.consumeReturn()).toBeNull()
+  })
+
+  it('does not bring the consumed date back after a reload', () => {
+    useExploreReturnContextStore().capture({
+      journeyId: '7',
+      startDate: '2026-09-03',
+      endDate: '2026-09-03',
+    })
+    useExploreReturnContextStore().consumeReturn()
+
+    setActivePinia(createPinia())
+    const restored = useExploreReturnContextStore()
+
+    expect(restored.journeyId).toBe(7)
+    expect(restored.visitDate).toBeNull()
+    expect(restored.returnTo).toBeNull()
+  })
+
   it('clears the stored context', () => {
     const store = useExploreReturnContextStore()
     store.capture({ journeyId: '7', startDate: '2026-09-03', endDate: '2026-09-03' })
