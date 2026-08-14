@@ -397,7 +397,7 @@ class SwaggerConfigTest {
 
         @Bean
         JourneyService journeyService() {
-            return new JourneyService(null);
+            return new JourneyService(null, null);
         }
     }
 

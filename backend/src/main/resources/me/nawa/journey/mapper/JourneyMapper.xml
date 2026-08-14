@@ -307,4 +307,89 @@
         WHERE ti.trip_item_id = #{tripItemId}
           AND ti.deleted_at IS NULL
     </select>
+
+    <select id="findJourneyItemForUpdate"
+            resultType="me.nawa.journey.domain.JourneyItem">
+        SELECT
+            ti.trip_item_id,
+            ti.trip_id,
+            ti.item_id,
+            ti.visit_date,
+            ti.trip_item_status,
+            ti.display_order,
+            ti.note,
+            ti.appointment_id,
+            a.host_member_id AS appointment_host_member_id,
+            ti.confirmed_at,
+            ti.created_at
+        FROM trip_items ti
+        LEFT JOIN appointments a
+          ON a.appointment_id = ti.appointment_id
+         AND a.deleted_at IS NULL
+        WHERE ti.trip_id = #{tripId}
+          AND ti.trip_item_id = #{tripItemId}
+          AND ti.deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="findConfirmedJourneyItemsForUpdate"
+            resultType="me.nawa.journey.domain.JourneyItem">
+        SELECT
+            ti.trip_item_id,
+            ti.trip_id,
+            ti.item_id,
+            ti.trip_item_status,
+            ti.appointment_id,
+            a.host_member_id AS appointment_host_member_id
+        FROM trip_items ti
+        LEFT JOIN appointments a
+          ON a.appointment_id = ti.appointment_id
+         AND a.deleted_at IS NULL
+        WHERE ti.trip_id = #{tripId}
+          AND ti.trip_item_status = 'CONFIRMED'
+          AND ti.deleted_at IS NULL
+        ORDER BY ti.trip_item_id ASC
+        FOR UPDATE
+    </select>
+
+    <update id="softDeleteJourneyItem">
+        UPDATE trip_items
+        SET deleted_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE trip_id = #{tripId}
+          AND trip_item_id = #{tripItemId}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="softDeleteJourneyItemsByTripId">
+        UPDATE trip_items
+        SET deleted_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="softDeleteReportsByTripId">
+        UPDATE reports
+        SET deleted_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="softDeleteExpenseLinksByTripId">
+        UPDATE trip_expense_links
+        SET deleted_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="softDeleteJourney">
+        UPDATE trips
+        SET deleted_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+    </update>
 </mapper>
