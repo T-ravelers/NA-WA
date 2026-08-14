@@ -81,8 +81,9 @@ function retry(): void {
     <header class="flex items-center gap-3">
       <IconOrb
         :label="t('report.detail.back')"
-        size="lg"
-        variant="surface"
+        size="md"
+        variant="plain"
+        class="-ml-2.5"
         @click="goBack"
       >
         <IconArrowLeft

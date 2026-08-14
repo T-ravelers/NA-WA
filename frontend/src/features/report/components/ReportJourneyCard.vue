@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { IconChevronRight } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppTicket from '@/shared/ui/AppTicket.vue'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
+import TicketStamp from '@/shared/ui/TicketStamp.vue'
 
 import { formatReportDate, type ReportJourneyOption } from '../model/reportModel'
 
@@ -69,7 +71,7 @@ function activateReport(): void {
       </template>
 
       <template #stub>
-        <div class="flex flex-col gap-2.5 p-4">
+        <div class="flex min-h-48 flex-col gap-2 p-4">
           <h2 class="min-w-0 truncate font-display text-trip-ticket-title uppercase text-on-paper">
             {{ option.title }}
           </h2>
@@ -91,21 +93,32 @@ function activateReport(): void {
             {{ option.report === null ? t('report.list.notCreated') : t('report.list.ready') }}
           </p>
 
-          <button
-            type="button"
-            class="inline-flex min-h-11 w-full items-center justify-center rounded-sm border border-on-paper/30 px-3 text-title-sm text-on-paper transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
-            :aria-pressed="option.report === null ? selected : undefined"
-            :disabled="option.report === null && pending"
-            @click="activateReport"
-          >
-            {{
-              option.report === null
-                ? selected
-                  ? t('report.list.choosingExpenses')
-                  : t('report.list.chooseExpenses')
-                : t('report.list.view')
-            }}
-          </button>
+          <div class="mt-auto flex min-h-16 items-center justify-between gap-3">
+            <button
+              type="button"
+              class="inline-flex min-h-11 min-w-0 items-center gap-1 rounded-sm px-0.5 text-left text-title-sm text-on-paper transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
+              :aria-pressed="option.report === null ? selected : undefined"
+              :disabled="option.report === null && pending"
+              @click="activateReport"
+            >
+              <span class="truncate">
+                {{
+                  option.report === null
+                    ? selected
+                      ? t('report.list.choosingExpenses')
+                      : t('report.list.chooseExpenses')
+                    : t('report.list.view')
+                }}
+              </span>
+              <IconChevronRight
+                :size="20"
+                :stroke-width="1.75"
+                aria-hidden="true"
+              />
+            </button>
+
+            <TicketStamp :label="t('report.list.ended')" />
+          </div>
         </div>
       </template>
     </AppTicket>

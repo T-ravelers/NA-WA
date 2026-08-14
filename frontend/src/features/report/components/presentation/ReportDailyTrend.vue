@@ -10,10 +10,9 @@ import type { ReportDailyTrendPoint, ReportDailyTrendProps } from './types'
 /**
  * 일자별 지출 추이 꺾은선.
  *
- * 시안 R4의 `Spending trend` 블록이다. 점마다 금액을 찍으면 모바일 폭에서 겹치므로
- * 화면에는 선만 그리고, 같은 값을 스크린 리더용 목록으로 함께 낸다. 축 라벨도 SVG
- * `<text>`가 아니라 HTML로 그린다. viewBox가 확대·축소되면 SVG 안의 글자 크기는 타이포
- * 토큰의 px 값과 달라지기 때문이다.
+ * 시안 R4의 `Spending trend` 블록이다. 모든 날짜의 점을 표시하고, 같은 값을 스크린
+ * 리더용 목록으로도 함께 낸다. 축 라벨은 SVG `<text>`가 아니라 HTML로 그린다. viewBox가
+ * 확대·축소되면 SVG 안의 글자 크기는 타이포 토큰의 px 값과 달라지기 때문이다.
  */
 const {
   points,
@@ -23,12 +22,13 @@ const {
   locale = 'en',
 } = defineProps<ReportDailyTrendProps>()
 
-/* 시안 실측 기준의 그리기 영역. 좌우 10은 점 반지름이 잘리지 않도록 둔 여백이다. */
-const VIEW_WIDTH = 310
-const PLOT_LEFT = 10
-const PLOT_RIGHT = 300
-const PLOT_TOP = 20
-const PLOT_BOTTOM = 100
+/* 시안 실측 기준의 그리기 영역. 좌우 8은 점 반지름이 잘리지 않도록 둔 여백이다. */
+const VIEW_WIDTH = 318
+const VIEW_HEIGHT = 112
+const PLOT_LEFT = 8
+const PLOT_RIGHT = 310
+const PLOT_TOP = 16
+const PLOT_BOTTOM = 93
 
 interface PlottedPoint {
   key: string
@@ -64,27 +64,6 @@ const polylinePoints = computed(() =>
   plotted.value.map((point) => `${String(point.x)},${String(point.y)}`).join(' '),
 )
 
-/** 처음·마지막·최고점만 점으로 찍는다. 시안과 같고, 모바일 폭에서 점이 뭉치지 않는다. */
-const markedPoints = computed<PlottedPoint[]>(() => {
-  const all = plotted.value
-  const first = all[0]
-  const last = all[all.length - 1]
-
-  if (first === undefined || last === undefined) {
-    return []
-  }
-
-  const highest = all.reduce<PlottedPoint>(
-    (best, point) => (point.y < best.y ? point : best),
-    first,
-  )
-
-  // 점이 하나뿐이면 셋이 같은 항목이라 Set이 하나로 접는다.
-  const marked = new Set<PlottedPoint>([first, last, highest])
-
-  return all.filter((point) => marked.has(point))
-})
-
 /** 축 라벨은 처음·가운데·마지막만 남긴다. 전부 그리면 모바일 폭에서 겹친다. */
 const axisLabels = computed<ReportDailyTrendPoint[]>(() => {
   const all = points
@@ -113,7 +92,7 @@ const isEmpty = computed(() => points.length === 0)
       {{ heading }}
     </h2>
 
-    <AppCard padding="lg">
+    <AppCard padding="base">
       <StateEmpty
         v-if="isEmpty"
         :title="emptyTitle"
@@ -123,7 +102,7 @@ const isEmpty = computed(() => points.length === 0)
       <div v-else>
         <svg
           aria-hidden="true"
-          :viewBox="`0 0 ${VIEW_WIDTH} 120`"
+          :viewBox="`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`"
           class="block w-full"
         >
           <line
@@ -137,9 +116,9 @@ const isEmpty = computed(() => points.length === 0)
           />
           <line
             :x1="0"
-            :y1="60"
+            :y1="(PLOT_TOP + PLOT_BOTTOM) / 2"
             :x2="VIEW_WIDTH"
-            :y2="60"
+            :y2="(PLOT_TOP + PLOT_BOTTOM) / 2"
             stroke="currentColor"
             stroke-width="1"
             stroke-dasharray="3 4"
@@ -167,7 +146,7 @@ const isEmpty = computed(() => points.length === 0)
           />
 
           <circle
-            v-for="point in markedPoints"
+            v-for="point in plotted"
             :key="point.key"
             :cx="point.x"
             :cy="point.y"
