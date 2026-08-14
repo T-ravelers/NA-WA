@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { formatServerDateTime } from '@/shared/lib/datetime'
 import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -16,7 +17,6 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { executeQrPayment, previewQrPayment } from '../api/qrPaymentApi'
 import { useWalletAppointmentIntegration } from '../model/appointmentIntegration'
-import { parseServerDateTime, shortKstDateFormatter } from '../model/walletHome'
 import {
   formatKrw,
   isValidQrPaymentAmount,
@@ -59,15 +59,14 @@ watch(spendingScope, (scope) => {
   }
 })
 
-const appointmentPeriodFormatter = computed(() => shortKstDateFormatter(locale.value))
-
 function formatAppointmentPeriod(activityStartAt: string, activityEndAt: string): string {
-  const start = parseServerDateTime(activityStartAt)
-  const end = parseServerDateTime(activityEndAt)
+  const options = { month: 'short' as const, day: 'numeric' as const }
+  const start = formatServerDateTime(activityStartAt, locale.value, options)
+  const end = formatServerDateTime(activityEndAt, locale.value, options)
 
-  if (start === null || end === null) return ''
+  if (start === '' || end === '') return ''
 
-  return `${appointmentPeriodFormatter.value.format(start)} – ${appointmentPeriodFormatter.value.format(end)}`
+  return `${start} – ${end}`
 }
 
 const finalAmount = computed<number | null>(() => {

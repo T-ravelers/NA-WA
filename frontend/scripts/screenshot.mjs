@@ -468,6 +468,96 @@ function stubWalletApis(page) {
   })
 }
 
+const SETTLEMENT_PARTICIPANTS = [
+  { id: 12, name: 'Alex', initials: 'AL' },
+  { id: 19, name: 'Mina', initials: 'MI' },
+  { id: 27, name: 'Leo', initials: 'LE' },
+]
+
+function stubSettlementApis(page) {
+  return Promise.all([
+    stubJson(page, '/api/v1/settlements', {
+      received: [
+        {
+          id: 42,
+          title: 'Late-night Burger Club',
+          totalAmount: '60300',
+          receivableAmount: '40200',
+          type: 'EQUAL',
+          status: 'REQUESTED',
+          viewer: {
+            role: 'CREATOR',
+            shareAmount: '0',
+            payableAmount: '0',
+            requestStatus: 'NOT_REQUESTED',
+            allowedActions: [],
+          },
+        },
+      ],
+      sent: [],
+    }),
+    stubJson(page, '/api/v1/settlements/candidates', [
+      {
+        transferId: 7,
+        appointmentId: 9,
+        payerAppointmentMemberId: 12,
+        journeyName: 'Seoul Summer',
+        gatheringName: 'Late-night Burger Club',
+        merchantName: "McDonald's Hongdae",
+        amount: '60300',
+        paidAt: '2026-07-26T20:42:00',
+        payerName: 'Alex',
+        participants: SETTLEMENT_PARTICIPANTS,
+      },
+    ]),
+    stubJson(page, '/api/v1/settlements/42', {
+      id: 42,
+      type: 'ITEMIZED',
+      totalAmount: '60300',
+      status: 'REQUESTED',
+      requestedBy: 'Alex',
+      gatheringName: 'Late-night Burger Club',
+      merchantName: "McDonald's Hongdae",
+      viewerItems: [
+        {
+          settlementItemId: 1,
+          name: 'Burger set',
+          allocatedQuantity: '1',
+          allocatedAmount: '20100',
+        },
+      ],
+      transactionId: null,
+      paidBy: 'Alex',
+      viewer: {
+        role: 'PARTICIPANT',
+        shareAmount: '20100',
+        payableAmount: '20100',
+        requestStatus: 'PENDING',
+        allowedActions: ['PAY'],
+      },
+    }),
+  ])
+}
+
+function stubEmptySettlementCandidates(page) {
+  return stubJson(page, '/api/v1/settlements/candidates', [])
+}
+
+function stubSettlementCandidatesError(page) {
+  return page.route(
+    (url) => url.pathname === '/api/v1/settlements/candidates',
+    (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error: { code: 'SETTLEMENT-001', message: 'Settlement candidates are unavailable' },
+        }),
+      }),
+  )
+}
+
 /**
  * 찍을 화면.
  *
@@ -627,6 +717,57 @@ const SCREENS = [
     path: '/wallet/qr/payment/complete?scope=shared&appointment=seoul-night-tour',
     setup: async (page) => {
       await stubMemberProfile(page)
+    },
+  },
+  {
+    name: '20-settlement-list-api',
+    path: '/settlements',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementApis(page)
+    },
+  },
+  {
+    name: '21-settlement-list-sent-api',
+    path: '/settlements',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementApis(page)
+    },
+    prepare: (page) => page.getByRole('radio', { name: 'Sent', exact: true }).click(),
+  },
+  {
+    name: '22-settlement-create-api',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementApis(page)
+    },
+  },
+  {
+    name: '23-settlement-create-empty',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEmptySettlementCandidates(page)
+    },
+    prepare: (page) => page.getByText('No payments available', { exact: true }).waitFor(),
+  },
+  {
+    name: '24-settlement-create-error',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementCandidatesError(page)
+    },
+    prepare: (page) => page.getByRole('alert').waitFor({ timeout: 10_000 }),
+  },
+  {
+    name: '25-settlement-detail-api',
+    path: '/settlements/42',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementApis(page)
     },
   },
 

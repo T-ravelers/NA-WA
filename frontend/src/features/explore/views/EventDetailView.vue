@@ -12,6 +12,7 @@ import {
   IconShare2,
 } from '@tabler/icons-vue'
 
+import { formatCalendarDateString } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -101,7 +102,9 @@ const detailRows = computed(() => {
   const rows: DetailEntry[] = []
   const period = current.isPermanent
     ? t('explore.detail.permanent')
-    : [formatDate(current.startDate), formatDate(current.endDate)].filter(Boolean).join(' – ')
+    : [formatCalendarDateString(current.startDate), formatCalendarDateString(current.endDate)]
+        .filter(Boolean)
+        .join(' – ')
   if (period) rows.push({ label: t('explore.detail.period'), value: period })
   if (current.venueName || current.addressRoad) {
     rows.push({ label: t('explore.detail.venue'), value: locationLabel.value })
@@ -139,10 +142,6 @@ const kindLabel = computed(() =>
 watch(imageUrls, () => {
   selectedImage.value = 0
 })
-
-function formatDate(value: string | null): string {
-  return value ? value.replace(/-/g, '.') : ''
-}
 
 function showPreviousImage(): void {
   if (imageUrls.value.length === 0) return

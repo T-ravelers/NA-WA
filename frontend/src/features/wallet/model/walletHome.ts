@@ -1,4 +1,9 @@
 import type { ServerDateTime, WalletHome, WalletTransaction } from '../api/walletApi'
+import {
+  formatServerDateTime,
+  parseServerDateTime as parseSharedServerDateTime,
+} from '@/shared/lib/datetime'
+import { formatGroupedDecimal } from '@/shared/lib/money'
 
 /**
  * Wallet 홈 응답을 화면이 쓰는 형태로 옮긴다.
@@ -132,80 +137,8 @@ export const walletKeys = {
     [...walletKeys.transactions(), 'detail', transactionId] as const,
 }
 
-/**
- * 오프셋 없는 서버 시각을 KST로 해석한다.
- *
- * 백엔드는 `LocalDateTime`을 타임존 없이 내려준다. 이대로 브라우저에 맡기면 로컬 타임존으로
- * 읽혀, 방한 외국인 사용자의 기기에서 거래 날짜가 하루 어긋난다. "서버 시각은 KST"라는
- * 전제를 이 한 곳에만 둔다. 백엔드가 오프셋을 포함해 내려주게 되면 이 함수를 지우면 된다.
- *
- * 형식이 두 가지인 이유는 `ServerDateTime` 주석에 있다. 배열이 현재 실제 형식이고,
- * 문자열은 백엔드가 `@JsonFormat`을 도입했을 때를 위한 것이다.
- *
- * 배열을 `new Date(년, 월, 일, ...)`로 넘기지 않는다. 그 생성자는 인자를 **로컬 타임존**의
- * 벽시계로 읽으므로 KST 전제가 깨진다. 시(hour)에서 9를 빼고 `Date.UTC`로 만든다. 자정
- * 부근에서 음수가 되어도 `Date.UTC`가 전날로 정규화한다.
- */
-const KST_OFFSET = '+09:00'
-const KST_OFFSET_HOURS = 9
-const HAS_OFFSET = /(?:Z|[+-]\d{2}:?\d{2})$/
-
-function parseDateTimeParts(parts: number[]): Date | null {
-  // 뒤쪽 0은 생략되므로 길이가 흔들린다. 날짜 세 칸만 있으면 해석할 수 있다.
-  if (parts.length < 3 || parts.some((part) => !Number.isFinite(part))) {
-    return null
-  }
-
-  const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = parts as [
-    number,
-    number,
-    number,
-    number?,
-    number?,
-    number?,
-    number?,
-  ]
-
-  const parsed = new Date(
-    Date.UTC(
-      year,
-      month - 1,
-      day,
-      hour - KST_OFFSET_HOURS,
-      minute,
-      second,
-      Math.floor(nanosecond / 1_000_000),
-    ),
-  )
-
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-export function parseServerDateTime(value: ServerDateTime): Date | null {
-  if (Array.isArray(value)) {
-    return parseDateTimeParts(value)
-  }
-
-  if (value === null || value === '') {
-    return null
-  }
-
-  const parsed = new Date(HAS_OFFSET.test(value) ? value : `${value}${KST_OFFSET}`)
-
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-/**
- * 월·일만 짧게 보여주는 KST 고정 포맷터. 표시 타임존을 KST로 고정하는 이유는
- * `parseServerDateTime`과 같다 — 해외 기기에서도 같은 날짜로 보여야 한다.
- */
-export function shortKstDateFormatter(locale: string): Intl.DateTimeFormat {
-  return new Intl.DateTimeFormat(locale, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'Asia/Seoul',
-  })
-}
+// 기존 wallet model을 직접 참조하던 호출부를 위해 공용 파서를 재노출한다.
+export const parseServerDateTime = parseSharedServerDateTime
 
 function toActivityKind(transferType: string): ActivityKind {
   const normalized = transferType.toUpperCase()
@@ -265,7 +198,7 @@ const toAmountString = (amount: string | number | null | undefined): string =>
 const getAbsoluteAmount = (amount: string): string => amount.replace(/^-/, '')
 
 export const formatPointAmount = (amount: string): string =>
-  amount.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  formatGroupedDecimal(amount, 'en-US') || amount
 
 /** 거래 내역·거래 상세 화면에서 쓰는 영문 표시명. 백엔드 `TransferType`과 1:1이다. */
 export const getTransactionTypeLabel = (transferType: string): string => {
@@ -301,19 +234,15 @@ export const getTransactionStatusLabel = (status: string): string => {
 }
 
 export const formatTransactionDateTime = (createdAt: ServerDateTime): string => {
-  const date = parseServerDateTime(createdAt)
-  if (date === null) return 'Unknown date'
-
-  // 표시 타임존을 KST로 고정한다. 서비스는 한국에서만 쓰이므로 거래 시각은 한국 시간
-  // 기준이어야 한다 — 기기 타임존에 맡기면 외국인 방문자 기기에서 날짜가 밀린다.
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'Asia/Seoul',
-  }).format(date)
+  return (
+    formatServerDateTime(createdAt, 'en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }) || 'Unknown date'
+  )
 }
 
 export const formatTransactionAmount = (transaction: WalletTransactionResponse): string => {

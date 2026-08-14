@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { formatServerDateTime, parseServerDateTime } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -19,7 +20,6 @@ import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
 } from '../model/appointmentQueries'
-import { parseAppointmentDateTime } from '../model/appointmentDateTime'
 import { useAppointmentMemberProfile } from '../model/memberIntegration'
 
 const route = useRoute()
@@ -62,7 +62,7 @@ const statusTone = computed(() =>
 
 const isJoinAvailable = computed(() => {
   if (appointment.value?.appointmentStatus !== 'RECRUITING') return false
-  const deadline = parseAppointmentDateTime(appointment.value.joinDeadline)
+  const deadline = parseServerDateTime(appointment.value.joinDeadline)
   return deadline !== null && Date.now() < deadline.getTime()
 })
 const currentMemberId = computed(() => profileQuery.data.value?.memberId)
@@ -91,13 +91,12 @@ const canOpenPostEventMenu = computed(() => canOpenAttendance.value || canOpenRe
 
 function formatDateTime(value: AppointmentDateTimeValue): string {
   if (!value) return t('appointment.detail.notProvided')
-  const parsed = parseAppointmentDateTime(value)
+  const parsed = parseServerDateTime(value)
   if (!parsed) return typeof value === 'string' ? value : t('appointment.detail.notProvided')
-  return new Intl.DateTimeFormat(locale.value, {
+  return formatServerDateTime(parsed, locale.value, {
     dateStyle: 'medium',
     timeStyle: 'short',
-    timeZone: 'Asia/Seoul',
-  }).format(parsed)
+  })
 }
 
 function formatDeposit(value: string): string {
