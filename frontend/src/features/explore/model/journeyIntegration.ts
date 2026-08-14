@@ -21,8 +21,6 @@ export interface ExploreJourneyIntegration {
     request: { itemId: number; visitDate: string },
   ) => Promise<unknown>
   parseJourneyRouteQuery: (value: unknown) => number | null
-  readActiveJourneyId: () => number | null
-  storeActiveJourneyId: (journeyId: number) => void
 }
 
 export const exploreJourneyIntegrationKey: InjectionKey<ExploreJourneyIntegration> = Symbol(

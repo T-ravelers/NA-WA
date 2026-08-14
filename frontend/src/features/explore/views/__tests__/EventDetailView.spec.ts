@@ -84,8 +84,6 @@ function createJourneyIntegration(): ExploreJourneyIntegration {
   return {
     addJourneyItem,
     parseJourneyRouteQuery: () => null,
-    readActiveJourneyId: () => null,
-    storeActiveJourneyId: vi.fn(),
     useJourneyListQuery: () => query,
   }
 }
@@ -134,8 +132,55 @@ async function mountView() {
   return { wrapper, router }
 }
 
+const RETURN_CONTEXT_KEY = 'nawa.explore.returnContext'
+/* Event 개최 기간(2026-08-10 ~ 2026-08-12) 안이어야 담기 시트가 그대로 프리필한다. */
+const CARRIED_DATE = '2026-08-11'
+
+/** Journey 날짜에서 넘어온 복귀 맥락을 심는다. store가 마운트 시점에 읽어간다. */
+function seedReturnContext(): void {
+  sessionStorage.setItem(
+    RETURN_CONTEXT_KEY,
+    JSON.stringify({
+      journeyId: 7,
+      visitDate: CARRIED_DATE,
+      returnTo: { name: 'journey-detail', params: { tripId: '7' } },
+    }),
+  )
+}
+
+function readReturnContext(): unknown {
+  const stored = sessionStorage.getItem(RETURN_CONTEXT_KEY)
+  return stored === null ? null : JSON.parse(stored)
+}
+
+/** 담기 버튼 → 여정 선택 → 날짜 확인까지 한 번에 진행한다. */
+async function runAddToJourney(
+  wrapper: Awaited<ReturnType<typeof mountView>>['wrapper'],
+): Promise<void> {
+  await wrapper
+    .findAll('button')
+    .find((button) => button.text() === 'Add to journey')
+    ?.trigger('click')
+  await flushPromises()
+
+  await wrapper
+    .get('[role="dialog"]')
+    .findAll('button')
+    .find((button) => button.text().includes('Seoul weekend'))
+    ?.trigger('click')
+  await flushPromises()
+
+  await wrapper
+    .get('[role="dialog"]')
+    .findAll('button')
+    .find((button) => button.text().includes('Add to'))
+    ?.trigger('click')
+  await flushPromises()
+}
+
 describe('EventDetailView', () => {
   beforeEach(() => {
+    sessionStorage.clear()
     fetchEventDetail.mockReset()
     addJourneyItem.mockReset()
     fetchEventDetail.mockResolvedValue(event)
@@ -188,6 +233,32 @@ describe('EventDetailView', () => {
       visitDate: expect.any(String),
     })
     expect(router.currentRoute.value.name).toBe('journey-detail')
+  })
+
+  it('adds the Event on the date the Journey entry carried and returns there', async () => {
+    seedReturnContext()
+    const { wrapper, router } = await mountView()
+
+    await runAddToJourney(wrapper)
+
+    expect(addJourneyItem).toHaveBeenCalledWith(7, { itemId: 42, visitDate: CARRIED_DATE })
+    expect(router.currentRoute.value.name).toBe('journey-detail')
+    expect(router.currentRoute.value.params.tripId).toBe('7')
+  })
+
+  it('spends the carried date once so a later direct entry does not reuse it', async () => {
+    seedReturnContext()
+    const first = await mountView()
+    await runAddToJourney(first.wrapper)
+
+    expect(readReturnContext()).toEqual({ journeyId: 7, visitDate: null, returnTo: null })
+
+    addJourneyItem.mockClear()
+    const second = await mountView()
+    await runAddToJourney(second.wrapper)
+
+    expect(addJourneyItem).toHaveBeenCalledTimes(1)
+    expect(addJourneyItem.mock.calls[0]?.[1].visitDate).not.toBe(CARRIED_DATE)
   })
 
   it('opens the Event appointment list with the Event filter', async () => {

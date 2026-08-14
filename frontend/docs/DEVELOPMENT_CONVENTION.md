@@ -72,14 +72,15 @@ feature를 추가할 때 공용 파일을 수정할 일이 없습니다. 공용 
 
 ## 파일과 이름 정하기
 
-| 대상              | 규칙                    | 예시                  |
-| ----------------- | ----------------------- | --------------------- |
-| Vue 컴포넌트      | PascalCase              | `JourneyCard.vue`     |
-| composable        | `use` + PascalCase 의미 | `useJourneyList.ts`   |
-| 일반 함수와 변수  | camelCase               | `formatTravelDate`    |
-| 타입과 인터페이스 | PascalCase              | `JourneySummary`      |
-| 상수              | UPPER_SNAKE_CASE        | `DEFAULT_PAGE_SIZE`   |
-| 테스트            | 원본 이름 + `.spec`     | `JourneyCard.spec.ts` |
+| 대상              | 규칙                                                    | 예시                                     |
+| ----------------- | ------------------------------------------------------- | ---------------------------------------- |
+| Vue 컴포넌트      | PascalCase                                              | `JourneyCard.vue`                        |
+| composable        | `use` + PascalCase 의미                                 | `useJourneyList.ts`                      |
+| 일반 함수와 변수  | camelCase                                               | `formatTravelDate`                       |
+| 타입과 인터페이스 | PascalCase                                              | `JourneySummary`                         |
+| 상수              | UPPER_SNAKE_CASE                                        | `DEFAULT_PAGE_SIZE`                      |
+| 테스트            | 원본 이름 + `.spec`                                     | `JourneyCard.spec.ts`                    |
+| Pinia store       | 파일은 대상 이름, export는 `use` + PascalCase + `Store` | `savedEvents.ts`의 `useSavedEventsStore` |
 
 - 컴포넌트 이름에는 두 단어 이상을 사용해 역할을 드러냅니다.
 - `utils.ts`, `common.ts`, `data.ts`처럼 책임을 알 수 없는 파일을 만들지 않습니다.
@@ -141,6 +142,8 @@ const select = () => {
 - Vue Query 데이터를 Pinia에 복사하지 않습니다.
 - Pinia에 API loading과 error 상태를 중복 저장하지 않습니다.
 - 새 전역 store를 만들기 전에 URL이나 로컬 상태로 충분한지 확인합니다.
+- store는 그 상태를 쓰는 feature의 `model/`에 두고, id는 `<feature>-<대상>` 형식으로 붙입니다.
+- 화면 사이를 건너는 복귀 맥락은 store가, 공유·북마크·뒤로가기가 되어야 하는 값은 URL이 가집니다.
 - 결제와 정산 금액의 최종 계산을 JavaScript 부동소수점에 의존하지 않습니다.
 - API 금액 계약과 정밀 계산 도구가 정해지기 전에는 금액 문자열을 임의로 `number`로
   변환하지 않습니다.
