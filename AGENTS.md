@@ -75,6 +75,7 @@ cd backend && ./gradlew build --no-daemon
 | 백엔드 구현 규칙     | [backend/docs/DEVELOPMENT_CONVENTION.md](./backend/docs/DEVELOPMENT_CONVENTION.md) |
 | API 응답·오류 코드   | [backend/docs/API_RESPONSE_CONVENTION.md](./backend/docs/API_RESPONSE_CONVENTION.md) |
 | 정산 API·상태·멱등성 | [backend/docs/SETTLEMENT.md](./backend/docs/SETTLEMENT.md)                  |
+| QR 결제 API·상태·멱등성 | [backend/docs/QR_PAYMENT_API.md](./backend/docs/QR_PAYMENT_API.md)      |
 | 소셜 로그인 운영     | [backend/docs/AUTHENTICATION.md](./backend/docs/AUTHENTICATION.md)          |
 | DB 지도·도메인 ERD   | [backend/docs/database/README.md](./backend/docs/database/README.md)         |
 
