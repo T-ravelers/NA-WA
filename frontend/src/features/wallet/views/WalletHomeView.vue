@@ -14,6 +14,8 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { formatServerDateTime } from '@/shared/lib/datetime'
+import { formatNumber } from '@/shared/lib/money'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -33,32 +35,17 @@ const { data, isPending } = walletQuery
 
 const wallet = computed(() => (data.value === undefined ? null : toWalletHomeData(data.value)))
 
-/*
- * 포맷터는 로케일에 따라 다시 만들어야 한다. 화면 진입 시점에 한 번 만들어 두면
- * 언어를 바꿔도 숫자와 날짜만 이전 로케일에 남는다.
- *
- * 표시 타임존도 KST로 고정한다. 서버 시각을 KST로 해석해 놓고 표시만 기기 시간대로
- * 하면, 해외 기기에서 같은 거래가 다른 날짜로 보인다.
- */
-const amountFormat = computed(
-  () => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 2 }),
-)
-
-const dateFormat = computed(
-  () =>
-    new Intl.DateTimeFormat(locale.value, {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'Asia/Seoul',
-    }),
-)
-
 function formatPoints(amount: number): string {
-  return t('wallet.home.points', { amount: amountFormat.value.format(amount) })
+  return t('wallet.home.points', {
+    amount: formatNumber(amount, locale.value, { maximumFractionDigits: 2 }),
+  })
 }
 
 function formatDate(occurredAt: Date): string {
-  return dateFormat.value.format(occurredAt)
+  return formatServerDateTime(occurredAt, locale.value, {
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 /**

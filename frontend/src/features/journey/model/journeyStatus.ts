@@ -1,5 +1,7 @@
 import { onMounted, onUnmounted, ref, type Ref } from 'vue'
 
+import { formatCalendarDate } from '@/shared/lib/datetime'
+
 import type { JourneySummary } from '../api/journeyApi'
 
 export type JourneyListTab = 'ongoing' | 'past'
@@ -94,13 +96,9 @@ export function filterJourneysByStatus(
  * 쓰도록 포맷을 여기 한 곳에 둔다. 예전에는 목록만 `2026.08.09`로 점을 찍어 두 화면의
  * 표기가 서로 달랐다.
  *
- * `new Date('2026-08-09')`는 UTC 자정으로 읽혀 한국 시간대에서 하루 앞당겨진다.
- * 연·월·일을 직접 꺼내 UTC로 고정하고 `timeZone: 'UTC'`로 다시 읽는다.
+ * 공용 달력 전용 파서와 포맷터가 `YYYY-MM-DD`의 연·월·일을 로컬 달력 값으로 보존한다.
+ * 서버 시각 파서를 거치지 않으므로 기기 타임존 변환으로 날짜가 밀리지 않는다.
  */
 export function formatJourneyDate(value: string, locale: string): string {
-  const [year, month, day] = value.split('-').map(Number)
-
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(
-    new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1)),
-  )
+  return formatCalendarDate(value, locale, { dateStyle: 'medium' })
 }

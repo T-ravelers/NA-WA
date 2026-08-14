@@ -1,3 +1,5 @@
+export { formatKrw } from '@/shared/lib/money'
+
 export type SpendingScope = 'personal' | 'shared'
 
 /** 백엔드 `SpendingScope` enum과 1:1. 화면은 소문자 `SpendingScope`로 다루고 API 호출 직전에만 바꾼다. */
@@ -114,6 +116,3 @@ export const ACTIVE_APPOINTMENTS = [
     period: 'Aug 14–18',
   },
 ] as const
-
-export const formatKrw = (amount: number): string =>
-  `₩${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
