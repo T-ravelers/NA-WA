@@ -4,6 +4,13 @@ export interface AppointmentMemberProfile {
   memberId: number
 }
 
+export interface AppointmentMemberStats {
+  completionRate: number | null
+  noShowCount: number
+  averageRating: number | null
+  reviewCount: number
+}
+
 export interface AppointmentMemberProfileQuery {
   data: Ref<AppointmentMemberProfile | undefined>
   isPending: Ref<boolean>
@@ -13,6 +20,11 @@ export interface AppointmentMemberProfileQuery {
 
 export interface AppointmentMemberIntegration {
   useMemberProfile: () => AppointmentMemberProfileQuery
+  useMemberStats: (memberId: Ref<number | null>) => {
+    data: Ref<AppointmentMemberStats | undefined>
+    isPending: Ref<boolean>
+    isError: Ref<boolean>
+  }
 }
 
 export const appointmentMemberIntegrationKey: InjectionKey<AppointmentMemberIntegration> = Symbol(
@@ -23,4 +35,10 @@ export function useAppointmentMemberProfile(): AppointmentMemberProfileQuery {
   const integration = inject(appointmentMemberIntegrationKey)
   if (!integration) throw new Error('Appointment member integration is not configured.')
   return integration.useMemberProfile()
+}
+
+export function useAppointmentMemberStats(memberId: Ref<number | null>) {
+  const integration = inject(appointmentMemberIntegrationKey)
+  if (!integration) throw new Error('Appointment member integration is not configured.')
+  return integration.useMemberStats(memberId)
 }

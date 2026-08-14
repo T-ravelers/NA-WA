@@ -1,6 +1,10 @@
 import { computed, type Ref } from 'vue'
 
-import { fetchAppointment, fetchAppointmentMembers } from '../api/appointmentApi'
+import {
+  fetchAppointment,
+  fetchAppointmentMembers,
+  fetchMyAppointmentParticipation,
+} from '../api/appointmentApi'
 import { appointmentKeys } from './appointmentKeys'
 
 function requireAppointmentId(appointmentId: number | null): number {
@@ -22,5 +26,12 @@ export function appointmentMembersQueryOptions(appointmentId: Readonly<Ref<numbe
   return {
     queryKey: computed(() => appointmentKeys.members(appointmentId.value)),
     queryFn: () => fetchAppointmentMembers(requireAppointmentId(appointmentId.value)),
+  }
+}
+
+export function appointmentParticipationQueryOptions(appointmentId: Readonly<Ref<number | null>>) {
+  return {
+    queryKey: computed(() => appointmentKeys.participation(appointmentId.value)),
+    queryFn: () => fetchMyAppointmentParticipation(requireAppointmentId(appointmentId.value)),
   }
 }

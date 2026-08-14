@@ -73,6 +73,11 @@ async function mountView() {
     history: createMemoryHistory(),
     routes: [
       {
+        path: '/explore',
+        name: 'explore',
+        component: { template: '<div>Explore</div>' },
+      },
+      {
         path: '/explore/places/:placeId',
         name: 'explore-place-detail',
         component: PlaceDetailView,
@@ -134,18 +139,31 @@ describe('PlaceDetailView', () => {
         .findAll('button')
         .find((button) => button.text() === 'Find companions')
         ?.attributes('disabled'),
-    ).toBeDefined()
+    ).toBeUndefined()
   })
 
-  it('keeps Find companions disabled until the Appointment API is available', async () => {
+  it('returns to the Place list from the detail screen', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('button[aria-label="Back to places"]').trigger('click')
+    await flushPromises()
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('explore')
+    expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
+  })
+
+  it('opens the Place appointment list with the Place filter', async () => {
     const { wrapper, router } = await mountView()
 
     const button = wrapper.findAll('button').find((button) => button.text() === 'Find companions')
 
-    expect(button?.attributes('disabled')).toBeDefined()
+    expect(button?.attributes('disabled')).toBeUndefined()
     await button?.trigger('click')
+    await flushPromises()
 
-    expect(router.currentRoute.value.name).toBe('explore-place-detail')
+    expect(router.currentRoute.value.name).toBe('appointment-list')
+    expect(router.currentRoute.value.query).toEqual({ itemId: '42', itemType: 'PLACE' })
   })
 
   it('opens the journey selector from Add to journey', async () => {

@@ -31,6 +31,13 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
 - 커밋 메시지에 `Co-Authored-By` 트레일러를 넣지 않습니다. 기존 이력에도 없습니다.
 - 관련 없는 프론트엔드/백엔드 변경을 한 PR에 섞지 않습니다.
 - **API·환경 변수·배포·공통 계약을 바꾸면 같은 PR에서 관련 문서와 이 파일도 고칩니다.**
+- 성공 `ApiResponse.data`의 런타임 검증은 요청별 `AxiosRequestConfig.responseSchema`로
+  선택합니다. 스키마는 해당 feature의 `api/` 폴더가 소유하고, 공용 계층은 feature를
+  import하지 않습니다. 설정하지 않은 요청은 기존 봉투 해제·인증/CSRF 재시도 동작을
+  그대로 유지합니다.
+- 응답 검증 실패도 `NormalizedApiError`의 `UNKNOWN`으로 정규화합니다. 진단 로그에는
+  URL·method·HTTP 상태와 스키마 issue의 path/code/expected만 남기며 응답 본문·인증정보·
+  개인정보·원본 오류 객체를 출력하지 않습니다.
 - 로그아웃 응답이 불확실할 때는 브라우저 장벽이 보호 경로와 refresh를 함께 차단합니다.
   장벽은 서버 로그아웃 성공 또는 새 로그인 callback 성공에서만 해제합니다.
 

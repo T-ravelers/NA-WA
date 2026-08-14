@@ -1,23 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 
-import {
-  createAppointment,
-  type AppointmentCreateRequest,
-  type AppointmentItemType,
-} from '../api/appointmentApi'
+import type { AppointmentItemType } from '../api/appointmentApi'
 import AppointmentCreateForm from '../components/AppointmentCreateForm.vue'
-import { appointmentKeys } from '../model/appointmentKeys'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const queryClient = useQueryClient()
 
 function readPositiveInteger(value: unknown): number | undefined {
   const raw = Array.isArray(value) ? value[0] : value
@@ -33,26 +26,15 @@ function readItemType(value: unknown): AppointmentItemType | undefined {
 const itemId = computed(() => readPositiveInteger(route.query.itemId))
 const itemType = computed(() => readItemType(route.query.itemType))
 
-const createMutation = useMutation({
-  mutationFn: createAppointment,
-  onSuccess: async (appointment) => {
-    queryClient.setQueryData(appointmentKeys.detail(appointment.appointmentId), appointment)
-    await router.push({
-      name: 'appointment-detail',
-      params: { appointmentId: appointment.appointmentId },
-    })
-  },
-})
-
-const errorMessage = computed(() =>
-  createMutation.error.value === null ? undefined : t('appointment.create.loadFailed'),
-)
-
-function submit(request: AppointmentCreateRequest): void {
-  if (!createMutation.isPending.value) createMutation.mutate(request)
+type AppointmentCreateFormExposed = {
+  goToPreviousStep: () => boolean
 }
 
+const createForm = ref<AppointmentCreateFormExposed | null>(null)
+
 function goBack(): void {
+  if (createForm.value?.goToPreviousStep()) return
+
   if (window.history.length > 1) {
     void router.back()
     return
@@ -78,11 +60,10 @@ function goBack(): void {
     </header>
 
     <AppointmentCreateForm
+      ref="createForm"
       :item-id="itemId"
       :item-type="itemType"
-      :pending="createMutation.isPending.value"
-      :error-message="errorMessage"
-      @submit="submit"
+      payment-unavailable
     />
   </main>
 </template>

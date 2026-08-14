@@ -4,6 +4,7 @@ import pluginVue from 'eslint-plugin-vue'
 import pluginPlaywright from 'eslint-plugin-playwright'
 import pluginVitest from '@vitest/eslint-plugin'
 import skipFormatting from 'eslint-config-prettier/flat'
+import { featureBoundariesPlugin } from './eslint-rules/feature-boundaries.mjs'
 
 export default withVueTs(
   {
@@ -24,6 +25,7 @@ export default withVueTs(
     '**/coverage/**',
     '**/playwright-report/**',
     '**/test-results/**',
+    'eslint-rules/**/*.d.mts',
   ]),
 
   pluginVue.configs['flat/recommended'],
@@ -45,40 +47,22 @@ export default withVueTs(
   {
     name: 'app/feature-boundaries',
     files: ['src/features/**/*.{ts,tsx,vue}'],
+    plugins: {
+      architecture: featureBoundariesPlugin,
+    },
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@/features/*', '@/features/*/**'],
-              allowTypeImports: false,
-              message:
-                'Feature 간 직접 import는 금지합니다. app 주입 또는 shared 계약을 사용하세요.',
-            },
-          ],
-        },
-      ],
+      'architecture/no-cross-feature-imports': 'error',
     },
   },
 
   {
     name: 'app/shared-boundaries',
     files: ['src/shared/**/*.{ts,tsx,vue}'],
+    plugins: {
+      architecture: featureBoundariesPlugin,
+    },
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@/features/*', '@/features/*/**'],
-              allowTypeImports: false,
-              message:
-                'Shared는 Feature를 import할 수 없습니다. Feature 조합은 app에서 처리하세요.',
-            },
-          ],
-        },
-      ],
+      'architecture/no-cross-feature-imports': 'error',
     },
   },
 

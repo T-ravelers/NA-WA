@@ -31,7 +31,7 @@ const appointment = {
   maxMembers: 4,
   currentMemberCount: 2,
   depositAmount: '10000',
-  appointmentStatus: 'COMPLETED' as const,
+  appointmentStatus: 'IN_PROGRESS' as const,
   meetingPlace: 'Seongsu Beauty Lab',
   activityStartAt: '2026-08-08T18:30:00',
   activityEndAt: '2026-08-08T22:00:00',
@@ -118,7 +118,7 @@ describe('AppointmentAttendanceView', () => {
     useAppointmentMemberProfileMock.mockReturnValue(profileQuery)
   })
 
-  it('renders attendance controls with a disabled save action', async () => {
+  it('renders attendance controls with a disabled save action until every member is decided', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Confirm attendance')
@@ -131,12 +131,9 @@ describe('AppointmentAttendanceView', () => {
         .find((button) => button.text() === 'Attendance checked')
         ?.attributes('disabled'),
     ).toBeDefined()
-    expect(wrapper.text()).toContain(
-      'Attendance saving will be available when the API is connected.',
-    )
   })
 
-  it('toggles a pending member to attended locally', async () => {
+  it('keeps member status controls disabled until payment integration is available', async () => {
     const { wrapper } = await mountView()
     const pendingButton = wrapper
       .findAll('button')
@@ -144,10 +141,11 @@ describe('AppointmentAttendanceView', () => {
 
     await pendingButton?.trigger('click')
 
-    expect(wrapper.text()).toContain('Attended')
+    expect(wrapper.text()).toContain('Not attended')
+    expect(pendingButton?.attributes('disabled')).toBeDefined()
   })
 
-  it('keeps the host on the attendance screen until saving is supported', async () => {
+  it('keeps the host on the attendance screen until every member is decided', async () => {
     const { wrapper, router } = await mountView()
 
     expect(router.currentRoute.value.name).toBe('appointment-attendance')
@@ -167,7 +165,7 @@ describe('AppointmentAttendanceView', () => {
     expect(wrapper.text()).not.toContain('Attendance checked')
   })
 
-  it('blocks attendance before the appointment is completed', async () => {
+  it('blocks attendance before the appointment is in progress', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'RECRUITING' })
     const { wrapper } = await mountView()
 

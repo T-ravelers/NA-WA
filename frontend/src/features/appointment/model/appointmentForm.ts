@@ -35,7 +35,7 @@ export interface AppointmentFormErrors {
   joinDeadline?: string
 }
 
-const APPOINTMENT_LANGUAGES: readonly AppointmentLanguage[] = ['en', 'ja', 'zh-CN', 'zh-TW', 'vi']
+const APPOINTMENT_LANGUAGES: readonly AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
 
 function isAppointmentLanguage(value: string): value is AppointmentLanguage {
   return APPOINTMENT_LANGUAGES.includes(value as AppointmentLanguage)

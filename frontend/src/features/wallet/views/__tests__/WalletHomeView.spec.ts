@@ -112,7 +112,7 @@ describe('WalletHomeView', () => {
   it('백엔드에 없는 거래 종류가 와도 항목을 지우지 않는다', async () => {
     fetchWalletHome.mockResolvedValue({
       ...WALLET,
-      recentTransactions: [{ ...WALLET.recentTransactions[0]!, transferType: 'DEPOSIT_HOLD' }],
+      recentTransactions: [{ ...WALLET.recentTransactions![0]!, transferType: 'DEPOSIT_HOLD' }],
     })
 
     const wrapper = await mountLoaded()

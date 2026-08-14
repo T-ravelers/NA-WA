@@ -62,6 +62,22 @@ const title = computed(() =>
 const languageOptions: Array<'ALL' | AppointmentLanguage> = ['ALL', 'en', 'ja', 'zh-TW', 'vi']
 
 function goBack(): void {
+  if (itemId.value !== undefined && itemType.value === 'EVENT') {
+    void router.push({
+      name: 'explore-event-detail',
+      params: { eventId: itemId.value },
+    })
+    return
+  }
+
+  if (itemId.value !== undefined && itemType.value === 'PLACE') {
+    void router.push({
+      name: 'explore-place-detail',
+      params: { placeId: itemId.value },
+    })
+    return
+  }
+
   if (window.history.length > 1) {
     void router.back()
     return

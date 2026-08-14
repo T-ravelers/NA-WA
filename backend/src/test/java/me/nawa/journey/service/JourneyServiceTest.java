@@ -619,6 +619,8 @@ class JourneyServiceTest {
             .getPlaceDetail());
         assertNotNull(result.getTimeline().get(1).getItems().get(0)
             .getAppointment());
+        assertEquals(900L, result.getTimeline().get(1).getItems().get(0)
+            .getAppointment().getAppointmentId());
     }
 
     @Test

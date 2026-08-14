@@ -93,6 +93,11 @@ async function mountView() {
     history: createMemoryHistory(),
     routes: [
       {
+        path: '/explore',
+        name: 'explore',
+        component: { template: '<div>Explore</div>' },
+      },
+      {
         path: '/explore/events/:eventId',
         name: 'explore-event-detail',
         component: EventDetailView,
@@ -142,6 +147,17 @@ describe('EventDetailView', () => {
     expect(wrapper.text()).toContain('Seoul · Seocho-gu')
   })
 
+  it('returns to the Event list from the detail screen', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('button[aria-label="Back to events"]').trigger('click')
+    await flushPromises()
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('explore')
+    expect(router.currentRoute.value.query).toEqual({ tab: 'events' })
+  })
+
   it('adds the Event to the selected journey for the chosen date', async () => {
     const { wrapper, router } = await mountView()
 
@@ -172,14 +188,16 @@ describe('EventDetailView', () => {
     expect(router.currentRoute.value.name).toBe('journey-detail')
   })
 
-  it('keeps Find companions disabled until the Appointment API is available', async () => {
+  it('opens the Event appointment list with the Event filter', async () => {
     const { wrapper, router } = await mountView()
 
     const button = wrapper.findAll('button').find((button) => button.text() === 'Find companions')
 
-    expect(button?.attributes('disabled')).toBeDefined()
+    expect(button?.attributes('disabled')).toBeUndefined()
     await button?.trigger('click')
+    await flushPromises()
 
-    expect(router.currentRoute.value.name).toBe('explore-event-detail')
+    expect(router.currentRoute.value.name).toBe('appointment-list')
+    expect(router.currentRoute.value.query).toEqual({ itemId: '42', itemType: 'EVENT' })
   })
 })
