@@ -13,7 +13,26 @@ describe('money formatters', () => {
     expect(formatMoney(null, 'en-US')).toBe('')
     expect(formatMoney(undefined, 'en-US')).toBe('')
     expect(formatMoney('not-a-number', 'en-US')).toBe('')
+    expect(formatMoney('not-a-number', 'en-US', { style: 'currency', currency: 'USD' })).toBe('')
     expect(formatKrw(null)).toBe('')
+  })
+
+  it('applies signDisplay to exact decimal strings after rounding', () => {
+    expect(formatGroupedDecimal('1234.5', 'en-US', { signDisplay: 'exceptZero' })).toBe('+1,234.5')
+    expect(formatGroupedDecimal('-1234.5', 'en-US', { signDisplay: 'never' })).toBe('1,234.5')
+    expect(
+      formatGroupedDecimal('0.004', 'en-US', {
+        maximumFractionDigits: 2,
+        signDisplay: 'exceptZero',
+      }),
+    ).toBe('0.00')
+    expect(
+      formatMoney('1234.5', 'en-US', {
+        style: 'currency',
+        currency: 'USD',
+        signDisplay: 'exceptZero',
+      }),
+    ).toBe('+$1,234.50')
   })
 
   it('groups wallet decimal strings without converting through Number', () => {

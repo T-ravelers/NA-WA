@@ -73,6 +73,17 @@ function roundDecimal(
   }
 }
 
+function resolveDecimalSign(
+  negative: boolean,
+  zero: boolean,
+  signDisplay: Intl.NumberFormatOptions['signDisplay'] = 'auto',
+): string {
+  if (signDisplay === 'never') return ''
+  if (signDisplay === 'always') return negative ? '-' : '+'
+  if (signDisplay === 'exceptZero') return zero ? '' : negative ? '-' : '+'
+  return negative ? '-' : ''
+}
+
 function formatExactDecimal(
   value: string,
   locale: string,
@@ -93,7 +104,8 @@ function formatExactDecimal(
   const fraction = rounded.fraction.padEnd(minimumFractionDigits, '0')
   const { decimal } = getNumberSymbols(locale)
   const groupedInteger = groupInteger(rounded.integer, locale, options.useGrouping !== false)
-  const sign = negative ? '-' : options.signDisplay === 'always' ? '+' : ''
+  const zero = rounded.integer === '0' && !/[1-9]/.test(fraction)
+  const sign = resolveDecimalSign(negative, zero, options.signDisplay)
 
   return `${sign}${groupedInteger}${fraction ? decimal + fraction : ''}`
 }
@@ -120,7 +132,9 @@ function formatExactCurrency(
     minimumFractionDigits: resolved.minimumFractionDigits,
     useGrouping: resolved.useGrouping,
   })
-  const parts = formatter.formatToParts(negative ? -0 : 0)
+  const zero = !/[1-9]/.test(numberText)
+  const templateValue = zero ? (negative ? -0 : 0) : negative ? -1 : 1
+  const parts = formatter.formatToParts(templateValue)
   const numericPartTypes = new Set(['integer', 'group', 'decimal', 'fraction'])
   const firstNumericPart = parts.findIndex((part) => numericPartTypes.has(part.type))
   let lastNumericPart = -1
@@ -155,8 +169,9 @@ export function formatMoney(
 ): string {
   if (value === null || value === undefined) return ''
   if (typeof value === 'number') return formatFiniteNumber(value, locale, options)
+  if (!isDecimalString(value)) return ''
 
-  if (options.style === 'currency' && typeof value === 'string') {
+  if (options.style === 'currency') {
     return formatExactCurrency(value, locale, options)
   }
   if (options.style !== undefined && options.style !== 'decimal') return ''
@@ -190,7 +205,6 @@ export function formatCurrency(
   options: Omit<Intl.NumberFormatOptions, 'style' | 'currency'> = {},
 ): string {
   if (value === null || value === undefined) return ''
-  if (typeof value === 'string' && !isDecimalString(value)) return ''
 
   return formatMoney(value, locale, {
     ...options,
