@@ -99,20 +99,11 @@ export interface QrPaymentStatusResponse {
 export const qrPaymentKeys = {
   all: ['wallet', 'qr'] as const,
   active: () => [...qrPaymentKeys.all, 'active'] as const,
-  preview: (qrToken: string, amount: number, spendingScope: QrPaymentSpendingScope) =>
-    [...qrPaymentKeys.all, 'preview', qrToken, amount, spendingScope] as const,
+  preview: (
+    qrToken: string,
+    amount: number,
+    spendingScope: QrPaymentSpendingScope,
+    appointmentId: number | null,
+  ) => [...qrPaymentKeys.all, 'preview', qrToken, amount, spendingScope, appointmentId] as const,
   status: (transferId: number) => [...qrPaymentKeys.all, 'status', transferId] as const,
 }
-
-export const ACTIVE_APPOINTMENTS = [
-  {
-    id: 'seoul-night-tour',
-    name: 'Seoul Night Tour',
-    period: 'Aug 10–12',
-  },
-  {
-    id: 'seoul-foodie-week',
-    name: 'Seoul Foodie Week',
-    period: 'Aug 14–18',
-  },
-] as const

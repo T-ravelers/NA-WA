@@ -230,8 +230,9 @@ export default {
       activeAppointments: 'Current appointments',
       activeAppointmentsHint: 'Choose the appointment this expense belongs to.',
       selectAppointment: 'Select an appointment to continue.',
-      sharedUnavailable:
-        'Shared expenses need a linked appointment, which is not supported yet. Choose personal to pay.',
+      appointmentsLoading: 'Loading your appointments...',
+      appointmentsError: 'We could not load your appointments. Please try again.',
+      appointmentsEmpty: 'You have no ongoing appointments to link this expense to.',
       noSessionTitle: 'No QR code scanned yet',
       noSessionDescription: 'Scan a payment QR code to see its details here.',
       cancel: 'Cancel',
