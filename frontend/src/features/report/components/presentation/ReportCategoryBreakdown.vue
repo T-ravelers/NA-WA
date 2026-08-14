@@ -90,7 +90,10 @@ const isEmpty = computed(() => items.length === 0)
       {{ heading }}
     </h2>
 
-    <AppCard padding="lg">
+    <AppCard
+      padding="lg"
+      class="min-h-49"
+    >
       <StateEmpty
         v-if="isEmpty"
         :title="emptyTitle"
@@ -99,9 +102,9 @@ const isEmpty = computed(() => items.length === 0)
 
       <div
         v-else
-        class="flex items-center gap-5"
+        class="flex min-h-full items-center gap-5"
       >
-        <div class="relative size-32 shrink-0">
+        <div class="relative size-33 shrink-0">
           <svg
             aria-hidden="true"
             viewBox="0 0 42 42"
@@ -146,17 +149,18 @@ const isEmpty = computed(() => items.length === 0)
           </div>
         </div>
 
-        <ul class="flex min-w-0 flex-1 flex-col gap-2">
+        <ul class="flex min-w-0 flex-1 flex-col gap-3">
           <li
             v-for="row in rows"
             :key="row.key"
             class="flex items-center gap-2 text-caption tabular-nums"
           >
             <ReportSeriesMarker :index="row.index" />
-            <span class="min-w-0 flex-1 truncate text-ink-2">
-              {{ row.label }} {{ row.percentText }}
+            <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span class="truncate text-ink-2">{{ row.label }}</span>
+              <span class="text-micro text-ink-3">{{ row.percentText }}</span>
             </span>
-            <span class="text-ink">{{ row.amountText }}</span>
+            <span class="shrink-0 text-right text-ink">{{ row.amountText }}</span>
           </li>
         </ul>
       </div>

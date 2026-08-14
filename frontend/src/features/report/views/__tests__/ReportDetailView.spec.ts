@@ -101,7 +101,7 @@ describe('ReportDetailView', () => {
     const { wrapper } = await mountView()
 
     expect(fetchReport).toHaveBeenCalledWith(100)
-    expect(wrapper.get('h1').text()).toBe('Final report')
+    expect(wrapper.get('h1').text()).toBe('Report')
     expect(wrapper.text()).toContain('Jeju Night Market · EVENT · ADDED')
     expect(wrapper.text()).toContain('₩1,284,500')
     expect(wrapper.text()).toContain('78%')
@@ -112,6 +112,14 @@ describe('ReportDetailView', () => {
     expect(wrapper.find('button[aria-label="Share"]').exists()).toBe(false)
     expect(wrapper.findAll('button').some((button) => button.text() === 'Group')).toBe(false)
     expect(wrapper.text()).not.toContain('similar travelers')
+    expect(wrapper.findAll('h2').map((heading) => heading.text())).toEqual([
+      'Analysis',
+      'By category',
+      'Spending trend',
+      'Journey snapshot',
+      'Saved itinerary',
+    ])
+    expect(wrapper.get('button[aria-label="Back to reports"]').text()).toBe('')
   })
 
   it('keeps legacy reports readable when analytics are absent', async () => {
@@ -121,6 +129,11 @@ describe('ReportDetailView', () => {
     expect(wrapper.text()).toContain('Jeju Island')
     expect(wrapper.text()).toContain('Spending analysis unavailable')
     expect(wrapper.text()).toContain('created before spending analytics were available')
+    expect(wrapper.findAll('h2').map((heading) => heading.text())).toEqual([
+      'Analysis',
+      'Journey snapshot',
+      'Saved itinerary',
+    ])
   })
 
   it('shows the explicit zero-spending branch', async () => {

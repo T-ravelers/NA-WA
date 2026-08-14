@@ -56,6 +56,7 @@ async function mountWithRouter(path: string, reportOptions: ReportIntegrationOpt
     history: createMemoryHistory(),
     routes: [
       { path: '/journeys/:tripId', name: 'journey-detail', component: JourneyDetailView },
+      { path: '/explore', name: 'explore', component: { template: '<div>Explore</div>' } },
       { path: '/reports', name: 'report-list', component: { template: '<div>Reports</div>' } },
       {
         path: '/reports/:reportId',
@@ -93,7 +94,7 @@ describe('JourneyDetailView', () => {
     fetchJourneyTimeline.mockReset()
   })
 
-  it('shows journey details and the empty itinerary state', async () => {
+  it('shows journey details and a day skeleton for an empty itinerary', async () => {
     fetchJourney.mockResolvedValue(journey)
     fetchJourneyTimeline.mockResolvedValue({ tripId: 7, timeline: [] })
 
@@ -104,7 +105,14 @@ describe('JourneyDetailView', () => {
     expect(wrapper.get('h1').text()).toBe('Seoul and Busan')
     expect(wrapper.text()).not.toContain('Visit regions')
     expect(wrapper.text()).not.toContain('No visit regions were added.')
-    expect(wrapper.text()).toContain('No itinerary yet')
+
+    // 2026-08-10 ~ 2026-08-12. 항목이 하나도 없어도 날짜가 전부 보인다.
+    // `time`은 JourneySummary도 쓰므로 날짜 블록은 추가 버튼 수로 센다.
+    expect(wrapper.text()).toContain('Day 1')
+    expect(wrapper.text()).toContain('Day 3')
+    expect(wrapper.text()).not.toContain('Day 4')
+    expect(wrapper.findAll('a[aria-label^="Add event on"]')).toHaveLength(3)
+    expect(wrapper.findAll('a[aria-label^="Add place on"]')).toHaveLength(3)
   })
 
   it('shows no report entry for an ongoing journey', async () => {
