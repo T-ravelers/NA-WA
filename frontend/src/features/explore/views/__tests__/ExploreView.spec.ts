@@ -1,6 +1,5 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { createPinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -52,7 +51,7 @@ async function mountView(path = '/explore') {
 
   const wrapper = mount(ExploreView, {
     global: {
-      plugins: [i18n, router, createPinia(), [VueQueryPlugin, { queryClient }]],
+      plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
     },
   })
 

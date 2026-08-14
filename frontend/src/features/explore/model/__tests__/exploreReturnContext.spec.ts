@@ -146,6 +146,22 @@ describe('useExploreReturnContextStore', () => {
     expect(restored.returnTo).toBeNull()
   })
 
+  it('drops the one-shot context without handing back a destination', () => {
+    const store = useExploreReturnContextStore()
+    store.capture({ journeyId: '7', startDate: '2026-09-03', endDate: '2026-09-03' })
+
+    store.discardReturn()
+
+    expect(store.visitDate).toBeNull()
+    expect(store.returnTo).toBeNull()
+    expect(store.journeyId).toBe(7)
+    expect(JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? 'null')).toEqual({
+      journeyId: 7,
+      visitDate: null,
+      returnTo: null,
+    })
+  })
+
   it('clears the stored context', () => {
     const store = useExploreReturnContextStore()
     store.capture({ journeyId: '7', startDate: '2026-09-03', endDate: '2026-09-03' })

@@ -148,11 +148,25 @@ export const useExploreReturnContextStore = defineStore('explore-return-context'
   function consumeReturn(): ExploreReturnLocation | null {
     const destination = returnTo.value
 
+    endReturnFlow()
+
+    return destination
+  }
+
+  /**
+   * 복귀하지 않고 흐름이 끝났을 때 일회성 맥락을 버린다.
+   *
+   * 담지 않고 이탈한 뒤 나중에 Discover로 그냥 들어오면 지난 날짜가 다시 프리필된다.
+   * 사용자가 눈치채지 못한 채 엉뚱한 날짜에 담을 수 있으므로 흐름이 끝난 자리에서 버린다.
+   */
+  function discardReturn(): void {
+    endReturnFlow()
+  }
+
+  function endReturnFlow(): void {
     visitDate.value = null
     returnTo.value = null
     persist()
-
-    return destination
   }
 
   function clear(): void {
@@ -162,5 +176,14 @@ export const useExploreReturnContextStore = defineStore('explore-return-context'
     persist()
   }
 
-  return { journeyId, visitDate, returnTo, capture, setJourneyId, consumeReturn, clear }
+  return {
+    journeyId,
+    visitDate,
+    returnTo,
+    capture,
+    setJourneyId,
+    consumeReturn,
+    discardReturn,
+    clear,
+  }
 })
