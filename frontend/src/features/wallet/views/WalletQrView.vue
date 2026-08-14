@@ -1,99 +1,127 @@
 <script setup lang="ts">
-import { IconChevronLeft, IconInfoCircle } from '@tabler/icons-vue'
-import { computed } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { IconChevronLeft } from '@tabler/icons-vue'
+import QRCode from 'qrcode'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import StateEmpty from '@/shared/ui/StateEmpty.vue'
+import StateError from '@/shared/ui/StateError.vue'
+import StateLoading from '@/shared/ui/StateLoading.vue'
 
-import { formatKrw } from '../model/qrPayment'
-import { useQrRequestDraftStore } from '../model/qrRequestDraft'
+import { listActiveQrPayments } from '../api/qrPaymentApi'
+import { formatKrw, qrPaymentKeys, type QrPaymentCreateResponse } from '../model/qrPayment'
+import { parseServerDateTime } from '../model/walletHome'
 import { useWalletHome } from '../model/walletQueries'
-
-const QR_SIZE = 21
-
-/**
- * 실제 QR 토큰 API가 연결되기 전까지 화면의 형태를 확인할 수 있는 미리보기 매트릭스다.
- * 세 모서리의 파인더 패턴은 실제 QR과 같은 구조로 만들고, 나머지는 고정된 규칙으로
- * 채워서 새로고침할 때마다 모양이 바뀌지 않게 한다. API 연결 시 이 값만 서버 응답으로
- * 교체하면 된다.
- */
-function createQrCells(): boolean[] {
-  const cells = Array.from({ length: QR_SIZE * QR_SIZE }, () => false)
-  const reserved = Array.from({ length: QR_SIZE * QR_SIZE }, () => false)
-  const indexOf = (x: number, y: number): number => y * QR_SIZE + x
-
-  const reserve = (x: number, y: number, active = false): void => {
-    if (x < 0 || y < 0 || x >= QR_SIZE || y >= QR_SIZE) return
-
-    const index = indexOf(x, y)
-    reserved[index] = true
-    cells[index] = active
-  }
-
-  const drawFinder = (originX: number, originY: number): void => {
-    for (let y = -1; y <= 7; y += 1) {
-      for (let x = -1; x <= 7; x += 1) {
-        reserve(originX + x, originY + y)
-      }
-    }
-
-    for (let y = 0; y < 7; y += 1) {
-      for (let x = 0; x < 7; x += 1) {
-        const isBorder = x === 0 || x === 6 || y === 0 || y === 6
-        const isCore = x >= 2 && x <= 4 && y >= 2 && y <= 4
-        reserve(originX + x, originY + y, isBorder || isCore)
-      }
-    }
-  }
-
-  drawFinder(0, 0)
-  drawFinder(QR_SIZE - 7, 0)
-  drawFinder(0, QR_SIZE - 7)
-
-  for (let position = 8; position < QR_SIZE - 8; position += 1) {
-    reserve(position, 6, position % 2 === 0)
-    reserve(6, position, position % 2 === 0)
-  }
-
-  for (let y = 0; y < QR_SIZE; y += 1) {
-    for (let x = 0; x < QR_SIZE; x += 1) {
-      const index = indexOf(x, y)
-      if (!reserved[index]) {
-        cells[index] = (x * 17 + y * 31 + x * y + ((x + y) % 5)) % 7 < 3
-      }
-    }
-  }
-
-  return cells
-}
 
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const walletQuery = useWalletHome()
-const qrRequestDraft = useQrRequestDraftStore()
-const qrCells = createQrCells()
+const queryClient = useQueryClient()
+
+const activeQrQuery = useQuery({
+  queryKey: qrPaymentKeys.active(),
+  queryFn: listActiveQrPayments,
+})
+
+const now = ref(Date.now())
+const nowTimer = setInterval(() => {
+  now.value = Date.now()
+}, 1000)
+
+let expiryRefetchTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 목록 중 가장 빨리 만료되는 QR 시점에 맞춰 재조회한다. 화면을 열어둔 채로 TTL이 지나도 만료된 QR이 남지 않게. */
+function scheduleExpiryRefetch(list: QrPaymentCreateResponse[]): void {
+  if (expiryRefetchTimer !== null) {
+    clearTimeout(expiryRefetchTimer)
+    expiryRefetchTimer = null
+  }
+
+  const expiryTimes = list
+    .map((qr) => parseServerDateTime(qr.expiresAt))
+    .filter((date): date is Date => date !== null)
+    .map((date) => date.getTime())
+
+  if (expiryTimes.length === 0) return
+
+  const delay = Math.max(Math.min(...expiryTimes) - Date.now(), 0)
+
+  expiryRefetchTimer = setTimeout(() => {
+    void queryClient.invalidateQueries({ queryKey: qrPaymentKeys.active() })
+  }, delay)
+}
+
+onUnmounted(() => {
+  clearInterval(nowTimer)
+  if (expiryRefetchTimer !== null) clearTimeout(expiryRefetchTimer)
+})
 
 const isMyQrActive = computed(() => route.name === 'wallet-qr')
 
-const qrRequest = computed(() => {
-  const draft = qrRequestDraft.draft
-  const payerEntersAmount = draft?.payerEntersAmount ?? false
+/**
+ * `now` 기준으로 만료된 QR을 걸러낸다. 재조회 타이머가 정확히 걸려도, 만료 경계에서
+ * 서버가 같은 QR을 한 번 더 "아직 활성"으로 돌려주면 TanStack Query의 structural
+ * sharing이 이전 데이터 참조를 그대로 유지해 재조회 스케줄이 다시 안 걸릴 수 있다.
+ * 그 경우에도 화면은 이 필터로 정확하게 유지된다 — 재조회 성공 여부에 기대지 않는다.
+ */
+const activeQrList = computed(() =>
+  (activeQrQuery.data.value ?? []).filter((qr) => {
+    const expiresAt = parseServerDateTime(qr.expiresAt)
 
-  return {
-    amount: payerEntersAmount ? null : (draft?.amount ?? 18_500),
-    memo: draft?.memo ?? 'Seoul Night Tour',
-    payerEntersAmount,
-  }
+    return expiresAt === null || expiresAt.getTime() > now.value
+  }),
+)
+
+// 재조회 스케줄은 원본 쿼리 데이터를 지켜본다. 화면 필터(activeQrList)는 매초 다시
+// 계산되므로, 여기서 그걸 지켜보면 값이 안 바뀌어도 매초 타이머를 다시 걸게 된다.
+watch(() => activeQrQuery.data.value ?? [], scheduleExpiryRefetch, { immediate: true })
+
+/** 방금 만든 QR(목록의 맨 앞)을 기본으로 보여주고, 다른 항목을 탭하면 그걸로 바꾼다. */
+const selectedQrToken = ref<string | null>(null)
+
+const selectedQr = computed<QrPaymentCreateResponse | null>(() => {
+  const list = activeQrList.value
+
+  if (list.length === 0) return null
+
+  return (
+    list.find((qr) => qr.qrToken === selectedQrToken.value) ?? (list[0] as QrPaymentCreateResponse)
+  )
 })
 
-const displayAmount = computed(() =>
-  qrRequest.value.payerEntersAmount || qrRequest.value.amount === null
-    ? t('wallet.qr.amountEnteredByPayer')
-    : formatKrw(qrRequest.value.amount),
+const otherQrs = computed(() =>
+  activeQrList.value.filter((qr) => qr.qrToken !== selectedQr.value?.qrToken),
 )
+
+const displayAmount = computed(() => {
+  const amount = selectedQr.value?.amount
+
+  return amount === undefined || amount === null
+    ? t('wallet.qr.amountEnteredByPayer')
+    : formatKrw(amount)
+})
+
+const expiresAtLabel = computed(() => {
+  const expiresAt = selectedQr.value?.expiresAt
+
+  if (expiresAt === undefined) return null
+
+  const parsedExpiresAt = parseServerDateTime(expiresAt)
+
+  if (parsedExpiresAt === null) return null
+
+  const remainingSeconds = Math.max(0, Math.ceil((parsedExpiresAt.getTime() - now.value) / 1000))
+  const minutes = Math.floor(remainingSeconds / 60)
+  const seconds = remainingSeconds % 60
+  const formattedTime = `${minutes}:${String(seconds).padStart(2, '0')}`
+
+  return t('wallet.qr.validity', { time: formattedTime })
+})
 
 const balanceLabel = computed(() => {
   const balance = walletQuery.data.value?.balance
@@ -106,6 +134,27 @@ const balanceLabel = computed(() => {
 
   return t('wallet.qr.balance', { amount: formattedBalance })
 })
+
+const qrImageSrc = ref<string | null>(null)
+
+watch(
+  () => selectedQr.value?.qrToken,
+  (qrToken) => {
+    if (qrToken === undefined) {
+      qrImageSrc.value = null
+      return
+    }
+
+    void QRCode.toDataURL(qrToken, { margin: 1, width: 320 }).then((dataUrl) => {
+      qrImageSrc.value = dataUrl
+    })
+  },
+  { immediate: true },
+)
+
+const selectQr = (qrToken: string): void => {
+  selectedQrToken.value = qrToken
+}
 
 const goBack = (): void => {
   void router.push({ name: 'wallet' })
@@ -174,72 +223,103 @@ const createNewQr = (): void => {
         {{ t('wallet.qr.heading') }}
       </h2>
 
-      <AppCard
-        padding="lg"
-        class="text-center"
-      >
-        <p class="text-body-sm text-ink-2">{{ t('wallet.qr.requestLabel') }}</p>
+      <StateLoading
+        v-if="activeQrQuery.isPending.value"
+        class="mt-4"
+      />
+
+      <StateError
+        v-else-if="activeQrQuery.isError.value"
+        :description="t('wallet.qr.listError')"
+        @retry="activeQrQuery.refetch"
+      />
+
+      <template v-else>
+        <AppCard
+          v-if="selectedQr !== null"
+          padding="lg"
+          class="text-center"
+        >
+          <p class="text-body-sm text-ink-2">{{ t('wallet.qr.requestLabel') }}</p>
+
+          <img
+            v-if="qrImageSrc !== null"
+            :src="qrImageSrc"
+            :alt="t('wallet.qr.imageLabel')"
+            class="mx-auto mt-4 size-52 rounded-sm bg-paper-fill p-3"
+          />
+
+          <p
+            v-if="expiresAtLabel !== null"
+            class="mt-4 text-body-sm font-semibold text-ink-2"
+          >
+            {{ expiresAtLabel }}
+          </p>
+
+          <dl class="mt-4 divide-y divide-hairline border-t border-hairline text-left">
+            <div class="flex items-center justify-between gap-4 py-3">
+              <dt class="text-body-sm text-ink-2">{{ t('wallet.qr.amount') }}</dt>
+              <dd class="text-right text-body-sm font-semibold">{{ displayAmount }}</dd>
+            </div>
+            <div class="flex items-center justify-between gap-4 py-3 last:pb-0">
+              <dt class="text-body-sm text-ink-2">{{ t('wallet.qr.memo') }}</dt>
+              <dd class="max-w-[65%] text-right text-body-sm font-semibold">
+                {{ selectedQr.memo || t('wallet.qr.noMemo') }}
+              </dd>
+            </div>
+          </dl>
+
+          <p class="mt-3 text-caption text-ink-3">
+            {{ balanceLabel }}
+          </p>
+        </AppCard>
+
+        <StateEmpty
+          v-else
+          :title="t('wallet.qr.emptyTitle')"
+          :description="t('wallet.qr.emptyDescription')"
+          :action-label="t('wallet.qr.createNew')"
+          @action="createNewQr"
+        />
 
         <div
-          class="mx-auto mt-4 size-52 rounded-sm bg-paper-fill p-3"
-          role="img"
-          :aria-label="t('wallet.qr.imageLabel')"
+          v-if="otherQrs.length > 0"
+          class="mt-3"
         >
-          <div
-            class="grid size-full overflow-hidden"
-            :style="{ gridTemplateColumns: `repeat(${QR_SIZE}, minmax(0, 1fr))` }"
-            aria-hidden="true"
-          >
-            <span
-              v-for="(active, index) in qrCells"
-              :key="index"
-              class="aspect-square"
-              :class="active ? 'bg-canvas' : 'bg-paper-fill'"
-            />
-          </div>
+          <h3 class="text-caption text-ink-3">{{ t('wallet.qr.otherActive') }}</h3>
+          <ul class="mt-2 space-y-2">
+            <li
+              v-for="qr in otherQrs"
+              :key="qr.qrToken"
+            >
+              <button
+                type="button"
+                class="flex w-full items-center justify-between gap-3 rounded-sm border border-hairline px-3 py-3 text-left transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                @click="selectQr(qr.qrToken)"
+              >
+                <span class="text-body-sm font-semibold">
+                  {{ qr.memo || t('wallet.qr.noMemo') }}
+                </span>
+                <span class="shrink-0 text-body-sm text-ink-2">
+                  {{
+                    qr.amount === null ? t('wallet.qr.amountEnteredByPayer') : formatKrw(qr.amount)
+                  }}
+                </span>
+              </button>
+            </li>
+          </ul>
         </div>
 
-        <p class="mt-4 text-body-sm font-semibold text-ink-2">
-          {{ t('wallet.qr.validity') }}
-        </p>
-
-        <dl class="mt-4 divide-y divide-hairline border-t border-hairline text-left">
-          <div class="flex items-center justify-between gap-4 py-3">
-            <dt class="text-body-sm text-ink-2">{{ t('wallet.qr.amount') }}</dt>
-            <dd class="text-right text-body-sm font-semibold">{{ displayAmount }}</dd>
-          </div>
-          <div class="flex items-center justify-between gap-4 py-3 last:pb-0">
-            <dt class="text-body-sm text-ink-2">{{ t('wallet.qr.memo') }}</dt>
-            <dd class="max-w-[65%] text-right text-body-sm font-semibold">
-              {{ qrRequest.memo || t('wallet.qr.noMemo') }}
-            </dd>
-          </div>
-        </dl>
-
-        <p class="mt-3 text-caption text-ink-3">
-          {{ balanceLabel }}
-        </p>
-      </AppCard>
-
-      <div
-        class="mt-3 flex items-center gap-2 rounded-xs bg-surface-2 px-3 py-2 text-caption text-ink-2"
-      >
-        <IconInfoCircle
-          :size="16"
-          :stroke-width="1.75"
-          aria-hidden="true"
-        />
-        <p>{{ t('wallet.qr.sandboxNotice') }}</p>
-      </div>
-
-      <AppButton
-        block
-        variant="secondary"
-        class="mt-3"
-        @click="createNewQr"
-      >
-        {{ t('wallet.qr.createNew') }}
-      </AppButton>
+        <AppButton
+          v-if="selectedQr !== null"
+          block
+          variant="secondary"
+          class="mt-3"
+          @click="createNewQr"
+        >
+          {{ t('wallet.qr.createNew') }}
+        </AppButton>
+      </template>
     </section>
   </main>
 </template>

@@ -18,6 +18,7 @@ interface Props {
   currencySymbol?: string
   error?: string
   helper?: string
+  placeholder?: string
 }
 
 const {
@@ -26,6 +27,7 @@ const {
   currencySymbol = '₩',
   error = undefined,
   helper = undefined,
+  placeholder = undefined,
 } = defineProps<Props>()
 
 const emit = defineEmits<{ 'update:modelValue': [value: number | null] }>()
@@ -79,9 +81,10 @@ function handleInput(event: Event): void {
         type="text"
         inputmode="numeric"
         :value="displayValue"
+        :placeholder="placeholder"
         :aria-invalid="hasError"
         :aria-describedby="message === undefined ? undefined : messageId"
-        class="min-w-0 flex-1 bg-transparent text-right text-data-lg text-ink outline-none"
+        class="min-w-0 flex-1 bg-transparent text-right text-data-lg text-ink outline-none placeholder:text-ink-3"
         @input="handleInput"
       />
     </div>

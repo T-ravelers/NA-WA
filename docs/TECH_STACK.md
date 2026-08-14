@@ -106,6 +106,10 @@ test와 build를 실행합니다. Vercel은 프론트엔드 배포를 담당하�
 품질 검증을 담당합니다. 같은 프론트엔드 배포를 두 시스템에서 중복 실행하지
 마세요.
 
+백엔드 컨테이너는 `TZ=Asia/Seoul`로 고정되어 있습니다(`backend/Dockerfile`).
+`LocalDateTime.now()`가 컨테이너 기본값인 UTC가 아니라 서비스 기준 시간대로
+찍히도록 하기 위함이며, JDBC URL의 `serverTimezone=Asia/Seoul`과 짝을 맞춥니다.
+
 ## 아직 구현하지 않았거나 정리할 항목
 
 - 제품 범위에는 채팅과 WebSocket/STOMP 기능이 없습니다.

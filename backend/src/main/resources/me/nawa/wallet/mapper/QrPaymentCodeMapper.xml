@@ -29,6 +29,27 @@
                )
     </insert>
 
+    <select id="findActiveByPayeeWalletId" resultType="me.nawa.wallet.domain.QrPaymentCode">
+        SELECT
+            qr_payment_code_id,
+            payee_wallet_id,
+            completed_transfer_id,
+            qr_token,
+            amount,
+            memo,
+            payment_status,
+            expires_at,
+            completed_at,
+            created_at,
+            updated_at
+        FROM qr_payment_codes
+        WHERE payee_wallet_id = #{payeeWalletId}
+          AND payment_status = 'ACTIVE'
+          AND expires_at &gt; #{now}
+          AND deleted_at IS NULL
+        ORDER BY created_at DESC
+    </select>
+
     <select id="findResolveTargetByToken" resultType="me.nawa.wallet.domain.QrPaymentResolveTarget">
         SELECT
             q.qr_payment_code_id,
