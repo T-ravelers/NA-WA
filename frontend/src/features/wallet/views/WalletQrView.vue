@@ -63,9 +63,23 @@ onUnmounted(() => {
 
 const isMyQrActive = computed(() => route.name === 'wallet-qr')
 
-const activeQrList = computed(() => activeQrQuery.data.value ?? [])
+/**
+ * `now` 기준으로 만료된 QR을 걸러낸다. 재조회 타이머가 정확히 걸려도, 만료 경계에서
+ * 서버가 같은 QR을 한 번 더 "아직 활성"으로 돌려주면 TanStack Query의 structural
+ * sharing이 이전 데이터 참조를 그대로 유지해 재조회 스케줄이 다시 안 걸릴 수 있다.
+ * 그 경우에도 화면은 이 필터로 정확하게 유지된다 — 재조회 성공 여부에 기대지 않는다.
+ */
+const activeQrList = computed(() =>
+  (activeQrQuery.data.value ?? []).filter((qr) => {
+    const expiresAt = parseServerDateTime(qr.expiresAt)
 
-watch(activeQrList, scheduleExpiryRefetch, { immediate: true })
+    return expiresAt === null || expiresAt.getTime() > now.value
+  }),
+)
+
+// 재조회 스케줄은 원본 쿼리 데이터를 지켜본다. 화면 필터(activeQrList)는 매초 다시
+// 계산되므로, 여기서 그걸 지켜보면 값이 안 바뀌어도 매초 타이머를 다시 걸게 된다.
+watch(() => activeQrQuery.data.value ?? [], scheduleExpiryRefetch, { immediate: true })
 
 /** 방금 만든 QR(목록의 맨 앞)을 기본으로 보여주고, 다른 항목을 탭하면 그걸로 바꾼다. */
 const selectedQrToken = ref<string | null>(null)

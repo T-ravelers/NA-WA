@@ -1,6 +1,6 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
@@ -17,6 +17,18 @@ vi.mock('../../api/qrPaymentApi', () => ({
   listActiveQrPayments: vi.fn(),
 }))
 
+/** 오프셋 없는 KST 문자열을 만든다. `parseServerDateTime`이 이 형식을 KST로 해석한다. */
+function toNaiveKstString(date: Date): string {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
+
+  return kst.toISOString().slice(0, 19)
+}
+
+/** 테스트가 언제 실행되든 항상 미래인 만료 시각. `now` 기준 만료 필터에 걸리지 않는다. */
+function futureExpiresAt(msFromNow: number): string {
+  return toNaiveKstString(new Date(Date.now() + msFromNow))
+}
+
 const seoulFoodTour = {
   qrPaymentCodeId: 1,
   qrToken: 'tok-abc',
@@ -24,7 +36,7 @@ const seoulFoodTour = {
   memo: 'Seoul Food Tour',
   status: 'ACTIVE',
   currencyCode: 'KRW',
-  expiresAt: '2026-08-13T14:32:00',
+  expiresAt: futureExpiresAt(5 * 60_000),
 }
 
 const payerEntersAmount = {
@@ -34,7 +46,7 @@ const payerEntersAmount = {
   memo: null,
   status: 'ACTIVE',
   currencyCode: 'KRW',
-  expiresAt: '2026-08-13T14:33:00',
+  expiresAt: futureExpiresAt(6 * 60_000),
 }
 
 function createTestRouter(): Router {
@@ -90,6 +102,10 @@ describe('WalletQrView', () => {
     vi.mocked(listActiveQrPayments).mockResolvedValue([])
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('shows an empty state and the current balance when no QR is active', async () => {
     const { wrapper } = await mountView()
     await flushPromises()
@@ -140,6 +156,47 @@ describe('WalletQrView', () => {
 
     const image = wrapper.get('img')
     expect(image.attributes('src')).toMatch(/^data:image\/png;base64,/)
+  })
+
+  it('refetches and drops a QR once its scheduled expiry timer fires', async () => {
+    vi.useFakeTimers()
+
+    const expiringSoon = { ...seoulFoodTour, expiresAt: futureExpiresAt(5_000) }
+    vi.mocked(listActiveQrPayments).mockResolvedValueOnce([expiringSoon])
+    vi.mocked(listActiveQrPayments).mockResolvedValueOnce([])
+
+    const { wrapper } = await mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Seoul Food Tour')
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    await flushPromises()
+
+    expect(vi.mocked(listActiveQrPayments)).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).not.toContain('Seoul Food Tour')
+    expect(wrapper.text()).toContain('No QR code yet')
+  })
+
+  it('hides an expired QR even if the server keeps returning it as still active at the boundary', async () => {
+    vi.useFakeTimers()
+
+    const expiringSoon = { ...seoulFoodTour, expiresAt: futureExpiresAt(5_000) }
+    // 만료 경계에서 서버가 같은 QR을 몇 번이고 "아직 활성"으로 돌려주는 상황을 흉내낸다.
+    // structural sharing이 이전 응답과 동일한 데이터 참조를 유지해도, 화면은 now 기준
+    // 필터로 정확해야 한다 — 재조회 스케줄이 다시 걸리는지에 기대지 않는다.
+    vi.mocked(listActiveQrPayments).mockImplementation(() => Promise.resolve([{ ...expiringSoon }]))
+
+    const { wrapper } = await mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Seoul Food Tour')
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Seoul Food Tour')
+    expect(wrapper.text()).toContain('No QR code yet')
   })
 
   it('shows that the payer can enter an unset amount, and no memo instead of a placeholder', async () => {
