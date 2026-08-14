@@ -57,6 +57,26 @@ async function mountWithRouter(path: string, reportOptions: ReportIntegrationOpt
     routes: [
       { path: '/journeys/:tripId', name: 'journey-detail', component: JourneyDetailView },
       { path: '/explore', name: 'explore', component: { template: '<div>Explore</div>' } },
+      {
+        path: '/explore/events/:eventId',
+        name: 'explore-event-detail',
+        component: { template: '<div>Event</div>' },
+      },
+      {
+        path: '/explore/places/:placeId',
+        name: 'explore-place-detail',
+        component: { template: '<div>Place</div>' },
+      },
+      {
+        path: '/appointments',
+        name: 'appointment-list',
+        component: { template: '<div>Appointments</div>' },
+      },
+      {
+        path: '/appointments/:appointmentId',
+        name: 'appointment-detail',
+        component: { template: '<div>Appointment</div>' },
+      },
       { path: '/reports', name: 'report-list', component: { template: '<div>Reports</div>' } },
       {
         path: '/reports/:reportId',
