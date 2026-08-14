@@ -21,6 +21,7 @@ import me.nawa.journey.domain.TripRegion;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
+import me.nawa.journey.dto.request.JourneyUpdateRequest;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyRegionResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
@@ -85,12 +86,53 @@ public class JourneyService {
     }
 
     @Transactional
+    public JourneyResponse updateJourney(
+        Long memberId,
+        Long tripId,
+        JourneyUpdateRequest request
+    ) {
+        validateMemberId(memberId);
+        validateUpdateRequest(request);
+
+        Journey journey = findOwnedJourneyForUpdate(memberId, tripId);
+        if (journeyMapper.hasJourneyItemsOutsideRange(
+            tripId,
+            request.getStartDate(),
+            request.getEndDate()
+        )) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_DATE_RANGE_CONFLICT
+            );
+        }
+
+        journey.setTitle(request.getTitle().trim());
+        journey.setStartDate(request.getStartDate());
+        journey.setEndDate(request.getEndDate());
+        journey.setBudgetAmount(request.getBudgetAmount());
+        journey.setCompanionPreference(normalizeOptional(
+            request.getCompanionPreference()
+        ));
+
+        if (journeyMapper.updateJourney(journey) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        journeyMapper.softDeleteRegionsByTripId(tripId);
+        List<TripRegion> regions = createRegions(tripId, request.getRegions());
+        if (!regions.isEmpty()) {
+            journeyMapper.insertRegions(regions);
+        }
+
+        return toResponse(journey, regions);
+    }
+
+    @Transactional
     public JourneyItemResponse addJourneyItem(
         Long memberId,
         Long tripId,
         JourneyItemCreateRequest request
     ) {
-        Journey journey = findOwnedJourney(memberId, tripId);
+        Journey journey = findOwnedJourneyForUpdate(memberId, tripId);
         validateJourneyItemRequest(request);
 
         JourneyExploreItem exploreItem = journeyMapper
@@ -226,6 +268,15 @@ public class JourneyService {
         return journey;
     }
 
+    private Journey findOwnedJourneyForUpdate(Long memberId, Long tripId) {
+        validateMemberId(memberId);
+        validateTripId(tripId);
+
+        Journey journey = journeyMapper.findJourneyByIdForUpdate(tripId);
+        validateJourneyOwner(journey, memberId);
+        return journey;
+    }
+
     private JourneyTimelineItemResponse toTimelineItemResponse(
         JourneyTimelineItem item
     ) {
@@ -333,27 +384,57 @@ public class JourneyService {
     }
 
     private void validateRequest(JourneyCreateRequest request) {
-        if (request == null
-            || isBlank(request.getTitle())
-            || request.getTitle().trim().length() > MAX_TITLE_LENGTH
-            || request.getStartDate() == null
-            || request.getEndDate() == null
-            || request.getStartDate().isAfter(request.getEndDate())
-            || isInvalidBudget(request.getBudgetAmount())) {
-            throw new BusinessException(
-                JourneyErrorCode.INVALID_JOURNEY_INPUT
-            );
+        if (request == null) {
+            throw invalidJourneyInput();
+        }
+        validateJourneyFields(
+            request.getTitle(),
+            request.getStartDate(),
+            request.getEndDate(),
+            request.getBudgetAmount(),
+            request.getCompanionPreference(),
+            request.getRegions()
+        );
+    }
+
+    private void validateUpdateRequest(JourneyUpdateRequest request) {
+        if (request == null || request.getRegions() == null) {
+            throw invalidJourneyInput();
+        }
+        validateJourneyFields(
+            request.getTitle(),
+            request.getStartDate(),
+            request.getEndDate(),
+            request.getBudgetAmount(),
+            request.getCompanionPreference(),
+            request.getRegions()
+        );
+    }
+
+    private void validateJourneyFields(
+        String title,
+        java.time.LocalDate startDate,
+        java.time.LocalDate endDate,
+        BigDecimal budgetAmount,
+        String companionPreference,
+        List<JourneyRegionRequest> regions
+    ) {
+        if (isBlank(title)
+            || title.trim().length() > MAX_TITLE_LENGTH
+            || startDate == null
+            || endDate == null
+            || startDate.isAfter(endDate)
+            || isInvalidBudget(budgetAmount)) {
+            throw invalidJourneyInput();
         }
 
-        String preference = normalizeOptional(request.getCompanionPreference());
+        String preference = normalizeOptional(companionPreference);
         if (preference != null
             && preference.length() > MAX_COMPANION_PREFERENCE_LENGTH) {
-            throw new BusinessException(
-                JourneyErrorCode.INVALID_JOURNEY_INPUT
-            );
+            throw invalidJourneyInput();
         }
 
-        validateRegions(request.getRegions());
+        validateRegions(regions);
     }
 
     private void validateRegions(List<JourneyRegionRequest> regions) {
@@ -488,6 +569,25 @@ public class JourneyService {
                 JourneyErrorCode.INVALID_JOURNEY_INPUT
             );
         }
+    }
+
+    private void validateTripId(Long tripId) {
+        if (tripId == null || tripId <= 0) {
+            throw invalidJourneyInput();
+        }
+    }
+
+    private void validateJourneyOwner(Journey journey, Long memberId) {
+        if (journey == null) {
+            throw new BusinessException(JourneyErrorCode.JOURNEY_NOT_FOUND);
+        }
+        if (!memberId.equals(journey.getMemberId())) {
+            throw new BusinessException(JourneyErrorCode.JOURNEY_FORBIDDEN);
+        }
+    }
+
+    private BusinessException invalidJourneyInput() {
+        return new BusinessException(JourneyErrorCode.INVALID_JOURNEY_INPUT);
     }
 
     private boolean isInvalidBudget(BigDecimal value) {

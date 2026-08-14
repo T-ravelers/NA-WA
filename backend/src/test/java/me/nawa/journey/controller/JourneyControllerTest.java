@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,6 +23,7 @@ import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
+import me.nawa.journey.dto.request.JourneyUpdateRequest;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineAppointmentResponse;
@@ -113,6 +115,85 @@ class JourneyControllerTest {
         assertEquals(10L, body.path("data").path("tripId").asLong());
         assertTrue(body.path("data").path("regions").isArray());
         assertEquals(0, body.path("data").path("regions").size());
+    }
+
+    @Test
+    void updateJourney_returns200WithUpdatedSettings() throws Exception {
+        JourneyResponse response = JourneyResponse.builder()
+            .tripId(20L)
+            .title("Updated Seoul Journey")
+            .startDate(LocalDate.of(2026, 4, 1))
+            .endDate(LocalDate.of(2026, 4, 5))
+            .regions(List.of())
+            .build();
+        when(journeyService.updateJourney(
+            eq(1L),
+            eq(20L),
+            any(JourneyUpdateRequest.class)
+        )).thenReturn(response);
+
+        String responseBody = mockMvc.perform(
+                put("/api/v1/journeys/20")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Updated Seoul Journey",
+                          "startDate": "2026-04-01",
+                          "endDate": "2026-04-05",
+                          "budgetAmount": null,
+                          "companionPreference": null,
+                          "regions": []
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertTrue(body.path("success").asBoolean());
+        assertEquals(20L, body.path("data").path("tripId").asLong());
+        assertEquals(
+            "Updated Seoul Journey",
+            body.path("data").path("title").asText()
+        );
+        assertEquals(0, body.path("data").path("regions").size());
+    }
+
+    @Test
+    void updateJourney_returns409WhenDateRangeConflicts() throws Exception {
+        when(journeyService.updateJourney(
+            eq(1L),
+            eq(20L),
+            any(JourneyUpdateRequest.class)
+        )).thenThrow(new BusinessException(
+            JourneyErrorCode.JOURNEY_DATE_RANGE_CONFLICT
+        ));
+
+        String responseBody = mockMvc.perform(
+                put("/api/v1/journeys/20")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Short Journey",
+                          "startDate": "2026-04-02",
+                          "endDate": "2026-04-03",
+                          "regions": []
+                        }
+                        """)
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals(
+            "JOURNEY-009",
+            body.path("error").path("code").asText()
+        );
     }
 
     @Test

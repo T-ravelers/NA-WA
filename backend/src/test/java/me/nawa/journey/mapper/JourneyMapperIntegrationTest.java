@@ -19,6 +19,7 @@ import me.nawa.journey.domain.Journey;
 import me.nawa.journey.domain.JourneyExploreItem;
 import me.nawa.journey.domain.JourneyItem;
 import me.nawa.journey.domain.JourneyTimelineItem;
+import me.nawa.journey.domain.TripRegion;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -356,6 +357,66 @@ class JourneyMapperIntegrationTest {
                 )
             );
         } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    @Test
+    void updateJourney_replacesRegionsAndDetectsDateConflict() {
+        JourneyItemFixture fixture = createFixture();
+        try {
+            insertTripItem(
+                fixture.tripId(),
+                fixture.itemId(),
+                LocalDate.of(2026, 8, 20)
+            );
+
+            assertTrue(mapper.hasJourneyItemsOutsideRange(
+                fixture.tripId(),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 10)
+            ));
+
+            Journey updated = Journey.builder()
+                .tripId(fixture.tripId())
+                .title("Updated integration journey")
+                .startDate(LocalDate.of(2026, 8, 1))
+                .endDate(LocalDate.of(2026, 8, 31))
+                .companionPreference("FRIENDS")
+                .build();
+            assertEquals(1, mapper.updateJourney(updated));
+
+            TripRegion first = TripRegion.builder()
+                .tripId(fixture.tripId())
+                .regionCode("SEOUL")
+                .regionName("Seoul")
+                .displayOrder(0)
+                .build();
+            mapper.insertRegions(List.of(first));
+            assertEquals(1, mapper.softDeleteRegionsByTripId(fixture.tripId()));
+
+            TripRegion restored = TripRegion.builder()
+                .tripId(fixture.tripId())
+                .regionCode("SEOUL")
+                .regionName("Seoul City")
+                .displayOrder(1)
+                .build();
+            mapper.insertRegions(List.of(restored));
+
+            Journey reloaded = mapper.findJourneyById(fixture.tripId());
+            List<TripRegion> regions = mapper.findRegionsByTripId(
+                fixture.tripId()
+            );
+            assertEquals("Updated integration journey", reloaded.getTitle());
+            assertEquals("FRIENDS", reloaded.getCompanionPreference());
+            assertEquals(1, regions.size());
+            assertEquals("Seoul City", regions.get(0).getRegionName());
+            assertEquals(1, regions.get(0).getDisplayOrder());
+        } finally {
+            jdbcTemplate.update(
+                "DELETE FROM trip_regions WHERE trip_id = ?",
+                fixture.tripId()
+            );
             deleteFixture(fixture);
         }
     }

@@ -1,5 +1,6 @@
 package me.nawa.journey.mapper;
 
+import java.time.LocalDate;
 import java.util.List;
 import me.nawa.journey.domain.Journey;
 import me.nawa.journey.domain.JourneyExploreItem;
@@ -20,6 +21,18 @@ public interface JourneyMapper {
 
     Journey findJourneyById(@Param("tripId") Long tripId);
 
+    Journey findJourneyByIdForUpdate(@Param("tripId") Long tripId);
+
+    int updateJourney(Journey journey);
+
+    boolean hasJourneyItemsOutsideRange(
+        @Param("tripId") Long tripId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate
+    );
+
+    int softDeleteRegionsByTripId(@Param("tripId") Long tripId);
+
     List<TripRegion> findRegionsByTripId(@Param("tripId") Long tripId);
 
     List<JourneyTimelineItem> findTimelineItemsByTripId(
@@ -33,7 +46,7 @@ public interface JourneyMapper {
     boolean existsJourneyItem(
         @Param("tripId") Long tripId,
         @Param("itemId") Long itemId,
-        @Param("visitDate") java.time.LocalDate visitDate
+        @Param("visitDate") LocalDate visitDate
     );
 
     void insertJourneyItem(JourneyItem journeyItem);
