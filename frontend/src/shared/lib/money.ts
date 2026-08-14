@@ -1,4 +1,5 @@
 export type MoneyValue = string | number | null | undefined
+type ExactSignDisplay = Intl.NumberFormatOptions['signDisplay'] | 'negative'
 
 function isDecimalString(value: string): boolean {
   return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value)
@@ -76,11 +77,12 @@ function roundDecimal(
 function resolveDecimalSign(
   negative: boolean,
   zero: boolean,
-  signDisplay: Intl.NumberFormatOptions['signDisplay'] = 'auto',
+  signDisplay: ExactSignDisplay = 'auto',
 ): string {
   if (signDisplay === 'never') return ''
   if (signDisplay === 'always') return negative ? '-' : '+'
   if (signDisplay === 'exceptZero') return zero ? '' : negative ? '-' : '+'
+  if (signDisplay === 'negative') return negative && !zero ? '-' : ''
   return negative ? '-' : ''
 }
 
@@ -184,10 +186,11 @@ export function formatGroupedDecimal(
   locale = 'en-US',
   options: Pick<
     Intl.NumberFormatOptions,
-    'maximumFractionDigits' | 'minimumFractionDigits' | 'useGrouping' | 'signDisplay'
-  > = {},
+    'maximumFractionDigits' | 'minimumFractionDigits' | 'useGrouping'
+  > & { signDisplay?: ExactSignDisplay } = {},
 ): string {
-  return formatMoney(value, locale, options)
+  // 런타임은 ES2023 Intl의 negative를 지원하지만 프로젝트 lib 타입은 ES2022에 고정돼 있다.
+  return formatMoney(value, locale, options as Intl.NumberFormatOptions)
 }
 
 export function formatNumber(

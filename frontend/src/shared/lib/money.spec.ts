@@ -33,6 +33,20 @@ describe('money formatters', () => {
         signDisplay: 'exceptZero',
       }),
     ).toBe('+$1,234.50')
+    expect(
+      formatGroupedDecimal('-0.004', 'en-US', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 2,
+        signDisplay: 'negative',
+      }),
+    ).toBe('0.00')
+    expect(
+      formatGroupedDecimal('-1.004', 'en-US', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 2,
+        signDisplay: 'negative',
+      }),
+    ).toBe('-1.00')
   })
 
   it('groups wallet decimal strings without converting through Number', () => {
