@@ -149,6 +149,21 @@ describe('EventDetailView', () => {
     expect(wrapper.text()).toContain('Seoul · Seocho-gu')
   })
 
+  it('translates operational region values and hides the raw hours key', async () => {
+    fetchEventDetail.mockResolvedValue({
+      ...event,
+      region1: '서울',
+      region2: '성수',
+      operatingHours: { raw: 'Every day 10:00 – 20:00' },
+    })
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Seoul · Seongsu')
+    expect(wrapper.text()).toContain('Every day 10:00 – 20:00')
+    expect(wrapper.text()).not.toContain('raw:')
+  })
+
   it('returns to the Event list from the detail screen', async () => {
     const { wrapper, router } = await mountView()
 

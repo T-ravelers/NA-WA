@@ -72,6 +72,7 @@ describe('exploreApi', () => {
     const params = toPlaceSearchParams({
       region1: ['Seoul'],
       region2: ['Seongsu', 'Hongdae'],
+      region2Other: true,
       sectorIds: [2],
       activityIds: [9, 10],
       placeKinds: ['RESTAURANT', 'CAFE'],
@@ -84,6 +85,7 @@ describe('exploreApi', () => {
     })
 
     expect(params.getAll('region2')).toEqual(['Seongsu', 'Hongdae'])
+    expect(params.get('region2Other')).toBe('true')
     expect(params.getAll('activityIds')).toEqual(['9', '10'])
     expect(params.getAll('placeKinds')).toEqual(['RESTAURANT', 'CAFE'])
     expect(params.get('hasParking')).toBe('true')

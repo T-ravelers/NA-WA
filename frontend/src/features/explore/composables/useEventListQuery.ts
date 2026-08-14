@@ -5,10 +5,18 @@ import { fetchEventList } from '../api/exploreApi'
 import type { EventSearchFilters } from '../model/eventExplore'
 import { exploreKeys } from '../model/exploreKeys'
 
-export function useEventListQuery(filters: MaybeRefOrGetter<EventSearchFilters>) {
+interface Options {
+  enabled?: MaybeRefOrGetter<boolean>
+}
+
+export function useEventListQuery(
+  filters: MaybeRefOrGetter<EventSearchFilters>,
+  options: Options = {},
+) {
   return useQuery({
     queryKey: computed(() => exploreKeys.eventList(toValue(filters))),
     queryFn: () => fetchEventList(toValue(filters)),
+    enabled: computed(() => toValue(options.enabled ?? true)),
     staleTime: 30_000,
   })
 }

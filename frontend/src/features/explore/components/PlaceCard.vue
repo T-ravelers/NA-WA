@@ -10,6 +10,7 @@ import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import type { Category } from '@/shared/ui/category'
 
 import { normalizePlaceKind, type PlaceKind, type PlaceSummary } from '../model/placeExplore'
+import { findExploreRegionLabelKey } from '../model/exploreRegions'
 
 interface Props {
   place: PlaceSummary
@@ -33,7 +34,13 @@ const category = computed<Category>(() => {
 const categoryLabel = computed(() => t(`explore.categories.${category.value}`))
 
 const regionLabel = computed(() =>
-  [place.region1, place.region2, place.region3].filter(Boolean).join(' · '),
+  [place.region1, place.region2, place.region3]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      const labelKey = findExploreRegionLabelKey(value)
+      return labelKey ? t(labelKey) : value
+    })
+    .join(' · '),
 )
 
 const subtitle = computed(() => [place.brand, place.branch].filter(Boolean).join(' · '))

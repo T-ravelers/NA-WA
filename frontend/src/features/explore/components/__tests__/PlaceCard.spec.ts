@@ -46,6 +46,16 @@ describe('PlaceCard', () => {
     expect(wrapper.text()).not.toContain('Takeout')
   })
 
+  it('translates operational region values for the list UI', () => {
+    const wrapper = mount(PlaceCard, {
+      global: { plugins: [i18n] },
+      props: { place: { ...place, region1: '서울', region2: '성수' } },
+    })
+
+    expect(wrapper.text()).toContain('Seoul · Seongsu')
+    expect(wrapper.text()).not.toContain('서울')
+  })
+
   it('emits the place id when the card content is activated', async () => {
     const wrapper = mount(PlaceCard, {
       global: { plugins: [i18n] },

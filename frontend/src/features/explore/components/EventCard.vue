@@ -10,6 +10,7 @@ import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import type { Category } from '@/shared/ui/category'
 
 import type { EventSummary } from '../model/eventExplore'
+import { findExploreRegionLabelKey } from '../model/exploreRegions'
 import { useSavedEventsStore } from '../model/savedEvents'
 
 interface Props {
@@ -46,7 +47,13 @@ const categoryKey = computed<Category>(() => {
 })
 
 const regionLabel = computed(() =>
-  [event.region1, event.region2, event.region3].filter(Boolean).join(' · '),
+  [event.region1, event.region2, event.region3]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      const labelKey = findExploreRegionLabelKey(value)
+      return labelKey ? t(labelKey) : value
+    })
+    .join(' · '),
 )
 
 function formatDate(value: string | null): string {

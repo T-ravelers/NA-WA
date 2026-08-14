@@ -143,6 +143,15 @@ describe('PlaceDetailView', () => {
     ).toBeUndefined()
   })
 
+  it('translates operational region values on the detail screen', async () => {
+    fetchPlaceDetail.mockResolvedValue({ ...place, region1: '서울', region2: '성수' })
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Seoul · Seongsu')
+    expect(wrapper.text()).not.toContain('서울')
+  })
+
   it('returns to the Place list from the detail screen', async () => {
     const { wrapper, router } = await mountView()
 

@@ -31,7 +31,7 @@ describe('PlaceFilterSheet', () => {
     expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({ savedOnly: true })
   })
 
-  it('emits the selected region and area', async () => {
+  it('uses the same All of Seoul and Other areas behavior as Event', async () => {
     const wrapper = mount(PlaceFilterSheet, {
       global: { plugins: [i18n] },
       props: { kind: 'region', filters: { sort: 'LATEST' }, resultCount: 3 },
@@ -39,11 +39,7 @@ describe('PlaceFilterSheet', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Gyeonggi'))
-      ?.trigger('click')
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Suwon'))
+      .find((button) => button.text() === 'Other areas')
       ?.trigger('click')
     await wrapper
       .findAll('button')
@@ -52,8 +48,8 @@ describe('PlaceFilterSheet', () => {
 
     const applied = wrapper.emitted('apply') ?? []
     expect(applied[applied.length - 1]?.[0]).toMatchObject({
-      region1: ['Gyeonggi'],
-      region2: ['Suwon'],
+      region1: ['서울'],
+      region2Other: true,
     })
   })
 

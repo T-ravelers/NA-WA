@@ -13,6 +13,7 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 
 import type { EventSearchFilters } from '../model/eventExplore'
+import { SEOUL_REGION1, SEOUL_REGION2_OPTIONS } from '../model/exploreRegions'
 import { EVENT_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
 import type { ExploreSheetKind } from './ExploreFilterBar.vue'
 
@@ -45,16 +46,10 @@ const SHEET_TITLES: Record<ExploreSheetKind, string> = {
 const REGION_OPTIONS = [
   {
     labelKey: 'explore.regions.seoul',
-    value: 'Seoul',
+    value: SEOUL_REGION1,
     areas: [
-      { labelKey: 'explore.areas.allSeoul', value: 'All of Seoul' },
-      { labelKey: 'explore.areas.seongsu', value: 'Seongsu' },
-      { labelKey: 'explore.areas.hongdae', value: 'Hongdae' },
-      { labelKey: 'explore.areas.jamsil', value: 'Jamsil' },
-      { labelKey: 'explore.areas.yeouido', value: 'Yeouido' },
-      { labelKey: 'explore.areas.yongsan', value: 'Yongsan' },
-      { labelKey: 'explore.areas.myeongdong', value: 'Myeongdong' },
-      { labelKey: 'explore.areas.dongdaemun', value: 'Dongdaemun·DDP' },
+      { labelKey: 'explore.areas.allSeoul', value: '__ALL_SEOUL__' },
+      ...SEOUL_REGION2_OPTIONS.map(({ labelKey, apiValue }) => ({ labelKey, value: apiValue })),
       { labelKey: 'explore.areas.other', value: REGION2_OTHER },
     ],
   },
@@ -163,15 +158,15 @@ const DATE_PRESETS = [
 ] as const
 
 const draft = reactive<EventSearchFilters>(cloneFilters(props.filters))
-const selectedRegion = ref(props.filters.region1?.[0] ?? 'Seoul')
-const expandedCategories = ref<string[]>(['explore.categories.food'])
+const selectedRegion = ref(SEOUL_REGION1)
+const expandedCategories = ref<string[]>(['explore.categories.beauty'])
 const monthCursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
 watch(
   () => props.filters,
   (filters) => {
     Object.assign(draft, cloneFilters(filters))
-    selectedRegion.value = filters.region1?.[0] ?? 'Seoul'
+    selectedRegion.value = SEOUL_REGION1
   },
   { deep: true },
 )
@@ -222,7 +217,7 @@ function cloneFilters(filters: EventSearchFilters): EventSearchFilters {
     sectorIds: filters.sectorIds ? [...filters.sectorIds] : undefined,
     activityIds: filters.activityIds ? [...filters.activityIds] : undefined,
     eventKinds: filters.eventKinds ? [...filters.eventKinds] : undefined,
-    region1: filters.region1 ? [...filters.region1] : undefined,
+    region1: filters.region1 ? [...filters.region1] : [SEOUL_REGION1],
     region2: filters.region2 ? [...filters.region2] : undefined,
     region3: filters.region3 ? [...filters.region3] : undefined,
   }
@@ -294,7 +289,7 @@ function toggleArea(value: string): void {
   }
 
   const current = new Set(draft.region2 ?? [])
-  if (value === 'All of Seoul' || value.startsWith('All of ')) {
+  if (value === '__ALL_SEOUL__' || value.startsWith('All of ')) {
     draft.region2 = undefined
     draft.region2Other = undefined
     return
@@ -340,6 +335,12 @@ function toggleActivity(sectorId: number, activityId: number): void {
   else activityIds.add(activityId)
   sectorIds.delete(sectorId)
 
+  const sector = EVENT_SECTOR_OPTIONS.find((option) => option.id === sectorId)
+  if (sector?.activities.every((activity) => activityIds.has(activity.id))) {
+    sector.activities.forEach((activity) => activityIds.delete(activity.id))
+    sectorIds.add(sectorId)
+  }
+
   draft.sectorIds = sectorIds.size > 0 ? [...sectorIds] : undefined
   draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
 }
@@ -360,7 +361,7 @@ function resetSheet(): void {
     draft.startDate = undefined
     draft.endDate = undefined
   } else if (props.kind === 'region') {
-    draft.region1 = undefined
+    draft.region1 = [SEOUL_REGION1]
     draft.region2 = undefined
     draft.region2Other = undefined
     draft.region3 = undefined
@@ -497,7 +498,7 @@ function apply(): void {
           <div class="grid min-h-80 grid-cols-[112px_1fr] border-y border-hairline">
             <div class="border-r border-hairline">
               <button
-                v-for="region in REGION_OPTIONS"
+                v-for="region in REGION_OPTIONS.slice(0, 1)"
                 :key="region.value"
                 type="button"
                 class="flex w-full items-center justify-between px-1 py-3 text-left text-body-sm"
@@ -515,7 +516,7 @@ function apply(): void {
                 type="button"
                 class="flex min-h-11 items-center justify-between rounded-sm px-3 text-left text-body-sm"
                 :class="
-                  (area.value.startsWith('All of ') &&
+                  (area.value === '__ALL_SEOUL__' &&
                     selectedAreas.size === 0 &&
                     !draft.region2Other) ||
                   selectedAreas.has(area.value) ||
@@ -529,7 +530,7 @@ function apply(): void {
                 <span
                   class="flex size-6 items-center justify-center rounded-xs"
                   :class="
-                    (area.value.startsWith('All of ') &&
+                    (area.value === '__ALL_SEOUL__' &&
                       selectedAreas.size === 0 &&
                       !draft.region2Other) ||
                     selectedAreas.has(area.value) ||
@@ -540,7 +541,7 @@ function apply(): void {
                 >
                   <IconCheck
                     v-if="
-                      (area.value.startsWith('All of ') &&
+                      (area.value === '__ALL_SEOUL__' &&
                         selectedAreas.size === 0 &&
                         !draft.region2Other) ||
                       selectedAreas.has(area.value) ||
