@@ -9,6 +9,7 @@ import me.nawa.appointment.dto.response.AppointmentDetailResponse;
 import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.dto.response.AppointmentParticipationResponse;
+import me.nawa.appointment.dto.response.MyOngoingAppointmentResponse;
 import me.nawa.appointment.service.AppointmentService;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
@@ -131,4 +132,13 @@ public class AppointmentController {
         return ApiResponse.success();
     }
 
+    @GetMapping("/me")
+    @ApiOperation("내가 참여 중인 진행 중 약속 목록 조회")
+    public ApiResponse<List<MyOngoingAppointmentResponse>> getMyOngoingAppointments(
+        @AuthenticationPrincipal AuthenticatedMember member
+    ){
+        return ApiResponse.success(
+            appointmentService.getMyOngoingAppointments(member.getMemberId())
+        );
+    }
 }
