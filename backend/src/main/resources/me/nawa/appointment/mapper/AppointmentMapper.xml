@@ -306,4 +306,24 @@
         ORDER BY host DESC, am.joined_at ASC, am.appointment_member_id ASC
     </select>
 
+    <select id="findMyOngoingAppointments" resultType="me.nawa.appointment.domain.MyOngoingAppointment">
+        SELECT
+            a.appointment_id,
+            a.appointment_name,
+            am.trip_id,
+            a.meeting_place,
+            a.activity_start_at,
+            a.activity_end_at
+        FROM appointment_members am
+                 JOIN appointments a
+                      ON a.appointment_id = am.appointment_id
+                          AND a.deleted_at IS NULL
+        WHERE am.member_id = #{memberId}
+          AND am.membership_status = 'ACTIVE'
+          AND am.trip_id IS NOT NULL
+          AND am.deleted_at IS NULL
+          AND a.appointment_status = 'IN_PROGRESS'
+        ORDER BY a.activity_start_at ASC
+    </select>
+
 </mapper>

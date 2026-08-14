@@ -13,6 +13,7 @@ import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.dto.response.AppointmentParticipationResponse;
 import me.nawa.appointment.dto.response.AppointmentSummaryResponse;
+import me.nawa.appointment.dto.response.MyOngoingAppointmentResponse;
 import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.common.exception.BusinessException;
@@ -242,6 +243,18 @@ public class AppointmentService {
             Long memberId,
             Long appointmentId) {
         return getAppointment(memberId, appointmentId).getMembers();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyOngoingAppointmentResponse> getMyOngoingAppointments(Long memberId){
+        if(memberId == null || memberId <= 0){
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
+        return appointmentMapper.findMyOngoingAppointments(memberId)
+            .stream()
+            .map(MyOngoingAppointmentResponse::from)
+            .toList();
     }
 
     private static void normalizeAndValidateSearch(

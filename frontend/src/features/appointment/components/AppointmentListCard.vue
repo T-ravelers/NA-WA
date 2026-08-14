@@ -3,12 +3,12 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+import { formatServerDateTime, parseServerDateTime } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import type { AppointmentSummary } from '../api/appointmentApi'
-import { parseAppointmentDateTime } from '../model/appointmentDateTime'
 
 interface Props {
   appointment: AppointmentSummary
@@ -18,31 +18,23 @@ const { appointment } = defineProps<Props>()
 const router = useRouter()
 const { t, locale } = useI18n()
 
-const dateFormatter = computed(
-  () =>
-    new Intl.DateTimeFormat(locale.value, {
-      month: 'numeric',
-      day: 'numeric',
-      timeZone: 'Asia/Seoul',
-    }),
-)
-
-const timeFormatter = computed(
-  () =>
-    new Intl.DateTimeFormat(locale.value, {
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZone: 'Asia/Seoul',
-    }),
-)
-
 const scheduleLabel = computed(() => {
-  const start = parseAppointmentDateTime(appointment.activityStartAt)
-  const end = parseAppointmentDateTime(appointment.activityEndAt)
+  const start = parseServerDateTime(appointment.activityStartAt)
+  const end = parseServerDateTime(appointment.activityEndAt)
 
   if (!start || !end) return t('appointment.list.scheduleUnavailable')
 
-  return `${dateFormatter.value.format(start)} ${timeFormatter.value.format(start)} – ${dateFormatter.value.format(end)} ${timeFormatter.value.format(end)}`
+  const dateOptions = { month: 'numeric' as const, day: 'numeric' as const }
+  const timeOptions = { hour: 'numeric' as const, minute: '2-digit' as const }
+  const startDate = formatServerDateTime(start, locale.value, dateOptions)
+  const endDate = formatServerDateTime(end, locale.value, dateOptions)
+  const startTime = formatServerDateTime(start, locale.value, timeOptions)
+  const endTime = formatServerDateTime(end, locale.value, timeOptions)
+  if (!startDate || !endDate || !startTime || !endTime) {
+    return t('appointment.list.scheduleUnavailable')
+  }
+
+  return `${startDate} ${startTime} – ${endDate} ${endTime}`
 })
 
 const memberLabel = computed(() =>

@@ -6,15 +6,18 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { formatServerDateTime } from '@/shared/lib/datetime'
 import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
+import StateError from '@/shared/ui/StateError.vue'
+import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { executeQrPayment, previewQrPayment } from '../api/qrPaymentApi'
+import { useWalletAppointmentIntegration } from '../model/appointmentIntegration'
 import {
-  ACTIVE_APPOINTMENTS,
   formatKrw,
   isValidQrPaymentAmount,
   qrPaymentKeys,
@@ -24,25 +27,47 @@ import {
 import { useQrPaymentSessionStore } from '../model/qrPaymentSession'
 
 const i18n = useI18n()
-const { t } = i18n
+const { t, locale } = i18n
 const router = useRouter()
 const qrPaymentSession = useQrPaymentSessionStore()
+const { useMyOngoingAppointmentsQuery } = useWalletAppointmentIntegration()
 
 const session = computed(() => qrPaymentSession.session)
 
 const spendingScope = ref<SpendingScope>('personal')
-const selectedAppointmentId = ref('')
+const selectedAppointmentId = ref<number | null>(null)
 const enteredAmount = ref<number | null>(null)
+
+const isSharedExpense = computed(() => spendingScope.value === 'shared')
+const ongoingAppointmentsQuery = useMyOngoingAppointmentsQuery(isSharedExpense)
 
 const spendingOptions = computed(() => [
   { value: 'personal', label: t('wallet.qrPayment.personal') },
   { value: 'shared', label: t('wallet.qrPayment.shared') },
 ])
-
-const isSharedExpense = computed(() => spendingScope.value === 'shared')
 const selectedAppointment = computed(() =>
-  ACTIVE_APPOINTMENTS.find((appointment) => appointment.id === selectedAppointmentId.value),
+  ongoingAppointmentsQuery.data.value?.find(
+    (appointment) => appointment.appointmentId === selectedAppointmentId.value,
+  ),
 )
+
+// Shared에서 고른 약속이 Personal로 돌아간 뒤에도 남아있으면, 백엔드가
+// PERSONAL + appointmentId 조합을 거부한다(QR_PERSONAL_APPOINTMENT_NOT_ALLOWED).
+watch(spendingScope, (scope) => {
+  if (scope !== 'shared') {
+    selectedAppointmentId.value = null
+  }
+})
+
+function formatAppointmentPeriod(activityStartAt: string, activityEndAt: string): string {
+  const options = { month: 'short' as const, day: 'numeric' as const }
+  const start = formatServerDateTime(activityStartAt, locale.value, options)
+  const end = formatServerDateTime(activityEndAt, locale.value, options)
+
+  if (start === '' || end === '') return ''
+
+  return `${start} – ${end}`
+}
 
 const finalAmount = computed<number | null>(() => {
   const resolved = session.value?.resolved
@@ -55,7 +80,8 @@ const finalAmount = computed<number | null>(() => {
 const isPreviewReady = computed(
   () =>
     session.value !== null &&
-    spendingScope.value === 'personal' &&
+    (spendingScope.value === 'personal' ||
+      (spendingScope.value === 'shared' && selectedAppointment.value !== undefined)) &&
     isValidQrPaymentAmount(finalAmount.value),
 )
 
@@ -65,6 +91,7 @@ const previewQuery = useQuery({
       session.value?.qrToken ?? '',
       finalAmount.value ?? 0,
       toQrPaymentSpendingScope(spendingScope.value),
+      selectedAppointment.value?.appointmentId ?? null,
     ),
   ),
   queryFn: () =>
@@ -72,7 +99,7 @@ const previewQuery = useQuery({
       qrToken: session.value?.qrToken ?? '',
       amount: finalAmount.value ?? 0,
       spendingScope: toQrPaymentSpendingScope(spendingScope.value),
-      appointmentId: null,
+      appointmentId: selectedAppointment.value?.appointmentId ?? null,
     }),
   enabled: isPreviewReady,
 })
@@ -108,10 +135,7 @@ const executeErrorMessage = computed(() => {
 })
 
 const canPay = computed(
-  () =>
-    spendingScope.value === 'personal' &&
-    previewQuery.data.value?.canPay === true &&
-    !executeMutation.isPending.value,
+  () => previewQuery.data.value?.canPay === true && !executeMutation.isPending.value,
 )
 
 const goBack = (): void => {
@@ -146,7 +170,7 @@ const completePayment = (): void => {
         qrToken: session.value.qrToken,
         amount: finalAmount.value,
         spendingScope: toQrPaymentSpendingScope(spendingScope.value),
-        appointmentId: null,
+        appointmentId: selectedAppointment.value?.appointmentId ?? null,
       },
       idempotencyKey: idempotencyKey.value,
     },
@@ -309,42 +333,64 @@ const completePayment = (): void => {
             {{ t('wallet.qrPayment.activeAppointmentsHint') }}
           </p>
 
-          <div class="mt-3 space-y-2">
-            <label
-              v-for="appointment in ACTIVE_APPOINTMENTS"
-              :key="appointment.id"
-              class="block cursor-pointer rounded-sm border p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
-              :class="
-                selectedAppointmentId === appointment.id
-                  ? 'border-ink bg-surface-2'
-                  : 'border-hairline bg-transparent'
-              "
+          <StateLoading
+            v-if="ongoingAppointmentsQuery.isPending.value"
+            class="mt-3"
+            :lines="2"
+            :label="t('wallet.qrPayment.appointmentsLoading')"
+          />
+          <StateError
+            v-else-if="ongoingAppointmentsQuery.isError.value"
+            class="mt-3"
+            :description="t('wallet.qrPayment.appointmentsError')"
+            @retry="ongoingAppointmentsQuery.refetch"
+          />
+          <StateEmpty
+            v-else-if="(ongoingAppointmentsQuery.data.value ?? []).length === 0"
+            class="mt-3"
+            :description="t('wallet.qrPayment.appointmentsEmpty')"
+          />
+          <template v-else>
+            <div class="mt-3 space-y-2">
+              <label
+                v-for="appointment in ongoingAppointmentsQuery.data.value"
+                :key="appointment.appointmentId"
+                class="block cursor-pointer rounded-sm border p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
+                :class="
+                  selectedAppointmentId === appointment.appointmentId
+                    ? 'border-ink bg-surface-2'
+                    : 'border-hairline bg-transparent'
+                "
+              >
+                <input
+                  v-model="selectedAppointmentId"
+                  class="sr-only"
+                  type="radio"
+                  name="active-appointment"
+                  :value="appointment.appointmentId"
+                />
+                <span class="flex items-center justify-between gap-3">
+                  <span class="text-body-sm font-semibold">{{ appointment.appointmentName }}</span>
+                  <span class="shrink-0 text-caption text-ink-3">
+                    {{
+                      formatAppointmentPeriod(
+                        appointment.activityStartAt,
+                        appointment.activityEndAt,
+                      )
+                    }}
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <p
+              v-if="selectedAppointment === undefined"
+              class="mt-3 text-caption text-warning"
+              role="status"
             >
-              <input
-                v-model="selectedAppointmentId"
-                class="sr-only"
-                type="radio"
-                name="active-appointment"
-                :value="appointment.id"
-              />
-              <span class="flex items-center justify-between gap-3">
-                <span class="text-body-sm font-semibold">{{ appointment.name }}</span>
-                <span class="shrink-0 text-caption text-ink-3">{{ appointment.period }}</span>
-              </span>
-            </label>
-          </div>
-
-          <p
-            v-if="selectedAppointment === undefined"
-            class="mt-3 text-caption text-warning"
-            role="status"
-          >
-            {{ t('wallet.qrPayment.selectAppointment') }}
-          </p>
-
-          <p class="mt-3 text-caption text-ink-3">
-            {{ t('wallet.qrPayment.sharedUnavailable') }}
-          </p>
+              {{ t('wallet.qrPayment.selectAppointment') }}
+            </p>
+          </template>
         </fieldset>
       </AppCard>
 

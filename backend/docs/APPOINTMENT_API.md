@@ -57,6 +57,30 @@
 조회할 수 있으며 다른 회원에게는 `APPOINTMENT-001`을 반환합니다.
 `members/me`는 현재 로그인 회원의 참여 여부, 참여·출석 상태와 방장 여부를 반환합니다.
 
+## 내가 참여 중인 진행 중 약속 조회
+
+`GET /api/v1/appointments/me`
+
+로그인 회원이 `ACTIVE`로 참여 중이고, 여행(trip)이 연결돼 있으며, `IN_PROGRESS`
+상태인 약속만 배열로 반환합니다. 참여만 하고 여행에 연결되지 않은 약속은 QR 공동
+소비(SHARED) 결제가 트립 비용 연결(`trip_expense_links`)을 만들 수 없어 제외합니다.
+
+```json
+[
+  {
+    "appointmentId": 42,
+    "appointmentName": "Seongsu K-Beauty Tour",
+    "tripId": 9,
+    "meetingPlace": "Olive Young N Seongsu",
+    "activityStartAt": "2026-08-21T18:30:00",
+    "activityEndAt": "2026-08-21T22:00:00"
+  }
+]
+```
+
+참여 자체가 보증금 결제 연동 전까지 `APPOINTMENT-008`로 막혀 있어, 그 전까지는
+항상 빈 배열을 반환합니다.
+
 ## 약속 생성
 
 `POST /api/v1/appointments`

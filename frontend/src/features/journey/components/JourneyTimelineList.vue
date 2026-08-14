@@ -4,6 +4,12 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { IconPlus } from '@tabler/icons-vue'
 
+import {
+  formatCalendarDate,
+  formatServerDateTime,
+  parseCalendarDate,
+  serializeCalendarDate,
+} from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 
 import type { JourneyTimelineDay, JourneyTimelineItem } from '../api/journeyApi'
@@ -19,44 +25,23 @@ const props = defineProps<Props>()
 
 const { locale, t } = useI18n()
 
-const MS_PER_DAY = 86_400_000
-
-const dateFormatter = computed(
-  () =>
-    new Intl.DateTimeFormat(locale.value, {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    }),
-)
-const timeFormatter = computed(
-  () =>
-    new Intl.DateTimeFormat(locale.value, {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'UTC',
-    }),
-)
-
-function toUtcDate(value: string): Date {
-  const [datePart, timePart] = value.split('T')
-  const [year, month, day] = (datePart ?? '').split('-').map(Number)
-  const [hour, minute, second] = (timePart ?? '').split(':').map(Number)
-
-  return new Date(
-    Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1, hour ?? 0, minute ?? 0, second ?? 0),
-  )
-}
-
 function formatDate(value: string): string {
-  return dateFormatter.value.format(toUtcDate(`${value}T00:00:00`))
+  return formatCalendarDate(value, locale.value, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 function formatTime(item: JourneyTimelineItem): string {
-  return item.appointment === undefined
-    ? t('journey.detail.noTime')
-    : timeFormatter.value.format(toUtcDate(item.appointment.activityStartAt))
+  if (item.appointment === undefined) return t('journey.detail.noTime')
+
+  return (
+    formatServerDateTime(item.appointment.activityStartAt, locale.value, {
+      hour: '2-digit',
+      minute: '2-digit',
+    }) || t('journey.detail.noTime')
+  )
 }
 
 function formatLocation(item: JourneyTimelineItem): string | null {
@@ -75,15 +60,17 @@ function typeLabel(item: JourneyTimelineItem): string {
     : t('journey.detail.place')
 }
 
-/** 여정 기간의 날짜를 `YYYY-MM-DD`로 하루씩 늘어놓는다. 계산은 UTC 기준이다. */
+/** 여정 기간의 날짜를 로컬 달력 기준으로 하루씩 늘어놓는다. */
 function journeyDates(startDate: string, endDate: string): string[] {
-  const start = toUtcDate(`${startDate}T00:00:00`).getTime()
-  const end = toUtcDate(`${endDate}T00:00:00`).getTime()
-  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return []
+  const start = parseCalendarDate(startDate)
+  const end = parseCalendarDate(endDate)
+  if (start === null || end === null || start.getTime() > end.getTime()) return []
 
   const dates: string[] = []
-  for (let time = start; time <= end; time += MS_PER_DAY) {
-    dates.push(new Date(time).toISOString().slice(0, 10))
+  const current = new Date(start.getTime())
+  while (current.getTime() <= end.getTime()) {
+    dates.push(serializeCalendarDate(current))
+    current.setDate(current.getDate() + 1)
   }
 
   return dates

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-vue'
 
+import { formatCalendarDate, parseCalendarDate, serializeCalendarDate } from '@/shared/lib/datetime'
 import AppButton from '@/shared/ui/AppButton.vue'
 
 interface Props {
@@ -27,25 +28,11 @@ const emit = defineEmits<{
 const { locale, t } = useI18n()
 
 function today(): string {
-  return formatDate(new Date())
+  return serializeCalendarDate(new Date())
 }
 
 function parseDate(value: string | null | undefined): Date | null {
-  if (!value) return null
-  const parts = value.split('-')
-  if (parts.length !== 3) return null
-  const year = Number(parts[0])
-  const month = Number(parts[1])
-  const day = Number(parts[2])
-  if ([year, month, day].some((part) => Number.isNaN(part))) return null
-  return new Date(year, month - 1, day)
-}
-
-function formatDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return parseCalendarDate(value)
 }
 
 function isDateAllowed(value: string): boolean {
@@ -79,7 +66,7 @@ const selectedDateLabel = computed(() => {
   if (!selectedDate.value) return t('explore.journeyDate.chooseDate')
   const date = parseDate(selectedDate.value)
   return date
-    ? new Intl.DateTimeFormat(locale.value, { month: 'short', day: 'numeric' }).format(date)
+    ? formatCalendarDate(date, locale.value, { month: 'short', day: 'numeric' })
     : t('explore.journeyDate.chooseDate')
 })
 
@@ -106,7 +93,7 @@ const calendarDays = computed(() => {
     const inMonth = rawDay >= 1 && rawDay <= daysInMonth
     const date = new Date(year, month, rawDay)
     const day = inMonth ? rawDay : rawDay < 1 ? previousMonthDays + rawDay : rawDay - daysInMonth
-    cells.push({ date: formatDate(date), day, inMonth })
+    cells.push({ date: serializeCalendarDate(date), day, inMonth })
   }
 
   return cells
@@ -126,11 +113,7 @@ function selectDate(value: string): void {
 
 function accessibleDateLabel(value: string): string {
   const date = parseDate(value)
-  return date
-    ? new Intl.DateTimeFormat(locale.value, {
-        dateStyle: 'long',
-      }).format(date)
-    : value
+  return date ? formatCalendarDate(date, locale.value, { dateStyle: 'long' }) : value
 }
 
 function confirm(): void {

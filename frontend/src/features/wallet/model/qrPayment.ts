@@ -1,3 +1,5 @@
+export { formatKrw } from '@/shared/lib/money'
+
 export type SpendingScope = 'personal' | 'shared'
 
 /** 백엔드 `SpendingScope` enum과 1:1. 화면은 소문자 `SpendingScope`로 다루고 API 호출 직전에만 바꾼다. */
@@ -97,23 +99,11 @@ export interface QrPaymentStatusResponse {
 export const qrPaymentKeys = {
   all: ['wallet', 'qr'] as const,
   active: () => [...qrPaymentKeys.all, 'active'] as const,
-  preview: (qrToken: string, amount: number, spendingScope: QrPaymentSpendingScope) =>
-    [...qrPaymentKeys.all, 'preview', qrToken, amount, spendingScope] as const,
+  preview: (
+    qrToken: string,
+    amount: number,
+    spendingScope: QrPaymentSpendingScope,
+    appointmentId: number | null,
+  ) => [...qrPaymentKeys.all, 'preview', qrToken, amount, spendingScope, appointmentId] as const,
   status: (transferId: number) => [...qrPaymentKeys.all, 'status', transferId] as const,
 }
-
-export const ACTIVE_APPOINTMENTS = [
-  {
-    id: 'seoul-night-tour',
-    name: 'Seoul Night Tour',
-    period: 'Aug 10–12',
-  },
-  {
-    id: 'seoul-foodie-week',
-    name: 'Seoul Foodie Week',
-    period: 'Aug 14–18',
-  },
-] as const
-
-export const formatKrw = (amount: number): string =>
-  `₩${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
