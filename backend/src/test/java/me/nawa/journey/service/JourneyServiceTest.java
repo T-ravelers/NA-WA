@@ -27,6 +27,7 @@ import me.nawa.journey.domain.TripRegion;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
+import me.nawa.journey.dto.request.JourneyUpdateRequest;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineResponse;
@@ -70,11 +71,181 @@ class JourneyServiceTest {
     }
 
     @Test
+    void updateJourney_replacesSettingsAndRegions() {
+        JourneyUpdateRequest request = validUpdateRequest();
+        request.setTitle(" Updated Seoul Journey ");
+        request.setCompanionPreference("  FRIENDS  ");
+        request.setRegions(List.of(
+            new JourneyRegionRequest("BUSAN", " Busan ", 1),
+            new JourneyRegionRequest(" SEOUL ", " Seoul ", 0)
+        ));
+        Journey journey = ownedJourney(20L);
+        when(journeyMapper.findJourneyByIdForUpdate(20L)).thenReturn(journey);
+        when(journeyMapper.hasJourneyItemsOutsideRange(
+            20L,
+            request.getStartDate(),
+            request.getEndDate()
+        )).thenReturn(false);
+        when(journeyMapper.updateJourney(any(Journey.class))).thenReturn(1);
+
+        JourneyResponse result = journeyService.updateJourney(1L, 20L, request);
+
+        org.mockito.ArgumentCaptor<Journey> journeyCaptor =
+            org.mockito.ArgumentCaptor.forClass(Journey.class);
+        verify(journeyMapper).updateJourney(journeyCaptor.capture());
+        assertEquals(
+            "Updated Seoul Journey",
+            journeyCaptor.getValue().getTitle()
+        );
+        assertEquals(
+            "FRIENDS",
+            journeyCaptor.getValue().getCompanionPreference()
+        );
+        verify(journeyMapper).softDeleteRegionsByTripId(20L);
+
+        org.mockito.ArgumentCaptor<List<TripRegion>> regionsCaptor =
+            org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(journeyMapper).insertRegions(regionsCaptor.capture());
+        assertEquals("SEOUL", regionsCaptor.getValue().get(0).getRegionCode());
+        assertEquals("Seoul", regionsCaptor.getValue().get(0).getRegionName());
+        assertEquals("Updated Seoul Journey", result.getTitle());
+        assertEquals(2, result.getRegions().size());
+    }
+
+    @Test
+    void updateJourney_allowsEmptyRegionsAndClearsExistingRegions() {
+        JourneyUpdateRequest request = validUpdateRequest();
+        Journey journey = ownedJourney(21L);
+        when(journeyMapper.findJourneyByIdForUpdate(21L)).thenReturn(journey);
+        when(journeyMapper.hasJourneyItemsOutsideRange(
+            21L,
+            request.getStartDate(),
+            request.getEndDate()
+        )).thenReturn(false);
+        when(journeyMapper.updateJourney(any(Journey.class))).thenReturn(1);
+
+        JourneyResponse result = journeyService.updateJourney(1L, 21L, request);
+
+        verify(journeyMapper).softDeleteRegionsByTripId(21L);
+        verify(journeyMapper, never()).insertRegions(anyList());
+        assertEquals(List.of(), result.getRegions());
+    }
+
+    @Test
+    void updateJourney_throwsConflictWhenItemsFallOutsideNewRange() {
+        JourneyUpdateRequest request = validUpdateRequest();
+        when(journeyMapper.findJourneyByIdForUpdate(22L)).thenReturn(
+            ownedJourney(22L)
+        );
+        when(journeyMapper.hasJourneyItemsOutsideRange(
+            22L,
+            request.getStartDate(),
+            request.getEndDate()
+        )).thenReturn(true);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.updateJourney(1L, 22L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_DATE_RANGE_CONFLICT,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).updateJourney(any(Journey.class));
+        verify(journeyMapper, never()).softDeleteRegionsByTripId(22L);
+    }
+
+    @Test
+    void updateJourney_throwsInvalidInputWhenRegionsAreOmitted() {
+        JourneyUpdateRequest request = validUpdateRequest();
+        request.setRegions(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.updateJourney(1L, 23L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.INVALID_JOURNEY_INPUT,
+            exception.getErrorCode()
+        );
+        verifyNoInteractions(journeyMapper);
+    }
+
+    @Test
+    void updateJourney_throwsForbiddenWhenJourneyHasDifferentOwner() {
+        JourneyUpdateRequest request = validUpdateRequest();
+        Journey journey = ownedJourney(24L);
+        journey.setMemberId(2L);
+        when(journeyMapper.findJourneyByIdForUpdate(24L)).thenReturn(journey);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.updateJourney(1L, 24L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_FORBIDDEN,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).hasJourneyItemsOutsideRange(
+            any(), any(), any()
+        );
+    }
+
+    @Test
+    void updateJourney_throwsNotFoundWhenJourneyDoesNotExist() {
+        JourneyUpdateRequest request = validUpdateRequest();
+        when(journeyMapper.findJourneyByIdForUpdate(25L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.updateJourney(1L, 25L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_NOT_FOUND,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).hasJourneyItemsOutsideRange(
+            any(), any(), any()
+        );
+    }
+
+    @Test
+    void updateJourney_throwsInternalErrorWhenUpdateAffectsNoRow() {
+        JourneyUpdateRequest request = validUpdateRequest();
+        when(journeyMapper.findJourneyByIdForUpdate(26L)).thenReturn(
+            ownedJourney(26L)
+        );
+        when(journeyMapper.hasJourneyItemsOutsideRange(
+            26L,
+            request.getStartDate(),
+            request.getEndDate()
+        )).thenReturn(false);
+        when(journeyMapper.updateJourney(any(Journey.class))).thenReturn(0);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.updateJourney(1L, 26L, request)
+        );
+
+        assertEquals(
+            CommonErrorCode.INTERNAL_SERVER_ERROR,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).softDeleteRegionsByTripId(26L);
+    }
+
+    @Test
     void addJourneyItem_createsAddedEventWithNullConfirmationFields() {
         JourneyItemCreateRequest request = itemRequest();
         request.setDisplayOrder(2);
         request.setNote("오전 방문");
-        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
         when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
             JourneyExploreItem.builder()
                 .itemId(300L)
@@ -126,7 +297,9 @@ class JourneyServiceTest {
         JourneyItemCreateRequest request = itemRequest();
         request.setDisplayOrder(null);
         request.setNote("  ");
-        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
         when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
             JourneyExploreItem.builder().itemId(300L).itemType("PLACE").build()
         );
@@ -167,7 +340,9 @@ class JourneyServiceTest {
     @Test
     void addJourneyItem_throwsInternalError_whenGeneratedKeyIsMissing() {
         JourneyItemCreateRequest request = itemRequest();
-        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
         when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
             JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
         );
@@ -192,7 +367,9 @@ class JourneyServiceTest {
     @Test
     void addJourneyItem_throwsInternalError_whenCreatedItemCannotBeReloaded() {
         JourneyItemCreateRequest request = itemRequest();
-        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
         when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
             JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
         );
@@ -222,7 +399,9 @@ class JourneyServiceTest {
     @Test
     void addJourneyItem_throwsDuplicate_whenExistingItemMatchesTripDate() {
         JourneyItemCreateRequest request = itemRequest();
-        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
         when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
             JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
         );
@@ -247,7 +426,9 @@ class JourneyServiceTest {
     @Test
     void addJourneyItem_mapsConcurrentUniqueViolationToDuplicate() {
         JourneyItemCreateRequest request = itemRequest();
-        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
         when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
             JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
         );
@@ -274,7 +455,9 @@ class JourneyServiceTest {
     void addJourneyItem_throwsDateError_whenVisitDateIsOutsideJourney() {
         JourneyItemCreateRequest request = itemRequest();
         request.setVisitDate(LocalDate.of(2026, 4, 4));
-        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
         when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
             JourneyExploreItem.builder().itemId(300L).itemType("EVENT").build()
         );
@@ -295,7 +478,9 @@ class JourneyServiceTest {
     void addJourneyItem_throwsDisplayOrderError_whenNegative() {
         JourneyItemCreateRequest request = itemRequest();
         request.setDisplayOrder(-1);
-        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
 
         BusinessException exception = assertThrows(
             BusinessException.class,
@@ -312,7 +497,9 @@ class JourneyServiceTest {
     @Test
     void addJourneyItem_throwsNotFound_whenExploreItemIsUnavailable() {
         JourneyItemCreateRequest request = itemRequest();
-        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
         when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(null);
 
         BusinessException exception = assertThrows(
@@ -329,7 +516,9 @@ class JourneyServiceTest {
     @Test
     void addJourneyItem_throwsTypeError_whenExploreItemTypeIsUnsupported() {
         JourneyItemCreateRequest request = itemRequest();
-        when(journeyMapper.findJourneyById(90L)).thenReturn(ownedJourney(90L));
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
         when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
             JourneyExploreItem.builder().itemId(300L).itemType("HOTEL").build()
         );
@@ -350,7 +539,7 @@ class JourneyServiceTest {
         JourneyItemCreateRequest request = itemRequest();
         Journey journey = ownedJourney(90L);
         journey.setMemberId(2L);
-        when(journeyMapper.findJourneyById(90L)).thenReturn(journey);
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(journey);
 
         BusinessException exception = assertThrows(
             BusinessException.class,
@@ -699,6 +888,17 @@ class JourneyServiceTest {
         request.setEndDate(LocalDate.of(2026, 4, 1));
         request.setBudgetAmount(BigDecimal.valueOf(1000));
         request.setCompanionPreference("ONE_TO_ONE");
+        return request;
+    }
+
+    private JourneyUpdateRequest validUpdateRequest() {
+        JourneyUpdateRequest request = new JourneyUpdateRequest();
+        request.setTitle("Updated Seoul Journey");
+        request.setStartDate(LocalDate.of(2026, 3, 28));
+        request.setEndDate(LocalDate.of(2026, 4, 3));
+        request.setBudgetAmount(BigDecimal.valueOf(2000));
+        request.setCompanionPreference("FRIENDS");
+        request.setRegions(List.of());
         return request;
     }
 }

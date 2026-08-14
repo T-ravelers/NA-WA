@@ -7,6 +7,7 @@ import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
+import me.nawa.journey.dto.request.JourneyUpdateRequest;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineResponse;
@@ -17,6 +18,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -38,6 +40,18 @@ public class JourneyController {
     ) {
         return ApiResponse.success(
             journeyService.createJourney(member.getMemberId(), request)
+        );
+    }
+
+    @PutMapping("/{tripId}")
+    @ApiOperation("Journey 설정 정보 일괄 수정")
+    public ApiResponse<JourneyResponse> updateJourney(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long tripId,
+        @RequestBody JourneyUpdateRequest request
+    ) {
+        return ApiResponse.success(
+            journeyService.updateJourney(member.getMemberId(), tripId, request)
         );
     }
 
