@@ -2,6 +2,7 @@ package me.nawa.explore.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -55,6 +56,7 @@ class PlaceServiceTest {
         PlaceSearchRequest request = new PlaceSearchRequest();
         request.setPlaceKinds(List.of(" cafe ", "ETC", "cafe"));
         request.setRegion1(List.of(" 서울 ", "서울"));
+        request.setRegion2Other(true);
         request.setSort("popular");
         when(placeMapper.searchPlaces(any(), eq(0), eq(20), isNull()))
             .thenReturn(List.of());
@@ -64,6 +66,7 @@ class PlaceServiceTest {
 
         assertEquals(List.of("CAFE", "ETC"), request.getPlaceKinds());
         assertEquals(List.of("서울"), request.getRegion1());
+        assertTrue(request.getKnownRegion2Values().contains("성수"));
         assertEquals("POPULAR", request.getSort());
     }
 
@@ -94,7 +97,7 @@ class PlaceServiceTest {
         PlaceDetailResponse place = PlaceDetailResponse.builder()
             .placeId(1L).itemId(1L).name("테스트").placeKind("뷰티매장")
             .build();
-        when(placeMapper.findPlaceDetail(1L)).thenReturn(place);
+        when(placeMapper.findPlaceDetail(1L, "en")).thenReturn(place);
         when(placeMapper.findPlaceActivities(1L, "en")).thenReturn(List.of());
 
         PlaceDetailResponse result = placeService.getPlaceDetail(1L, "EN");
@@ -105,7 +108,7 @@ class PlaceServiceTest {
 
     @Test
     void getPlaceDetail_throwsPlaceNotFound() {
-        when(placeMapper.findPlaceDetail(1L)).thenReturn(null);
+        when(placeMapper.findPlaceDetail(1L, "en")).thenReturn(null);
         BusinessException exception = assertThrows(
             BusinessException.class,
             () -> placeService.getPlaceDetail(1L, "en")

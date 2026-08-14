@@ -1,5 +1,6 @@
 package me.nawa.explore.dto.request;
 
+import io.swagger.annotations.ApiModelProperty;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -20,6 +21,8 @@ public class EventSearchRequest {
     private List<String> region1;
     private List<String> region2;
     private Boolean region2Other;
+    @ApiModelProperty(hidden = true)
+    private List<String> knownRegion2Values;
     private List<String> region3;
     private String keyword;
 

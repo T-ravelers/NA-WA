@@ -61,6 +61,34 @@ class PlaceMapperXmlTest {
         assertTrue(sql.contains("p.is_active = TRUE"));
     }
 
+    @Test
+    void placeList_appliesOtherRegionOptionsAndLocalizedContent() throws Exception {
+        Configuration configuration = configuration();
+        PlaceSearchRequest request = new PlaceSearchRequest();
+        request.setRegion1(List.of("서울"));
+        request.setRegion2(List.of("성수"));
+        request.setRegion2Other(true);
+        request.setKnownRegion2Values(List.of("성수", "홍대"));
+        request.setHasParking(true);
+        request.setLanguage("en");
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+        parameters.put("offset", 0);
+        parameters.put("limit", 20);
+        parameters.put("memberId", null);
+
+        BoundSql boundSql = configuration.getMappedStatement(
+            "me.nawa.explore.mapper.PlaceMapper.searchPlaces"
+        ).getBoundSql(parameters);
+        String sql = boundSql.getSql();
+
+        assertTrue(sql.contains("OR p.region2 IS NULL"));
+        assertTrue(sql.contains("OR p.region2 NOT IN"));
+        assertTrue(sql.contains("p.has_parking = TRUE"));
+        assertTrue(sql.contains("LEFT JOIN place_translations pt"));
+        assertTrue(sql.contains("COALESCE(pt.name, p.name) AS name"));
+    }
+
     private Configuration configuration() throws Exception {
         Configuration configuration = new Configuration();
         try (InputStream input = Resources.getResourceAsStream(RESOURCE)) {

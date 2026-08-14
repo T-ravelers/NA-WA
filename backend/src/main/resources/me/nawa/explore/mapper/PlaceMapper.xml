@@ -63,11 +63,40 @@
             <foreach collection="request.region1" item="value"
                      open="(" separator="," close=")">#{value}</foreach>
         </if>
-        <if test="request.region2 != null and request.region2.size() > 0">
-            AND p.region2 IN
-            <foreach collection="request.region2" item="value"
-                     open="(" separator="," close=")">#{value}</foreach>
-        </if>
+        <choose>
+            <when test="request.region2Other == true and request.region1 != null and request.region1.size() > 0 and request.region2 != null and request.region2.size() > 0">
+                AND (
+                    p.region2 IN
+                    <foreach collection="request.region2" item="value"
+                             open="(" separator="," close=")">#{value}</foreach>
+                    OR p.region2 IS NULL
+                    OR TRIM(p.region2) = ''
+                    <if test="request.knownRegion2Values != null and request.knownRegion2Values.size() > 0">
+                        OR p.region2 NOT IN
+                        <foreach collection="request.knownRegion2Values" item="knownRegion2"
+                                 open="(" separator="," close=")">#{knownRegion2}</foreach>
+                    </if>
+                )
+            </when>
+            <when test="request.region2Other == true and request.region1 != null and request.region1.size() > 0">
+                AND (
+                    p.region2 IS NULL OR TRIM(p.region2) = ''
+                    <if test="request.knownRegion2Values != null and request.knownRegion2Values.size() > 0">
+                        OR p.region2 NOT IN
+                        <foreach collection="request.knownRegion2Values" item="knownRegion2"
+                                 open="(" separator="," close=")">#{knownRegion2}</foreach>
+                    </if>
+                )
+            </when>
+            <when test="request.region2Other == true">
+                AND 1 = 0
+            </when>
+            <when test="request.region2 != null and request.region2.size() > 0">
+                AND p.region2 IN
+                <foreach collection="request.region2" item="value"
+                         open="(" separator="," close=")">#{value}</foreach>
+            </when>
+        </choose>
         <if test="request.region3 != null and request.region3.size() > 0">
             AND p.region3 IN
             <foreach collection="request.region3" item="value"
@@ -75,9 +104,9 @@
         </if>
         <if test="request.keyword != null and request.keyword != ''">
             AND (
-                p.name LIKE CONCAT('%', #{request.keyword}, '%')
-                OR p.brand LIKE CONCAT('%', #{request.keyword}, '%')
-                OR p.branch LIKE CONCAT('%', #{request.keyword}, '%')
+                COALESCE(pt.name, p.name) LIKE CONCAT('%', #{request.keyword}, '%')
+                OR COALESCE(pt.brand, p.brand) LIKE CONCAT('%', #{request.keyword}, '%')
+                OR COALESCE(pt.branch, p.branch) LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.address_road LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.address_detail LIKE CONCAT('%', #{request.keyword}, '%')
             )
@@ -129,7 +158,11 @@
     <select id="searchPlaces" resultMap="placeSummaryResultMap">
         SELECT
             p.place_id AS item_id,
-            p.name, p.brand, p.branch, p.place_kind, p.thumbnail_url,
+            COALESCE(pt.name, p.name) AS name,
+            COALESCE(pt.brand, p.brand) AS brand,
+            COALESCE(pt.branch, p.branch) AS branch,
+            COALESCE(pt.place_kind, p.place_kind) AS place_kind,
+            p.thumbnail_url,
             p.image_urls, p.region1, p.region2, p.region3, p.address_road,
             p.address_detail, p.latitude, p.longitude, p.has_foreign_lang,
             p.has_parking, p.reservable, p.takeout_available,
@@ -138,6 +171,10 @@
             p.opening_hours, p.closed_days
         FROM explore_items ei
         JOIN place p ON p.place_id = ei.item_id
+        LEFT JOIN place_translations pt
+          ON pt.place_id = p.place_id
+         AND pt.language_code = #{request.language}
+         AND pt.deleted_at IS NULL
         WHERE <include refid="placeListWhere"/>
         <choose>
             <when test="request.sort == 'POPULAR'">
@@ -156,13 +193,21 @@
         SELECT COUNT(*)
         FROM explore_items ei
         JOIN place p ON p.place_id = ei.item_id
+        LEFT JOIN place_translations pt
+          ON pt.place_id = p.place_id
+         AND pt.language_code = #{request.language}
+         AND pt.deleted_at IS NULL
         WHERE <include refid="placeListWhere"/>
     </select>
 
     <select id="findPlaceDetail" resultMap="placeDetailResultMap">
         SELECT
-            p.place_id, p.place_id AS item_id, p.name, p.brand, p.branch,
-            p.place_kind, p.thumbnail_url, p.image_urls, p.source_url,
+            p.place_id, p.place_id AS item_id,
+            COALESCE(pt.name, p.name) AS name,
+            COALESCE(pt.brand, p.brand) AS brand,
+            COALESCE(pt.branch, p.branch) AS branch,
+            COALESCE(pt.place_kind, p.place_kind) AS place_kind,
+            p.thumbnail_url, p.image_urls, p.source_url,
             p.region1, p.region2, p.region3, p.address_road,
             p.address_detail, p.postal_code, p.latitude, p.longitude,
             p.opening_hours, p.closed_days, p.menu_summary, p.tel,
@@ -172,6 +217,10 @@
             p.view_count, p.favorite_count
         FROM explore_items ei
         JOIN place p ON p.place_id = ei.item_id
+        LEFT JOIN place_translations pt
+          ON pt.place_id = p.place_id
+         AND pt.language_code = #{language}
+         AND pt.deleted_at IS NULL
         WHERE ei.item_type = 'PLACE'
           AND ei.item_id = #{placeId}
           AND ei.approval_status = 'APPROVED'

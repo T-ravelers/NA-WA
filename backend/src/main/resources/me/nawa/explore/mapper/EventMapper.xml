@@ -35,10 +35,10 @@
             e.event_id,
             e.event_type,
             e.event_kind,
-            e.title,
-            e.subtitle,
-            e.description,
-            e.program_text,
+            COALESCE(et.title, e.title) AS title,
+            COALESCE(et.subtitle, e.subtitle) AS subtitle,
+            COALESCE(et.description, e.description) AS description,
+            COALESCE(et.program_text, e.program_text) AS program_text,
             e.thumbnail_url,
             e.image_urls,
             e.links,
@@ -52,7 +52,7 @@
             e.open_days,
             e.open_weekend,
             e.opens_late,
-            e.venue_name,
+            COALESCE(et.venue_name, e.venue_name) AS venue_name,
             e.region1,
             e.region2,
             e.region3,
@@ -61,9 +61,9 @@
             e.longitude,
             e.has_photo_zone,
             e.is_experience,
-            e.age_limit,
+            COALESCE(et.age_limit, e.age_limit) AS age_limit,
             e.is_free,
-            e.price_text,
+            COALESCE(et.price_text, e.price_text) AS price_text,
             e.has_benefit,
             e.reservable,
             e.contact,
@@ -71,6 +71,10 @@
         FROM explore_items ei
                  JOIN event e
                       ON e.event_id = ei.item_id
+                 LEFT JOIN event_translations et
+                      ON et.event_id = e.event_id
+                     AND et.language_code = #{language}
+                     AND et.deleted_at IS NULL
         WHERE ei.item_type = 'EVENT'
           AND ei.item_id = #{eventId}
           AND ei.approval_status = 'APPROVED'
@@ -112,11 +116,16 @@
                  a.activity_id
     </select>
 
-    <!-- region2Other는 선택한 region1에서 세부지역이 분류되지 않은 데이터를 의미한다. -->
+    <!-- region2Other는 선택한 region1의 공식 세부지역 목록 밖 데이터를 의미한다. -->
     <sql id="region2OtherCondition">
         (
             e.region2 IS NULL
             OR TRIM(e.region2) = ''
+            <if test="request.knownRegion2Values != null and request.knownRegion2Values.size() > 0">
+                OR e.region2 NOT IN
+                <foreach collection="request.knownRegion2Values" item="knownRegion2"
+                         open="(" separator="," close=")">#{knownRegion2}</foreach>
+            </if>
         )
     </sql>
 
@@ -194,9 +203,9 @@
 
         <if test="request.keyword != null and request.keyword != ''">
             AND (
-            e.title LIKE CONCAT('%', #{request.keyword}, '%')
-            OR e.subtitle LIKE CONCAT('%', #{request.keyword}, '%')
-            OR e.description LIKE CONCAT('%', #{request.keyword}, '%')
+            COALESCE(et.title, e.title) LIKE CONCAT('%', #{request.keyword}, '%')
+            OR COALESCE(et.subtitle, e.subtitle) LIKE CONCAT('%', #{request.keyword}, '%')
+            OR COALESCE(et.description, e.description) LIKE CONCAT('%', #{request.keyword}, '%')
             )
         </if>
 
@@ -305,8 +314,8 @@
         e.event_id AS item_id,
         e.event_kind,
         e.status,
-        e.title,
-        e.subtitle,
+        COALESCE(et.title, e.title) AS title,
+        COALESCE(et.subtitle, e.subtitle) AS subtitle,
         e.thumbnail_url,
         e.region1,
         e.region2,
@@ -318,6 +327,10 @@
         FROM explore_items ei
         JOIN event e
         ON e.event_id = ei.item_id
+        LEFT JOIN event_translations et
+        ON et.event_id = e.event_id
+        AND et.language_code = #{request.language}
+        AND et.deleted_at IS NULL
         WHERE
         <include refid="eventListWhere"/>
         <choose>
@@ -340,6 +353,10 @@
         FROM explore_items ei
         JOIN event e
         ON e.event_id = ei.item_id
+        LEFT JOIN event_translations et
+        ON et.event_id = e.event_id
+        AND et.language_code = #{request.language}
+        AND et.deleted_at IS NULL
         WHERE
         <include refid="eventListWhere"/>
     </select>

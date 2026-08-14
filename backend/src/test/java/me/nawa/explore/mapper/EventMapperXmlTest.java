@@ -133,6 +133,20 @@ class EventMapperXmlTest {
         ));
         assertFalse(openingSoonSql.contains("e.status = 'SCHEDULED'"));
 
+        EventSearchRequest otherRegionRequest = new EventSearchRequest();
+        otherRegionRequest.setRegion1(List.of("서울"));
+        otherRegionRequest.setRegion2Other(true);
+        otherRegionRequest.setKnownRegion2Values(List.of("성수", "홍대"));
+        Map<String, Object> otherRegionParameters = new HashMap<>();
+        otherRegionParameters.put("request", otherRegionRequest);
+        otherRegionParameters.put("offset", 0);
+        String otherRegionSql = normalizedSql(
+            configuration,
+            "me.nawa.explore.mapper.EventMapper.searchEvents",
+            otherRegionParameters
+        );
+        assertTrue(otherRegionSql.contains("OR e.region2 NOT IN"));
+
         String detailSql = normalizedSql(
             configuration,
             "me.nawa.explore.mapper.EventMapper.findEventDetail",
@@ -141,6 +155,7 @@ class EventMapperXmlTest {
         assertTrue(detailSql.contains(
             "(e.end_date IS NULL OR e.end_date >= CURRENT_DATE())"
         ));
+        assertTrue(detailSql.contains("LEFT JOIN event_translations et"));
         assertFalse(detailSql.contains(
             "e.status IN ('SCHEDULED', 'ONGOING')"
         ));

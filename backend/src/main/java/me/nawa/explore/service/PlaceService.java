@@ -62,7 +62,9 @@ public class PlaceService {
         String normalizedLanguage = StringUtils.hasText(language)
             ? language.toLowerCase(Locale.ROOT)
             : "en";
-        PlaceDetailResponse place = placeMapper.findPlaceDetail(placeId);
+        PlaceDetailResponse place = placeMapper.findPlaceDetail(
+            placeId, normalizedLanguage
+        );
         if (place == null) {
             throw new BusinessException(ExploreErrorCode.PLACE_NOT_FOUND);
         }
@@ -95,6 +97,9 @@ public class PlaceService {
         request.setRegion1(normalizeTextValues(request.getRegion1()));
         request.setRegion2(normalizeTextValues(request.getRegion2()));
         request.setRegion3(normalizeTextValues(request.getRegion3()));
+        request.setKnownRegion2Values(
+            ExploreRegionPolicy.knownRegion2Values(request.getRegion1())
+        );
         request.setKeyword(StringUtils.hasText(request.getKeyword())
             ? request.getKeyword().trim() : null);
         String sort = StringUtils.hasText(request.getSort())
@@ -103,7 +108,8 @@ public class PlaceService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         request.setSort(sort);
-        if (!StringUtils.hasText(request.getLanguage())) request.setLanguage("en");
+        request.setLanguage(StringUtils.hasText(request.getLanguage())
+            ? request.getLanguage().trim().toLowerCase(Locale.ROOT) : "en");
     }
 
     private void validateSavedOnly(PlaceSearchRequest request, Long memberId) {
