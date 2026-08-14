@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { IconArrowsExchange } from '@tabler/icons-vue'
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import AppTicket from '@/shared/ui/AppTicket.vue'
 
@@ -14,19 +14,55 @@ import type { ReportKpiCardProps } from './types'
  * 아니라 `AppTicket`을 쓴다. 노치와 절취선은 `AppTicket`이 소유하므로 여기서 다시
  * 그리지 않는다.
  *
- * **시안과 좌우가 뒤집혀 있다.** 시안은 금액이 왼쪽, 아이콘 칸이 오른쪽인데 `AppTicket`의
- * 가로형은 `bodySize`가 **왼쪽** 고정 폭이고 stub이 남은 폭을 먹는다. 금액을 고정 폭에
- * 넣으면 자릿수가 늘어날 때 절취선이 금액 위로 올라오므로, 고정 폭 쪽에 아이콘을 두고
- * 금액을 가변 폭에 둔다. 좌우를 시안대로 되돌리려면 `AppTicket`에 stub 고정 폭 prop이
- * 필요한데 그것은 `shared/ui` 변경이라 이 이슈 범위 밖이다.
+ * `AppTicket`의 가로형 body가 왼쪽 고정 폭을 차지하므로 금액 영역을 body에 두고,
+ * 아이콘을 오른쪽 stub에 둔다. 금액은 고정 영역 안에서 줄바꿈할 수 있어 자릿수가
+ * 긴 통화 문자열도 절취선을 넘어가거나 조용히 잘리지 않는다.
  *
  * 표시 문자열은 전부 props로 받는다. `useI18n`을 쓰면 상위(#153)의 i18n 등록 없이는
  * 렌더되지 않아 props-only 계약이 깨진다.
  */
 const { data, heading = undefined, locale = 'en' } = defineProps<ReportKpiCardProps>()
 
-/** 아이콘 칸 폭. 시안 실측 64px이다. 노치 지름 12도 시안 실측값이다. */
-const ICON_COLUMN_WIDTH = 64
+/** 금액 영역 폭. 시안의 350px 카드에서 왼쪽 약 253px을 차지한다. */
+const DEFAULT_AMOUNT_COLUMN_WIDTH = 253
+
+const ticketContainer = ref<HTMLElement | null>(null)
+const measuredContainerWidth = ref<number | null>(null)
+let resizeObserver: ResizeObserver | null = null
+
+const amountColumnWidth = computed(() => {
+  const width = measuredContainerWidth.value
+
+  if (width === null || width <= 0) {
+    return DEFAULT_AMOUNT_COLUMN_WIDTH
+  }
+
+  return Math.min(DEFAULT_AMOUNT_COLUMN_WIDTH, Math.floor(width * 0.75))
+})
+
+const totalAmountClass = computed(() =>
+  amountColumnWidth.value < DEFAULT_AMOUNT_COLUMN_WIDTH ? 'text-title' : 'text-data-lg',
+)
+
+onMounted(() => {
+  if (ticketContainer.value === null || typeof ResizeObserver === 'undefined') {
+    return
+  }
+
+  resizeObserver = new ResizeObserver(([entry]) => {
+    const width = entry?.contentRect.width
+
+    if (width !== undefined && Number.isFinite(width)) {
+      measuredContainerWidth.value = width
+    }
+  })
+  resizeObserver.observe(ticketContainer.value)
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+})
 
 const totalText = computed(() => formatMoney(data.totalSpent, data.currency, locale))
 const dailyAverageText = computed(() => formatMoney(data.dailyAverage, data.currency, locale))
@@ -41,39 +77,52 @@ const dailyAverageText = computed(() => formatMoney(data.dailyAverage, data.curr
       {{ heading }}
     </h2>
 
-    <AppTicket
-      orientation="horizontal"
-      :body-size="ICON_COLUMN_WIDTH"
-      :notch-size="12"
-      tone="paper"
+    <div
+      ref="ticketContainer"
+      class="w-full"
     >
-      <template #body>
-        <!-- 아이콘은 장식이다. 값은 모두 stub 쪽 텍스트로 읽힌다. -->
-        <div
-          aria-hidden="true"
-          class="flex size-full items-center justify-center"
-        >
-          <span class="flex size-11 items-center justify-center rounded-pill border-2">
-            <IconArrowsExchange
-              :size="20"
-              :stroke-width="1.75"
-            />
-          </span>
-        </div>
-      </template>
+      <AppTicket
+        orientation="horizontal"
+        :body-size="amountColumnWidth"
+        :notch-size="12"
+        tone="paper"
+        class="min-h-35"
+      >
+        <template #body>
+          <dl class="flex min-w-0 flex-col justify-center gap-3 p-5">
+            <div class="flex min-w-0 flex-col gap-1">
+              <dt class="text-micro uppercase text-on-paper/65">{{ totalLabel }}</dt>
+              <dd
+                class="break-all font-display tabular-nums text-on-paper"
+                :class="totalAmountClass"
+              >
+                {{ totalText }}
+              </dd>
+            </div>
+            <div class="flex min-w-0 flex-col gap-1">
+              <dt class="text-micro uppercase text-on-paper/65">{{ dailyAverageLabel }}</dt>
+              <dd class="break-all text-title tabular-nums text-on-paper">
+                {{ dailyAverageText }}
+              </dd>
+            </div>
+          </dl>
+        </template>
 
-      <template #stub>
-        <dl class="flex flex-col gap-3 p-5">
-          <div class="flex flex-col gap-1">
-            <dt class="text-micro uppercase text-on-paper/65">{{ totalLabel }}</dt>
-            <dd class="font-display text-data-xl tabular-nums text-on-paper">{{ totalText }}</dd>
+        <template #stub>
+          <!-- 아이콘은 장식이다. 값은 모두 body 쪽 텍스트로 읽힌다. -->
+          <div
+            aria-hidden="true"
+            class="flex size-full items-center justify-center"
+          >
+            <span class="flex size-11 items-center justify-center rounded-pill border-2">
+              <IconArrowsExchange
+                :size="20"
+                :stroke-width="1.75"
+              />
+            </span>
           </div>
-          <div class="flex flex-col gap-1">
-            <dt class="text-micro uppercase text-on-paper/65">{{ dailyAverageLabel }}</dt>
-            <dd class="text-title tabular-nums text-on-paper">{{ dailyAverageText }}</dd>
-          </div>
-        </dl>
-      </template>
-    </AppTicket>
+        </template>
+      </AppTicket>
+    </div>
   </section>
 </template>

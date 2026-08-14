@@ -57,6 +57,32 @@ describe('reportApi', () => {
     expect(get).toHaveBeenNthCalledWith(2, '/api/v1/reports')
   })
 
+  it('keeps journey item counts on the report-owned journey summary', async () => {
+    get.mockResolvedValueOnce({
+      data: [
+        {
+          tripId: 7,
+          title: 'Jeju Island',
+          startDate: '2026-07-18',
+          endDate: '2026-07-27',
+          eventCount: 5,
+          placeCount: 9,
+        },
+      ],
+    })
+
+    await expect(fetchReportJourneys()).resolves.toEqual([
+      {
+        tripId: 7,
+        title: 'Jeju Island',
+        startDate: '2026-07-18',
+        endDate: '2026-07-27',
+        eventCount: 5,
+        placeCount: 9,
+      },
+    ])
+  })
+
   it('maps the candidate array and numeric amount to the frontend model', async () => {
     get.mockResolvedValueOnce({ data: null }).mockResolvedValueOnce({
       data: [
