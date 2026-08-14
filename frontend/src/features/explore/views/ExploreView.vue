@@ -24,7 +24,6 @@ import {
   type EventSearchFilters,
   type EventSort,
 } from '../model/eventExplore'
-import { useExploreFilterMemoryStore } from '../model/exploreFilterMemory'
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { EVENT_SECTOR_OPTIONS, PLACE_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
 import {
@@ -41,8 +40,6 @@ type ExploreTab = 'events' | 'places'
 const { locale, t } = useI18n()
 const route = useRoute()
 const router = useRouter()
-
-const filterMemory = useExploreFilterMemoryStore()
 
 // Journey 화면에서 날짜를 지정해 넘어온 맥락은 필터 동기화가 URL에서 지우기 전에 store로 옮겨 담는다.
 useExploreReturnContextStore().capture({
@@ -287,7 +284,6 @@ watch(
     addQueryValue(query, 'preReservationOnly', next.preReservationOnly)
     addQueryValue(query, 'experienceOnly', next.experienceOnly)
 
-    filterMemory.remember(query)
     router.replace({ query }).catch(() => undefined)
   },
   { deep: true },
@@ -316,7 +312,6 @@ watch(
     addQueryValue(query, 'hasRestroom', next.hasRestroom)
     addQueryValue(query, 'savedOnly', next.savedOnly)
     addQueryValue(query, 'placePage', next.page && next.page > 0 ? String(next.page) : undefined)
-    filterMemory.remember(query)
     router.replace({ query }).catch(() => undefined)
   },
   { deep: true },
