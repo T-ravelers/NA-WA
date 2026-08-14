@@ -9,6 +9,7 @@ import {
   IconCheck,
 } from '@tabler/icons-vue'
 
+import { serializeCalendarDate } from '@/shared/lib/datetime'
 import AppButton from '@/shared/ui/AppButton.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 
@@ -210,7 +211,7 @@ const calendarDays = computed(() => {
     const inMonth = rawDay >= 1 && rawDay <= daysInMonth
     const date = new Date(year, month, rawDay)
     const day = inMonth ? rawDay : rawDay < 1 ? previousMonthDays + rawDay : rawDay - daysInMonth
-    cells.push({ date: formatDate(date), day, inMonth })
+    cells.push({ date: serializeCalendarDate(date), day, inMonth })
   }
 
   return cells
@@ -226,13 +227,6 @@ function cloneFilters(filters: EventSearchFilters): EventSearchFilters {
     region2: filters.region2 ? [...filters.region2] : undefined,
     region3: filters.region3 ? [...filters.region3] : undefined,
   }
-}
-
-function formatDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 function setDatePreset(value: string): void {

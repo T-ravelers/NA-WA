@@ -80,6 +80,9 @@ method·상태와 issue path/code/expected만 기록하며 response body, issue 
 > 발견이 늦습니다. 새 날짜 필드를 쓸 때는 백엔드 DTO에 `@JsonFormat`이 있는지
 > 먼저 확인하세요. 프론트 타입 선언과 단위 테스트로는 잡히지 않습니다.
 
+공용 파서는 `src/shared/lib/datetime.ts`의 `parseServerDateTime`만 사용합니다. 날짜 전용
+`YYYY-MM-DD` 값은 같은 파일의 달력 전용 함수를 사용하고 서버 시각 파서에 넘기지 않습니다.
+
 ## PWA 캐시 경계
 
 앱 셸과 정적 자원만 precache합니다. 인증·개인정보·정산·mutation 응답, 일반 API,

@@ -1,3 +1,5 @@
+export { formatKrw } from '@/shared/lib/money'
+
 export const TOPUP_CURRENCY = 'KRW'
 export const DEFAULT_TOPUP_METHOD = 'STRIPE_CARD'
 export const QUICK_TOPUP_AMOUNTS = [10_000, 30_000, 50_000, 100_000] as const
@@ -57,9 +59,6 @@ export const topupKeys = {
   all: ['topups'] as const,
   methods: () => [...topupKeys.all, 'methods'] as const,
 }
-
-export const formatKrw = (amount: string | number): string =>
-  `₩${Number(amount).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
 export const getTopupMethodLabel = (method: TopupMethod): string => {
   if (method.type === DEFAULT_TOPUP_METHOD) return 'Stripe'
