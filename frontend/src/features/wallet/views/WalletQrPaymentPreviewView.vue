@@ -13,8 +13,9 @@ import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 
 import { executeQrPayment, previewQrPayment } from '../api/qrPaymentApi'
+import { useWalletAppointmentIntegration } from '../model/appointmentIntegration'
+import { parseServerDateTime } from '../model/walletHome'
 import {
-  ACTIVE_APPOINTMENTS,
   formatKrw,
   isValidQrPaymentAmount,
   qrPaymentKeys,
@@ -24,14 +25,16 @@ import {
 import { useQrPaymentSessionStore } from '../model/qrPaymentSession'
 
 const i18n = useI18n()
-const { t } = i18n
+const { t, locale } = i18n
 const router = useRouter()
 const qrPaymentSession = useQrPaymentSessionStore()
+const { useMyOngoingAppointmentsQuery } = useWalletAppointmentIntegration()
+const ongoingAppointmentsQuery = useMyOngoingAppointmentsQuery()
 
 const session = computed(() => qrPaymentSession.session)
 
 const spendingScope = ref<SpendingScope>('personal')
-const selectedAppointmentId = ref('')
+const selectedAppointmentId = ref<number | null>(null)
 const enteredAmount = ref<number | null>(null)
 
 const spendingOptions = computed(() => [
@@ -41,8 +44,28 @@ const spendingOptions = computed(() => [
 
 const isSharedExpense = computed(() => spendingScope.value === 'shared')
 const selectedAppointment = computed(() =>
-  ACTIVE_APPOINTMENTS.find((appointment) => appointment.id === selectedAppointmentId.value),
+  ongoingAppointmentsQuery.data.value?.find(
+    (appointment) => appointment.appointmentId === selectedAppointmentId.value,
+  ),
 )
+
+const appointmentPeriodFormatter = computed(
+  () =>
+    new Intl.DateTimeFormat(locale.value, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'Asia/Seoul',
+    }),
+)
+
+function formatAppointmentPeriod(activityStartAt: string, activityEndAt: string): string {
+  const start = parseServerDateTime(activityStartAt)
+  const end = parseServerDateTime(activityEndAt)
+
+  if (start === null || end === null) return ''
+
+  return `${appointmentPeriodFormatter.value.format(start)} – ${appointmentPeriodFormatter.value.format(end)}`
+}
 
 const finalAmount = computed<number | null>(() => {
   const resolved = session.value?.resolved
@@ -55,7 +78,8 @@ const finalAmount = computed<number | null>(() => {
 const isPreviewReady = computed(
   () =>
     session.value !== null &&
-    spendingScope.value === 'personal' &&
+    (spendingScope.value === 'personal' ||
+      (spendingScope.value === 'shared' && selectedAppointment.value !== undefined)) &&
     isValidQrPaymentAmount(finalAmount.value),
 )
 
@@ -65,6 +89,7 @@ const previewQuery = useQuery({
       session.value?.qrToken ?? '',
       finalAmount.value ?? 0,
       toQrPaymentSpendingScope(spendingScope.value),
+      selectedAppointment.value?.appointmentId ?? null,
     ),
   ),
   queryFn: () =>
@@ -72,7 +97,7 @@ const previewQuery = useQuery({
       qrToken: session.value?.qrToken ?? '',
       amount: finalAmount.value ?? 0,
       spendingScope: toQrPaymentSpendingScope(spendingScope.value),
-      appointmentId: null,
+      appointmentId: selectedAppointment.value?.appointmentId ?? null,
     }),
   enabled: isPreviewReady,
 })
@@ -108,10 +133,7 @@ const executeErrorMessage = computed(() => {
 })
 
 const canPay = computed(
-  () =>
-    spendingScope.value === 'personal' &&
-    previewQuery.data.value?.canPay === true &&
-    !executeMutation.isPending.value,
+  () => previewQuery.data.value?.canPay === true && !executeMutation.isPending.value,
 )
 
 const goBack = (): void => {
@@ -146,7 +168,7 @@ const completePayment = (): void => {
         qrToken: session.value.qrToken,
         amount: finalAmount.value,
         spendingScope: toQrPaymentSpendingScope(spendingScope.value),
-        appointmentId: null,
+        appointmentId: selectedAppointment.value?.appointmentId ?? null,
       },
       idempotencyKey: idempotencyKey.value,
     },
@@ -309,42 +331,66 @@ const completePayment = (): void => {
             {{ t('wallet.qrPayment.activeAppointmentsHint') }}
           </p>
 
-          <div class="mt-3 space-y-2">
-            <label
-              v-for="appointment in ACTIVE_APPOINTMENTS"
-              :key="appointment.id"
-              class="block cursor-pointer rounded-sm border p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
-              :class="
-                selectedAppointmentId === appointment.id
-                  ? 'border-ink bg-surface-2'
-                  : 'border-hairline bg-transparent'
-              "
-            >
-              <input
-                v-model="selectedAppointmentId"
-                class="sr-only"
-                type="radio"
-                name="active-appointment"
-                :value="appointment.id"
-              />
-              <span class="flex items-center justify-between gap-3">
-                <span class="text-body-sm font-semibold">{{ appointment.name }}</span>
-                <span class="shrink-0 text-caption text-ink-3">{{ appointment.period }}</span>
-              </span>
-            </label>
-          </div>
-
           <p
-            v-if="selectedAppointment === undefined"
-            class="mt-3 text-caption text-warning"
-            role="status"
+            v-if="ongoingAppointmentsQuery.isPending.value"
+            class="mt-3 text-caption text-ink-3"
           >
-            {{ t('wallet.qrPayment.selectAppointment') }}
+            {{ t('wallet.qrPayment.appointmentsLoading') }}
           </p>
+          <p
+            v-else-if="ongoingAppointmentsQuery.isError.value"
+            role="alert"
+            class="mt-3 text-caption text-ink-3"
+          >
+            {{ t('wallet.qrPayment.appointmentsError') }}
+          </p>
+          <p
+            v-else-if="(ongoingAppointmentsQuery.data.value ?? []).length === 0"
+            class="mt-3 text-caption text-ink-3"
+          >
+            {{ t('wallet.qrPayment.appointmentsEmpty') }}
+          </p>
+          <template v-else>
+            <div class="mt-3 space-y-2">
+              <label
+                v-for="appointment in ongoingAppointmentsQuery.data.value"
+                :key="appointment.appointmentId"
+                class="block cursor-pointer rounded-sm border p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
+                :class="
+                  selectedAppointmentId === appointment.appointmentId
+                    ? 'border-ink bg-surface-2'
+                    : 'border-hairline bg-transparent'
+                "
+              >
+                <input
+                  v-model="selectedAppointmentId"
+                  class="sr-only"
+                  type="radio"
+                  name="active-appointment"
+                  :value="appointment.appointmentId"
+                />
+                <span class="flex items-center justify-between gap-3">
+                  <span class="text-body-sm font-semibold">{{ appointment.appointmentName }}</span>
+                  <span class="shrink-0 text-caption text-ink-3">
+                    {{
+                      formatAppointmentPeriod(
+                        appointment.activityStartAt,
+                        appointment.activityEndAt,
+                      )
+                    }}
+                  </span>
+                </span>
+              </label>
+            </div>
 
-          <p class="mt-3 text-caption text-ink-3">
-            {{ t('wallet.qrPayment.sharedUnavailable') }}
-          </p>
+            <p
+              v-if="selectedAppointment === undefined"
+              class="mt-3 text-caption text-warning"
+              role="status"
+            >
+              {{ t('wallet.qrPayment.selectAppointment') }}
+            </p>
+          </template>
         </fieldset>
       </AppCard>
 

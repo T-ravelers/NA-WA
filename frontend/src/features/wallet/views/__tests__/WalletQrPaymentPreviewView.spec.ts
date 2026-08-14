@@ -2,11 +2,16 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref, type Ref } from 'vue'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
 import { executeQrPayment, previewQrPayment } from '../../api/qrPaymentApi'
+import {
+  walletAppointmentIntegrationKey,
+  type WalletOngoingAppointment,
+} from '../../model/appointmentIntegration'
 import { useQrPaymentSessionStore } from '../../model/qrPaymentSession'
 import WalletQrPaymentPreviewView from '../WalletQrPaymentPreviewView.vue'
 
@@ -39,6 +44,13 @@ const executeResponse = {
   completedAt: '2026-08-13T12:00:00',
 }
 
+const seoulNightTour: WalletOngoingAppointment = {
+  appointmentId: 42,
+  appointmentName: 'Seoul Night Tour',
+  activityStartAt: '2026-08-10T18:00:00',
+  activityEndAt: '2026-08-12T22:00:00',
+}
+
 function createTestRouter(): Router {
   return createRouter({
     history: createMemoryHistory(),
@@ -59,7 +71,25 @@ function createTestRouter(): Router {
   })
 }
 
-async function mountView(): Promise<{ router: Router; wrapper: ReturnType<typeof mount> }> {
+interface OngoingAppointmentsQueryState {
+  data: Ref<WalletOngoingAppointment[] | undefined>
+  isPending: Ref<boolean>
+  isError: Ref<boolean>
+}
+
+function ongoingAppointmentsQueryState(
+  appointments: WalletOngoingAppointment[] = [seoulNightTour],
+): OngoingAppointmentsQueryState {
+  return {
+    data: ref(appointments),
+    isPending: ref(false),
+    isError: ref(false),
+  }
+}
+
+async function mountView(
+  appointmentsQuery: OngoingAppointmentsQueryState = ongoingAppointmentsQueryState(),
+): Promise<{ router: Router; wrapper: ReturnType<typeof mount> }> {
   const router = createTestRouter()
   setActivePinia(createPinia())
   await router.push('/wallet/qr/payment/preview')
@@ -79,6 +109,11 @@ async function mountView(): Promise<{ router: Router; wrapper: ReturnType<typeof
           },
         ],
       ],
+      provide: {
+        [walletAppointmentIntegrationKey as symbol]: {
+          useMyOngoingAppointmentsQuery: () => appointmentsQuery,
+        },
+      },
     },
   })
 
@@ -99,6 +134,13 @@ function setFixedAmountSession(): void {
       expiresAt: '2026-08-13T14:32:00',
     },
   })
+}
+
+async function selectSharedExpense(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await wrapper
+    .findAll('[role="radio"]')
+    .find((option) => option.text() === 'Shared')
+    ?.trigger('click')
 }
 
 describe('WalletQrPaymentPreviewView', () => {
@@ -176,26 +218,57 @@ describe('WalletQrPaymentPreviewView', () => {
     })
   })
 
-  it('disables Pay and shows a notice for shared expenses regardless of appointment selection', async () => {
+  it('keeps Pay disabled for shared expenses until an appointment is selected', async () => {
     const { wrapper } = await mountView()
     setFixedAmountSession()
     await flushPromises()
 
-    await wrapper
-      .findAll('[role="radio"]')
-      .find((option) => option.text() === 'Shared')
-      ?.trigger('click')
-    await wrapper.get('input[value="seoul-night-tour"]').setValue(true)
+    await selectSharedExpense(wrapper)
+    await flushPromises()
 
-    expect(wrapper.text()).toContain(
-      'Shared expenses need a linked appointment, which is not supported yet.',
-    )
+    expect(vi.mocked(previewQrPayment)).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Select an appointment to continue.')
     expect(
       wrapper
         .findAll('button')
         .find((button) => button.text() === 'Pay')
         ?.attributes('disabled'),
     ).toBeDefined()
+  })
+
+  it('shows an empty-state message when there are no ongoing appointments to link', async () => {
+    const { wrapper } = await mountView(ongoingAppointmentsQueryState([]))
+    setFixedAmountSession()
+    await flushPromises()
+
+    await selectSharedExpense(wrapper)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('You have no ongoing appointments to link this expense to.')
+  })
+
+  it('requests a shared-expense preview with the selected appointment id and enables Pay', async () => {
+    const { wrapper } = await mountView()
+    setFixedAmountSession()
+    await flushPromises()
+    vi.mocked(previewQrPayment).mockClear()
+
+    await selectSharedExpense(wrapper)
+    await wrapper.get('input[value="42"]').setValue(true)
+    await flushPromises()
+
+    expect(vi.mocked(previewQrPayment).mock.calls[0]?.[0]).toEqual({
+      qrToken: 'tok-abc',
+      amount: 18_500,
+      spendingScope: 'SHARED',
+      appointmentId: 42,
+    })
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Pay')
+        ?.attributes('disabled'),
+    ).toBeUndefined()
   })
 
   it('executes the payment and navigates to the complete screen with the transfer id', async () => {
@@ -222,6 +295,29 @@ describe('WalletQrPaymentPreviewView', () => {
       params: { transferId: '77' },
     })
     expect(useQrPaymentSessionStore().session).toBeNull()
+  })
+
+  it('executes a shared-expense payment with the selected appointment id', async () => {
+    const { wrapper } = await mountView()
+    setFixedAmountSession()
+    await flushPromises()
+
+    await selectSharedExpense(wrapper)
+    await wrapper.get('input[value="42"]').setValue(true)
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Pay')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(executeQrPayment).mock.calls[0]?.[0]).toEqual({
+      qrToken: 'tok-abc',
+      amount: 18_500,
+      spendingScope: 'SHARED',
+      appointmentId: 42,
+    })
   })
 
   it('shows an error and keeps the session when execution fails', async () => {
