@@ -24,6 +24,7 @@ import {
   type EventSearchFilters,
   type EventSort,
 } from '../model/eventExplore'
+import { useExploreFilterMemoryStore } from '../model/exploreFilterMemory'
 import { EVENT_SECTOR_OPTIONS, PLACE_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
 import {
   PLACE_KINDS,
@@ -39,6 +40,7 @@ type ExploreTab = 'events' | 'places'
 const { locale, t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const filterMemory = useExploreFilterMemoryStore()
 
 const selectedTab = ref<ExploreTab>(readExploreTab(readQueryString('tab')))
 const selectedSheet = ref<ExploreSheetKind | null>(null)
@@ -276,6 +278,7 @@ watch(
     addQueryValue(query, 'preReservationOnly', next.preReservationOnly)
     addQueryValue(query, 'experienceOnly', next.experienceOnly)
 
+    filterMemory.remember(query)
     router.replace({ query }).catch(() => undefined)
   },
   { deep: true },
@@ -304,6 +307,7 @@ watch(
     addQueryValue(query, 'hasRestroom', next.hasRestroom)
     addQueryValue(query, 'savedOnly', next.savedOnly)
     addQueryValue(query, 'placePage', next.page && next.page > 0 ? String(next.page) : undefined)
+    filterMemory.remember(query)
     router.replace({ query }).catch(() => undefined)
   },
   { deep: true },
