@@ -42,7 +42,7 @@ const scheduleLabel = computed(() => {
 
   if (!start || !end) return t('appointment.list.scheduleUnavailable')
 
-  return `${dateFormatter.value.format(start)} · ${timeFormatter.value.format(start)}–${timeFormatter.value.format(end)}`
+  return `${dateFormatter.value.format(start)} ${timeFormatter.value.format(start)} – ${dateFormatter.value.format(end)} ${timeFormatter.value.format(end)}`
 })
 
 const memberLabel = computed(() =>

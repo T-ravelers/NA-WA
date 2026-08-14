@@ -3,9 +3,15 @@ import { httpClient } from '@/shared/api/httpClient'
 export const APPOINTMENT_LIST_PATH = '/api/v1/appointments'
 
 export type AppointmentItemType = 'EVENT' | 'PLACE'
-export type AppointmentLanguage = 'en' | 'ja' | 'zh-CN' | 'zh-TW' | 'vi'
+export type AppointmentLanguage = 'en' | 'ja' | 'zh-TW' | 'vi'
 export type AppointmentStatus =
-  'RECRUITING' | 'CLOSED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  | 'PAYMENT_PENDING'
+  | 'RECRUITING'
+  | 'CLOSED'
+  | 'CONFIRMED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'CANCELLED'
 /** Jackson LocalDateTime may be serialized as an ISO string or numeric components. */
 export type AppointmentDateTimeValue = string | readonly number[] | null
 
@@ -65,7 +71,7 @@ export interface AppointmentMember {
   displayName: string
   profileImageUrl: string | null
   preferredLanguage: AppointmentLanguage
-  membershipStatus: 'ACTIVE' | 'LEFT'
+  membershipStatus: 'PENDING' | 'ACTIVE' | 'LEFT'
   attendanceStatus: 'PENDING' | 'ATTENDED' | 'NO_SHOW'
   isHost: boolean
 }
@@ -86,6 +92,16 @@ export interface AppointmentReviewRequest {
   reviewedAppointmentMemberId: number
   scores: Record<ReviewCategory, number>
   keywordCodes: ReviewKeywordCode[]
+}
+
+export type AppointmentMembershipStatus = AppointmentMember['membershipStatus']
+
+export interface AppointmentParticipation {
+  joined: boolean
+  appointmentMemberId: number | null
+  membershipStatus: AppointmentMembershipStatus | null
+  attendanceStatus: AppointmentAttendanceStatus | null
+  host: boolean
 }
 
 function normalizePageResponse(response: AppointmentListResponse): AppointmentListResponse {
@@ -130,6 +146,39 @@ export async function fetchAppointmentMembers(appointmentId: number): Promise<Ap
   )
 
   return response.data ?? []
+}
+
+export async function joinAppointment(appointmentId: number): Promise<AppointmentMember> {
+  const response = await httpClient.post<AppointmentMember>(
+    `${APPOINTMENT_LIST_PATH}/${appointmentId}/members`,
+  )
+
+  return response.data
+}
+
+export async function fetchMyAppointmentParticipation(
+  appointmentId: number,
+): Promise<AppointmentParticipation> {
+  const response = await httpClient.get<AppointmentParticipation>(
+    `${APPOINTMENT_LIST_PATH}/${appointmentId}/members/me`,
+  )
+
+  return response.data
+}
+
+export async function cancelAppointmentParticipation(appointmentId: number): Promise<void> {
+  await httpClient.delete(`${APPOINTMENT_LIST_PATH}/${appointmentId}/members/me`)
+}
+
+export interface AppointmentAttendanceRequest {
+  members: Array<{ memberId: number; attendanceStatus: 'ATTENDED' | 'NO_SHOW' }>
+}
+
+export async function confirmAppointmentAttendance(
+  appointmentId: number,
+  request: AppointmentAttendanceRequest,
+): Promise<void> {
+  await httpClient.patch(`${APPOINTMENT_LIST_PATH}/${appointmentId}/attendance`, request)
 }
 
 export async function submitAppointmentReview(

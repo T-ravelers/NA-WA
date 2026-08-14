@@ -20,7 +20,10 @@ import {
   readActiveJourneyId,
   storeActiveJourneyId,
 } from '@/features/journey/model/activeJourney'
-import { useMemberProfile } from '@/features/member/model/memberQueries'
+import {
+  useMemberAppointmentProfile,
+  useMemberProfile,
+} from '@/features/member/model/memberQueries'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
 import { journeyReportIntegrationKey } from '@/features/journey/model/reportIntegration'
 import { useReportSummariesQuery } from '@/features/report/composables/useReportQueries'
@@ -61,7 +64,10 @@ app.provide(exploreJourneyIntegrationKey, {
   readActiveJourneyId,
   storeActiveJourneyId,
 })
-app.provide(appointmentMemberIntegrationKey, { useMemberProfile })
+app.provide(appointmentMemberIntegrationKey, {
+  useMemberProfile,
+  useMemberStats: useMemberAppointmentProfile,
+})
 app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
 
 app.mount('#app')

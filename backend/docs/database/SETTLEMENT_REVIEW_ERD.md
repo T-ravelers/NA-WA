@@ -105,6 +105,11 @@ erDiagram
     }
 ```
 
+- 정산은 약속의 참가자 집합과 원거래를 기준으로 생성합니다.
+- DB는 행별 금액과 수량이 음수가 되지 않도록 검증합니다. 항목·참가자 간 합계
+  일치는 후속 서비스 트랜잭션에서 검증합니다.
+- 후기 키워드 기준값은 `FRIENDLY`, `ON_TIME`, `CONSIDERATE`,
+  `GOOD_COMMUNICATOR`, `WOULD_JOIN_AGAIN`이며 화면 문구는 Vue i18n에서 관리합니다.
 - `source_transfer_id` UNIQUE는 하나의 원거래가 여러 정산에 사용되는 것을 막는다.
 - 생성 멱등성은 `(created_by_member_id, idempotency_key)` UNIQUE와 요청 지문으로
   보장한다.

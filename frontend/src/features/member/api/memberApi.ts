@@ -16,6 +16,27 @@ export interface UpdateMemberProfilePayload {
   preferredCurrencyCode?: string
 }
 
+/** Appointment profile response contains only the public member fields below. */
+export interface MemberAppointmentProfile {
+  memberId: number
+  displayName: string
+  profileImageUrl: string | null
+  preferredLanguage: string
+  completionRate: number | null
+  noShowCount: number
+  averageRating: number | null
+  reviewCount: number
+}
+
+export async function fetchMemberAppointmentProfile(
+  memberId: number,
+): Promise<MemberAppointmentProfile> {
+  const response = await httpClient.get<MemberAppointmentProfile>(
+    `/api/v1/members/${memberId}/appointment-profile`,
+  )
+  return response.data
+}
+
 /**
  * 현재 회원 프로필.
  *

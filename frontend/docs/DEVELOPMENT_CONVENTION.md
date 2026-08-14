@@ -32,6 +32,11 @@ src/
 - `shared`는 `features`와 `app`을 import하지 않습니다.
 - 여러 feature에서 사용하더라도 도메인 의미가 있다면 `shared`로 옮기지 않습니다.
 
+ESLint는 alias와 상대경로를 모두 해석해 이 경계를 검사합니다. `import type`, re-export와
+동적 `import()`도 같은 정책을 따릅니다. 같은 feature 내부의 상대경로 import는 허용하지만,
+다른 feature의 구현이 필요하면 `app`에서 주입하거나 합의된 계약을 적절한 상위 계층에
+둡니다. 경계를 피하려고 alias를 상대경로로 바꾸지 않습니다.
+
 feature에는 필요한 폴더만 만드세요.
 
 ```text
@@ -180,6 +185,24 @@ export const journeyKeys = {
 - 401을 받으면 갱신을 1회 시도하고 원 요청을 재시도합니다. 동시에 여러 요청이 401을
   받아도 갱신은 한 번만 실행합니다. feature에서 별도로 재시도 로직을 만들면 백엔드의
   refresh token 재사용 감지에 걸리므로 만들지 마세요.
+
+### 요청별 응답 스키마 검증
+
+백엔드 DTO와 화면 모델의 계약을 런타임에서도 확인해야 하는 요청은
+`AxiosRequestConfig.responseSchema`에 feature `api/` 폴더가 소유한 Zod 스키마를
+전달합니다. 이 검증은 공통 `ApiResponse` 봉투가 성공한 뒤 `data`에만 적용하며, Zod의
+변환 결과가 아니라 서버가 보낸 원본 `data`를 반환합니다. feature 스키마는 알 수 없는
+추가 객체 키를 허용하고, nullable 배열·날짜와 안전한 정규화/fallback이 있는 미래 enum
+값의 처리는 기존 feature model이 담당합니다. 서버 allow-list가 화면 의미나 금액 방향을
+결정하는 enum은 현재 계약 밖의 값을 검증 단계에서 거부할 수 있습니다.
+
+`responseSchema`를 생략한 기존 요청은 검증 없이 봉투 해제, 401 refresh와 AUTH-005
+CSRF 재시도를 그대로 유지합니다. 지정한 스키마는 두 재시도에서도 원 Axios config와
+함께 전달됩니다. 검증 실패는 `UNKNOWN`과 실제 HTTP 상태를 가진
+`NormalizedApiError`로 정규화하며, 로그에는 URL·method·상태와 issue의 path/code/
+expected만 남깁니다. 응답 본문, issue message/input, 인증·개인정보와 전체 오류 객체는
+로그에 남기지 않습니다. API mock 테스트는 config 전달을 확인하고, feature별 schema
+fixture 테스트는 실제 parser 동작을 별도로 검증합니다.
 
 세션이 완전히 끊겼을 때의 화면 이동은 `src/main.ts`가 `setSessionExpiredHandler`로
 주입합니다. `shared`는 router와 feature를 import하지 않습니다.

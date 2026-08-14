@@ -88,6 +88,8 @@ export interface TransactionFxResponse {
   ratedAt: ServerDateTime
 }
 
+export type ServerLocalDate = string | [number, number, number] | null
+
 export interface TransactionDetailResponse {
   amount: string | number
   occurredAt: ServerDateTime
@@ -99,10 +101,10 @@ export interface TransactionDetailResponse {
 }
 
 export interface TransactionAppliedFilters {
-  type: TransactionType | null
-  status: TransactionStatus | null
-  from: string | null
-  to: string | null
+  type: string | null
+  status: string | null
+  from: ServerLocalDate
+  to: ServerLocalDate
 }
 
 export interface TransactionListResponse {

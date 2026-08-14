@@ -99,6 +99,10 @@ describe('toWalletHomeData', () => {
     expect(toWalletHomeData(response({ availabilityStatus: 'ACTIVE' })).status).toBe('ACTIVE')
   })
 
+  it('최근 거래가 null이면 활동 목록을 빈 배열로 정규화한다', () => {
+    expect(toWalletHomeData(response({ recentTransactions: null })).activities).toEqual([])
+  })
+
   // 회귀: 지갑 응답 필드가 누락된 사례가 실제로 관측됐다. 계약상 필수 필드지만 방어적으로 다룬다.
   it('지갑 응답 필드가 누락돼도 화면을 중단시키지 않고 기본값을 쓴다', () => {
     const data = toWalletHomeData({} as WalletHome)
