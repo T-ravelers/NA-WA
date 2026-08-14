@@ -78,6 +78,8 @@ export interface JourneyTimelineExploreItem {
 }
 
 export interface JourneyTimelineAppointment {
+  /** 약속이 아직 잡히지 않은 항목에는 `appointment` 자체가 없다. */
+  appointmentId: number
   activityStartAt: string
   activityEndAt: string
   appointmentStatus: string

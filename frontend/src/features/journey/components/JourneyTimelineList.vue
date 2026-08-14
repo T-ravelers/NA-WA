@@ -113,6 +113,40 @@ function exploreLink(visitDate: string, tab: 'events' | 'places'): RouteLocation
   }
 }
 
+/**
+ * 항목 상세로 보낸다. explore 라우트는 EVENT와 PLACE를 별도 이름으로 나눠 두었다
+ * (`explore/routes.ts`). Feature 경계 규칙(#166)이 feature 간 import를 막으므로
+ * 라우트 상수를 가져오지 않고 이름 문자열을 쓴다. `exploreLink`도 같은 방식이다.
+ */
+function detailLink(item: JourneyTimelineItem): RouteLocationRaw {
+  return item.exploreItem.itemType === 'EVENT'
+    ? { name: 'explore-event-detail', params: { eventId: String(item.itemId) } }
+    : { name: 'explore-place-detail', params: { placeId: String(item.itemId) } }
+}
+
+/**
+ * 확정 항목은 그 약속 상세로, 미확정 항목은 같은 탐색 항목의 약속 목록으로 보낸다.
+ * 목록은 `itemId`·`itemType` 쿼리를 이미 읽어 스스로 걸러낸다
+ * (`AppointmentListView`). 새 쿼리 키가 아니다.
+ *
+ * 확정인데 `appointmentId`가 없는 응답이면 갈 곳이 없으므로 링크를 만들지 않는다.
+ * 그때는 이 CTA 자체가 렌더되지 않는다.
+ */
+function companionsLink(item: JourneyTimelineItem): RouteLocationRaw | null {
+  if (item.status !== 'CONFIRMED') {
+    return {
+      name: 'appointment-list',
+      query: { itemId: String(item.itemId), itemType: item.exploreItem.itemType },
+    }
+  }
+
+  const appointmentId = item.appointment?.appointmentId
+
+  return appointmentId === undefined
+    ? null
+    : { name: 'appointment-detail', params: { appointmentId: String(appointmentId) } }
+}
+
 const displayDays = computed(() => {
   const itemsByDate = new Map(props.days.map((day) => [day.visitDate, day.items]))
   /* 시안 J2는 날짜 앞에 `Day 1` 순번을 둔다. 여정 시작일로부터 몇 번째 날인지다. */
@@ -143,17 +177,40 @@ const displayDays = computed(() => {
               eventLabel: t('journey.detail.addEventForDate', { date: dateLabel }),
               placeLabel: t('journey.detail.addPlaceForDate', { date: dateLabel }),
             },
-      items: (itemsByDate.get(visitDate) ?? []).map((item) => ({
-        tripItemId: item.tripItemId,
-        timeLabel: formatTime(item),
-        confirmed: item.status === 'CONFIRMED',
-        statusLabel:
-          item.status === 'CONFIRMED' ? t('journey.detail.confirmed') : t('journey.detail.saved'),
-        title: item.exploreItem.title,
-        typeLabel: typeLabel(item),
-        location: formatLocation(item),
-        note: item.note,
-      })),
+      items: (itemsByDate.get(visitDate) ?? []).map((item) => {
+        const confirmed = item.status === 'CONFIRMED'
+        const title = item.exploreItem.title
+        const isEvent = item.exploreItem.itemType === 'EVENT'
+        const companionsTo = companionsLink(item)
+
+        return {
+          tripItemId: item.tripItemId,
+          timeLabel: formatTime(item),
+          confirmed,
+          statusLabel: confirmed ? t('journey.detail.confirmed') : t('journey.detail.saved'),
+          title,
+          typeLabel: typeLabel(item),
+          location: formatLocation(item),
+          note: item.note,
+          detailTo: detailLink(item),
+          /* 시안 J2는 두 버튼 모두 `Event detail`이지만 시안에 place 항목이 없다. 우리는
+             EVENT와 PLACE를 도메인에서 나눠 다루므로 보이는 라벨도 나눈다. */
+          detailLabel: isEvent ? t('journey.detail.eventDetail') : t('journey.detail.placeDetail'),
+          /* 같은 라벨이 항목 수만큼 반복된다. 날짜로 구분한 Add 버튼과 같은 이유로 항목
+             제목을 넣어 접근 가능한 이름을 구분한다. 보이는 라벨은 이름 앞부분에 그대로
+             들어간다 (WCAG 2.5.3). */
+          detailName: isEvent
+            ? t('journey.detail.eventDetailFor', { title })
+            : t('journey.detail.placeDetailFor', { title }),
+          companionsTo,
+          companionsLabel: confirmed
+            ? t('journey.detail.viewCompanions')
+            : t('journey.detail.findCompanions'),
+          companionsName: confirmed
+            ? t('journey.detail.viewCompanionsFor', { title })
+            : t('journey.detail.findCompanionsFor', { title }),
+        }
+      }),
     }
   })
 })
@@ -224,6 +281,31 @@ const displayDays = computed(() => {
               >
                 {{ t('journey.detail.note', { note: item.note }) }}
               </p>
+
+              <!-- 시안 J2의 항목 하단 버튼 행. 두 버튼이 폭을 나눠 갖는다. -->
+              <div class="mt-1 flex gap-2">
+                <RouterLink
+                  :to="item.detailTo"
+                  :aria-label="item.detailName"
+                  class="flex min-h-11 flex-1 items-center justify-center rounded-sm bg-surface-2 text-body-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                >
+                  {{ item.detailLabel }}
+                </RouterLink>
+                <!-- 확정인데 약속 ID가 없으면 갈 곳이 없다. 그때는 이 자리를 비운다. -->
+                <RouterLink
+                  v-if="item.companionsTo !== null"
+                  :to="item.companionsTo"
+                  :aria-label="item.companionsName"
+                  class="flex min-h-11 flex-1 items-center justify-center rounded-sm text-body-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  :class="
+                    item.confirmed
+                      ? 'bg-surface-2 text-ink-2'
+                      : 'border border-matching bg-matching/20 text-status-ongoing'
+                  "
+                >
+                  {{ item.companionsLabel }}
+                </RouterLink>
+              </div>
             </div>
           </article>
         </li>
