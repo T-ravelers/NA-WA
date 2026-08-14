@@ -11,10 +11,12 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
+import StateError from '@/shared/ui/StateError.vue'
+import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { executeQrPayment, previewQrPayment } from '../api/qrPaymentApi'
 import { useWalletAppointmentIntegration } from '../model/appointmentIntegration'
-import { parseServerDateTime } from '../model/walletHome'
+import { parseServerDateTime, shortKstDateFormatter } from '../model/walletHome'
 import {
   formatKrw,
   isValidQrPaymentAmount,
@@ -29,7 +31,6 @@ const { t, locale } = i18n
 const router = useRouter()
 const qrPaymentSession = useQrPaymentSessionStore()
 const { useMyOngoingAppointmentsQuery } = useWalletAppointmentIntegration()
-const ongoingAppointmentsQuery = useMyOngoingAppointmentsQuery()
 
 const session = computed(() => qrPaymentSession.session)
 
@@ -37,26 +38,28 @@ const spendingScope = ref<SpendingScope>('personal')
 const selectedAppointmentId = ref<number | null>(null)
 const enteredAmount = ref<number | null>(null)
 
+const isSharedExpense = computed(() => spendingScope.value === 'shared')
+const ongoingAppointmentsQuery = useMyOngoingAppointmentsQuery(isSharedExpense)
+
 const spendingOptions = computed(() => [
   { value: 'personal', label: t('wallet.qrPayment.personal') },
   { value: 'shared', label: t('wallet.qrPayment.shared') },
 ])
-
-const isSharedExpense = computed(() => spendingScope.value === 'shared')
 const selectedAppointment = computed(() =>
   ongoingAppointmentsQuery.data.value?.find(
     (appointment) => appointment.appointmentId === selectedAppointmentId.value,
   ),
 )
 
-const appointmentPeriodFormatter = computed(
-  () =>
-    new Intl.DateTimeFormat(locale.value, {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'Asia/Seoul',
-    }),
-)
+// Shared에서 고른 약속이 Personal로 돌아간 뒤에도 남아있으면, 백엔드가
+// PERSONAL + appointmentId 조합을 거부한다(QR_PERSONAL_APPOINTMENT_NOT_ALLOWED).
+watch(spendingScope, (scope) => {
+  if (scope !== 'shared') {
+    selectedAppointmentId.value = null
+  }
+})
+
+const appointmentPeriodFormatter = computed(() => shortKstDateFormatter(locale.value))
 
 function formatAppointmentPeriod(activityStartAt: string, activityEndAt: string): string {
   const start = parseServerDateTime(activityStartAt)
@@ -331,25 +334,23 @@ const completePayment = (): void => {
             {{ t('wallet.qrPayment.activeAppointmentsHint') }}
           </p>
 
-          <p
+          <StateLoading
             v-if="ongoingAppointmentsQuery.isPending.value"
-            class="mt-3 text-caption text-ink-3"
-          >
-            {{ t('wallet.qrPayment.appointmentsLoading') }}
-          </p>
-          <p
+            class="mt-3"
+            :lines="2"
+            :label="t('wallet.qrPayment.appointmentsLoading')"
+          />
+          <StateError
             v-else-if="ongoingAppointmentsQuery.isError.value"
-            role="alert"
-            class="mt-3 text-caption text-ink-3"
-          >
-            {{ t('wallet.qrPayment.appointmentsError') }}
-          </p>
-          <p
+            class="mt-3"
+            :description="t('wallet.qrPayment.appointmentsError')"
+            @retry="ongoingAppointmentsQuery.refetch"
+          />
+          <StateEmpty
             v-else-if="(ongoingAppointmentsQuery.data.value ?? []).length === 0"
-            class="mt-3 text-caption text-ink-3"
-          >
-            {{ t('wallet.qrPayment.appointmentsEmpty') }}
-          </p>
+            class="mt-3"
+            :description="t('wallet.qrPayment.appointmentsEmpty')"
+          />
           <template v-else>
             <div class="mt-3 space-y-2">
               <label

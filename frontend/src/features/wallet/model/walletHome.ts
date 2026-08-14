@@ -195,6 +195,18 @@ export function parseServerDateTime(value: ServerDateTime): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
+/**
+ * 월·일만 짧게 보여주는 KST 고정 포맷터. 표시 타임존을 KST로 고정하는 이유는
+ * `parseServerDateTime`과 같다 — 해외 기기에서도 같은 날짜로 보여야 한다.
+ */
+export function shortKstDateFormatter(locale: string): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'Asia/Seoul',
+  })
+}
+
 function toActivityKind(transferType: string): ActivityKind {
   const normalized = transferType.toUpperCase()
 

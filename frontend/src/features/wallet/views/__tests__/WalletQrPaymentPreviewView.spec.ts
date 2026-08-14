@@ -2,7 +2,7 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref, type Ref } from 'vue'
+import { ref, toValue, type Ref } from 'vue'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
@@ -75,6 +75,7 @@ interface OngoingAppointmentsQueryState {
   data: Ref<WalletOngoingAppointment[] | undefined>
   isPending: Ref<boolean>
   isError: Ref<boolean>
+  refetch: () => Promise<unknown>
 }
 
 function ongoingAppointmentsQueryState(
@@ -84,16 +85,23 @@ function ongoingAppointmentsQueryState(
     data: ref(appointments),
     isPending: ref(false),
     isError: ref(false),
+    refetch: vi.fn().mockResolvedValue(undefined),
   }
 }
 
 async function mountView(
   appointmentsQuery: OngoingAppointmentsQueryState = ongoingAppointmentsQueryState(),
-): Promise<{ router: Router; wrapper: ReturnType<typeof mount> }> {
+): Promise<{
+  router: Router
+  wrapper: ReturnType<typeof mount>
+  useMyOngoingAppointmentsQuery: ReturnType<typeof vi.fn>
+}> {
   const router = createTestRouter()
   setActivePinia(createPinia())
   await router.push('/wallet/qr/payment/preview')
   await router.isReady()
+
+  const useMyOngoingAppointmentsQuery = vi.fn(() => appointmentsQuery)
 
   const wrapper = mount(WalletQrPaymentPreviewView, {
     global: {
@@ -111,13 +119,13 @@ async function mountView(
       ],
       provide: {
         [walletAppointmentIntegrationKey as symbol]: {
-          useMyOngoingAppointmentsQuery: () => appointmentsQuery,
+          useMyOngoingAppointmentsQuery,
         },
       },
     },
   })
 
-  return { router, wrapper }
+  return { router, wrapper, useMyOngoingAppointmentsQuery }
 }
 
 function setFixedAmountSession(): void {
@@ -143,12 +151,33 @@ async function selectSharedExpense(wrapper: ReturnType<typeof mount>): Promise<v
     ?.trigger('click')
 }
 
+async function selectPersonalExpense(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await wrapper
+    .findAll('[role="radio"]')
+    .find((option) => option.text() === 'Personal')
+    ?.trigger('click')
+}
+
 describe('WalletQrPaymentPreviewView', () => {
   beforeEach(() => {
     vi.mocked(previewQrPayment).mockReset()
     vi.mocked(executeQrPayment).mockReset()
     vi.mocked(previewQrPayment).mockResolvedValue(previewResponse)
     vi.mocked(executeQrPayment).mockResolvedValue(executeResponse)
+  })
+
+  it('only requests my ongoing appointments while shared is selected', async () => {
+    const { wrapper, useMyOngoingAppointmentsQuery } = await mountView()
+    setFixedAmountSession()
+    await flushPromises()
+    const enabledArg = useMyOngoingAppointmentsQuery.mock.calls[0]?.[0]
+
+    expect(toValue(enabledArg)).toBe(false)
+
+    await selectSharedExpense(wrapper)
+    await flushPromises()
+
+    expect(toValue(enabledArg)).toBe(true)
   })
 
   it('shows an empty state when no QR has been scanned', async () => {
@@ -269,6 +298,40 @@ describe('WalletQrPaymentPreviewView', () => {
         .find((button) => button.text() === 'Pay')
         ?.attributes('disabled'),
     ).toBeUndefined()
+  })
+
+  it('clears the selected appointment id when switching back from shared to personal', async () => {
+    const { wrapper } = await mountView()
+    setFixedAmountSession()
+    await flushPromises()
+
+    await selectSharedExpense(wrapper)
+    await wrapper.get('input[value="42"]').setValue(true)
+    await flushPromises()
+    vi.mocked(previewQrPayment).mockClear()
+
+    await selectPersonalExpense(wrapper)
+    await flushPromises()
+
+    expect(vi.mocked(previewQrPayment).mock.calls[0]?.[0]).toEqual({
+      qrToken: 'tok-abc',
+      amount: 18_500,
+      spendingScope: 'PERSONAL',
+      appointmentId: null,
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Pay')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(executeQrPayment).mock.calls[0]?.[0]).toEqual({
+      qrToken: 'tok-abc',
+      amount: 18_500,
+      spendingScope: 'PERSONAL',
+      appointmentId: null,
+    })
   })
 
   it('executes the payment and navigates to the complete screen with the transfer id', async () => {

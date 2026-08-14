@@ -21,7 +21,7 @@ import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
-import { toWalletHomeData, type ActivityKind } from '../model/walletHome'
+import { shortKstDateFormatter, toWalletHomeData, type ActivityKind } from '../model/walletHome'
 import { useWalletHome } from '../model/walletQueries'
 
 const i18n = useI18n()
@@ -44,14 +44,7 @@ const amountFormat = computed(
   () => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 2 }),
 )
 
-const dateFormat = computed(
-  () =>
-    new Intl.DateTimeFormat(locale.value, {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'Asia/Seoul',
-    }),
-)
+const dateFormat = computed(() => shortKstDateFormatter(locale.value))
 
 function formatPoints(amount: number): string {
   return t('wallet.home.points', { amount: amountFormat.value.format(amount) })
