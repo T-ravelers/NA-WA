@@ -97,6 +97,9 @@ function journeyDates(startDate: string, endDate: string): string[] {
  * Places 목록은 아직 날짜로 걸러지지 않는다. place에는 시간 값이 없어 검색 API에도 날짜
  * 파라미터가 없다. 그쪽 날짜는 필터가 아니라 "어느 여정의 어느 날에 담는가"라는 맥락이다.
  * `journeyId`와 함께 그 맥락을 store로 옮겨 담아 담기 시트에 프리필하는 일은 #192가 맡는다.
+ *
+ * 여정 기간 밖 날짜는 항목 추가 API가 `JOURNEY-007`로 거절한다
+ * (`JourneyService.addJourneyItem`). 그런 날짜로는 링크를 만들지 않는다.
  */
 function exploreLink(visitDate: string, tab: 'events' | 'places'): RouteLocationRaw {
   const journeyId = String(props.tripId)
@@ -129,11 +132,17 @@ const displayDays = computed(() => {
       dateLabel,
       /* 기간 밖 날짜에는 붙일 순번이 없다. 날짜만 보여준다. */
       dayLabel: dayNumber === undefined ? null : t('journey.detail.dayLabel', { index: dayNumber }),
-      addEventTo: exploreLink(visitDate, 'events'),
-      addPlaceTo: exploreLink(visitDate, 'places'),
-      /* 날짜마다 같은 라벨이 반복되므로 접근 가능한 이름에 날짜를 넣어 구분한다. */
-      addEventLabel: t('journey.detail.addEventForDate', { date: dateLabel }),
-      addPlaceLabel: t('journey.detail.addPlaceForDate', { date: dateLabel }),
+      /* 기간 밖 날짜로는 담을 수 없으므로 링크 자체를 만들지 않는다. */
+      addLinks:
+        dayNumber === undefined
+          ? null
+          : {
+              eventTo: exploreLink(visitDate, 'events'),
+              placeTo: exploreLink(visitDate, 'places'),
+              /* 날짜마다 같은 라벨이 반복되므로 접근 가능한 이름에 날짜를 넣어 구분한다. */
+              eventLabel: t('journey.detail.addEventForDate', { date: dateLabel }),
+              placeLabel: t('journey.detail.addPlaceForDate', { date: dateLabel }),
+            },
       items: (itemsByDate.get(visitDate) ?? []).map((item) => ({
         tripItemId: item.tripItemId,
         timeLabel: formatTime(item),
@@ -221,10 +230,13 @@ const displayDays = computed(() => {
       </ol>
 
       <!-- 하루에 여러 개를 담는 것이 정상 흐름이라 항목이 있는 날에도 그대로 둔다. -->
-      <div class="flex gap-2">
+      <div
+        v-if="day.addLinks !== null"
+        class="flex gap-2"
+      >
         <RouterLink
-          :to="day.addEventTo"
-          :aria-label="day.addEventLabel"
+          :to="day.addLinks.eventTo"
+          :aria-label="day.addLinks.eventLabel"
           class="flex min-h-13 flex-1 items-center justify-center gap-2 rounded-sm border-2 border-dashed border-hairline-2 text-body-sm font-semibold text-ink-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         >
           <IconPlus
@@ -235,8 +247,8 @@ const displayDays = computed(() => {
           {{ t('journey.detail.addEvent') }}
         </RouterLink>
         <RouterLink
-          :to="day.addPlaceTo"
-          :aria-label="day.addPlaceLabel"
+          :to="day.addLinks.placeTo"
+          :aria-label="day.addLinks.placeLabel"
           class="flex min-h-13 flex-1 items-center justify-center gap-2 rounded-sm border-2 border-dashed border-hairline-2 text-body-sm font-semibold text-ink-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         >
           <IconPlus

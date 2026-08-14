@@ -149,6 +149,19 @@ describe('JourneyTimelineList', () => {
     expect(wrapper.text()).not.toContain('Day 3')
   })
 
+  it('offers add buttons only for dates inside the journey range', async () => {
+    const wrapper = await mountList({
+      days: [dayWithItem('2026-08-20', 'Late addition')],
+      startDate: '2026-08-10',
+      endDate: '2026-08-11',
+    })
+
+    // 기간 밖 날짜로 담으면 서버가 `JOURNEY-007`로 거절하므로 진입로를 두지 않는다.
+    expect(addLinks(wrapper, 'Add event on')).toHaveLength(2)
+    expect(addLinks(wrapper, 'Add place on')).toHaveLength(2)
+    expect(wrapper.findAll('a[href*="2026-08-20"]')).toHaveLength(0)
+  })
+
   it('handles a journey longer than a month', async () => {
     const wrapper = await mountList({
       days: [],
