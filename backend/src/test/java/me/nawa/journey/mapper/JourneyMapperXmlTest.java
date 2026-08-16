@@ -216,11 +216,17 @@ class JourneyMapperXmlTest {
         MappedStatement lockedItemStatement = configuration
             .getMappedStatement(namespace + "findJourneyItemForUpdate");
         String lockedItemSql = lockedItemStatement
-            .getBoundSql(Map.of("tripId", 1L, "tripItemId", 2L))
+            .getBoundSql(Map.of(
+                "tripId", 1L,
+                "tripItemId", 2L,
+                "memberId", 3L
+            ))
             .getSql()
             .replaceAll("\\s+", " ")
             .trim();
         assertTrue(lockedItemSql.contains("a.host_member_id"));
+        assertTrue(lockedItemSql.contains("am.membership_status"));
+        assertTrue(lockedItemSql.contains("am.member_id = ?"));
         assertTrue(lockedItemSql.contains("ti.trip_id = ?"));
         assertTrue(lockedItemSql.endsWith("FOR UPDATE"));
 
@@ -229,13 +235,15 @@ class JourneyMapperXmlTest {
                 namespace + "findConfirmedJourneyItemsForUpdate"
             );
         String confirmedItemsSql = confirmedItemsStatement
-            .getBoundSql(Map.of("tripId", 1L))
+            .getBoundSql(Map.of("tripId", 1L, "memberId", 3L))
             .getSql()
             .replaceAll("\\s+", " ")
             .trim();
         assertTrue(confirmedItemsSql.contains(
             "ti.trip_item_status = 'CONFIRMED'"
         ));
+        assertTrue(confirmedItemsSql.contains("am.membership_status"));
+        assertTrue(confirmedItemsSql.contains("am.member_id = ?"));
         assertTrue(confirmedItemsSql.endsWith("FOR UPDATE"));
 
         assertSoftDeleteSql(

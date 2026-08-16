@@ -210,7 +210,8 @@ public class JourneyService {
 
         JourneyItem journeyItem = journeyMapper.findJourneyItemForUpdate(
             tripId,
-            tripItemId
+            tripItemId,
+            memberId
         );
         if (journeyItem == null) {
             throw new BusinessException(
@@ -229,7 +230,7 @@ public class JourneyService {
         findOwnedJourneyForUpdate(memberId, tripId);
 
         List<JourneyItem> confirmedItems = journeyMapper
-            .findConfirmedJourneyItemsForUpdate(tripId);
+            .findConfirmedJourneyItemsForUpdate(tripId, memberId);
         List<JourneyItem> items = confirmedItems == null
             ? List.of()
             : confirmedItems;
@@ -649,6 +650,8 @@ public class JourneyService {
         if (!"CONFIRMED".equals(journeyItem.getTripItemStatus())) {
             return;
         }
+        // V5 requires CONFIRMED rows to reference an Appointment. Fail closed
+        // if the joined Appointment was removed or its required host is missing.
         if (journeyItem.getAppointmentId() == null
             || journeyItem.getAppointmentHostMemberId() == null) {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
@@ -657,6 +660,9 @@ public class JourneyService {
             throw new BusinessException(
                 JourneyErrorCode.JOURNEY_APPOINTMENT_HOST_DELETE_CONFLICT
             );
+        }
+        if ("LEFT".equals(journeyItem.getAppointmentMembershipStatus())) {
+            return;
         }
         appointmentService.leaveAppointment(
             memberId,

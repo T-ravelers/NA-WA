@@ -25,6 +25,7 @@ public class JourneyItem {
     private String note;
     private Long appointmentId;
     private Long appointmentHostMemberId;
+    private String appointmentMembershipStatus;
     private LocalDateTime confirmedAt;
     private LocalDateTime createdAt;
 }

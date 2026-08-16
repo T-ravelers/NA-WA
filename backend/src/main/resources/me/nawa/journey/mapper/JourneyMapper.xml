@@ -308,6 +308,12 @@
           AND ti.deleted_at IS NULL
     </select>
 
+    <!--
+        Journey deletion locks trip_items, their joined appointments, and the
+        current member rows before calling AppointmentService. Appointment
+        mutations do not acquire trip_items locks, so the current codebase has
+        no reverse lock order.
+    -->
     <select id="findJourneyItemForUpdate"
             resultType="me.nawa.journey.domain.JourneyItem">
         SELECT
@@ -320,12 +326,17 @@
             ti.note,
             ti.appointment_id,
             a.host_member_id AS appointment_host_member_id,
+            am.membership_status AS appointment_membership_status,
             ti.confirmed_at,
             ti.created_at
         FROM trip_items ti
         LEFT JOIN appointments a
           ON a.appointment_id = ti.appointment_id
          AND a.deleted_at IS NULL
+        LEFT JOIN appointment_members am
+          ON am.appointment_id = ti.appointment_id
+         AND am.member_id = #{memberId}
+         AND am.deleted_at IS NULL
         WHERE ti.trip_id = #{tripId}
           AND ti.trip_item_id = #{tripItemId}
           AND ti.deleted_at IS NULL
@@ -340,11 +351,16 @@
             ti.item_id,
             ti.trip_item_status,
             ti.appointment_id,
-            a.host_member_id AS appointment_host_member_id
+            a.host_member_id AS appointment_host_member_id,
+            am.membership_status AS appointment_membership_status
         FROM trip_items ti
         LEFT JOIN appointments a
           ON a.appointment_id = ti.appointment_id
          AND a.deleted_at IS NULL
+        LEFT JOIN appointment_members am
+          ON am.appointment_id = ti.appointment_id
+         AND am.member_id = #{memberId}
+         AND am.deleted_at IS NULL
         WHERE ti.trip_id = #{tripId}
           AND ti.trip_item_status = 'CONFIRMED'
           AND ti.deleted_at IS NULL

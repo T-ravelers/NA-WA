@@ -55,11 +55,13 @@ public interface JourneyMapper {
 
     JourneyItem findJourneyItemForUpdate(
         @Param("tripId") Long tripId,
-        @Param("tripItemId") Long tripItemId
+        @Param("tripItemId") Long tripItemId,
+        @Param("memberId") Long memberId
     );
 
     List<JourneyItem> findConfirmedJourneyItemsForUpdate(
-        @Param("tripId") Long tripId
+        @Param("tripId") Long tripId,
+        @Param("memberId") Long memberId
     );
 
     int softDeleteJourneyItem(

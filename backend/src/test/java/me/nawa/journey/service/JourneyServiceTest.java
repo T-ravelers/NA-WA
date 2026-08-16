@@ -564,7 +564,7 @@ class JourneyServiceTest {
         when(journeyMapper.findJourneyByIdForUpdate(30L)).thenReturn(
             ownedJourney(30L)
         );
-        when(journeyMapper.findJourneyItemForUpdate(30L, 301L)).thenReturn(
+        when(journeyMapper.findJourneyItemForUpdate(30L, 301L, 1L)).thenReturn(
             journeyItem(301L, "ADDED", null, null)
         );
         when(journeyMapper.softDeleteJourneyItem(30L, 301L)).thenReturn(1);
@@ -580,7 +580,7 @@ class JourneyServiceTest {
         when(journeyMapper.findJourneyByIdForUpdate(31L)).thenReturn(
             ownedJourney(31L)
         );
-        when(journeyMapper.findJourneyItemForUpdate(31L, 311L)).thenReturn(
+        when(journeyMapper.findJourneyItemForUpdate(31L, 311L, 1L)).thenReturn(
             journeyItem(311L, "CONFIRMED", 900L, 2L)
         );
         when(journeyMapper.softDeleteJourneyItem(31L, 311L)).thenReturn(1);
@@ -600,7 +600,7 @@ class JourneyServiceTest {
         when(journeyMapper.findJourneyByIdForUpdate(32L)).thenReturn(
             ownedJourney(32L)
         );
-        when(journeyMapper.findJourneyItemForUpdate(32L, 321L)).thenReturn(
+        when(journeyMapper.findJourneyItemForUpdate(32L, 321L, 1L)).thenReturn(
             journeyItem(321L, "CONFIRMED", 901L, 1L)
         );
 
@@ -618,12 +618,29 @@ class JourneyServiceTest {
     }
 
     @Test
+    void deleteJourneyItem_deletesFormerHostAfterAppointmentLeave() {
+        when(journeyMapper.findJourneyByIdForUpdate(33L)).thenReturn(
+            ownedJourney(33L)
+        );
+        JourneyItem item = journeyItem(331L, "CONFIRMED", 902L, 2L);
+        item.setAppointmentMembershipStatus("LEFT");
+        when(journeyMapper.findJourneyItemForUpdate(33L, 331L, 1L))
+            .thenReturn(item);
+        when(journeyMapper.softDeleteJourneyItem(33L, 331L)).thenReturn(1);
+
+        journeyService.deleteJourneyItem(1L, 33L, 331L);
+
+        verifyNoInteractions(appointmentService);
+        verify(journeyMapper).softDeleteJourneyItem(33L, 331L);
+    }
+
+    @Test
     void deleteJourneyItem_keepsItemWhenCancellationFails() {
         when(journeyMapper.findJourneyByIdForUpdate(33L)).thenReturn(
             ownedJourney(33L)
         );
-        when(journeyMapper.findJourneyItemForUpdate(33L, 331L)).thenReturn(
-            journeyItem(331L, "CONFIRMED", 902L, 2L)
+        when(journeyMapper.findJourneyItemForUpdate(33L, 332L, 1L)).thenReturn(
+            journeyItem(332L, "CONFIRMED", 902L, 2L)
         );
         doThrow(new BusinessException(
             AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
@@ -631,7 +648,7 @@ class JourneyServiceTest {
 
         BusinessException exception = assertThrows(
             BusinessException.class,
-            () -> journeyService.deleteJourneyItem(1L, 33L, 331L)
+            () -> journeyService.deleteJourneyItem(1L, 33L, 332L)
         );
 
         assertEquals(
@@ -646,7 +663,7 @@ class JourneyServiceTest {
         when(journeyMapper.findJourneyByIdForUpdate(34L)).thenReturn(
             ownedJourney(34L)
         );
-        when(journeyMapper.findJourneyItemForUpdate(34L, 341L)).thenReturn(
+        when(journeyMapper.findJourneyItemForUpdate(34L, 341L, 1L)).thenReturn(
             null
         );
 
@@ -676,7 +693,11 @@ class JourneyServiceTest {
             JourneyErrorCode.JOURNEY_FORBIDDEN,
             exception.getErrorCode()
         );
-        verify(journeyMapper, never()).findJourneyItemForUpdate(any(), any());
+        verify(journeyMapper, never()).findJourneyItemForUpdate(
+            any(),
+            any(),
+            any()
+        );
     }
 
     @Test
@@ -684,12 +705,13 @@ class JourneyServiceTest {
         when(journeyMapper.findJourneyByIdForUpdate(40L)).thenReturn(
             ownedJourney(40L)
         );
-        when(journeyMapper.findConfirmedJourneyItemsForUpdate(40L)).thenReturn(
-            List.of(
-                journeyItem(401L, "CONFIRMED", 910L, 2L),
-                journeyItem(402L, "CONFIRMED", 911L, 3L)
-            )
-        );
+        when(journeyMapper.findConfirmedJourneyItemsForUpdate(40L, 1L))
+            .thenReturn(
+                List.of(
+                    journeyItem(401L, "CONFIRMED", 910L, 2L),
+                    journeyItem(402L, "CONFIRMED", 911L, 3L)
+                )
+            );
         when(journeyMapper.softDeleteJourney(40L)).thenReturn(1);
 
         journeyService.deleteJourney(1L, 40L);
@@ -708,12 +730,13 @@ class JourneyServiceTest {
         when(journeyMapper.findJourneyByIdForUpdate(41L)).thenReturn(
             ownedJourney(41L)
         );
-        when(journeyMapper.findConfirmedJourneyItemsForUpdate(41L)).thenReturn(
-            List.of(
-                journeyItem(411L, "CONFIRMED", 920L, 2L),
-                journeyItem(412L, "CONFIRMED", 921L, 1L)
-            )
-        );
+        when(journeyMapper.findConfirmedJourneyItemsForUpdate(41L, 1L))
+            .thenReturn(
+                List.of(
+                    journeyItem(411L, "CONFIRMED", 920L, 2L),
+                    journeyItem(412L, "CONFIRMED", 921L, 1L)
+                )
+            );
 
         BusinessException exception = assertThrows(
             BusinessException.class,
@@ -734,9 +757,10 @@ class JourneyServiceTest {
         when(journeyMapper.findJourneyByIdForUpdate(42L)).thenReturn(
             ownedJourney(42L)
         );
-        when(journeyMapper.findConfirmedJourneyItemsForUpdate(42L)).thenReturn(
-            List.of(journeyItem(421L, "CONFIRMED", 930L, 2L))
-        );
+        when(journeyMapper.findConfirmedJourneyItemsForUpdate(42L, 1L))
+            .thenReturn(
+                List.of(journeyItem(421L, "CONFIRMED", 930L, 2L))
+            );
         doThrow(new BusinessException(
             AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
         )).when(appointmentService).leaveAppointment(1L, 930L);
@@ -768,7 +792,7 @@ class JourneyServiceTest {
             exception.getErrorCode()
         );
         verify(journeyMapper, never())
-            .findConfirmedJourneyItemsForUpdate(any());
+            .findConfirmedJourneyItemsForUpdate(any(), any());
     }
 
     @Test

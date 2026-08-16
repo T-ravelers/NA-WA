@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
@@ -469,6 +470,28 @@ class JourneyControllerTest {
     }
 
     @Test
+    void deleteJourneyItem_returnsAppointmentCancellationError()
+        throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+            AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
+        )).when(journeyService).deleteJourneyItem(1L, 12L, 7L);
+
+        String responseBody = mockMvc.perform(
+                delete("/api/v1/journeys/12/items/7")
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertEquals(
+            "APPOINTMENT-007",
+            body.path("error").path("code").asText()
+        );
+    }
+
+    @Test
     void deleteJourney_returns204() throws Exception {
         mockMvc.perform(delete("/api/v1/journeys/12"))
             .andExpect(status().isNoContent());
@@ -494,6 +517,28 @@ class JourneyControllerTest {
         assertFalse(body.path("success").asBoolean());
         assertEquals(
             "JOURNEY-011",
+            body.path("error").path("code").asText()
+        );
+    }
+
+    @Test
+    void deleteJourney_returnsAppointmentCancellationError()
+        throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+            AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
+        )).when(journeyService).deleteJourney(1L, 12L);
+
+        String responseBody = mockMvc.perform(
+                delete("/api/v1/journeys/12")
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertEquals(
+            "APPOINTMENT-007",
             body.path("error").path("code").asText()
         );
     }
