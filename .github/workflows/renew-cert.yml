@@ -17,6 +17,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -eu
             cd ~/nawa
             docker compose run --rm certbot renew --webroot -w /var/www/certbot --quiet
             docker compose exec -T nginx nginx -s reload
