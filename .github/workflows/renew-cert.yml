@@ -1,0 +1,22 @@
+name: Renew TLS Certificate
+
+on:
+  schedule:
+    - cron: "0 18 * * *" # 매일 03:00 KST
+  workflow_dispatch:
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    steps:
+      # SSH 키를 다루는 서드파티 액션이라 버전 태그 대신 commit SHA로 고정
+      - name: 인증서 갱신 및 nginx reload
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/nawa
+            docker compose run --rm certbot renew --webroot -w /var/www/certbot --quiet
+            docker compose exec -T nginx nginx -s reload
