@@ -248,6 +248,68 @@ describe('ExploreView Place branch', () => {
     expect(router.currentRoute.value.query.eventRegion1).toEqual(['부산'])
   })
 
+  it('keeps Event filters after a direct-URL entry and a tab round trip', async () => {
+    fetchEventList.mockResolvedValue({
+      content: [],
+      page: 2,
+      size: 20,
+      totalElements: 60,
+      totalPages: 3,
+      hasNext: false,
+    })
+    const { wrapper, router } = await mountView('/explore?eventKeyword=festival&eventPage=2')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Places')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Events')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.eventKeyword).toBe('festival')
+    expect(router.currentRoute.value.query.eventPage).toBe('2')
+    expect(fetchEventList).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: 'festival', page: 2 }),
+    )
+  })
+
+  it('keeps Place filters after a direct-URL entry and a tab round trip', async () => {
+    fetchPlaceList.mockResolvedValue({
+      content: [place],
+      page: 1,
+      size: 20,
+      totalElements: 30,
+      totalPages: 2,
+      hasNext: false,
+    })
+    const { wrapper, router } = await mountView(
+      '/explore?tab=places&placeKeyword=onsil&placePage=1',
+    )
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Events')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Places')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.placeKeyword).toBe('onsil')
+    expect(router.currentRoute.value.query.placePage).toBe('1')
+    expect(fetchPlaceList).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: 'onsil', page: 1 }),
+    )
+  })
+
   it('requests a selected Event page and scrolls to the top', async () => {
     fetchEventList.mockResolvedValue({
       content: [],

@@ -54,8 +54,6 @@ const router = useRouter()
 const selectedTab = ref<ExploreTab>(readExploreTab(readQueryString('tab')))
 const selectedSheet = ref<ExploreSheetKind | null>(null)
 const searchOpen = ref(false)
-const eventRouteQuery = ref<LocationQueryRaw>({})
-const placeRouteQuery = ref<LocationQueryRaw>({ tab: 'places' })
 
 const selectedEventKinds = ref<EventKind[]>(readQueryList('eventKinds').filter(isEventKind))
 const selectedEventSectorIds = ref(readValidTaxonomyIds('eventSectorIds', VALID_EXPLORE_SECTOR_IDS))
@@ -307,33 +305,57 @@ const placeActiveFilters = computed(() => {
   return values
 })
 
+function buildEventQuery(next: EventSearchFilters): LocationQueryRaw {
+  const query: LocationQueryRaw = {}
+  addQueryList(query, 'eventKinds', next.eventKinds)
+  addQueryList(query, 'eventSectorIds', next.sectorIds)
+  addQueryList(query, 'eventActivityIds', next.activityIds)
+  addRegion1Query(query, 'eventRegion1', next.region1)
+  addQueryList(query, 'eventRegion2', next.region2)
+  addQueryValue(query, 'region2Other', next.region2Other)
+  addQueryList(query, 'region3', next.region3)
+  addQueryValue(query, 'datePreset', next.datePreset)
+  addQueryValue(query, 'startDate', next.startDate)
+  addQueryValue(query, 'endDate', next.endDate)
+  addQueryValue(query, 'eventKeyword', next.keyword)
+  addQueryValue(query, 'eventPage', next.page && next.page > 0 ? String(next.page) : undefined)
+  addQueryValue(query, 'sort', next.sort === 'LATEST' ? undefined : next.sort)
+  addQueryValue(query, 'freeOnly', next.freeOnly)
+  addQueryValue(query, 'openWeekendOnly', next.openWeekendOnly)
+  addQueryValue(query, 'opensLateOnly', next.opensLateOnly)
+  addQueryValue(query, 'preReservationOnly', next.preReservationOnly)
+  addQueryValue(query, 'experienceOnly', next.experienceOnly)
+  return query
+}
+
+function buildPlaceQuery(next: PlaceSearchFilters): LocationQueryRaw {
+  const query: LocationQueryRaw = { tab: 'places' }
+  addQueryList(query, 'placeKinds', next.placeKinds)
+  addQueryList(query, 'placeSectorIds', next.sectorIds)
+  addQueryList(query, 'placeActivityIds', next.activityIds)
+  addRegion1Query(query, 'placeRegion1', next.region1)
+  addQueryList(query, 'placeRegion2', next.region2)
+  addQueryValue(query, 'placeRegion2Other', next.region2Other)
+  addQueryValue(query, 'placeKeyword', next.keyword)
+  addQueryValue(query, 'placeSort', next.sort === 'LATEST' ? undefined : next.sort)
+  addQueryValue(query, 'hasForeignLang', next.hasForeignLang)
+  addQueryValue(query, 'hasParking', next.hasParking)
+  addQueryValue(query, 'reservable', next.reservable)
+  addQueryValue(query, 'takeoutAvailable', next.takeoutAvailable)
+  addQueryValue(query, 'cardPaymentAvailable', next.cardPaymentAvailable)
+  addQueryValue(query, 'smokeFree', next.smokeFree)
+  addQueryValue(query, 'kidFacility', next.kidFacility)
+  addQueryValue(query, 'hasRestroom', next.hasRestroom)
+  addQueryValue(query, 'savedOnly', next.savedOnly)
+  addQueryValue(query, 'placePage', next.page && next.page > 0 ? String(next.page) : undefined)
+  return query
+}
+
 watch(
   filters,
   (next) => {
     if (selectedTab.value !== 'events' || hydratingEventQuery.value) return
-
-    const query: LocationQueryRaw = {}
-    addQueryList(query, 'eventKinds', next.eventKinds)
-    addQueryList(query, 'eventSectorIds', next.sectorIds)
-    addQueryList(query, 'eventActivityIds', next.activityIds)
-    addRegion1Query(query, 'eventRegion1', next.region1)
-    addQueryList(query, 'eventRegion2', next.region2)
-    addQueryValue(query, 'region2Other', next.region2Other)
-    addQueryList(query, 'region3', next.region3)
-    addQueryValue(query, 'datePreset', next.datePreset)
-    addQueryValue(query, 'startDate', next.startDate)
-    addQueryValue(query, 'endDate', next.endDate)
-    addQueryValue(query, 'eventKeyword', next.keyword)
-    addQueryValue(query, 'eventPage', next.page && next.page > 0 ? String(next.page) : undefined)
-    addQueryValue(query, 'sort', next.sort === 'LATEST' ? undefined : next.sort)
-    addQueryValue(query, 'freeOnly', next.freeOnly)
-    addQueryValue(query, 'openWeekendOnly', next.openWeekendOnly)
-    addQueryValue(query, 'opensLateOnly', next.opensLateOnly)
-    addQueryValue(query, 'preReservationOnly', next.preReservationOnly)
-    addQueryValue(query, 'experienceOnly', next.experienceOnly)
-
-    eventRouteQuery.value = query
-    router.replace({ query }).catch(() => undefined)
+    router.replace({ query: buildEventQuery(next) }).catch(() => undefined)
   },
   { deep: true },
 )
@@ -342,28 +364,7 @@ watch(
   placeFilters,
   (next) => {
     if (selectedTab.value !== 'places' || hydratingPlaceQuery.value) return
-
-    const query: LocationQueryRaw = { tab: 'places' }
-    addQueryList(query, 'placeKinds', next.placeKinds)
-    addQueryList(query, 'placeSectorIds', next.sectorIds)
-    addQueryList(query, 'placeActivityIds', next.activityIds)
-    addRegion1Query(query, 'placeRegion1', next.region1)
-    addQueryList(query, 'placeRegion2', next.region2)
-    addQueryValue(query, 'placeRegion2Other', next.region2Other)
-    addQueryValue(query, 'placeKeyword', next.keyword)
-    addQueryValue(query, 'placeSort', next.sort === 'LATEST' ? undefined : next.sort)
-    addQueryValue(query, 'hasForeignLang', next.hasForeignLang)
-    addQueryValue(query, 'hasParking', next.hasParking)
-    addQueryValue(query, 'reservable', next.reservable)
-    addQueryValue(query, 'takeoutAvailable', next.takeoutAvailable)
-    addQueryValue(query, 'cardPaymentAvailable', next.cardPaymentAvailable)
-    addQueryValue(query, 'smokeFree', next.smokeFree)
-    addQueryValue(query, 'kidFacility', next.kidFacility)
-    addQueryValue(query, 'hasRestroom', next.hasRestroom)
-    addQueryValue(query, 'savedOnly', next.savedOnly)
-    addQueryValue(query, 'placePage', next.page && next.page > 0 ? String(next.page) : undefined)
-    placeRouteQuery.value = query
-    router.replace({ query }).catch(() => undefined)
+    router.replace({ query: buildPlaceQuery(next) }).catch(() => undefined)
   },
   { deep: true },
 )
@@ -372,7 +373,8 @@ watch(selectedTab, (next, previous) => {
   closeSheet()
   if (next === previous) return
 
-  const query = next === 'places' ? placeRouteQuery.value : eventRouteQuery.value
+  const query =
+    next === 'places' ? buildPlaceQuery(placeFilters.value) : buildEventQuery(filters.value)
   router.push({ query }).catch(() => undefined)
 })
 
