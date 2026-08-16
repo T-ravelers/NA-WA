@@ -1,6 +1,7 @@
 package me.nawa.wallet.controller;
 
 
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
@@ -40,6 +41,15 @@ public class QrPaymentController {
         ){
         return ApiResponse.success(
             qrPaymentService.createPaymentQr(member.getMemberId(), request)
+        );
+    }
+
+    @GetMapping("/active")
+    public ApiResponse<List<QrPaymentCreateResponse>> listActivePaymentQrs(
+        @AuthenticationPrincipal AuthenticatedMember member
+    ) {
+        return ApiResponse.success(
+            qrPaymentService.listActivePaymentQrs(member.getMemberId())
         );
     }
 

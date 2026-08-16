@@ -1,18 +1,53 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
 import { fetchWalletHome } from '../../api/walletApi'
-import { useQrRequestDraftStore } from '../../model/qrRequestDraft'
+import { listActiveQrPayments } from '../../api/qrPaymentApi'
 import WalletQrView from '../WalletQrView.vue'
 
 vi.mock('../../api/walletApi', () => ({
   fetchWalletHome: vi.fn(),
 }))
+
+vi.mock('../../api/qrPaymentApi', () => ({
+  listActiveQrPayments: vi.fn(),
+}))
+
+/** 오프셋 없는 KST 문자열을 만든다. `parseServerDateTime`이 이 형식을 KST로 해석한다. */
+function toNaiveKstString(date: Date): string {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
+
+  return kst.toISOString().slice(0, 19)
+}
+
+/** 테스트가 언제 실행되든 항상 미래인 만료 시각. `now` 기준 만료 필터에 걸리지 않는다. */
+function futureExpiresAt(msFromNow: number): string {
+  return toNaiveKstString(new Date(Date.now() + msFromNow))
+}
+
+const seoulFoodTour = {
+  qrPaymentCodeId: 1,
+  qrToken: 'tok-abc',
+  amount: 18_500,
+  memo: 'Seoul Food Tour',
+  status: 'ACTIVE',
+  currencyCode: 'KRW',
+  expiresAt: futureExpiresAt(5 * 60_000),
+}
+
+const payerEntersAmount = {
+  qrPaymentCodeId: 2,
+  qrToken: 'tok-def',
+  amount: null,
+  memo: null,
+  status: 'ACTIVE',
+  currencyCode: 'KRW',
+  expiresAt: futureExpiresAt(6 * 60_000),
+}
 
 function createTestRouter(): Router {
   return createRouter({
@@ -32,7 +67,6 @@ function createTestRouter(): Router {
 
 async function mountView(): Promise<{ router: Router; wrapper: ReturnType<typeof mount> }> {
   const router = createTestRouter()
-  setActivePinia(createPinia())
   await router.push('/wallet/qr')
   await router.isReady()
 
@@ -64,124 +98,154 @@ describe('WalletQrView', () => {
       availabilityStatus: 'ACTIVE',
       recentTransactions: [],
     })
+    vi.mocked(listActiveQrPayments).mockReset()
+    vi.mocked(listActiveQrPayments).mockResolvedValue([])
   })
 
-  it('shows the wallet QR preview and current balance', async () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shows an empty state and the current balance when no QR is active', async () => {
     const { wrapper } = await mountView()
     await flushPromises()
 
     expect(wrapper.get('h1').text()).toBe('QR PAYMENT')
-    expect(wrapper.text()).toContain('Payment request QR')
-    expect(wrapper.text()).toContain('NA-WA · Valid for 05:00')
-    expect(wrapper.text()).toContain('Available balance 128,500 P')
-    expect(wrapper.find('[role="img"]').exists()).toBe(true)
-    expect(wrapper.find('[role="img"]').findAll('span')).toHaveLength(21 * 21)
-    expect(wrapper.text()).toContain('Sandbox mode')
+    expect(wrapper.text()).toContain('No QR code yet')
+    expect(wrapper.find('img').exists()).toBe(false)
   })
 
-  it('shows local payment request values from the create screen', async () => {
-    const router = createTestRouter()
-    setActivePinia(createPinia())
-    await router.push('/wallet/qr')
-    await router.isReady()
+  it('shows a loading state while the active QR list is being fetched', async () => {
+    const { wrapper } = await mountView()
 
-    useQrRequestDraftStore().setDraft({
-      amount: 18_500,
-      memo: 'Seoul Food Tour',
-      payerEntersAmount: false,
-    })
+    expect(wrapper.text()).not.toContain('No QR code yet')
+  })
 
-    const wrapper = mount(WalletQrView, {
-      global: {
-        plugins: [
-          i18n,
-          router,
-          [
-            VueQueryPlugin,
-            {
-              queryClient: new QueryClient({
-                defaultOptions: { queries: { retry: false } },
-              }),
-            },
-          ],
-        ],
-      },
-    })
+  it('shows an error state and can retry when the active QR list fails to load', async () => {
+    vi.mocked(listActiveQrPayments).mockRejectedValue(new Error('network down'))
+
+    const { wrapper } = await mountView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('₩18,500')
+    expect(wrapper.text()).toContain('We could not load your active QR codes.')
+
+    vi.mocked(listActiveQrPayments).mockResolvedValue([seoulFoodTour])
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Try again')
+      ?.trigger('click')
+    await flushPromises()
+
     expect(wrapper.text()).toContain('Seoul Food Tour')
   })
 
-  it('shows that the payer can enter an unset amount', async () => {
-    const router = createTestRouter()
-    setActivePinia(createPinia())
-    await router.push('/wallet/qr')
-    await router.isReady()
+  it('shows the most recent active QR image and its real amount, memo, and expiry countdown', async () => {
+    vi.mocked(listActiveQrPayments).mockResolvedValue([seoulFoodTour])
 
-    useQrRequestDraftStore().setDraft({
-      amount: null,
-      memo: '',
-      payerEntersAmount: true,
+    const { wrapper } = await mountView()
+    await flushPromises()
+    await vi.waitFor(() => {
+      if (!wrapper.find('img').exists()) throw new Error('QR image not rendered yet')
     })
 
-    const wrapper = mount(WalletQrView, {
-      global: {
-        plugins: [
-          i18n,
-          router,
-          [
-            VueQueryPlugin,
-            {
-              queryClient: new QueryClient({
-                defaultOptions: { queries: { retry: false } },
-              }),
-            },
-          ],
-        ],
-      },
-    })
+    expect(wrapper.text()).toContain('Payment request QR')
+    expect(wrapper.text()).toContain('₩18,500')
+    expect(wrapper.text()).toContain('Seoul Food Tour')
+    expect(wrapper.text()).toMatch(/NA-WA · Expires in \d+:\d{2}/)
+    expect(wrapper.text()).toContain('Available balance 128,500 P')
+
+    const image = wrapper.get('img')
+    expect(image.attributes('src')).toMatch(/^data:image\/png;base64,/)
+  })
+
+  it('refetches and drops a QR once its scheduled expiry timer fires', async () => {
+    vi.useFakeTimers()
+
+    const expiringSoon = { ...seoulFoodTour, expiresAt: futureExpiresAt(5_000) }
+    vi.mocked(listActiveQrPayments).mockResolvedValueOnce([expiringSoon])
+    vi.mocked(listActiveQrPayments).mockResolvedValueOnce([])
+
+    const { wrapper } = await mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Seoul Food Tour')
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    await flushPromises()
+
+    expect(vi.mocked(listActiveQrPayments)).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).not.toContain('Seoul Food Tour')
+    expect(wrapper.text()).toContain('No QR code yet')
+  })
+
+  it('hides an expired QR even if the server keeps returning it as still active at the boundary', async () => {
+    vi.useFakeTimers()
+
+    const expiringSoon = { ...seoulFoodTour, expiresAt: futureExpiresAt(5_000) }
+    // 만료 경계에서 서버가 같은 QR을 몇 번이고 "아직 활성"으로 돌려주는 상황을 흉내낸다.
+    // structural sharing이 이전 응답과 동일한 데이터 참조를 유지해도, 화면은 now 기준
+    // 필터로 정확해야 한다 — 재조회 스케줄이 다시 걸리는지에 기대지 않는다.
+    vi.mocked(listActiveQrPayments).mockImplementation(() => Promise.resolve([{ ...expiringSoon }]))
+
+    const { wrapper } = await mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Seoul Food Tour')
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Seoul Food Tour')
+    expect(wrapper.text()).toContain('No QR code yet')
+  })
+
+  it('shows that the payer can enter an unset amount, and no memo instead of a placeholder', async () => {
+    vi.mocked(listActiveQrPayments).mockResolvedValue([payerEntersAmount])
+
+    const { wrapper } = await mountView()
     await flushPromises()
 
     expect(wrapper.text()).toContain('Amount entered by payer')
+    expect(wrapper.text()).toContain('No memo')
   })
 
-  it('shows no memo when the create screen submitted a cleared memo, instead of the placeholder default', async () => {
-    const router = createTestRouter()
-    setActivePinia(createPinia())
-    await router.push('/wallet/qr')
-    await router.isReady()
+  it('lists other active QR codes and switches the detail card when one is tapped', async () => {
+    vi.mocked(listActiveQrPayments).mockResolvedValue([seoulFoodTour, payerEntersAmount])
 
-    useQrRequestDraftStore().setDraft({
-      amount: 18_500,
-      memo: '',
-      payerEntersAmount: false,
-    })
-
-    const wrapper = mount(WalletQrView, {
-      global: {
-        plugins: [
-          i18n,
-          router,
-          [
-            VueQueryPlugin,
-            {
-              queryClient: new QueryClient({
-                defaultOptions: { queries: { retry: false } },
-              }),
-            },
-          ],
-        ],
-      },
-    })
+    const { wrapper } = await mountView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('No memo')
-    expect(wrapper.text()).not.toContain('Seoul Night Tour')
+    expect(wrapper.text()).toContain('Seoul Food Tour')
+    expect(wrapper.text()).toContain('Other active QR requests')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Amount entered by payer'))
+      ?.trigger('click')
+    await flushPromises()
+
+    const detailAmount = wrapper.get('dl').text()
+    expect(detailAmount).toContain('Amount entered by payer')
   })
 
-  it('opens the QR creation screen from the My QR tab', async () => {
+  it('opens the QR creation screen from the empty state', async () => {
     const { router, wrapper } = await mountView()
+    await flushPromises()
+    const pushSpy = vi.spyOn(router, 'push')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '+ Create QR')
+      ?.trigger('click')
+
+    expect(pushSpy).toHaveBeenCalledWith({ name: 'wallet-qr-create' })
+  })
+
+  it('opens the QR creation screen from the My QR tab when a QR already exists', async () => {
+    vi.mocked(listActiveQrPayments).mockResolvedValue([seoulFoodTour])
+
+    const { router, wrapper } = await mountView()
+    await flushPromises()
     const pushSpy = vi.spyOn(router, 'push')
 
     await wrapper

@@ -229,12 +229,19 @@ function stubReportApis(page) {
         totalSpent: 1284500,
         dailyAverage: 128450,
         categoryBreakdown: [
-          { category: 'FOOD', amount: 1000000, percentage: 77.85 },
-          { category: 'OTHER', amount: 284500, percentage: 22.15 },
+          { category: 'FOOD', amount: 539500, percentage: 42 },
+          { category: 'SHOPPING', amount: 398200, percentage: 31 },
+          { category: 'SHOW', amount: 218400, percentage: 17 },
+          { category: 'BEAUTY', amount: 128400, percentage: 10 },
         ],
         dailyTrend: [
-          { date: '2021-07-18', amount: 1284500 },
-          { date: '2021-07-19', amount: 0 },
+          { date: '2021-07-18', amount: 262000 },
+          { date: '2021-07-19', amount: 148500 },
+          { date: '2021-07-20', amount: 76000 },
+          { date: '2021-07-21', amount: 178000 },
+          { date: '2021-07-22', amount: 122000 },
+          { date: '2021-07-23', amount: 290000 },
+          { date: '2021-07-27', amount: 208000 },
         ],
       },
     },
@@ -253,12 +260,16 @@ function stubReportApis(page) {
               title: 'Jeju Island',
               startDate: '2021-07-18',
               endDate: '2021-07-27',
+              eventCount: 5,
+              placeCount: 9,
             },
             {
               tripId: 7,
               title: 'Busan Weekender',
               startDate: '2020-08-10',
               endDate: '2020-08-12',
+              eventCount: 4,
+              placeCount: 2,
             },
           ],
         }),
@@ -457,6 +468,96 @@ function stubWalletApis(page) {
   })
 }
 
+const SETTLEMENT_PARTICIPANTS = [
+  { id: 12, name: 'Alex', initials: 'AL' },
+  { id: 19, name: 'Mina', initials: 'MI' },
+  { id: 27, name: 'Leo', initials: 'LE' },
+]
+
+function stubSettlementApis(page) {
+  return Promise.all([
+    stubJson(page, '/api/v1/settlements', {
+      received: [
+        {
+          id: 42,
+          title: 'Late-night Burger Club',
+          totalAmount: '60300',
+          receivableAmount: '40200',
+          type: 'EQUAL',
+          status: 'REQUESTED',
+          viewer: {
+            role: 'CREATOR',
+            shareAmount: '0',
+            payableAmount: '0',
+            requestStatus: 'NOT_REQUESTED',
+            allowedActions: [],
+          },
+        },
+      ],
+      sent: [],
+    }),
+    stubJson(page, '/api/v1/settlements/candidates', [
+      {
+        transferId: 7,
+        appointmentId: 9,
+        payerAppointmentMemberId: 12,
+        journeyName: 'Seoul Summer',
+        gatheringName: 'Late-night Burger Club',
+        merchantName: "McDonald's Hongdae",
+        amount: '60300',
+        paidAt: '2026-07-26T20:42:00',
+        payerName: 'Alex',
+        participants: SETTLEMENT_PARTICIPANTS,
+      },
+    ]),
+    stubJson(page, '/api/v1/settlements/42', {
+      id: 42,
+      type: 'ITEMIZED',
+      totalAmount: '60300',
+      status: 'REQUESTED',
+      requestedBy: 'Alex',
+      gatheringName: 'Late-night Burger Club',
+      merchantName: "McDonald's Hongdae",
+      viewerItems: [
+        {
+          settlementItemId: 1,
+          name: 'Burger set',
+          allocatedQuantity: '1',
+          allocatedAmount: '20100',
+        },
+      ],
+      transactionId: null,
+      paidBy: 'Alex',
+      viewer: {
+        role: 'PARTICIPANT',
+        shareAmount: '20100',
+        payableAmount: '20100',
+        requestStatus: 'PENDING',
+        allowedActions: ['PAY'],
+      },
+    }),
+  ])
+}
+
+function stubEmptySettlementCandidates(page) {
+  return stubJson(page, '/api/v1/settlements/candidates', [])
+}
+
+function stubSettlementCandidatesError(page) {
+  return page.route(
+    (url) => url.pathname === '/api/v1/settlements/candidates',
+    (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error: { code: 'SETTLEMENT-001', message: 'Settlement candidates are unavailable' },
+        }),
+      }),
+  )
+}
+
 /**
  * 찍을 화면.
  *
@@ -616,6 +717,57 @@ const SCREENS = [
     path: '/wallet/qr/payment/complete?scope=shared&appointment=seoul-night-tour',
     setup: async (page) => {
       await stubMemberProfile(page)
+    },
+  },
+  {
+    name: '20-settlement-list-api',
+    path: '/settlements',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementApis(page)
+    },
+  },
+  {
+    name: '21-settlement-list-sent-api',
+    path: '/settlements',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementApis(page)
+    },
+    prepare: (page) => page.getByRole('radio', { name: 'Sent', exact: true }).click(),
+  },
+  {
+    name: '22-settlement-create-api',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementApis(page)
+    },
+  },
+  {
+    name: '23-settlement-create-empty',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEmptySettlementCandidates(page)
+    },
+    prepare: (page) => page.getByText('No payments available', { exact: true }).waitFor(),
+  },
+  {
+    name: '24-settlement-create-error',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementCandidatesError(page)
+    },
+    prepare: (page) => page.getByRole('alert').waitFor({ timeout: 10_000 }),
+  },
+  {
+    name: '25-settlement-detail-api',
+    path: '/settlements/42',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementApis(page)
     },
   },
 

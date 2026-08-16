@@ -97,6 +97,7 @@ PWA는 필수 기능입니다. 개인정보와 정산 데이터의 안전을 위
 | ------------------- | -------------- | ---------------------------------------------------- |
 | Backend CI          | 구현됨         | `main` PR과 push에서 Gradle 빌드·테스트              |
 | Backend CD          | 구현됨         | CI 성공 후 Docker Hub push와 EC2 Docker Compose 배포 |
+| TLS 인증서 갱신     | 구현됨         | 매일 스케줄로 Let's Encrypt 갱신 후 nginx reload (`.github/workflows/renew-cert.yml`) |
 | Frontend CI         | 구현됨         | `main` PR과 push에서 설치, 품질 검사와 빌드          |
 | Frontend Preview    | 운영 방향 확정 | Vercel PR Preview                                    |
 | Frontend Production | 운영 방향 확정 | Vercel `main` Production                             |
@@ -105,6 +106,10 @@ Frontend CI는 고정된 잠금 파일로 의존성을 설치한 뒤 format, lin
 test와 build를 실행합니다. Vercel은 프론트엔드 배포를 담당하고 GitHub Actions는
 품질 검증을 담당합니다. 같은 프론트엔드 배포를 두 시스템에서 중복 실행하지
 마세요.
+
+백엔드 컨테이너는 `TZ=Asia/Seoul`로 고정되어 있습니다(`backend/Dockerfile`).
+`LocalDateTime.now()`가 컨테이너 기본값인 UTC가 아니라 서비스 기준 시간대로
+찍히도록 하기 위함이며, JDBC URL의 `serverTimezone=Asia/Seoul`과 짝을 맞춥니다.
 
 ## 아직 구현하지 않았거나 정리할 항목
 

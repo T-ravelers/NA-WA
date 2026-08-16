@@ -3,6 +3,7 @@ package me.nawa.wallet.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
@@ -44,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class QrPaymentServiceImpl implements QrPaymentService {
 
-    private static final long QR_EXPIRATION_MINUTES = 5L;
+    private static final long QR_EXPIRATION_MINUTES = 1L;
     private static final int MAX_MEMO_LENGTH = 255;
     private static final int AMOUNT_SCALE = 4;
     private static final int MAX_AMOUNT_INTEGER_DIGITS = 15;
@@ -106,6 +107,31 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             wallet.getCurrencyCode(),
             qrPaymentCode.getExpiresAt()
         );
+    }
+
+    // 아직 만료되지 않고 결제도 되지 않아 다시 조회할 수 있는 내 QR 목록. My QR 화면에서 쓴다.
+    @Override
+    public List<QrPaymentCreateResponse> listActivePaymentQrs(Long memberId) {
+        Wallet wallet = walletMapper.findByMemberId(memberId);
+
+        if (wallet == null) {
+            throw new BusinessException(WalletErrorCode.WALLET_NOT_FOUND);
+        }
+
+        List<QrPaymentCode> activeQrPayments =
+            qrPaymentCodeMapper.findActiveByPayeeWalletId(wallet.getWalletId(), LocalDateTime.now());
+
+        return activeQrPayments.stream()
+            .map(qrPaymentCode -> new QrPaymentCreateResponse(
+                qrPaymentCode.getQrPaymentCodeId(),
+                qrPaymentCode.getQrToken(),
+                qrPaymentCode.getAmount(),
+                qrPaymentCode.getMemo(),
+                qrPaymentCode.getPaymentStatus().name(),
+                wallet.getCurrencyCode(),
+                qrPaymentCode.getExpiresAt()
+            ))
+            .toList();
     }
 
     @Override

@@ -71,6 +71,11 @@ docker compose up
   (`.github/workflows/deploy.yml`이 `docker-compose.yml`, `nginx/nginx.conf`,
   `deploy/deploy.sh`만 전송합니다). 운영에만 필요한 `nginx` 서비스는 로컬에서
   기본적으로 실행되지 않습니다.
+- `certbot` 서비스는 `profiles: ["ops"]`로 묶여 있어 평소 `docker compose up -d`에는
+  포함되지 않습니다. TLS 인증서 최초 발급은 EC2에서
+  `docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d <도메인> ...`로
+  1회 실행하고, 갱신과 nginx reload는 `.github/workflows/renew-cert.yml`이 매일
+  자동으로 수행합니다.
 - 프론트엔드는 `frontend/` 디렉터리를 컨테이너에 바인드 마운트하므로 소스를
   고치면 Vite가 자동으로 반영합니다.
 - 백엔드는 Spring Legacy WAR라 소스를 바꾸면 다시 빌드해야 반영됩니다.

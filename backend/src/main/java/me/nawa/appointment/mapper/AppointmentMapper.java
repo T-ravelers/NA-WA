@@ -2,6 +2,7 @@ package me.nawa.appointment.mapper;
 
 import me.nawa.appointment.domain.Appointment;
 import me.nawa.appointment.domain.AppointmentMember;
+import me.nawa.appointment.domain.MyOngoingAppointment;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -68,4 +69,7 @@ public interface AppointmentMapper {
             @Param("appointmentId") Long appointmentId
     );
 
+    List<MyOngoingAppointment> findMyOngoingAppointments(
+        @Param("memberId") Long memberId
+    );
 }

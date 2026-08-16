@@ -4,15 +4,18 @@ import me.nawa.appointment.domain.Appointment;
 import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.domain.AppointmentStatus;
 import me.nawa.appointment.domain.MembershipStatus;
+import me.nawa.appointment.domain.MyOngoingAppointment;
 import me.nawa.appointment.dto.request.AppointmentCreateRequest;
 import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import me.nawa.appointment.dto.response.AppointmentDetailResponse;
 import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
+import me.nawa.appointment.dto.response.MyOngoingAppointmentResponse;
 import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.deposit.domain.Deposit;
 import me.nawa.deposit.mapper.DepositMapper;
 import org.junit.jupiter.api.Test;
@@ -325,6 +328,37 @@ class AppointmentServiceTest {
         assertEquals(false, appointmentService
                 .getMyParticipation(2L, 10L)
                 .isJoined());
+    }
+
+    @Test
+    void getMyOngoingAppointments_returnsTripLinkedAppointments() {
+        MyOngoingAppointment appointment = new MyOngoingAppointment(
+                10L,
+                "Seoul Night Tour",
+                5L,
+                "Gwanghwamun Square",
+                LocalDateTime.of(2026, 8, 21, 18, 30),
+                LocalDateTime.of(2026, 8, 21, 22, 0)
+        );
+        when(appointmentMapper.findMyOngoingAppointments(1L))
+                .thenReturn(List.of(appointment));
+
+        List<MyOngoingAppointmentResponse> result =
+                appointmentService.getMyOngoingAppointments(1L);
+
+        assertEquals(1, result.size());
+        assertEquals(10L, result.get(0).appointmentId());
+        assertEquals(5L, result.get(0).tripId());
+    }
+
+    @Test
+    void getMyOngoingAppointments_invalidMemberId_rejectsRequest() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.getMyOngoingAppointments(0L)
+        );
+
+        assertEquals(CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
     }
 
     @Test

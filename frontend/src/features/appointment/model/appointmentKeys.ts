@@ -10,4 +10,5 @@ export const appointmentKeys = {
     [...appointmentKeys.all, 'members', appointmentId] as const,
   participation: (appointmentId: number | null) =>
     [...appointmentKeys.all, 'participation', appointmentId] as const,
+  mine: () => [...appointmentKeys.all, 'mine'] as const,
 } as const

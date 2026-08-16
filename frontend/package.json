@@ -23,8 +23,10 @@
     "@tanstack/vue-query": "^5.101.4",
     "axios": "^1.18.1",
     "pinia": "^4.0.2",
+    "qrcode": "^1.5.4",
     "vue": "^3.5.40",
     "vue-i18n": "^11.4.8",
+    "vue-qrcode-reader": "^5.7.3",
     "vue-router": "^5.2.0",
     "zod": "^4.4.3"
   },
@@ -34,6 +36,7 @@
     "@tsconfig/node24": "^24.0.4",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^24.13.3",
+    "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vitest/eslint-plugin": "^1.6.23",
     "@vue/eslint-config-typescript": "^14.9.0",

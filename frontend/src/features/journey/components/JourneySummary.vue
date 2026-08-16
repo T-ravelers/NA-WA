@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
+import { formatCurrency } from '@/shared/lib/money'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import type { Journey } from '../api/journeyApi'
@@ -19,11 +20,9 @@ function formatBudget(value: number | null): string {
     return t('journey.detail.noBudget')
   }
 
-  return new Intl.NumberFormat(locale.value, {
-    style: 'currency',
-    currency: 'KRW',
+  return formatCurrency(value, locale.value, 'KRW', {
     maximumFractionDigits: 0,
-  }).format(value)
+  })
 }
 
 function formatCompanionPreference(value: string | null): string {

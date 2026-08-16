@@ -1,5 +1,6 @@
 package me.nawa.wallet.service;
 
+import java.util.List;
 import me.nawa.wallet.dto.request.QrPaymentCreateRequest;
 import me.nawa.wallet.dto.request.QrPaymentExecuteRequest;
 import me.nawa.wallet.dto.request.QrPaymentPreviewRequest;
@@ -16,6 +17,8 @@ public interface QrPaymentService {
         Long memberId,
         QrPaymentCreateRequest request
     );
+
+    List<QrPaymentCreateResponse> listActivePaymentQrs(Long memberId);
 
     QrPaymentResolveResponse resolvePaymentQr(
         Long memberId,

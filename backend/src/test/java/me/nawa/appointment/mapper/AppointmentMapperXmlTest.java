@@ -65,6 +65,9 @@ class AppointmentMapperXmlTest {
         assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.markMemberLeft"
         ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.findMyOngoingAppointments"
+        ));
     }
 
     @Test
@@ -102,6 +105,19 @@ class AppointmentMapperXmlTest {
 
         assertTrue(sql.contains("membership_status = 'PENDING'"));
         assertFalse(sql.contains("membership_status IN ('PENDING', 'ACTIVE')"));
+    }
+
+    @Test
+    void myOngoingAppointmentList_filtersByActiveTripLinkedInProgressMembership()
+            throws Exception {
+        String sql = boundSql(
+                "findMyOngoingAppointments",
+                Map.of("memberId", 1L)
+        );
+
+        assertTrue(sql.contains("am.membership_status = 'ACTIVE'"));
+        assertTrue(sql.contains("am.trip_id IS NOT NULL"));
+        assertTrue(sql.contains("a.appointment_status = 'IN_PROGRESS'"));
     }
 
     private static Configuration configuration() throws Exception {

@@ -1,6 +1,7 @@
 package me.nawa.wallet.mapper;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import me.nawa.wallet.domain.QrPaymentAppointmentMembership;
 import me.nawa.wallet.domain.QrPaymentCode;
 import me.nawa.wallet.domain.QrPaymentResolveTarget;
@@ -11,6 +12,12 @@ import org.apache.ibatis.annotations.Param;
 public interface  QrPaymentCodeMapper {
 
     void insert(QrPaymentCode qrPaymentCode);
+
+    // 아직 만료되지 않고 결제도 되지 않은, 다시 조회 가능한 내 QR 목록
+    List<QrPaymentCode> findActiveByPayeeWalletId(
+        @Param("payeeWalletId") Long payeeWalletId,
+        @Param("now") LocalDateTime now
+    );
 
     QrPaymentResolveTarget findResolveTargetByToken(
         @Param("qrToken") String qrToken

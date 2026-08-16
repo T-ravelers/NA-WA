@@ -31,6 +31,11 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
 - 커밋 메시지에 `Co-Authored-By` 트레일러를 넣지 않습니다. 기존 이력에도 없습니다.
 - 관련 없는 프론트엔드/백엔드 변경을 한 PR에 섞지 않습니다.
 - **API·환경 변수·배포·공통 계약을 바꾸면 같은 PR에서 관련 문서와 이 파일도 고칩니다.**
+- EC2 nginx의 TLS 인증서는 `docker-compose.yml`의 `certbot` 서비스(`profiles: ["ops"]`,
+  평소 `up -d`에는 포함 안 됨)로 다룹니다. 최초 발급은 `docker compose run --rm certbot
+  certonly --webroot ...`로 수동 1회 실행하고, 갱신과 nginx reload는
+  [renew-cert.yml](./.github/workflows/renew-cert.yml)이 매일 스케줄로 담당합니다.
+  이 두 경로 중 하나만 보고 판단하면 발급·갱신 흐름을 놓칩니다.
 - 성공 `ApiResponse.data`의 런타임 검증은 요청별 `AxiosRequestConfig.responseSchema`로
   선택합니다. 스키마는 해당 feature의 `api/` 폴더가 소유하고, 공용 계층은 feature를
   import하지 않습니다. 설정하지 않은 요청은 기존 봉투 해제·인증/CSRF 재시도 동작을
@@ -74,7 +79,9 @@ cd backend && ./gradlew build --no-daemon
 | 프론트엔드 구현 규칙 | [frontend/docs/DEVELOPMENT_CONVENTION.md](./frontend/docs/DEVELOPMENT_CONVENTION.md) |
 | 백엔드 구현 규칙     | [backend/docs/DEVELOPMENT_CONVENTION.md](./backend/docs/DEVELOPMENT_CONVENTION.md) |
 | API 응답·오류 코드   | [backend/docs/API_RESPONSE_CONVENTION.md](./backend/docs/API_RESPONSE_CONVENTION.md) |
+| Journey 설정 수정 API | [backend/docs/JOURNEY_API.md](./backend/docs/JOURNEY_API.md)                  |
 | 정산 API·상태·멱등성 | [backend/docs/SETTLEMENT.md](./backend/docs/SETTLEMENT.md)                  |
+| QR 결제 API·상태·멱등성 | [backend/docs/QR_PAYMENT_API.md](./backend/docs/QR_PAYMENT_API.md)      |
 | 소셜 로그인 운영     | [backend/docs/AUTHENTICATION.md](./backend/docs/AUTHENTICATION.md)          |
 | DB 지도·도메인 ERD   | [backend/docs/database/README.md](./backend/docs/database/README.md)         |
 

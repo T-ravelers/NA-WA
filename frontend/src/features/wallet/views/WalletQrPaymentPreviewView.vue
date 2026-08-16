@@ -1,53 +1,190 @@
 <script setup lang="ts">
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import { IconChevronLeft } from '@tabler/icons-vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+import { NormalizedApiError } from '@/shared/api/apiError'
+import { formatServerDateTime } from '@/shared/lib/datetime'
+import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
+import StateEmpty from '@/shared/ui/StateEmpty.vue'
+import StateError from '@/shared/ui/StateError.vue'
+import StateLoading from '@/shared/ui/StateLoading.vue'
 
+import { executeQrPayment, previewQrPayment } from '../api/qrPaymentApi'
+import { useWalletAppointmentIntegration } from '../model/appointmentIntegration'
 import {
-  ACTIVE_APPOINTMENTS,
   formatKrw,
-  QR_PAYMENT_PREVIEW,
+  isValidQrPaymentAmount,
+  qrPaymentKeys,
+  toQrPaymentSpendingScope,
   type SpendingScope,
 } from '../model/qrPayment'
+import { useQrPaymentSessionStore } from '../model/qrPaymentSession'
 
-const { t } = useI18n()
+const i18n = useI18n()
+const { t, locale } = i18n
 const router = useRouter()
+const qrPaymentSession = useQrPaymentSessionStore()
+const { useMyOngoingAppointmentsQuery } = useWalletAppointmentIntegration()
+
+const session = computed(() => qrPaymentSession.session)
 
 const spendingScope = ref<SpendingScope>('personal')
-const selectedAppointmentId = ref('')
+const selectedAppointmentId = ref<number | null>(null)
+const enteredAmount = ref<number | null>(null)
+
+const isSharedExpense = computed(() => spendingScope.value === 'shared')
+const ongoingAppointmentsQuery = useMyOngoingAppointmentsQuery(isSharedExpense)
 
 const spendingOptions = computed(() => [
   { value: 'personal', label: t('wallet.qrPayment.personal') },
   { value: 'shared', label: t('wallet.qrPayment.shared') },
 ])
-
-const isSharedExpense = computed(() => spendingScope.value === 'shared')
 const selectedAppointment = computed(() =>
-  ACTIVE_APPOINTMENTS.find((appointment) => appointment.id === selectedAppointmentId.value),
+  ongoingAppointmentsQuery.data.value?.find(
+    (appointment) => appointment.appointmentId === selectedAppointmentId.value,
+  ),
 )
+
+// Shared에서 고른 약속이 Personal로 돌아간 뒤에도 남아있으면, 백엔드가
+// PERSONAL + appointmentId 조합을 거부한다(QR_PERSONAL_APPOINTMENT_NOT_ALLOWED).
+watch(spendingScope, (scope) => {
+  if (scope !== 'shared') {
+    selectedAppointmentId.value = null
+  }
+})
+
+function formatAppointmentPeriod(activityStartAt: string, activityEndAt: string): string {
+  const options = { month: 'short' as const, day: 'numeric' as const }
+  const start = formatServerDateTime(activityStartAt, locale.value, options)
+  const end = formatServerDateTime(activityEndAt, locale.value, options)
+
+  if (start === '' || end === '') return ''
+
+  return `${start} – ${end}`
+}
+
+const finalAmount = computed<number | null>(() => {
+  const resolved = session.value?.resolved
+
+  if (resolved === undefined) return null
+
+  return resolved.amountInputRequired ? enteredAmount.value : resolved.amount
+})
+
+const isPreviewReady = computed(
+  () =>
+    session.value !== null &&
+    (spendingScope.value === 'personal' ||
+      (spendingScope.value === 'shared' && selectedAppointment.value !== undefined)) &&
+    isValidQrPaymentAmount(finalAmount.value),
+)
+
+const previewQuery = useQuery({
+  queryKey: computed(() =>
+    qrPaymentKeys.preview(
+      session.value?.qrToken ?? '',
+      finalAmount.value ?? 0,
+      toQrPaymentSpendingScope(spendingScope.value),
+      selectedAppointment.value?.appointmentId ?? null,
+    ),
+  ),
+  queryFn: () =>
+    previewQrPayment({
+      qrToken: session.value?.qrToken ?? '',
+      amount: finalAmount.value ?? 0,
+      spendingScope: toQrPaymentSpendingScope(spendingScope.value),
+      appointmentId: selectedAppointment.value?.appointmentId ?? null,
+    }),
+  enabled: isPreviewReady,
+})
+
+const previewErrorMessage = computed(() => {
+  const error = previewQuery.error.value
+
+  if (!(error instanceof NormalizedApiError) || !i18n.te(error.messageKey)) {
+    return t('wallet.qrPayment.previewError')
+  }
+
+  return t(error.messageKey)
+})
+
+const executeMutation = useMutation({
+  mutationFn: ({
+    request,
+    idempotencyKey,
+  }: {
+    request: Parameters<typeof executeQrPayment>[0]
+    idempotencyKey: string
+  }) => executeQrPayment(request, idempotencyKey),
+})
+
+const executeErrorMessage = computed(() => {
+  const error = executeMutation.error.value
+
+  if (!(error instanceof NormalizedApiError) || !i18n.te(error.messageKey)) {
+    return t('wallet.qrPayment.executeError')
+  }
+
+  return t(error.messageKey)
+})
+
 const canPay = computed(
-  () => spendingScope.value === 'personal' || selectedAppointment.value !== undefined,
+  () => previewQuery.data.value?.canPay === true && !executeMutation.isPending.value,
 )
 
 const goBack = (): void => {
   void router.push({ name: 'wallet-qr-scan' })
 }
 
-const completePayment = (): void => {
-  if (!canPay.value) return
+const idempotencyKey = ref<string | null>(null)
 
-  void router.push({
-    name: 'wallet-qr-payment-complete',
-    query: {
-      scope: spendingScope.value,
-      ...(selectedAppointment.value ? { appointment: selectedAppointment.value.id } : {}),
+// 요청 내용이 바뀌면(다른 결제 시도) 새 키를 쓴다. 재시도(내용 동일)는 키를 재사용한다.
+watch(
+  () =>
+    [
+      session.value?.qrToken,
+      finalAmount.value,
+      spendingScope.value,
+      selectedAppointmentId.value,
+    ] as const,
+  () => {
+    idempotencyKey.value = null
+  },
+)
+
+const completePayment = (): void => {
+  if (!canPay.value || session.value === null || finalAmount.value === null) return
+
+  idempotencyKey.value ??=
+    globalThis.crypto?.randomUUID?.() ?? `qr-payment-${Date.now()}-${Math.random()}`
+
+  executeMutation.mutate(
+    {
+      request: {
+        qrToken: session.value.qrToken,
+        amount: finalAmount.value,
+        spendingScope: toQrPaymentSpendingScope(spendingScope.value),
+        appointmentId: selectedAppointment.value?.appointmentId ?? null,
+      },
+      idempotencyKey: idempotencyKey.value,
     },
-  })
+    {
+      onSuccess: (response) => {
+        idempotencyKey.value = null
+        qrPaymentSession.clearSession()
+        void router.push({
+          name: 'wallet-qr-payment-complete',
+          params: { transferId: String(response.transferId) },
+        })
+      },
+    },
+  )
 }
 </script>
 
@@ -76,6 +213,26 @@ const completePayment = (): void => {
     </header>
 
     <section
+      v-if="session === null"
+      class="pt-6"
+      aria-labelledby="wallet-qr-payment-preview-heading"
+    >
+      <h2
+        id="wallet-qr-payment-preview-heading"
+        class="sr-only"
+      >
+        {{ t('wallet.qrPayment.previewHeading') }}
+      </h2>
+      <StateEmpty
+        :title="t('wallet.qrPayment.noSessionTitle')"
+        :description="t('wallet.qrPayment.noSessionDescription')"
+        :action-label="t('wallet.qrScan.rescan')"
+        @action="goBack"
+      />
+    </section>
+
+    <section
+      v-else
       class="space-y-4 pt-6"
       aria-labelledby="wallet-qr-payment-preview-heading"
     >
@@ -90,28 +247,63 @@ const completePayment = (): void => {
         <h3 class="text-title-sm">{{ t('wallet.qrPayment.previewHeading') }}</h3>
 
         <dl class="mt-4 divide-y divide-hairline">
-          <div class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+          <div class="flex items-center justify-between gap-4 py-3 first:pt-0">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.recipient') }}</dt>
             <dd class="text-right text-body-sm font-semibold">
-              {{ QR_PAYMENT_PREVIEW.recipient }}
+              {{ session.resolved.payeeName }}
             </dd>
           </div>
+        </dl>
+
+        <div
+          v-if="session.resolved.amountInputRequired"
+          class="mt-1"
+        >
+          <AmountInput
+            v-model="enteredAmount"
+            :label="t('wallet.qrPayment.amount')"
+            :helper="t('wallet.qrPayment.amountInputHelper')"
+          />
+        </div>
+        <dl
+          v-else
+          class="divide-y divide-hairline"
+        >
           <div class="flex items-center justify-between gap-4 py-3">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.amount') }}</dt>
             <dd class="text-body-sm font-semibold">
-              {{ formatKrw(QR_PAYMENT_PREVIEW.amount) }}
+              {{ formatKrw(session.resolved.amount ?? 0) }}
             </dd>
           </div>
+        </dl>
+
+        <p
+          v-if="previewQuery.isPending.value"
+          class="mt-3 text-body-sm text-ink-2"
+        >
+          {{ t('wallet.qrPayment.loadingPreview') }}
+        </p>
+        <p
+          v-else-if="previewQuery.isError.value"
+          role="alert"
+          class="mt-3 rounded-sm bg-surface-3 px-3.5 py-3 text-body-sm text-ink-2"
+        >
+          {{ previewErrorMessage }}
+        </p>
+        <dl
+          v-else-if="previewQuery.data.value"
+          class="mt-1 divide-y divide-hairline"
+        >
           <div class="flex items-center justify-between gap-4 py-3">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.currentBalance') }}</dt>
             <dd class="text-body-sm font-semibold">
-              {{ formatKrw(QR_PAYMENT_PREVIEW.currentBalance) }}
+              {{ formatKrw(previewQuery.data.value.currentBalance) }}
             </dd>
           </div>
           <div class="flex items-center justify-between gap-4 py-3 last:pb-0">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.balanceAfter') }}</dt>
             <dd class="text-body-sm font-semibold">
-              {{ formatKrw(QR_PAYMENT_PREVIEW.balanceAfter) }}
+              {{ formatKrw(previewQuery.data.value.balanceAfter) }}
             </dd>
           </div>
         </dl>
@@ -141,40 +333,74 @@ const completePayment = (): void => {
             {{ t('wallet.qrPayment.activeAppointmentsHint') }}
           </p>
 
-          <div class="mt-3 space-y-2">
-            <label
-              v-for="appointment in ACTIVE_APPOINTMENTS"
-              :key="appointment.id"
-              class="block cursor-pointer rounded-sm border p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
-              :class="
-                selectedAppointmentId === appointment.id
-                  ? 'border-ink bg-surface-2'
-                  : 'border-hairline bg-transparent'
-              "
-            >
-              <input
-                v-model="selectedAppointmentId"
-                class="sr-only"
-                type="radio"
-                name="active-appointment"
-                :value="appointment.id"
-              />
-              <span class="flex items-center justify-between gap-3">
-                <span class="text-body-sm font-semibold">{{ appointment.name }}</span>
-                <span class="shrink-0 text-caption text-ink-3">{{ appointment.period }}</span>
-              </span>
-            </label>
-          </div>
+          <StateLoading
+            v-if="ongoingAppointmentsQuery.isPending.value"
+            class="mt-3"
+            :lines="2"
+            :label="t('wallet.qrPayment.appointmentsLoading')"
+          />
+          <StateError
+            v-else-if="ongoingAppointmentsQuery.isError.value"
+            class="mt-3"
+            :description="t('wallet.qrPayment.appointmentsError')"
+            @retry="ongoingAppointmentsQuery.refetch"
+          />
+          <StateEmpty
+            v-else-if="(ongoingAppointmentsQuery.data.value ?? []).length === 0"
+            class="mt-3"
+            :description="t('wallet.qrPayment.appointmentsEmpty')"
+          />
+          <template v-else>
+            <div class="mt-3 space-y-2">
+              <label
+                v-for="appointment in ongoingAppointmentsQuery.data.value"
+                :key="appointment.appointmentId"
+                class="block cursor-pointer rounded-sm border p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
+                :class="
+                  selectedAppointmentId === appointment.appointmentId
+                    ? 'border-ink bg-surface-2'
+                    : 'border-hairline bg-transparent'
+                "
+              >
+                <input
+                  v-model="selectedAppointmentId"
+                  class="sr-only"
+                  type="radio"
+                  name="active-appointment"
+                  :value="appointment.appointmentId"
+                />
+                <span class="flex items-center justify-between gap-3">
+                  <span class="text-body-sm font-semibold">{{ appointment.appointmentName }}</span>
+                  <span class="shrink-0 text-caption text-ink-3">
+                    {{
+                      formatAppointmentPeriod(
+                        appointment.activityStartAt,
+                        appointment.activityEndAt,
+                      )
+                    }}
+                  </span>
+                </span>
+              </label>
+            </div>
 
-          <p
-            v-if="selectedAppointment === undefined"
-            class="mt-3 text-caption text-warning"
-            role="status"
-          >
-            {{ t('wallet.qrPayment.selectAppointment') }}
-          </p>
+            <p
+              v-if="selectedAppointment === undefined"
+              class="mt-3 text-caption text-warning"
+              role="status"
+            >
+              {{ t('wallet.qrPayment.selectAppointment') }}
+            </p>
+          </template>
         </fieldset>
       </AppCard>
+
+      <p
+        v-if="executeMutation.isError.value"
+        role="alert"
+        class="rounded-sm bg-surface-3 px-3.5 py-3 text-body-sm text-ink-2"
+      >
+        {{ executeErrorMessage }}
+      </p>
 
       <div class="grid grid-cols-2 gap-3 pt-1">
         <AppButton
@@ -190,7 +416,11 @@ const completePayment = (): void => {
           :disabled="!canPay"
           @click="completePayment"
         >
-          {{ t('wallet.qrPayment.pay') }}
+          {{
+            executeMutation.isPending.value
+              ? t('wallet.qrPayment.executing')
+              : t('wallet.qrPayment.pay')
+          }}
         </AppButton>
       </div>
     </section>

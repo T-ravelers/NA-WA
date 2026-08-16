@@ -55,6 +55,12 @@ public enum JourneyErrorCode implements ErrorCode {
         HttpStatus.BAD_REQUEST,
         "JOURNEY-008",
         "displayOrder는 0 이상이어야 합니다."
+    ),
+
+    JOURNEY_DATE_RANGE_CONFLICT(
+        HttpStatus.CONFLICT,
+        "JOURNEY-009",
+        "변경할 Journey 기간을 벗어나는 일정이 있습니다."
     );
 
     private final HttpStatus status;

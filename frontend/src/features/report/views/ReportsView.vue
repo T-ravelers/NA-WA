@@ -5,12 +5,12 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import AppButton from '@/shared/ui/AppButton.vue'
-import AppCard from '@/shared/ui/AppCard.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import type { ReportExpenseCandidate } from '../api/reportApi'
+import ReportJourneyCard from '../components/ReportJourneyCard.vue'
 import {
   useCreateReportMutation,
   useReportExpenseCandidatesQuery,
@@ -224,52 +224,15 @@ async function generateReport(): Promise<void> {
       v-else
       class="flex flex-col gap-3"
     >
-      <li
+      <ReportJourneyCard
         v-for="option in options"
         :key="option.tripId"
-      >
-        <AppCard>
-          <article class="flex flex-col gap-4">
-            <div class="flex items-start justify-between gap-4">
-              <div class="min-w-0">
-                <h2 class="truncate text-title text-ink">
-                  {{ option.title }}
-                </h2>
-                <p class="mt-1 text-body-sm text-ink-3">
-                  {{ formatReportDate(option.startDate) }}–{{ formatReportDate(option.endDate) }}
-                </p>
-              </div>
-              <span class="text-label text-ink-3">{{ t('report.list.ended') }}</span>
-            </div>
-
-            <p class="text-body-sm text-ink-3">
-              {{ option.report === null ? t('report.list.notCreated') : t('report.list.ready') }}
-            </p>
-
-            <AppButton
-              v-if="option.report !== null"
-              variant="secondary"
-              block
-              @click="viewReport(option.report.reportId)"
-            >
-              {{ t('report.list.view') }}
-            </AppButton>
-            <AppButton
-              v-else
-              variant="secondary"
-              block
-              :disabled="createMutation.isPending.value"
-              @click="chooseJourney(option.tripId)"
-            >
-              {{
-                selectedTripId === option.tripId
-                  ? t('report.list.choosingExpenses')
-                  : t('report.list.chooseExpenses')
-              }}
-            </AppButton>
-          </article>
-        </AppCard>
-      </li>
+        :option="option"
+        :selected="selectedTripId === option.tripId"
+        :pending="createMutation.isPending.value"
+        @view-report="viewReport"
+        @choose-journey="chooseJourney"
+      />
     </ul>
 
     <section

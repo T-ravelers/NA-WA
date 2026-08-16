@@ -7,6 +7,8 @@ export default {
       emptyTitle: 'No ended journeys yet',
       emptyDescription: 'Final reports become available after a journey ends.',
       ended: 'Ended',
+      eventCount: '{count} events',
+      placeCount: '{count} places',
       ready: 'Final report ready',
       notCreated: 'No final report',
       view: 'View final report',
@@ -32,7 +34,7 @@ export default {
       refresh: 'Refresh reports',
     },
     detail: {
-      title: 'Final report',
+      title: 'Report',
       back: 'Back to reports',
       invalidTitle: 'Invalid report link',
       invalidDescription: 'The report number in this link is not valid.',

@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconHeart } from '@tabler/icons-vue'
 
+import { formatCalendarDateString } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
@@ -56,13 +57,11 @@ const regionLabel = computed(() =>
     .join(' · '),
 )
 
-function formatDate(value: string | null): string {
-  return value ? value.replace(/-/g, '.') : ''
-}
-
 // 한쪽 날짜만 있으면 구분자 없이 그 날짜만 보인다. `EventDetailView`와 같은 방식이다.
 const periodLabel = computed(() =>
-  [formatDate(event.startDate), formatDate(event.endDate)].filter(Boolean).join(' ~ '),
+  [formatCalendarDateString(event.startDate), formatCalendarDateString(event.endDate)]
+    .filter(Boolean)
+    .join(' ~ '),
 )
 
 function openEvent(): void {

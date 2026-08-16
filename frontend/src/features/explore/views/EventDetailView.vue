@@ -12,6 +12,7 @@ import {
   IconShare2,
 } from '@tabler/icons-vue'
 
+import { formatCalendarDateString } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -33,6 +34,7 @@ import {
   toStringList,
   type DetailEntry,
 } from '../model/eventDetail'
+import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
 import { findExploreRegionLabelKey } from '../model/exploreRegions'
 import { useSavedEventsStore } from '../model/savedEvents'
@@ -40,13 +42,9 @@ import { useSavedEventsStore } from '../model/savedEvents'
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
-const {
-  addJourneyItem,
-  parseJourneyRouteQuery,
-  readActiveJourneyId,
-  storeActiveJourneyId,
-  useJourneyListQuery,
-} = useExploreJourneyIntegration()
+const { addJourneyItem, parseJourneyRouteQuery, useJourneyListQuery } =
+  useExploreJourneyIntegration()
+const returnContext = useExploreReturnContextStore()
 
 const eventId = computed(() => String(route.params.eventId ?? ''))
 const eventQuery = useEventDetailQuery(eventId, locale)
@@ -96,7 +94,7 @@ const locationLabel = computed(() =>
 
 const journeyLocation = computed(() => regionLabel.value || locationLabel.value)
 const activeJourneyId = computed(
-  () => parseJourneyRouteQuery(route.query.journeyId) ?? readActiveJourneyId(),
+  () => parseJourneyRouteQuery(route.query.journeyId) ?? returnContext.journeyId,
 )
 const journeyListQuery = useJourneyListQuery(journeySelectSheetOpen)
 const journeys = computed(() => journeyListQuery.data.value ?? [])
@@ -111,7 +109,9 @@ const detailRows = computed(() => {
   const rows: DetailEntry[] = []
   const period = current.isPermanent
     ? t('explore.detail.permanent')
-    : [formatDate(current.startDate), formatDate(current.endDate)].filter(Boolean).join(' – ')
+    : [formatCalendarDateString(current.startDate), formatCalendarDateString(current.endDate)]
+        .filter(Boolean)
+        .join(' – ')
   if (period) rows.push({ label: t('explore.detail.period'), value: period })
   if (current.venueName || current.addressRoad) {
     rows.push({ label: t('explore.detail.venue'), value: locationLabel.value })
@@ -153,10 +153,6 @@ const kindLabel = computed(() =>
 watch(imageUrls, () => {
   selectedImage.value = 0
 })
-
-function formatDate(value: string | null): string {
-  return value ? value.replace(/-/g, '.') : ''
-}
 
 function showPreviousImage(): void {
   if (imageUrls.value.length === 0) return
@@ -230,7 +226,8 @@ function closeJourneySelectSheet(): void {
 
 function selectJourney(journeyId: number): void {
   selectedJourneyId.value = journeyId
-  storeActiveJourneyId(journeyId)
+  returnContext.setJourneyId(journeyId)
+  journeyDate.value = returnContext.visitDate
   journeySelectSheetOpen.value = false
   journeyDateSheetOpen.value = true
 }
@@ -257,11 +254,12 @@ async function confirmJourneyDate(date: string): Promise<void> {
       itemId: current.eventId,
       visitDate: date,
     })
-    storeActiveJourneyId(journeyId)
+    returnContext.setJourneyId(journeyId)
     journeyDate.value = date
     journeyAdded.value = true
     journeyDateSheetOpen.value = false
-    await router.push({ name: 'journey-detail', params: { tripId: journeyId } })
+    const destination = returnContext.consumeReturn()
+    await router.push(destination ?? { name: 'journey-detail', params: { tripId: journeyId } })
   } catch {
     journeyAddError.value = 'failed'
   } finally {

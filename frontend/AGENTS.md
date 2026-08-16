@@ -49,6 +49,10 @@ method·상태와 issue path/code/expected만 기록하며 response body, issue 
 인증·개인정보와 Axios error 전체를 기록하지 않습니다. feature API 테스트는
 `responseSchema` 전달을 확인하고, 스키마 fixture 테스트로 실제 검증도 별도로 증명합니다.
 
+정산 화면은 모든 환경에서 API 계약만 호출합니다. API 오류나 빈 응답을 예시 데이터로
+대체하지 않습니다. 테스트와 화면 캡처는 production source의 데이터 분기를 만들지 말고
+API mock 또는 Playwright route stub을 사용합니다.
+
 ## 문구 — 한국어는 서비스 locale이 아니다
 
 지원 locale은 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
@@ -79,6 +83,9 @@ method·상태와 issue path/code/expected만 기록하며 response body, issue 
 > 두 번 겪었습니다(#108, #99). 예외도 로그도 없이 날짜만 조용히 사라지므로
 > 발견이 늦습니다. 새 날짜 필드를 쓸 때는 백엔드 DTO에 `@JsonFormat`이 있는지
 > 먼저 확인하세요. 프론트 타입 선언과 단위 테스트로는 잡히지 않습니다.
+
+공용 파서는 `src/shared/lib/datetime.ts`의 `parseServerDateTime`만 사용합니다. 날짜 전용
+`YYYY-MM-DD` 값은 같은 파일의 달력 전용 함수를 사용하고 서버 시각 파서에 넘기지 않습니다.
 
 ## PWA 캐시 경계
 

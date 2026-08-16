@@ -29,7 +29,32 @@
             (#{region.tripId}, #{region.regionCode}, #{region.regionName},
              #{region.displayOrder})
         </foreach>
+        ON DUPLICATE KEY UPDATE
+            region_name = VALUES(region_name),
+            display_order = VALUES(display_order),
+            updated_at = CURRENT_TIMESTAMP,
+            deleted_at = NULL
     </insert>
+
+    <update id="updateJourney">
+        UPDATE trips
+        SET title = #{title},
+            start_date = #{startDate},
+            end_date = #{endDate},
+            budget_amount = #{budgetAmount},
+            companion_preference = #{companionPreference},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="softDeleteRegionsByTripId">
+        UPDATE trip_regions
+        SET deleted_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+    </update>
 
     <select id="findJourneysByMemberId"
             resultType="me.nawa.journey.domain.Journey">
@@ -85,6 +110,32 @@
         FROM trips
         WHERE trip_id = #{tripId}
           AND deleted_at IS NULL
+    </select>
+
+    <select id="findJourneyByIdForUpdate"
+            resultType="me.nawa.journey.domain.Journey">
+        SELECT
+            trip_id,
+            member_id,
+            title,
+            start_date,
+            end_date,
+            budget_amount,
+            companion_preference
+        FROM trips
+        WHERE trip_id = #{tripId}
+          AND deleted_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="hasJourneyItemsOutsideRange" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM trip_items
+            WHERE trip_id = #{tripId}
+              AND deleted_at IS NULL
+              AND (visit_date &lt; #{startDate} OR visit_date &gt; #{endDate})
+        )
     </select>
 
     <select id="findRegionsByTripId" resultType="me.nawa.journey.domain.TripRegion">

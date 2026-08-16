@@ -39,18 +39,19 @@ describe('ReportDailyTrend', () => {
     const plotted = readPolyline(wrapper.get('polyline').attributes('points') ?? '')
 
     expect(plotted).toHaveLength(7)
-    expect(plotted[0]?.x).toBe(10)
-    expect(plotted[6]?.x).toBe(300)
+    expect(plotted[0]?.x).toBe(8)
+    expect(plotted[6]?.x).toBe(310)
   })
 
   it('puts the highest spending day at the top of the plot area', () => {
     const wrapper = mountTrend({ points: reportDailyTrendFixture })
     const plotted = readPolyline(wrapper.get('polyline').attributes('points') ?? '')
 
-    // 최고액(₩262,000)은 상단 경계 20, 최저액(₩76,000)은 그보다 아래에 있다.
-    expect(plotted[0]?.y).toBe(20)
-    expect(plotted[2]?.y).toBeGreaterThan(20)
-    expect(plotted.every((point) => point.y <= 100)).toBe(true)
+    // 최고액(₩262,000)은 상단 경계 16, 최저액(₩76,000)은 그보다 아래에 있다.
+    expect(plotted[0]?.y).toBe(16)
+    expect(plotted[2]?.y).toBeGreaterThan(16)
+    expect(plotted.every((point) => point.y <= 93)).toBe(true)
+    expect(wrapper.findAll('circle')).toHaveLength(reportDailyTrendFixture.length)
   })
 
   it('keeps every amount available as text for screen readers', () => {
@@ -74,7 +75,7 @@ describe('ReportDailyTrend', () => {
     const plotted = readPolyline(wrapper.get('polyline').attributes('points') ?? '')
 
     expect(plotted).toHaveLength(3)
-    expect(plotted.every((point) => point.y === 100)).toBe(true)
+    expect(plotted.every((point) => point.y === 93)).toBe(true)
     expect(wrapper.text()).toContain('May 2')
   })
 
@@ -84,8 +85,8 @@ describe('ReportDailyTrend', () => {
     const plotted = readPolyline(wrapper.get('polyline').attributes('points') ?? '')
 
     expect(plotted).toHaveLength(1)
-    expect(plotted[0]?.x).toBe(155)
-    // 처음·마지막·최고점이 모두 같은 점이라 표식은 하나만 남는다.
+    expect(plotted[0]?.x).toBe(159)
+    // 첫·마지막 점이 같은 항목이어도 표식은 하나만 남는다.
     expect(wrapper.findAll('circle')).toHaveLength(1)
   })
 
