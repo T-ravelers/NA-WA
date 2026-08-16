@@ -13,15 +13,15 @@ services:
     networks:
       - nawa-network
 
+  # 상시 기동하지 않음. 최초 발급/갱신은 `docker compose run --rm certbot ...`으로
+  # 필요할 때만 실행하고(갱신은 .github/workflows/renew-cert.yml이 매일 트리거),
+  # 이미지 기본 entrypoint(`certbot`)를 그대로 써야 하므로 여기서 재정의하지 않습니다.
   certbot:
     image: certbot/certbot
+    profiles: ["ops"]
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_conf:/etc/letsencrypt
-    entrypoint: >
-      sh -c "trap exit TERM; while :; do
-      certbot renew --webroot -w /var/www/certbot;
-      sleep 12h; done"
 
   backend:
     image: ${DOCKERHUB_USERNAME}/nawa-backend:latest
