@@ -34,7 +34,6 @@
 | `sort` | `LATEST` 또는 `POPULAR` | 최신순 또는 인기순으로 정렬합니다. |
 | `page` | 0 이상의 정수 | 0부터 시작하는 페이지 번호입니다. |
 | `size` | 양의 정수 | 페이지 크기입니다. 기본값은 20입니다. |
-| `language` | 문자열 | 목록 제목·부제목과 분류명의 언어입니다. 해당 번역 행이 없으면 원문을 반환합니다. |
 
 Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `1~4`, Activity는
 `1~56`이며 Event와 Place가 같은 분류표를 공유합니다.
@@ -96,7 +95,7 @@ Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `
 | `hasRestroom` | boolean | 화장실이 있는 Place만 조회합니다. |
 | `savedOnly` | boolean | 인증한 회원이 저장한 Place만 조회합니다. |
 | `sort` | `LATEST` 또는 `POPULAR` | 최신순 또는 인기순으로 정렬합니다. |
-| `language` | 문자열 | 목록 이름·브랜드·지점과 Activity·Sector 이름 언어입니다. 해당 번역 행이 없으면 원문을 반환합니다. |
+| `language` | 문자열 | Activity·Sector 이름 언어입니다. `en`은 영문, 그 외에는 한글입니다. |
 | `page` | 0 이상의 정수 | 0부터 시작하며 잘못된 음수는 0으로 보정합니다. |
 | `size` | 양의 정수 | 기본값은 20, 최댓값은 100입니다. |
 
@@ -108,10 +107,7 @@ Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `
 `All of Seoul`은 `region2`와 `region2Other`를 모두 보내지 않는 전체 선택이고,
 `Other areas`는 `region2Other=true`로 전달하며 operational_v9의 서울 세부지역 목록에
 속하지 않는 값과 비어 있는 값을 포함합니다. Event와 Place가 같은 동작을 사용합니다.
-지역 라벨은 Vue i18n으로 표시합니다. Event 제목과 Place 이름처럼 데이터마다 달라지는
-문구는 i18n 사전에 하드코딩하지 않고 `event_translations`·`place_translations`에서
-요청 언어를 조회합니다. 현재 외부 로컬 시드에는 번역 행이 없으므로 번역 데이터가 없는
-항목은 한국어 원문으로 폴백합니다.
+지역 라벨은 Vue i18n으로 표시합니다.
 
 ### 필터 및 데이터 공개 규칙
 
