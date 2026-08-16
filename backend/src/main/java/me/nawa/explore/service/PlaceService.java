@@ -62,9 +62,7 @@ public class PlaceService {
         String normalizedLanguage = StringUtils.hasText(language)
             ? language.toLowerCase(Locale.ROOT)
             : "en";
-        PlaceDetailResponse place = placeMapper.findPlaceDetail(
-            placeId, normalizedLanguage
-        );
+        PlaceDetailResponse place = placeMapper.findPlaceDetail(placeId);
         if (place == null) {
             throw new BusinessException(ExploreErrorCode.PLACE_NOT_FOUND);
         }

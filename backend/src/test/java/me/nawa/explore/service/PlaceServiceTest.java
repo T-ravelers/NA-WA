@@ -97,7 +97,7 @@ class PlaceServiceTest {
         PlaceDetailResponse place = PlaceDetailResponse.builder()
             .placeId(1L).itemId(1L).name("테스트").placeKind("뷰티매장")
             .build();
-        when(placeMapper.findPlaceDetail(1L, "en")).thenReturn(place);
+        when(placeMapper.findPlaceDetail(1L)).thenReturn(place);
         when(placeMapper.findPlaceActivities(1L, "en")).thenReturn(List.of());
 
         PlaceDetailResponse result = placeService.getPlaceDetail(1L, "EN");
@@ -108,7 +108,7 @@ class PlaceServiceTest {
 
     @Test
     void getPlaceDetail_throwsPlaceNotFound() {
-        when(placeMapper.findPlaceDetail(1L, "en")).thenReturn(null);
+        when(placeMapper.findPlaceDetail(1L)).thenReturn(null);
         BusinessException exception = assertThrows(
             BusinessException.class,
             () -> placeService.getPlaceDetail(1L, "en")

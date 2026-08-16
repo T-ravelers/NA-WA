@@ -155,7 +155,6 @@ class EventMapperXmlTest {
         assertTrue(detailSql.contains(
             "(e.end_date IS NULL OR e.end_date >= CURRENT_DATE())"
         ));
-        assertTrue(detailSql.contains("LEFT JOIN event_translations et"));
         assertFalse(detailSql.contains(
             "e.status IN ('SCHEDULED', 'ONGOING')"
         ));

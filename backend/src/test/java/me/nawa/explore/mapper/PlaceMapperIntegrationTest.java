@@ -96,7 +96,7 @@ class PlaceMapperIntegrationTest {
             "A public active Place with JSON values is required"
         );
 
-        PlaceDetailResponse result = mapper.findPlaceDetail(placeIds.get(0), "en");
+        PlaceDetailResponse result = mapper.findPlaceDetail(placeIds.get(0));
 
         assertNotNull(result);
         assertNotNull(result.getPlaceKind());

@@ -62,7 +62,7 @@ class PlaceMapperXmlTest {
     }
 
     @Test
-    void placeList_appliesOtherRegionOptionsAndLocalizedContent() throws Exception {
+    void placeList_appliesOtherRegionOptions() throws Exception {
         Configuration configuration = configuration();
         PlaceSearchRequest request = new PlaceSearchRequest();
         request.setRegion1(List.of("서울"));
@@ -85,8 +85,6 @@ class PlaceMapperXmlTest {
         assertTrue(sql.contains("OR p.region2 IS NULL"));
         assertTrue(sql.contains("OR p.region2 NOT IN"));
         assertTrue(sql.contains("p.has_parking = TRUE"));
-        assertTrue(sql.contains("LEFT JOIN place_translations pt"));
-        assertTrue(sql.contains("COALESCE(pt.name, p.name) AS name"));
     }
 
     private Configuration configuration() throws Exception {
