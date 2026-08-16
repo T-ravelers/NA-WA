@@ -97,6 +97,7 @@ PWA는 필수 기능입니다. 개인정보와 정산 데이터의 안전을 위
 | ------------------- | -------------- | ---------------------------------------------------- |
 | Backend CI          | 구현됨         | `main` PR과 push에서 Gradle 빌드·테스트              |
 | Backend CD          | 구현됨         | CI 성공 후 Docker Hub push와 EC2 Docker Compose 배포 |
+| TLS 인증서 갱신     | 구현됨         | 매일 스케줄로 Let's Encrypt 갱신 후 nginx reload (`.github/workflows/renew-cert.yml`) |
 | Frontend CI         | 구현됨         | `main` PR과 push에서 설치, 품질 검사와 빌드          |
 | Frontend Preview    | 운영 방향 확정 | Vercel PR Preview                                    |
 | Frontend Production | 운영 방향 확정 | Vercel `main` Production                             |
