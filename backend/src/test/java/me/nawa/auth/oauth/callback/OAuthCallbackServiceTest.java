@@ -33,6 +33,7 @@ class OAuthCallbackServiceTest {
     private static final Instant NOW = Instant.parse(
             "2026-08-03T06:30:00Z"
     );
+    private static final String BROWSER_BINDING = "browser-binding-value";
 
     private List<String> calls;
     private FakeStateService stateService;
@@ -74,7 +75,8 @@ class OAuthCallbackServiceTest {
                 "google",
                 "state-value",
                 "authorization-code",
-                null
+                null,
+                BROWSER_BINDING
         );
 
         assertEquals(authTokenService.tokens, result.getTokens());
@@ -107,6 +109,51 @@ class OAuthCallbackServiceTest {
                         "google",
                         "reused-state",
                         "authorization-code",
+                        null,
+                        BROWSER_BINDING
+                )
+        );
+
+        assertEquals(
+                AuthErrorCode.INVALID_OAUTH_CALLBACK_STATE,
+                exception.getErrorCode()
+        );
+        assertEquals(List.of("state"), calls);
+    }
+
+    @Test
+    void handle_otherBrowserBinding_rejectsBeforeOtherSteps() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.handle(
+                        "google",
+                        "state-value",
+                        "authorization-code",
+                        null,
+                        "another-browser-binding"
+                )
+        );
+
+        assertEquals(
+                AuthErrorCode.INVALID_OAUTH_CALLBACK_STATE,
+                exception.getErrorCode()
+        );
+        assertEquals(List.of("state"), calls);
+        assertEquals(
+                "another-browser-binding",
+                stateService.consumedBrowserBinding
+        );
+    }
+
+    @Test
+    void handle_missingBrowserBinding_rejectsBeforeOtherSteps() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.handle(
+                        "google",
+                        "state-value",
+                        "authorization-code",
+                        null,
                         null
                 )
         );
@@ -126,7 +173,8 @@ class OAuthCallbackServiceTest {
                         "line",
                         "state-value",
                         "authorization-code",
-                        null
+                        null,
+                        BROWSER_BINDING
                 )
         );
 
@@ -145,7 +193,8 @@ class OAuthCallbackServiceTest {
                         "google",
                         "state-value",
                         null,
-                        "access_denied"
+                        "access_denied",
+                        BROWSER_BINDING
                 )
         );
 
@@ -164,7 +213,8 @@ class OAuthCallbackServiceTest {
                         "google",
                         "state-value",
                         " ",
-                        null
+                        null,
+                        BROWSER_BINDING
                 )
         );
 
@@ -185,7 +235,8 @@ class OAuthCallbackServiceTest {
                         "google",
                         "state-value",
                         "authorization-code",
-                        null
+                        null,
+                        BROWSER_BINDING
                 )
         );
 
@@ -215,6 +266,7 @@ class OAuthCallbackServiceTest {
                 provider,
                 "nonce-value",
                 "code-verifier",
+                "binding-hash",
                 "/journeys",
                 NOW,
                 NOW.plusSeconds(600)
@@ -257,6 +309,8 @@ class OAuthCallbackServiceTest {
     private static final class FakeStateService implements OAuthStateService {
         private final List<String> calls;
         private OAuthStateSession session;
+        private String requiredBrowserBinding = BROWSER_BINDING;
+        private String consumedBrowserBinding;
 
         private FakeStateService(List<String> calls) {
             this.calls = calls;
@@ -270,8 +324,14 @@ class OAuthCallbackServiceTest {
         }
 
         @Override
-        public Optional<OAuthStateSession> consume(String state) {
+        public Optional<OAuthStateSession> consume(
+                String state,
+                String browserBinding) {
             calls.add("state");
+            consumedBrowserBinding = browserBinding;
+            if (!requiredBrowserBinding.equals(browserBinding)) {
+                return Optional.empty();
+            }
             return Optional.ofNullable(session);
         }
     }

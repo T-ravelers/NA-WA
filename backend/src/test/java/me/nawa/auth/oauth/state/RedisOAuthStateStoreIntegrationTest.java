@@ -89,6 +89,10 @@ class RedisOAuthStateStoreIntegrationTest {
         assertEquals("line", stored.get("provider"));
         assertEquals(session.getNonce(), stored.get("nonce"));
         assertEquals(session.getCodeVerifier(), stored.get("codeVerifier"));
+        assertEquals(
+                session.getBrowserBindingHash(),
+                stored.get("browserBindingHash")
+        );
         assertEquals("/", stored.get("returnPath"));
     }
 
@@ -100,6 +104,7 @@ class RedisOAuthStateStoreIntegrationTest {
                 OAuthProvider.LINE,
                 "different-nonce",
                 "different-verifier",
+                "different-binding-hash",
                 "/",
                 original.getIssuedAt(),
                 original.getExpiresAt()
@@ -131,6 +136,10 @@ class RedisOAuthStateStoreIntegrationTest {
         assertEquals(session.getProvider(), consumed.getProvider());
         assertEquals(session.getNonce(), consumed.getNonce());
         assertEquals(session.getCodeVerifier(), consumed.getCodeVerifier());
+        assertEquals(
+                session.getBrowserBindingHash(),
+                consumed.getBrowserBindingHash()
+        );
         assertEquals(session.getReturnPath(), consumed.getReturnPath());
         assertEquals(session.getIssuedAt(), consumed.getIssuedAt());
         assertEquals(session.getExpiresAt(), consumed.getExpiresAt());
@@ -182,6 +191,7 @@ class RedisOAuthStateStoreIntegrationTest {
                 OAuthProvider.GOOGLE,
                 "nonce",
                 "verifier-" + UUID.randomUUID(),
+                "binding-hash",
                 "/",
                 now.minusSeconds(60),
                 now.minusSeconds(1)
@@ -202,6 +212,7 @@ class RedisOAuthStateStoreIntegrationTest {
                 provider.isPkceRequired()
                         ? "verifier-" + UUID.randomUUID()
                         : null,
+                "binding-hash-" + UUID.randomUUID(),
                 "/",
                 issuedAt,
                 issuedAt.plusSeconds(60)
