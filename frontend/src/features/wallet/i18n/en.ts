@@ -22,7 +22,7 @@ export default {
         label: 'Wallet actions',
         topUp: 'Top up',
         qr: 'QR',
-        settlement: 'Settle up',
+        settlement: 'Splits',
         comingSoon: 'These become available in a later release.',
       },
       recentActivity: 'Recent activity',

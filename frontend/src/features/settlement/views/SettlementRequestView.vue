@@ -18,6 +18,7 @@ const queryClient = useQueryClient()
 const { t } = useI18n()
 const candidatesQuery = useSettlementCandidates()
 const step = ref(1)
+const submitting = ref(false)
 const createView = useTemplateRef('createView')
 const errorKey = computed(() => resolveSettlementError(candidatesQuery.error.value).messageKey)
 
@@ -26,12 +27,14 @@ async function handleComplete(settlementId: string): Promise<void> {
     queryClient.invalidateQueries({ queryKey: settlementKeys.candidates() }),
     queryClient.invalidateQueries({ queryKey: settlementKeys.lists() }),
   ])
-  await router.push({ name: 'settlement-detail', params: { settlementId } })
+  // 요청서를 다시 열 수 없도록 되돌아가기 대상에서 지운다.
+  await router.replace({ name: 'settlement-requested', params: { settlementId } })
 }
 
 function cancel(): void {
   void router.push({ name: 'settlements' })
 }
+
 function back(): void {
   if (createView.value !== null) createView.value.back()
   else cancel()
@@ -39,9 +42,14 @@ function back(): void {
 </script>
 
 <template>
-  <section class="flex min-h-dvh flex-col px-screen pt-14 pb-8">
+  <section
+    class="flex min-h-dvh flex-col"
+    :class="submitting ? '' : 'px-screen pt-14 pb-32'"
+  >
     <SettlementFlowHeader
+      v-if="!submitting"
       :current="step"
+      :title="t('settlement.create.title')"
       :back-label="t('settlement.back')"
       @back="back"
     />
@@ -67,6 +75,7 @@ function back(): void {
       ref="createView"
       v-model:step="step"
       :candidates="candidatesQuery.data.value ?? []"
+      @submitting-change="submitting = $event"
       @complete="handleComplete"
       @cancel="cancel"
       @refresh-candidates="candidatesQuery.refetch()"

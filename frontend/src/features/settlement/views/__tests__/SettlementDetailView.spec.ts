@@ -4,12 +4,11 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '@/app/i18n'
-import { NormalizedApiError } from '@/shared/api/apiError'
 
 import SettlementDetailView from '../SettlementDetailView.vue'
 
-const { getDetail, pay } = vi.hoisted(() => ({ getDetail: vi.fn(), pay: vi.fn() }))
-vi.mock('../../api/settlementGateway', () => ({ settlementGateway: { getDetail, pay } }))
+const { getDetail } = vi.hoisted(() => ({ getDetail: vi.fn() }))
+vi.mock('../../api/settlementGateway', () => ({ settlementGateway: { getDetail } }))
 
 const detail = {
   id: '42',
@@ -18,10 +17,10 @@ const detail = {
   status: 'REQUESTED' as const,
   requestedBy: 'Alex',
   gatheringName: 'Dinner',
-  merchantName: 'Cafe',
+  merchantName: 'Dinner',
   paidBy: 'Alex',
   transactionId: undefined,
-  viewerItems: [{ id: '1', name: 'Dinner', allocatedQuantity: '1', allocatedAmount: '12.50' }],
+  viewerItems: [{ id: '1', name: 'Pasta', allocatedQuantity: '1', allocatedAmount: '12.50' }],
   viewer: {
     role: 'PARTICIPANT' as const,
     shareAmount: '12.50',
@@ -39,6 +38,11 @@ async function mountDetail() {
         path: '/settlements/:settlementId',
         name: 'settlement-detail',
         component: SettlementDetailView,
+      },
+      {
+        path: '/settlements/:settlementId/pay',
+        name: 'settlement-pay',
+        component: { template: '<div />' },
       },
       { path: '/settlements', name: 'settlements', component: { template: '<div />' } },
     ],
@@ -58,41 +62,58 @@ async function mountDetail() {
     },
   })
   await flushPromises()
-  return wrapper
+  return { wrapper, router }
 }
 
 describe('SettlementDetailView', () => {
   beforeEach(() => {
     getDetail.mockReset().mockResolvedValue(detail)
-    pay.mockReset().mockResolvedValue({})
   })
 
-  it('shows payment only when the server grants PAY and renders viewer ITEMIZED data', async () => {
-    const wrapper = await mountDetail()
-    expect(wrapper.text()).toContain('Dinner')
-    expect(wrapper.text()).toContain('12.50 P')
-    expect(wrapper.get('[data-action="pay"]')).toBeTruthy()
+  it('shows the participant who to send to, how much, and the amount on the pay button', async () => {
+    const { wrapper } = await mountDetail()
+
+    expect(wrapper.text()).toContain('Send to')
+    expect(wrapper.text()).toContain('Alex')
+    expect(wrapper.text()).toContain('Pasta')
+    expect(wrapper.get('[data-action="pay"]').text()).toBe('Pay 12.50 P')
+  })
+
+  it('starts the payment in its own route instead of paying from the detail screen', async () => {
+    const { wrapper, router } = await mountDetail()
 
     await wrapper.get('[data-action="pay"]').trigger('click')
     await flushPromises()
-    expect(pay).toHaveBeenCalledWith('42', expect.any(String))
+
+    expect(router.currentRoute.value.name).toBe('settlement-pay')
+    expect(router.currentRoute.value.params.settlementId).toBe('42')
   })
 
   it('does not infer a payment action from a positive payable amount', async () => {
-    getDetail.mockResolvedValue({ ...detail, viewer: { ...detail.viewer, allowedActions: [] } })
-    const wrapper = await mountDetail()
+    getDetail.mockResolvedValue({
+      ...detail,
+      viewer: { ...detail.viewer, requestStatus: 'PAID' as const, allowedActions: [] },
+    })
+    const { wrapper } = await mountDetail()
+
     expect(wrapper.find('[data-action="pay"]').exists()).toBe(false)
+    expect(wrapper.get('[data-action="pay-completed"]').attributes('disabled')).toBeDefined()
   })
 
-  it('refetches detail instead of retrying payment after an already-processed payment conflict', async () => {
-    pay.mockRejectedValue(new NormalizedApiError('SETTLEMENT-014', 409, 'already paid'))
-    const wrapper = await mountDetail()
-    await wrapper.get('[data-action="pay"]').trigger('click')
-    await flushPromises()
-    await wrapper.get('[role="alert"] button').trigger('click')
-    await flushPromises()
+  it('shows the creator the participant status placeholder and no payment action', async () => {
+    getDetail.mockResolvedValue({
+      ...detail,
+      viewer: {
+        ...detail.viewer,
+        role: 'CREATOR' as const,
+        requestStatus: 'NOT_REQUESTED' as const,
+        allowedActions: [],
+      },
+    })
+    const { wrapper } = await mountDetail()
 
-    expect(getDetail).toHaveBeenCalledTimes(2)
-    expect(pay).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-action="pay"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="participant-status-placeholder"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Send to')
   })
 })

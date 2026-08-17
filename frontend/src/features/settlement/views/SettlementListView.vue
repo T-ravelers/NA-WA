@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
@@ -9,17 +9,31 @@ import StateError from '@/shared/ui/StateError.vue'
 
 import SettlementEmptyState from '../components/SettlementEmptyState.vue'
 import SettlementInlineLoading from '../components/SettlementInlineLoading.vue'
+import SettlementListCard from '../components/SettlementListCard.vue'
 import SettlementPageHeader from '../components/SettlementPageHeader.vue'
 import { resolveSettlementError } from '../model/settlementErrors'
-import { formatSettlementAmount } from '../model/settlementPresentation'
+import {
+  COMPLETED_PREVIEW_COUNT,
+  splitIntoSections,
+  type SettlementSide,
+} from '../model/settlementList'
 import { useSettlements } from '../model/settlementQueries'
 
+const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const tab = ref<'received' | 'sent'>('received')
+// 요청을 보낸 직후나 요청자 상세에서 돌아올 때 받을 목록이 열려 있어야 한다.
+const side = ref<SettlementSide>(route.query.side === 'sent' ? 'sent' : 'received')
 const settlementQuery = useSettlements()
-const items = computed(() => settlementQuery.data.value?.[tab.value] ?? [])
+
+const sections = computed(() => splitIntoSections(settlementQuery.data.value?.[side.value] ?? []))
+const completedPreview = computed(() => sections.value.completed.slice(0, COMPLETED_PREVIEW_COUNT))
 const errorKey = computed(() => resolveSettlementError(settlementQuery.error.value).messageKey)
+const paying = computed(() => side.value === 'received')
+
+function open(settlementId: string): void {
+  void router.push({ name: 'settlement-detail', params: { settlementId } })
+}
 </script>
 
 <template>
@@ -31,14 +45,15 @@ const errorKey = computed(() => resolveSettlementError(settlementQuery.error.val
     />
     <SegmentedControl
       class="mt-7"
-      :model-value="tab"
+      :model-value="side"
       :label="t('settlement.title')"
       :options="[
-        { value: 'received', label: t('settlement.received') },
-        { value: 'sent', label: t('settlement.sent') },
+        { value: 'received', label: t('settlement.toPay') },
+        { value: 'sent', label: t('settlement.toCollect') },
       ]"
-      @update:model-value="tab = $event as 'received' | 'sent'"
+      @update:model-value="side = $event as SettlementSide"
     />
+
     <SettlementInlineLoading
       v-if="settlementQuery.isPending.value"
       class="mt-8"
@@ -51,46 +66,84 @@ const errorKey = computed(() => resolveSettlementError(settlementQuery.error.val
       :description="t('settlement.list.retryHint')"
       @retry="settlementQuery.refetch()"
     />
-    <SettlementEmptyState
-      v-else-if="items.length === 0"
-      class="flex-1"
-      :title="
-        t(
-          tab === 'received'
-            ? 'settlement.list.emptyReceivedTitle'
-            : 'settlement.list.emptySentTitle',
-        )
-      "
-      :description="
-        t(tab === 'received' ? 'settlement.list.emptyReceived' : 'settlement.list.emptySent')
-      "
-    />
-    <ul
-      v-else
-      class="mt-6 space-y-3"
-    >
-      <li
-        v-for="item in items"
-        :key="item.id"
+
+    <template v-else>
+      <h2 class="mt-8 text-title">{{ t('settlement.section.ongoing') }}</h2>
+      <SettlementEmptyState
+        v-if="sections.ongoing.length === 0"
+        class="mt-2"
+        :title="
+          t(
+            paying
+              ? 'settlement.list.emptyOngoingPayTitle'
+              : 'settlement.list.emptyOngoingCollectTitle',
+          )
+        "
+        :description="
+          t(paying ? 'settlement.list.emptyOngoingPay' : 'settlement.list.emptyOngoingCollect')
+        "
+      />
+      <ul
+        v-else
+        class="mt-4 space-y-3"
       >
-        <button
-          type="button"
-          :data-settlement-id="item.id"
-          class="w-full rounded-sm bg-surface-1 p-4 text-left"
-          @click="router.push({ name: 'settlement-detail', params: { settlementId: item.id } })"
+        <li
+          v-for="settlement in sections.ongoing"
+          :key="settlement.id"
         >
-          <span class="flex items-center justify-between"
-            ><strong>{{ item.title }}</strong
-            ><span class="text-caption text-ink-2">{{
-              t(`settlement.status.${item.status}`)
-            }}</span></span
-          ><span class="mt-3 flex justify-between text-body-sm"
-            ><span>{{ t(`settlement.type.${item.type}`) }}</span
-            ><strong>{{ formatSettlementAmount(item.totalAmount) }} P</strong></span
-          >
+          <SettlementListCard
+            :settlement="settlement"
+            :side="side"
+            @open="open(settlement.id)"
+          />
+        </li>
+      </ul>
+
+      <div class="mt-10 flex items-center justify-between gap-3">
+        <h2 class="text-title">{{ t('settlement.section.completed') }}</h2>
+        <button
+          v-if="sections.completed.length > 0"
+          type="button"
+          data-action="view-all"
+          class="min-h-11 text-body-sm text-ink-2 underline underline-offset-4"
+          :aria-label="t('settlement.history.viewAllLabel')"
+          @click="router.push({ name: 'settlement-history', query: { side } })"
+        >
+          {{ t('settlement.viewAll') }}
         </button>
-      </li>
-    </ul>
+      </div>
+      <SettlementEmptyState
+        v-if="completedPreview.length === 0"
+        class="mt-2"
+        :title="
+          t(
+            paying
+              ? 'settlement.list.emptyCompletedPayTitle'
+              : 'settlement.list.emptyCompletedCollectTitle',
+          )
+        "
+        :description="
+          t(paying ? 'settlement.list.emptyCompletedPay' : 'settlement.list.emptyCompletedCollect')
+        "
+      />
+      <ul
+        v-else
+        class="mt-4 space-y-2"
+      >
+        <li
+          v-for="settlement in completedPreview"
+          :key="settlement.id"
+        >
+          <SettlementListCard
+            compact
+            :settlement="settlement"
+            :side="side"
+            @open="open(settlement.id)"
+          />
+        </li>
+      </ul>
+    </template>
+
     <AppButton
       class="mt-auto"
       block

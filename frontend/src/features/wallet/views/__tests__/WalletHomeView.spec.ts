@@ -128,7 +128,7 @@ describe('WalletHomeView', () => {
 
     const buttons = wrapper.findAll('button')
     const qrButton = buttons.find((button) => button.text() === 'QR')
-    const settlementButton = buttons.find((button) => button.text() === 'Settle up')
+    const settlementButton = buttons.find((button) => button.text() === 'Splits')
 
     expect(qrButton?.attributes('disabled')).toBeUndefined()
     expect(settlementButton?.attributes('disabled')).toBeUndefined()

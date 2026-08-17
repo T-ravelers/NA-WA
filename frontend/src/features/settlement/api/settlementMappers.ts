@@ -1,3 +1,5 @@
+import { formatServerDateTime } from '@/shared/lib/datetime'
+
 import type {
   SettlementCandidate,
   SettlementDetail,
@@ -28,19 +30,17 @@ function viewer(dto: SettlementViewerDto): SettlementViewer {
   }
 }
 
+/** 서버 시각 파싱은 `shared/lib/datetime.ts`의 공용 파서만 쓴다. */
 function formatPaidAt(value: string): string {
-  const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value)
-  const parsed = new Date(hasOffset ? value : `${value}+09:00`)
-  if (Number.isNaN(parsed.getTime())) return value
-
-  return new Intl.DateTimeFormat('en-US', {
+  const formatted = formatServerDateTime(value, 'en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    timeZone: 'Asia/Seoul',
-  }).format(parsed)
+  })
+
+  return formatted === '' ? value : formatted
 }
 
 export function mapSettlementCandidate(dto: SettlementCandidateDto): SettlementCandidate {
