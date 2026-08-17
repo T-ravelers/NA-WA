@@ -32,7 +32,10 @@ export function storeLocale(locale: AppLocale): void {
  * 브라우저 언어에서 지원 로케일을 고른다.
  *
  * `ja-JP`처럼 지역 태그가 붙은 값은 기본 언어(`ja`)로 낮춰 다시 맞춰본다. 다만
- * `zh-CN`·`zh-TW`는 그 자체가 지원 로케일이므로 완전 일치를 먼저 시도한다.
+ * `zh-TW`는 그 자체가 지원 로케일이므로 완전 일치를 먼저 시도한다.
+ *
+ * 브라우저 언어가 `zh-CN`이면 기본 언어 `zh`도 지원 로케일이 아니라 `en`으로 폴백한다.
+ * 간체 사용자를 번체로 보내지 않는다 — 서로 다른 언어를 고른 것으로 취급한다.
  */
 export function detectBrowserLocale(): AppLocale {
   for (const language of navigator.languages) {

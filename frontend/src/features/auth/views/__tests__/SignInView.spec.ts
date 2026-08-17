@@ -139,7 +139,7 @@ describe('SignInView', () => {
     const wrapper = await mountView()
 
     await wrapper.get('[aria-label="Change screen language"]').trigger('click')
-    await wrapper.findAll('[role="dialog"] [role="radio"]')[4]?.trigger('click')
+    await wrapper.findAll('[role="dialog"] [role="radio"]')[3]?.trigger('click')
 
     expect(wrapper.text()).toContain('Screen language · Tiếng Việt')
   })

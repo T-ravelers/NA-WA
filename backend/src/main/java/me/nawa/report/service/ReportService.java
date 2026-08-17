@@ -45,7 +45,6 @@ public class ReportService {
     private static final Set<String> SUPPORTED_LOCALES = Set.of(
         "en",
         "ja",
-        "zh-CN",
         "zh-TW",
         "vi"
     );

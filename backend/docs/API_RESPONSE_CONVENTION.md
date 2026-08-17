@@ -257,8 +257,7 @@ public enum MemberErrorCode implements ErrorCode {
 | `NO_UPDATABLE_FIELD`   | `MEMBER-004` |       400 | 변경할 항목 없음         |
 
 `PATCH /api/v1/members/me`가 `preferredLanguage`·`preferredCurrencyCode`를
-부분 수정할 때 사용합니다. 언어 allow-list는 `en`, `ja`, `zh-CN`, `zh-TW`,
-`vi`이며 이 백엔드 목록이 정본입니다.
+부분 수정할 때 사용합니다. 언어 allow-list는 `en`, `ja`, `zh-TW`, `vi`이며 이 백엔드 목록이 정본입니다.
 
 약속 도메인에는 다음 오류 코드가 구현돼 있습니다.
 

@@ -55,7 +55,7 @@ API mock 또는 Playwright route stub을 사용합니다.
 
 ## 문구 — 한국어는 서비스 locale이 아니다
 
-지원 locale은 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
+지원 locale은 `en`, `ja`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
 방한 외국인이 대상이라 한국어 UI 문구를 만들지 않습니다. 최종 기준은
 `src/shared/i18n/locales.ts`입니다.
 

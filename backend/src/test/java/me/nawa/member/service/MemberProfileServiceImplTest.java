@@ -128,11 +128,11 @@ class MemberProfileServiceImplTest {
     void updateProfile_acceptsEverySupportedLanguage() {
         when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
 
-        for (String language : new String[] {"en", "ja", "zh-CN", "zh-TW", "vi"}) {
+        for (String language : new String[] {"en", "ja", "zh-TW", "vi"}) {
             service.updateProfile(1L, new UpdateMemberProfileRequest(language, null));
         }
 
-        verify(memberMapper, times(5)).updateProfile(eq(1L), anyString(), isNull());
+        verify(memberMapper, times(4)).updateProfile(eq(1L), anyString(), isNull());
     }
 
     @Test

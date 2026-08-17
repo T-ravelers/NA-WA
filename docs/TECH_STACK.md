@@ -23,7 +23,7 @@
 | Test         | Vitest, Vue Test Utils, Playwright    | 단위, 컴포넌트와 브라우저 테스트      |
 | Quality      | ESLint, Prettier, Husky, lint-staged  | 정적 검사와 커밋 전 검사              |
 
-지원 로케일은 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
+지원 로케일은 `en`, `ja`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
 방한 외국인이 대상이라 한국어는 서비스 로케일이 아닙니다. 최종 기준은
 `frontend/src/shared/i18n/locales.ts`입니다.
 
