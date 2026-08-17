@@ -22,8 +22,7 @@ public class MemberProfileServiceImpl implements MemberProfileService {
      * 서비스가 지원하는 언어. 이 목록이 정본이며 프론트엔드 SUPPORTED_LOCALES와 일치해야 한다.
      * 한국어는 서비스 로케일이 아니다(방한 외국인 대상).
      */
-    private static final Set<String> SUPPORTED_LANGUAGES =
-            Set.of("en", "ja", "zh-CN", "zh-TW", "vi");
+    private static final Set<String> SUPPORTED_LANGUAGES = Set.of("en", "ja", "zh-TW", "vi");
 
     private final MemberMapper memberMapper;
 
