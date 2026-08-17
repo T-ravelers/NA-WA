@@ -69,8 +69,10 @@ public class OAuthCallbackServiceImpl implements OAuthCallbackService {
             String provider,
             String state,
             String authorizationCode,
-            String authorizationError) {
-        OAuthStateSession stateSession = stateService.consume(state)
+            String authorizationError,
+            String browserBinding) {
+        OAuthStateSession stateSession = stateService
+                .consume(state, browserBinding)
                 .orElseThrow(
                         () -> new BusinessException(
                                 AuthErrorCode.INVALID_OAUTH_CALLBACK_STATE

@@ -9,5 +9,5 @@ public interface OAuthStateService {
             OAuthProvider provider,
             String returnPath);
 
-    Optional<OAuthStateSession> consume(String state);
+    Optional<OAuthStateSession> consume(String state, String browserBinding);
 }
