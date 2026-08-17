@@ -29,7 +29,6 @@ const emit = defineEmits<{
 const LOCALE_LABEL: Record<AppLocale, { native: string; english: string }> = {
   en: { native: 'English', english: 'English' },
   ja: { native: '日本語', english: 'Japanese' },
-  'zh-CN': { native: '简体中文', english: 'Chinese (Simplified)' },
   'zh-TW': { native: '繁體中文', english: 'Chinese (Traditional)' },
   vi: { native: 'Tiếng Việt', english: 'Vietnamese' },
 }

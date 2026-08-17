@@ -1,6 +1,8 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
+import { SUPPORTED_LOCALES } from '@/shared/i18n/locales'
+
 import LocaleSheet from '../LocaleSheet.vue'
 
 function mountSheet(modelValue = 'en') {
@@ -11,7 +13,7 @@ function mountSheet(modelValue = 'en') {
 
 describe('LocaleSheet', () => {
   it('offers every supported locale', () => {
-    expect(mountSheet().findAll('[role="radio"]')).toHaveLength(5)
+    expect(mountSheet().findAll('[role="radio"]')).toHaveLength(SUPPORTED_LOCALES.length)
   })
 
   /*
@@ -21,7 +23,7 @@ describe('LocaleSheet', () => {
   it('labels each locale in its own language', () => {
     const text = mountSheet().text()
 
-    for (const native of ['English', '日本語', '简体中文', '繁體中文', 'Tiếng Việt']) {
+    for (const native of ['English', '日本語', '繁體中文', 'Tiếng Việt']) {
       expect(text).toContain(native)
     }
   })
