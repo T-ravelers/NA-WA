@@ -21,9 +21,11 @@ docker compose exec -T nginx nginx -s reload
 echo "[deploy] 헬스 체크"
 healthy=false
 for i in $(seq 1 10); do
-  code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost/ || true)
-  # 000(무응답)과 5xx(서버 오류)는 실패로 간주 - 2xx/3xx/4xx만 정상 응답으로 취급
-  if [[ "$code" =~ ^[234][0-9]{2}$ ]]; then
+  # HTTP는 이제 항상 308 리다이렉트만 반환하므로, 실제 TLS/SNI와 backend까지
+  # 통과하는 HTTPS 경로를 직접 검사한다. DNS 대신 로컬 nginx로 강제 resolve.
+  code=$(curl -s -o /dev/null -w '%{http_code}' --resolve api.clearpng.cloud:443:127.0.0.1 https://api.clearpng.cloud/ || true)
+  # 000(무응답)과 5xx(서버 오류)는 실패로 간주 - 2xx/4xx만 정상 응답으로 취급
+  if [[ "$code" =~ ^[24][0-9]{2}$ ]]; then
     echo "[deploy] 응답 확인됨 (HTTP $code, ${i}번째 시도)"
     healthy=true
     break
