@@ -253,7 +253,7 @@ export default routes
 ## 다국어 문구 작성하기
 
 NA-WA는 방한 외국인을 대상으로 하므로 **한국어는 서비스 locale이 아닙니다.**
-지원 locale은 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이고 기본 locale과 fallback locale은
+지원 locale은 `en`, `ja`, `zh-TW`, `vi`이고 기본 locale과 fallback locale은
 모두 `en`입니다. 문구는 `en`을 원본으로 작성하고, 번역되지 않은 key는 `en`으로
 폴백하므로 화면에 raw key가 노출되지 않습니다.
 

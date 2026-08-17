@@ -124,10 +124,10 @@ Sztos 로드 여부와 관계없이 워드마크 모양이 유지되고 추가 �
 
 ## 아직 없는 폰트
 
-- **CJK Body**: `ja`, `zh-CN`, `zh-TW`용 Noto Sans JP/SC/TC. 원본 합계가 37MB라
+- **CJK Body**: `ja`, `zh-TW`용 Noto Sans JP/TC. 원본 합계가 20MB라
   서브셋 후 로케일별 동적 로드로 추가한다. 전체 선로드는 하지 않는다.
-- **CJK Display**: Smiley Sans(`zh-CN`), Taipei Sans TC Beta(`zh-TW`),
-  M PLUS 1(`ja`). 디자인 번들에 없다. 확보 전까지 Body 폰트로 폴백한다.
+- **CJK Display**: Taipei Sans TC Beta(`zh-TW`), M PLUS 1(`ja`).
+  디자인 번들에 없다. 확보 전까지 Body 폰트로 폴백한다.
 
 ## Service Worker
 

@@ -77,7 +77,7 @@ token을 발급하지 않지만, 확인되지 않은 Redis 세션까지 폐기�
 `PATCH /api/v1/members/me`는 같은 형태의 응답을 반환하며 `preferredLanguage`와
 `preferredCurrencyCode`만 부분 수정합니다. 필드를 아예 보내지 않는 것과 값에
 `null`을 보내는 것은 모두 "변경하지 않음"으로 취급하며, 두 필드 모두 없으면
-`MEMBER-004`를 반환합니다. 지원 언어는 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며
+`MEMBER-004`를 반환합니다. 지원 언어는 `en`, `ja`, `zh-TW`, `vi`이며
 이 백엔드 allow-list가 정본입니다(한국어는 서비스 locale이 아닙니다). 목록에
 없는 언어는 `MEMBER-002`, 활성 통화 코드가 아니면 `MEMBER-003`을 반환합니다.
 
