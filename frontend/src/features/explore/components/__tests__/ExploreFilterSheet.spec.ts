@@ -68,29 +68,27 @@ describe('ExploreFilterSheet', () => {
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
   })
 
-  it('offers subregions for regions outside Seoul', async () => {
+  it('only exposes Seoul and sends operational_v9 region values', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
       props: { kind: 'region', filters: { sort: 'LATEST' }, resultCount: 3 },
     })
 
-    const gyeonggiButton = wrapper
+    expect(wrapper.text()).toContain('Seoul')
+    expect(wrapper.text()).not.toContain('Gyeonggi')
+
+    await wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Gyeonggi'))
-    await gyeonggiButton?.trigger('click')
-
-    const suwonButton = wrapper.findAll('button').find((button) => button.text().includes('Suwon'))
-    expect(suwonButton).toBeDefined()
-
-    await suwonButton?.trigger('click')
+      .find((button) => button.text().includes('Seongsu'))
+      ?.trigger('click')
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Apply'))
       ?.trigger('click')
 
     expect(wrapper.emitted('apply')?.[wrapper.emitted('apply')!.length - 1]?.[0]).toMatchObject({
-      region1: ['Gyeonggi'],
-      region2: ['Suwon'],
+      region1: ['서울'],
+      region2: ['성수'],
     })
   })
 
@@ -102,10 +100,6 @@ describe('ExploreFilterSheet', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Gyeonggi'))
-      ?.trigger('click')
-    await wrapper
-      .findAll('button')
       .find((button) => button.text() === 'Other areas')
       ?.trigger('click')
     await wrapper
@@ -114,7 +108,7 @@ describe('ExploreFilterSheet', () => {
       ?.trigger('click')
 
     expect(wrapper.emitted('apply')?.[wrapper.emitted('apply')!.length - 1]?.[0]).toMatchObject({
-      region1: ['Gyeonggi'],
+      region1: ['서울'],
       region2Other: true,
     })
   })
@@ -127,11 +121,7 @@ describe('ExploreFilterSheet', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Gyeonggi'))
-      ?.trigger('click')
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Suwon'))
+      .find((button) => button.text().includes('Seongsu'))
       ?.trigger('click')
     await wrapper
       .findAll('button')
@@ -143,13 +133,13 @@ describe('ExploreFilterSheet', () => {
       ?.trigger('click')
 
     expect(wrapper.emitted('apply')?.[wrapper.emitted('apply')!.length - 1]?.[0]).toMatchObject({
-      region1: ['Gyeonggi'],
-      region2: ['Suwon'],
+      region1: ['서울'],
+      region2: ['성수'],
       region2Other: true,
     })
   })
 
-  it('selects a sector and its activities using the existing numeric filter contract', async () => {
+  it('selects a sector and its activities using operational_v9 IDs', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
       props: { kind: 'category', filters: { sort: 'LATEST' }, resultCount: 3 },
@@ -159,9 +149,10 @@ describe('ExploreFilterSheet', () => {
     await foodHeader?.find('[role="checkbox"]').trigger('click')
 
     expect(wrapper.emitted('change')?.[wrapper.emitted('change')!.length - 1]?.[0]).toMatchObject({
-      sectorIds: [1],
+      sectorIds: [2],
     })
 
+    await foodHeader?.trigger('click')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Cafe / Dessert')
@@ -169,7 +160,7 @@ describe('ExploreFilterSheet', () => {
 
     expect(wrapper.emitted('change')?.[wrapper.emitted('change')!.length - 1]?.[0]).toMatchObject({
       sectorIds: undefined,
-      activityIds: [101],
+      activityIds: [9],
     })
   })
 })

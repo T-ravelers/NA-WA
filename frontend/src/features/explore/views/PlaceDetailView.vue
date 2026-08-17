@@ -26,6 +26,7 @@ import JourneySelectSheet from '../components/JourneySelectSheet.vue'
 import { usePlaceDetailQuery } from '../composables/usePlaceDetailQuery'
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
+import { findExploreRegionLabelKey } from '../model/exploreRegions'
 import { normalizePlaceKind, type PlaceKind } from '../model/placeExplore'
 import { toClosedDays, toDetailEntries } from '../model/placeDetail'
 
@@ -66,7 +67,13 @@ const category = computed<Category>(() => {
 const categoryLabel = computed(() => t(`explore.categories.${category.value}`))
 
 const regionLabel = computed(() =>
-  [place.value?.region1, place.value?.region2, place.value?.region3].filter(Boolean).join(' · '),
+  [place.value?.region1, place.value?.region2, place.value?.region3]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      const labelKey = findExploreRegionLabelKey(value)
+      return labelKey ? t(labelKey) : value
+    })
+    .join(' · '),
 )
 
 const addressLabel = computed(() =>

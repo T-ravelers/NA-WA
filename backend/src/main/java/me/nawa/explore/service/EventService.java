@@ -119,6 +119,9 @@ public class EventService {
         request.setRegion1(normalizeTextValues(request.getRegion1()));
         request.setRegion2(normalizeTextValues(request.getRegion2()));
         request.setRegion3(normalizeTextValues(request.getRegion3()));
+        request.setKnownRegion2Values(
+            ExploreRegionPolicy.knownRegion2Values(request.getRegion1())
+        );
 
         String datePreset = normalizeOptionalUppercase(request.getDatePreset());
         if (datePreset != null && !DATE_PRESETS.contains(datePreset)) {
@@ -139,9 +142,8 @@ public class EventService {
         }
         request.setSort(sort);
 
-        if (!StringUtils.hasText(request.getLanguage())) {
-            request.setLanguage("en");
-        }
+        request.setLanguage(StringUtils.hasText(request.getLanguage())
+            ? request.getLanguage().trim().toLowerCase(Locale.ROOT) : "en");
     }
 
     private List<String> normalizeUppercaseValues(List<String> values) {

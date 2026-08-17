@@ -36,6 +36,7 @@ import {
 } from '../model/eventDetail'
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
+import { findExploreRegionLabelKey } from '../model/exploreRegions'
 import { useSavedEventsStore } from '../model/savedEvents'
 
 const route = useRoute()
@@ -78,7 +79,13 @@ const category = computed<Category>(() => {
 })
 
 const regionLabel = computed(() =>
-  [event.value?.region1, event.value?.region2, event.value?.region3].filter(Boolean).join(' · '),
+  [event.value?.region1, event.value?.region2, event.value?.region3]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      const labelKey = findExploreRegionLabelKey(value)
+      return labelKey ? t(labelKey) : value
+    })
+    .join(' · '),
 )
 
 const locationLabel = computed(() =>
@@ -112,7 +119,11 @@ const detailRows = computed(() => {
   if (hours.value.length > 0) {
     rows.push({
       label: t('explore.detail.hours'),
-      value: hours.value.map((entry) => `${entry.label}: ${entry.value}`).join('\n'),
+      value: hours.value
+        .map((entry) =>
+          entry.label.toLowerCase() === 'raw' ? entry.value : `${entry.label}: ${entry.value}`,
+        )
+        .join('\n'),
     })
   } else if (openDays.value) {
     rows.push({ label: t('explore.detail.hours'), value: openDays.value })

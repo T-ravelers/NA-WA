@@ -20,7 +20,7 @@
 | `activityIds` | 반복 가능한 숫자 목록 | Activity를 같은 종류 안에서 OR로 필터링합니다. |
 | `region1` | 반복 가능한 문자열 목록 | 광역 지역을 같은 종류 안에서 OR로 필터링합니다. |
 | `region2` | 반복 가능한 문자열 목록 | 선택한 `region1`의 세부 지역을 같은 종류 안에서 OR로 필터링합니다. |
-| `region2Other` | boolean | `region1`이 선택된 경우, `region2`가 비어 있거나 분류되지 않은 Event를 포함합니다. `region1` 없이 사용하면 결과를 만들지 않습니다. |
+| `region2Other` | boolean | `region1`이 선택된 경우, 공식 `region2` 목록 밖의 값과 `region2`가 비어 있는 Event를 포함합니다. `region1` 없이 사용하면 결과를 만들지 않습니다. |
 | `region3` | 반복 가능한 문자열 목록 | 세부 지역을 같은 종류 안에서 OR로 필터링합니다. |
 | `keyword` | 문자열 | 제목·부제목·설명에 대해 부분 일치 검색을 적용합니다. |
 | `datePreset` | `ONGOING`, `OPENING_SOON`, `THIS_WEEKEND`, `THIS_MONTH` | DB의 현재 날짜를 기준으로 Event 기간을 필터링합니다. `startDate`·`endDate`와 함께 사용할 수 없습니다. |
@@ -34,6 +34,9 @@
 | `sort` | `LATEST` 또는 `POPULAR` | 최신순 또는 인기순으로 정렬합니다. |
 | `page` | 0 이상의 정수 | 0부터 시작하는 페이지 번호입니다. |
 | `size` | 양의 정수 | 페이지 크기입니다. 기본값은 20입니다. |
+
+Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `1~4`, Activity는
+`1~56`이며 Event와 Place가 같은 분류표를 공유합니다.
 
 ### 필터 결합
 
@@ -61,9 +64,9 @@
 
 ### 응답 및 페이지 표시
 
-응답의 `data.content`가 현재 페이지에 포함된 목록입니다. `totalElements`는 전체
-검색 결과 수이며, 현재 프론트엔드는 무한 스크롤을 구현하지 않았으므로 화면의 건수
-표시는 현재 페이지의 `content.length`를 사용합니다.
+응답의 `data.content`가 현재 페이지에 포함된 목록이며 `totalElements`는 필터가 적용된
+전체 검색 결과 수입니다. 프론트엔드는 Event와 Place 모두 `size=20`으로 요청하고,
+`totalPages`를 사용해 번호형 페이지네이션을 표시합니다.
 
 ## Place 목록
 
@@ -80,6 +83,7 @@
 | `sectorIds` | 반복 가능한 숫자 목록 | Sector를 같은 종류 안에서 OR로 필터링합니다. |
 | `activityIds` | 반복 가능한 숫자 목록 | Activity를 같은 종류 안에서 OR로 필터링합니다. |
 | `region1`, `region2`, `region3` | 반복 가능한 문자열 목록 | 각 지역 단계 안에서는 OR, 단계 사이에는 AND로 필터링합니다. 현재 프론트엔드는 `region1`·`region2`를 사용하며, 사용자 위치 기반 기능은 `region3`까지 전달할 수 있습니다. |
+| `region2Other` | boolean | `region1`이 선택된 경우, 공식 `region2` 목록 밖의 값과 `region2`가 비어 있는 Place를 포함합니다. `region1` 없이 사용하면 결과를 만들지 않습니다. |
 | `keyword` | 문자열 | 이름·브랜드·지점·도로명 주소·상세 주소에 부분 일치 검색을 적용합니다. |
 | `hasForeignLang` | boolean | 외국어 안내가 있는 Place만 조회합니다. |
 | `hasParking` | boolean | 주차 가능한 Place만 조회합니다. |
@@ -94,6 +98,16 @@
 | `language` | 문자열 | Activity·Sector 이름 언어입니다. `en`은 영문, 그 외에는 한글입니다. |
 | `page` | 0 이상의 정수 | 0부터 시작하며 잘못된 음수는 0으로 보정합니다. |
 | `size` | 양의 정수 | 기본값은 20, 최댓값은 100입니다. |
+
+현재 Explore 화면은 서울 데이터만 노출합니다. 화면에는 locale별 번역값을 표시하지만
+목록 API에는 `operational_v9`의 원본 값인 `region1=서울`과 선택한 한국어 `region2`를
+전달합니다. 다른 `region1`과 사용자 위치 기반 `region3` UI는 현재 범위에 포함하지
+않습니다.
+
+`All of Seoul`은 `region2`와 `region2Other`를 모두 보내지 않는 전체 선택이고,
+`Other areas`는 `region2Other=true`로 전달하며 operational_v9의 서울 세부지역 목록에
+속하지 않는 값과 비어 있는 값을 포함합니다. Event와 Place가 같은 동작을 사용합니다.
+지역 라벨은 Vue i18n으로 표시합니다.
 
 ### 필터 및 데이터 공개 규칙
 

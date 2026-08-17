@@ -92,6 +92,7 @@ function toPlaceSearchParams(filters: PlaceSearchFilters): URLSearchParams {
   if (filters.size !== undefined) params.set('size', String(filters.size))
 
   const booleanFilters = [
+    'region2Other',
     'hasForeignLang',
     'hasParking',
     'reservable',

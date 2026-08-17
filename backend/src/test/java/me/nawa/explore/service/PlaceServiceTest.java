@@ -2,6 +2,7 @@ package me.nawa.explore.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -55,6 +56,7 @@ class PlaceServiceTest {
         PlaceSearchRequest request = new PlaceSearchRequest();
         request.setPlaceKinds(List.of(" cafe ", "ETC", "cafe"));
         request.setRegion1(List.of(" 서울 ", "서울"));
+        request.setRegion2Other(true);
         request.setSort("popular");
         when(placeMapper.searchPlaces(any(), eq(0), eq(20), isNull()))
             .thenReturn(List.of());
@@ -64,6 +66,7 @@ class PlaceServiceTest {
 
         assertEquals(List.of("CAFE", "ETC"), request.getPlaceKinds());
         assertEquals(List.of("서울"), request.getRegion1());
+        assertTrue(request.getKnownRegion2Values().contains("성수"));
         assertEquals("POPULAR", request.getSort());
     }
 

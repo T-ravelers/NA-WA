@@ -106,6 +106,7 @@ export interface PlaceSearchFilters {
   placeKinds?: PlaceKind[]
   region1?: string[]
   region2?: string[]
+  region2Other?: boolean
   region3?: string[]
   keyword?: string
   hasForeignLang?: boolean

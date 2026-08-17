@@ -112,11 +112,16 @@
                  a.activity_id
     </select>
 
-    <!-- region2Other는 선택한 region1에서 세부지역이 분류되지 않은 데이터를 의미한다. -->
+    <!-- region2Other는 선택한 region1의 공식 세부지역 목록 밖 데이터를 의미한다. -->
     <sql id="region2OtherCondition">
         (
             e.region2 IS NULL
             OR TRIM(e.region2) = ''
+            <if test="request.knownRegion2Values != null and request.knownRegion2Values.size() > 0">
+                OR e.region2 NOT IN
+                <foreach collection="request.knownRegion2Values" item="knownRegion2"
+                         open="(" separator="," close=")">#{knownRegion2}</foreach>
+            </if>
         )
     </sql>
 
