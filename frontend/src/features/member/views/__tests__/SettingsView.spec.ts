@@ -35,6 +35,7 @@ const PROFILE: MemberProfile = {
   nationalityCode: null,
   preferredLanguage: 'en',
   preferredCurrencyCode: null,
+  accountType: 'TRAVELER',
   onboardingRequired: false,
 }
 
