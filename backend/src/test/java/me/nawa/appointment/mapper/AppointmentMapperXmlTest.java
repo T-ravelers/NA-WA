@@ -74,6 +74,23 @@ class AppointmentMapperXmlTest {
         assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.startDueClosedAppointments"
         ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.updateAttendance"
+        ));
+    }
+
+    @Test
+    void updateAttendance_onlyTargetsActivePendingMembers() throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("appointmentMemberId", 1L);
+        parameters.put("attendanceStatus", me.nawa.deposit.domain.AttendanceStatus.ATTENDED);
+        parameters.put("confirmedAt", java.time.LocalDateTime.now());
+
+        String sql = boundSql("updateAttendance", parameters);
+
+        assertTrue(sql.contains("attendance_status = ?"));
+        assertTrue(sql.contains("membership_status = 'ACTIVE'"));
+        assertTrue(sql.contains("attendance_status = 'PENDING'"));
     }
 
     @Test

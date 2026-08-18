@@ -15,12 +15,18 @@ import me.nawa.appointment.domain.Appointment;
 import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.domain.AppointmentStatus;
 import me.nawa.appointment.domain.MembershipStatus;
+import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentCreateRequest;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.mapper.AppointmentMapper;
+import me.nawa.deposit.domain.AttendanceStatus;
 import me.nawa.deposit.domain.Deposit;
+import me.nawa.deposit.domain.DepositPayoutBatch;
 import me.nawa.deposit.domain.DepositStatus;
+import me.nawa.deposit.domain.ResolutionReason;
+import me.nawa.deposit.domain.ResolutionStatus;
 import me.nawa.deposit.mapper.DepositMapper;
+import me.nawa.deposit.mapper.DepositPayoutBatchMapper;
 import me.nawa.wallet.domain.SystemWalletCode;
 import me.nawa.wallet.mapper.WalletLedgerMapper;
 import me.nawa.wallet.mapper.WalletMapper;
@@ -59,6 +65,7 @@ class AppointmentDepositIntegrationTest {
     private static HikariDataSource dataSource;
     private static AppointmentMapper appointmentMapper;
     private static DepositMapper depositMapper;
+    private static DepositPayoutBatchMapper depositPayoutBatchMapper;
     private static WalletMapper walletMapper;
     private static JdbcTemplate jdbcTemplate;
     private static AppointmentService appointmentService;
@@ -85,6 +92,7 @@ class AppointmentDepositIntegrationTest {
         SqlSessionFactory sqlSessionFactory = factoryBean.getObject();
         sqlSessionFactory.getConfiguration().addMapper(AppointmentMapper.class);
         sqlSessionFactory.getConfiguration().addMapper(DepositMapper.class);
+        sqlSessionFactory.getConfiguration().addMapper(DepositPayoutBatchMapper.class);
         sqlSessionFactory.getConfiguration().addMapper(WalletMapper.class);
         sqlSessionFactory.getConfiguration().addMapper(WalletTransferMapper.class);
         sqlSessionFactory.getConfiguration().addMapper(WalletLedgerMapper.class);
@@ -92,6 +100,8 @@ class AppointmentDepositIntegrationTest {
         SqlSessionTemplate sqlSessionTemplate = new SqlSessionTemplate(sqlSessionFactory);
         appointmentMapper = sqlSessionTemplate.getMapper(AppointmentMapper.class);
         depositMapper = sqlSessionTemplate.getMapper(DepositMapper.class);
+        depositPayoutBatchMapper =
+                sqlSessionTemplate.getMapper(DepositPayoutBatchMapper.class);
         walletMapper = sqlSessionTemplate.getMapper(WalletMapper.class);
         WalletTransferMapper walletTransferMapper =
                 sqlSessionTemplate.getMapper(WalletTransferMapper.class);
@@ -106,7 +116,10 @@ class AppointmentDepositIntegrationTest {
                 new TransactionNumberGenerator()
         );
         appointmentService = new AppointmentService(
-                appointmentMapper, depositMapper, walletTransferService
+                appointmentMapper,
+                depositMapper,
+                depositPayoutBatchMapper,
+                walletTransferService
         );
     }
 
@@ -126,6 +139,10 @@ class AppointmentDepositIntegrationTest {
                     "DELETE d FROM deposits d"
                             + " JOIN appointment_members m ON m.appointment_member_id = d.appointment_member_id"
                             + " WHERE m.appointment_id IN (" + placeholders + ")",
+                    ids
+            );
+            jdbcTemplate.update(
+                    "DELETE FROM deposit_payout_batches WHERE appointment_id IN (" + placeholders + ")",
                     ids
             );
             jdbcTemplate.update(
@@ -295,6 +312,88 @@ class AppointmentDepositIntegrationTest {
                 poolBalanceBeforeTest.add(new BigDecimal("10000")).compareTo(poolBalanceAfter),
                 "방장 보증금 10000원만 DEPOSIT_POOL에 남아 있어야 한다"
         );
+    }
+
+    @Test
+    void confirmAttendance_completesAppointmentAndCreatesPendingPayoutBatch() {
+        poolBalanceBeforeTest = jdbcTemplate.queryForObject(
+                "SELECT available_balance FROM wallets w"
+                        + " JOIN wallet_owners o ON o.wallet_owner_id = w.wallet_owner_id"
+                        + " WHERE o.owner_type = 'SYSTEM' AND o.system_code = 'DEPOSIT_POOL'",
+                BigDecimal.class
+        );
+        long hostMemberId = createMemberWithWallet("방장", new BigDecimal("50000.0000"));
+        long guestMemberId = createMemberWithWallet("참여자", new BigDecimal("50000.0000"));
+        long eventId = createApprovedEvent();
+
+        AppointmentCreateRequest request = new AppointmentCreateRequest();
+        request.setItemId(eventId);
+        request.setItemType("EVENT");
+        request.setLanguageCode("en");
+        request.setAppointmentName("Integration Test Appointment");
+        request.setMaxMembers(5);
+        request.setDepositAmount(BigDecimal.valueOf(10_000));
+        request.setMeetingPlace("Test Meeting Place");
+        request.setJoinDeadline(LocalDateTime.now().plusDays(1));
+        request.setActivityStartAt(LocalDateTime.now().plusDays(2));
+        request.setActivityEndAt(LocalDateTime.now().plusDays(2).plusHours(2));
+
+        Appointment created = appointmentService.createAppointment(hostMemberId, request);
+        appointmentIds.add(created.getAppointmentId());
+        appointmentService.joinAppointment(guestMemberId, created.getAppointmentId());
+
+        // 스케줄러가 실제로 IN_PROGRESS로 넘길 때까지 기다리지 않고, 출석
+        // 확정 자체의 동작만 검증하기 위해 상태를 직접 IN_PROGRESS로 맞춘다.
+        jdbcTemplate.update(
+                "UPDATE appointments SET appointment_status = 'IN_PROGRESS'"
+                        + " WHERE appointment_id = ?",
+                created.getAppointmentId()
+        );
+
+        AppointmentAttendanceRequest attendanceRequest = new AppointmentAttendanceRequest();
+        AppointmentAttendanceRequest.MemberAttendance hostAttendance =
+                new AppointmentAttendanceRequest.MemberAttendance();
+        hostAttendance.setMemberId(hostMemberId);
+        hostAttendance.setAttendanceStatus(AttendanceStatus.ATTENDED);
+        AppointmentAttendanceRequest.MemberAttendance guestAttendance =
+                new AppointmentAttendanceRequest.MemberAttendance();
+        guestAttendance.setMemberId(guestMemberId);
+        guestAttendance.setAttendanceStatus(AttendanceStatus.NO_SHOW);
+        attendanceRequest.setMembers(List.of(hostAttendance, guestAttendance));
+
+        appointmentService.confirmAttendance(
+                hostMemberId, created.getAppointmentId(), attendanceRequest
+        );
+
+        assertEquals(
+                "COMPLETED",
+                jdbcTemplate.queryForObject(
+                        "SELECT appointment_status FROM appointments WHERE appointment_id = ?",
+                        String.class,
+                        created.getAppointmentId()
+                )
+        );
+
+        DepositPayoutBatch batch = depositPayoutBatchMapper.findByAppointmentId(
+                created.getAppointmentId()
+        );
+        assertNotNull(batch, "출석 확정 후 정산 배치가 PENDING으로 생성돼야 한다");
+        assertEquals(ResolutionStatus.PENDING, batch.getResolutionStatus());
+        assertEquals(ResolutionReason.APPOINTMENT_COMPLETED, batch.getResolutionReason());
+        assertEquals(
+                0,
+                new BigDecimal("20000").compareTo(batch.getTotalHeldAmount()),
+                "방장·참여자 보증금 10000원씩 합쳐 20000원이 정산 대상이어야 한다"
+        );
+
+        AppointmentMember hostMember = appointmentMapper.findMemberByAppointmentAndMember(
+                created.getAppointmentId(), hostMemberId
+        );
+        AppointmentMember guestMember = appointmentMapper.findMemberByAppointmentAndMember(
+                created.getAppointmentId(), guestMemberId
+        );
+        assertEquals(AttendanceStatus.ATTENDED, hostMember.getAttendanceStatus());
+        assertEquals(AttendanceStatus.NO_SHOW, guestMember.getAttendanceStatus());
     }
 
     private BigDecimal walletBalance(long memberId) {

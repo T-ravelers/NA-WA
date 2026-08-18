@@ -15,9 +15,11 @@
 - 방장이 아닌 회원의 참여 취소: 실제로 동작합니다. `HELD` 보증금 환급과 상태
   전환이 같은 트랜잭션에서 함께 끝납니다(12절).
 - 약속 lifecycle 자동 전이(`RECRUITING → CLOSED → IN_PROGRESS`): 실제로
-  동작합니다(15절). `IN_PROGRESS → COMPLETED`(출석 확정)는 아직 없습니다 —
-  `AppointmentService.confirmAttendance`는 입력 검증만 하고
-  `APPOINTMENT-008`(409)을 반환합니다.
+  동작합니다(15절).
+- 출석 확정(`IN_PROGRESS → COMPLETED`): 실제로 동작합니다. 방장이 `ACTIVE` 회원
+  전원의 출석을 정확히 한 번씩 확정하면, 같은 트랜잭션에서 약속을 `COMPLETED`로
+  전환하고 `DepositPayoutBatch`를 `PENDING`으로 만들어둡니다. 이 배치를 실제
+  지갑 이체로 처리하는 비동기 단계(16절)는 아직 없습니다 — 아래 항목 참고.
 - 기존 완료 약속에 대한 후기 등록은 이미 동작합니다.
 - 보증금 환급·분배를 실행하는 지갑 이체 중 노쇼 분배, 그리고 그 비동기 배치
   처리는 아직 없습니다. 설계는 16절에 정리했습니다.
@@ -346,17 +348,11 @@ DB 컬럼: `appointments.item_type`
 | 약속 lifecycle 자동 전이(`RECRUITING → CLOSED → IN_PROGRESS`) | 사용 가능(15절) |
 | 회원 약속 프로필 조회 | 사용 가능 |
 | 조건을 만족하는 기존 완료 약속의 후기 등록 | 사용 가능 |
-| 출석 확정 | `APPOINTMENT-008`로 차단 |
-| 보증금 환급 중 노쇼 분배, 그 비동기 정산 배치 처리 | 16절 설계, 미구현 |
+| 출석 확정(`IN_PROGRESS → COMPLETED`, 정산 배치 `PENDING` 생성까지) | 사용 가능 |
+| 정산 배치를 실제 지갑 이체로 처리하는 비동기 단계 | 16절 설계, 미구현 |
 
-`APPOINTMENT-008` 응답(출석 확정 요청 시):
-
-    HTTP 409 Conflict
-    { "success": false, "error": { "code": "APPOINTMENT-008",
-      "message": "보증금 결제 연동 후 이용할 수 있습니다." } }
-
-차단된 요청은 `appointments`, `appointment_members`, `deposits`,
-`wallet_transfers`, 지갑 잔액·원장, 약속 lifecycle 상태를 변경하지 않습니다.
+정산 배치가 `PENDING`으로 남아있는 동안은 아직 아무 지갑도 움직이지 않습니다.
+실제 환급·노쇼 분배 이체는 16절의 비동기 처리가 구현되면 그때 실행됩니다.
 
 ## 14. `DEPOSIT_POOL` 지갑 설정
 

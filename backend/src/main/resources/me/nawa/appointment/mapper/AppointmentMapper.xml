@@ -97,6 +97,16 @@
           AND deleted_at IS NULL
     </update>
 
+    <update id="updateAttendance">
+        UPDATE appointment_members
+        SET attendance_status = #{attendanceStatus},
+            attendance_confirmed_at = #{confirmedAt}
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status = 'ACTIVE'
+          AND attendance_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
     <sql id="appointmentColumns">
         a.appointment_id,
         a.item_id,

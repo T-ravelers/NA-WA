@@ -20,7 +20,10 @@ import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.deposit.domain.AttendanceStatus;
 import me.nawa.deposit.domain.Deposit;
+import me.nawa.deposit.domain.DepositPayoutBatch;
+import me.nawa.deposit.domain.ResolutionReason;
 import me.nawa.deposit.mapper.DepositMapper;
+import me.nawa.deposit.mapper.DepositPayoutBatchMapper;
 import me.nawa.wallet.domain.SystemWalletCode;
 import me.nawa.wallet.domain.enums.TransferType;
 import me.nawa.wallet.service.WalletTransferService;
@@ -29,8 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -61,6 +66,7 @@ public class AppointmentService {
 
     private final AppointmentMapper appointmentMapper;
     private final DepositMapper depositMapper;
+    private final DepositPayoutBatchMapper depositPayoutBatchMapper;
     private final WalletTransferService walletTransferService;
 
     @Transactional
@@ -287,9 +293,108 @@ public class AppointmentService {
             Long appointmentId,
             AppointmentAttendanceRequest request) {
         validateIdentifiers(hostMemberId, appointmentId);
-        throw new BusinessException(
-                AppointmentErrorCode.PAYMENT_INTEGRATION_REQUIRED
+        if (request == null
+                || request.getMembers() == null
+                || request.getMembers().isEmpty()) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
+        Appointment appointment = requireAppointmentForUpdate(appointmentId);
+        if (!hostMemberId.equals(appointment.getHostMemberId())) {
+            throw new BusinessException(
+                    AppointmentErrorCode.APPOINTMENT_FORBIDDEN
+            );
+        }
+        if (appointment.getAppointmentStatus()
+                != AppointmentStatus.IN_PROGRESS) {
+            throw new BusinessException(
+                    AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
+            );
+        }
+
+        Map<Long, AttendanceStatus> requestedByMemberId =
+                toRequestedAttendanceMap(request);
+        List<AppointmentMember> activeMembers = appointmentMapper
+                .findActiveMembersByAppointmentId(appointmentId);
+        if (activeMembers.size() != requestedByMemberId.size()) {
+            throw new BusinessException(
+                    AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
+            );
+        }
+
+        LocalDateTime confirmedAt = LocalDateTime.now();
+        BigDecimal totalHeldAmount = BigDecimal.ZERO;
+        for (AppointmentMember member : activeMembers) {
+            AttendanceStatus status =
+                    requestedByMemberId.get(member.getMemberId());
+            if (status == null) {
+                throw new BusinessException(
+                        AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
+                );
+            }
+            if (appointmentMapper.updateAttendance(
+                    member.getAppointmentMemberId(), status, confirmedAt
+            ) != 1) {
+                throw new BusinessException(
+                        CommonErrorCode.INTERNAL_SERVER_ERROR
+                );
+            }
+            Deposit deposit = depositMapper.findByAppointmentMemberId(
+                    member.getAppointmentMemberId()
+            );
+            if (deposit == null || !deposit.isHeld()) {
+                throw new BusinessException(
+                        CommonErrorCode.INTERNAL_SERVER_ERROR
+                );
+            }
+            totalHeldAmount = totalHeldAmount.add(deposit.getAmount());
+        }
+
+        if (appointmentMapper.updateAppointmentStatus(
+                appointmentId,
+                AppointmentStatus.IN_PROGRESS,
+                AppointmentStatus.COMPLETED
+        ) != 1) {
+            throw new BusinessException(
+                    CommonErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
+
+        // 실제 지갑 이체는 하지 않고 배치만 PENDING으로 남긴다. 이후 별도
+        // 비동기 처리(16절)가 이 배치를 집어 환급·노쇼 분배 이체를 실행한다.
+        DepositPayoutBatch batch = DepositPayoutBatch.pending(
+                appointmentId,
+                ResolutionReason.APPOINTMENT_COMPLETED,
+                totalHeldAmount,
+                confirmedAt,
+                "APPOINTMENT_COMPLETION-" + appointmentId
         );
+        if (depositPayoutBatchMapper.insert(batch) != 1) {
+            throw new BusinessException(
+                    CommonErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    // 요청의 회원별 출석 상태를 맵으로 정리하면서, 값 누락·PENDING 지정·중복
+    // memberId를 여기서 한 번에 걸러낸다.
+    private static Map<Long, AttendanceStatus> toRequestedAttendanceMap(
+            AppointmentAttendanceRequest request) {
+        Map<Long, AttendanceStatus> requestedByMemberId = new HashMap<>();
+        for (AppointmentAttendanceRequest.MemberAttendance entry
+                : request.getMembers()) {
+            if (entry.getMemberId() == null
+                    || entry.getAttendanceStatus() == null
+                    || entry.getAttendanceStatus()
+                            == AttendanceStatus.PENDING
+                    || requestedByMemberId.put(
+                            entry.getMemberId(),
+                            entry.getAttendanceStatus()
+                    ) != null) {
+                throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+            }
+        }
+        return requestedByMemberId;
     }
 
     @Transactional(readOnly = true)

@@ -5,9 +5,11 @@ import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.domain.AppointmentStatus;
 import me.nawa.appointment.domain.MyOngoingAppointment;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
+import me.nawa.deposit.domain.AttendanceStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -80,5 +82,13 @@ public interface AppointmentMapper {
 
     List<MyOngoingAppointment> findMyOngoingAppointments(
         @Param("memberId") Long memberId
+    );
+
+    // ACTIVE·PENDING(출석 미확정) 회원만 대상으로 한다 — 출석 확정은 한 번만
+    // 허용하는 낙관적 상태 전이 가드.
+    int updateAttendance(
+            @Param("appointmentMemberId") Long appointmentMemberId,
+            @Param("attendanceStatus") AttendanceStatus attendanceStatus,
+            @Param("confirmedAt") LocalDateTime confirmedAt
     );
 }
