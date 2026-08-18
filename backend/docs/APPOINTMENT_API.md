@@ -1,7 +1,9 @@
 # 약속 및 후기 API 계약
 
 이 문서는 탐색 Event·Place에서 생성하는 약속의 조회와 회원 후기 API 계약을 정의합니다.
-모든 경로는 인증이 필요하며 공통 `ApiResponse` 형식을 사용합니다.
+모든 경로는 인증이 필요하며 공통 `ApiResponse` 형식을 사용합니다. ENUM·상태 전이·
+구현 여부는 [APPOINTMENT_DEPOSIT_STATE_MACHINE.md](APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+를 따릅니다.
 
 ## 공통 정책
 
