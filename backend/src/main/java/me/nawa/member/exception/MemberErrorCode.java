@@ -54,6 +54,12 @@ public enum MemberErrorCode implements ErrorCode {
             HttpStatus.BAD_REQUEST,
             "MEMBER-008",
             "온보딩에 필요한 항목이 비어 있습니다."
+    ),
+
+    ALREADY_MERCHANT(
+            HttpStatus.CONFLICT,
+            "MEMBER-009",
+            "이미 가맹점으로 등록된 계정입니다."
     );
 
     private final HttpStatus status;

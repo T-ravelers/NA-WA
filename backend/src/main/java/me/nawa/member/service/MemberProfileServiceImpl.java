@@ -6,6 +6,7 @@ import me.nawa.common.exception.BusinessException;
 import me.nawa.member.domain.MemberProfile;
 import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.MemberAppointmentProfileResponse;
+import me.nawa.member.dto.MerchantRegisterRequest;
 import me.nawa.member.dto.OnboardingProfileRequest;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.exception.MemberErrorCode;
@@ -111,6 +112,36 @@ public class MemberProfileServiceImpl implements MemberProfileService {
 
         if (updatedRows == 0) {
             throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND);
+        }
+
+        return new MemberProfileResponse(loadActiveProfile(memberId));
+    }
+
+    /**
+     * 가맹점으로 등록한다.
+     *
+     * 소셜 로그인은 계정을 항상 TRAVELER로 만든다. 가맹점주는 Welcome 화면의 가맹점
+     * 진입점으로 들어와 로그인한 뒤 이 메서드로 상호명을 확정하며, 그 단계가 가맹점
+     * 회원가입이다. 손님으로 쓰던 계정을 나중에 바꾸는 흐름은 상정하지 않는다.
+     */
+    @Override
+    @Transactional
+    public MemberProfileResponse registerAsMerchant(
+            long memberId,
+            MerchantRegisterRequest request) {
+        String businessName = normalizeDisplayName(request.getBusinessName());
+
+        // 상호명은 결제자 화면에 표시되는 유일한 가맹점 식별값이라 비워 둘 수 없다.
+        if (businessName == null) {
+            throw new BusinessException(MemberErrorCode.INVALID_DISPLAY_NAME);
+        }
+        validateDisplayName(businessName);
+
+        loadActiveProfile(memberId);
+
+        // markAsMerchant에 account_type = 'TRAVELER' 조건이 있어, 한 행도 안 바뀌면 이미 가맹점이다.
+        if (memberMapper.markAsMerchant(memberId, businessName) == 0) {
+            throw new BusinessException(MemberErrorCode.ALREADY_MERCHANT);
         }
 
         return new MemberProfileResponse(loadActiveProfile(memberId));

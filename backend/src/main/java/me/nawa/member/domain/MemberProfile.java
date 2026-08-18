@@ -14,6 +14,7 @@ public class MemberProfile {
     private String nationalityCode;
     private String preferredLanguage;
     private String preferredCurrencyCode;
+    private String accountType;
     private String memberStatus;
     private boolean onboardingCompleted;
     private boolean deleted;

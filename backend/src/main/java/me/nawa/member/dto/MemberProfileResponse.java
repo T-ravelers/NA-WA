@@ -11,6 +11,7 @@ public class MemberProfileResponse {
     private final String nationalityCode;
     private final String preferredLanguage;
     private final String preferredCurrencyCode;
+    private final String accountType;
     private final boolean onboardingRequired;
 
     public MemberProfileResponse(MemberProfile profile) {
@@ -20,6 +21,7 @@ public class MemberProfileResponse {
         this.nationalityCode = profile.getNationalityCode();
         this.preferredLanguage = profile.getPreferredLanguage();
         this.preferredCurrencyCode = profile.getPreferredCurrencyCode();
+        this.accountType = profile.getAccountType();
         this.onboardingRequired = !profile.isOnboardingCompleted();
     }
 }

@@ -34,11 +34,32 @@ class FlywayMigrationIntegrationTest {
 
         MigrationInfo current = flyway.info().current();
         assertNotNull(current);
-        assertEquals("10", current.getVersion().getVersion());
+        assertEquals("11", current.getVersion().getVersion());
         assertTrue(current.getState().isApplied());
 
         verifyAppointmentParticipationSchema(flyway);
         verifyReviewKeywordSeed(flyway);
+        verifyMemberAccountTypeSchema(flyway);
+    }
+
+    private static void verifyMemberAccountTypeSchema(Flyway flyway) {
+        try (Connection connection = flyway.getConfiguration()
+                .getDataSource()
+                .getConnection()) {
+            String columnType = columnType(connection, "members", "account_type");
+            assertTrue(columnType.contains("traveler"));
+            assertTrue(columnType.contains("merchant"));
+            // 기존 회원은 DEFAULT로만 보정된다. 기본값이 빠지면 백필 없이 배포한 회원이 NULL이 된다.
+            assertEquals(
+                    "TRAVELER",
+                    columnDefault(connection, "members", "account_type")
+            );
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                    "Failed to verify member account type migration",
+                    exception
+            );
+        }
     }
 
     private static void verifyAppointmentParticipationSchema(Flyway flyway) {

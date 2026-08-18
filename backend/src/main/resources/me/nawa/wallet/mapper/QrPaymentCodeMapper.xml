@@ -166,4 +166,11 @@
           AND payment_status = 'ACTIVE'
           AND expires_at &gt; #{now}
     </update>
+
+    <select id="findAccountTypeByMemberId" resultType="string">
+        SELECT account_type
+          FROM members
+         WHERE member_id = #{memberId}
+           AND deleted_at IS NULL
+    </select>
 </mapper>

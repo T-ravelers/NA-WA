@@ -13,6 +13,7 @@ import me.nawa.appointment.service.AppointmentService;
 import me.nawa.common.exception.ErrorCode;
 import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.MemberAppointmentProfileResponse;
+import me.nawa.member.dto.MerchantRegisterRequest;
 import me.nawa.member.dto.OnboardingProfileRequest;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.service.MemberProfileService;
@@ -365,6 +366,12 @@ class SwaggerConfigTest {
                 @Override
                 public MemberProfileResponse completeOnboarding(
                         long memberId, OnboardingProfileRequest request) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public MemberProfileResponse registerAsMerchant(
+                        long memberId, MerchantRegisterRequest request) {
                     throw new UnsupportedOperationException();
                 }
 

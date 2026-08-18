@@ -198,6 +198,42 @@ class MemberMapperIntegrationTest {
         });
     }
 
+    @Test
+    void markAsMerchant_setsAccountTypeOnce_andRejectsSecondRegistration() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long memberId = insertMember("가맹점 회원");
+
+            assertEquals(1, memberMapper.markAsMerchant(memberId, "○○ 카페"));
+
+            sqlSessionTemplate.clearCache();
+            MemberProfile profile = memberMapper.findProfile(memberId);
+            assertEquals("MERCHANT", profile.getAccountType());
+            assertEquals("○○ 카페", profile.getDisplayName());
+            // 손님용 온보딩 화면이 생겨도 가맹점이 끌려가지 않도록 함께 채운다.
+            assertTrue(profile.isOnboardingCompleted());
+
+            // account_type = 'TRAVELER' 조건이 재등록을 막는다. 상호명도 덮어쓰지 않는다.
+            assertEquals(0, memberMapper.markAsMerchant(memberId, "△△ 식당"));
+
+            sqlSessionTemplate.clearCache();
+            assertEquals("○○ 카페", memberMapper.findProfile(memberId).getDisplayName());
+        });
+    }
+
+    @Test
+    void markAsMerchant_reportsZeroRows_whenMemberSoftDeleted() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long memberId = insertMember("삭제된 가맹점 회원");
+            jdbcTemplate.update(
+                    "UPDATE members SET deleted_at = CURRENT_TIMESTAMP WHERE member_id = ?",
+                    memberId);
+
+            assertEquals(0, memberMapper.markAsMerchant(memberId, "○○ 카페"));
+        });
+    }
+
     private long insertMember(String displayName) {
         OAuthMemberInsert member = new OAuthMemberInsert(displayName, null);
         assertEquals(1, accountMapper.insertMember(member));
