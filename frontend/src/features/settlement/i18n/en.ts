@@ -90,6 +90,7 @@ export default {
       paidBy: 'Paid by',
       transactionId: 'Transaction',
       yourShare: 'Your share',
+      payableNow: 'Payable now',
       yourItems: 'Your items',
       sendTo: 'Send to',
       sendAmount: 'You send',
@@ -101,6 +102,9 @@ export default {
       backToCollect: 'Back to your requests',
     },
     pay: {
+      confirmTitle: 'Confirm payment',
+      confirmDescription:
+        'This moves your share out of your points balance. It cannot be undone here.',
       processing: 'Sending your payment',
       processingHint: 'Keep this screen open while we move your points.',
       completeTitle: 'Payment sent',

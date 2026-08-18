@@ -10,7 +10,7 @@ import SettlementInlineLoading from '../components/SettlementInlineLoading.vue'
 import SettlementListCard from '../components/SettlementListCard.vue'
 import SettlementPageHeader from '../components/SettlementPageHeader.vue'
 import { resolveSettlementError } from '../model/settlementErrors'
-import { splitIntoSections, type SettlementSide } from '../model/settlementList'
+import { resolveSide, splitIntoSections, type SettlementSide } from '../model/settlementList'
 import { useSettlements } from '../model/settlementQueries'
 
 /**
@@ -24,14 +24,18 @@ const router = useRouter()
 const { t } = useI18n()
 const settlementQuery = useSettlements()
 
-const side = computed<SettlementSide>(() => (route.query.side === 'sent' ? 'sent' : 'received'))
+const side = computed<SettlementSide>(() => resolveSide(route.query.side))
 const completed = computed(
   () => splitIntoSections(settlementQuery.data.value?.[side.value] ?? []).completed,
 )
 const errorKey = computed(() => resolveSettlementError(settlementQuery.error.value).messageKey)
 
 function open(settlementId: string): void {
-  void router.push({ name: 'settlement-detail', params: { settlementId } })
+  void router.push({
+    name: 'settlement-detail',
+    params: { settlementId },
+    query: { side: side.value },
+  })
 }
 </script>
 
@@ -42,7 +46,7 @@ function open(settlementId: string): void {
         t(side === 'sent' ? 'settlement.history.titleCollect' : 'settlement.history.titlePay')
       "
       :back-label="t('settlement.backToList')"
-      @back="router.push({ name: 'settlements' })"
+      @back="router.push({ name: 'settlements', query: { side } })"
     />
     <SettlementInlineLoading
       v-if="settlementQuery.isPending.value"

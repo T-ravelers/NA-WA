@@ -753,15 +753,26 @@ async function stubPayableSettlement(page, { delayMs = 2500 } = {}) {
   )
 }
 
-/** 요청 생성. 응답을 늦춰 "Sending your request" 화면이 사라지기 전에 찍는다. */
+/**
+ * 요청 생성. 응답을 늦춰 "Sending your request" 화면이 사라지기 전에 찍는다.
+ *
+ * 요청 완료 화면은 서버가 나를 이 정산의 요청자로 인정해야 완료를 표시한다. 만든 정산의
+ * 상세를 함께 서빙하지 않으면 완료 화면이 영원히 처리 중에 머문다.
+ */
 function stubSettlementCreate(page, { id = 77, delayMs = 2000 } = {}) {
-  return page.route(
-    (url) => url.pathname === '/api/v1/appointments/9/settlements',
-    async (route) => {
-      await delay(delayMs)
-      await fulfillJson(route, { id })
-    },
-  )
+  return Promise.all([
+    page.route(
+      (url) => url.pathname === '/api/v1/appointments/9/settlements',
+      async (route) => {
+        await delay(delayMs)
+        await fulfillJson(route, { id })
+      },
+    ),
+    stubJson(page, `/api/v1/settlements/${id}`, {
+      ...COLLECT_SETTLEMENT_DETAIL,
+      id,
+    }),
+  ])
 }
 
 function stubEmptySettlementCandidates(page) {
@@ -1284,8 +1295,11 @@ const FLOWS = [
       {
         name: '04-detail-completed',
         act: async (page) => {
+          // 출발 화면의 카드에도 'Completed' 배지가 있어 문구로는 도착을 알 수 없다.
+          // 주소와 상세에만 있는 버튼으로 판정한다.
           await page.locator('[data-settlement-id="41"]').click()
-          await page.getByText('Completed', { exact: true }).first().waitFor()
+          await page.waitForURL(/\/settlements\/41(\?|$)/)
+          await page.locator('[data-action="pay-completed"]').waitFor()
         },
       },
       {

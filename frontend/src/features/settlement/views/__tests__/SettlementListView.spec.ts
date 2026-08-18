@@ -107,6 +107,7 @@ describe('SettlementListView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('settlement-detail')
+    expect(router.currentRoute.value.query.side).toBe('received')
   })
 
   it('highlights the viewer share when paying and the receivable when collecting', async () => {
@@ -114,7 +115,7 @@ describe('SettlementListView', () => {
       received: [summary('1', 'REQUESTED')],
       sent: [summary('2', 'REQUESTED')],
     })
-    const { wrapper } = await mountList()
+    const { wrapper, router } = await mountList()
     expect(wrapper.text()).toContain('You pay')
     expect(wrapper.text()).toContain('12.50 P')
 
@@ -124,6 +125,8 @@ describe('SettlementListView', () => {
 
     expect(wrapper.text()).toContain('You collect')
     expect(wrapper.text()).toContain('18.00 P')
+    // 토글이 주소에 남아야 상세·전체 내역에서 돌아올 때 같은 쪽이 열린다.
+    expect(router.currentRoute.value.query.side).toBe('sent')
   })
 
   it('opens the full history for the side that is currently shown', async () => {

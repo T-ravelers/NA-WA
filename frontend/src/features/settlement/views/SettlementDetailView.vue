@@ -13,6 +13,7 @@ import SettlementPageHeader from '../components/SettlementPageHeader.vue'
 import SettlementTransactionCard from '../components/SettlementTransactionCard.vue'
 import { useSettlementPoints } from '../composables/useSettlementPoints'
 import { resolveSettlementError } from '../model/settlementErrors'
+import { resolveSide } from '../model/settlementList'
 import { useSettlementDetail } from '../model/settlementQueries'
 
 /**
@@ -21,6 +22,9 @@ import { useSettlementDetail } from '../model/settlementQueries'
  * 요청자와 참여자가 서로 다른 것을 알아야 한다. 요청자는 누가 냈는지를, 참여자는
  * 누구에게 얼마를 보내야 하는지를 본다. 역할 판정은 서버가 준 `viewer.role`로만 한다.
  * 표시용 이름은 동명이인이 있을 수 있어 본인 판정에 쓰지 않는다.
+ *
+ * 목록에서 어느 쪽 토글로 들어왔는지는 `query.side`로 받아 되돌려준다. 주소로 바로
+ * 들어와 그 값이 없으면 요청자는 받을 목록, 참여자는 낼 목록으로 나간다.
  */
 const route = useRoute()
 const router = useRouter()
@@ -35,9 +39,27 @@ const isCreator = computed(() => detail.value?.viewer.role === 'CREATOR')
 const canPay = computed(() => detail.value?.viewer.allowedActions.includes('PAY') ?? false)
 const hasPaid = computed(() => detail.value?.viewer.requestStatus === 'PAID')
 const queryErrorKey = computed(() => resolveSettlementError(detailQuery.error.value).messageKey)
+const side = computed(() =>
+  route.query.side === undefined && isCreator.value ? 'sent' : resolveSide(route.query.side),
+)
 
+function backToList(): void {
+  void router.push({ name: 'settlements', query: { side: side.value } })
+}
+
+/**
+ * 결제 화면으로 넘어간다.
+ *
+ * `replace`로 대체해야 결제 뒤 되돌아온 상세가 스택에 두 번 쌓이지 않는다. 진입 의사는
+ * 히스토리 상태로 실어 보내, 결제 화면이 주소로 열린 경우와 구분하게 한다.
+ */
 function startPayment(): void {
-  void router.push({ name: 'settlement-pay', params: { settlementId: settlementId.value } })
+  void router.replace({
+    name: 'settlement-pay',
+    params: { settlementId: settlementId.value },
+    query: { side: side.value },
+    state: { confirmed: true },
+  })
 }
 </script>
 
@@ -47,7 +69,7 @@ function startPayment(): void {
     <SettlementPageHeader
       :title="t('settlement.title')"
       :back-label="t('settlement.back')"
-      @back="router.push({ name: 'settlements' })"
+      @back="backToList"
     />
     <StateLoading
       v-if="detailQuery.isPending.value"
@@ -81,8 +103,16 @@ function startPayment(): void {
       >
         <p class="text-caption text-ink-3">{{ t('settlement.detail.sendTo') }}</p>
         <p class="mt-1 text-title">{{ detail.requestedBy }}</p>
-        <p class="mt-4 text-caption text-ink-3">{{ t('settlement.detail.sendAmount') }}</p>
-        <p class="mt-1 text-data-xl">{{ points(detail.viewer.shareAmount) }}</p>
+        <!--
+          크게 보여주는 값은 지금 내야 할 금액이다. 부담금을 그대로 두면 이미 낸 뒤에도
+          전액을 보내라고 말하게 되어 아래 "Pay completed" 버튼과 어긋난다.
+        -->
+        <p class="mt-4 text-caption text-ink-3">{{ t('settlement.detail.payableNow') }}</p>
+        <p class="mt-1 text-data-xl">{{ points(detail.viewer.payableAmount) }}</p>
+        <dl class="mt-4 flex justify-between gap-3 text-body-sm">
+          <dt class="text-ink-3">{{ t('settlement.detail.yourShare') }}</dt>
+          <dd>{{ points(detail.viewer.shareAmount) }}</dd>
+        </dl>
       </AppCard>
 
       <AppCard class="mt-4">
@@ -115,8 +145,9 @@ function startPayment(): void {
         </dl>
       </AppCard>
 
+      <!-- 항목별 내역은 서버가 생성자에게도 내려준다. 역할로 가리지 않는다. -->
       <AppCard
-        v-if="!isCreator && detail.type === 'ITEMIZED'"
+        v-if="detail.type === 'ITEMIZED' && detail.viewerItems.length > 0"
         class="mt-4"
       >
         <p class="text-caption text-ink-3">{{ t('settlement.detail.yourItems') }}</p>
@@ -172,14 +203,14 @@ function startPayment(): void {
           v-else-if="isCreator"
           block
           variant="secondary"
-          @click="router.push({ name: 'settlements', query: { side: 'sent' } })"
+          @click="backToList"
           >{{ t('settlement.detail.backToCollect') }}</AppButton
         >
         <AppButton
           v-else
           block
           variant="secondary"
-          @click="router.push({ name: 'settlements' })"
+          @click="backToList"
           >{{ t('settlement.backToList') }}</AppButton
         >
       </div>

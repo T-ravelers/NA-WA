@@ -31,7 +31,8 @@ const detail = {
   },
 }
 
-async function mountPay() {
+/** 기본값은 상세의 Pay 버튼으로 들어온 경우다. 주소로 열린 진입은 `confirmed: false`. */
+async function mountPay({ confirmed = true } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -53,7 +54,11 @@ async function mountPay() {
       { path: '/settlements', name: 'settlements', component: { template: '<div />' } },
     ],
   })
-  await router.push('/settlements/42/pay')
+  await router.push(
+    confirmed
+      ? { name: 'settlement-pay', params: { settlementId: '42' }, state: { confirmed: true } }
+      : '/settlements/42/pay',
+  )
   await router.isReady()
   const wrapper = mount(SettlementPayView, {
     global: {
@@ -83,6 +88,30 @@ describe('SettlementPayView', () => {
 
     expect(pay).toHaveBeenCalledWith('42', expect.any(String))
     expect(router.currentRoute.value.name).toBe('settlement-pay-complete')
+  })
+
+  it('asks before paying when it was not opened from the split detail', async () => {
+    const { wrapper } = await mountPay({ confirmed: false })
+
+    // 공유된 링크·북마크·주소창으로 열어도 이체가 무클릭으로 나가면 안 된다.
+    expect(pay).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-action="confirm-pay"]').text()).toBe('Pay 12.50 P')
+
+    await wrapper.get('[data-action="confirm-pay"]').trigger('click')
+    await flushPromises()
+
+    expect(pay).toHaveBeenCalledWith('42', expect.any(String))
+  })
+
+  it('never asks to confirm a payment the server does not grant', async () => {
+    getDetail.mockResolvedValue({
+      ...detail,
+      viewer: { ...detail.viewer, requestStatus: 'PAID' as const, allowedActions: [] },
+    })
+    const { wrapper, router } = await mountPay({ confirmed: false })
+
+    expect(wrapper.find('[data-action="confirm-pay"]').exists()).toBe(false)
+    expect(router.currentRoute.value.name).toBe('settlement-detail')
   })
 
   it('never pays when the server does not grant the action', async () => {

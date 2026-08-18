@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -14,6 +14,7 @@ import SettlementPageHeader from '../components/SettlementPageHeader.vue'
 import { resolveSettlementError } from '../model/settlementErrors'
 import {
   COMPLETED_PREVIEW_COUNT,
+  resolveSide,
   splitIntoSections,
   type SettlementSide,
 } from '../model/settlementList'
@@ -22,8 +23,13 @@ import { useSettlements } from '../model/settlementQueries'
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-// 요청을 보낸 직후나 요청자 상세에서 돌아올 때 받을 목록이 열려 있어야 한다.
-const side = ref<SettlementSide>(route.query.side === 'sent' ? 'sent' : 'received')
+/**
+ * 어느 쪽 목록을 보고 있는지는 주소에 남긴다.
+ *
+ * 요청을 보낸 직후나 상세·전체 내역에서 돌아올 때 열려 있어야 할 쪽이 정해져 있는데,
+ * 토글이 컴포넌트 안에만 있으면 돌아오는 화면이 그것을 알 방법이 없다.
+ */
+const side = computed<SettlementSide>(() => resolveSide(route.query.side))
 const settlementQuery = useSettlements()
 
 const sections = computed(() => splitIntoSections(settlementQuery.data.value?.[side.value] ?? []))
@@ -31,8 +37,16 @@ const completedPreview = computed(() => sections.value.completed.slice(0, COMPLE
 const errorKey = computed(() => resolveSettlementError(settlementQuery.error.value).messageKey)
 const paying = computed(() => side.value === 'received')
 
+function selectSide(next: SettlementSide): void {
+  void router.replace({ query: { ...route.query, side: next } })
+}
+
 function open(settlementId: string): void {
-  void router.push({ name: 'settlement-detail', params: { settlementId } })
+  void router.push({
+    name: 'settlement-detail',
+    params: { settlementId },
+    query: { side: side.value },
+  })
 }
 </script>
 
@@ -51,7 +65,7 @@ function open(settlementId: string): void {
         { value: 'received', label: t('settlement.toPay') },
         { value: 'sent', label: t('settlement.toCollect') },
       ]"
-      @update:model-value="side = $event as SettlementSide"
+      @update:model-value="selectSide($event as SettlementSide)"
     />
 
     <SettlementInlineLoading

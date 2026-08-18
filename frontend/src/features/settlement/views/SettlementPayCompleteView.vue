@@ -7,6 +7,7 @@ import StateError from '@/shared/ui/StateError.vue'
 
 import SettlementStatusScreen from '../components/SettlementStatusScreen.vue'
 import { resolveSettlementError } from '../model/settlementErrors'
+import { resolveSide } from '../model/settlementList'
 import { useSettlementDetail } from '../model/settlementQueries'
 
 /**
@@ -28,7 +29,11 @@ const detailQuery = useSettlementDetail(() => settlementId.value)
 const errorKey = computed(() => resolveSettlementError(detailQuery.error.value).messageKey)
 
 function goToDetail(): void {
-  void router.replace({ name: 'settlement-detail', params: { settlementId: settlementId.value } })
+  void router.replace({
+    name: 'settlement-detail',
+    params: { settlementId: settlementId.value },
+    query: { side: resolveSide(route.query.side) },
+  })
 }
 
 watchEffect(() => {

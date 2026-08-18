@@ -312,7 +312,7 @@ export default {
 | `journey`                              | `trip`                | 코드와 DB는 `trip`을 씁니다. **UI 문구만 `journey`입니다**                                                                                                                                                                 |
 | `top up`(동사) / `top-up`(명사)        | `charge`, `recharge`  |                                                                                                                                                                                                                            |
 | `split`                                | `settle up`, `divide` | 정산 도메인의 UI 문구입니다. 코드·API·오류 코드는 `settlement`을 그대로 씁니다. 화면 이름은 복수형 `Splits`, 새로 만드는 동작은 단수형 `Start Split`입니다. 브랜드 태그라인(`app.tagline`)의 `settle up`만 예외로 남습니다 |
-| `To Pay` / `To Collect`                | `Received`, `Sent`    | 정산 목록 토글입니다. 낼 돈인지 받을 돈인지를 말이 직접 드러내야 합니다. 코드 식별자는 `received`·`sent`를 유지합니다                                                                                                      |
+| `To Pay` / `To Collect`                | `Received`, `Sent`    | 정산 목록 토글입니다. 낼 돈인지 받을 돈인지를 말이 직접 드러내야 합니다. 코드 식별자는 `received`·`sent`를 유지하고, 어느 쪽을 보고 있는지는 `query.side`로 화면 사이에 나릅니다                                           |
 | `sign in`(동사) / `sign-in`(명사·수식) | `log in`, `login`     | 현재 용법이 맞습니다                                                                                                                                                                                                       |
 
 기존 문구 중 이 규칙을 어긴 것이 아직 남아 있습니다. **위반을 근거로 따라 쓰지

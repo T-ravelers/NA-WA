@@ -1,25 +1,68 @@
 <script setup lang="ts">
+import { computed, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+
+import StateError from '@/shared/ui/StateError.vue'
 
 import SettlementStatusScreen from '../components/SettlementStatusScreen.vue'
+import { resolveSettlementError } from '../model/settlementErrors'
+import { useSettlementDetail } from '../model/settlementQueries'
 
 /**
  * 정산 요청을 보낸 뒤의 완료 화면.
  *
  * 요청서로 되돌아갈 수 없는 지점이라 단계 표시를 두지 않는다. 여기서는 받을 목록으로
  * 넘어가 방금 만든 요청을 확인한다.
+ *
+ * 결제 완료 화면과 같은 기준으로, 완료를 화면이 스스로 주장하지 않는다. 서버가 이 정산의
+ * 요청자로 나를 인정한 경우에만 "Request sent"를 띄우고, 그 전과 실패에는 띄우지 않는다.
  */
+const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
+const settlementId = computed(() => String(route.params.settlementId))
+const detailQuery = useSettlementDetail(() => settlementId.value)
+const errorKey = computed(() => resolveSettlementError(detailQuery.error.value).messageKey)
+
+function goToCollect(): void {
+  void router.replace({ name: 'settlements', query: { side: 'sent' } })
+}
+
+watchEffect(() => {
+  const detail = detailQuery.data.value
+  if (detail === undefined || detail.viewer.role === 'CREATOR') return
+  // 남이 만든 정산으로 주소를 열었다. 요청을 보냈다고 말할 자리가 아니다.
+  void router.replace({
+    name: 'settlement-detail',
+    params: { settlementId: settlementId.value },
+  })
+})
 </script>
 
 <template>
+  <section
+    v-if="detailQuery.isError.value"
+    class="flex min-h-dvh flex-col px-screen pt-8 pb-32"
+  >
+    <StateError
+      class="my-auto"
+      :title="t(errorKey)"
+      @retry="detailQuery.refetch()"
+    />
+  </section>
   <SettlementStatusScreen
+    v-else-if="detailQuery.data.value === undefined"
+    state="processing"
+    :title="t('settlement.create.requesting')"
+    :description="t('settlement.create.requestingHint')"
+  />
+  <SettlementStatusScreen
+    v-else
     state="done"
     :title="t('settlement.create.requestedTitle')"
     :description="t('settlement.create.requestedDescription')"
     :action-label="t('settlement.create.goToCollect')"
-    @action="router.replace({ name: 'settlements', query: { side: 'sent' } })"
+    @action="goToCollect"
   />
 </template>

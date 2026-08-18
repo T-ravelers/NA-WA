@@ -9,6 +9,8 @@ const routes: RouteRecordRaw[] = [
    * 정산 홈
    *
    * To Pay(내가 낼 것)과 To Collect(받을 것)를 한 화면에서 보여준다
+   * 어느 쪽을 보고 있는지는 `query.side`에 남긴다
+   * 상세·전체 내역·결제가 같은 쿼리를 주고받아 되돌아올 때 같은 쪽을 연다
    */
   {
     path: '/settlements',
@@ -44,6 +46,8 @@ const routes: RouteRecordRaw[] = [
   },
   /**
    * 정산 한 건 상세
+   *
+   * `query.side`로 어느 목록에서 들어왔는지 받아 뒤로가기에 되돌려준다
    */
   {
     path: '/settlements/:settlementId',
@@ -55,6 +59,7 @@ const routes: RouteRecordRaw[] = [
    * 정산 요청 완료 화면
    *
    * 정산 요청을 완료하면 이 화면으로 이동한다
+   * 서버가 `viewer.role`을 `CREATOR`로 인정한 경우에만 완료를 표시한다
    */
   {
     path: '/settlements/:settlementId/requested',
@@ -66,6 +71,8 @@ const routes: RouteRecordRaw[] = [
    * 결제 진행 화면
    *
    * 새로고침해도 세션에 남은 멱등키로 중복 결제를 방지한다
+   * 이체를 곧바로 실행하는 것은 상세의 Pay 버튼이 히스토리 상태로 진입 의사를 실어
+   * 보낸 경우뿐이고, 주소로 직접 열면 확인을 한 번 받는다
    */
   {
     path: '/settlements/:settlementId/pay',

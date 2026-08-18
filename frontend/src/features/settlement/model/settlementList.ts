@@ -3,6 +3,16 @@ import type { SettlementSummary } from './settlement'
 /** 코드 식별자는 서버 응답을 따르고, 화면 문구만 To Pay / To Collect로 부른다. */
 export type SettlementSide = 'received' | 'sent'
 
+/**
+ * 화면 사이로 나르는 토글 위치.
+ *
+ * 목록·전체 내역·상세·결제가 같은 `side` 쿼리를 주고받아야 To Collect에서 들어간 뒤
+ * 되돌아 나올 때 To Pay로 떨어지지 않는다. 값이 없거나 모르는 값이면 기본값으로 읽는다.
+ */
+export function resolveSide(value: unknown): SettlementSide {
+  return value === 'sent' ? 'sent' : 'received'
+}
+
 /** 완료 구획에서 미리 보여주는 건수. 나머지는 전체 내역 화면에서 본다. */
 export const COMPLETED_PREVIEW_COUNT = 3
 
