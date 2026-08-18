@@ -270,7 +270,7 @@ public enum MemberErrorCode implements ErrorCode {
 | `APPOINTMENT_MEMBER_NOT_FOUND` | `APPOINTMENT-005` | 404 | 참여 정보를 찾을 수 없음 |
 | `INVALID_ATTENDANCE_CONFIRMATION` | `APPOINTMENT-006` | 409 | 출석 확정 조건 불충족 |
 | `CANCELLATION_NOT_AVAILABLE` | `APPOINTMENT-007` | 409 | 약속 참여 취소 조건 불충족 |
-| `PAYMENT_INTEGRATION_REQUIRED` | `APPOINTMENT-008` | 409 | 결제 연동 전에는 약속 생성·참여·출석 확정 불가 |
+| `PAYMENT_INTEGRATION_REQUIRED` | `APPOINTMENT-008` | 409 | 약속 생성·참여·출석 확정이 모두 실제로 구현된 뒤로는 코드에만 남아있고 어디서도 던지지 않음 |
 
 후기 도메인에는 다음 오류 코드가 구현돼 있습니다.
 
