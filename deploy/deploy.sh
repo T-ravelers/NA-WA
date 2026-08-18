@@ -35,9 +35,24 @@ for i in $(seq 1 10); do
 done
 
 if [ "$healthy" = false ]; then
+  # 헬스 체크가 HTTPS 경로를 보므로 실패 원인은 backend만이 아니라 인증서·TLS·nginx일 수 있다
   echo "[deploy] 헬스 체크 실패 - 컨테이너 로그"
+  echo "[deploy] --- nginx ---"
+  docker compose logs --tail=50 nginx
+  echo "[deploy] --- backend ---"
   docker compose logs --tail=50 backend
   echo "[deploy] 배포 실패로 처리"
+  exit 1
+fi
+
+# 80의 acme-challenge 경로는 리다이렉트를 타지 않고 nginx가 직접 응답해야 한다.
+# 이 경로가 깨지면 배포는 성공하고 약 60일 뒤 갱신 실패로만 드러나므로 여기서 막는다.
+echo "[deploy] acme-challenge 경로 확인"
+acme_code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: api.clearpng.cloud' http://127.0.0.1/.well-known/acme-challenge/deploy-check || true)
+# 없는 토큰이라 404가 정상. 308이면 리다이렉트에 먹힌 것이고, 그 상태로는 인증서 갱신이 실패한다.
+if [[ "$acme_code" != "404" ]]; then
+  echo "[deploy] acme-challenge 경로가 nginx 직접 응답이 아님 (HTTP $acme_code) - 인증서 갱신이 실패할 수 있음"
+  docker compose logs --tail=50 nginx
   exit 1
 fi
 

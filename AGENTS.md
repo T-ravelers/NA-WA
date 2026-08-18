@@ -36,6 +36,15 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   certonly --webroot ...`로 수동 1회 실행하고, 갱신과 nginx reload는
   [renew-cert.yml](./.github/workflows/renew-cert.yml)이 매일 스케줄로 담당합니다.
   이 두 경로 중 하나만 보고 판단하면 발급·갱신 흐름을 놓칩니다.
+- **운영 백엔드는 `https://api.clearpng.cloud`입니다.** nginx가 443에서 TLS를 종료하고
+  80으로 온 요청은 `308`로 https에 넘깁니다. 예외는 `/.well-known/acme-challenge/`
+  하나뿐이며, 이 경로는 갱신에 필요해 80에서 직접 응답해야 합니다 — 리다이렉트가
+  이 경로를 삼키면 약 60일 뒤 갱신 실패로만 드러나므로 `deploy/deploy.sh`가
+  배포마다 확인합니다.
+- 리다이렉트 응답에는 CORS 헤더가 없습니다. 프론트의 `VITE_API_BASE_URL`이 `http://`로
+  남아 있으면 브라우저가 preflight 단계에서 차단해 **모든 API 호출이 실패합니다.**
+  백엔드 도메인·프로토콜을 바꿀 때는 Vercel 환경 변수와 EC2 `.env`의
+  `AUTH_ALLOWED_ORIGINS`·OAuth redirect URI를 같은 시점에 맞춥니다.
 - 성공 `ApiResponse.data`의 런타임 검증은 요청별 `AxiosRequestConfig.responseSchema`로
   선택합니다. 스키마는 해당 feature의 `api/` 폴더가 소유하고, 공용 계층은 feature를
   import하지 않습니다. 설정하지 않은 요청은 기존 봉투 해제·인증/CSRF 재시도 동작을
