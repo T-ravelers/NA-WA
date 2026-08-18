@@ -189,6 +189,15 @@ public class EventService {
 
     @Transactional(readOnly = true)
     public EventDetailResponse getEventDetail(Long eventId, String language) {
+        return getEventDetail(eventId, language, null);
+    }
+
+    @Transactional(readOnly = true)
+    public EventDetailResponse getEventDetail(
+        Long eventId,
+        String language,
+        Long memberId
+    ) {
         if (eventId == null || eventId <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
@@ -200,7 +209,8 @@ public class EventService {
 
         EventDetailResponse event = eventMapper.findEventDetail(
             eventId,
-            normalizedLanguage
+            normalizedLanguage,
+            memberId
         );
 
         if (event == null) {

@@ -44,6 +44,7 @@ import me.nawa.wallet.service.TopupService;
 import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
+import me.nawa.explore.service.ExploreItemLikeService;
 import me.nawa.explore.service.PlaceService;
 import me.nawa.journey.service.JourneyService;
 import me.nawa.report.controller.ReportController;
@@ -399,6 +400,11 @@ class SwaggerConfigTest {
         @Bean
         EventService eventService() {
             return new EventService(null);
+        }
+
+        @Bean
+        ExploreItemLikeService exploreItemLikeService() {
+            return new ExploreItemLikeService(null);
         }
 
         @Bean

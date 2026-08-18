@@ -82,6 +82,54 @@ class EventMapperXmlTest {
     }
 
     @Test
+    void savedColumn_switchesOnMemberPresence() throws Exception {
+        Configuration configuration = new Configuration();
+
+        try (InputStream input = Resources.getResourceAsStream(MAPPER_RESOURCE)) {
+            new XMLMapperBuilder(
+                input,
+                configuration,
+                MAPPER_RESOURCE,
+                configuration.getSqlFragments()
+            ).parse();
+        }
+
+        Map<String, Object> memberParameters = new HashMap<>();
+        memberParameters.put("request", new EventSearchRequest());
+        memberParameters.put("offset", 0);
+        memberParameters.put("memberId", 7L);
+        String memberSql = normalizedSql(
+            configuration,
+            "me.nawa.explore.mapper.EventMapper.searchEvents",
+            memberParameters
+        );
+        assertTrue(memberSql.contains("FROM explore_item_likes saved_like"));
+        assertTrue(memberSql.contains(") AS saved"));
+
+        Map<String, Object> anonymousParameters = new HashMap<>();
+        anonymousParameters.put("request", new EventSearchRequest());
+        anonymousParameters.put("offset", 0);
+        anonymousParameters.put("memberId", null);
+        String anonymousSql = normalizedSql(
+            configuration,
+            "me.nawa.explore.mapper.EventMapper.searchEvents",
+            anonymousParameters
+        );
+        assertTrue(anonymousSql.contains("FALSE AS saved"));
+
+        Map<String, Object> detailParameters = new HashMap<>();
+        detailParameters.put("eventId", 1L);
+        detailParameters.put("language", "en");
+        detailParameters.put("memberId", 7L);
+        String detailSql = normalizedSql(
+            configuration,
+            "me.nawa.explore.mapper.EventMapper.findEventDetail",
+            detailParameters
+        );
+        assertTrue(detailSql.contains(") AS saved"));
+    }
+
+    @Test
     void eventVisibility_usesCurrentDatesInsteadOfStoredStatus()
         throws Exception {
         Configuration configuration = new Configuration();

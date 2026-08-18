@@ -62,6 +62,53 @@ class PlaceMapperXmlTest {
     }
 
     @Test
+    void savedColumn_switchesOnMemberPresence() throws Exception {
+        Configuration configuration = configuration();
+
+        Map<String, Object> memberParameters = new HashMap<>();
+        memberParameters.put("request", new PlaceSearchRequest());
+        memberParameters.put("offset", 0);
+        memberParameters.put("limit", 20);
+        memberParameters.put("memberId", 7L);
+        String memberSql = normalizedSql(
+            configuration, "searchPlaces", memberParameters
+        );
+        assertTrue(memberSql.contains("FROM explore_item_likes saved_like"));
+        assertTrue(memberSql.contains(") AS saved"));
+
+        Map<String, Object> anonymousParameters = new HashMap<>();
+        anonymousParameters.put("request", new PlaceSearchRequest());
+        anonymousParameters.put("offset", 0);
+        anonymousParameters.put("limit", 20);
+        anonymousParameters.put("memberId", null);
+        String anonymousSql = normalizedSql(
+            configuration, "searchPlaces", anonymousParameters
+        );
+        assertTrue(anonymousSql.contains("FALSE AS saved"));
+
+        Map<String, Object> detailParameters = new HashMap<>();
+        detailParameters.put("placeId", 1L);
+        detailParameters.put("memberId", 7L);
+        String detailSql = normalizedSql(
+            configuration, "findPlaceDetail", detailParameters
+        );
+        assertTrue(detailSql.contains(") AS saved"));
+    }
+
+    private String normalizedSql(
+        Configuration configuration,
+        String statementName,
+        Map<String, Object> parameters
+    ) {
+        return configuration
+            .getMappedStatement("me.nawa.explore.mapper.PlaceMapper." + statementName)
+            .getBoundSql(parameters)
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+    }
+
+    @Test
     void placeList_appliesOtherRegionOptions() throws Exception {
         Configuration configuration = configuration();
         PlaceSearchRequest request = new PlaceSearchRequest();

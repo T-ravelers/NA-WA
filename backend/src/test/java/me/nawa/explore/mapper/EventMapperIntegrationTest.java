@@ -12,8 +12,10 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import me.nawa.explore.dto.request.EventSearchRequest;
@@ -90,6 +92,10 @@ class EventMapperIntegrationTest {
     void cleanUpFixture() {
         for (Long eventId : eventIds) {
             jdbcTemplate.update(
+                "DELETE FROM explore_item_likes WHERE item_id = ?",
+                eventId
+            );
+            jdbcTemplate.update(
                 "DELETE FROM event WHERE event_id = ?",
                 eventId
             );
@@ -122,7 +128,7 @@ class EventMapperIntegrationTest {
             "ENDED"
         );
 
-        EventDetailResponse result = mapper.findEventDetail(eventId, "en");
+        EventDetailResponse result = mapper.findEventDetail(eventId, "en", null);
 
         assertNotNull(result);
         assertNotNull(result.getEventKind());
@@ -189,9 +195,65 @@ class EventMapperIntegrationTest {
         Set<Long> openingSoonIds = searchIds("OPENING_SOON");
         assertEquals(Set.of(startsTomorrow), openingSoonIds);
 
-        assertNull(mapper.findEventDetail(endedYesterday, "en"));
-        assertNotNull(mapper.findEventDetail(endsToday, "en"));
-        assertNotNull(mapper.findEventDetail(permanentWithEndedStatus, "en"));
+        assertNull(mapper.findEventDetail(endedYesterday, "en", null));
+        assertNotNull(mapper.findEventDetail(endsToday, "en", null));
+        assertNotNull(mapper.findEventDetail(
+            permanentWithEndedStatus,
+            "en",
+            null
+        ));
+    }
+
+    @Test
+    void savedColumn_marksOnlyRequestingMembersActiveLikes() {
+        LocalDate today = currentDatabaseDate();
+        long likedId = insertEvent(
+            "saved-liked",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        long unlikedId = insertEvent(
+            "saved-unliked",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        long canceledId = insertEvent(
+            "saved-canceled",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO explore_item_likes (item_id, member_id) "
+                + "VALUES (?, ?)",
+            likedId,
+            memberId
+        );
+        jdbcTemplate.update(
+            "INSERT INTO explore_item_likes (item_id, member_id, deleted_at) "
+                + "VALUES (?, ?, CURRENT_TIMESTAMP)",
+            canceledId,
+            memberId
+        );
+
+        Map<Long, Boolean> savedById = new HashMap<>();
+        for (EventSummaryResponse result
+            : mapper.searchEvents(request(null), 0, memberId)) {
+            savedById.put(result.getItemId(), result.isSaved());
+        }
+        assertEquals(Boolean.TRUE, savedById.get(likedId));
+        assertEquals(Boolean.FALSE, savedById.get(unlikedId));
+        assertEquals(Boolean.FALSE, savedById.get(canceledId));
+
+        for (EventSummaryResponse result
+            : mapper.searchEvents(request(null), 0, null)) {
+            assertFalse(result.isSaved());
+        }
+
+        assertTrue(mapper.findEventDetail(likedId, "en", memberId).isSaved());
+        assertFalse(mapper.findEventDetail(likedId, "en", null).isSaved());
     }
 
     private Set<Long> searchIds(String datePreset) {
