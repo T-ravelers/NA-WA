@@ -53,6 +53,7 @@ import javax.sql.DataSource;
     "me.nawa.wallet.external.stripe",
     "me.nawa.wallet.util",
     "me.nawa.settlement.service",
+    "me.nawa.common.storage",
     "me.nawa.deposit.service"})
 @EnableTransactionManagement
 @EnableScheduling
