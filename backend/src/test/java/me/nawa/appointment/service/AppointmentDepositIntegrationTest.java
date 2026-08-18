@@ -204,7 +204,7 @@ class AppointmentDepositIntegrationTest {
                         + " WHERE o.owner_type = 'SYSTEM' AND o.system_code = 'DEPOSIT_POOL'",
                 BigDecimal.class
         );
-        assertNotNull(poolBalanceBeforeTest, "V11 마이그레이션으로 DEPOSIT_POOL 지갑이 미리 존재해야 한다");
+        assertNotNull(poolBalanceBeforeTest, "V12 마이그레이션으로 DEPOSIT_POOL 지갑이 미리 존재해야 한다");
 
         long hostMemberId = createMemberWithWallet("방장", new BigDecimal("50000.0000"));
         long guestMemberId = createMemberWithWallet("참여자", new BigDecimal("50000.0000"));
@@ -262,7 +262,7 @@ class AppointmentDepositIntegrationTest {
                         + " WHERE o.owner_type = 'SYSTEM' AND o.system_code = 'DEPOSIT_POOL'",
                 BigDecimal.class
         );
-        assertNotNull(poolBalanceBeforeTest, "V11 마이그레이션으로 DEPOSIT_POOL 지갑이 미리 존재해야 한다");
+        assertNotNull(poolBalanceBeforeTest, "V12 마이그레이션으로 DEPOSIT_POOL 지갑이 미리 존재해야 한다");
 
         long hostMemberId = createMemberWithWallet("방장", new BigDecimal("50000.0000"));
         long guestMemberId = createMemberWithWallet("참여자", new BigDecimal("50000.0000"));
