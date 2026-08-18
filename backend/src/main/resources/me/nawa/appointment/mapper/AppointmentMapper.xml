@@ -62,6 +62,23 @@
              #{attendanceConfirmedAt})
     </insert>
 
+    <update id="updateAppointmentStatus">
+        UPDATE appointments
+        SET appointment_status = #{toStatus},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = #{appointmentId}
+          AND appointment_status = #{fromStatus}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markMemberActive">
+        UPDATE appointment_members
+        SET membership_status = 'ACTIVE'
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
     <sql id="appointmentColumns">
         a.appointment_id,
         a.item_id,

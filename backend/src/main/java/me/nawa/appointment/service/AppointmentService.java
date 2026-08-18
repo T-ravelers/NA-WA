@@ -18,8 +18,12 @@ import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
+import me.nawa.deposit.domain.AttendanceStatus;
 import me.nawa.deposit.domain.Deposit;
 import me.nawa.deposit.mapper.DepositMapper;
+import me.nawa.wallet.domain.SystemWalletCode;
+import me.nawa.wallet.domain.enums.TransferType;
+import me.nawa.wallet.service.WalletTransferService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,20 +61,64 @@ public class AppointmentService {
 
     private final AppointmentMapper appointmentMapper;
     private final DepositMapper depositMapper;
+    private final WalletTransferService walletTransferService;
 
     @Transactional
     public Appointment createAppointment(
             Long memberId,
             AppointmentCreateRequest request) {
         validateCreateRequest(memberId, request);
-        throw new BusinessException(
-                AppointmentErrorCode.PAYMENT_INTEGRATION_REQUIRED
-        );
+
+        Appointment appointment = Appointment.builder()
+                .itemId(request.getItemId())
+                .hostMemberId(memberId)
+                .languageCode(request.getLanguageCode())
+                .appointmentName(request.getAppointmentName().trim())
+                .maxMembers(request.getMaxMembers())
+                .joinDeadline(request.getJoinDeadline())
+                .depositAmount(request.getDepositAmount())
+                .appointmentStatus(AppointmentStatus.PAYMENT_PENDING)
+                .meetingPlace(request.getMeetingPlace().trim())
+                .meetingAddress(request.getMeetingAddress())
+                .activityStartAt(request.getActivityStartAt())
+                .activityEndAt(request.getActivityEndAt())
+                .build();
+        if (appointmentMapper.insertAppointment(appointment) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        AppointmentMember host = AppointmentMember.builder()
+                .appointmentId(appointment.getAppointmentId())
+                .memberId(memberId)
+                .membershipStatus(MembershipStatus.PENDING)
+                .attendanceStatus(AttendanceStatus.PENDING)
+                .build();
+        if (appointmentMapper.insertAppointmentMember(host) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        holdDepositForNewMember(memberId, host, request.getDepositAmount());
+
+        if (appointmentMapper.updateAppointmentStatus(
+                appointment.getAppointmentId(),
+                AppointmentStatus.PAYMENT_PENDING,
+                AppointmentStatus.RECRUITING
+        ) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        appointment.setAppointmentStatus(AppointmentStatus.RECRUITING);
+        appointment.setCurrentMemberCount(1);
+        return appointment;
     }
 
+    @Transactional(readOnly = true)
     public AppointmentDetailResponse toCreatedResponse(
             Appointment appointment) {
-        return toDetailResponse(appointment, List.of());
+        List<AppointmentMemberResponse> members = appointmentMapper
+                .findActiveMembersByAppointmentId(appointment.getAppointmentId())
+                .stream()
+                .map(AppointmentService::toMemberResponse)
+                .toList();
+        return toDetailResponse(appointment, members);
     }
 
     @Transactional
@@ -78,9 +126,68 @@ public class AppointmentService {
             Long memberId,
             Long appointmentId) {
         validateIdentifiers(memberId, appointmentId);
-        throw new BusinessException(
-                AppointmentErrorCode.PAYMENT_INTEGRATION_REQUIRED
+        Appointment appointment = requireAppointmentForUpdate(appointmentId);
+
+        if (appointment.getAppointmentStatus() != AppointmentStatus.RECRUITING
+                || appointment.getJoinDeadline().isBefore(LocalDateTime.now())
+                || appointment.getCurrentMemberCount() >= appointment.getMaxMembers()) {
+            throw new BusinessException(AppointmentErrorCode.JOIN_NOT_AVAILABLE);
+        }
+
+        AppointmentMember existing = appointmentMapper
+                .findMemberByAppointmentAndMemberForUpdate(appointmentId, memberId);
+        if (existing != null) {
+            throw new BusinessException(AppointmentErrorCode.ALREADY_JOINED);
+        }
+
+        AppointmentMember member = AppointmentMember.builder()
+                .appointmentId(appointmentId)
+                .memberId(memberId)
+                .membershipStatus(MembershipStatus.PENDING)
+                .attendanceStatus(AttendanceStatus.PENDING)
+                .build();
+        if (appointmentMapper.insertAppointmentMember(member) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        holdDepositForNewMember(memberId, member, appointment.getDepositAmount());
+
+        AppointmentMember active = appointmentMapper.findMemberByIdForUpdate(
+                appointmentId, member.getAppointmentMemberId()
         );
+        return toMemberResponse(active);
+    }
+
+    // 신규 참여자(방장 포함)의 보증금을 회원 지갑 -> DEPOSIT_POOL로 즉시 예치한다.
+    // 약속·참여 행 생성과 같은 트랜잭션에서 호출되어, 실패하면 참여 자체가 롤백된다.
+    private void holdDepositForNewMember(
+            Long memberId,
+            AppointmentMember member,
+            BigDecimal depositAmount) {
+        Deposit deposit = Deposit.pending(
+                member.getAppointmentMemberId(), depositAmount
+        );
+        if (depositMapper.insert(deposit) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        long transferId = walletTransferService.transferToSystemWallet(
+                memberId,
+                memberId,
+                SystemWalletCode.DEPOSIT_POOL,
+                depositAmount,
+                TransferType.DEPOSIT_HOLD.name(),
+                "약속 보증금 예치"
+        );
+
+        LocalDateTime heldAt = LocalDateTime.now();
+        deposit.hold(transferId, heldAt);
+        if (depositMapper.markHeld(deposit.getDepositId(), transferId, heldAt) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        if (appointmentMapper.markMemberActive(member.getAppointmentMemberId()) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        member.setMembershipStatus(MembershipStatus.ACTIVE);
     }
 
     @Transactional
@@ -400,7 +507,7 @@ public class AppointmentService {
                 : normalized.toUpperCase(Locale.ROOT);
     }
 
-    private static void validateCreateRequest(
+    private void validateCreateRequest(
             Long memberId,
             AppointmentCreateRequest request) {
         if (memberId == null || memberId <= 0 || request == null
@@ -432,6 +539,11 @@ public class AppointmentService {
                 || !request.getActivityStartAt().isBefore(
                         request.getActivityEndAt()
                 )) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        if (!request.getItemType().equals(
+                appointmentMapper.findAvailableItemType(request.getItemId())
+        )) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
     }

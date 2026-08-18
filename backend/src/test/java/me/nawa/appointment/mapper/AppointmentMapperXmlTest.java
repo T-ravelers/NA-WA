@@ -62,6 +62,36 @@ class AppointmentMapperXmlTest {
         assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.findMyOngoingAppointments"
         ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.updateAppointmentStatus"
+        ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.markMemberActive"
+        ));
+    }
+
+    @Test
+    void updateAppointmentStatus_guardsOnFromStatus() throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("appointmentId", 1L);
+        parameters.put("fromStatus", me.nawa.appointment.domain.AppointmentStatus.PAYMENT_PENDING);
+        parameters.put("toStatus", me.nawa.appointment.domain.AppointmentStatus.RECRUITING);
+
+        String sql = boundSql("updateAppointmentStatus", parameters);
+
+        assertTrue(sql.contains("appointment_status = ?"));
+        assertTrue(sql.contains("WHERE appointment_id = ?"));
+    }
+
+    @Test
+    void markMemberActive_onlyTransitionsFromPending() throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("appointmentMemberId", 1L);
+
+        String sql = boundSql("markMemberActive", parameters);
+
+        assertTrue(sql.contains("membership_status = 'ACTIVE'"));
+        assertTrue(sql.contains("membership_status = 'PENDING'"));
     }
 
     @Test

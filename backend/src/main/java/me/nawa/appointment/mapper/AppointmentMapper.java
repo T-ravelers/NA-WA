@@ -2,6 +2,7 @@ package me.nawa.appointment.mapper;
 
 import me.nawa.appointment.domain.Appointment;
 import me.nawa.appointment.domain.AppointmentMember;
+import me.nawa.appointment.domain.AppointmentStatus;
 import me.nawa.appointment.domain.MyOngoingAppointment;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import org.apache.ibatis.annotations.Mapper;
@@ -17,6 +18,17 @@ public interface AppointmentMapper {
     int insertAppointment(Appointment appointment);
 
     int insertAppointmentMember(AppointmentMember appointmentMember);
+
+    // fromStatus 조건이 안 맞으면 0행을 반환한다 — 낙관적 상태 전이 가드.
+    int updateAppointmentStatus(
+            @Param("appointmentId") Long appointmentId,
+            @Param("fromStatus") AppointmentStatus fromStatus,
+            @Param("toStatus") AppointmentStatus toStatus
+    );
+
+    int markMemberActive(
+            @Param("appointmentMemberId") Long appointmentMemberId
+    );
 
     List<Appointment> searchAppointments(
             @Param("request") AppointmentSearchRequest request,
