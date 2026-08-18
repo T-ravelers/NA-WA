@@ -155,6 +155,22 @@ describe('authGuard', () => {
     expect(result).toBe(true)
   })
 
+  it('does not treat a neighbouring path as the merchant screen', async () => {
+    ensureMemberProfile.mockResolvedValue({
+      memberId: 1,
+      preferredLanguage: 'en',
+      accountType: 'MERCHANT',
+    })
+
+    const result = await authGuard(
+      routeTo('/merchant-settings', { requiresAuth: true }),
+      from,
+      next,
+    )
+
+    expect(result).toEqual({ path: '/merchant' })
+  })
+
   it('does not redirect a traveller away from customer screens', async () => {
     ensureMemberProfile.mockResolvedValue({
       memberId: 1,

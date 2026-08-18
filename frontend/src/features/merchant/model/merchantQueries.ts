@@ -1,12 +1,13 @@
 import { computed, type Ref } from 'vue'
 import { useQuery, type UseQueryReturnType } from '@tanstack/vue-query'
 
-import { serializeCalendarDate } from '@/shared/lib/datetime'
+import { SERVER_TIME_ZONE } from '@/shared/lib/datetime'
 
 import {
   fetchMerchantAccount,
   fetchMerchantIncome,
   type MerchantAccount,
+  type MerchantIncomeEntry,
   type MerchantIncomeResponse,
 } from '../api/merchantApi'
 
@@ -33,12 +34,31 @@ export function useMerchantAccount(): UseQueryReturnType<MerchantAccount, Error>
 }
 
 /**
+ * 서버 시각대(Asia/Seoul) 기준 오늘 날짜를 `yyyy-MM-dd`로 만든다.
+ *
+ * 매출은 서버가 저장한 시각으로 집계되므로 기기 시간대로 날짜를 만들면 자정 부근에 다른
+ * 날짜를 조회한다. `serializeCalendarDate`는 기기 로컬 날짜라 여기에 쓸 수 없다.
+ */
+function serverToday(now: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SERVER_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now)
+
+  const find = (type: string): string => parts.find((part) => part.type === type)?.value ?? ''
+
+  return `${find('year')}-${find('month')}-${find('day')}`
+}
+
+/**
  * 조회 기준일. 서버 시각대(Asia/Seoul)로 오늘 하루를 뜻한다.
  *
  * `from`과 `to`는 둘 다 포함이며 백엔드가 `to`를 다음날 0시 미만으로 바꿔 처리한다.
  */
 export function todayRange(now: Date = new Date()): { from: string; to: string } {
-  const today = serializeCalendarDate(now)
+  const today = serverToday(now)
 
   return { from: today, to: today }
 }
@@ -64,13 +84,23 @@ export function useMerchantIncome(
 }
 
 /**
+ * 매출로 셀 항목만 고른다.
+ *
+ * `CREDIT`만 매출이다. 지금은 QR 결제 원장에 `DEBIT`을 쓰는 코드가 없지만, 환불이 생기면
+ * 방향을 구분하지 않는 합계와 건수가 실제보다 커진다.
+ */
+export function creditEntries(response: MerchantIncomeResponse | undefined): MerchantIncomeEntry[] {
+  if (response === undefined) return []
+
+  return response.transactions.filter((entry) => entry.entryType === 'CREDIT')
+}
+
+/**
  * 매출 합계.
  *
  * 백엔드에 합계 API가 없어 목록을 더한다. `MAX_PAGE_SIZE`가 50이라 하루 결제가 50건을
  * 넘으면 실제보다 작게 나온다. 그 규모가 되면 요약 API를 붙여야 한다.
  */
-export function sumIncome(response: MerchantIncomeResponse | undefined): number {
-  if (response === undefined) return 0
-
-  return response.transactions.reduce((total, entry) => total + entry.amount, 0)
+export function sumIncome(entries: MerchantIncomeEntry[]): number {
+  return entries.reduce((total, entry) => total + entry.amount, 0)
 }

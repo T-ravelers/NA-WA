@@ -31,6 +31,11 @@ function resolveReturnPath(to: RouteLocationNormalized): string | undefined {
   return to.fullPath === '/' ? undefined : to.fullPath
 }
 
+/** `/merchant`와 그 하위만 가맹점 화면이다. `/merchant-x` 같은 이웃 경로를 통과시키지 않는다. */
+function isMerchantPath(path: string): boolean {
+  return path === MERCHANT_HOME_PATH || path.startsWith(`${MERCHANT_HOME_PATH}/`)
+}
+
 /**
  * 가맹점 계정이 손님 화면으로 가려는지 판단한다.
  *
@@ -42,9 +47,7 @@ function resolveReturnPath(to: RouteLocationNormalized): string | undefined {
  */
 function isMerchantLockedOut(to: RouteLocationNormalized, profile: MemberProfile | null): boolean {
   return (
-    to.meta.requiresAuth === true &&
-    profile?.accountType === 'MERCHANT' &&
-    !to.path.startsWith(MERCHANT_HOME_PATH)
+    to.meta.requiresAuth === true && profile?.accountType === 'MERCHANT' && !isMerchantPath(to.path)
   )
 }
 

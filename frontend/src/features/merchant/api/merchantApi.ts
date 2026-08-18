@@ -22,13 +22,17 @@ export interface MerchantAccount {
 
 /** 가맹점이 스스로 만든 결제 QR. 백엔드 `QrPaymentCreateResponse`와 1:1이다. */
 export interface MerchantQr {
-  qrPaymentId: number
+  qrPaymentCodeId: number
   qrToken: string
   amount: number | null
   memo: string | null
-  paymentStatus: string
+  status: string
   currencyCode: string
-  /** `@JsonFormat`이 붙어 있어 `2026-08-18T12:00:00` 형태의 문자열로 내려온다. */
+  /**
+   * `@JsonFormat`이 붙어 있어 `2026-08-18T12:00:00` 형태로 내려온다. 오프셋이 없으므로
+   * 서버 시각대(Asia/Seoul)의 벽시계다. `new Date()`로 해석하면 기기 시간대에 따라
+   * 어긋나므로 `parseServerDateTime`을 쓴다.
+   */
   expiresAt: string
 }
 

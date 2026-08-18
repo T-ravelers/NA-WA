@@ -5,6 +5,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { parseServerDateTime } from '@/shared/lib/datetime'
 import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -14,6 +15,7 @@ import TextInput from '@/shared/ui/TextInput.vue'
 
 import { createMerchantQr, registerAsMerchant, type MerchantQr } from '../api/merchantApi'
 import {
+  creditEntries,
   merchantKeys,
   sumIncome,
   todayRange,
@@ -66,8 +68,10 @@ const submitRegistration = (): void => {
 const range = ref(todayRange())
 const incomeQuery = useMerchantIncome(range, isMerchant)
 
-const incomeTotal = computed(() => sumIncome(incomeQuery.data.value))
-const incomeCount = computed(() => incomeQuery.data.value?.transactions.length ?? 0)
+// 합계와 건수는 같은 목록에서 나와야 한다. 한쪽만 방향을 거르면 서로 어긋난다.
+const incomeEntries = computed(() => creditEntries(incomeQuery.data.value))
+const incomeTotal = computed(() => sumIncome(incomeEntries.value))
+const incomeCount = computed(() => incomeEntries.value.length)
 
 const formattedIncome = computed(() =>
   new Intl.NumberFormat(locale.value, { maximumFractionDigits: 2 }).format(incomeTotal.value),
@@ -150,7 +154,16 @@ watch(
       return
     }
 
-    const expiresAtMs = new Date(expiresAt).getTime()
+    // `expiresAt`은 오프셋이 없는 KST 벽시계다. `new Date()`로 읽으면 기기 시간대로
+    // 해석돼 이미 만료된 QR이 한참 남은 것처럼 보인다.
+    const expiresAtDate = parseServerDateTime(expiresAt)
+
+    if (expiresAtDate === null) {
+      remainingMs.value = 0
+      return
+    }
+
+    const expiresAtMs = expiresAtDate.getTime()
     const tick = (): void => {
       remainingMs.value = Math.max(0, expiresAtMs - Date.now())
 
