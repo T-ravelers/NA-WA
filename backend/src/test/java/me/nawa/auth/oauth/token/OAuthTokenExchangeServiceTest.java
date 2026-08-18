@@ -318,6 +318,7 @@ class OAuthTokenExchangeServiceTest {
                 provider,
                 "nonce-value",
                 codeVerifier,
+                "binding-hash",
                 "/journeys",
                 issuedAt,
                 issuedAt.plusSeconds(600)

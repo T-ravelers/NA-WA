@@ -63,7 +63,9 @@ public class OAuthAuthorizationServiceImpl
     }
 
     @Override
-    public URI createAuthorizationUri(String provider, String returnPath) {
+    public OAuthAuthorizationRedirect createAuthorizationRedirect(
+            String provider,
+            String returnPath) {
         OAuthProvider oauthProvider = requireSupportedProvider(provider);
         OAuthClient client = clients.get(oauthProvider);
         if (!client.isConfigured()) {
@@ -80,7 +82,8 @@ public class OAuthAuthorizationServiceImpl
                     exception
             );
         }
-        return UriComponentsBuilder.fromUri(client.authorizationUri)
+        URI authorizationUri = UriComponentsBuilder
+                .fromUri(client.authorizationUri)
                 .queryParam("response_type", "code")
                 .queryParam("client_id", client.clientId)
                 .queryParam("redirect_uri", client.redirectUri)
@@ -98,6 +101,12 @@ public class OAuthAuthorizationServiceImpl
                 .build()
                 .encode(StandardCharsets.UTF_8)
                 .toUri();
+
+        return new OAuthAuthorizationRedirect(
+                authorizationUri,
+                requestState.getBrowserBinding(),
+                requestState.getExpiresAt()
+        );
     }
 
     private OAuthProvider requireSupportedProvider(String provider) {

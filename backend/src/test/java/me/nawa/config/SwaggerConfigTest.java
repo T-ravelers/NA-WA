@@ -3,6 +3,7 @@ package me.nawa.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import me.nawa.auth.cookie.AuthCookieManager;
+import me.nawa.auth.oauth.authorization.OAuthAuthorizationRedirect;
 import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.oauth.callback.OAuthCallbackResult;
 import me.nawa.auth.oauth.callback.OAuthCallbackService;
@@ -65,6 +66,7 @@ import org.springframework.web.context.WebApplicationContext;
 import springfox.documentation.spring.web.plugins.Docket;
 
 import java.net.URI;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -178,6 +180,7 @@ class SwaggerConfigTest {
             return new AuthCookieManager(
                     "access_token",
                     "refresh_token",
+                    "oauth_state",
                     false,
                     "Lax",
                     ""
@@ -186,8 +189,12 @@ class SwaggerConfigTest {
 
         @Bean
         OAuthAuthorizationService oauthAuthorizationService() {
-            return (provider, returnPath) -> URI.create(
-                    "https://accounts.google.com/o/oauth2/v2/auth"
+            return (provider, returnPath) -> new OAuthAuthorizationRedirect(
+                    URI.create(
+                            "https://accounts.google.com/o/oauth2/v2/auth"
+                    ),
+                    "browser-binding-value",
+                    Instant.parse("2026-08-03T00:10:00Z")
             );
         }
 
@@ -199,7 +206,8 @@ class SwaggerConfigTest {
                         String provider,
                         String state,
                         String authorizationCode,
-                        String authorizationError) {
+                        String authorizationError,
+                        String browserBinding) {
                     throw new UnsupportedOperationException();
                 }
 

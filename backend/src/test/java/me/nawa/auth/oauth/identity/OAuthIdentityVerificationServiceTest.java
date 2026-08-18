@@ -344,6 +344,7 @@ class OAuthIdentityVerificationServiceTest {
                 provider,
                 NONCE,
                 "code-verifier",
+                "binding-hash",
                 "/journeys",
                 NOW.minusSeconds(60),
                 NOW.plusSeconds(540)

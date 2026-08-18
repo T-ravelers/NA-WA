@@ -23,6 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class OAuthAuthorizationServiceTest {
+    private static final Instant EXPIRES_AT = Instant.parse(
+            "2026-08-03T00:10:00Z"
+    );
+
     private FakeOAuthStateService stateService;
     private OAuthAuthorizationService service;
 
@@ -41,8 +45,10 @@ class OAuthAuthorizationServiceTest {
     }
 
     @Test
-    void createAuthorizationUri_google_usesOfficialOidcParameters() {
-        URI uri = service.createAuthorizationUri("google", "/journeys");
+    void createAuthorizationRedirect_google_usesOfficialOidcParameters() {
+        OAuthAuthorizationRedirect redirect = service
+                .createAuthorizationRedirect("google", "/journeys");
+        URI uri = redirect.getAuthorizationUri();
 
         assertEquals(
                 "https://accounts.google.com/o/oauth2/v2/auth",
@@ -64,11 +70,16 @@ class OAuthAuthorizationServiceTest {
         );
         assertEquals(OAuthProvider.GOOGLE, stateService.issuedProvider);
         assertEquals("/journeys", stateService.issuedReturnPath);
+        assertEquals("browser-binding-value", redirect.getBrowserBinding());
+        assertEquals(EXPIRES_AT, redirect.getExpiresAt());
+        assertFalse(uri.toString().contains("browser-binding-value"));
     }
 
     @Test
-    void createAuthorizationUri_line_usesV21AndConfiguredScopes() {
-        URI uri = service.createAuthorizationUri("line", null);
+    void createAuthorizationRedirect_line_usesV21AndConfiguredScopes() {
+        URI uri = service
+                .createAuthorizationRedirect("line", null)
+                .getAuthorizationUri();
 
         assertEquals(
                 "https://access.line.me/oauth2/v2.1/authorize",
@@ -84,10 +95,10 @@ class OAuthAuthorizationServiceTest {
     }
 
     @Test
-    void createAuthorizationUri_unsupportedProvider_rejectsBeforeStateIssue() {
+    void createAuthorizationRedirect_unsupportedProvider_rejectsBeforeStateIssue() {
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> service.createAuthorizationUri("wechat", "/")
+                () -> service.createAuthorizationRedirect("wechat", "/")
         );
 
         assertEquals(
@@ -98,12 +109,12 @@ class OAuthAuthorizationServiceTest {
     }
 
     @Test
-    void createAuthorizationUri_disallowedReturnPath_returnsStableAuthError() {
+    void createAuthorizationRedirect_disallowedReturnPath_returnsStableAuthError() {
         stateService.rejectReturnPath = true;
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> service.createAuthorizationUri(
+                () -> service.createAuthorizationRedirect(
                         "google",
                         "https://evil.example"
                 )
@@ -116,7 +127,7 @@ class OAuthAuthorizationServiceTest {
     }
 
     @Test
-    void createAuthorizationUri_unconfiguredProvider_doesNotCreateState() {
+    void createAuthorizationRedirect_unconfiguredProvider_doesNotCreateState() {
         service = new OAuthAuthorizationServiceImpl(
                 stateService,
                 "",
@@ -129,7 +140,7 @@ class OAuthAuthorizationServiceTest {
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> service.createAuthorizationUri("google", "/")
+                () -> service.createAuthorizationRedirect("google", "/")
         );
 
         assertEquals(
@@ -176,12 +187,15 @@ class OAuthAuthorizationServiceTest {
                     "nonce-value",
                     "challenge-value",
                     "S256",
-                    Instant.parse("2026-08-03T00:10:00Z")
+                    "browser-binding-value",
+                    EXPIRES_AT
             );
         }
 
         @Override
-        public Optional<OAuthStateSession> consume(String state) {
+        public Optional<OAuthStateSession> consume(
+                String state,
+                String browserBinding) {
             throw new UnsupportedOperationException();
         }
     }

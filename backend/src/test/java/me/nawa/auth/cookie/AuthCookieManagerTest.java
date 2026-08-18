@@ -74,6 +74,87 @@ class AuthCookieManagerTest {
     }
 
     @Test
+    void createOAuthStateCookie_strictConfiguration_staysLaxOnAuthPath() {
+        AuthCookieManager manager = createManager(true, "Strict", "");
+
+        ResponseCookie stateCookie = manager.createOAuthStateCookie(
+                "browser-binding-value",
+                CURRENT_TIME.plusSeconds(600)
+        );
+
+        assertEquals("oauth_state", stateCookie.getName());
+        assertEquals("browser-binding-value", stateCookie.getValue());
+        assertEquals("/api/v1/auth", stateCookie.getPath());
+        assertEquals(600, stateCookie.getMaxAge().getSeconds());
+        assertTrue(stateCookie.isHttpOnly());
+        assertTrue(stateCookie.isSecure());
+        assertEquals("Lax", stateCookie.getSameSite());
+    }
+
+    @Test
+    void createOAuthStateCookie_expiredOrBlankBinding_throwsException() {
+        AuthCookieManager manager = createManager(true, "Lax", "");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> manager.createOAuthStateCookie(
+                        "browser-binding-value",
+                        CURRENT_TIME
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> manager.createOAuthStateCookie(
+                        " ",
+                        CURRENT_TIME.plusSeconds(600)
+                )
+        );
+    }
+
+    @Test
+    void deleteOAuthStateCookie_setsZeroMaxAgeOnAuthPath() {
+        AuthCookieManager manager = createManager(true, "Strict", "example.com");
+
+        ResponseCookie stateCookie = manager.deleteOAuthStateCookie();
+
+        assertEquals(0, stateCookie.getMaxAge().getSeconds());
+        assertEquals("/api/v1/auth", stateCookie.getPath());
+        assertEquals("example.com", stateCookie.getDomain());
+        assertEquals("Lax", stateCookie.getSameSite());
+    }
+
+    @Test
+    void findOAuthStateBinding_matchingCookie_returnsValue() {
+        AuthCookieManager manager = createManager(false, "Lax", "");
+        Cookie[] cookies = {
+                new Cookie("access_token", "ignored"),
+                new Cookie("oauth_state", "browser-binding-value")
+        };
+
+        assertEquals(
+                "browser-binding-value",
+                manager.findOAuthStateBinding(cookies).orElseThrow()
+        );
+        assertFalse(manager.findOAuthStateBinding(null).isPresent());
+    }
+
+    @Test
+    void constructor_duplicateCookieNames_throwsException() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new AuthCookieManager(
+                        "access_token",
+                        "refresh_token",
+                        "refresh_token",
+                        false,
+                        "Lax",
+                        "",
+                        Clock.fixed(CURRENT_TIME, ZoneOffset.UTC)
+                )
+        );
+    }
+
+    @Test
     void findRefreshToken_matchingCookie_returnsValue() {
         AuthCookieManager manager = createManager(false, "Lax", "");
         Cookie[] cookies = {
@@ -122,6 +203,7 @@ class AuthCookieManagerTest {
         return new AuthCookieManager(
                 "access_token",
                 "refresh_token",
+                "oauth_state",
                 secure,
                 sameSite,
                 domain,

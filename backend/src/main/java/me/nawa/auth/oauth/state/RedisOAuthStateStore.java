@@ -18,7 +18,7 @@ import java.util.Optional;
 @Repository
 public class RedisOAuthStateStore implements OAuthStateStore {
     private static final String OAUTH_STATE_KEY_PREFIX = "auth:oauth:state:";
-    private static final int STORED_FIELD_COUNT = 6;
+    private static final int STORED_FIELD_COUNT = 7;
 
     private static final DefaultRedisScript<Long> SAVE_IF_ABSENT_SCRIPT =
             new DefaultRedisScript<>(
@@ -29,10 +29,11 @@ public class RedisOAuthStateStore implements OAuthStateStore {
                             + "'provider', ARGV[1], "
                             + "'nonce', ARGV[2], "
                             + "'codeVerifier', ARGV[3], "
-                            + "'returnPath', ARGV[4], "
-                            + "'issuedAt', ARGV[5], "
-                            + "'expiresAt', ARGV[6]); "
-                            + "redis.call('PEXPIRE', KEYS[1], ARGV[7]); "
+                            + "'browserBindingHash', ARGV[4], "
+                            + "'returnPath', ARGV[5], "
+                            + "'issuedAt', ARGV[6], "
+                            + "'expiresAt', ARGV[7]); "
+                            + "redis.call('PEXPIRE', KEYS[1], ARGV[8]); "
                             + "return 1;",
                     Long.class
             );
@@ -44,6 +45,7 @@ public class RedisOAuthStateStore implements OAuthStateStore {
                             + "'provider', "
                             + "'nonce', "
                             + "'codeVerifier', "
+                            + "'browserBindingHash', "
                             + "'returnPath', "
                             + "'issuedAt', "
                             + "'expiresAt'); "
@@ -97,6 +99,7 @@ public class RedisOAuthStateStore implements OAuthStateStore {
                 session.getCodeVerifier() == null
                         ? ""
                         : session.getCodeVerifier(),
+                session.getBrowserBindingHash(),
                 session.getReturnPath(),
                 Long.toString(session.getIssuedAt().toEpochMilli()),
                 Long.toString(session.getExpiresAt().toEpochMilli()),
@@ -143,15 +146,16 @@ public class RedisOAuthStateStore implements OAuthStateStore {
                     OAuthProvider.fromRegistrationId(fields.get(0)),
                     requiredField(fields.get(1), "nonce"),
                     nullableField(fields.get(2)),
-                    requiredField(fields.get(3), "returnPath"),
+                    requiredField(fields.get(3), "browserBindingHash"),
+                    requiredField(fields.get(4), "returnPath"),
                     Instant.ofEpochMilli(
                             Long.parseLong(
-                                    requiredField(fields.get(4), "issuedAt")
+                                    requiredField(fields.get(5), "issuedAt")
                             )
                     ),
                     Instant.ofEpochMilli(
                             Long.parseLong(
-                                    requiredField(fields.get(5), "expiresAt")
+                                    requiredField(fields.get(6), "expiresAt")
                             )
                     )
             ));
