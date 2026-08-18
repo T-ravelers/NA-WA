@@ -123,6 +123,18 @@
           AND deleted_at IS NULL
     </update>
 
+    <update id="revive">
+        UPDATE deposits
+        SET held_transfer_id = NULL,
+            held_at          = NULL,
+            resolved_at      = NULL,
+            deposit_status   = 'PENDING',
+            updated_at       = CURRENT_TIMESTAMP
+        WHERE deposit_id = #{depositId}
+          AND deposit_status = 'REFUNDED'
+          AND deleted_at IS NULL
+    </update>
+
     <update id="markDistributed">
         UPDATE deposits
         SET resolved_at    = #{resolvedAt},

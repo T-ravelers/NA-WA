@@ -142,20 +142,29 @@ public class AppointmentService {
 
         AppointmentMember existing = appointmentMapper
                 .findMemberByAppointmentAndMemberForUpdate(appointmentId, memberId);
-        if (existing != null) {
+        if (existing != null && existing.getMembershipStatus() != MembershipStatus.LEFT) {
             throw new BusinessException(AppointmentErrorCode.ALREADY_JOINED);
         }
 
-        AppointmentMember member = AppointmentMember.builder()
-                .appointmentId(appointmentId)
-                .memberId(memberId)
-                .membershipStatus(MembershipStatus.PENDING)
-                .attendanceStatus(AttendanceStatus.PENDING)
-                .build();
-        if (appointmentMapper.insertAppointmentMember(member) != 1) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        AppointmentMember member;
+        if (existing == null) {
+            member = AppointmentMember.builder()
+                    .appointmentId(appointmentId)
+                    .memberId(memberId)
+                    .membershipStatus(MembershipStatus.PENDING)
+                    .attendanceStatus(AttendanceStatus.PENDING)
+                    .build();
+            if (appointmentMapper.insertAppointmentMember(member) != 1) {
+                throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+            }
+            holdDepositForNewMember(memberId, member, appointment.getDepositAmount());
+        } else {
+            // 참여 취소(LEFT) 후 마감 시각 전 재참여다. appointment_id·
+            // member_id, appointment_member_id UNIQUE 제약 때문에 새 행을
+            // 만들 수 없어 기존 참여·보증금 행을 재활용한다.
+            member = existing;
+            reviveLeftMemberAndHoldDeposit(memberId, member);
         }
-        holdDepositForNewMember(memberId, member, appointment.getDepositAmount());
 
         // 이번 참여로 정원이 다 찼으면 마감 시각을 기다리지 않고 바로 CLOSED로
         // 전환한다. 정원 도달은 마감 시각과 달리 스케줄러가 아니라 이 트랜잭션이
@@ -188,12 +197,44 @@ public class AppointmentService {
         if (depositMapper.insert(deposit) != 1) {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
+        holdDeposit(memberId, member, deposit);
+    }
 
+    // 참여 취소(LEFT) 이력이 있는 회원의 재참여다. appointment_member_id·
+    // appointment_id+member_id가 각각 UNIQUE라 새 참여·보증금 행을 만들 수
+    // 없으므로, 기존 행을 PENDING/REFUNDED에서 되돌려 재사용한다.
+    private void reviveLeftMemberAndHoldDeposit(
+            Long memberId,
+            AppointmentMember member) {
+        if (appointmentMapper.reviveLeftMember(member.getAppointmentMemberId()) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        member.setMembershipStatus(MembershipStatus.PENDING);
+
+        Deposit deposit = depositMapper.findByAppointmentMemberId(
+                member.getAppointmentMemberId()
+        );
+        if (deposit == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        deposit.revive();
+        if (depositMapper.revive(deposit.getDepositId()) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        holdDeposit(memberId, member, deposit);
+    }
+
+    // 회원 지갑 -> DEPOSIT_POOL 이체를 실행하고 보증금·참여 행을 HELD/ACTIVE로
+    // 확정한다. 신규 참여와 재참여 양쪽에서 공유하는 마지막 단계다.
+    private void holdDeposit(
+            Long memberId,
+            AppointmentMember member,
+            Deposit deposit) {
         long transferId = walletTransferService.transferToSystemWallet(
                 memberId,
                 memberId,
                 SystemWalletCode.DEPOSIT_POOL,
-                depositAmount,
+                deposit.getAmount(),
                 TransferType.DEPOSIT_HOLD.name(),
                 "약속 보증금 예치"
         );
@@ -256,6 +297,17 @@ public class AppointmentService {
         ) != 1) {
             throw new BusinessException(
                     CommonErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
+        // 정원 도달로 CLOSED된 약속에서 빈자리가 생겼다. joinDeadline은 이미
+        // 위에서 지나지 않았음을 확인했으므로(활동 시작 전) 시간 기준으로는
+        // 항상 재모집 가능한 상태다 — 마감 시각 경과로 CLOSED된 경우라면
+        // 애초에 이 지점까지 오지 못한다.
+        if (appointment.getAppointmentStatus() == AppointmentStatus.CLOSED) {
+            appointmentMapper.updateAppointmentStatus(
+                    appointmentId,
+                    AppointmentStatus.CLOSED,
+                    AppointmentStatus.RECRUITING
             );
         }
     }

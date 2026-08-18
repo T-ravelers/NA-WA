@@ -17,7 +17,10 @@
   전환합니다.
 - 출석 확정이 성공하면 `DepositPayoutBatch`를 `PENDING`으로 생성하고, 60초 주기
   비동기 배치 처리가 실제 환급·노쇼 분배 지갑 이체를 실행합니다.
-- `LEFT`가 된 회원은 같은 약속에 다시 참여할 수 없습니다.
+- 참여를 취소(`LEFT`)한 회원도 참여 마감 시각 전이면 같은 약속에 다시 참여할 수
+  있습니다. 기존 참여·보증금 행을 재사용합니다(자세한 내용은
+  [APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+  3·5절 참고).
 
 ## 약속 상태 전이
 
@@ -26,6 +29,8 @@
 
 - `RECRUITING` → `CLOSED`: 정원 도달은 참여 성공 시점에 즉시, 참여 마감 시각
   도달은 60초 주기 스케줄러가 전환합니다.
+- `CLOSED` → `RECRUITING`: 정원 도달로 `CLOSED`된 약속에서 참여 마감 시각 전에
+  참여 취소가 발생해 빈자리가 생기면 즉시 되돌아갑니다.
 - `CLOSED` → `IN_PROGRESS`: 활동 시작 시각이 되면 스케줄러가 전환합니다. 방장의
   별도 확정 절차는 없습니다.
 - `IN_PROGRESS` → `COMPLETED`: 방장이 모든 `ACTIVE` 회원의 출석을 확정한 경우

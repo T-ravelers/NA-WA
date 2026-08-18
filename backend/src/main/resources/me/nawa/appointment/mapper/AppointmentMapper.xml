@@ -291,6 +291,18 @@
           AND deleted_at IS NULL
     </update>
 
+    <update id="reviveLeftMember">
+        UPDATE appointment_members
+        SET membership_status = 'PENDING',
+            attendance_status = 'PENDING',
+            joined_at = CURRENT_TIMESTAMP,
+            left_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status = 'LEFT'
+          AND deleted_at IS NULL
+    </update>
+
     <select id="findActiveMembersByAppointmentId"
             resultType="me.nawa.appointment.domain.AppointmentMember">
         SELECT

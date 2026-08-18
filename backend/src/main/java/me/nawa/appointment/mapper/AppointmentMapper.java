@@ -76,6 +76,12 @@ public interface AppointmentMapper {
             @Param("appointmentMemberId") Long appointmentMemberId
     );
 
+    // 참여 취소(LEFT) 후 재참여를 위해 기존 행을 되돌린다. appointment_id·
+    // member_id UNIQUE 제약 때문에 재참여 시 새 행을 만들 수 없어 재활용한다.
+    int reviveLeftMember(
+            @Param("appointmentMemberId") Long appointmentMemberId
+    );
+
     List<AppointmentMember> findActiveMembersByAppointmentId(
             @Param("appointmentId") Long appointmentId
     );

@@ -48,6 +48,7 @@ DB 컬럼: `appointments.appointment_status`
     └─→ CANCELLED   # 17절 참고 — 현재 트리거 없음
 
     CLOSED
+    ├─→ RECRUITING  # 정원 도달로 CLOSED된 뒤 마감 시각 전 참여 취소로 빈자리 발생
     ├─→ IN_PROGRESS
     └─→ CANCELLED   # 17절 참고 — 현재 트리거 없음
 
@@ -69,6 +70,7 @@ DB 컬럼: `appointments.appointment_status`
 | --- | --- |
 | `PAYMENT_PENDING → RECRUITING` | 방장의 보증금 결제와 `DEPOSIT_POOL` 예치가 같은 트랜잭션에서 완료. 예치가 실패하면 트랜잭션이 롤백되어 약속 행 자체가 생기지 않으므로, `PAYMENT_PENDING`은 DB에 지속적으로 남는 상태가 아니라 같은 트랜잭션 안에서만 존재합니다. |
 | `RECRUITING → CLOSED` | 정원 도달은 `joinAppointment`가 참여 성공 트랜잭션 안에서 즉시 동기로 전환. 참여 마감 시각 도달은 시간 기반이라 스케줄러가 60초 주기로 전환(15절). |
+| `CLOSED → RECRUITING` | 정원 도달로 `CLOSED`된 약속에서, 마감 시각(`joinDeadline`) 전에 참여 취소가 발생해 빈자리가 생기면 `leaveAppointment`가 같은 트랜잭션에서 즉시 되돌립니다. 마감 시각이 지나 `CLOSED`된 경우는 참여 취소 자체가 마감 시각 전까지만 허용되므로 이 경로에 들어오지 않습니다. |
 | `CLOSED → IN_PROGRESS` | `activityStartAt` 도달. 방장의 별도 확정 액션 없이 스케줄러가 시간만 보고 전환(15절). |
 | `IN_PROGRESS → COMPLETED` | 방장이 모든 `ACTIVE` 회원의 출석을 확정 |
 | `* → CANCELLED` | 코드에는 정의돼 있으나 17절 정책에 따라 트리거하는 API·스케줄러를 만들지 않습니다. |
@@ -93,7 +95,7 @@ DB 컬럼: `appointment_members.membership_status`
     └─→ LEFT
 
     LEFT
-    └─→ 전이 불가
+    └─→ PENDING   # 마감 시각 전 재참여. 기존 행을 재활용(아래 참고)
 
 전이 조건:
 
@@ -102,7 +104,7 @@ DB 컬럼: `appointment_members.membership_status`
 | `PENDING → ACTIVE` | 보증금 결제 성공 및 `PENDING → HELD` 예치 완료 |
 | `PENDING → LEFT` | 보증금 결제 전 참여 취소. **방장은 대상이 아닙니다** — 아래 참조. |
 | `ACTIVE → LEFT` | 예치된 보증금 환급까지 같은 트랜잭션에서 완료된 참여 취소. **방장은 대상이 아닙니다.** |
-| `LEFT → 재참여` | 허용하지 않음 |
+| `LEFT → PENDING` | 참여 취소한 회원이 참여 마감 시각 전에 같은 약속에 다시 참여. `appointment_members`는 `(appointment_id, member_id)` UNIQUE, `deposits`는 `appointment_member_id` UNIQUE라 새 행을 만들 수 없어 `joinAppointment`가 기존 `appointment_member`·`deposit` 행을 `PENDING`으로 되돌려 재사용합니다(이후 정상적인 `PENDING → ACTIVE`와 동일하게 예치 진행). |
 
 **방장의 참여 취소 정책 (17절과 함께 확정)**
 
@@ -167,7 +169,10 @@ DB 컬럼: `deposits.deposit_status`
     ├─→ REFUNDED
     └─→ DISTRIBUTED
 
-    REFUNDED / DISTRIBUTED / CANCELLED
+    REFUNDED
+    └─→ PENDING   # 마감 시각 전 재참여. MembershipStatus의 LEFT → PENDING과 함께 일어남
+
+    DISTRIBUTED / CANCELLED
     └─→ 전이 불가
 
 중요한 금융 정합성 규칙(코드로 강제됨, `Deposit.java`):
@@ -175,6 +180,9 @@ DB 컬럼: `deposits.deposit_status`
 - `HELD`가 되려면 `heldTransferId`, `heldAt`이 반드시 있어야 합니다.
 - `REFUNDED`, `DISTRIBUTED`가 되려면 `resolvedAt`이 반드시 있어야 합니다.
 - 실제 지갑 이체와 상태 변경은 같은 트랜잭션에서 처리합니다.
+- `REFUNDED → PENDING`(재참여)은 `heldTransferId`·`heldAt`·`resolvedAt`을 모두
+  `NULL`로 되돌립니다. `deposits.appointment_member_id`가 UNIQUE라 같은 참여
+  행에 새 보증금 행을 만들 수 없어, 참여 취소로 환급된 기존 행을 재사용합니다.
 
 참고: 과거 `FORFEITED` 상태는 제거됐고 기존 `FORFEITED` 데이터는 `DISTRIBUTED`로
 정규화됐습니다(V3 마이그레이션에서 이미 완료).

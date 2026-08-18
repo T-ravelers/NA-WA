@@ -89,4 +89,14 @@ public interface DepositMapper {
         @Param("depositId") Long depositId,
         @Param("resolvedAt") LocalDateTime resolvedAt
     );
+
+    /**
+     * 재참여를 위한 보증금 되돌리기
+     *
+     * 참여 취소로 `REFUNDED`된 보증금을 재참여에 맞춰 `PENDING`으로
+     * 되돌립니다. 이후 다시 `markHeld`를 거쳐 예치를 완료합니다.
+     */
+    int revive(
+        @Param("depositId") Long depositId
+    );
 }

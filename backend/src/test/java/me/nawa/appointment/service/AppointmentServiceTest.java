@@ -377,7 +377,7 @@ class AppointmentServiceTest {
         when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(10L, 2L))
                 .thenReturn(AppointmentMember.builder()
                         .appointmentMemberId(30L)
-                        .membershipStatus(MembershipStatus.LEFT)
+                        .membershipStatus(MembershipStatus.ACTIVE)
                         .build());
 
         BusinessException exception = assertThrows(
@@ -388,6 +388,51 @@ class AppointmentServiceTest {
         assertEquals(AppointmentErrorCode.ALREADY_JOINED,
                 exception.getErrorCode());
         verify(appointmentMapper, never()).insertAppointmentMember(any());
+    }
+
+    @Test
+    void joinAppointment_rejoinsAfterLeaving_revivesExistingMemberAndDeposit() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        AppointmentMember left = AppointmentMember.builder()
+                .appointmentMemberId(30L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .membershipStatus(MembershipStatus.LEFT)
+                .build();
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(10L, 2L))
+                .thenReturn(left);
+        when(appointmentMapper.reviveLeftMember(30L)).thenReturn(1);
+        Deposit refundedDeposit = Deposit.pending(30L, BigDecimal.valueOf(10_000));
+        refundedDeposit.hold(400L, LocalDateTime.now());
+        refundedDeposit.refund(LocalDateTime.now());
+        when(depositMapper.findByAppointmentMemberId(30L))
+                .thenReturn(refundedDeposit);
+        when(depositMapper.revive(any())).thenReturn(1);
+        when(walletTransferService.transferToSystemWallet(
+                eq(2L), eq(2L), eq(SystemWalletCode.DEPOSIT_POOL),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_HOLD.name()), anyString()
+        )).thenReturn(501L);
+        when(depositMapper.markHeld(any(), eq(501L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberActive(30L)).thenReturn(1);
+        when(appointmentMapper.findMemberByIdForUpdate(10L, 30L))
+                .thenReturn(AppointmentMember.builder()
+                        .appointmentMemberId(30L)
+                        .appointmentId(10L)
+                        .memberId(2L)
+                        .membershipStatus(MembershipStatus.ACTIVE)
+                        .build());
+
+        AppointmentMemberResponse result =
+                appointmentService.joinAppointment(2L, 10L);
+
+        assertEquals(MembershipStatus.ACTIVE, result.getMembershipStatus());
+        verify(appointmentMapper).reviveLeftMember(30L);
+        verify(depositMapper).revive(refundedDeposit.getDepositId());
+        verify(appointmentMapper, never()).insertAppointmentMember(any());
+        verify(depositMapper, never()).insert(any());
     }
 
     @Test
@@ -494,6 +539,48 @@ class AppointmentServiceTest {
         verify(deposit).refund(any());
         verify(depositMapper).markRefunded(eq(40L), any());
         verify(appointmentMapper).markMemberLeft(30L);
+    }
+
+    @Test
+    void leaveAppointment_closedByCapacity_reopensRecruiting() {
+        Appointment appointment = appointment(
+                10L,
+                AppointmentStatus.CLOSED
+        );
+        AppointmentMember member = AppointmentMember.builder()
+                .appointmentMemberId(30L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .build();
+        Deposit deposit = mock(Deposit.class);
+        when(deposit.getDepositId()).thenReturn(40L);
+        when(deposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        when(deposit.isPending()).thenReturn(false);
+        when(deposit.isHeld()).thenReturn(true);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
+                10L, 2L
+        )).thenReturn(member);
+        when(depositMapper.findByAppointmentMemberId(30L))
+                .thenReturn(deposit);
+        when(walletTransferService.transferFromSystemWallet(
+                eq(2L), eq(SystemWalletCode.DEPOSIT_POOL), eq(2L),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_REFUND.name()), anyString()
+        )).thenReturn(600L);
+        when(depositMapper.markRefunded(eq(40L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberLeft(30L)).thenReturn(1);
+        when(appointmentMapper.updateAppointmentStatus(
+                10L, AppointmentStatus.CLOSED, AppointmentStatus.RECRUITING
+        )).thenReturn(1);
+
+        appointmentService.leaveAppointment(2L, 10L);
+
+        verify(appointmentMapper).updateAppointmentStatus(
+                10L, AppointmentStatus.CLOSED, AppointmentStatus.RECRUITING
+        );
     }
 
     @Test
