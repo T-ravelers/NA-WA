@@ -196,6 +196,36 @@ class AppointmentServiceTest {
     }
 
     @Test
+    void getAppointment_afterJoinDeadline_showsClosedBeforeSchedulerCatchesUp() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        appointment.setJoinDeadline(LocalDateTime.now().minusMinutes(1));
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of());
+
+        AppointmentDetailResponse result =
+                appointmentService.getAppointment(2L, 10L);
+
+        assertEquals(AppointmentStatus.CLOSED, result.getAppointmentStatus());
+    }
+
+    @Test
+    void getAppointment_afterActivityStart_showsInProgressBeforeSchedulerCatchesUp() {
+        Appointment appointment = appointment(10L, AppointmentStatus.CLOSED);
+        appointment.setActivityStartAt(LocalDateTime.now().minusMinutes(1));
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of());
+
+        AppointmentDetailResponse result =
+                appointmentService.getAppointment(2L, 10L);
+
+        assertEquals(AppointmentStatus.IN_PROGRESS, result.getAppointmentStatus());
+    }
+
+    @Test
     void getAppointment_paymentPendingForNonHost_returnsNotFound() {
         Appointment appointment = appointment(
                 10L,
@@ -245,6 +275,41 @@ class AppointmentServiceTest {
 
         assertEquals(MembershipStatus.ACTIVE, result.getMembershipStatus());
         verify(appointmentMapper).markMemberActive(30L);
+    }
+
+    @Test
+    void joinAppointment_fillsLastSlot_closesRecruitingSynchronously() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        appointment.setCurrentMemberCount(appointment.getMaxMembers() - 1);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(10L, 2L))
+                .thenReturn(null);
+        stubInsertAppointmentMember(30L);
+        when(depositMapper.insert(any())).thenReturn(1);
+        when(walletTransferService.transferToSystemWallet(
+                eq(2L), eq(2L), eq(SystemWalletCode.DEPOSIT_POOL),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_HOLD.name()), anyString()
+        )).thenReturn(501L);
+        when(depositMapper.markHeld(any(), eq(501L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberActive(30L)).thenReturn(1);
+        when(appointmentMapper.updateAppointmentStatus(
+                10L, AppointmentStatus.RECRUITING, AppointmentStatus.CLOSED
+        )).thenReturn(1);
+        when(appointmentMapper.findMemberByIdForUpdate(10L, 30L))
+                .thenReturn(AppointmentMember.builder()
+                        .appointmentMemberId(30L)
+                        .appointmentId(10L)
+                        .memberId(2L)
+                        .membershipStatus(MembershipStatus.ACTIVE)
+                        .build());
+
+        appointmentService.joinAppointment(2L, 10L);
+
+        verify(appointmentMapper).updateAppointmentStatus(
+                10L, AppointmentStatus.RECRUITING, AppointmentStatus.CLOSED
+        );
     }
 
     @Test

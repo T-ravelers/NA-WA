@@ -21,15 +21,22 @@
 
 ## 약속 상태 전이
 
-결제 연동 전에는 약속 상태 전이 API와 자동 전이를 실행하지 않습니다. 결제 연동 후
-상태 전이는 방장의 시작 버튼이 아닌 서버 조건으로 처리합니다.
+상태 전이는 별도 API 없이 서버가 조건에 따라 자동으로 처리합니다. 방장의 확정
+버튼 같은 수동 액션은 없습니다.
 
-- `RECRUITING` → `CLOSED`: 참여 마감 시각이 지났거나 결제 완료 회원이 정원에 도달한 경우
-- `CLOSED` → `CONFIRMED`: 남은 모든 `ACTIVE` 회원의 보증금이 실제로 `HELD`인 경우
-- `CONFIRMED` → `IN_PROGRESS`: 활동 시작 시각이 도달한 경우
+- `RECRUITING` → `CLOSED`: 정원 도달은 참여 성공 시점에 즉시, 참여 마감 시각
+  도달은 60초 주기 스케줄러가 전환합니다.
+- `CLOSED` → `IN_PROGRESS`: 활동 시작 시각이 되면 스케줄러가 전환합니다. 방장의
+  별도 확정 절차는 없습니다.
 - `IN_PROGRESS` → `COMPLETED`: 방장이 모든 `ACTIVE` 회원의 출석을 확정한 경우
+  (아직 미구현, `APPOINTMENT-008` 반환)
 
-상태 전이 API는 결제·에스크로 연동 PR에서 함께 제공합니다.
+목록·상세 조회 응답의 `appointmentStatus`는 스케줄러가 아직 못 따라잡았어도
+마감·시작 시각 기준으로 즉시 계산한 값을 보여줍니다. 단, `GET /appointments/me`는
+DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초까지 지연될 수
+있습니다. 자세한 내용은
+[APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+15절을 참고하세요.
 
 ## 약속 목록 조회
 
@@ -80,8 +87,11 @@
 ]
 ```
 
-약속 상태 자동 전이가 아직 구현되지 않아 `IN_PROGRESS` 상태에 도달하는 약속이
-없으므로, 그 전까지는 항상 빈 배열을 반환합니다.
+이 엔드포인트는 스케줄러가 실제로 반영한 DB의 `appointment_status` 값만
+사용합니다(목록·상세 조회와 달리 즉시 계산한 값을 쓰지 않습니다 — 근거는
+[APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+15절). 그래서 활동 시작 시각이 지나도 스케줄러가 아직 `IN_PROGRESS`로 못
+바꿨다면 최대 60초까지는 빈 배열이 나올 수 있습니다.
 
 ## 약속 생성
 
@@ -142,9 +152,9 @@
 }
 ```
 
-- 상태 전이 자동화가 구현되기 전에는 `APPOINTMENT-008`(409)을 반환하며 출석과
-  약속 상태를 변경하지 않습니다.
-- 이후에는 방장만 `IN_PROGRESS` 상태에서 모든 `ACTIVE` 회원을 정확히 한 번씩
+- 아직 구현 전이라 항상 `APPOINTMENT-008`(409)을 반환하며 출석과 약속 상태를
+  변경하지 않습니다.
+- 구현되면 방장만 `IN_PROGRESS` 상태에서 모든 `ACTIVE` 회원을 정확히 한 번씩
   `ATTENDED` 또는 `NO_SHOW`로 확정할 수 있습니다.
 
 ## 회원 후기 등록
@@ -163,8 +173,8 @@
 }
 ```
 
-- 기존 `COMPLETED` 약속에서만 작성할 수 있습니다. 상태 전이 자동화가 구현되기
-  전에는 새 약속을 `COMPLETED` 상태까지 진행할 수 없습니다.
+- 기존 `COMPLETED` 약속에서만 작성할 수 있습니다. 출석 확정이 아직 구현 전이라
+  새 약속을 `COMPLETED` 상태까지 진행할 수 없습니다.
 - 작성자와 평가 대상 모두 `ACTIVE`, `ATTENDED` 회원이어야 합니다.
 - 자기 자신과 이미 평가한 회원을 다시 평가할 수 없습니다.
 - `PUNCTUALITY`, `MANNERS`, `COMMUNICATION` 점수를 모두 입력하며 각 점수는

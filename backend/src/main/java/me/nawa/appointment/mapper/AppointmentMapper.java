@@ -30,6 +30,14 @@ public interface AppointmentMapper {
             @Param("appointmentMemberId") Long appointmentMemberId
     );
 
+    // 참여 마감 시각이 지난 RECRUITING 약속을 일괄로 CLOSED로 전환한다.
+    // 정원이 차서 CLOSED가 되는 경로는 시간과 무관해 joinAppointment가 동기로
+    // 처리하므로 여기서 다루지 않는다.
+    int closeExpiredRecruitingAppointments();
+
+    // 활동 시작 시각이 된 CLOSED 약속을 일괄로 IN_PROGRESS로 전환한다.
+    int startDueClosedAppointments();
+
     List<Appointment> searchAppointments(
             @Param("request") AppointmentSearchRequest request,
             @Param("offset") int offset

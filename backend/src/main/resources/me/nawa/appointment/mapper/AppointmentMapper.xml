@@ -79,6 +79,24 @@
           AND deleted_at IS NULL
     </update>
 
+    <update id="closeExpiredRecruitingAppointments">
+        UPDATE appointments
+        SET appointment_status = 'CLOSED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_status = 'RECRUITING'
+          AND join_deadline &lt; CURRENT_TIMESTAMP
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="startDueClosedAppointments">
+        UPDATE appointments
+        SET appointment_status = 'IN_PROGRESS',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_status = 'CLOSED'
+          AND activity_start_at &lt;= CURRENT_TIMESTAMP
+          AND deleted_at IS NULL
+    </update>
+
     <sql id="appointmentColumns">
         a.appointment_id,
         a.item_id,

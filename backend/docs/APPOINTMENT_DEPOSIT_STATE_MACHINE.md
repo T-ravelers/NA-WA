@@ -9,13 +9,18 @@
 
 - 상태 ENUM과 `canTransitionTo()` 규칙: `Appointment`·`Deposit`·`DepositPayoutBatch`
   도메인 객체와 매퍼(CRUD)까지 구현돼 있습니다.
-- 약속 생성·참여·출석 확정을 실제로 실행하는 서비스 로직: 아직 없습니다. 현재
-  `AppointmentService.createAppointment`/`joinAppointment`/`confirmAttendance`는
-  입력 검증만 하고 `APPOINTMENT-008`(409)을 반환하며 DB에 아무것도 쓰지 않습니다.
-- 방장이 아닌 회원의 결제 대기(`PENDING`) 참여 취소는 이미 동작합니다.
+- 약속 생성·참여: 실제로 동작합니다. 보증금 예치(회원 지갑 → `DEPOSIT_POOL`)와
+  `AppointmentStatus`/`MembershipStatus` 전환이 같은 트랜잭션에서 함께 끝납니다
+  (14절).
+- 방장이 아닌 회원의 참여 취소: 실제로 동작합니다. `HELD` 보증금 환급과 상태
+  전환이 같은 트랜잭션에서 함께 끝납니다(12절).
+- 약속 lifecycle 자동 전이(`RECRUITING → CLOSED → IN_PROGRESS`): 실제로
+  동작합니다(15절). `IN_PROGRESS → COMPLETED`(출석 확정)는 아직 없습니다 —
+  `AppointmentService.confirmAttendance`는 입력 검증만 하고
+  `APPOINTMENT-008`(409)을 반환합니다.
 - 기존 완료 약속에 대한 후기 등록은 이미 동작합니다.
-- 보증금 예치·환급·분배를 실행하는 지갑 이체, 약속 lifecycle 자동 전이(스케줄러)는
-  아직 없습니다. 설계는 14~17절에 정리했습니다.
+- 보증금 환급·분배를 실행하는 지갑 이체 중 노쇼 분배, 그리고 그 비동기 배치
+  처리는 아직 없습니다. 설계는 16절에 정리했습니다.
 
 ## 2. 약속 상태 `AppointmentStatus`
 
@@ -26,7 +31,7 @@ DB 컬럼: `appointments.appointment_status`
 | `PAYMENT_PENDING` | 방장의 보증금 결제를 기다리는 약속 생성 대기 상태 |
 | `RECRUITING` | 방장 결제가 완료되어 참가자를 모집하는 상태 |
 | `CLOSED` | 참여 마감 시각 도달 또는 정원 충족으로 모집이 종료된 상태 |
-| `CONFIRMED` | 남은 활성 회원 전원의 보증금 예치가 확인된 상태 |
+| `CONFIRMED` | 코드에는 정의돼 있으나, 활동 시작 시각에 방장 확정 없이 바로 `IN_PROGRESS`로 넘어가기로 정하면서 실제로 도달하는 경로가 없는 상태(`CANCELLED`와 같은 취급) |
 | `IN_PROGRESS` | 활동 시작 시각에 도달하여 약속이 진행 중인 상태 |
 | `COMPLETED` | 출석 확정과 약속 진행이 모두 끝난 상태 |
 | `CANCELLED` | 코드에는 정의돼 있으나, 17절 정책에 따라 실제로 도달하는 경로가 없는 상태 |
@@ -42,10 +47,6 @@ DB 컬럼: `appointments.appointment_status`
     └─→ CANCELLED   # 17절 참고 — 현재 트리거 없음
 
     CLOSED
-    ├─→ CONFIRMED
-    └─→ CANCELLED   # 17절 참고 — 현재 트리거 없음
-
-    CONFIRMED
     ├─→ IN_PROGRESS
     └─→ CANCELLED   # 17절 참고 — 현재 트리거 없음
 
@@ -55,6 +56,9 @@ DB 컬럼: `appointments.appointment_status`
     COMPLETED
     └─→ 전이 불가
 
+    CONFIRMED
+    └─→ 전이 불가   # 위 표 참고 — 현재 트리거 없음
+
     CANCELLED
     └─→ 전이 불가
 
@@ -63,9 +67,8 @@ DB 컬럼: `appointments.appointment_status`
 | 전이 | 조건 |
 | --- | --- |
 | `PAYMENT_PENDING → RECRUITING` | 방장의 보증금 결제와 `DEPOSIT_POOL` 예치가 같은 트랜잭션에서 완료. 예치가 실패하면 트랜잭션이 롤백되어 약속 행 자체가 생기지 않으므로, `PAYMENT_PENDING`은 DB에 지속적으로 남는 상태가 아니라 같은 트랜잭션 안에서만 존재합니다. |
-| `RECRUITING → CLOSED` | 참여 마감 시각 도달 또는 결제 완료 회원이 정원에 도달 (15절 스케줄러) |
-| `CLOSED → CONFIRMED` | 남은 모든 `ACTIVE` 회원의 보증금이 `HELD`. 참여 시점에 보증금 예치와 회원 `ACTIVE` 전환이 같은 트랜잭션에서 함께 일어나도록 설계했기 때문에, `CLOSED`에 도달한 시점엔 이 조건이 항상 참입니다. |
-| `CONFIRMED → IN_PROGRESS` | `activityStartAt` 도달 (15절 스케줄러) |
+| `RECRUITING → CLOSED` | 정원 도달은 `joinAppointment`가 참여 성공 트랜잭션 안에서 즉시 동기로 전환. 참여 마감 시각 도달은 시간 기반이라 스케줄러가 60초 주기로 전환(15절). |
+| `CLOSED → IN_PROGRESS` | `activityStartAt` 도달. 방장의 별도 확정 액션 없이 스케줄러가 시간만 보고 전환(15절). |
 | `IN_PROGRESS → COMPLETED` | 방장이 모든 `ACTIVE` 회원의 출석을 확정 |
 | `* → CANCELLED` | 코드에는 정의돼 있으나 17절 정책에 따라 트리거하는 API·스케줄러를 만들지 않습니다. |
 
@@ -277,9 +280,10 @@ DB 컬럼: `appointments.item_type`
        (같은 트랜잭션, 같은 요청 안에서 함께 처리)
 
     3. 참여 마감 또는 정원 도달 → AppointmentStatus: RECRUITING → CLOSED
-       → CLOSED에 도달하는 즉시 CONFIRMED로도 전이 (2절, 조건이 항상 참이므로)
+       (정원 도달은 참여 트랜잭션 안에서 즉시, 마감 시각 도달은 스케줄러가 처리)
 
-    4. 활동 시작 시각 도달 → AppointmentStatus: CONFIRMED → IN_PROGRESS
+    4. 활동 시작 시각 도달 → AppointmentStatus: CLOSED → IN_PROGRESS
+       (방장의 별도 확정 액션 없이 스케줄러가 시간만 보고 전환, 2절)
 
     5. 방장이 ACTIVE 회원 전원의 출석 확정
        AttendanceStatus: PENDING → ATTENDED 또는 NO_SHOW
@@ -337,13 +341,15 @@ DB 컬럼: `appointments.item_type`
 | 기능 | 현재 상태 |
 | --- | --- |
 | 약속 목록·상세·활성 회원·내 참여 상태 조회 | 사용 가능 |
-| 방장이 아닌 회원의 기존 `PENDING` 참여 취소 | 사용 가능 |
+| 약속 생성·참여(보증금 예치 포함) | 사용 가능 |
+| 방장이 아닌 회원의 참여 취소(보증금 환급 포함) | 사용 가능 |
+| 약속 lifecycle 자동 전이(`RECRUITING → CLOSED → IN_PROGRESS`) | 사용 가능(15절) |
 | 회원 약속 프로필 조회 | 사용 가능 |
 | 조건을 만족하는 기존 완료 약속의 후기 등록 | 사용 가능 |
-| 약속 생성·참여·출석 확정 | `APPOINTMENT-008`로 차단 |
-| 보증금 예치·환급·분배, 약속 lifecycle 자동 전이 | 14~16절 설계, 미구현 |
+| 출석 확정 | `APPOINTMENT-008`로 차단 |
+| 보증금 환급 중 노쇼 분배, 그 비동기 정산 배치 처리 | 16절 설계, 미구현 |
 
-`APPOINTMENT-008` 응답:
+`APPOINTMENT-008` 응답(출석 확정 요청 시):
 
     HTTP 409 Conflict
     { "success": false, "error": { "code": "APPOINTMENT-008",
@@ -380,34 +386,45 @@ DB 컬럼: `appointments.item_type`
 
 ## 15. 약속 lifecycle 전이 — 계산해서 표시 + 폴링 스케줄러로 뒷정리
 
-시간 기반 전이(`RECRUITING → CLOSED`, `CONFIRMED → IN_PROGRESS`)는 사용자 액션이
+시간 기반 전이(`RECRUITING → CLOSED`, `CLOSED → IN_PROGRESS`)는 사용자 액션이
 아니라 시간이 조건입니다. `IN_PROGRESS → COMPLETED`는 방장의 출석 확정 액션이
-트리거이므로 아래 내용의 대상이 아닙니다.
+트리거이므로 아래 내용의 대상이 아닙니다. 정원이 차서 `CLOSED`가 되는 경우는
+시간과 무관한 이벤트라 스케줄러가 아니라 `joinAppointment`가 참여 성공 시점에
+동기로 처리합니다(2절).
 
-**화면에 보여주는 값과 DB에 저장된 값을 분리합니다.** 목록·상세 조회는
-`appointment_status` 컬럼을 그대로 반환하지 않고, `join_deadline`·
-`activityStartAt`과 현재 시각을 비교해 "지금 시점의 실제 상태"를 계산해서
-반환합니다. 예를 들어 컬럼 값이 아직 `RECRUITING`이어도 `join_deadline`이 이미
-지났으면 응답은 `CLOSED`로 나갑니다. 이러면 사용자는 스케줄러 주기와 무관하게
-항상 정확한 상태를 봅니다. 서버 쪽 검증(예: 출석 확정이 `IN_PROGRESS`에서만
-가능한지)도 컬럼 값이 아니라 이 계산 결과를 기준으로 판단합니다.
+**화면에 보여주는 값과 DB에 저장된 값을 분리합니다.** 약속 목록·상세 조회
+(`AppointmentService.toSummaryResponse`/`toDetailResponse`가 호출하는
+`resolveDisplayStatus`)는 `appointment_status` 컬럼을 그대로 반환하지 않고,
+`join_deadline`·`activityStartAt`과 현재 시각을 비교해 "지금 시점의 실제 상태"를
+계산해서 반환합니다. 예를 들어 컬럼 값이 아직 `RECRUITING`이어도 `join_deadline`이
+이미 지났으면 응답은 `CLOSED`로 나갑니다. 이러면 사용자는 스케줄러 주기와 무관하게
+항상 정확한 상태를 봅니다.
+
+이 라이브 계산은 **화면 표시에만** 적용합니다. `GET /appointments/me`(트립 연결·
+QR 공동결제 게이팅에 쓰이는 엔드포인트, `findMyOngoingAppointments`)는 라이브
+계산을 거치지 않고 DB에 저장된 `appointment_status` 값만 그대로 사용합니다. 이
+값에 걸리는 다른 로직(트립 비용 연결 등)과의 일관성이 즉시 반영보다 더
+중요하다고 판단했습니다. 따라서 활동이 실제로 시작된 뒤에도 스케줄러가 아직
+`IN_PROGRESS`로 못 바꿨다면 최대 60초까지는 이 엔드포인트에 나타나지 않을 수
+있습니다.
 
 DB 컬럼 값 자체는 스케줄러가 뒤에서 맞춥니다. 아무도 이 쓰기 작업의 결과를
 실시간으로 보고 있지 않으므로 주기가 길어도 됩니다.
 
 - `RootConfig`에 `@EnableScheduling`이 이미 있어 별도 설정이 필요 없습니다.
-- `me.nawa.appointment.service.AppointmentLifecycleScheduler`(신규)가
-  `@Scheduled(fixedDelay = 60_000)`로 60초마다 동작합니다. `fixedDelay`를 쓰는
-  이유는 이전 tick이 끝나야 다음 tick이 시작돼서 겹쳐 돌지 않기 때문입니다.
-  주기는 `application.properties`로 조정 가능하게 둡니다. 화면 표시가 이미
-  실시간이므로 이 주기를 더 줄일 이유는 없습니다.
-- 각 약속의 전이는 독립된 트랜잭션으로 처리해, 하나가 실패해도 나머지에 영향이
-  없도록 합니다. 시계가 흐르길 기다리지 않고 테스트할 수 있도록, 실제 전이 로직은
-  `@Scheduled` 메서드가 아니라 별도 메서드(`runOnce()`)로 분리합니다.
-- `CLOSED → CONFIRMED`는 시간이 아니라 조건(보증금 `HELD`) 기반이지만, 참여 시점에
-  보증금 예치와 회원 `ACTIVE` 전환을 같은 트랜잭션으로 묶어뒀기 때문에 `CLOSED`
-  도달 즉시 조건이 항상 참입니다. 따라서 `RECRUITING → CLOSED` 전이와 같은 스케줄러
-  tick에서 바로 이어서 처리합니다.
+- `me.nawa.appointment.service.AppointmentLifecycleScheduler`가
+  `@Scheduled(fixedDelay = 60_000)`로 60초마다 `advanceLifecycle()`을
+  실행합니다. `fixedDelay`를 쓰는 이유는 이전 tick이 끝나야 다음 tick이
+  시작돼서 겹쳐 돌지 않기 때문입니다. 화면 표시가 이미 실시간이므로 이 주기를
+  더 줄일 이유는 없어 값은 코드에 고정해뒀습니다(설정 파일로 뺄 만큼의 실익이
+  없음).
+- 전이는 약속마다 개별 트랜잭션으로 처리하지 않고, `AppointmentMapper`의 벌크
+  `UPDATE` 두 개(`closeExpiredRecruitingAppointments`,
+  `startDueClosedAppointments`)를 한 트랜잭션(`advanceLifecycle()`) 안에서
+  차례로 실행합니다. 각 `UPDATE`는 조건에 맞는 행을 한 번에 전환하는 단일
+  문장이라 그 자체로 원자적이고, 약속 수가 늘어나도 라운드트립이 늘지 않습니다.
+  `advanceLifecycle()`은 `@Scheduled` 메서드 자체가 직접 호출 가능한 public
+  메서드라 스케줄을 기다리지 않고 단위 테스트에서 바로 호출해 검증합니다.
 
 ## 16. 보증금 정산 — 비동기 배치
 

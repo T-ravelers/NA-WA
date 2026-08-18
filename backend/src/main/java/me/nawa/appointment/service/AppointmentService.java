@@ -151,6 +151,19 @@ public class AppointmentService {
         }
         holdDepositForNewMember(memberId, member, appointment.getDepositAmount());
 
+        // 이번 참여로 정원이 다 찼으면 마감 시각을 기다리지 않고 바로 CLOSED로
+        // 전환한다. 정원 도달은 마감 시각과 달리 스케줄러가 아니라 이 트랜잭션이
+        // 이미 약속 행을 잠그고 있는 지금 시점에 정확히 알 수 있다.
+        if (appointment.getCurrentMemberCount() + 1 >= appointment.getMaxMembers()) {
+            if (appointmentMapper.updateAppointmentStatus(
+                    appointmentId,
+                    AppointmentStatus.RECRUITING,
+                    AppointmentStatus.CLOSED
+            ) != 1) {
+                throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+            }
+        }
+
         AppointmentMember active = appointmentMapper.findMemberByIdForUpdate(
                 appointmentId, member.getAppointmentMemberId()
         );
@@ -462,7 +475,7 @@ public class AppointmentService {
                 .maxMembers(appointment.getMaxMembers())
                 .currentMemberCount(appointment.getCurrentMemberCount())
                 .depositAmount(appointment.getDepositAmount())
-                .appointmentStatus(appointment.getAppointmentStatus())
+                .appointmentStatus(resolveDisplayStatus(appointment))
                 .meetingPlace(appointment.getMeetingPlace())
                 .activityStartAt(appointment.getActivityStartAt())
                 .activityEndAt(appointment.getActivityEndAt())
@@ -483,7 +496,7 @@ public class AppointmentService {
                 .maxMembers(appointment.getMaxMembers())
                 .currentMemberCount(appointment.getCurrentMemberCount())
                 .depositAmount(appointment.getDepositAmount())
-                .appointmentStatus(appointment.getAppointmentStatus())
+                .appointmentStatus(resolveDisplayStatus(appointment))
                 .meetingPlace(appointment.getMeetingPlace())
                 .meetingAddress(appointment.getMeetingAddress())
                 .description(appointment.getAppointmentDescription())
@@ -493,6 +506,30 @@ public class AppointmentService {
                 .hostDisplayName(appointment.getHostDisplayName())
                 .members(members)
                 .build();
+    }
+
+    // 목록·상세 조회에서 실제로 보여줄 상태를 시간 기준으로 즉시 계산한다.
+    // 스케줄러(60초 주기)가 DB 컬럼을 아직 못 따라잡았어도, 사용자에게는 여기서
+    // 계산한 값을 곧바로 보여준다. DB의 실제 appointment_status는 스케줄러가
+    // 뒤에서 계속 따라잡으므로, 이 메서드는 화면 표시에만 쓰고 트립 연결·QR
+    // 공동결제처럼 실제 DB 상태 일관성이 중요한 로직(findMyOngoingAppointments
+    // 등)에는 쓰지 않는다.
+    private static AppointmentStatus resolveDisplayStatus(
+            Appointment appointment) {
+        AppointmentStatus status = appointment.getAppointmentStatus();
+        LocalDateTime now = LocalDateTime.now();
+
+        if (status == AppointmentStatus.RECRUITING
+                && (now.isAfter(appointment.getJoinDeadline())
+                        || appointment.getCurrentMemberCount()
+                                >= appointment.getMaxMembers())) {
+            status = AppointmentStatus.CLOSED;
+        }
+        if (status == AppointmentStatus.CLOSED
+                && !now.isBefore(appointment.getActivityStartAt())) {
+            status = AppointmentStatus.IN_PROGRESS;
+        }
+        return status;
     }
 
     private static AppointmentMemberResponse toMemberResponse(

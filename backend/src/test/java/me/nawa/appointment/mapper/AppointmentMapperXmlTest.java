@@ -68,6 +68,36 @@ class AppointmentMapperXmlTest {
         assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.markMemberActive"
         ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.closeExpiredRecruitingAppointments"
+        ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.startDueClosedAppointments"
+        ));
+    }
+
+    @Test
+    void closeExpiredRecruitingAppointments_onlyTargetsExpiredRecruiting()
+            throws Exception {
+        String sql = boundSql(
+                "closeExpiredRecruitingAppointments", Map.of()
+        );
+
+        assertTrue(sql.contains("appointment_status = 'CLOSED'"));
+        assertTrue(sql.contains("appointment_status = 'RECRUITING'"));
+        assertTrue(sql.contains("join_deadline <"));
+    }
+
+    @Test
+    void startDueClosedAppointments_onlyTargetsClosedPastActivityStart()
+            throws Exception {
+        String sql = boundSql(
+                "startDueClosedAppointments", Map.of()
+        );
+
+        assertTrue(sql.contains("appointment_status = 'IN_PROGRESS'"));
+        assertTrue(sql.contains("appointment_status = 'CLOSED'"));
+        assertTrue(sql.contains("activity_start_at <="));
     }
 
     @Test
