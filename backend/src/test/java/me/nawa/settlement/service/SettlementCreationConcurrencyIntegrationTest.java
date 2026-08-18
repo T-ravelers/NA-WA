@@ -249,11 +249,13 @@ class SettlementCreationConcurrencyIntegrationTest {
         long payerAppointmentMemberId = insert("appointment_members", "appointment_member_id", Map.of(
             "appointment_id", appointmentId,
             "member_id", payerMemberId,
-            "trip_id", tripId
+            "trip_id", tripId,
+            "membership_status", "ACTIVE"
         ));
         long payeeAppointmentMemberId = insert("appointment_members", "appointment_member_id", Map.of(
             "appointment_id", appointmentId,
-            "member_id", payeeMemberId
+            "member_id", payeeMemberId,
+            "membership_status", "ACTIVE"
         ));
         long walletOwnerId = insert("wallet_owners", "wallet_owner_id", Map.of(
             "member_id", payerMemberId,
