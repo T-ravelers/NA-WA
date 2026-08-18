@@ -334,7 +334,12 @@
         <choose>
             <when test="includeAll">
                 AND a.appointment_status != 'CANCELLED'
-                ORDER BY a.activity_start_at DESC, a.appointment_id DESC
+                <!-- 예정 약속(임박한 순)을 위에, 지난 약속(최근 순)을 아래에 둔다. -->
+                ORDER BY (a.activity_start_at &lt; NOW()),
+                         CASE WHEN a.activity_start_at &gt;= NOW()
+                              THEN a.activity_start_at END ASC,
+                         a.activity_start_at DESC,
+                         a.appointment_id DESC
             </when>
             <otherwise>
                 AND a.appointment_status = 'IN_PROGRESS'

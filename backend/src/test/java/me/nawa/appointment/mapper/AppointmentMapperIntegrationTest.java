@@ -75,16 +75,24 @@ class AppointmentMapperIntegrationTest {
             long itemId = insertVisibleEventItem(memberId);
             long tripId = insertTrip(memberId);
 
+            // 분류가 MySQL NOW() 기준이라 시각 차가 하루 미만이어도 안전하게
+            // 미래·과거 여백을 하루 이상 둔다.
+            LocalDateTime now = LocalDateTime.now();
+            long paymentPendingId = insertAppointment(
+                    itemId, memberId, "PAYMENT_PENDING", now.plusDays(1));
             long ongoingId = insertAppointment(
-                    itemId, memberId, "IN_PROGRESS",
-                    LocalDateTime.of(2026, 8, 25, 18, 0));
+                    itemId, memberId, "IN_PROGRESS", now.plusDays(2));
+            long farFutureId = insertAppointment(
+                    itemId, memberId, "CONFIRMED", now.plusDays(10));
             long finishedId = insertAppointment(
-                    itemId, memberId, "COMPLETED",
-                    LocalDateTime.of(2026, 8, 10, 18, 0));
+                    itemId, memberId, "COMPLETED", now.minusDays(5));
+            long olderFinishedId = insertAppointment(
+                    itemId, memberId, "COMPLETED", now.minusDays(8));
             long cancelledId = insertAppointment(
-                    itemId, memberId, "CANCELLED",
-                    LocalDateTime.of(2026, 8, 12, 18, 0));
-            for (long appointmentId : new long[] {ongoingId, finishedId, cancelledId}) {
+                    itemId, memberId, "CANCELLED", now.minusDays(3));
+            for (long appointmentId : new long[] {
+                    paymentPendingId, ongoingId, farFutureId,
+                    finishedId, olderFinishedId, cancelledId}) {
                 insertActiveMembership(appointmentId, memberId, tripId);
             }
 
@@ -97,13 +105,16 @@ class AppointmentMapperIntegrationTest {
             assertEquals("EVENT", ongoing.get(0).getItemType());
             assertEquals("IN_PROGRESS", ongoing.get(0).getAppointmentStatus());
 
-            // 전체: 취소 제외, 최신 활동 시각부터.
+            // 전체: 취소 제외. 예정은 임박한 순으로 위, 지난 것은 최근 순으로 아래.
+            // PAYMENT_PENDING은 포함된다 — 근거는 APPOINTMENT_API.md.
             List<MyOngoingAppointment> all =
                     appointmentMapper.findMyOngoingAppointments(memberId, true);
-            assertEquals(2, all.size());
-            assertEquals(ongoingId, all.get(0).getAppointmentId());
-            assertEquals(finishedId, all.get(1).getAppointmentId());
-            assertEquals("COMPLETED", all.get(1).getAppointmentStatus());
+            assertEquals(
+                    List.of(paymentPendingId, ongoingId, farFutureId,
+                            finishedId, olderFinishedId),
+                    all.stream().map(MyOngoingAppointment::getAppointmentId).toList());
+            assertEquals("PAYMENT_PENDING", all.get(0).getAppointmentStatus());
+            assertEquals("COMPLETED", all.get(3).getAppointmentStatus());
         });
     }
 
