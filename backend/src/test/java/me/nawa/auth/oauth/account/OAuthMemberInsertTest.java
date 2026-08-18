@@ -11,11 +11,16 @@ class OAuthMemberInsertTest {
         return new OAuthMemberInsert("여행자", profileImageUrl).getProfileImageUrl();
     }
 
+    /** 수정 경로와 같은 strip()이라 전각 공백(U+3000) 같은 유니코드 공백도 지운다. */
     @Test
-    void keepsHttpsUrl_afterTrimming() {
+    void keepsHttpsUrl_afterStripping() {
         assertEquals(
                 "https://cdn.example.com/me.png",
                 normalizedUrl("  https://cdn.example.com/me.png  ")
+        );
+        assertEquals(
+                "https://cdn.example.com/me.png",
+                normalizedUrl("　https://cdn.example.com/me.png　")
         );
     }
 
@@ -42,6 +47,13 @@ class OAuthMemberInsertTest {
         }) {
             assertNull(normalizedUrl(url));
         }
+    }
+
+    @Test
+    void keepsUrl_atExactColumnLimit() {
+        String base = "https://cdn.example.com/";
+        String url = base + "a".repeat(500 - base.length());
+        assertEquals(url, normalizedUrl(url));
     }
 
     @Test

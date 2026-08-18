@@ -25,8 +25,9 @@ public class OAuthMemberInsert {
     }
 
     private static String normalizeDisplayName(String value) {
+        // 수정 경로(MemberProfileServiceImpl)와 같은 strip()으로 유니코드 공백까지 지운다.
         String normalized = StringUtils.hasText(value)
-                ? value.trim()
+                ? value.strip()
                 : DEFAULT_DISPLAY_NAME;
         int codePointCount = normalized.codePointCount(
                 0,
@@ -51,7 +52,7 @@ public class OAuthMemberInsert {
         if (!StringUtils.hasText(value)) {
             return null;
         }
-        String normalized = value.trim();
+        String normalized = value.strip();
         String lowerCased = normalized.toLowerCase(Locale.ROOT);
         boolean hasAllowedScheme = lowerCased.startsWith("http://")
                 || lowerCased.startsWith("https://");
