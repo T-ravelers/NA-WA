@@ -1,8 +1,13 @@
 import type { NavigationGuard, RouteLocationNormalized } from 'vue-router'
 
 import { syncLocaleWithProfile } from '@/features/member/model/localeSync'
+import type { MemberProfile } from '@/features/member/api/memberApi'
 import { ensureMemberProfile } from '@/features/member/model/memberQueries'
-import { AUTHENTICATED_HOME_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
+import {
+  AUTHENTICATED_HOME_PATH,
+  MERCHANT_HOME_PATH,
+  SIGN_IN_PATH,
+} from '@/shared/config/routePaths'
 import { isSignOutBarrierActive } from '@/shared/api/signOutBarrier'
 
 /**
@@ -24,6 +29,23 @@ declare module 'vue-router' {
 
 function resolveReturnPath(to: RouteLocationNormalized): string | undefined {
   return to.fullPath === '/' ? undefined : to.fullPath
+}
+
+/**
+ * 가맹점 계정이 손님 화면으로 가려는지 판단한다.
+ *
+ * 가맹점은 회원가입·QR 생성·매출 조회만 한다. 화면마다 막지 않고 여기 한 곳에서
+ * 되돌린다. guard는 화면이 그려지기 전에 돌므로 손님 화면이 스쳐 보이지 않는다.
+ *
+ * 로그인 직후 가맹점 등록을 마치기 전까지는 계정이 아직 `TRAVELER`라 이 분기가 걸리지
+ * 않는다. 그 구간은 `/merchant`로 보내는 복귀 경로가 맡는다.
+ */
+function isMerchantLockedOut(to: RouteLocationNormalized, profile: MemberProfile | null): boolean {
+  return (
+    to.meta.requiresAuth === true &&
+    profile?.accountType === 'MERCHANT' &&
+    !to.path.startsWith(MERCHANT_HOME_PATH)
+  )
 }
 
 export const authGuard: NavigationGuard = async (to) => {
@@ -49,6 +71,10 @@ export const authGuard: NavigationGuard = async (to) => {
   if (profile !== null) {
     // 로케일 동기화 실패가 화면 진입을 막아서는 안 된다.
     await syncLocaleWithProfile(profile).catch(() => undefined)
+  }
+
+  if (isMerchantLockedOut(to, profile)) {
+    return { path: MERCHANT_HOME_PATH }
   }
 
   return true

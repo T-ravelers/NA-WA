@@ -28,6 +28,7 @@ function profile(preferredLanguage: string): MemberProfile {
     nationalityCode: null,
     preferredLanguage,
     preferredCurrencyCode: null,
+    accountType: 'TRAVELER',
     onboardingRequired: false,
   }
 }

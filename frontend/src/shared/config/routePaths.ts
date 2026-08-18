@@ -21,3 +21,11 @@ export const AUTH_CALLBACK_PATH = '/auth/callback'
 
 /** 인증된 사용자의 기본 진입 화면. */
 export const AUTHENTICATED_HOME_PATH = '/explore'
+
+/**
+ * 가맹점 계정의 유일한 화면.
+ *
+ * 가맹점은 QR 생성과 매출 조회만 하므로 손님용 화면에 들어갈 일이 없다. router guard가
+ * 이 경로 밖으로 나가지 못하게 막으므로 shared에 둔다.
+ */
+export const MERCHANT_HOME_PATH = '/merchant'
