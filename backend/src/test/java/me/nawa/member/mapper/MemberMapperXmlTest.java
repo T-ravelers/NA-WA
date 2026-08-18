@@ -43,6 +43,13 @@ class MemberMapperXmlTest {
     }
 
     @Test
+    void mapperXml_parsesMarkAsMerchantStatement() throws Exception {
+        assertTrue(parsedConfiguration().hasStatement(
+                "me.nawa.member.mapper.MemberMapper.markAsMerchant"
+        ));
+    }
+
+    @Test
     void mapperXml_parsesExistsActiveCurrencyStatement() throws Exception {
         assertTrue(parsedConfiguration().hasStatement(
                 "me.nawa.member.mapper.MemberMapper.existsActiveCurrency"

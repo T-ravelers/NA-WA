@@ -3,6 +3,7 @@ package me.nawa.member.service;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.member.domain.MemberProfile;
 import me.nawa.member.dto.MemberProfileResponse;
+import me.nawa.member.dto.MerchantRegisterRequest;
 import me.nawa.member.dto.OnboardingProfileRequest;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.mapper.MemberMapper;
@@ -314,5 +315,61 @@ class MemberProfileServiceImplTest {
         );
 
         assertEquals("MEMBER-001", exception.getErrorCode().getCode());
+    }
+
+    @Test
+    void registerAsMerchant_savesBusinessName_andReturnsRefreshedProfile() {
+        MemberProfile merchant = profile("ACTIVE", true);
+        merchant.setAccountType("MERCHANT");
+        merchant.setDisplayName("○○ 카페");
+
+        when(memberMapper.findProfile(1L))
+                .thenReturn(profile("ACTIVE", false))
+                .thenReturn(merchant);
+        when(memberMapper.markAsMerchant(1L, "○○ 카페")).thenReturn(1);
+
+        MemberProfileResponse response = service.registerAsMerchant(
+                1L, new MerchantRegisterRequest("○○ 카페"));
+
+        verify(memberMapper).markAsMerchant(1L, "○○ 카페");
+        assertEquals("MERCHANT", response.getAccountType());
+        assertEquals("○○ 카페", response.getDisplayName());
+    }
+
+    @Test
+    void registerAsMerchant_trimsBusinessName() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.markAsMerchant(1L, "○○ 카페")).thenReturn(1);
+
+        service.registerAsMerchant(1L, new MerchantRegisterRequest("  ○○ 카페  "));
+
+        verify(memberMapper).markAsMerchant(1L, "○○ 카페");
+    }
+
+    @Test
+    void registerAsMerchant_throwsInvalidDisplayName_whenBusinessNameBlank() {
+        String[] blankNames = {null, "", "   "};
+
+        for (String blankName : blankNames) {
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.registerAsMerchant(1L, new MerchantRegisterRequest(blankName))
+            );
+            assertEquals("MEMBER-006", exception.getErrorCode().getCode());
+        }
+        verify(memberMapper, never()).markAsMerchant(anyLong(), anyString());
+    }
+
+    @Test
+    void registerAsMerchant_throwsAlreadyMerchant_whenNoRowUpdated() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.markAsMerchant(1L, "○○ 카페")).thenReturn(0);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.registerAsMerchant(1L, new MerchantRegisterRequest("○○ 카페"))
+        );
+
+        assertEquals("MEMBER-009", exception.getErrorCode().getCode());
     }
 }
