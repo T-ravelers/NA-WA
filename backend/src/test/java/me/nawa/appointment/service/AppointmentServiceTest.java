@@ -381,7 +381,7 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void leaveAppointment_activeMember_requiresRefundIntegration() {
+    void leaveAppointment_activeMember_refundsDepositAndLeaves() {
         Appointment appointment = appointment(
                 10L,
                 AppointmentStatus.RECRUITING
@@ -392,25 +392,40 @@ class AppointmentServiceTest {
                 .memberId(2L)
                 .membershipStatus(MembershipStatus.ACTIVE)
                 .build();
+        Deposit deposit = mock(Deposit.class);
+        when(deposit.getDepositId()).thenReturn(40L);
+        when(deposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        when(deposit.isPending()).thenReturn(false);
+        when(deposit.isHeld()).thenReturn(true);
         when(appointmentMapper.findAppointmentByIdForUpdate(10L))
                 .thenReturn(appointment);
         when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
                 10L, 2L
         )).thenReturn(member);
+        when(depositMapper.findByAppointmentMemberId(30L))
+                .thenReturn(deposit);
+        when(walletTransferService.transferFromSystemWallet(
+                eq(2L), eq(SystemWalletCode.DEPOSIT_POOL), eq(2L),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_REFUND.name()), anyString()
+        )).thenReturn(600L);
+        when(depositMapper.markRefunded(eq(40L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberLeft(30L)).thenReturn(1);
 
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> appointmentService.leaveAppointment(2L, 10L)
+        appointmentService.leaveAppointment(2L, 10L);
+
+        verify(walletTransferService).transferFromSystemWallet(
+                eq(2L), eq(SystemWalletCode.DEPOSIT_POOL), eq(2L),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_REFUND.name()), anyString()
         );
-
-        assertEquals(AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
-                exception.getErrorCode());
-        verify(depositMapper, never()).findByAppointmentMemberId(any());
-        verify(appointmentMapper, never()).markMemberLeft(any());
+        verify(deposit).refund(any());
+        verify(depositMapper).markRefunded(eq(40L), any());
+        verify(appointmentMapper).markMemberLeft(30L);
     }
 
     @Test
-    void leaveAppointment_activeHost_requiresRefundIntegration() {
+    void leaveAppointment_activeHost_rejectsCancellation() {
         Appointment appointment = appointment(
                 10L,
                 AppointmentStatus.RECRUITING
@@ -433,6 +448,36 @@ class AppointmentServiceTest {
 
         assertEquals(AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
                 exception.getErrorCode());
+        verify(appointmentMapper, never()).markMemberLeft(any());
+    }
+
+    @Test
+    void leaveAppointment_afterJoinDeadline_rejectsCancellation() {
+        Appointment appointment = appointment(
+                10L,
+                AppointmentStatus.RECRUITING
+        );
+        appointment.setJoinDeadline(LocalDateTime.now().minusDays(1));
+        AppointmentMember member = AppointmentMember.builder()
+                .appointmentMemberId(30L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .build();
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
+                10L, 2L
+        )).thenReturn(member);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.leaveAppointment(2L, 10L)
+        );
+
+        assertEquals(AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
+                exception.getErrorCode());
+        verify(depositMapper, never()).findByAppointmentMemberId(any());
         verify(appointmentMapper, never()).markMemberLeft(any());
     }
 

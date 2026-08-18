@@ -65,6 +65,28 @@ public class WalletTransferService {
         );
     }
 
+    // 시스템 지갑(예: DEPOSIT_POOL) -> 회원 지갑 이체. 보증금 환급처럼 상대가 시스템
+    // 계정에서 사람에게 갈 때 쓴다. transferType은 호출자가 명시한다(DEPOSIT_REFUND 등).
+    @Transactional
+    public long transferFromSystemWallet(
+        long initiatorMemberId,
+        String payerSystemCode,
+        long payeeMemberId,
+        BigDecimal amount,
+        String transferType,
+        String memo
+    ) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessException(WalletErrorCode.INVALID_SETTLEMENT_TRANSFER);
+        }
+
+        Wallet payerWallet = requireSystemWallet(payerSystemCode);
+        Wallet payeeWallet = requireWallet(payeeMemberId);
+        return executeTransfer(
+            initiatorMemberId, payerWallet, payeeWallet, amount, transferType, memo
+        );
+    }
+
     // 지갑의 존재·활성 상태를 확인한 뒤, wallet_id 오름차순으로 잠그고 이체를 실행한다.
     // 반대 방향 이체가 동시에 들어와도 교착 상태가 나지 않게 하는 순서다.
     private long executeTransfer(

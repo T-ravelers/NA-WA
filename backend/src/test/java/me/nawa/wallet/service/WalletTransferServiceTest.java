@@ -106,4 +106,41 @@ class WalletTransferServiceTest {
         order.verify(walletLedgerMapper).insert(77L, 10L, "DEBIT", new BigDecimal("10000"), new BigDecimal("40000"));
         order.verify(walletLedgerMapper).insert(77L, 1L, "CREDIT", new BigDecimal("10000"), new BigDecimal("10000"));
     }
+
+    @Test
+    void transferFromSystemWallet_debitsSystemWalletAndCreditsMember() {
+        Wallet pool = new Wallet(1L, "KRW", new BigDecimal("10000"), "ACTIVE");
+        Wallet member = new Wallet(10L, "KRW", new BigDecimal("40000"), "ACTIVE");
+        when(walletMapper.findBySystemCode("DEPOSIT_POOL")).thenReturn(pool);
+        when(walletMapper.findByMemberId(3L)).thenReturn(member);
+        // wallet_id 오름차순 잠금 순서 확인용 — pool(1L)이 member(10L)보다 먼저 잠긴다.
+        when(walletMapper.findByWalletIdForUpdate(1L)).thenReturn(pool);
+        when(walletMapper.findByWalletIdForUpdate(10L)).thenReturn(member);
+        when(transactionNumberGenerator.generate()).thenReturn("TXN-DEPOSIT-REFUND-1");
+        doAnswer(invocation -> {
+            invocation.getArgument(0, WalletTransfer.class).setTransferId(88L);
+            return null;
+        }).when(walletTransferMapper).insert(any(WalletTransfer.class));
+
+        WalletTransferService service = new WalletTransferService(
+            walletMapper,
+            walletTransferMapper,
+            walletLedgerMapper,
+            transactionNumberGenerator
+        );
+
+        long transferId = service.transferFromSystemWallet(
+            3L, "DEPOSIT_POOL", 3L, new BigDecimal("10000"), "DEPOSIT_REFUND", "약속 참여 취소 보증금 환급"
+        );
+
+        assertEquals(88L, transferId);
+        InOrder order = inOrder(walletMapper, walletTransferMapper, walletLedgerMapper);
+        order.verify(walletMapper).findByWalletIdForUpdate(1L);
+        order.verify(walletMapper).findByWalletIdForUpdate(10L);
+        order.verify(walletTransferMapper).insert(any(WalletTransfer.class));
+        order.verify(walletMapper).updateBalance(1L, new BigDecimal("0"));
+        order.verify(walletMapper).updateBalance(10L, new BigDecimal("50000"));
+        order.verify(walletLedgerMapper).insert(88L, 1L, "DEBIT", new BigDecimal("10000"), new BigDecimal("0"));
+        order.verify(walletLedgerMapper).insert(88L, 10L, "CREDIT", new BigDecimal("10000"), new BigDecimal("50000"));
+    }
 }

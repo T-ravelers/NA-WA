@@ -237,6 +237,66 @@ class AppointmentDepositIntegrationTest {
         );
     }
 
+    @Test
+    void joinAppointment_thenLeaveAppointment_refundsDepositFromPool() {
+        poolBalanceBeforeTest = jdbcTemplate.queryForObject(
+                "SELECT available_balance FROM wallets w"
+                        + " JOIN wallet_owners o ON o.wallet_owner_id = w.wallet_owner_id"
+                        + " WHERE o.owner_type = 'SYSTEM' AND o.system_code = 'DEPOSIT_POOL'",
+                BigDecimal.class
+        );
+        assertNotNull(poolBalanceBeforeTest, "V11 마이그레이션으로 DEPOSIT_POOL 지갑이 미리 존재해야 한다");
+
+        long hostMemberId = createMemberWithWallet("방장", new BigDecimal("50000.0000"));
+        long guestMemberId = createMemberWithWallet("참여자", new BigDecimal("50000.0000"));
+        long eventId = createApprovedEvent();
+
+        AppointmentCreateRequest request = new AppointmentCreateRequest();
+        request.setItemId(eventId);
+        request.setItemType("EVENT");
+        request.setLanguageCode("en");
+        request.setAppointmentName("Integration Test Appointment");
+        request.setMaxMembers(5);
+        request.setDepositAmount(BigDecimal.valueOf(10_000));
+        request.setMeetingPlace("Test Meeting Place");
+        request.setJoinDeadline(LocalDateTime.now().plusDays(1));
+        request.setActivityStartAt(LocalDateTime.now().plusDays(2));
+        request.setActivityEndAt(LocalDateTime.now().plusDays(2).plusHours(2));
+
+        Appointment created = appointmentService.createAppointment(hostMemberId, request);
+        appointmentIds.add(created.getAppointmentId());
+        appointmentService.joinAppointment(guestMemberId, created.getAppointmentId());
+        assertEquals(0, new BigDecimal("40000.0000").compareTo(walletBalance(guestMemberId)));
+
+        appointmentService.leaveAppointment(guestMemberId, created.getAppointmentId());
+
+        AppointmentMember guestMember = appointmentMapper.findMemberByAppointmentAndMember(
+                created.getAppointmentId(), guestMemberId
+        );
+        assertEquals(MembershipStatus.LEFT, guestMember.getMembershipStatus());
+        Deposit guestDeposit = depositMapper.findByAppointmentMemberId(
+                guestMember.getAppointmentMemberId()
+        );
+        assertEquals(DepositStatus.REFUNDED, guestDeposit.getDepositStatus());
+        assertEquals(
+                0,
+                new BigDecimal("50000.0000").compareTo(walletBalance(guestMemberId)),
+                "환급 후 참여자 지갑 잔액이 참여 전으로 돌아와야 한다"
+        );
+
+        BigDecimal poolBalanceAfter = jdbcTemplate.queryForObject(
+                "SELECT available_balance FROM wallets w"
+                        + " JOIN wallet_owners o ON o.wallet_owner_id = w.wallet_owner_id"
+                        + " WHERE o.owner_type = 'SYSTEM' AND o.system_code = 'DEPOSIT_POOL'",
+                BigDecimal.class
+        );
+        assertEquals(
+                0,
+                poolBalanceBeforeTest.add(new BigDecimal("10000")).compareTo(poolBalanceAfter),
+                "방장 보증금 10000원만 DEPOSIT_POOL에 남아 있어야 한다"
+        );
+    }
+
     private BigDecimal walletBalance(long memberId) {
         return jdbcTemplate.queryForObject(
                 "SELECT available_balance FROM wallets w"

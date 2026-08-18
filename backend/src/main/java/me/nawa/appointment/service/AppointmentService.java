@@ -215,17 +215,10 @@ public class AppointmentService {
                     AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
             );
         }
-        if (member.getMembershipStatus() != MembershipStatus.PENDING) {
-            throw new BusinessException(
-                    AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
-            );
-        }
-        if (appointment.getAppointmentStatus()
-                == AppointmentStatus.IN_PROGRESS
-                || appointment.getAppointmentStatus()
-                == AppointmentStatus.COMPLETED
-                || appointment.getAppointmentStatus()
-                == AppointmentStatus.CANCELLED) {
+        // 참여 취소는 참여 마감 시각 전까지만 가능하다. joinDeadline은 항상
+        // activityStartAt보다 늦을 수 없으므로(생성 시 검증), 이 조건 하나로
+        // 활동 시작 이후(IN_PROGRESS/COMPLETED) 취소도 함께 막힌다.
+        if (LocalDateTime.now().isAfter(appointment.getJoinDeadline())) {
             throw new BusinessException(
                     AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
             );
@@ -236,6 +229,8 @@ public class AppointmentService {
         );
         if (deposit != null && deposit.isPending()) {
             cancelPendingDeposit(deposit);
+        } else if (deposit != null && deposit.isHeld()) {
+            refundHeldDeposit(memberId, deposit);
         }
         if (appointmentMapper.markMemberLeft(
                 member.getAppointmentMemberId()
@@ -411,6 +406,26 @@ public class AppointmentService {
                 deposit.getDepositId(),
                 LocalDateTime.now()
         ) != 1) {
+            throw new BusinessException(
+                    CommonErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    // DEPOSIT_POOL -> 회원 지갑으로 보증금을 되돌리고 보증금 상태를 REFUNDED로
+    // 반영한다. 참여 취소 시 이미 예치(HELD)된 보증금을 환급하는 경로다.
+    private void refundHeldDeposit(Long memberId, Deposit deposit) {
+        long transferId = walletTransferService.transferFromSystemWallet(
+                memberId,
+                SystemWalletCode.DEPOSIT_POOL,
+                memberId,
+                deposit.getAmount(),
+                TransferType.DEPOSIT_REFUND.name(),
+                "약속 참여 취소 보증금 환급"
+        );
+        LocalDateTime resolvedAt = LocalDateTime.now();
+        deposit.refund(resolvedAt);
+        if (depositMapper.markRefunded(deposit.getDepositId(), resolvedAt) != 1) {
             throw new BusinessException(
                     CommonErrorCode.INTERNAL_SERVER_ERROR
             );

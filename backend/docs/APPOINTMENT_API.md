@@ -125,8 +125,10 @@
 `APPOINTMENT-008`로 막혀 있어 이 취소 경로도 아직 실행되지 않습니다.
 
 방장은 참여 취소 API로 약속에서 빠질 수 없습니다. 상태와 무관하게 항상
-`APPOINTMENT-007`을 반환합니다. `IN_PROGRESS`, `COMPLETED`, `CANCELLED` 약속에서도
-참여를 취소할 수 없습니다.
+`APPOINTMENT-007`을 반환합니다. 방장이 아닌 회원의 참여 취소는 참여 마감
+시각(`joinDeadline`) 전까지만 가능하며, 지난 뒤에는 `APPOINTMENT-007`을
+반환합니다. 자세한 근거는 [APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+12절을 참고하세요.
 
 ## 출석 확정
 
