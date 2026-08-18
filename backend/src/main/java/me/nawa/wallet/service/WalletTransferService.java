@@ -67,9 +67,12 @@ public class WalletTransferService {
 
     // 시스템 지갑(예: DEPOSIT_POOL) -> 회원 지갑 이체. 보증금 환급처럼 상대가 시스템
     // 계정에서 사람에게 갈 때 쓴다. transferType은 호출자가 명시한다(DEPOSIT_REFUND 등).
+    // initiatorMemberId는 null을 허용한다 — 스케줄러 등 회원 요청 없이 시스템이
+    // 자동으로 처리하는 이체는 시작한 회원이 없으므로 null로 남긴다(스키마 주석
+    // "시스템 자동 이체는 null" 참고).
     @Transactional
     public long transferFromSystemWallet(
-        long initiatorMemberId,
+        Long initiatorMemberId,
         String payerSystemCode,
         long payeeMemberId,
         BigDecimal amount,
@@ -90,7 +93,7 @@ public class WalletTransferService {
     // 지갑의 존재·활성 상태를 확인한 뒤, wallet_id 오름차순으로 잠그고 이체를 실행한다.
     // 반대 방향 이체가 동시에 들어와도 교착 상태가 나지 않게 하는 순서다.
     private long executeTransfer(
-        long initiatorMemberId,
+        Long initiatorMemberId,
         Wallet payerWallet,
         Wallet payeeWallet,
         BigDecimal amount,

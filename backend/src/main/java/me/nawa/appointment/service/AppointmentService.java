@@ -314,6 +314,14 @@ public class AppointmentService {
 
         Map<Long, AttendanceStatus> requestedByMemberId =
                 toRequestedAttendanceMap(request);
+        // 출석자가 한 명도 없으면 노쇼 보증금을 나눠 줄 대상이 없어 정산 자체가
+        // 성립하지 않는다. 정산 배치를 만들기 전에 여기서 미리 거부한다(16절).
+        if (requestedByMemberId.values().stream()
+                .noneMatch(status -> status == AttendanceStatus.ATTENDED)) {
+            throw new BusinessException(
+                    AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
+            );
+        }
         List<AppointmentMember> activeMembers = appointmentMapper
                 .findActiveMembersByAppointmentId(appointmentId);
         if (activeMembers.size() != requestedByMemberId.size()) {

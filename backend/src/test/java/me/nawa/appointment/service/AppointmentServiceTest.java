@@ -724,6 +724,34 @@ class AppointmentServiceTest {
         verify(appointmentMapper, never()).updateAttendance(any(), any(), any());
     }
 
+    @Test
+    void confirmAttendance_noAttendedMember_rejects() {
+        Appointment appointment = appointment(10L, AppointmentStatus.IN_PROGRESS);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+
+        AppointmentAttendanceRequest.MemberAttendance host =
+                new AppointmentAttendanceRequest.MemberAttendance();
+        host.setMemberId(1L);
+        host.setAttendanceStatus(AttendanceStatus.NO_SHOW);
+        AppointmentAttendanceRequest.MemberAttendance guest =
+                new AppointmentAttendanceRequest.MemberAttendance();
+        guest.setMemberId(2L);
+        guest.setAttendanceStatus(AttendanceStatus.NO_SHOW);
+        AppointmentAttendanceRequest allNoShowRequest = new AppointmentAttendanceRequest();
+        allNoShowRequest.setMembers(List.of(host, guest));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.confirmAttendance(1L, 10L, allNoShowRequest)
+        );
+
+        assertEquals(AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION,
+                exception.getErrorCode());
+        verify(appointmentMapper, never()).findActiveMembersByAppointmentId(any());
+        verify(appointmentMapper, never()).updateAttendance(any(), any(), any());
+    }
+
     private static AppointmentCreateRequest validRequest() {
         AppointmentCreateRequest request = new AppointmentCreateRequest();
         request.setItemId(100L);

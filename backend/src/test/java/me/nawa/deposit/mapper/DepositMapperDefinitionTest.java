@@ -44,6 +44,7 @@ class DepositMapperDefinitionTest {
             configuration,
             "me.nawa.deposit.mapper.DepositPayoutBatchMapper",
             List.of(
+                "findPendingOrFailedBatchIds",
                 "findById",
                 "findByIdForUpdate",
                 "findByAppointmentId",

@@ -18,11 +18,10 @@
   동작합니다(15절).
 - 출석 확정(`IN_PROGRESS → COMPLETED`): 실제로 동작합니다. 방장이 `ACTIVE` 회원
   전원의 출석을 정확히 한 번씩 확정하면, 같은 트랜잭션에서 약속을 `COMPLETED`로
-  전환하고 `DepositPayoutBatch`를 `PENDING`으로 만들어둡니다. 이 배치를 실제
-  지갑 이체로 처리하는 비동기 단계(16절)는 아직 없습니다 — 아래 항목 참고.
+  전환하고 `DepositPayoutBatch`를 `PENDING`으로 만들어둡니다.
+- 정산 배치 비동기 처리: 실제로 동작합니다(16절). 출석 회원에게는 본인 보증금을
+  환급하고, 노쇼 회원의 보증금은 출석 회원에게 균등 분배합니다.
 - 기존 완료 약속에 대한 후기 등록은 이미 동작합니다.
-- 보증금 환급·분배를 실행하는 지갑 이체 중 노쇼 분배, 그리고 그 비동기 배치
-  처리는 아직 없습니다. 설계는 16절에 정리했습니다.
 
 ## 2. 약속 상태 `AppointmentStatus`
 
@@ -349,7 +348,7 @@ DB 컬럼: `appointments.item_type`
 | 회원 약속 프로필 조회 | 사용 가능 |
 | 조건을 만족하는 기존 완료 약속의 후기 등록 | 사용 가능 |
 | 출석 확정(`IN_PROGRESS → COMPLETED`, 정산 배치 `PENDING` 생성까지) | 사용 가능 |
-| 정산 배치를 실제 지갑 이체로 처리하는 비동기 단계 | 16절 설계, 미구현 |
+| 정산 배치 비동기 처리(환급·노쇼 분배 지갑 이체) | 사용 가능(16절) |
 
 정산 배치가 `PENDING`으로 남아있는 동안은 아직 아무 지갑도 움직이지 않습니다.
 실제 환급·노쇼 분배 이체는 16절의 비동기 처리가 구현되면 그때 실행됩니다.
@@ -424,34 +423,44 @@ DB 컬럼 값 자체는 스케줄러가 뒤에서 맞춥니다. 아무도 이 �
 
 ## 16. 보증금 정산 — 비동기 배치
 
-방장의 출석 확정 요청은 무거운 지갑 이체를 직접 하지 않고 `DepositPayoutBatch`를
-`PENDING`으로 남기기만 합니다. 실제 이체는 15절의 스케줄러가 별도 tick으로
-처리합니다. 이 앱의 다른 결제성 기능(정산·QR결제)은 요청 하나 안에서 동기로
-처리하지만, 보증금 정산은 참가자 수만큼 이체가 한 번에 여러 건 필요해 무거워질
-수 있어 비동기로 갑니다.
+방장의 출석 확정 요청(`confirmAttendance`)은 무거운 지갑 이체를 직접 하지 않고
+`DepositPayoutBatch`를 `PENDING`으로 남기기만 합니다. 실제 이체는
+`me.nawa.deposit.service.DepositPayoutProcessingScheduler`가 60초 주기로 별도
+tick에서 처리합니다. 이 앱의 다른 결제성 기능(정산·QR결제)은 요청 하나 안에서
+동기로 처리하지만, 보증금 정산은 참가자 수만큼 이체가 한 번에 여러 건 필요해
+무거워질 수 있어 비동기로 갑니다.
 
-- `DepositPayoutBatchMapper`에 `markProcessing`/`markCompleted`/`markFailed`가
-  이미 구현돼 있어 상태 전이 자체는 새로 만들 게 없습니다. 스케줄러가 `PENDING`
-  또는 `FAILED` 배치를 찾는 조회 메서드 하나만 추가하면 됩니다.
-- 노쇼 보증금을 참석 회원에게 나눌 때 나머지 금액은
-  [SETTLEMENT.md](SETTLEMENT.md)의 `EQUAL` 분담과 같은 규칙(참가 ID 오름차순으로
-  최소 단위 금액을 하나씩 배분)을 재사용합니다.
-- 노쇼 분배 이체의 `transfer_type`은 `wallet_transfers`에 이미 있는
-  `DEPOSIT_NO_SHOW_DISTRIBUTION`을 그대로 씁니다. `V6__align_deposit_payout_
-  columns_and_constraints.sql`이 예전 이름 `DEPOSIT_FORFEIT_DISTRIBUTION`을 이미
-  이 값으로 바꿔뒀고, DB ENUM에서 예전 이름은 빠졌습니다. 새 마이그레이션은
-  필요 없습니다.
-- 단, `TransferType.java`(자바 enum)는 이 변경을 놓쳐 아직 예전 이름
-  `DEPOSIT_FORFEIT_DISTRIBUTION`을 갖고 있습니다. DB엔 이제 이 값이 없으므로,
-  이 이름으로 INSERT를 시도하면 실패합니다. 이번 작업에서 `DEPOSIT_NO_SHOW_
-  DISTRIBUTION`으로 고쳐야 합니다.
+- `DepositPayoutProcessingScheduler`가 `DepositPayoutBatchMapper.
+  findPendingOrFailedBatchIds()`로 대상 배치를 훑고, 배치마다
+  `DepositPayoutBatchProcessor.processBatch(batchId)`를 호출합니다. 각 배치는
+  독립된 트랜잭션(`@Transactional`)으로 처리해 하나가 실패해도 나머지에
+  영향이 없습니다.
+- `processBatch`가 하는 일: 출석한 회원에게는 본인 보증금을 환급
+  (`SELF_REFUND`, `DEPOSIT_REFUND` 이체), 노쇼 회원의 보증금은 출석 회원에게
+  균등 분배(`NO_SHOW_SHARE`, `DEPOSIT_NO_SHOW_DISTRIBUTION` 이체)합니다. 분배는
+  [SETTLEMENT.md](SETTLEMENT.md)의 `EQUAL` 분담과 같은
+  `SettlementAmountAllocator`를 그대로 재사용합니다(참가 ID 오름차순으로 최소
+  단위 금액을 하나씩 배분).
+- 이체마다 `DepositPayoutMapper.countByAllocation`으로 이미 처리됐는지 먼저
+  확인합니다. 중간에 실패해 다음 tick이 같은 배치를 재처리하더라도, 이미 끝난
+  지급 건은 다시 이체하지 않고 건너뜁니다 — `deposit_payouts`의
+  `(source_deposit_id, recipient_appointment_member_id, allocation_type)`
+  UNIQUE 제약과도 맞습니다.
 - `ATTENDED` 참가자가 0명이면 노쇼 보증금을 나눠줄 대상이 없어 분배 계산이
-  성립하지 않습니다. 이 경우 배치를 `FAILED`로 남기지 않고, 정산 자체를 도메인
-  오류로 거부합니다.
+  성립하지 않습니다. 이 배치 처리 단계가 아니라 `confirmAttendance` 자체에서
+  미리 거부합니다 — 출석자가 한 명도 없는 요청은 배치를 만들기 전에
+  `APPOINTMENT-006`으로 막히므로, 이 시나리오의 배치는 애초에 생기지 않습니다.
 - 도중에 실패하면 배치가 `FAILED`로 남고, 이미 처리된 지급 건은 그대로 유지됩니다.
-  다음 tick이 `FAILED` 배치를 다시 집어 `PROCESSING`으로 돌리고 이어서 처리합니다.
-  방장의 출석 확정 요청 자체는 이미 성공한 뒤라 사용자가 재시도를 신경 쓸 필요가
-  없습니다.
+  실패 표시(`markBatchFailed`)는 실패를 일으킨 트랜잭션과 별도로
+  (`Propagation.REQUIRES_NEW`) 커밋합니다 — 같은 트랜잭션이면 롤백될 때 `FAILED`
+  반영도 함께 사라지기 때문입니다. 다음 tick이 `FAILED` 배치를 다시 집어
+  `PROCESSING`으로 돌리고 이어서 처리합니다. 방장의 출석 확정 요청 자체는 이미
+  성공한 뒤라 사용자가 재시도를 신경 쓸 필요가 없습니다.
+- 시스템(스케줄러)이 자동으로 시작한 이체는 `wallet_transfers.
+  initiator_member_id`를 `null`로 남깁니다(스키마 주석 "시스템 자동 이체는
+  null" 참고). 이를 위해 `WalletTransferService.transferFromSystemWallet`의
+  `initiatorMemberId` 파라미터를 `long`에서 `Long`으로 바꿔 null을 받을 수
+  있게 했습니다.
 - `deposit_payout_batches.appointment_id`에 UNIQUE 제약이 있어 같은 약속에 배치가
   두 번 생기지 않습니다.
 
