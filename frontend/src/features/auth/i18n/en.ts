@@ -15,6 +15,8 @@ export default {
       passTitle: 'Seoul & Beyond',
       passStamp: 'GO',
       start: 'Get started',
+      /** 가맹점 진입점. 손님에게는 해당 없는 링크라 눈에 덜 띄게 둔다. */
+      merchantEntry: 'Running a store?',
     },
     signIn: {
       title: 'Welcome to NA-WA',

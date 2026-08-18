@@ -14,6 +14,9 @@ export default {
       description: 'Enter your store name. Customers see this name when they scan your QR code.',
       businessName: 'Store name',
       businessNamePlaceholder: 'e.g. Blue Bottle Hongdae',
+      /** 되돌리는 API가 없다. 손님이 호기심에 눌러 계정을 잠그지 않도록 미리 알린다. */
+      irreversible:
+        'This cannot be undone. A store account cannot make payments or use traveller features.',
       submit: 'Create store',
       error: 'We could not set up your store. Please try again.',
     },

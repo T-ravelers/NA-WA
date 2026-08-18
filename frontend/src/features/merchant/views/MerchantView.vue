@@ -246,6 +246,9 @@ const createError = computed(() =>
         <p class="mt-1 text-caption text-ink-3">
           {{ t('merchant.register.description') }}
         </p>
+        <p class="mt-3 rounded-sm bg-surface-2 px-3 py-2 text-caption text-ink-2">
+          {{ t('merchant.register.irreversible') }}
+        </p>
 
         <form
           class="mt-5 space-y-4"

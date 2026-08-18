@@ -102,6 +102,8 @@ describe('MerchantView', () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Set up your store')
+    // Welcome에 링크가 생겨 손님도 이 화면에 닿는다. 되돌릴 수 없다는 것을 미리 알려야 한다.
+    expect(wrapper.text()).toContain('This cannot be undone.')
     expect(wrapper.text()).not.toContain('Charge a customer')
     expect(fetchMerchantIncome).not.toHaveBeenCalled()
   })
