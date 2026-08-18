@@ -42,7 +42,8 @@ public class ExploreItemLikeService {
      * 찜 취소. 찜한 적이 없거나 이미 취소된 상태면 아무것도 바꾸지 않는다(멱등).
      *
      * 노출이 꺼진(HIDDEN 등) 항목도 취소는 허용한다 — 사용자가 자기 찜 목록을
-     * 정리할 수 있어야 하므로 존재 여부만 확인한다.
+     * 정리할 수 있어야 하므로 노출 조건 대신 삭제되지 않았는지만 확인한다.
+     * 삭제된 항목은 등록과 같이 ITEM_NOT_FOUND다.
      */
     @Transactional
     public ExploreItemLikeResponse unlike(long memberId, long itemId) {

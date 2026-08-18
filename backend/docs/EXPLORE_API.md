@@ -68,6 +68,9 @@ Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `
 전체 검색 결과 수입니다. 프론트엔드는 Event와 Place 모두 `size=20`으로 요청하고,
 `totalPages`를 사용해 번호형 페이지네이션을 표시합니다.
 
+목록·상세 응답의 `saved`는 요청한 회원이 해당 Event를 찜했는지입니다. 비인증
+요청에서는 항상 `false`입니다.
+
 ## Place 목록
 
 `GET /api/v1/explore/places`
@@ -128,6 +131,9 @@ Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `
 `hasNext`를 반환합니다. 상세 응답은 기본 정보와 주소·좌표, 운영시간 원문, 편의 옵션,
 조회·저장 수, 연결된 Activity와 Sector를 반환합니다.
 
+목록·상세 응답의 `saved`는 요청한 회원이 해당 Place를 찜했는지입니다. 비인증
+요청에서는 항상 `false`입니다.
+
 ## Place 상세
 
 `GET /api/v1/explore/places/{placeId}?language=en`
@@ -153,8 +159,10 @@ Event·Place 공통으로 `explore_items`의 `item_id`를 사용합니다(Event�
 
 - 등록은 목록·상세와 같은 노출 조건(`APPROVED`·`VISIBLE`·미삭제)을 요구합니다.
   조건을 만족하지 않으면 HTTP 404와 `EXPLORE-003`을 반환합니다.
-- 취소는 노출이 꺼진 항목에도 허용합니다 — 회원이 자기 찜 목록을 정리할 수 있어야
-  하므로 항목의 존재 여부만 확인합니다.
+- 취소는 노출이 꺼진(`HIDDEN`) 항목에도 허용합니다 — 회원이 자기 찜 목록을 정리할
+  수 있어야 하므로 노출 조건 대신 삭제되지 않았는지만 확인합니다. 삭제된 항목의
+  취소는 등록과 같이 HTTP 404와 `EXPLORE-003`을 반환합니다.
 - 찜 상태가 실제로 바뀔 때만 해당 Event·Place의 `favorite_count`를 같은
   트랜잭션에서 1 증감합니다.
-- 내 찜 목록은 목록 API의 `savedOnly=true`로 조회합니다.
+- 내 찜 목록은 목록 API의 `savedOnly=true`로 조회합니다. 개별 항목의 찜 여부는
+  목록·상세 응답의 `saved` 필드로 확인합니다.

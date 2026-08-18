@@ -23,7 +23,10 @@ public interface PlaceMapper {
         @Param("memberId") Long memberId
     );
 
-    PlaceDetailResponse findPlaceDetail(@Param("placeId") Long placeId);
+    PlaceDetailResponse findPlaceDetail(
+        @Param("placeId") Long placeId,
+        @Param("memberId") Long memberId
+    );
 
     List<PlaceActivityResponse> findPlaceActivities(
         @Param("placeId") Long placeId,

@@ -65,6 +65,7 @@ class EventControllerTest {
             .region3("명동")
             .startDate(LocalDate.of(2026, 8, 5))
             .endDate(LocalDate.of(2026, 8, 31))
+            .saved(true)
             .build();
 
         EventListResponse response = new EventListResponse(
@@ -105,6 +106,9 @@ class EventControllerTest {
         assertEquals(
             "2026-08-31",
             body.path("data").path("content").get(0).path("endDate").asText()
+        );
+        assertTrue(
+            body.path("data").path("content").get(0).path("saved").asBoolean()
         );
         assertEquals(1L, body.path("data").path("totalElements").asLong());
     }
@@ -199,10 +203,11 @@ class EventControllerTest {
             .organizer("NA-WA 테스트 운영팀")
             .startDate(LocalDate.of(2026, 8, 5))
             .endDate(LocalDate.of(2026, 8, 31))
+            .saved(true)
             .activities(List.of())
             .build();
 
-        when(eventService.getEventDetail(990001L, "ko"))
+        when(eventService.getEventDetail(990001L, "ko", null))
             .thenReturn(response);
 
         String body = mockMvc.perform(
@@ -255,12 +260,13 @@ class EventControllerTest {
             "2026-08-31",
             json.path("data").path("endDate").asText()
         );
+        assertTrue(json.path("data").path("saved").asBoolean());
     }
 
     @Test
     void getEventDetail_returns404WithErrorCode_whenEventNotFound()
         throws Exception {
-        when(eventService.getEventDetail(990001L, "ko"))
+        when(eventService.getEventDetail(990001L, "ko", null))
             .thenThrow(new BusinessException(ExploreErrorCode.EVENT_NOT_FOUND));
 
         String responseBody = mockMvc.perform(

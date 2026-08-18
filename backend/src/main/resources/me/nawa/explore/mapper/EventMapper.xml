@@ -29,6 +29,22 @@
         (e.end_date IS NULL OR e.end_date &gt;= CURRENT_DATE())
     </sql>
 
+    <!-- 요청한 회원의 찜 여부. 비인증 요청(memberId IS NULL)은 항상 FALSE다. -->
+    <sql id="savedColumn">
+        <choose>
+            <when test="memberId != null">
+                EXISTS (
+                    SELECT 1
+                    FROM explore_item_likes saved_like
+                    WHERE saved_like.item_id = ei.item_id
+                      AND saved_like.member_id = #{memberId}
+                      AND saved_like.deleted_at IS NULL
+                ) AS saved
+            </when>
+            <otherwise>FALSE AS saved</otherwise>
+        </choose>
+    </sql>
+
     <select id="findEventDetail"
             resultMap="eventDetailResultMap">
         SELECT
@@ -67,7 +83,8 @@
             e.has_benefit,
             e.reservable,
             e.contact,
-            e.organizer
+            e.organizer,
+            <include refid="savedColumn"/>
         FROM explore_items ei
                  JOIN event e
                       ON e.event_id = ei.item_id
@@ -319,7 +336,8 @@
         e.latitude,
         e.longitude,
         e.start_date,
-        e.end_date
+        e.end_date,
+        <include refid="savedColumn"/>
         FROM explore_items ei
         JOIN event e
         ON e.event_id = ei.item_id

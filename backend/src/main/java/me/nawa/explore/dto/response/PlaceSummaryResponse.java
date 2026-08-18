@@ -41,6 +41,7 @@ public class PlaceSummaryResponse {
     private Boolean isActive;
     private long viewCount;
     private long favoriteCount;
+    private boolean saved;
     @JsonIgnore
     private JsonNode openingHours;
     @JsonIgnore

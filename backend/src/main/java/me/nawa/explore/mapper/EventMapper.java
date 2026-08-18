@@ -25,7 +25,8 @@ public interface EventMapper {
 
     EventDetailResponse findEventDetail(
         @Param("eventId") Long eventId,
-        @Param("language") String language
+        @Param("language") String language,
+        @Param("memberId") Long memberId
     );
 
     List<EventActivityResponse> findEventActivities(

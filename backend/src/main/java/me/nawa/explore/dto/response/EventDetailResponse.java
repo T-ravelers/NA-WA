@@ -65,6 +65,7 @@ public class EventDetailResponse {
     private Boolean reservable;
     private String contact;
     private String organizer;
+    private boolean saved;
 
     private List<EventActivityResponse> activities;
 }

@@ -38,10 +38,12 @@ public class EventController {
     public ApiResponse<EventDetailResponse> getEventDetail(
         @PathVariable Long eventId,
         // TODO(국제화 후속 이슈): 크롤링 원본 국제화 전까지 en을 기본 언어로 사용한다.
-        @RequestParam(name = "language", defaultValue = "en") String language
+        @RequestParam(name = "language", defaultValue = "en") String language,
+        @AuthenticationPrincipal AuthenticatedMember member
     ) {
+        Long memberId = member == null ? null : member.getMemberId();
         return ApiResponse.success(
-            eventService.getEventDetail(eventId, language)
+            eventService.getEventDetail(eventId, language, memberId)
         );
     }
 }

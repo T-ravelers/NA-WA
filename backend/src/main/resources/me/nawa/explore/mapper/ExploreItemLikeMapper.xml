@@ -37,6 +37,11 @@
           AND deleted_at IS NOT NULL
     </update>
 
+    <!--
+        INSERT IGNORE는 중복 키뿐 아니라 FK 위반도 경고로 낮춰 0을 돌려주고,
+        서비스는 0을 "이미 찜한 상태"로 읽는다. explore_items를 하드 삭제하지
+        않는다는 전제 위에서만 안전하다.
+    -->
     <insert id="insertLike">
         INSERT IGNORE INTO explore_item_likes (item_id, member_id)
         VALUES (#{itemId}, #{memberId})
