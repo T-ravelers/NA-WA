@@ -3,11 +3,13 @@ import { IconChevronLeft } from '@tabler/icons-vue'
 
 interface Props {
   current: number
-  title?: string
+  title: string
   backLabel?: string
+  /** 입력 단계 수. 처리 중·완료는 되돌아갈 수 없어 여기에 포함하지 않는다. */
+  total?: number
 }
 
-const { current, title = 'SENT', backLabel = 'Back' } = defineProps<Props>()
+const { current, title, backLabel = 'Back', total = 3 } = defineProps<Props>()
 const emit = defineEmits<{ back: [] }>()
 </script>
 
@@ -31,13 +33,13 @@ const emit = defineEmits<{ back: [] }>()
       </h1>
     </div>
     <div
-      class="mt-6 grid grid-cols-4 gap-1.5"
+      class="mt-6 flex gap-1.5"
       aria-label="Request progress"
     >
       <span
-        v-for="index in 4"
+        v-for="index in total"
         :key="index"
-        class="h-1.5 rounded-pill"
+        class="h-1.5 flex-1 rounded-pill"
         :class="index <= current ? 'bg-gauge' : 'bg-hairline-strong'"
       />
     </div>

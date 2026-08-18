@@ -1,34 +1,50 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import { settlementGateway } from '../api/settlementGateway'
+import SettlementStatusScreen from '../components/SettlementStatusScreen.vue'
+import SettlementTransactionCard from '../components/SettlementTransactionCard.vue'
+import { useSettlementPoints } from '../composables/useSettlementPoints'
 import type {
   ItemizedSettlementItem,
   SettlementCandidate,
   SettlementType,
 } from '../model/settlement'
 import { resolveSettlementError } from '../model/settlementErrors'
+import { groupCandidates } from '../model/settlementGrouping'
 import {
   clearSettlementCreateIdempotencyKey,
   resolveSettlementCreateIdempotencyKey,
 } from '../model/settlementIdempotency'
-import { formatSettlementAmount } from '../model/settlementPresentation'
 import { validateItemizedItems } from '../model/settlementRules'
 
+/**
+ * 정산 요청서를 만드는 세 단계.
+ *
+ * 1단계는 여정 → 약속 → 거래를 좁혀 무엇을 정산할지 정하고, 2단계는 방식·참여자·품목을
+ * 채우고, 3단계는 읽기 전용으로 확인만 한다. 1/N과 품목별이 같은 단계 수를 갖도록 두
+ * 방식의 골격을 맞췄다.
+ */
 const props = defineProps<{ candidates: SettlementCandidate[] }>()
 const emit = defineEmits<{
   complete: [settlementId: string]
   cancel: []
   refreshCandidates: []
   'update:step': [step: number]
+  /** v-model이 아니라 부모가 머리말을 감출지 판단하는 신호다. */
+  submittingChange: [submitting: boolean]
 }>()
+
 const { t } = useI18n()
+const points = useSettlementPoints()
 
 const step = ref(1)
+const journeyKey = ref<string | null>(null)
+const appointmentId = ref<string | null>(null)
 const selectedCandidate = ref<SettlementCandidate | null>(null)
 const type = ref<SettlementType>('EQUAL')
 const selectedParticipantIds = ref<string[]>([])
@@ -37,15 +53,59 @@ const submitting = ref(false)
 const error = ref<unknown>(null)
 const validationMessage = ref<string | null>(null)
 
-const selectedIds = computed(() => new Set(selectedParticipantIds.value))
-const itemValidation = computed(() => validateItemizedItems(items.value, selectedIds.value))
-const canContinueDetails = computed(() =>
-  type.value === 'EQUAL'
-    ? selectedParticipantIds.value.length >= 2
-    : selectedParticipantIds.value.length >= 2 && itemValidation.value.valid,
+const journeys = computed(() => groupCandidates(props.candidates))
+const selectedJourney = computed(
+  () => journeys.value.find((journey) => journey.key === journeyKey.value) ?? null,
+)
+const appointments = computed(() => selectedJourney.value?.appointments ?? [])
+const selectedAppointment = computed(
+  () =>
+    appointments.value.find((appointment) => appointment.appointmentId === appointmentId.value) ??
+    null,
+)
+const transactions = computed(() => selectedAppointment.value?.candidates ?? [])
+const journeyLabel = computed(() =>
+  selectedJourney.value === null || selectedJourney.value.journeyName === ''
+    ? t('settlement.create.unassignedJourney')
+    : selectedJourney.value.journeyName,
 )
 
-function selectCandidate(candidate: SettlementCandidate): void {
+const selectedIds = computed(() => new Set(selectedParticipantIds.value))
+const chosenParticipants = computed(
+  () =>
+    selectedCandidate.value?.participants.filter((entry) => selectedIds.value.has(entry.id)) ?? [],
+)
+const itemValidation = computed(() => validateItemizedItems(items.value, selectedIds.value))
+const hasEnoughParticipants = computed(() => selectedParticipantIds.value.length >= 2)
+const canContinueDetails = computed(
+  () => hasEnoughParticipants.value && (type.value === 'EQUAL' || itemValidation.value.valid),
+)
+
+watch(submitting, (value) => emit('submittingChange', value))
+
+function resetJourney(): void {
+  journeyKey.value = null
+  appointmentId.value = null
+  selectedCandidate.value = null
+}
+
+function resetAppointment(): void {
+  appointmentId.value = null
+  selectedCandidate.value = null
+}
+
+function selectJourney(key: string): void {
+  journeyKey.value = key
+  appointmentId.value = null
+  selectedCandidate.value = null
+}
+
+function selectAppointment(id: string): void {
+  appointmentId.value = id
+  selectedCandidate.value = null
+}
+
+function selectTransaction(candidate: SettlementCandidate): void {
   selectedCandidate.value = candidate
   selectedParticipantIds.value = [candidate.payerAppointmentMemberId]
   items.value = []
@@ -69,6 +129,7 @@ function toggleParticipant(participantId: string): void {
   selectedParticipantIds.value = selectedIds.value.has(participantId)
     ? selectedParticipantIds.value.filter((id) => id !== participantId)
     : [...selectedParticipantIds.value, participantId]
+  validationMessage.value = null
 }
 
 function addItem(): void {
@@ -106,13 +167,18 @@ function updateAllocation(index: number, participantId: string, quantity: string
 }
 
 function goToReview(): void {
-  validationMessage.value = canContinueDetails.value
-    ? null
-    : t('settlement.create.allocationIncomplete')
-  if (canContinueDetails.value) {
-    step.value = 3
-    emit('update:step', step.value)
+  if (!hasEnoughParticipants.value) {
+    validationMessage.value = t('settlement.create.participantsTooFew')
+    return
   }
+  if (!canContinueDetails.value) {
+    validationMessage.value = t('settlement.create.allocationIncomplete')
+    return
+  }
+
+  validationMessage.value = null
+  step.value = 3
+  emit('update:step', step.value)
 }
 
 async function create(): Promise<void> {
@@ -130,56 +196,177 @@ async function create(): Promise<void> {
     const key = resolveSettlementCreateIdempotencyKey(candidate.appointmentId, request)
     const result = await settlementGateway.create(candidate.appointmentId, key, request)
     clearSettlementCreateIdempotencyKey(candidate.transferId)
+    // 성공 뒤에는 풀지 않는다. 부모가 다음 화면으로 넘길 때까지 이 화면이 살아 있는데,
+    // 검토 화면으로 되돌아가면 멱등키가 이미 지워져 다시 누르는 순간 새 키로 두 번째
+    // 요청이 나간다.
     emit('complete', result.id)
   } catch (reason) {
+    submitting.value = false
     error.value = reason
     if (resolveSettlementError(reason).recovery === 'REFETCH_CANDIDATES') {
       emit('refreshCandidates')
     }
-  } finally {
-    submitting.value = false
   }
 }
 
 function back(): void {
-  if (step.value === 1) emit('cancel')
-  else {
-    step.value -= 1
-    emit('update:step', step.value)
+  if (submitting.value) return
+  if (step.value === 1) {
+    if (selectedAppointment.value !== null) resetAppointment()
+    else if (selectedJourney.value !== null) resetJourney()
+    else emit('cancel')
+    return
   }
+
+  step.value -= 1
+  emit('update:step', step.value)
 }
 
 defineExpose({ back })
 </script>
 
 <template>
-  <div class="flex flex-1 flex-col">
-    <div v-if="step === 1">
-      <h2 class="mt-8 text-section-header">{{ t('settlement.paymentSelection') }}</h2>
-      <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.selectionHint') }}</p>
-      <div class="mt-5 space-y-3">
-        <button
-          v-for="candidate in props.candidates"
-          :key="candidate.transferId"
-          type="button"
-          :data-payment-id="candidate.transferId"
-          class="w-full rounded-sm bg-surface-1 p-4 text-left"
-          :class="
-            selectedCandidate?.transferId === candidate.transferId
-              ? 'border border-ink'
-              : 'border border-transparent'
-          "
-          @click="selectCandidate(candidate)"
-        >
-          <strong class="block">{{ candidate.gatheringName }}</strong>
-          <span class="mt-1 block text-body-sm text-ink-2"
-            >{{ candidate.payerName }} · {{ candidate.merchantName }}</span
+  <SettlementStatusScreen
+    v-if="submitting"
+    state="processing"
+    :title="t('settlement.create.requesting')"
+    :description="t('settlement.create.requestingHint')"
+  />
+
+  <div
+    v-else
+    class="flex flex-1 flex-col"
+  >
+    <div
+      v-if="step === 1"
+      class="flex flex-1 flex-col"
+    >
+      <template v-if="selectedJourney === null">
+        <h2 class="mt-8 text-section-header">{{ t('settlement.create.journeys') }}</h2>
+        <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.selectJourney') }}</p>
+        <ul class="mt-5 space-y-3">
+          <li
+            v-for="journey in journeys"
+            :key="journey.key"
           >
-          <span class="mt-2 block text-title"
-            >{{ formatSettlementAmount(candidate.amount) }} P</span
+            <button
+              type="button"
+              :data-journey-key="journey.key"
+              class="flex min-h-14 w-full items-center justify-between gap-3 rounded-sm bg-surface-1 p-4 text-left"
+              @click="selectJourney(journey.key)"
+            >
+              <span class="min-w-0 truncate">{{
+                journey.journeyName === ''
+                  ? t('settlement.create.unassignedJourney')
+                  : journey.journeyName
+              }}</span>
+              <span class="shrink-0 text-caption text-ink-3">{{
+                t(
+                  'settlement.create.paymentCount',
+                  { count: journey.paymentCount },
+                  journey.paymentCount,
+                )
+              }}</span>
+            </button>
+          </li>
+        </ul>
+      </template>
+
+      <template v-else>
+        <dl class="mt-8 space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <dt class="text-caption text-ink-3">{{ t('settlement.create.journeys') }}</dt>
+              <dd class="truncate text-body">{{ journeyLabel }}</dd>
+            </div>
+            <button
+              type="button"
+              data-action="change-journey"
+              class="min-h-11 shrink-0 text-body-sm text-ink-2 underline underline-offset-4"
+              @click="resetJourney"
+            >
+              {{ t('settlement.create.changeJourney') }}
+            </button>
+          </div>
+          <div
+            v-if="selectedAppointment !== null"
+            class="flex items-center justify-between gap-3"
           >
-        </button>
-      </div>
+            <div class="min-w-0">
+              <dt class="text-caption text-ink-3">{{ t('settlement.create.appointments') }}</dt>
+              <dd class="truncate text-body">{{ selectedAppointment.gatheringName }}</dd>
+            </div>
+            <button
+              type="button"
+              data-action="change-appointment"
+              class="min-h-11 shrink-0 text-body-sm text-ink-2 underline underline-offset-4"
+              @click="resetAppointment"
+            >
+              {{ t('settlement.create.changeAppointment') }}
+            </button>
+          </div>
+        </dl>
+
+        <template v-if="selectedAppointment === null">
+          <h2 class="mt-8 text-section-header">{{ t('settlement.create.appointments') }}</h2>
+          <p class="mt-2 text-body-sm text-ink-2">
+            {{ t('settlement.create.selectAppointment') }}
+          </p>
+          <ul class="mt-5 space-y-3">
+            <li
+              v-for="appointment in appointments"
+              :key="appointment.appointmentId"
+            >
+              <button
+                type="button"
+                :data-appointment-id="appointment.appointmentId"
+                class="flex min-h-14 w-full items-center justify-between gap-3 rounded-sm bg-surface-1 p-4 text-left"
+                @click="selectAppointment(appointment.appointmentId)"
+              >
+                <span class="min-w-0 truncate">{{ appointment.gatheringName }}</span>
+                <span class="shrink-0 text-caption text-ink-3">{{
+                  t(
+                    'settlement.create.paymentCount',
+                    { count: appointment.candidates.length },
+                    appointment.candidates.length,
+                  )
+                }}</span>
+              </button>
+            </li>
+          </ul>
+        </template>
+
+        <template v-else>
+          <h2 class="mt-8 text-section-header">{{ t('settlement.create.transactions') }}</h2>
+          <p class="mt-2 text-body-sm text-ink-2">
+            {{ t('settlement.create.selectTransaction') }}
+          </p>
+          <ul class="mt-5 space-y-3">
+            <li
+              v-for="candidate in transactions"
+              :key="candidate.transferId"
+            >
+              <button
+                type="button"
+                :data-payment-id="candidate.transferId"
+                class="w-full rounded-sm bg-surface-1 p-4 text-left"
+                :class="
+                  selectedCandidate?.transferId === candidate.transferId
+                    ? 'border border-ink'
+                    : 'border border-transparent'
+                "
+                :aria-pressed="selectedCandidate?.transferId === candidate.transferId"
+                @click="selectTransaction(candidate)"
+              >
+                <span class="block text-title">{{ points(candidate.amount) }}</span>
+                <span class="mt-1 block text-body-sm text-ink-2">{{ candidate.payerName }}</span>
+                <span class="mt-1 block text-caption text-ink-3">{{ candidate.paidAt }}</span>
+              </button>
+            </li>
+          </ul>
+        </template>
+      </template>
+
       <AppButton
         data-action="next"
         class="mt-auto"
@@ -191,14 +378,23 @@ defineExpose({ back })
       >
     </div>
 
-    <div v-else-if="step === 2">
-      <h2 class="mt-8 text-section-header">{{ t('settlement.requestDetails') }}</h2>
-      <div class="mt-5 grid grid-cols-2 gap-2">
+    <div
+      v-else-if="step === 2"
+      class="flex flex-1 flex-col"
+    >
+      <h2 class="mt-8 text-section-header">{{ t('settlement.create.method') }}</h2>
+      <div
+        class="mt-5 grid grid-cols-2 gap-2"
+        role="radiogroup"
+        :aria-label="t('settlement.create.method')"
+      >
         <button
           v-for="option in ['EQUAL', 'ITEMIZED'] as SettlementType[]"
           :key="option"
           type="button"
+          role="radio"
           :data-type="option"
+          :aria-checked="type === option"
           class="min-h-11 rounded-pill px-3 text-body-sm"
           :class="type === option ? 'bg-settlement text-on-paper' : 'bg-surface-1 text-ink-2'"
           @click="setType(option)"
@@ -206,8 +402,19 @@ defineExpose({ back })
           {{ t(`settlement.type.${option}`) }}
         </button>
       </div>
-      <p class="mt-8 text-caption text-ink-3">{{ t('settlement.participants') }}</p>
-      <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.payerRequired') }}</p>
+
+      <SettlementTransactionCard
+        v-if="selectedCandidate !== null"
+        class="mt-6"
+        :gathering-name="selectedCandidate.gatheringName"
+        :amount="selectedCandidate.amount"
+        :paid-at="selectedCandidate.paidAt"
+        :payer-name="selectedCandidate.payerName"
+      />
+
+      <h3 class="mt-8 text-title">{{ t('settlement.create.participants') }}</h3>
+      <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.participantsHint') }}</p>
+      <p class="mt-1 text-caption text-ink-3">{{ t('settlement.create.payerRequired') }}</p>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <button
           v-for="participant in selectedCandidate?.participants"
@@ -227,8 +434,9 @@ defineExpose({ back })
           >
         </button>
       </div>
+
       <template v-if="type === 'ITEMIZED'">
-        <div class="mt-8 flex items-center justify-between">
+        <div class="mt-8 flex items-center justify-between gap-3">
           <h3 class="text-title">{{ t('settlement.create.items') }}</h3>
           <AppButton
             data-action="add-item"
@@ -238,6 +446,7 @@ defineExpose({ back })
             >{{ t('settlement.create.addItem') }}</AppButton
           >
         </div>
+        <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.itemsHint') }}</p>
         <div
           v-for="(item, index) in items"
           :key="index"
@@ -278,9 +487,7 @@ defineExpose({ back })
           </div>
           <p class="mt-4 text-caption text-ink-3">{{ t('settlement.create.allocations') }}</p>
           <label
-            v-for="participant in selectedCandidate?.participants.filter((entry) =>
-              selectedIds.has(entry.id),
-            )"
+            v-for="participant in chosenParticipants"
             :key="participant.id"
             class="mt-2 flex min-h-11 items-center justify-between text-body-sm"
             ><span>{{ participant.name }}</span
@@ -295,6 +502,7 @@ defineExpose({ back })
           /></label>
         </div>
       </template>
+
       <p
         v-if="validationMessage !== null"
         class="mt-4 text-body-sm text-danger"
@@ -302,40 +510,68 @@ defineExpose({ back })
       >
         {{ validationMessage }}
       </p>
-      <AppButton
-        data-action="next"
-        class="mt-8"
-        block
-        variant="settle"
-        @click="goToReview"
-        >{{ t('settlement.continue') }}</AppButton
-      >
+      <div class="mt-auto pt-8">
+        <AppButton
+          data-action="next"
+          block
+          variant="settle"
+          @click="goToReview"
+          >{{ t('settlement.continue') }}</AppButton
+        >
+      </div>
     </div>
 
-    <div v-else>
-      <h2 class="mt-8 text-section-header">{{ t('settlement.finalReview') }}</h2>
-      <AppCard class="mt-5"
-        ><p class="text-caption text-ink-3">{{ selectedCandidate?.gatheringName }}</p>
-        <p class="mt-2 text-title">
-          {{ formatSettlementAmount(selectedCandidate?.amount ?? '0') }} P
-        </p>
-        <p class="mt-3 text-body-sm text-ink-2">
-          {{ t(`settlement.type.${type}`) }} · {{ selectedParticipantIds.length }}
-          {{ t('settlement.create.people') }}
-        </p></AppCard
-      >
+    <div
+      v-else
+      class="flex flex-1 flex-col"
+    >
+      <h2 class="mt-8 text-section-header">{{ t('settlement.create.overview') }}</h2>
+      <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.overviewHint') }}</p>
+
+      <SettlementTransactionCard
+        v-if="selectedCandidate !== null"
+        class="mt-5"
+        :gathering-name="selectedCandidate.gatheringName"
+        :amount="selectedCandidate.amount"
+        :paid-at="selectedCandidate.paidAt"
+        :payer-name="selectedCandidate.payerName"
+      />
+
+      <AppCard class="mt-4">
+        <dl class="space-y-3 text-body-sm">
+          <div class="flex justify-between gap-3">
+            <dt class="text-ink-3">{{ t('settlement.create.method') }}</dt>
+            <dd>{{ t(`settlement.type.${type}`) }}</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-ink-3">{{ t('settlement.create.breakdown') }}</dt>
+            <dd class="text-right">
+              {{ chosenParticipants.map((participant) => participant.name).join(', ') }}
+            </dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-ink-3">{{ t('settlement.total') }}</dt>
+            <dd>{{ points(selectedCandidate?.amount ?? '0') }}</dd>
+          </div>
+        </dl>
+      </AppCard>
+
       <ul
         v-if="type === 'ITEMIZED'"
         class="mt-4 space-y-2"
       >
         <li
-          v-for="item in items"
-          :key="item.name"
+          v-for="(item, index) in items"
+          :key="index"
           class="rounded-sm bg-surface-1 p-3 text-body-sm"
         >
-          {{ item.name }} · {{ item.quantity }} × {{ item.unitPrice }}
+          <span class="block">{{ item.name }}</span>
+          <span class="mt-1 block text-caption text-ink-3">
+            {{ item.quantity }} × {{ points(item.unitPrice) }}
+          </span>
         </li>
       </ul>
+
       <p
         v-if="error !== null"
         class="mt-4 text-body-sm text-danger"
@@ -343,15 +579,17 @@ defineExpose({ back })
       >
         {{ t(resolveSettlementError(error).messageKey) }}
       </p>
-      <AppButton
-        data-action="create"
-        class="mt-auto"
-        block
-        variant="settle"
-        :loading="submitting"
-        @click="create"
-        >{{ t('settlement.create.create') }}</AppButton
-      >
+      <div class="mt-auto pt-8">
+        <AppButton
+          data-action="create"
+          block
+          variant="settle"
+          @click="create"
+          >{{
+            t('settlement.create.request', { amount: points(selectedCandidate?.amount ?? '0') })
+          }}</AppButton
+        >
+      </div>
     </div>
   </div>
 </template>
