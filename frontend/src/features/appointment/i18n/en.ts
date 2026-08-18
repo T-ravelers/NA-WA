@@ -66,7 +66,6 @@ export default {
       confirm: 'Confirm',
       cancel: 'Cancel',
       close: 'Close confirmation',
-      paymentUnavailable: 'Payment integration is required before an appointment can be created.',
       loadFailed: 'Appointment could not be created. Please try again.',
       validation: {
         itemContext: 'Open this form from an Event or Place.',

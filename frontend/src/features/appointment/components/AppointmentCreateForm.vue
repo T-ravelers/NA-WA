@@ -28,7 +28,6 @@ interface Props {
   itemId?: number
   itemType?: AppointmentItemType
   pending?: boolean
-  paymentUnavailable?: boolean
   errorMessage?: string
 }
 
@@ -36,7 +35,6 @@ const {
   itemId = undefined,
   itemType = undefined,
   pending = false,
-  paymentUnavailable = false,
   errorMessage = undefined,
 } = defineProps<Props>()
 
@@ -130,7 +128,6 @@ function cancelConfirmation(): void {
 }
 
 function confirmCreation(): void {
-  if (paymentUnavailable) return
   confirmationOpen.value = false
   emit('submit', toAppointmentCreateRequest(draft))
 }
@@ -392,12 +389,6 @@ defineExpose({ goToPreviousStep })
       <p class="mt-3 text-body-sm text-on-paper/70">
         {{ t('appointment.create.confirmDescription') }}
       </p>
-      <p
-        v-if="paymentUnavailable"
-        class="mt-2 text-caption text-on-paper/60"
-      >
-        {{ t('appointment.create.paymentUnavailable') }}
-      </p>
       <div class="mt-4 rounded-sm bg-surface-1 p-4">
         <p class="text-caption text-settlement">{{ t('appointment.create.deposit') }}</p>
         <p class="mt-1 text-data-lg text-ink-display">
@@ -416,7 +407,6 @@ defineExpose({ goToPreviousStep })
           block
           variant="settle"
           :loading="pending"
-          :disabled="paymentUnavailable"
           @click="confirmCreation"
         >
           {{ t('appointment.create.confirm') }}

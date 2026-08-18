@@ -1,9 +1,16 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+
+const createAppointment = vi.fn()
+
+vi.mock('../../api/appointmentApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
+  createAppointment: (request: unknown) => createAppointment(request),
+}))
 
 const AppointmentCreateView = (await import('../AppointmentCreateView.vue')).default
 
@@ -90,14 +97,44 @@ describe('AppointmentCreateView', () => {
     expect(router.currentRoute.value.name).toBe('appointment-create')
   })
 
-  it('keeps creation confirmation disabled until payment integration is available', async () => {
+  it('creates the appointment and navigates to its detail page on success', async () => {
+    createAppointment.mockResolvedValueOnce({
+      appointmentId: 42,
+      itemId: 42,
+      itemType: 'EVENT',
+      appointmentName: 'Seongsu K-Beauty Tour',
+      languageCode: 'en',
+      maxMembers: 4,
+      currentMemberCount: 1,
+      depositAmount: '10000',
+      appointmentStatus: 'RECRUITING',
+      meetingPlace: 'Seongsu Beauty Lab',
+      activityStartAt: '2026-08-08T18:30:00',
+      activityEndAt: '2026-08-08T22:00:00',
+      joinDeadline: '2026-08-08T17:30:00',
+      hostDisplayName: 'Mina Park',
+      meetingAddress: null,
+      description: null,
+      members: [],
+    })
     const { wrapper, router } = await mountView()
 
     await fillAndConfirm(wrapper)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Payment integration is required')
-    expect(buttonByText(wrapper, 'Confirm').attributes('disabled')).toBeDefined()
+    expect(createAppointment).toHaveBeenCalledOnce()
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
+    expect(router.currentRoute.value.params.appointmentId).toBe('42')
+  })
+
+  it('shows an error message and stays on the form when creation fails', async () => {
+    createAppointment.mockRejectedValueOnce(new Error('network error'))
+    const { wrapper, router } = await mountView()
+
+    await fillAndConfirm(wrapper)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Appointment could not be created')
     expect(router.currentRoute.value.name).toBe('appointment-create')
   })
 })
