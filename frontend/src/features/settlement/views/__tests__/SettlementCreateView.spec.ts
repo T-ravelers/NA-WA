@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 import type { SettlementCandidate } from '../../model/settlement'
 import SettlementCreateView from '../SettlementCreateView.vue'
@@ -137,6 +138,35 @@ describe('SettlementCreateView', () => {
     await wrapper.get('[data-allocation-quantity="0:19"]').setValue('1')
     await wrapper.get('[data-action="next"]').trigger('click')
     expect(wrapper.text()).toContain('Request overview')
+  })
+
+  it('holds the sending screen after a success so the request cannot be sent twice', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    // 부모가 다음 화면으로 넘기기 전까지 검토 화면이 다시 보이면 안 된다. 멱등키는 이미
+    // 지워져 있어 두 번째 요청은 새 키로 나간다.
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(false)
+    expect(wrapper.emitted('submittingChange')).toEqual([[true]])
+    expect(create).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns to the review step when the request fails', async () => {
+    create.mockRejectedValueOnce(new NormalizedApiError('SETTLEMENT-005', 400, 'invalid'))
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(true)
+    expect(wrapper.emitted('submittingChange')).toEqual([[true], [false]])
+    expect(wrapper.emitted('complete')).toBeUndefined()
   })
 
   it('keeps the receipt entry point disabled until receipt capture ships', async () => {

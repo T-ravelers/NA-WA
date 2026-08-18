@@ -4,6 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 import SettlementPayCompleteView from '../SettlementPayCompleteView.vue'
 
@@ -82,5 +83,29 @@ describe('SettlementPayCompleteView', () => {
     const { router } = await mountComplete()
 
     expect(router.currentRoute.value.name).toBe('settlement-detail')
+  })
+
+  it('does not claim a payment before the server answers', async () => {
+    let answer: (value: unknown) => void = () => {}
+    getDetail.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    const { wrapper } = await mountComplete()
+
+    expect(wrapper.text()).not.toContain('Payment sent')
+    expect(wrapper.text()).toContain('Sending your payment')
+
+    answer(detail)
+    await flushPromises()
+    expect(wrapper.text()).toContain('Payment sent')
+  })
+
+  it('does not claim a payment it could not verify', async () => {
+    // 조회가 실패하면 되돌려보내는 판정이 서지 않는다. 성공을 그리면 결제된 적 없는
+    // 정산에 완료 화면이 그대로 남는다.
+    getDetail.mockRejectedValueOnce(new NormalizedApiError('SETTLEMENT-001', 404, 'missing'))
+    const { wrapper, router } = await mountComplete()
+
+    expect(wrapper.text()).not.toContain('Payment sent')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    expect(router.currentRoute.value.name).toBe('settlement-pay-complete')
   })
 })

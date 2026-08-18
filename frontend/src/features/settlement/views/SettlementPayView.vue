@@ -78,6 +78,8 @@ function recover(): void {
     goToDetail()
     return
   }
+  // 서버가 키를 거부했다면 같은 키로 다시 보내도 같은 오류다. 버리고 새로 만든다.
+  if (recovery === 'RETRY_NEW_KEY') clearSettlementPaymentIdempotencyKey(settlementId.value)
 
   paymentMutation.mutate()
 }

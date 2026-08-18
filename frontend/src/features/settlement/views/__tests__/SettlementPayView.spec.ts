@@ -96,6 +96,30 @@ describe('SettlementPayView', () => {
     expect(router.currentRoute.value.name).toBe('settlement-detail')
   })
 
+  it('retries a rejected idempotency key with a new one', async () => {
+    pay.mockRejectedValueOnce(new NormalizedApiError('SETTLEMENT-015', 400, 'invalid key'))
+    const { wrapper, router } = await mountPay()
+
+    await wrapper.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+
+    expect(pay).toHaveBeenCalledTimes(2)
+    // 서버가 키 자체를 거부했으므로 같은 키로 다시 보내면 영원히 같은 오류가 난다.
+    expect(pay.mock.calls[1]?.[1]).not.toBe(pay.mock.calls[0]?.[1])
+    expect(router.currentRoute.value.name).toBe('settlement-pay-complete')
+  })
+
+  it('retries an unknown failure with the same key so it cannot double-charge', async () => {
+    pay.mockRejectedValueOnce(new Error('network down'))
+    const { wrapper } = await mountPay()
+
+    await wrapper.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+
+    expect(pay).toHaveBeenCalledTimes(2)
+    expect(pay.mock.calls[1]?.[1]).toBe(pay.mock.calls[0]?.[1])
+  })
+
   it('returns to the detail screen instead of retrying an already-processed payment', async () => {
     pay.mockRejectedValue(new NormalizedApiError('SETTLEMENT-014', 409, 'already paid'))
     const { wrapper, router } = await mountPay()

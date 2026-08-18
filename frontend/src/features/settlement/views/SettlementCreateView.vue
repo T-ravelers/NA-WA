@@ -196,14 +196,16 @@ async function create(): Promise<void> {
     const key = resolveSettlementCreateIdempotencyKey(candidate.appointmentId, request)
     const result = await settlementGateway.create(candidate.appointmentId, key, request)
     clearSettlementCreateIdempotencyKey(candidate.transferId)
+    // 성공 뒤에는 풀지 않는다. 부모가 다음 화면으로 넘길 때까지 이 화면이 살아 있는데,
+    // 검토 화면으로 되돌아가면 멱등키가 이미 지워져 다시 누르는 순간 새 키로 두 번째
+    // 요청이 나간다.
     emit('complete', result.id)
   } catch (reason) {
+    submitting.value = false
     error.value = reason
     if (resolveSettlementError(reason).recovery === 'REFETCH_CANDIDATES') {
       emit('refreshCandidates')
     }
-  } finally {
-    submitting.value = false
   }
 }
 
