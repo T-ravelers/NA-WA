@@ -245,13 +245,22 @@ public class AppointmentService {
         return getAppointment(memberId, appointmentId).getMembers();
     }
 
+    /**
+     * scope=ONGOING은 기존 계약 그대로 진행 중 약속만 다가오는 순으로,
+     * scope=ALL은 취소를 제외한 전체를 예정(임박한 순) 먼저, 지난 약속(최근 순)
+     * 순서로 돌려준다(프로필의 약속 목록용).
+     */
     @Transactional(readOnly = true)
-    public List<MyOngoingAppointmentResponse> getMyOngoingAppointments(Long memberId){
+    public List<MyOngoingAppointmentResponse> getMyOngoingAppointments(
+            Long memberId, String scope){
         if(memberId == null || memberId <= 0){
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
+        if(!"ONGOING".equals(scope) && !"ALL".equals(scope)){
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
 
-        return appointmentMapper.findMyOngoingAppointments(memberId)
+        return appointmentMapper.findMyOngoingAppointments(memberId, "ALL".equals(scope))
             .stream()
             .map(MyOngoingAppointmentResponse::from)
             .toList();

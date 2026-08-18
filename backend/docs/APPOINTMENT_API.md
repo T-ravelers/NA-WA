@@ -57,13 +57,26 @@
 조회할 수 있으며 다른 회원에게는 `APPOINTMENT-001`을 반환합니다.
 `members/me`는 현재 로그인 회원의 참여 여부, 참여·출석 상태와 방장 여부를 반환합니다.
 
-## 내가 참여 중인 진행 중 약속 조회
+## 내가 참여 중인 약속 조회
 
-`GET /api/v1/appointments/me`
+`GET /api/v1/appointments/me?scope=ONGOING`
 
-로그인 회원이 `ACTIVE`로 참여 중이고, 여행(trip)이 연결돼 있으며, `IN_PROGRESS`
-상태인 약속만 배열로 반환합니다. 참여만 하고 여행에 연결되지 않은 약속은 QR 공동
-소비(SHARED) 결제가 트립 비용 연결(`trip_expense_links`)을 만들 수 없어 제외합니다.
+로그인 회원이 `ACTIVE`로 참여 중이고 여행(trip)이 연결된 약속을 배열로
+반환합니다. 참여만 하고 여행에 연결되지 않은 약속은 QR 공동 소비(SHARED) 결제가
+트립 비용 연결(`trip_expense_links`)을 만들 수 없어 제외합니다.
+
+`scope`가 범위와 정렬을 정합니다. 그 밖의 값은 `COMMON-001`을 반환합니다.
+
+| scope | 범위 | 정렬 |
+| --- | --- | --- |
+| `ONGOING`(기본) | `IN_PROGRESS` 약속만 | `activityStartAt` 오름차순 — QR 공동 소비 결제가 쓰는 기존 계약 그대로 |
+| `ALL` | `CANCELLED`를 제외한 전체 | 예정 약속을 임박한 순으로 먼저, 지난 약속을 최근 순으로 뒤에 — 프로필의 약속 목록이 사용 |
+
+`ALL`은 `PAYMENT_PENDING`을 포함합니다. 상세 조회가 이 상태를 호스트 본인에게는
+보여주는 것과 같은 규칙입니다 — 보증금 결제 전에는 모집이 열리지 않아 호스트 외에는
+`ACTIVE` 멤버십이 생길 수 없고, 본인 목록에서는 결제를 마치도록 보이는 편이 맞습니다.
+공개 약속 목록(`GET /api/v1/appointments`)이 `PAYMENT_PENDING`을 제외하는 것과
+근거가 다르니 혼동하지 마세요.
 
 ```json
 [
@@ -73,10 +86,15 @@
     "tripId": 9,
     "meetingPlace": "Olive Young N Seongsu",
     "activityStartAt": "2026-08-21T18:30:00",
-    "activityEndAt": "2026-08-21T22:00:00"
+    "activityEndAt": "2026-08-21T22:00:00",
+    "itemId": 100,
+    "itemType": "EVENT",
+    "appointmentStatus": "IN_PROGRESS"
   }
 ]
 ```
+
+`itemType`은 `EVENT` 또는 `PLACE`이며 화면의 탭 구분에 사용합니다.
 
 참여 자체가 보증금 결제 연동 전까지 `APPOINTMENT-008`로 막혀 있어, 그 전까지는
 항상 빈 배열을 반환합니다.

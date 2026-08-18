@@ -70,6 +70,7 @@ public interface AppointmentMapper {
     );
 
     List<MyOngoingAppointment> findMyOngoingAppointments(
-        @Param("memberId") Long memberId
+        @Param("memberId") Long memberId,
+        @Param("includeAll") boolean includeAll
     );
 }
