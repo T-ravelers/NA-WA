@@ -25,6 +25,7 @@ function profile(preferredLanguage: string): MemberProfile {
     memberId: 1,
     displayName: 'Traveler',
     profileImageUrl: null,
+    nationalityCode: null,
     preferredLanguage,
     preferredCurrencyCode: null,
     onboardingRequired: false,
@@ -40,10 +41,15 @@ describe('syncLocaleWithProfile', () => {
     updateMemberProfile.mockResolvedValue(profile('ja'))
   })
 
-  it('adopts the server locale when the visitor never chose one', async () => {
+  /*
+   * 회귀: 서버 값을 persist하면 컬럼 기본값(en)이 「명시 선택」으로 굳는다. 언어를
+   * 고르지 않고 가입한 회원은 감지 로케일을 잃고 영어에 영구히 갇힌다.
+   */
+  it('applies the server locale without persisting when the visitor never chose one', async () => {
     await syncLocaleWithProfile(profile('vi'))
 
-    expect(applyLocale).toHaveBeenCalledWith('vi', { persist: true })
+    expect(applyLocale).toHaveBeenCalledWith('vi')
+    expect(applyLocale).not.toHaveBeenCalledWith('vi', { persist: true })
     expect(updateMemberProfile).not.toHaveBeenCalled()
   })
 

@@ -56,13 +56,22 @@ public class PlaceService {
 
     @Transactional(readOnly = true)
     public PlaceDetailResponse getPlaceDetail(Long placeId, String language) {
+        return getPlaceDetail(placeId, language, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PlaceDetailResponse getPlaceDetail(
+        Long placeId,
+        String language,
+        Long memberId
+    ) {
         if (placeId == null || placeId <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         String normalizedLanguage = StringUtils.hasText(language)
             ? language.toLowerCase(Locale.ROOT)
             : "en";
-        PlaceDetailResponse place = placeMapper.findPlaceDetail(placeId);
+        PlaceDetailResponse place = placeMapper.findPlaceDetail(placeId, memberId);
         if (place == null) {
             throw new BusinessException(ExploreErrorCode.PLACE_NOT_FOUND);
         }

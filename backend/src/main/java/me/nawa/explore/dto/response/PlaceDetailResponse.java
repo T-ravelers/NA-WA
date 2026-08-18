@@ -48,5 +48,6 @@ public class PlaceDetailResponse {
     private Boolean isActive;
     private long viewCount;
     private long favoriteCount;
+    private boolean saved;
     private List<PlaceActivityResponse> activities;
 }

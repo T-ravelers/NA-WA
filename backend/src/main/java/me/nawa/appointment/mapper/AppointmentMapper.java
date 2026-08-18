@@ -81,7 +81,8 @@ public interface AppointmentMapper {
     );
 
     List<MyOngoingAppointment> findMyOngoingAppointments(
-        @Param("memberId") Long memberId
+        @Param("memberId") Long memberId,
+        @Param("includeAll") boolean includeAll
     );
 
     // ACTIVE·PENDING(출석 미확정) 회원만 대상으로 한다 — 출석 확정은 한 번만

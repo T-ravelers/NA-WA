@@ -19,6 +19,17 @@ public interface MemberMapper {
 
     int updateProfile(
             @Param("memberId") long memberId,
+            @Param("displayName") String displayName,
+            @Param("profileImageUrl") String profileImageUrl,
+            @Param("nationalityCode") String nationalityCode,
+            @Param("preferredLanguage") String preferredLanguage,
+            @Param("preferredCurrencyCode") String preferredCurrencyCode
+    );
+
+    int completeOnboarding(
+            @Param("memberId") long memberId,
+            @Param("displayName") String displayName,
+            @Param("nationalityCode") String nationalityCode,
             @Param("preferredLanguage") String preferredLanguage,
             @Param("preferredCurrencyCode") String preferredCurrencyCode
     );

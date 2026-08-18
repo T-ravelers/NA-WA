@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -108,7 +109,7 @@ class AppointmentControllerTest {
 
     @Test
     void getMyOngoingAppointments_returnsResponseList() throws Exception {
-        when(appointmentService.getMyOngoingAppointments(1L))
+        when(appointmentService.getMyOngoingAppointments(1L, "ONGOING"))
                 .thenReturn(List.of(myOngoingAppointmentResponse()));
 
         JsonNode body = performGet("/api/v1/appointments/me");
@@ -118,6 +119,21 @@ class AppointmentControllerTest {
                 body.path("data").get(0).path("appointmentId").asLong());
         assertEquals("Seoul Night Tour",
                 body.path("data").get(0).path("appointmentName").asText());
+        assertEquals(100L, body.path("data").get(0).path("itemId").asLong());
+        assertEquals("EVENT", body.path("data").get(0).path("itemType").asText());
+        assertEquals("IN_PROGRESS",
+                body.path("data").get(0).path("appointmentStatus").asText());
+    }
+
+    @Test
+    void getMyOngoingAppointments_passesAllScopeThrough() throws Exception {
+        when(appointmentService.getMyOngoingAppointments(1L, "ALL"))
+                .thenReturn(List.of());
+
+        JsonNode body = performGet("/api/v1/appointments/me?scope=ALL");
+
+        assertTrue(body.path("success").asBoolean());
+        verify(appointmentService).getMyOngoingAppointments(1L, "ALL");
     }
 
     @Test
@@ -196,7 +212,10 @@ class AppointmentControllerTest {
                 5L,
                 "Gwanghwamun Square",
                 LocalDateTime.of(2026, 8, 21, 18, 30),
-                LocalDateTime.of(2026, 8, 21, 22, 0)
+                LocalDateTime.of(2026, 8, 21, 22, 0),
+                100L,
+                "EVENT",
+                "IN_PROGRESS"
         );
     }
 

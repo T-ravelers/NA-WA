@@ -34,4 +34,6 @@ public class EventSummaryResponse {
     private LocalDate startDate;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate endDate;
+
+    private boolean saved;
 }

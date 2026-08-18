@@ -30,6 +30,30 @@ public enum MemberErrorCode implements ErrorCode {
             HttpStatus.BAD_REQUEST,
             "MEMBER-004",
             "변경할 항목이 없습니다."
+    ),
+
+    UNSUPPORTED_NATIONALITY(
+            HttpStatus.BAD_REQUEST,
+            "MEMBER-005",
+            "지원하지 않는 국가 코드입니다."
+    ),
+
+    INVALID_DISPLAY_NAME(
+            HttpStatus.BAD_REQUEST,
+            "MEMBER-006",
+            "표시 이름이 올바르지 않습니다."
+    ),
+
+    INVALID_PROFILE_IMAGE_URL(
+            HttpStatus.BAD_REQUEST,
+            "MEMBER-007",
+            "프로필 이미지 주소가 올바르지 않습니다."
+    ),
+
+    ONBOARDING_FIELD_MISSING(
+            HttpStatus.BAD_REQUEST,
+            "MEMBER-008",
+            "온보딩에 필요한 항목이 비어 있습니다."
     );
 
     private final HttpStatus status;

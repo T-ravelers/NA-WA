@@ -257,7 +257,7 @@ class EventServiceTest {
             .title("서울 야시장 푸드 팝업(테스트)")
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -271,7 +271,7 @@ class EventServiceTest {
         assertEquals("FESTIVAL", result.getEventKind());
         assertEquals("서울 야시장 푸드 팝업(테스트)", result.getTitle());
         assertEquals(0, result.getActivities().size());
-        verify(eventMapper).findEventDetail(990001L, "ko");
+        verify(eventMapper).findEventDetail(990001L, "ko", null);
         verify(eventMapper).findEventActivities(990001L, "ko");
     }
 
@@ -286,7 +286,7 @@ class EventServiceTest {
 
     @Test
     void getEventDetail_throwsEventNotFound_whenMapperReturnsNull() {
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(null);
 
         BusinessException exception = assertThrows(
@@ -298,7 +298,7 @@ class EventServiceTest {
             ExploreErrorCode.EVENT_NOT_FOUND,
             exception.getErrorCode()
         );
-        verify(eventMapper).findEventDetail(990001L, "ko");
+        verify(eventMapper).findEventDetail(990001L, "ko", null);
     }
 
     @Test
@@ -308,7 +308,7 @@ class EventServiceTest {
             .title("서울 야시장 푸드 팝업(테스트)")
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(null);
@@ -339,7 +339,7 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "en"))
+        when(eventMapper.findEventDetail(990001L, "en", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "en"))
             .thenReturn(List.of());
@@ -381,7 +381,7 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -407,7 +407,7 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -432,7 +432,7 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -449,19 +449,35 @@ class EventServiceTest {
     }
 
     @Test
+    void getEventDetail_passesMemberIdToMapper() {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .build();
+
+        when(eventMapper.findEventDetail(990001L, "ko", 7L))
+            .thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ko"))
+            .thenReturn(List.of());
+
+        eventService.getEventDetail(990001L, "ko", 7L);
+
+        verify(eventMapper).findEventDetail(990001L, "ko", 7L);
+    }
+
+    @Test
     void getEventDetail_usesEnglishAsDefaultLanguage() {
         EventDetailResponse event = EventDetailResponse.builder()
             .eventId(990001L)
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "en"))
+        when(eventMapper.findEventDetail(990001L, "en", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "en"))
             .thenReturn(List.of());
 
         eventService.getEventDetail(990001L, null);
 
-        verify(eventMapper).findEventDetail(990001L, "en");
+        verify(eventMapper).findEventDetail(990001L, "en", null);
         verify(eventMapper).findEventActivities(990001L, "en");
     }
 }

@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -133,12 +134,13 @@ public class AppointmentController {
     }
 
     @GetMapping("/me")
-    @ApiOperation("내가 참여 중인 진행 중 약속 목록 조회")
+    @ApiOperation("내가 참여 중인 약속 목록 조회 — scope=ONGOING(기본)·ALL")
     public ApiResponse<List<MyOngoingAppointmentResponse>> getMyOngoingAppointments(
-        @AuthenticationPrincipal AuthenticatedMember member
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @RequestParam(name = "scope", defaultValue = "ONGOING") String scope
     ){
         return ApiResponse.success(
-            appointmentService.getMyOngoingAppointments(member.getMemberId())
+            appointmentService.getMyOngoingAppointments(member.getMemberId(), scope)
         );
     }
 }

@@ -25,6 +25,40 @@ describe('settlement response mappers', () => {
     expect(candidate.participants[0]?.id).toBe('12')
   })
 
+  it('reads an offset-less payment time as server time instead of the browser time zone', () => {
+    const candidate = mapSettlementCandidate({
+      transferId: 7,
+      appointmentId: 9,
+      payerAppointmentMemberId: 12,
+      journeyName: 'Seoul',
+      gatheringName: 'Dinner',
+      merchantName: 'Cafe',
+      amount: '25.00',
+      paidAt: '2026-08-12T10:00:00',
+      payerName: 'Alex',
+      participants: [{ id: 12, name: 'Alex', initials: 'AL' }],
+    })
+
+    expect(candidate.paidAt).toBe('Aug 12, 2026, 10:00 AM')
+  })
+
+  it('falls back to the raw payment time when the server value cannot be parsed', () => {
+    const candidate = mapSettlementCandidate({
+      transferId: 7,
+      appointmentId: 9,
+      payerAppointmentMemberId: 12,
+      journeyName: 'Seoul',
+      gatheringName: 'Dinner',
+      merchantName: 'Cafe',
+      amount: '25.00',
+      paidAt: 'not a timestamp',
+      payerName: 'Alex',
+      participants: [],
+    })
+
+    expect(candidate.paidAt).toBe('not a timestamp')
+  })
+
   it('maps nested viewer fields without deriving a payment action', () => {
     const detail = mapSettlementDetail({
       id: 42,

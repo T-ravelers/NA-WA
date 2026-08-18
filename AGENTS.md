@@ -36,6 +36,15 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   certonly --webroot ...`로 수동 1회 실행하고, 갱신과 nginx reload는
   [renew-cert.yml](./.github/workflows/renew-cert.yml)이 매일 스케줄로 담당합니다.
   이 두 경로 중 하나만 보고 판단하면 발급·갱신 흐름을 놓칩니다.
+- **운영 백엔드는 `https://api.clearpng.cloud`입니다.** nginx가 443에서 TLS를 종료하고
+  80으로 온 요청은 `308`로 https에 넘깁니다. 예외는 `/.well-known/acme-challenge/`
+  하나뿐이며, 이 경로는 갱신에 필요해 80에서 직접 응답해야 합니다 — 리다이렉트가
+  이 경로를 삼키면 약 60일 뒤 갱신 실패로만 드러나므로 `deploy/deploy.sh`가
+  배포마다 확인합니다.
+- 리다이렉트 응답에는 CORS 헤더가 없습니다. 프론트의 `VITE_API_BASE_URL`이 `http://`로
+  남아 있으면 브라우저가 preflight 단계에서 차단해 **모든 API 호출이 실패합니다.**
+  백엔드 도메인·프로토콜을 바꿀 때는 Vercel 환경 변수와 EC2 `.env`의
+  `AUTH_ALLOWED_ORIGINS`·OAuth redirect URI를 같은 시점에 맞춥니다.
 - 성공 `ApiResponse.data`의 런타임 검증은 요청별 `AxiosRequestConfig.responseSchema`로
   선택합니다. 스키마는 해당 feature의 `api/` 폴더가 소유하고, 공용 계층은 feature를
   import하지 않습니다. 설정하지 않은 요청은 기존 봉투 해제·인증/CSRF 재시도 동작을
@@ -45,6 +54,11 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   개인정보·원본 오류 객체를 출력하지 않습니다.
 - 로그아웃 응답이 불확실할 때는 브라우저 장벽이 보호 경로와 refresh를 함께 차단합니다.
   장벽은 서버 로그아웃 성공 또는 새 로그인 callback 성공에서만 해제합니다.
+- 영수증 이미지 S3 버킷은 **백엔드가 도는 AWS 계정이 아닌 다른 계정**이 소유합니다.
+  그래서 EC2 인스턴스 역할로 권한을 얹지 못하고, 버킷 소유 계정이 발급한 IAM 사용자 키를
+  `AWS_ACCESS_KEY_ID`·`AWS_SECRET_ACCESS_KEY`로 받아 씁니다. 이 정적 자격증명을 인스턴스
+  역할로 "정리"하면 운영에서 접근이 끊깁니다. IAM 정책이 `receipts/` 접두사로 좁혀져 있어
+  객체 키가 이 접두사를 벗어나면 런타임에 `AccessDenied`가 납니다.
 
 ## 검증
 

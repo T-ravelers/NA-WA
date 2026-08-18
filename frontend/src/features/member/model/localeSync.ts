@@ -23,7 +23,10 @@ export async function syncLocaleWithProfile(profile: MemberProfile): Promise<voi
       return
     }
 
-    applyLocale(profile.preferredLanguage, { persist: true })
+    // 서버 값은 적용만 한다. 저장하면 「키의 존재 = 명시 선택」 규약이 깨진다 —
+    // 가입 직후의 서버 값은 컬럼 기본값(en)일 수 있고, 그것을 명시 선택으로 굳히면
+    // 브라우저 감지로 일본어를 보던 신규 회원이 영어에 영구히 갇힌다.
+    applyLocale(profile.preferredLanguage)
     return
   }
 

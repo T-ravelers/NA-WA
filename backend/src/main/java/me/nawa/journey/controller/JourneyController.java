@@ -15,6 +15,7 @@ import me.nawa.journey.dto.response.JourneySummaryResponse;
 import me.nawa.journey.service.JourneyService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -102,5 +103,30 @@ public class JourneyController {
         return ApiResponse.success(
             journeyService.getTimeline(member.getMemberId(), tripId)
         );
+    }
+
+    @DeleteMapping("/{tripId}/items/{tripItemId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ApiOperation("Journey 개별 일정 삭제")
+    public void deleteJourneyItem(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long tripId,
+        @PathVariable Long tripItemId
+    ) {
+        journeyService.deleteJourneyItem(
+            member.getMemberId(),
+            tripId,
+            tripItemId
+        );
+    }
+
+    @DeleteMapping("/{tripId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ApiOperation("Journey 전체 삭제")
+    public void deleteJourney(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long tripId
+    ) {
+        journeyService.deleteJourney(member.getMemberId(), tripId);
     }
 }

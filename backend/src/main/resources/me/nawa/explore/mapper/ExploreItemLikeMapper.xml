@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.explore.mapper.ExploreItemLikeMapper">
+
+    <select id="findVisibleItemType" resultType="string">
+        SELECT item_type
+        FROM explore_items
+        WHERE item_id = #{itemId}
+          AND approval_status = 'APPROVED'
+          AND visibility_status = 'VISIBLE'
+          AND deleted_at IS NULL
+        LIMIT 1
+    </select>
+
+    <select id="findItemType" resultType="string">
+        SELECT item_type
+        FROM explore_items
+        WHERE item_id = #{itemId}
+          AND deleted_at IS NULL
+        LIMIT 1
+    </select>
+
+    <!--
+        상태 전이를 영향 행 수로 판정하기 위해 되살리기와 삽입을 나눈다.
+        ON DUPLICATE KEY UPDATE 하나로 합치면 "이미 찜한 상태"와 "새로 찜한 상태"의
+        영향 행 수가 드라이버 설정(useAffectedRows)에 따라 갈려서 카운트 증감을
+        신뢰할 수 없다.
+    -->
+    <update id="reviveLike">
+        UPDATE explore_item_likes
+        SET deleted_at = NULL
+        WHERE item_id = #{itemId}
+          AND member_id = #{memberId}
+          AND deleted_at IS NOT NULL
+    </update>
+
+    <!--
+        INSERT IGNORE는 중복 키뿐 아니라 FK 위반도 경고로 낮춰 0을 돌려주고,
+        서비스는 0을 "이미 찜한 상태"로 읽는다. explore_items를 하드 삭제하지
+        않는다는 전제 위에서만 안전하다.
+    -->
+    <insert id="insertLike">
+        INSERT IGNORE INTO explore_item_likes (item_id, member_id)
+        VALUES (#{itemId}, #{memberId})
+    </insert>
+
+    <update id="softDeleteLike">
+        UPDATE explore_item_likes
+        SET deleted_at = CURRENT_TIMESTAMP
+        WHERE item_id = #{itemId}
+          AND member_id = #{memberId}
+          AND deleted_at IS NULL
+    </update>
+
+    <!-- chk_event_counts가 음수를 거부하므로 감소는 GREATEST로 0에서 멈춘다. -->
+    <update id="adjustEventFavoriteCount">
+        UPDATE event
+        SET favorite_count = GREATEST(favorite_count + #{delta}, 0)
+        WHERE event_id = #{itemId}
+    </update>
+
+    <update id="adjustPlaceFavoriteCount">
+        UPDATE place
+        SET favorite_count = GREATEST(favorite_count + #{delta}, 0)
+        WHERE place_id = #{itemId}
+    </update>
+
+</mapper>

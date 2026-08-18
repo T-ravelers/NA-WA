@@ -573,24 +573,50 @@ class AppointmentServiceTest {
                 5L,
                 "Gwanghwamun Square",
                 LocalDateTime.of(2026, 8, 21, 18, 30),
-                LocalDateTime.of(2026, 8, 21, 22, 0)
+                LocalDateTime.of(2026, 8, 21, 22, 0),
+                100L,
+                "EVENT",
+                "IN_PROGRESS"
         );
-        when(appointmentMapper.findMyOngoingAppointments(1L))
+        when(appointmentMapper.findMyOngoingAppointments(1L, false))
                 .thenReturn(List.of(appointment));
 
         List<MyOngoingAppointmentResponse> result =
-                appointmentService.getMyOngoingAppointments(1L);
+                appointmentService.getMyOngoingAppointments(1L, "ONGOING");
 
         assertEquals(1, result.size());
         assertEquals(10L, result.get(0).appointmentId());
         assertEquals(5L, result.get(0).tripId());
+        assertEquals(100L, result.get(0).itemId());
+        assertEquals("EVENT", result.get(0).itemType());
+        assertEquals("IN_PROGRESS", result.get(0).appointmentStatus());
+    }
+
+    @Test
+    void getMyOngoingAppointments_allScope_includesFinishedAppointments() {
+        when(appointmentMapper.findMyOngoingAppointments(1L, true))
+                .thenReturn(List.of());
+
+        appointmentService.getMyOngoingAppointments(1L, "ALL");
+
+        verify(appointmentMapper).findMyOngoingAppointments(1L, true);
     }
 
     @Test
     void getMyOngoingAppointments_invalidMemberId_rejectsRequest() {
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> appointmentService.getMyOngoingAppointments(0L)
+                () -> appointmentService.getMyOngoingAppointments(0L, "ONGOING")
+        );
+
+        assertEquals(CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
+    }
+
+    @Test
+    void getMyOngoingAppointments_unknownScope_rejectsRequest() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.getMyOngoingAppointments(1L, "PAST")
         );
 
         assertEquals(CommonErrorCode.INVALID_INPUT, exception.getErrorCode());

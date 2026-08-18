@@ -22,6 +22,7 @@ ext {
     log4jVersion = '2.26.1'
     jacksonVersion = '2.22.1'
     jacksonToolsVersion = '3.1.5'
+    awsSdkVersion = '2.46.7'
 }
 
 java {
@@ -41,6 +42,7 @@ dependencies {
     implementation platform("org.apache.logging.log4j:log4j-bom:${log4jVersion}")
     implementation platform("com.fasterxml.jackson:jackson-bom:${jacksonVersion}")
     implementation platform("tools.jackson:jackson-bom:${jacksonToolsVersion}")
+    implementation platform("software.amazon.awssdk:bom:${awsSdkVersion}")
 
     // JWT
     implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
@@ -118,6 +120,10 @@ dependencies {
     // Stripe
     // 구현 시점에 최신 안정 버전 확인
     implementation 'com.stripe:stripe-java:29.0.0'
+
+    // S3 (영수증 이미지 저장)
+    // 버킷은 별도 AWS 계정이 소유하므로 인스턴스 역할이 아니라 IAM 사용자 키로 접근한다.
+    implementation 'software.amazon.awssdk:s3'
 }
 
 test {

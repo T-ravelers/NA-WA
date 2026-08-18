@@ -13,6 +13,7 @@ import me.nawa.appointment.service.AppointmentService;
 import me.nawa.common.exception.ErrorCode;
 import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.MemberAppointmentProfileResponse;
+import me.nawa.member.dto.OnboardingProfileRequest;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.service.MemberProfileService;
 import me.nawa.settlement.service.SettlementCreationService;
@@ -43,6 +44,7 @@ import me.nawa.wallet.service.TopupService;
 import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
+import me.nawa.explore.service.ExploreItemLikeService;
 import me.nawa.explore.service.PlaceService;
 import me.nawa.journey.service.JourneyService;
 import me.nawa.report.controller.ReportController;
@@ -361,6 +363,12 @@ class SwaggerConfigTest {
                 }
 
                 @Override
+                public MemberProfileResponse completeOnboarding(
+                        long memberId, OnboardingProfileRequest request) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
                 public MemberAppointmentProfileResponse getAppointmentProfile(long memberId) {
                     throw new UnsupportedOperationException();
                 }
@@ -395,6 +403,11 @@ class SwaggerConfigTest {
         }
 
         @Bean
+        ExploreItemLikeService exploreItemLikeService() {
+            return new ExploreItemLikeService(null);
+        }
+
+        @Bean
         PlaceService placeService() {
             return new PlaceService(null);
         }
@@ -405,7 +418,7 @@ class SwaggerConfigTest {
 
         @Bean
         JourneyService journeyService() {
-            return new JourneyService(null);
+            return new JourneyService(null, null);
         }
     }
 

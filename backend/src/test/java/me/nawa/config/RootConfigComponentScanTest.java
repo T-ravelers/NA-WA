@@ -1,5 +1,6 @@
 package me.nawa.config;
 
+import me.nawa.common.storage.ReceiptStorageService;
 import me.nawa.member.service.MemberProfileServiceImpl;
 import me.nawa.report.mapper.ReportMapper;
 import me.nawa.report.service.ReportService;
@@ -32,6 +33,17 @@ class RootConfigComponentScanTest {
 
         assertTrue(Arrays.asList(mapperScan.basePackages()).contains(
                 "me.nawa.deposit.mapper"
+        ));
+    }
+
+    @Test
+    void componentScan_includesReceiptStoragePackage() {
+        ComponentScan componentScan = RootConfig.class.getAnnotation(
+                ComponentScan.class
+        );
+
+        assertTrue(Arrays.asList(componentScan.basePackages()).contains(
+                ReceiptStorageService.class.getPackageName()
         ));
     }
 

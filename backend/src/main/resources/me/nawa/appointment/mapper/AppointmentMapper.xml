@@ -320,6 +320,11 @@
         ORDER BY host DESC, am.joined_at ASC, am.appointment_member_id ASC
     </select>
 
+    <!--
+        includeAll=false: 기존 계약 그대로 진행 중(IN_PROGRESS) 약속만, 다가오는 순.
+        includeAll=true: 취소를 제외한 전체. 예정 약속을 임박한 순으로 먼저,
+        지난 약속을 최근 순으로 뒤에. 프로필의 약속 목록이 쓴다.
+    -->
     <select id="findMyOngoingAppointments" resultType="me.nawa.appointment.domain.MyOngoingAppointment">
         SELECT
             a.appointment_id,
@@ -327,17 +332,35 @@
             am.trip_id,
             a.meeting_place,
             a.activity_start_at,
-            a.activity_end_at
+            a.activity_end_at,
+            a.item_id,
+            ei.item_type,
+            a.appointment_status
         FROM appointment_members am
                  JOIN appointments a
                       ON a.appointment_id = am.appointment_id
                           AND a.deleted_at IS NULL
+                 JOIN explore_items ei
+                      ON ei.item_id = a.item_id
         WHERE am.member_id = #{memberId}
           AND am.membership_status = 'ACTIVE'
           AND am.trip_id IS NOT NULL
           AND am.deleted_at IS NULL
-          AND a.appointment_status = 'IN_PROGRESS'
-        ORDER BY a.activity_start_at ASC
+        <choose>
+            <when test="includeAll">
+                AND a.appointment_status != 'CANCELLED'
+                <!-- 예정 약속(임박한 순)을 위에, 지난 약속(최근 순)을 아래에 둔다. -->
+                ORDER BY (a.activity_start_at &lt; NOW()),
+                         CASE WHEN a.activity_start_at &gt;= NOW()
+                              THEN a.activity_start_at END ASC,
+                         a.activity_start_at DESC,
+                         a.appointment_id DESC
+            </when>
+            <otherwise>
+                AND a.appointment_status = 'IN_PROGRESS'
+                ORDER BY a.activity_start_at ASC
+            </otherwise>
+        </choose>
     </select>
 
 </mapper>

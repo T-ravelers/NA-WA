@@ -107,6 +107,12 @@ test와 build를 실행합니다. Vercel은 프론트엔드 배포를 담당하�
 품질 검증을 담당합니다. 같은 프론트엔드 배포를 두 시스템에서 중복 실행하지
 마세요.
 
+운영 백엔드는 `https://api.clearpng.cloud`이고 TLS는 nginx가 443에서 종료합니다.
+인증서는 Let's Encrypt에서 발급받아 `certbot_conf` 볼륨으로 nginx와 공유하며, 80은
+`/.well-known/acme-challenge/`(갱신 검증 경로)만 직접 응답하고 나머지는 `308`로
+https에 넘깁니다. 리다이렉트 응답에는 CORS 헤더가 없으므로 프론트엔드의
+`VITE_API_BASE_URL`은 반드시 https 주소여야 합니다.
+
 백엔드 컨테이너는 `TZ=Asia/Seoul`로 고정되어 있습니다(`backend/Dockerfile`).
 `LocalDateTime.now()`가 컨테이너 기본값인 UTC가 아니라 서비스 기준 시간대로
 찍히도록 하기 위함이며, JDBC URL의 `serverTimezone=Asia/Seoul`과 짝을 맞춥니다.

@@ -21,6 +21,7 @@
             member_id,
             display_name,
             profile_image_url,
+            nationality_code,
             preferred_language,
             preferred_currency_code,
             member_status,
@@ -75,6 +76,15 @@
     <update id="updateProfile">
         UPDATE members
         <set>
+            <if test="displayName != null">
+                display_name = #{displayName},
+            </if>
+            <if test="profileImageUrl != null">
+                profile_image_url = #{profileImageUrl},
+            </if>
+            <if test="nationalityCode != null">
+                nationality_code = #{nationalityCode},
+            </if>
             <if test="preferredLanguage != null">
                 preferred_language = #{preferredLanguage},
             </if>
@@ -83,6 +93,19 @@
             </if>
             updated_at = CURRENT_TIMESTAMP
         </set>
+        WHERE member_id = #{memberId}
+          AND deleted_at IS NULL
+    </update>
+
+    <!-- 재호출은 값만 갱신한다. 완료 시각은 COALESCE로 최초 값을 보존해 멱등을 지킨다. -->
+    <update id="completeOnboarding">
+        UPDATE members
+        SET display_name = #{displayName},
+            nationality_code = #{nationalityCode},
+            preferred_language = #{preferredLanguage},
+            preferred_currency_code = #{preferredCurrencyCode},
+            onboarding_completed_at = COALESCE(onboarding_completed_at, CURRENT_TIMESTAMP),
+            updated_at = CURRENT_TIMESTAMP
         WHERE member_id = #{memberId}
           AND deleted_at IS NULL
     </update>
