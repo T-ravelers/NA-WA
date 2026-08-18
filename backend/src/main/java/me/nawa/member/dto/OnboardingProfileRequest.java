@@ -6,18 +6,17 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * 회원 프로필 부분 수정 요청.
+ * 온보딩 프로필 저장·완료 요청.
  *
- * 모든 필드는 선택이다. 값이 없으면(필드 부재 또는 null) 그 항목은 변경하지 않는다.
- * 항목을 비우는 사용 사례가 없으므로 부재와 null을 구분하지 않는다.
+ * 네 필드 모두 필수다. 온보딩은 서비스 사용에 필요한 최소 프로필(표시 이름·국적·
+ * 선호 언어·선호 통화)을 한 번에 확정하는 절차이므로 부분 저장을 허용하지 않는다.
  */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class UpdateMemberProfileRequest {
+public class OnboardingProfileRequest {
     private String displayName;
-    private String profileImageUrl;
     private String nationalityCode;
     private String preferredLanguage;
     private String preferredCurrencyCode;
