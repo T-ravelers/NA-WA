@@ -14,7 +14,11 @@ public record MyOngoingAppointmentResponse(
     LocalDateTime activityStartAt,
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    LocalDateTime activityEndAt
+    LocalDateTime activityEndAt,
+
+    Long itemId,
+    String itemType,
+    String appointmentStatus
 ) {
 
     public static MyOngoingAppointmentResponse from(MyOngoingAppointment appointment){
@@ -24,7 +28,10 @@ public record MyOngoingAppointmentResponse(
             appointment.getTripId(),
             appointment.getMeetingPlace(),
             appointment.getActivityStartAt(),
-            appointment.getActivityEndAt()
+            appointment.getActivityEndAt(),
+            appointment.getItemId(),
+            appointment.getItemType(),
+            appointment.getAppointmentStatus()
         );
     }
 }

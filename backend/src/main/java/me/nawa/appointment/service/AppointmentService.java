@@ -246,12 +246,20 @@ public class AppointmentService {
     }
 
     @Transactional(readOnly = true)
-    public List<MyOngoingAppointmentResponse> getMyOngoingAppointments(Long memberId){
+    /**
+     * scope=ONGOING은 기존 계약 그대로 진행 중 약속만, scope=ALL은 취소를 제외한
+     * 전체를 최신 활동 시각부터 돌려준다(프로필의 약속 목록용).
+     */
+    public List<MyOngoingAppointmentResponse> getMyOngoingAppointments(
+            Long memberId, String scope){
         if(memberId == null || memberId <= 0){
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
+        if(!"ONGOING".equals(scope) && !"ALL".equals(scope)){
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
 
-        return appointmentMapper.findMyOngoingAppointments(memberId)
+        return appointmentMapper.findMyOngoingAppointments(memberId, "ALL".equals(scope))
             .stream()
             .map(MyOngoingAppointmentResponse::from)
             .toList();

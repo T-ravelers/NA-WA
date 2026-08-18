@@ -17,4 +17,7 @@ public class MyOngoingAppointment {
     private String meetingPlace;
     private LocalDateTime activityStartAt;
     private LocalDateTime activityEndAt;
+    private Long itemId;
+    private String itemType;
+    private String appointmentStatus;
 }
