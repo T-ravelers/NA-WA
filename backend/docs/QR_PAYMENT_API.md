@@ -17,9 +17,9 @@ QR 결제는 수취인이 QR을 생성하면 결제자가 스캔해 지갑 간 �
 ## 계정 유형 제약
 
 결제자는 `TRAVELER` 계정만 가능하다. `MERCHANT` 계정은 QR 생성과 매출 조회만 할 수
-있으므로 `POST /api/v1/wallet/qr/resolve`와 `POST /api/v1/wallet/qr/payment/execute`가
-`WALLET-030`으로 거절한다. QR 생성(`POST /api/v1/wallet/qr/create`)은 두 계정 유형 모두
-쓸 수 있다.
+있으므로 `resolve`·`payment/preview`·`payment/execute` 세 경로가 모두 `WALLET-030`으로
+거절한다. 세 경로 다 직접 호출할 수 있으므로 한 곳만 막지 않는다. QR
+생성(`POST /api/v1/wallet/qr/create`)은 두 계정 유형 모두 쓸 수 있다.
 
 가맹점 매출은 별도 API가 아니라 기존 거래 내역 조회로 본다. 가맹점은 결제·충전·정산을
 하지 않아 그 지갑 원장에는 QR 수입만 쌓인다.

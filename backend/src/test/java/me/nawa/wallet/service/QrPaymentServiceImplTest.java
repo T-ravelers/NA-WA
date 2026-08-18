@@ -427,6 +427,22 @@ class QrPaymentServiceImplTest {
     }
 
     @Test
+    void previewPayment_throwsMerchantCannotPay_whenMemberIsMerchant() {
+        when(qrPaymentCodeMapper.findAccountTypeByMemberId(MEMBER_ID)).thenReturn("MERCHANT");
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> qrPaymentService.previewPayment(
+                MEMBER_ID,
+                new QrPaymentPreviewRequest("token-abc", null, SpendingScope.PERSONAL, null)
+            )
+        );
+
+        assertEquals(WalletErrorCode.MERCHANT_CANNOT_PAY, exception.getErrorCode());
+        verifyNoInteractions(walletMapper);
+    }
+
+    @Test
     void executePayment_throwsMerchantCannotPay_whenMemberIsMerchant() {
         when(qrPaymentCodeMapper.findAccountTypeByMemberId(MEMBER_ID)).thenReturn("MERCHANT");
 

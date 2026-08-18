@@ -167,6 +167,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
     public QrPaymentPreviewResponse previewPayment(Long memberId, QrPaymentPreviewRequest request) {
         // 1. QR 토큰, 소비 범위, 약속 id의 형태를 먼저 검증
         validatePreviewRequest(request);
+        assertCanPay(memberId);
 
         // 2. 결제자(로그인 사용자)의 지갑 조회
         Wallet payerWallet = walletMapper.findByMemberId(memberId);
