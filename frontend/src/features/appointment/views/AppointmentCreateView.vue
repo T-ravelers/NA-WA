@@ -1,16 +1,53 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { NormalizedApiError } from '@/shared/api/apiError'
 import AppButton from '@/shared/ui/AppButton.vue'
 
-import type { AppointmentItemType } from '../api/appointmentApi'
+import {
+  createAppointment,
+  type AppointmentCreateRequest,
+  type AppointmentItemType,
+} from '../api/appointmentApi'
 import AppointmentCreateForm from '../components/AppointmentCreateForm.vue'
+import { appointmentKeys } from '../model/appointmentKeys'
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const queryClient = useQueryClient()
+const i18n = useI18n()
+const { t } = i18n
+
+const createMutation = useMutation({
+  mutationFn: (request: AppointmentCreateRequest) => createAppointment(request),
+  onSuccess: async (appointment) => {
+    queryClient.setQueryData(appointmentKeys.detail(appointment.appointmentId), appointment)
+    await queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() })
+    await router.push({
+      name: 'appointment-detail',
+      params: { appointmentId: appointment.appointmentId },
+    })
+  },
+})
+
+const errorMessage = computed(() => {
+  const error = createMutation.error.value
+  if (error === null) return undefined
+
+  if (!(error instanceof NormalizedApiError) || !i18n.te(error.messageKey)) {
+    return t('appointment.create.loadFailed')
+  }
+  return t(error.messageKey)
+})
+
+function submit(request: AppointmentCreateRequest): void {
+  if (!createMutation.isPending.value) {
+    createMutation.mutate(request)
+  }
+}
 
 function readPositiveInteger(value: unknown): number | undefined {
   const raw = Array.isArray(value) ? value[0] : value
@@ -63,7 +100,9 @@ function goBack(): void {
       ref="createForm"
       :item-id="itemId"
       :item-type="itemType"
-      payment-unavailable
+      :pending="createMutation.isPending.value"
+      :error-message="errorMessage"
+      @submit="submit"
     />
   </main>
 </template>

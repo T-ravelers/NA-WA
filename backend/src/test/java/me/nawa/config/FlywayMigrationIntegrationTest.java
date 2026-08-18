@@ -34,12 +34,13 @@ class FlywayMigrationIntegrationTest {
 
         MigrationInfo current = flyway.info().current();
         assertNotNull(current);
-        assertEquals("11", current.getVersion().getVersion());
+        assertEquals("12", current.getVersion().getVersion());
         assertTrue(current.getState().isApplied());
 
         verifyAppointmentParticipationSchema(flyway);
         verifyReviewKeywordSeed(flyway);
         verifyMemberAccountTypeSchema(flyway);
+        verifyDepositPoolWalletSeed(flyway);
     }
 
     private static void verifyMemberAccountTypeSchema(Flyway flyway) {
@@ -121,6 +122,33 @@ class FlywayMigrationIntegrationTest {
         } catch (SQLException exception) {
             throw new IllegalStateException(
                     "Failed to verify review keyword seed",
+                    exception
+            );
+        }
+    }
+
+    private static void verifyDepositPoolWalletSeed(Flyway flyway) {
+        String sql = """
+                SELECT w.currency_code, w.wallet_status
+                FROM wallet_owners o
+                JOIN wallets w ON w.wallet_owner_id = o.wallet_owner_id
+                WHERE o.owner_type = 'SYSTEM'
+                  AND o.system_code = 'DEPOSIT_POOL'
+                  AND o.deleted_at IS NULL
+                  AND w.deleted_at IS NULL
+                """;
+
+        try (Connection connection = flyway.getConfiguration()
+                .getDataSource()
+                .getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            assertTrue(resultSet.next());
+            assertEquals("KRW", resultSet.getString("currency_code"));
+            assertEquals("ACTIVE", resultSet.getString("wallet_status"));
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                    "Failed to verify deposit pool wallet seed",
                     exception
             );
         }

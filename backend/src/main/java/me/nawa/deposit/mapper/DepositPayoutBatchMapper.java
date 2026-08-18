@@ -1,11 +1,20 @@
 package me.nawa.deposit.mapper;
 
+import java.util.List;
 import me.nawa.deposit.domain.DepositPayoutBatch;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface DepositPayoutBatchMapper {
+
+    /**
+     * 처리 대기 정산 배치 식별자 조회
+     * <p>
+     * `PENDING` 또는 `FAILED` 상태의 정산 배치 식별자를 오름차순으로 조회한다.
+     * 비동기 처리 스케줄러가 매 tick마다 이 목록을 가져가 순차 처리한다.
+     */
+    List<Long> findPendingOrFailedBatchIds();
 
     /**
      * 정산 배치 식별자 조회

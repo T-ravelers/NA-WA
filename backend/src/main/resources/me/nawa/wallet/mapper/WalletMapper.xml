@@ -18,6 +18,20 @@
             AND w.deleted_at IS NULL
     </select>
 
+    <select id="findBySystemCode" resultType="me.nawa.wallet.domain.Wallet">
+        SELECT
+            w.wallet_id,
+            w.currency_code,
+            w.available_balance,
+            w.wallet_status
+        FROM wallets w
+        JOIN wallet_owners o ON o.wallet_owner_id = w.wallet_owner_id
+        WHERE o.owner_type = 'SYSTEM'
+            AND o.system_code = #{systemCode}
+            AND o.deleted_at IS NULL
+            AND w.deleted_at IS NULL
+    </select>
+
     <insert id="insertMemberWalletOwner"
             useGeneratedKeys="true"
             keyProperty="walletOwnerId"

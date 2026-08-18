@@ -272,12 +272,12 @@ public enum MemberErrorCode implements ErrorCode {
 | --- | --- | ---: | --- |
 | `APPOINTMENT_NOT_FOUND` | `APPOINTMENT-001` | 404 | 약속을 찾을 수 없음 |
 | `JOIN_NOT_AVAILABLE` | `APPOINTMENT-002` | 409 | 현재 상태·기한·정원상 참여 불가 |
-| `ALREADY_JOINED` | `APPOINTMENT-003` | 409 | 기존 참여 이력이 있어 재참여 불가 |
+| `ALREADY_JOINED` | `APPOINTMENT-003` | 409 | 이미 `PENDING`/`ACTIVE`로 참여 중 (참여 취소 후 재참여는 허용) |
 | `APPOINTMENT_FORBIDDEN` | `APPOINTMENT-004` | 403 | 약속 처리 권한 없음 |
 | `APPOINTMENT_MEMBER_NOT_FOUND` | `APPOINTMENT-005` | 404 | 참여 정보를 찾을 수 없음 |
 | `INVALID_ATTENDANCE_CONFIRMATION` | `APPOINTMENT-006` | 409 | 출석 확정 조건 불충족 |
 | `CANCELLATION_NOT_AVAILABLE` | `APPOINTMENT-007` | 409 | 약속 참여 취소 조건 불충족 |
-| `PAYMENT_INTEGRATION_REQUIRED` | `APPOINTMENT-008` | 409 | 결제 연동 전에는 약속 생성·참여·출석 확정 불가 |
+| `PAYMENT_INTEGRATION_REQUIRED` | `APPOINTMENT-008` | 409 | 약속 생성·참여·출석 확정이 모두 실제로 구현된 뒤로는 코드에만 남아있고 어디서도 던지지 않음 |
 
 후기 도메인에는 다음 오류 코드가 구현돼 있습니다.
 

@@ -62,6 +62,51 @@
              #{attendanceConfirmedAt})
     </insert>
 
+    <update id="updateAppointmentStatus">
+        UPDATE appointments
+        SET appointment_status = #{toStatus},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = #{appointmentId}
+          AND appointment_status = #{fromStatus}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markMemberActive">
+        UPDATE appointment_members
+        SET membership_status = 'ACTIVE'
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="closeExpiredRecruitingAppointments">
+        UPDATE appointments
+        SET appointment_status = 'CLOSED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_status = 'RECRUITING'
+          AND join_deadline &lt; CURRENT_TIMESTAMP
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="startDueClosedAppointments">
+        UPDATE appointments
+        SET appointment_status = 'IN_PROGRESS',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_status = 'CLOSED'
+          AND activity_start_at &lt;= CURRENT_TIMESTAMP
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="updateAttendance">
+        UPDATE appointment_members
+        SET attendance_status = #{attendanceStatus},
+            attendance_confirmed_at = #{confirmedAt}
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status = 'ACTIVE'
+          AND attendance_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
     <sql id="appointmentColumns">
         a.appointment_id,
         a.item_id,
@@ -217,37 +262,6 @@
           AND am.deleted_at IS NULL
     </select>
 
-    <select id="findHostSuccessorForUpdate"
-            resultType="me.nawa.appointment.domain.AppointmentMember">
-        SELECT
-            appointment_member_id,
-            appointment_id,
-            member_id,
-            trip_id,
-            membership_status,
-            attendance_status,
-            joined_at,
-            left_at,
-            attendance_confirmed_at
-        FROM appointment_members
-        WHERE appointment_id = #{appointmentId}
-          AND member_id &lt;&gt; #{hostMemberId}
-          AND membership_status = 'PENDING'
-          AND deleted_at IS NULL
-        ORDER BY joined_at ASC, appointment_member_id ASC
-        LIMIT 1
-        FOR UPDATE
-    </select>
-
-    <update id="updateHostMember">
-        UPDATE appointments
-        SET host_member_id = #{nextHostMemberId},
-            updated_at = CURRENT_TIMESTAMP
-        WHERE appointment_id = #{appointmentId}
-          AND host_member_id = #{currentHostMemberId}
-          AND deleted_at IS NULL
-    </update>
-
     <select id="findMemberByIdForUpdate"
             resultType="me.nawa.appointment.domain.AppointmentMember">
         SELECT
@@ -274,6 +288,18 @@
             updated_at = CURRENT_TIMESTAMP
         WHERE appointment_member_id = #{appointmentMemberId}
           AND membership_status IN ('PENDING', 'ACTIVE')
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="reviveLeftMember">
+        UPDATE appointment_members
+        SET membership_status = 'PENDING',
+            attendance_status = 'PENDING',
+            joined_at = CURRENT_TIMESTAMP,
+            left_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status = 'LEFT'
           AND deleted_at IS NULL
     </update>
 

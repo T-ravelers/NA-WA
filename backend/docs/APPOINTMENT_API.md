@@ -1,7 +1,9 @@
 # 약속 및 후기 API 계약
 
 이 문서는 탐색 Event·Place에서 생성하는 약속의 조회와 회원 후기 API 계약을 정의합니다.
-모든 경로는 인증이 필요하며 공통 `ApiResponse` 형식을 사용합니다.
+모든 경로는 인증이 필요하며 공통 `ApiResponse` 형식을 사용합니다. ENUM·상태 전이·
+구현 여부는 [APPOINTMENT_DEPOSIT_STATE_MACHINE.md](APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+를 따릅니다.
 
 ## 공통 정책
 
@@ -10,24 +12,35 @@
 - 지원 언어는 `en`, `ja`, `zh-TW`, `vi`입니다.
 - `maxMembers`는 방장을 포함하여 2명 이상 10명 이하입니다.
 - 보증금은 5,000원 이상 50,000원 이하의 정수 금액입니다.
-- 보증금 결제 연동 전에는 생성·참여·출석 확정을 완료 처리하지 않습니다.
-  이 요청은 `APPOINTMENT-008`(409)을 반환하며, 보증금·회원·지갑 거래 상태를
-  변경하지 않습니다.
-- 결제 연동은 회원 지갑 차감, 시스템 에스크로 입금, 양쪽 원장 기록을 하나의
-  트랜잭션으로 처리한 뒤 보증금을 `HELD`, 회원을 `ACTIVE`로 전환해야 합니다.
-- `LEFT`가 된 회원은 같은 약속에 다시 참여할 수 없습니다.
+- 약속 생성·참여는 회원 지갑 차감, 시스템 에스크로(`DEPOSIT_POOL`) 입금, 양쪽
+  원장 기록을 하나의 트랜잭션으로 처리한 뒤 보증금을 `HELD`, 회원을 `ACTIVE`로
+  전환합니다.
+- 출석 확정이 성공하면 `DepositPayoutBatch`를 `PENDING`으로 생성하고, 60초 주기
+  비동기 배치 처리가 실제 환급·노쇼 분배 지갑 이체를 실행합니다.
+- 참여를 취소(`LEFT`)한 회원도 참여 마감 시각 전이면 같은 약속에 다시 참여할 수
+  있습니다. 기존 참여·보증금 행을 재사용합니다(자세한 내용은
+  [APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+  3·5절 참고).
 
 ## 약속 상태 전이
 
-결제 연동 전에는 약속 상태 전이 API와 자동 전이를 실행하지 않습니다. 결제 연동 후
-상태 전이는 방장의 시작 버튼이 아닌 서버 조건으로 처리합니다.
+상태 전이는 별도 API 없이 서버가 조건에 따라 자동으로 처리합니다. 방장의 확정
+버튼 같은 수동 액션은 없습니다.
 
-- `RECRUITING` → `CLOSED`: 참여 마감 시각이 지났거나 결제 완료 회원이 정원에 도달한 경우
-- `CLOSED` → `CONFIRMED`: 남은 모든 `ACTIVE` 회원의 보증금이 실제로 `HELD`인 경우
-- `CONFIRMED` → `IN_PROGRESS`: 활동 시작 시각이 도달한 경우
+- `RECRUITING` → `CLOSED`: 정원 도달은 참여 성공 시점에 즉시, 참여 마감 시각
+  도달은 60초 주기 스케줄러가 전환합니다.
+- `CLOSED` → `RECRUITING`: 정원 도달로 `CLOSED`된 약속에서 참여 마감 시각 전에
+  참여 취소가 발생해 빈자리가 생기면 즉시 되돌아갑니다.
+- `CLOSED` → `IN_PROGRESS`: 활동 시작 시각이 되면 스케줄러가 전환합니다. 방장의
+  별도 확정 절차는 없습니다.
 - `IN_PROGRESS` → `COMPLETED`: 방장이 모든 `ACTIVE` 회원의 출석을 확정한 경우
 
-상태 전이 API는 결제·에스크로 연동 PR에서 함께 제공합니다.
+목록·상세 조회 응답의 `appointmentStatus`는 스케줄러가 아직 못 따라잡았어도
+마감·시작 시각 기준으로 즉시 계산한 값을 보여줍니다. 단, `GET /appointments/me`는
+DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초까지 지연될 수
+있습니다. 자세한 내용은
+[APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+15절을 참고하세요.
 
 ## 약속 목록 조회
 
@@ -97,8 +110,12 @@
 
 `itemType`은 `EVENT` 또는 `PLACE`이며 화면의 탭 구분에 사용합니다.
 
-참여 자체가 보증금 결제 연동 전까지 `APPOINTMENT-008`로 막혀 있어, 그 전까지는
-항상 빈 배열을 반환합니다.
+이 엔드포인트는 스케줄러가 실제로 반영한 DB의 `appointment_status` 값만
+사용합니다(목록·상세 조회와 달리 즉시 계산한 값을 쓰지 않습니다 — 근거는
+[APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+15절). 그래서 활동 시작 시각이 지나도 스케줄러가 아직 상태를 못 바꿨다면,
+`scope=ONGOING`에서는 해당 약속이 최대 60초까지 배열에서 빠질 수 있고
+`scope=ALL`에서는 `appointmentStatus`가 그만큼 늦게 반영될 수 있습니다.
 
 ## 약속 생성
 
@@ -121,27 +138,30 @@
 ```
 
 참여 마감은 활동 시작 시각보다 늦을 수 없으며, 활동 시작 시각은 종료 시각보다
-빨라야 합니다. 현재는 실제 보증금 예치 경로가 없어 요청이 `APPOINTMENT-008`(409)을
-반환하며 데이터를 생성하지 않습니다.
+빨라야 합니다. 성공하면 방장의 보증금을 즉시 예치(`DEPOSIT_HOLD`)하고 약속을
+`RECRUITING` 상태로 생성합니다.
 
 ## 참여 요청과 취소
 
 - `POST /api/v1/appointments/{appointmentId}/members`
 - `DELETE /api/v1/appointments/{appointmentId}/members/me`
 
-참여 요청은 실제 보증금 예치 경로가 준비되기 전까지 `APPOINTMENT-008`(409)을 반환하며
-회원·보증금 데이터를 생성하지 않습니다. 결제 연동 후에는 `RECRUITING` 상태, 참여
-마감 전, 정원 미달 조건에서만 참여할 수 있습니다.
+참여 요청은 `RECRUITING` 상태, 참여 마감 전, 정원 미달 조건을 모두 만족해야
+하며, 성공하면 참여자의 보증금을 즉시 예치(`DEPOSIT_HOLD`)하고 `ACTIVE`로
+전환합니다.
 
-결제 대기 상태인 기존 `PENDING` 회원만 참여를 취소할 수 있으며, 취소 시 참가 상태는
-`LEFT`, 대기 중인 보증금은 `CANCELLED`로 변경합니다. 이미 예치된 `HELD` 보증금의
-환급은 지갑·에스크로 연동이 완료되기 전에는 지원하지 않습니다.
+참여 성공 시 보증금 예치와 `ACTIVE` 전환이 같은 트랜잭션에서 함께 끝나므로,
+방장이 아닌 회원의 참여 취소는 실질적으로 `ACTIVE` 상태에서 일어납니다. 이
+경우 `HELD` 보증금을 환급(`DEPOSIT_REFUND`)하고 참가 상태를 `LEFT`로 변경하는
+걸 같은 트랜잭션에서 처리합니다. 결제 전(`PENDING`) 취소 경로도 남아있지만,
+참여 성공 시 `PENDING`으로 남는 경우가 없어 참여가 실패해 트랜잭션이 롤백된
+경우를 빼면 실질적으로 도달하지 않습니다.
 
-현재 범위에서 방장 취소와 방장 권한 이전은 결제 대기 상태인 기존 `PENDING` 회원의
-취소에만 적용됩니다. 동일한 가입 시각이면 참여 ID가 작은 회원을 우선합니다. 승계할
-회원 없이 방장만 참여 중인 약속은 취소할 수 없습니다. `ACTIVE` 회원의 취소·환급과
-`HELD` 보증금의 환급은 지갑·에스크로 연동 후속 범위입니다. `IN_PROGRESS`,
-`COMPLETED`, `CANCELLED` 약속에서도 참여를 취소할 수 없습니다.
+방장은 참여 취소 API로 약속에서 빠질 수 없습니다. 상태와 무관하게 항상
+`APPOINTMENT-007`을 반환합니다. 방장이 아닌 회원의 참여 취소는 참여 마감
+시각(`joinDeadline`) 전까지만 가능하며, 지난 뒤에는 `APPOINTMENT-007`을
+반환합니다. 자세한 근거는 [APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+12절을 참고하세요.
 
 ## 출석 확정
 
@@ -156,10 +176,17 @@
 }
 ```
 
-- 결제·상태 전이 연동 전에는 `APPOINTMENT-008`(409)을 반환하며 출석과 약속 상태를
-  변경하지 않습니다.
-- 결제 연동 후에는 방장만 `IN_PROGRESS` 상태에서 모든 `ACTIVE` 회원을 정확히 한 번씩
-  `ATTENDED` 또는 `NO_SHOW`로 확정할 수 있습니다.
+- 방장만 `IN_PROGRESS` 상태에서 모든 `ACTIVE` 회원을 정확히 한 번씩 `ATTENDED`
+  또는 `NO_SHOW`로 확정할 수 있습니다. 방장이 아니면 `APPOINTMENT-004`, 약속이
+  `IN_PROGRESS`가 아니거나 출석자가 한 명도 없거나 요청이 활성 회원 전원을
+  정확히 한 번씩 포함하지 않으면 `APPOINTMENT-006`을 반환합니다.
+- 성공하면 같은 트랜잭션에서 각 회원의 출석 상태를 반영하고 약속을 `COMPLETED`로
+  전환한 뒤, 보증금 정산 배치(`DepositPayoutBatch`)를 `PENDING`으로 생성합니다.
+  이 시점에는 아직 지갑 이체가 일어나지 않습니다 — 실제 환급(출석 회원 본인
+  보증금)·노쇼 분배(노쇼 회원 보증금을 출석 회원에게 균등 분배)는 60초 주기
+  비동기 배치 처리가 이어서 실행합니다. 자세한 내용은
+  [APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+  16절을 참고하세요.
 
 ## 회원 후기 등록
 
@@ -177,8 +204,7 @@
 }
 ```
 
-- 기존 `COMPLETED` 약속에서만 작성할 수 있습니다. 결제·상태 전이 연동 전에는 새 약속을
-  `COMPLETED` 상태까지 진행할 수 없습니다.
+- 기존 `COMPLETED` 약속에서만 작성할 수 있습니다.
 - 작성자와 평가 대상 모두 `ACTIVE`, `ATTENDED` 회원이어야 합니다.
 - 자기 자신과 이미 평가한 회원을 다시 평가할 수 없습니다.
 - `PUNCTUALITY`, `MANNERS`, `COMMUNICATION` 점수를 모두 입력하며 각 점수는

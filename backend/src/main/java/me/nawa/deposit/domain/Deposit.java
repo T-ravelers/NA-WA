@@ -129,6 +129,22 @@ public class Deposit {
         resolveAs(DepositStatus.DISTRIBUTED, resolvedAt);
     }
 
+    /**
+     * 재참여를 위한 보증금 되돌리기
+     *
+     * 참여 취소로 환급 완료(`REFUNDED`)된 보증금을, 같은 회원이 마감 시각
+     * 전에 다시 참여할 때 `PENDING`으로 되돌려 재사용합니다. 새 보증금
+     * 행을 만들지 않는 이유는 appointment_member_id가 UNIQUE라 같은 참여
+     * 행에 두 번째 보증금을 만들 수 없기 때문입니다.
+     */
+    public void revive() {
+        transitionTo(DepositStatus.PENDING);
+
+        this.heldTransferId = null;
+        this.heldAt = null;
+        this.resolvedAt = null;
+    }
+
 
     /**
      * 보증금 납부 대기 여부

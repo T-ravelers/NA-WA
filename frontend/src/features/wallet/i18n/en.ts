@@ -6,9 +6,11 @@
  * `activity`와 `status`의 key는 백엔드 `TransferType`·`wallet_status` 값과 그대로 맞춘다.
  * 서버가 모르는 값을 내려도 화면이 비지 않도록 `UNKNOWN`을 함께 둔다.
  *
- * `errorCode`는 백엔드 `WalletErrorCode`와 1:1로 맞추되, 이 화면에서 실제로 도달할 수 있는
- * 코드만 둔다. 충전·Webhook 계열(WALLET-002~004, 007, 009~013)은 충전 화면(#99)에서
- * 그 화면의 문구와 함께 추가한다.
+ * `errorCode`는 백엔드 `WalletErrorCode`와 1:1로 맞추되, 실제로 도달할 수 있는 코드만
+ * 둔다. `resolveErrorMessageKey`가 오류 코드 접두어(`WALLET-`)로 메시지 키를 만들기
+ * 때문에, 이 맵은 wallet 화면뿐 아니라 지갑 이체를 호출하는 다른 기능(약속 보증금
+ * 예치 등)에서도 그대로 재사용된다. 충전·Webhook 계열(WALLET-002~004, 007, 009~013)은
+ * 충전 화면(#99)에서 그 화면의 문구와 함께 추가한다.
  */
 export default {
   wallet: {
@@ -65,6 +67,8 @@ export default {
       'WALLET-023': "The recipient's wallet is not active right now.",
       'WALLET-024': 'Enter an amount to continue.',
       'WALLET-029': "You don't have enough balance for this payment.",
+      'WALLET-015': 'Your wallet balance is too low for this transfer.',
+      'WALLET-016': 'Your wallet cannot be used for this transfer right now.',
     },
     transactions: {
       title: 'TRANSACTIONS',
