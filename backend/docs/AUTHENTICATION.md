@@ -103,7 +103,10 @@ token을 발급하지 않지만, 확인되지 않은 Redis 세션까지 폐기�
 지원 언어는 `en`, `ja`, `zh-TW`, `vi`이며 이 백엔드 allow-list가 정본입니다
 (한국어는 서비스 locale이 아닙니다). 목록에 없는 언어는 `MEMBER-002`, 활성 통화
 코드가 아니면 `MEMBER-003`, ISO 3166-1 alpha-2가 아닌 국적은 `MEMBER-005`를
-반환합니다.
+반환합니다. 국적은 대소문자를 가리지 않고 받아 대문자로 저장합니다. 표시 이름
+길이는 code point 기준 50자입니다. 프로필 이미지는 `http`·`https` URL만 받습니다 —
+이 값은 다른 회원 화면에 이미지로 렌더되므로 그 밖의 스킴은 `MEMBER-007`로
+거부합니다.
 
 `PATCH /api/v1/members/me/onboarding`은 온보딩 프로필을 저장하고 완료를
 기록합니다. `displayName`·`nationalityCode`·`preferredLanguage`·

@@ -56,8 +56,8 @@ public class MemberProfileServiceImpl implements MemberProfileService {
             long memberId,
             UpdateMemberProfileRequest request) {
         String displayName = normalizeDisplayName(request.getDisplayName());
-        String profileImageUrl = request.getProfileImageUrl();
-        String nationality = request.getNationalityCode();
+        String profileImageUrl = normalizeProfileImageUrl(request.getProfileImageUrl());
+        String nationality = normalizeNationality(request.getNationalityCode());
         String language = request.getPreferredLanguage();
         String currency = request.getPreferredCurrencyCode();
 
@@ -91,7 +91,7 @@ public class MemberProfileServiceImpl implements MemberProfileService {
             long memberId,
             OnboardingProfileRequest request) {
         String displayName = normalizeDisplayName(request.getDisplayName());
-        String nationality = request.getNationalityCode();
+        String nationality = normalizeNationality(request.getNationalityCode());
         String language = request.getPreferredLanguage();
         String currency = request.getPreferredCurrencyCode();
 
@@ -124,20 +124,49 @@ public class MemberProfileServiceImpl implements MemberProfileService {
         return displayName.strip();
     }
 
+    /** 가입 경로(OAuthMemberInsert)와 같게 앞뒤 공백을 정리한다. */
+    private String normalizeProfileImageUrl(String profileImageUrl) {
+        if (profileImageUrl == null) {
+            return null;
+        }
+        return profileImageUrl.strip();
+    }
+
+    /** ISO 3166-1 alpha-2는 대문자가 정본이다. "kr"도 받되 "KR"로 저장한다. */
+    private String normalizeNationality(String nationalityCode) {
+        if (nationalityCode == null) {
+            return null;
+        }
+        return nationalityCode.toUpperCase(Locale.ROOT);
+    }
+
+    /**
+     * 길이는 code point로 센다. 가입 경로(OAuthMemberInsert)와 DB(VARCHAR는 문자 단위)가
+     * 둘 다 문자 기준이라, UTF-16 단위로 세면 이모지가 든 이름이 가입은 되고 수정만 막힌다.
+     */
     private void validateDisplayName(String displayName) {
         if (displayName == null) {
             return;
         }
-        if (displayName.isEmpty() || displayName.length() > DISPLAY_NAME_MAX_LENGTH) {
+        if (displayName.isEmpty()
+                || displayName.codePointCount(0, displayName.length())
+                        > DISPLAY_NAME_MAX_LENGTH) {
             throw new BusinessException(MemberErrorCode.INVALID_DISPLAY_NAME);
         }
     }
 
+    /**
+     * 이 값은 다른 회원 화면의 img src로 렌더된다. 사용자 입력을 그대로 받으므로
+     * http·https 외의 스킴(javascript:, data: 등)은 형식 오류로 거부한다.
+     */
     private void validateProfileImageUrl(String profileImageUrl) {
         if (profileImageUrl == null) {
             return;
         }
-        if (profileImageUrl.isBlank()
+        String lowerCased = profileImageUrl.toLowerCase(Locale.ROOT);
+        boolean hasAllowedScheme = lowerCased.startsWith("http://")
+                || lowerCased.startsWith("https://");
+        if (!hasAllowedScheme
                 || profileImageUrl.length() > PROFILE_IMAGE_URL_MAX_LENGTH) {
             throw new BusinessException(MemberErrorCode.INVALID_PROFILE_IMAGE_URL);
         }

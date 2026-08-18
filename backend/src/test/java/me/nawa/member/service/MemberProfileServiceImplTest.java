@@ -190,6 +190,69 @@ class MemberProfileServiceImplTest {
     }
 
     @Test
+    void updateProfile_acceptsEmojiDisplayName_withinCodePointLimit() {
+        // 👍 50개 = code point 50, UTF-16 단위 100. 가입 경로와 같은 code point 기준이다.
+        String emojiName = "👍".repeat(50);
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.updateProfile(1L, emojiName, null, null, null, null)).thenReturn(1);
+
+        service.updateProfile(1L, updateRequest(emojiName, null, null, null, null));
+
+        verify(memberMapper).updateProfile(1L, emojiName, null, null, null, null);
+    }
+
+    @Test
+    void updateProfile_throwsInvalidDisplayName_whenOverFiftyCodePoints() {
+        String emojiName = "👍".repeat(51);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.updateProfile(1L, updateRequest(emojiName, null, null, null, null))
+        );
+
+        assertEquals("MEMBER-006", exception.getErrorCode().getCode());
+    }
+
+    @Test
+    void updateProfile_trimsProfileImageUrl_beforeSaving() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.updateProfile(
+                1L, null, "https://cdn.example.com/me.png", null, null, null)).thenReturn(1);
+
+        service.updateProfile(
+                1L, updateRequest(null, "  https://cdn.example.com/me.png  ", null, null, null));
+
+        verify(memberMapper).updateProfile(
+                1L, null, "https://cdn.example.com/me.png", null, null, null);
+    }
+
+    @Test
+    void updateProfile_throwsInvalidProfileImageUrl_whenSchemeNotHttp() {
+        for (String url : new String[] {
+                "javascript:alert(1)",
+                "data:image/png;base64,AAAA",
+                "ftp://cdn.example.com/me.png",
+                "cdn.example.com/me.png",
+        }) {
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.updateProfile(1L, updateRequest(null, url, null, null, null))
+            );
+            assertEquals("MEMBER-007", exception.getErrorCode().getCode());
+        }
+    }
+
+    @Test
+    void updateProfile_normalizesNationalityToUppercase() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.updateProfile(1L, null, null, "KR", null, null)).thenReturn(1);
+
+        service.updateProfile(1L, updateRequest(null, null, "kr", null, null));
+
+        verify(memberMapper).updateProfile(1L, null, null, "KR", null, null);
+    }
+
+    @Test
     void updateProfile_throwsUnsupportedLanguage_whenLanguageNotInAllowList() {
         // 언어 검사는 회원 조회보다 먼저 일어나므로 findProfile을 stub하지 않는다.
         BusinessException exception = assertThrows(
@@ -288,6 +351,20 @@ class MemberProfileServiceImplTest {
         }
         verify(memberMapper, never()).completeOnboarding(
                 anyLong(), any(), any(), any(), any());
+    }
+
+    @Test
+    void completeOnboarding_normalizesNationalityToUppercase() {
+        when(memberMapper.findProfile(1L))
+                .thenReturn(profile("ACTIVE", false))
+                .thenReturn(profile("ACTIVE", true));
+        when(memberMapper.existsActiveCurrency("JPY")).thenReturn(true);
+        when(memberMapper.completeOnboarding(1L, "여행자", "JP", "ja", "JPY")).thenReturn(1);
+
+        service.completeOnboarding(
+                1L, new OnboardingProfileRequest("여행자", "jp", "ja", "JPY"));
+
+        verify(memberMapper).completeOnboarding(1L, "여행자", "JP", "ja", "JPY");
     }
 
     @Test
