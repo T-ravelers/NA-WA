@@ -72,11 +72,12 @@
 | `ONGOING`(기본) | `IN_PROGRESS` 약속만 | `activityStartAt` 오름차순 — QR 공동 소비 결제가 쓰는 기존 계약 그대로 |
 | `ALL` | `CANCELLED`를 제외한 전체 | 예정 약속을 임박한 순으로 먼저, 지난 약속을 최근 순으로 뒤에 — 프로필의 약속 목록이 사용 |
 
-`ALL`은 `PAYMENT_PENDING`을 포함합니다. 상세 조회가 이 상태를 호스트 본인에게는
-보여주는 것과 같은 규칙입니다 — 보증금 결제 전에는 모집이 열리지 않아 호스트 외에는
+`ALL`은 `PAYMENT_PENDING`을 포함합니다. `PAYMENT_PENDING`에 한해 상세 조회의
+호스트 노출 기준을 따릅니다 — 보증금 결제 전에는 모집이 열리지 않아 호스트 외에는
 `ACTIVE` 멤버십이 생길 수 없고, 본인 목록에서는 결제를 마치도록 보이는 편이 맞습니다.
-공개 약속 목록(`GET /api/v1/appointments`)이 `PAYMENT_PENDING`을 제외하는 것과
-근거가 다르니 혼동하지 마세요.
+`CANCELLED`는 상세 조회가 호스트 본인에게는 보여주는 것과 달리, 프로필 목록에 노출할
+근거가 없어 호스트에게도 제외합니다. 공개 약속 목록(`GET /api/v1/appointments`)이
+`PAYMENT_PENDING`을 제외하는 것과 근거가 다르니 혼동하지 마세요.
 
 ```json
 [
