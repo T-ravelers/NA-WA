@@ -65,4 +65,9 @@ public interface  QrPaymentCodeMapper {
         @Param("memberId") Long memberId,
         @Param("appointmentId") Long appointmentId
     );
+
+    // 가맹점 계정은 결제할 수 없다. 결제 진입 시점에 계정 유형만 확인한다.
+    String findAccountTypeByMemberId(
+        @Param("memberId") Long memberId
+    );
 }

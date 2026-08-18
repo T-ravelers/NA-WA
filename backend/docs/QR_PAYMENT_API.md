@@ -14,6 +14,23 @@ QR 결제는 수취인이 QR을 생성하면 결제자가 스캔해 지갑 간 �
 | `POST /api/v1/wallet/qr/payment/execute` | 결제를 실행한다. `Idempotency-Key` 헤더가 필요하다. |
 | `GET /api/v1/wallet/qr/payment/{transferId}` | 완료된 QR 결제 거래 상태를 조회한다. |
 
+## 계정 유형 제약
+
+결제자는 `TRAVELER` 계정만 가능하다. `MERCHANT` 계정은 QR 생성과 매출 조회만 할 수
+있으므로 `resolve`·`payment/preview`·`payment/execute` 세 경로가 모두 `WALLET-030`으로
+거절한다. 세 경로 다 직접 호출할 수 있으므로 한 곳만 막지 않는다. QR
+생성(`POST /api/v1/wallet/qr/create`)은 두 계정 유형 모두 쓸 수 있다.
+
+가맹점 매출은 별도 API가 아니라 기존 거래 내역 조회로 본다. 가맹점은 결제·충전·정산을
+하지 않아 그 지갑 원장에는 QR 수입만 쌓인다.
+
+```text
+GET /api/v1/me/transactions?type=QR_PAYMENT&status=COMPLETED&from=2026-08-18&to=2026-08-18
+```
+
+계정 유형은 `GET /api/v1/members/me`의 `accountType`으로 확인하고, 가맹점 등록은
+`POST /api/v1/members/me/merchant`로 한다.
+
 ## QR 생성
 
 `POST /api/v1/wallet/qr/create`
@@ -103,3 +120,4 @@ QR 결제로 생성된 거래만 조회할 수 있다. 결제자 본인만 조�
 | `WALLET-027` | 409 | 약속에 연결된 여행이 없음 |
 | `WALLET-028` | 400 | 공동 소비에 약속 정보 누락 |
 | `WALLET-029` | 409 | 결제 가능한 잔액 부족 |
+| `WALLET-030` | 403 | 가맹점 계정은 결제할 수 없음 |

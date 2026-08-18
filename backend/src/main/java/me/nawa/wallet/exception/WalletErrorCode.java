@@ -181,6 +181,12 @@ public enum WalletErrorCode implements ErrorCode {
         HttpStatus.CONFLICT,
         "WALLET-029",
         "결제 가능한 잔액이 부족합니다."
+    ),
+
+    MERCHANT_CANNOT_PAY(
+        HttpStatus.FORBIDDEN,
+        "WALLET-030",
+        "가맹점 계정은 결제할 수 없습니다."
     );
 
     private final HttpStatus status;
