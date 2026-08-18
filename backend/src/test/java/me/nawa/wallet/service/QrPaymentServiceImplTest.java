@@ -407,7 +407,40 @@ class QrPaymentServiceImplTest {
         );
 
         assertEquals(WalletErrorCode.WALLET_NOT_FOUND, exception.getErrorCode());
-        verifyNoInteractions(qrPaymentCodeMapper);
+        // 계정 유형 확인은 결제 차단을 위해 지갑 조회보다 먼저 일어난다. QR 조회로만 넘어가지 않으면 된다.
+        verify(qrPaymentCodeMapper, never()).findResolveTargetByToken(any());
+    }
+
+    @Test
+    void resolvePaymentQr_throwsMerchantCannotPay_whenMemberIsMerchant() {
+        when(qrPaymentCodeMapper.findAccountTypeByMemberId(MEMBER_ID)).thenReturn("MERCHANT");
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> qrPaymentService.resolvePaymentQr(MEMBER_ID, resolveRequest("token-abc"))
+        );
+
+        assertEquals(WalletErrorCode.MERCHANT_CANNOT_PAY, exception.getErrorCode());
+        // 가맹점은 결제 대상 조회 단계로 넘어가지 않는다.
+        verifyNoInteractions(walletMapper);
+        verify(qrPaymentCodeMapper, never()).findResolveTargetByToken(any());
+    }
+
+    @Test
+    void executePayment_throwsMerchantCannotPay_whenMemberIsMerchant() {
+        when(qrPaymentCodeMapper.findAccountTypeByMemberId(MEMBER_ID)).thenReturn("MERCHANT");
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> qrPaymentService.executePayment(
+                MEMBER_ID, "idem-1", executeRequest("token-abc", SpendingScope.PERSONAL, null)
+            )
+        );
+
+        assertEquals(WalletErrorCode.MERCHANT_CANNOT_PAY, exception.getErrorCode());
+        // 멱등 조회와 지갑 조회 이전에 막혀 결제 경로 전체가 실행되지 않는다.
+        verifyNoInteractions(walletMapper, walletTransferMapper, walletLedgerMapper);
+        verify(qrPaymentCodeMapper, never()).findByQrTokenForUpdate(any());
     }
 
     @Test
@@ -840,7 +873,8 @@ class QrPaymentServiceImplTest {
         );
 
         assertEquals(WalletErrorCode.WALLET_NOT_FOUND, exception.getErrorCode());
-        verifyNoInteractions(qrPaymentCodeMapper);
+        // 계정 유형 확인은 결제 차단을 위해 지갑 조회보다 먼저 일어난다. QR 잠금으로만 넘어가지 않으면 된다.
+        verify(qrPaymentCodeMapper, never()).findByQrTokenForUpdate(any());
     }
 
     @Test

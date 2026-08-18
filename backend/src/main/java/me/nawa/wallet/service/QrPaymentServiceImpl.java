@@ -138,6 +138,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
     @Transactional
     public QrPaymentResolveResponse resolvePaymentQr(Long memberId, QrPaymentResolveRequest request) {
         validateQrToken(request);
+        assertCanPay(memberId);
 
         //결제하려는 사람의 지갑: 자기 자신 결제를 막는데 사용
         Wallet payerWallet = walletMapper.findByMemberId(memberId);
@@ -270,6 +271,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         QrPaymentExecuteRequest request
     ) {
         validateExecuteRequest(idempotencyKey, request);
+        assertCanPay(memberId);
 
         // 1. 이미 완료된 동일 요청이면 기존 결과 반환 (빠른 경로, 잠금 없음).
         // 최종 판단은 아래 insert 시도 결과로 내린다.
@@ -560,6 +562,13 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         if(request.memo() != null
             && request.memo().trim().length() > MAX_MEMO_LENGTH){
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+    }
+
+    // 가맹점은 QR 생성과 매출 조회만 한다. 결제자는 방한 외국인(TRAVELER)뿐이다.
+    private void assertCanPay(Long memberId) {
+        if ("MERCHANT".equals(qrPaymentCodeMapper.findAccountTypeByMemberId(memberId))) {
+            throw new BusinessException(WalletErrorCode.MERCHANT_CANNOT_PAY);
         }
     }
 
