@@ -194,48 +194,7 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void leaveAppointment_pendingHost_transfersHostAndLeaves() {
-        Appointment appointment = appointment(
-                10L,
-                AppointmentStatus.PAYMENT_PENDING
-        );
-        AppointmentMember host = AppointmentMember.builder()
-                .appointmentMemberId(20L)
-                .appointmentId(10L)
-                .memberId(1L)
-                .membershipStatus(MembershipStatus.PENDING)
-                .build();
-        AppointmentMember successor = AppointmentMember.builder()
-                .appointmentMemberId(30L)
-                .appointmentId(10L)
-                .memberId(2L)
-                .membershipStatus(MembershipStatus.PENDING)
-                .build();
-        Deposit deposit = mock(Deposit.class);
-        when(deposit.getDepositId()).thenReturn(40L);
-        when(deposit.isPending()).thenReturn(true);
-        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
-                .thenReturn(appointment);
-        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
-                10L, 1L
-        )).thenReturn(host);
-        when(appointmentMapper.findHostSuccessorForUpdate(10L, 1L))
-                .thenReturn(successor);
-        when(appointmentMapper.updateHostMember(10L, 1L, 2L))
-                .thenReturn(1);
-        when(depositMapper.findByAppointmentMemberId(20L))
-                .thenReturn(deposit);
-        when(depositMapper.markCancelled(eq(40L), any())).thenReturn(1);
-        when(appointmentMapper.markMemberLeft(20L)).thenReturn(1);
-
-        appointmentService.leaveAppointment(1L, 10L);
-
-        verify(appointmentMapper).updateHostMember(10L, 1L, 2L);
-        verify(appointmentMapper).markMemberLeft(20L);
-    }
-
-    @Test
-    void leaveAppointment_hostOnly_rejectsCancellation() {
+    void leaveAppointment_pendingHost_rejectsCancellation() {
         Appointment appointment = appointment(
                 10L,
                 AppointmentStatus.PAYMENT_PENDING
@@ -251,14 +210,15 @@ class AppointmentServiceTest {
         when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
                 10L, 1L
         )).thenReturn(host);
-        when(appointmentMapper.findHostSuccessorForUpdate(10L, 1L))
-                .thenReturn(null);
 
-        assertThrows(
+        BusinessException exception = assertThrows(
                 BusinessException.class,
                 () -> appointmentService.leaveAppointment(1L, 10L)
         );
 
+        assertEquals(AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
+                exception.getErrorCode());
+        verify(depositMapper, never()).findByAppointmentMemberId(any());
         verify(appointmentMapper, never()).markMemberLeft(any());
     }
 
@@ -315,7 +275,7 @@ class AppointmentServiceTest {
 
         assertEquals(AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
                 exception.getErrorCode());
-        verify(appointmentMapper, never()).updateHostMember(any(), any(), any());
+        verify(appointmentMapper, never()).markMemberLeft(any());
     }
 
     @Test

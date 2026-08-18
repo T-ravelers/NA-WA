@@ -217,37 +217,6 @@
           AND am.deleted_at IS NULL
     </select>
 
-    <select id="findHostSuccessorForUpdate"
-            resultType="me.nawa.appointment.domain.AppointmentMember">
-        SELECT
-            appointment_member_id,
-            appointment_id,
-            member_id,
-            trip_id,
-            membership_status,
-            attendance_status,
-            joined_at,
-            left_at,
-            attendance_confirmed_at
-        FROM appointment_members
-        WHERE appointment_id = #{appointmentId}
-          AND member_id &lt;&gt; #{hostMemberId}
-          AND membership_status = 'PENDING'
-          AND deleted_at IS NULL
-        ORDER BY joined_at ASC, appointment_member_id ASC
-        LIMIT 1
-        FOR UPDATE
-    </select>
-
-    <update id="updateHostMember">
-        UPDATE appointments
-        SET host_member_id = #{nextHostMemberId},
-            updated_at = CURRENT_TIMESTAMP
-        WHERE appointment_id = #{appointmentId}
-          AND host_member_id = #{currentHostMemberId}
-          AND deleted_at IS NULL
-    </update>
-
     <select id="findMemberByIdForUpdate"
             resultType="me.nawa.appointment.domain.AppointmentMember">
         SELECT

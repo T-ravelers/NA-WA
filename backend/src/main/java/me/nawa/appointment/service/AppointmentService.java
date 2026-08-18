@@ -102,6 +102,12 @@ public class AppointmentService {
                     AppointmentErrorCode.APPOINTMENT_MEMBER_NOT_FOUND
             );
         }
+        // 방장은 자기 참여를 취소할 수 없다. 상태와 무관하게 즉시 차단한다.
+        if (memberId.equals(appointment.getHostMemberId())) {
+            throw new BusinessException(
+                    AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
+            );
+        }
         if (member.getMembershipStatus() != MembershipStatus.PENDING) {
             throw new BusinessException(
                     AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
@@ -118,19 +124,6 @@ public class AppointmentService {
             );
         }
 
-        if (memberId.equals(appointment.getHostMemberId())) {
-            AppointmentMember successor = appointmentMapper
-                    .findHostSuccessorForUpdate(appointmentId, memberId);
-            if (successor == null || appointmentMapper.updateHostMember(
-                    appointmentId,
-                    memberId,
-                    successor.getMemberId()
-            ) != 1) {
-                throw new BusinessException(
-                        AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
-                );
-            }
-        }
         Deposit deposit = depositMapper.findByAppointmentMemberId(
                 member.getAppointmentMemberId()
         );

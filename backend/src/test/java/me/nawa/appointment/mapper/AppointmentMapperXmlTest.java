@@ -54,12 +54,6 @@ class AppointmentMapperXmlTest {
                 "me.nawa.appointment.mapper.AppointmentMapper.findMemberByAppointmentAndMember"
         ));
         assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.findHostSuccessorForUpdate"
-        ));
-        assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.updateHostMember"
-        ));
-        assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.findMemberByIdForUpdate"
         ));
         assertTrue(configuration.hasStatement(
@@ -94,17 +88,6 @@ class AppointmentMapperXmlTest {
 
         assertTrue(sql.contains("am.membership_status = 'ACTIVE'"));
         assertTrue(sql.contains("am.deleted_at IS NULL"));
-    }
-
-    @Test
-    void hostSuccessorList_usesPendingMembersOnly() throws Exception {
-        String sql = boundSql(
-                "findHostSuccessorForUpdate",
-                Map.of("appointmentId", 1L, "hostMemberId", 2L)
-        );
-
-        assertTrue(sql.contains("membership_status = 'PENDING'"));
-        assertFalse(sql.contains("membership_status IN ('PENDING', 'ACTIVE')"));
     }
 
     @Test
