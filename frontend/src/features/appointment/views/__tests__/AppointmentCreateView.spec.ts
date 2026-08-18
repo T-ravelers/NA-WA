@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 const createAppointment = vi.fn()
 
@@ -127,7 +128,7 @@ describe('AppointmentCreateView', () => {
     expect(router.currentRoute.value.params.appointmentId).toBe('42')
   })
 
-  it('shows an error message and stays on the form when creation fails', async () => {
+  it('shows a generic error message and stays on the form when creation fails', async () => {
     createAppointment.mockRejectedValueOnce(new Error('network error'))
     const { wrapper, router } = await mountView()
 
@@ -135,6 +136,19 @@ describe('AppointmentCreateView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Appointment could not be created')
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+  })
+
+  it('shows an insufficient-balance message when the deposit hold fails', async () => {
+    createAppointment.mockRejectedValueOnce(
+      new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
+    )
+    const { wrapper, router } = await mountView()
+
+    await fillAndConfirm(wrapper)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Your wallet balance is too low for this transfer.')
     expect(router.currentRoute.value.name).toBe('appointment-create')
   })
 })

@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { NormalizedApiError } from '@/shared/api/apiError'
 import AppButton from '@/shared/ui/AppButton.vue'
 
 import {
@@ -17,7 +18,8 @@ import { appointmentKeys } from '../model/appointmentKeys'
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
-const { t } = useI18n()
+const i18n = useI18n()
+const { t } = i18n
 
 const createMutation = useMutation({
   mutationFn: (request: AppointmentCreateRequest) => createAppointment(request),
@@ -31,9 +33,15 @@ const createMutation = useMutation({
   },
 })
 
-const errorMessage = computed(() =>
-  createMutation.isError.value ? t('appointment.create.loadFailed') : undefined,
-)
+const errorMessage = computed(() => {
+  const error = createMutation.error.value
+  if (error === null) return undefined
+
+  if (!(error instanceof NormalizedApiError) || !i18n.te(error.messageKey)) {
+    return t('appointment.create.loadFailed')
+  }
+  return t(error.messageKey)
+})
 
 function submit(request: AppointmentCreateRequest): void {
   if (!createMutation.isPending.value) {
