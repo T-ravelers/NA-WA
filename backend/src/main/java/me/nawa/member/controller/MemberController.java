@@ -6,6 +6,7 @@ import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.MemberAppointmentProfileResponse;
+import me.nawa.member.dto.OnboardingProfileRequest;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.service.MemberProfileService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -44,6 +45,15 @@ public class MemberController {
             @RequestBody UpdateMemberProfileRequest request) {
         return ApiResponse.success(
                 memberProfileService.updateProfile(member.getMemberId(), request)
+        );
+    }
+
+    @PatchMapping("/me/onboarding")
+    public ApiResponse<MemberProfileResponse> completeOnboarding(
+            @AuthenticationPrincipal AuthenticatedMember member,
+            @RequestBody OnboardingProfileRequest request) {
+        return ApiResponse.success(
+                memberProfileService.completeOnboarding(member.getMemberId(), request)
         );
     }
 }

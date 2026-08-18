@@ -6,12 +6,17 @@ export interface MemberProfile {
   memberId: number
   displayName: string
   profileImageUrl: string | null
+  /** ISO 3166-1 alpha-2. 온보딩 전에는 null이다. */
+  nationalityCode: string | null
   preferredLanguage: string
   preferredCurrencyCode: string | null
   onboardingRequired: boolean
 }
 
 export interface UpdateMemberProfilePayload {
+  displayName?: string
+  profileImageUrl?: string
+  nationalityCode?: string
   preferredLanguage?: AppLocale
   preferredCurrencyCode?: string
 }

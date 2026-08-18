@@ -211,8 +211,8 @@ me.nawa.wallet.exception.WalletErrorCode
 미리 만들지 마세요.
 
 회원 도메인 오류 코드는 다음과 같이 구현할 수 있습니다.
-(`DUPLICATE_EMAIL`/`MEMBER-005`는 형식을 보여주기 위한 예시일 뿐 실제 구현된 코드가
-아닙니다. 실제 코드는 아래 표의 `MEMBER-001`~`MEMBER-004`를 참고하세요.)
+(`DUPLICATE_EMAIL`/`MEMBER-999`는 형식을 보여주기 위한 예시일 뿐 실제 구현된 코드가
+아닙니다. 실제 코드는 아래 표의 `MEMBER-001`~`MEMBER-008`을 참고하세요.)
 
 ```java
 package me.nawa.member.exception;
@@ -234,7 +234,7 @@ public enum MemberErrorCode implements ErrorCode {
 
     DUPLICATE_EMAIL(
         HttpStatus.CONFLICT,
-        "MEMBER-005",
+        "MEMBER-999",
         "이미 사용 중인 이메일입니다."
     );
 
@@ -249,15 +249,22 @@ public enum MemberErrorCode implements ErrorCode {
 
 회원 도메인에는 다음 오류 코드가 실제로 구현돼 있습니다.
 
-| enum 상수             | 오류 코드    | HTTP 상태 | 의미                    |
-| ---------------------- | ------------ | --------: | ----------------------- |
-| `MEMBER_NOT_FOUND`     | `MEMBER-001` |       404 | 회원 정보를 찾을 수 없음 |
-| `UNSUPPORTED_LANGUAGE` | `MEMBER-002` |       400 | 지원하지 않는 언어       |
-| `UNSUPPORTED_CURRENCY` | `MEMBER-003` |       400 | 지원하지 않는 통화       |
-| `NO_UPDATABLE_FIELD`   | `MEMBER-004` |       400 | 변경할 항목 없음         |
+| enum 상수                   | 오류 코드    | HTTP 상태 | 의미                        |
+| --------------------------- | ------------ | --------: | --------------------------- |
+| `MEMBER_NOT_FOUND`          | `MEMBER-001` |       404 | 회원 정보를 찾을 수 없음     |
+| `UNSUPPORTED_LANGUAGE`      | `MEMBER-002` |       400 | 지원하지 않는 언어           |
+| `UNSUPPORTED_CURRENCY`      | `MEMBER-003` |       400 | 지원하지 않는 통화           |
+| `NO_UPDATABLE_FIELD`        | `MEMBER-004` |       400 | 변경할 항목 없음             |
+| `UNSUPPORTED_NATIONALITY`   | `MEMBER-005` |       400 | 지원하지 않는 국가 코드      |
+| `INVALID_DISPLAY_NAME`      | `MEMBER-006` |       400 | 표시 이름 형식 오류          |
+| `INVALID_PROFILE_IMAGE_URL` | `MEMBER-007` |       400 | 프로필 이미지 주소 형식 오류 |
+| `ONBOARDING_FIELD_MISSING`  | `MEMBER-008` |       400 | 온보딩 필수 항목 누락        |
 
-`PATCH /api/v1/members/me`가 `preferredLanguage`·`preferredCurrencyCode`를
-부분 수정할 때 사용합니다. 언어 allow-list는 `en`, `ja`, `zh-TW`, `vi`이며 이 백엔드 목록이 정본입니다.
+`PATCH /api/v1/members/me`가 `displayName`·`profileImageUrl`·`nationalityCode`·
+`preferredLanguage`·`preferredCurrencyCode`를 부분 수정할 때, 그리고
+`PATCH /api/v1/members/me/onboarding`이 온보딩 프로필을 저장·완료할 때 사용합니다.
+언어 allow-list는 `en`, `ja`, `zh-TW`, `vi`이며 이 백엔드 목록이 정본입니다.
+국적은 ISO 3166-1 alpha-2 코드만 받습니다.
 
 약속 도메인에는 다음 오류 코드가 구현돼 있습니다.
 

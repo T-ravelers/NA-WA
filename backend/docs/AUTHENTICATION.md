@@ -88,6 +88,7 @@ token을 발급하지 않지만, 확인되지 않은 Redis 세션까지 폐기�
     "memberId": 1,
     "displayName": "여행자",
     "profileImageUrl": null,
+    "nationalityCode": null,
     "preferredLanguage": "en",
     "preferredCurrencyCode": null,
     "onboardingRequired": true
@@ -95,12 +96,23 @@ token을 발급하지 않지만, 확인되지 않은 Redis 세션까지 폐기�
 }
 ```
 
-`PATCH /api/v1/members/me`는 같은 형태의 응답을 반환하며 `preferredLanguage`와
-`preferredCurrencyCode`만 부분 수정합니다. 필드를 아예 보내지 않는 것과 값에
-`null`을 보내는 것은 모두 "변경하지 않음"으로 취급하며, 두 필드 모두 없으면
-`MEMBER-004`를 반환합니다. 지원 언어는 `en`, `ja`, `zh-TW`, `vi`이며
-이 백엔드 allow-list가 정본입니다(한국어는 서비스 locale이 아닙니다). 목록에
-없는 언어는 `MEMBER-002`, 활성 통화 코드가 아니면 `MEMBER-003`을 반환합니다.
+`PATCH /api/v1/members/me`는 같은 형태의 응답을 반환하며 `displayName`·
+`profileImageUrl`·`nationalityCode`·`preferredLanguage`·`preferredCurrencyCode`를
+부분 수정합니다. 필드를 아예 보내지 않는 것과 값에 `null`을 보내는 것은 모두
+"변경하지 않음"으로 취급하며, 모든 필드가 없으면 `MEMBER-004`를 반환합니다.
+지원 언어는 `en`, `ja`, `zh-TW`, `vi`이며 이 백엔드 allow-list가 정본입니다
+(한국어는 서비스 locale이 아닙니다). 목록에 없는 언어는 `MEMBER-002`, 활성 통화
+코드가 아니면 `MEMBER-003`, ISO 3166-1 alpha-2가 아닌 국적은 `MEMBER-005`를
+반환합니다.
+
+`PATCH /api/v1/members/me/onboarding`은 온보딩 프로필을 저장하고 완료를
+기록합니다. `displayName`·`nationalityCode`·`preferredLanguage`·
+`preferredCurrencyCode` 네 필드가 모두 필수이며 하나라도 없으면 `MEMBER-008`을
+반환합니다. 성공 시 `onboarding_completed_at`이 기록되어 이후 응답의
+`onboardingRequired`가 `false`가 됩니다. 재호출은 값만 갱신하고 완료 시각은
+최초 값을 유지합니다(멱등). 검증 규칙과 오류 코드는 `PATCH /me`와 같습니다.
+서버는 온보딩 미완료 회원의 다른 업무 API를 차단하지 않습니다 — 미완료 회원의
+화면 진입 통제는 프런트엔드 라우터 guard가 담당합니다.
 
 access token이 없거나 유효하지 않으면 `AUTH-003`, 정지 회원은 `AUTH-016`,
 탈퇴 또는 삭제 회원은 `AUTH-017`을 반환합니다. 회원을 찾을 수 없으면

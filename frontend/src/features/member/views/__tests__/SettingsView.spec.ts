@@ -32,6 +32,7 @@ const PROFILE: MemberProfile = {
   memberId: 1,
   displayName: 'Mina',
   profileImageUrl: null,
+  nationalityCode: null,
   preferredLanguage: 'en',
   preferredCurrencyCode: null,
   onboardingRequired: false,

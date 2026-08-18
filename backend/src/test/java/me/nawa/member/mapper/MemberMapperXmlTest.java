@@ -55,4 +55,11 @@ class MemberMapperXmlTest {
                 "me.nawa.member.mapper.MemberMapper.updateProfile"
         ));
     }
+
+    @Test
+    void mapperXml_parsesCompleteOnboardingStatement() throws Exception {
+        assertTrue(parsedConfiguration().hasStatement(
+                "me.nawa.member.mapper.MemberMapper.completeOnboarding"
+        ));
+    }
 }
