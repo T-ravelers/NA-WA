@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import me.nawa.appointment.service.AppointmentService;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.journey.domain.Journey;
@@ -52,6 +53,7 @@ public class JourneyService {
     private static final int MAX_BUDGET_SCALE = 4;
 
     private final JourneyMapper journeyMapper;
+    private final AppointmentService appointmentService;
 
     @Transactional
     public JourneyResponse createJourney(
@@ -195,6 +197,64 @@ public class JourneyService {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
         return toJourneyItemResponse(createdItem);
+    }
+
+    @Transactional
+    public void deleteJourneyItem(
+        Long memberId,
+        Long tripId,
+        Long tripItemId
+    ) {
+        validateTripItemId(tripItemId);
+        findOwnedJourneyForUpdate(memberId, tripId);
+
+        JourneyItem journeyItem = journeyMapper.findJourneyItemForUpdate(
+            tripId,
+            tripItemId,
+            memberId
+        );
+        if (journeyItem == null) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_SCHEDULE_NOT_FOUND
+            );
+        }
+
+        leaveConfirmedAppointment(memberId, journeyItem);
+        if (journeyMapper.softDeleteJourneyItem(tripId, tripItemId) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Transactional
+    public void deleteJourney(Long memberId, Long tripId) {
+        findOwnedJourneyForUpdate(memberId, tripId);
+
+        List<JourneyItem> confirmedItems = journeyMapper
+            .findConfirmedJourneyItemsForUpdate(tripId, memberId);
+        List<JourneyItem> items = confirmedItems == null
+            ? List.of()
+            : confirmedItems;
+
+        if (items.stream().anyMatch(item -> isAppointmentHost(
+            memberId,
+            item
+        ))) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_APPOINTMENT_HOST_DELETE_CONFLICT
+            );
+        }
+
+        for (JourneyItem item : items) {
+            leaveConfirmedAppointment(memberId, item);
+        }
+
+        journeyMapper.softDeleteJourneyItemsByTripId(tripId);
+        journeyMapper.softDeleteRegionsByTripId(tripId);
+        journeyMapper.softDeleteReportsByTripId(tripId);
+        journeyMapper.softDeleteExpenseLinksByTripId(tripId);
+        if (journeyMapper.softDeleteJourney(tripId) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -575,6 +635,46 @@ public class JourneyService {
         if (tripId == null || tripId <= 0) {
             throw invalidJourneyInput();
         }
+    }
+
+    private void validateTripItemId(Long tripItemId) {
+        if (tripItemId == null || tripItemId <= 0) {
+            throw invalidJourneyInput();
+        }
+    }
+
+    private void leaveConfirmedAppointment(
+        Long memberId,
+        JourneyItem journeyItem
+    ) {
+        if (!"CONFIRMED".equals(journeyItem.getTripItemStatus())) {
+            return;
+        }
+        // V5 requires CONFIRMED rows to reference an Appointment. Fail closed
+        // if the joined Appointment was removed or its required host is missing.
+        if (journeyItem.getAppointmentId() == null
+            || journeyItem.getAppointmentHostMemberId() == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        if (isAppointmentHost(memberId, journeyItem)) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_APPOINTMENT_HOST_DELETE_CONFLICT
+            );
+        }
+        if ("LEFT".equals(journeyItem.getAppointmentMembershipStatus())) {
+            return;
+        }
+        appointmentService.leaveAppointment(
+            memberId,
+            journeyItem.getAppointmentId()
+        );
+    }
+
+    private boolean isAppointmentHost(
+        Long memberId,
+        JourneyItem journeyItem
+    ) {
+        return memberId.equals(journeyItem.getAppointmentHostMemberId());
     }
 
     private void validateJourneyOwner(Journey journey, Long memberId) {

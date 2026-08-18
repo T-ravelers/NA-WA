@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -18,6 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
@@ -434,5 +437,109 @@ class JourneyControllerTest {
             .get(0).path("items").get(0);
         assertEquals(900L, responseItem.path("appointment")
             .path("appointmentId").asLong());
+    }
+
+    @Test
+    void deleteJourneyItem_returns204() throws Exception {
+        mockMvc.perform(delete("/api/v1/journeys/12/items/7"))
+            .andExpect(status().isNoContent());
+
+        verify(journeyService).deleteJourneyItem(1L, 12L, 7L);
+    }
+
+    @Test
+    void deleteJourneyItem_returns404WhenScheduleDoesNotExist()
+        throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+            JourneyErrorCode.JOURNEY_SCHEDULE_NOT_FOUND
+        )).when(journeyService).deleteJourneyItem(1L, 12L, 7L);
+
+        String responseBody = mockMvc.perform(
+                delete("/api/v1/journeys/12/items/7")
+            )
+            .andExpect(status().isNotFound())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertEquals(
+            "JOURNEY-010",
+            body.path("error").path("code").asText()
+        );
+    }
+
+    @Test
+    void deleteJourneyItem_returnsAppointmentCancellationError()
+        throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+            AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
+        )).when(journeyService).deleteJourneyItem(1L, 12L, 7L);
+
+        String responseBody = mockMvc.perform(
+                delete("/api/v1/journeys/12/items/7")
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertEquals(
+            "APPOINTMENT-007",
+            body.path("error").path("code").asText()
+        );
+    }
+
+    @Test
+    void deleteJourney_returns204() throws Exception {
+        mockMvc.perform(delete("/api/v1/journeys/12"))
+            .andExpect(status().isNoContent());
+
+        verify(journeyService).deleteJourney(1L, 12L);
+    }
+
+    @Test
+    void deleteJourney_returns409ForHostedAppointment() throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+            JourneyErrorCode.JOURNEY_APPOINTMENT_HOST_DELETE_CONFLICT
+        )).when(journeyService).deleteJourney(1L, 12L);
+
+        String responseBody = mockMvc.perform(
+                delete("/api/v1/journeys/12")
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals(
+            "JOURNEY-011",
+            body.path("error").path("code").asText()
+        );
+    }
+
+    @Test
+    void deleteJourney_returnsAppointmentCancellationError()
+        throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+            AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
+        )).when(journeyService).deleteJourney(1L, 12L);
+
+        String responseBody = mockMvc.perform(
+                delete("/api/v1/journeys/12")
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertEquals(
+            "APPOINTMENT-007",
+            body.path("error").path("code").asText()
+        );
     }
 }

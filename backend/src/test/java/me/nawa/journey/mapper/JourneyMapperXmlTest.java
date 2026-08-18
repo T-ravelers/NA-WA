@@ -62,6 +62,25 @@ class JourneyMapperXmlTest {
         assertTrue(configuration.hasStatement(
             namespace + "findJourneyItemById"
         ));
+        assertTrue(configuration.hasStatement(
+            namespace + "findJourneyItemForUpdate"
+        ));
+        assertTrue(configuration.hasStatement(
+            namespace + "findConfirmedJourneyItemsForUpdate"
+        ));
+        assertTrue(configuration.hasStatement(
+            namespace + "softDeleteJourneyItem"
+        ));
+        assertTrue(configuration.hasStatement(
+            namespace + "softDeleteJourneyItemsByTripId"
+        ));
+        assertTrue(configuration.hasStatement(
+            namespace + "softDeleteReportsByTripId"
+        ));
+        assertTrue(configuration.hasStatement(
+            namespace + "softDeleteExpenseLinksByTripId"
+        ));
+        assertTrue(configuration.hasStatement(namespace + "softDeleteJourney"));
 
         MappedStatement journeysStatement = configuration.getMappedStatement(
             namespace + "findJourneysByMemberId"
@@ -193,5 +212,85 @@ class JourneyMapperXmlTest {
             .trim();
         assertTrue(regionsSql.contains("ON DUPLICATE KEY UPDATE"));
         assertTrue(regionsSql.contains("deleted_at = NULL"));
+
+        MappedStatement lockedItemStatement = configuration
+            .getMappedStatement(namespace + "findJourneyItemForUpdate");
+        String lockedItemSql = lockedItemStatement
+            .getBoundSql(Map.of(
+                "tripId", 1L,
+                "tripItemId", 2L,
+                "memberId", 3L
+            ))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+        assertTrue(lockedItemSql.contains("a.host_member_id"));
+        assertTrue(lockedItemSql.contains("am.membership_status"));
+        assertTrue(lockedItemSql.contains("am.member_id = ?"));
+        assertTrue(lockedItemSql.contains("ti.trip_id = ?"));
+        assertTrue(lockedItemSql.endsWith("FOR UPDATE"));
+
+        MappedStatement confirmedItemsStatement = configuration
+            .getMappedStatement(
+                namespace + "findConfirmedJourneyItemsForUpdate"
+            );
+        String confirmedItemsSql = confirmedItemsStatement
+            .getBoundSql(Map.of("tripId", 1L, "memberId", 3L))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+        assertTrue(confirmedItemsSql.contains(
+            "ti.trip_item_status = 'CONFIRMED'"
+        ));
+        assertTrue(confirmedItemsSql.contains("am.membership_status"));
+        assertTrue(confirmedItemsSql.contains("am.member_id = ?"));
+        assertTrue(confirmedItemsSql.endsWith("FOR UPDATE"));
+
+        assertSoftDeleteSql(
+            configuration,
+            namespace + "softDeleteJourneyItem",
+            Map.of("tripId", 1L, "tripItemId", 2L),
+            "UPDATE trip_items"
+        );
+        assertSoftDeleteSql(
+            configuration,
+            namespace + "softDeleteJourneyItemsByTripId",
+            Map.of("tripId", 1L),
+            "UPDATE trip_items"
+        );
+        assertSoftDeleteSql(
+            configuration,
+            namespace + "softDeleteReportsByTripId",
+            Map.of("tripId", 1L),
+            "UPDATE reports"
+        );
+        assertSoftDeleteSql(
+            configuration,
+            namespace + "softDeleteExpenseLinksByTripId",
+            Map.of("tripId", 1L),
+            "UPDATE trip_expense_links"
+        );
+        assertSoftDeleteSql(
+            configuration,
+            namespace + "softDeleteJourney",
+            Map.of("tripId", 1L),
+            "UPDATE trips"
+        );
+    }
+
+    private static void assertSoftDeleteSql(
+        Configuration configuration,
+        String statementId,
+        Map<String, Long> parameters,
+        String updateClause
+    ) {
+        String sql = configuration.getMappedStatement(statementId)
+            .getBoundSql(parameters)
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+        assertTrue(sql.startsWith(updateClause));
+        assertTrue(sql.contains("deleted_at = CURRENT_TIMESTAMP"));
+        assertTrue(sql.contains("deleted_at IS NULL"));
     }
 }

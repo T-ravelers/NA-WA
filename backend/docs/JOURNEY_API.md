@@ -112,3 +112,68 @@ PUT /api/v1/journeys/{tripId}
 | 403 | `JOURNEY-002` | 다른 회원이 소유한 Journey 수정 요청 |
 | 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
 | 409 | `JOURNEY-009` | 변경 기간 밖에 활성 일정 항목이 존재함 |
+
+## Journey 개별 일정 삭제
+
+```http
+DELETE /api/v1/journeys/{tripId}/items/{tripItemId}
+```
+
+- 인증 회원이 소유한 Journey의 일정만 삭제할 수 있습니다.
+- `ADDED` 일정은 `trip_items`에서 soft delete합니다.
+- `CONFIRMED` 일정은 현재 회원이 Appointment 방장이 아닐 때만 기존 Appointment 참여
+  취소를 먼저 수행합니다. 참여 취소와 일정 삭제는 같은 트랜잭션이며, 둘 중 하나라도
+  실패하면 일정은 유지됩니다.
+- Journey 삭제 경로는 Appointment 방장 승계를 수행하지 않습니다. Issue #205의 제품
+  계약이 방장 Appointment 삭제와 방장 승계를 범위에서 제외하므로, 방장 일정은
+  `JOURNEY-011`로 거부합니다. 방장은 Appointment 참여 취소 API에서 후계자에게 방장을
+  승계하고 참여 취소를 완료한 뒤 Journey 일정 삭제를 다시 요청할 수 있습니다. 이미
+  `LEFT`인 참여는 Journey 경로에서 다시 취소하지 않습니다.
+
+성공하면 응답 본문 없이 `204 No Content`를 반환합니다.
+
+### soft-delete 일정 재추가 제한
+
+V5의 `trip_items` 유니크 키는 `deleted_at`을 포함하지 않습니다. 따라서 soft delete한
+일정과 같은 `itemId`·`visitDate` 조합을 같은 Journey에 다시 추가하면
+`JOURNEY-004`(409)를 반환합니다. 같은 Journey와 Appointment 조합도 다시 연결할 수
+없습니다. 이 제한을 제거하려면 별도 Flyway 스키마 변경이 필요하며, Issue #205/#206의
+범위에는 포함되지 않습니다.
+
+### 오류 코드
+
+| HTTP | 오류 코드 | 발생 조건 |
+| ---: | --- | --- |
+| 400 | `JOURNEY-003` | `tripId` 또는 `tripItemId`가 유효하지 않음 |
+| 403 | `JOURNEY-002` | 다른 회원이 소유한 Journey의 일정 삭제 요청 |
+| 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
+| 404 | `JOURNEY-010` | 삭제됐거나 존재하지 않는 일정 |
+| 409 | `JOURNEY-011` | 현재 회원이 연결된 Appointment의 방장임 |
+| 409 | `APPOINTMENT-007` | 참여가 `ACTIVE`이거나 Appointment 상태상 취소할 수 없음 |
+
+## Journey 전체 삭제
+
+```http
+DELETE /api/v1/journeys/{tripId}
+```
+
+- 삭제 전에 모든 `CONFIRMED` 일정을 검사합니다. 방장 Appointment가 하나라도 있으면
+  어떤 참여 취소나 soft delete도 시작하지 않고 `JOURNEY-011`로 거부합니다.
+- 비방장 Appointment 참여 취소를 모두 완료한 뒤 `trip_items`, `trip_regions`,
+  `reports`, `trip_expense_links`, `trips`를 한 트랜잭션에서 soft delete합니다.
+- `trip_expense_links`만 삭제하며 Wallet 원장과 결제·보증금·Appointment 기록은
+  삭제하지 않습니다. Report와 expense link를 Journey와 함께 숨기는 범위는 Issue
+  #206의 명시 계약입니다.
+- 참여 취소 또는 하위 데이터 처리 하나라도 실패하면 전체 변경을 롤백합니다.
+
+성공하면 응답 본문 없이 `204 No Content`를 반환합니다.
+
+### 오류 코드
+
+| HTTP | 오류 코드 | 발생 조건 |
+| ---: | --- | --- |
+| 400 | `JOURNEY-003` | `tripId`가 유효하지 않음 |
+| 403 | `JOURNEY-002` | 다른 회원이 소유한 Journey 삭제 요청 |
+| 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
+| 409 | `JOURNEY-011` | 방장으로 참여 중인 Appointment가 하나 이상 존재함 |
+| 409 | `APPOINTMENT-007` | 비방장 참여 중 취소할 수 없는 상태가 하나 이상 존재함 |

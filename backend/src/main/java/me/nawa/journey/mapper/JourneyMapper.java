@@ -52,4 +52,28 @@ public interface JourneyMapper {
     void insertJourneyItem(JourneyItem journeyItem);
 
     JourneyItem findJourneyItemById(@Param("tripItemId") Long tripItemId);
+
+    JourneyItem findJourneyItemForUpdate(
+        @Param("tripId") Long tripId,
+        @Param("tripItemId") Long tripItemId,
+        @Param("memberId") Long memberId
+    );
+
+    List<JourneyItem> findConfirmedJourneyItemsForUpdate(
+        @Param("tripId") Long tripId,
+        @Param("memberId") Long memberId
+    );
+
+    int softDeleteJourneyItem(
+        @Param("tripId") Long tripId,
+        @Param("tripItemId") Long tripItemId
+    );
+
+    int softDeleteJourneyItemsByTripId(@Param("tripId") Long tripId);
+
+    int softDeleteReportsByTripId(@Param("tripId") Long tripId);
+
+    int softDeleteExpenseLinksByTripId(@Param("tripId") Long tripId);
+
+    int softDeleteJourney(@Param("tripId") Long tripId);
 }

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -17,6 +18,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import me.nawa.appointment.exception.AppointmentErrorCode;
+import me.nawa.appointment.service.AppointmentService;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.journey.domain.Journey;
@@ -46,6 +49,9 @@ class JourneyServiceTest {
 
     @Mock
     private JourneyMapper journeyMapper;
+
+    @Mock
+    private AppointmentService appointmentService;
 
     @InjectMocks
     private JourneyService journeyService;
@@ -554,6 +560,242 @@ class JourneyServiceTest {
     }
 
     @Test
+    void deleteJourneyItem_softDeletesAddedItem() {
+        when(journeyMapper.findJourneyByIdForUpdate(30L)).thenReturn(
+            ownedJourney(30L)
+        );
+        when(journeyMapper.findJourneyItemForUpdate(30L, 301L, 1L)).thenReturn(
+            journeyItem(301L, "ADDED", null, null)
+        );
+        when(journeyMapper.softDeleteJourneyItem(30L, 301L)).thenReturn(1);
+
+        journeyService.deleteJourneyItem(1L, 30L, 301L);
+
+        verify(journeyMapper).softDeleteJourneyItem(30L, 301L);
+        verifyNoInteractions(appointmentService);
+    }
+
+    @Test
+    void deleteJourneyItem_cancelsNonHostBeforeConfirmedItemDeletion() {
+        when(journeyMapper.findJourneyByIdForUpdate(31L)).thenReturn(
+            ownedJourney(31L)
+        );
+        when(journeyMapper.findJourneyItemForUpdate(31L, 311L, 1L)).thenReturn(
+            journeyItem(311L, "CONFIRMED", 900L, 2L)
+        );
+        when(journeyMapper.softDeleteJourneyItem(31L, 311L)).thenReturn(1);
+
+        journeyService.deleteJourneyItem(1L, 31L, 311L);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(
+            appointmentService,
+            journeyMapper
+        );
+        order.verify(appointmentService).leaveAppointment(1L, 900L);
+        order.verify(journeyMapper).softDeleteJourneyItem(31L, 311L);
+    }
+
+    @Test
+    void deleteJourneyItem_rejectsAppointmentHost() {
+        when(journeyMapper.findJourneyByIdForUpdate(32L)).thenReturn(
+            ownedJourney(32L)
+        );
+        when(journeyMapper.findJourneyItemForUpdate(32L, 321L, 1L)).thenReturn(
+            journeyItem(321L, "CONFIRMED", 901L, 1L)
+        );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.deleteJourneyItem(1L, 32L, 321L)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_APPOINTMENT_HOST_DELETE_CONFLICT,
+            exception.getErrorCode()
+        );
+        verifyNoInteractions(appointmentService);
+        verify(journeyMapper, never()).softDeleteJourneyItem(any(), any());
+    }
+
+    @Test
+    void deleteJourneyItem_deletesFormerHostAfterAppointmentLeave() {
+        when(journeyMapper.findJourneyByIdForUpdate(33L)).thenReturn(
+            ownedJourney(33L)
+        );
+        JourneyItem item = journeyItem(331L, "CONFIRMED", 902L, 2L);
+        item.setAppointmentMembershipStatus("LEFT");
+        when(journeyMapper.findJourneyItemForUpdate(33L, 331L, 1L))
+            .thenReturn(item);
+        when(journeyMapper.softDeleteJourneyItem(33L, 331L)).thenReturn(1);
+
+        journeyService.deleteJourneyItem(1L, 33L, 331L);
+
+        verifyNoInteractions(appointmentService);
+        verify(journeyMapper).softDeleteJourneyItem(33L, 331L);
+    }
+
+    @Test
+    void deleteJourneyItem_keepsItemWhenCancellationFails() {
+        when(journeyMapper.findJourneyByIdForUpdate(33L)).thenReturn(
+            ownedJourney(33L)
+        );
+        when(journeyMapper.findJourneyItemForUpdate(33L, 332L, 1L)).thenReturn(
+            journeyItem(332L, "CONFIRMED", 902L, 2L)
+        );
+        doThrow(new BusinessException(
+            AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
+        )).when(appointmentService).leaveAppointment(1L, 902L);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.deleteJourneyItem(1L, 33L, 332L)
+        );
+
+        assertEquals(
+            AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).softDeleteJourneyItem(any(), any());
+    }
+
+    @Test
+    void deleteJourneyItem_throwsNotFoundWhenScheduleDoesNotExist() {
+        when(journeyMapper.findJourneyByIdForUpdate(34L)).thenReturn(
+            ownedJourney(34L)
+        );
+        when(journeyMapper.findJourneyItemForUpdate(34L, 341L, 1L)).thenReturn(
+            null
+        );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.deleteJourneyItem(1L, 34L, 341L)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_SCHEDULE_NOT_FOUND,
+            exception.getErrorCode()
+        );
+    }
+
+    @Test
+    void deleteJourneyItem_throwsForbiddenForAnotherOwnersJourney() {
+        Journey journey = ownedJourney(35L);
+        journey.setMemberId(2L);
+        when(journeyMapper.findJourneyByIdForUpdate(35L)).thenReturn(journey);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.deleteJourneyItem(1L, 35L, 351L)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_FORBIDDEN,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).findJourneyItemForUpdate(
+            any(),
+            any(),
+            any()
+        );
+    }
+
+    @Test
+    void deleteJourney_cancelsParticipantsAndSoftDeletesOwnedData() {
+        when(journeyMapper.findJourneyByIdForUpdate(40L)).thenReturn(
+            ownedJourney(40L)
+        );
+        when(journeyMapper.findConfirmedJourneyItemsForUpdate(40L, 1L))
+            .thenReturn(
+                List.of(
+                    journeyItem(401L, "CONFIRMED", 910L, 2L),
+                    journeyItem(402L, "CONFIRMED", 911L, 3L)
+                )
+            );
+        when(journeyMapper.softDeleteJourney(40L)).thenReturn(1);
+
+        journeyService.deleteJourney(1L, 40L);
+
+        verify(appointmentService).leaveAppointment(1L, 910L);
+        verify(appointmentService).leaveAppointment(1L, 911L);
+        verify(journeyMapper).softDeleteJourneyItemsByTripId(40L);
+        verify(journeyMapper).softDeleteRegionsByTripId(40L);
+        verify(journeyMapper).softDeleteReportsByTripId(40L);
+        verify(journeyMapper).softDeleteExpenseLinksByTripId(40L);
+        verify(journeyMapper).softDeleteJourney(40L);
+    }
+
+    @Test
+    void deleteJourney_prechecksEveryHostBeforeCancellation() {
+        when(journeyMapper.findJourneyByIdForUpdate(41L)).thenReturn(
+            ownedJourney(41L)
+        );
+        when(journeyMapper.findConfirmedJourneyItemsForUpdate(41L, 1L))
+            .thenReturn(
+                List.of(
+                    journeyItem(411L, "CONFIRMED", 920L, 2L),
+                    journeyItem(412L, "CONFIRMED", 921L, 1L)
+                )
+            );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.deleteJourney(1L, 41L)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_APPOINTMENT_HOST_DELETE_CONFLICT,
+            exception.getErrorCode()
+        );
+        verifyNoInteractions(appointmentService);
+        verify(journeyMapper, never()).softDeleteJourneyItemsByTripId(any());
+        verify(journeyMapper, never()).softDeleteJourney(any());
+    }
+
+    @Test
+    void deleteJourney_stopsBeforeSoftDeleteWhenCancellationFails() {
+        when(journeyMapper.findJourneyByIdForUpdate(42L)).thenReturn(
+            ownedJourney(42L)
+        );
+        when(journeyMapper.findConfirmedJourneyItemsForUpdate(42L, 1L))
+            .thenReturn(
+                List.of(journeyItem(421L, "CONFIRMED", 930L, 2L))
+            );
+        doThrow(new BusinessException(
+            AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
+        )).when(appointmentService).leaveAppointment(1L, 930L);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.deleteJourney(1L, 42L)
+        );
+
+        assertEquals(
+            AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).softDeleteJourneyItemsByTripId(any());
+        verify(journeyMapper, never()).softDeleteJourney(any());
+    }
+
+    @Test
+    void deleteJourney_throwsNotFoundWhenJourneyDoesNotExist() {
+        when(journeyMapper.findJourneyByIdForUpdate(43L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.deleteJourney(1L, 43L)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_NOT_FOUND,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never())
+            .findConfirmedJourneyItemsForUpdate(any(), any());
+    }
+
+    @Test
     void createJourney_insertsNormalizedRegionsByDisplayOrder() {
         JourneyCreateRequest request = validRequest();
         request.setRegions(List.of(
@@ -853,6 +1095,22 @@ class JourneyServiceTest {
             .title("Seoul Foodie Week")
             .startDate(LocalDate.of(2026, 3, 28))
             .endDate(LocalDate.of(2026, 4, 3))
+            .build();
+    }
+
+    private JourneyItem journeyItem(
+        Long tripItemId,
+        String status,
+        Long appointmentId,
+        Long hostMemberId
+    ) {
+        return JourneyItem.builder()
+            .tripItemId(tripItemId)
+            .tripId(30L)
+            .itemId(300L)
+            .tripItemStatus(status)
+            .appointmentId(appointmentId)
+            .appointmentHostMemberId(hostMemberId)
             .build();
     }
 
