@@ -42,14 +42,23 @@ const businessName = ref('')
 
 const registerMutation = useMutation({
   mutationFn: (name: string) => registerAsMerchant(name),
-  onSuccess: () => {
+  onSuccess: (account) => {
     /*
      * 계정 유형이 바뀌면 이전에 받아 둔 응답의 전제가 모두 달라진다. 특히 라우터 guard가
      * 보는 회원 프로필 캐시가 TRAVELER로 남아 있으면 등록 직후 손님 화면으로 나갈 수 있다.
-     * feature 간 import 금지 때문에 그 캐시를 직접 지정할 수 없으므로, 로그인 콜백이 쓰는
-     * 것과 같은 방식으로 캐시 전체를 버린다. 활성 쿼리는 곧바로 다시 받아 온다.
+     * guard의 ensureQueryData는 값이 있으면 stale이어도 그대로 돌려주므로 무효화로는
+     * 부족하고 캐시에서 지워야 한다. feature 간 import 금지 때문에 남의 캐시 키를 여기서
+     * 지정할 수 없어, 이 화면 것만 남기고 전부 버린다.
      */
-    queryClient.clear()
+    queryClient.removeQueries({
+      predicate: (query) => query.queryKey[0] !== merchantKeys.all[0],
+    })
+
+    /*
+     * 이 화면은 응답으로 직접 갱신한다. 캐시를 지우는 것만으로는 활성 쿼리가 다시 그려진다는
+     * 보장이 없어, 등록에 성공하고도 등록 폼이 남고 다시 누르면 MEMBER-009를 받는다.
+     */
+    queryClient.setQueryData(merchantKeys.account(), account)
   },
 })
 
@@ -245,6 +254,9 @@ const createError = computed(() =>
         </h2>
         <p class="mt-1 text-caption text-ink-3">
           {{ t('merchant.register.description') }}
+        </p>
+        <p class="mt-3 rounded-sm bg-surface-2 px-3 py-2 text-caption text-ink-2">
+          {{ t('merchant.register.irreversible') }}
         </p>
 
         <form

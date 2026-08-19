@@ -12,6 +12,7 @@ function createTestRouter(): Router {
     routes: [
       { path: '/', name: 'welcome', component: WelcomeView },
       { path: '/sign-in', name: 'sign-in', component: { template: '<div />' } },
+      { path: '/merchant', name: 'merchant', component: { template: '<div />' } },
     ],
   })
 }
@@ -57,6 +58,19 @@ describe('WelcomeView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe('/sign-in')
+  })
+
+  it('offers a way into the merchant screen', async () => {
+    const { wrapper, router } = await mountView()
+
+    const merchantLink = wrapper.get('a[href="/merchant"]')
+
+    expect(merchantLink.text()).toContain('Running a store?')
+
+    await merchantLink.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.path).toBe('/merchant')
   })
 
   /*

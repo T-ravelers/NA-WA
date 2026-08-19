@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
-import { SIGN_IN_PATH } from '@/shared/config/routePaths'
+import { MERCHANT_HOME_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
 import BrandWordmark from '@/shared/ui/BrandWordmark.vue'
 
 const { t } = useI18n()
@@ -78,5 +78,16 @@ const router = useRouter()
     >
       {{ t('auth.welcome.start') }}
     </button>
+
+    <!--
+      가맹점 진입점. 손님이 절대다수라 기본 흐름을 한 단계도 늘리지 않고 링크로만 둔다.
+      로그인 여부는 확인하지 않는다. 미인증이면 guard가 복귀 경로를 붙여 로그인으로 보낸다.
+    -->
+    <RouterLink
+      :to="MERCHANT_HOME_PATH"
+      class="mt-4 self-center text-body-sm text-ink-3 underline underline-offset-4"
+    >
+      {{ t('auth.welcome.merchantEntry') }}
+    </RouterLink>
   </section>
 </template>
