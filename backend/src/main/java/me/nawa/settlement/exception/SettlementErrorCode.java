@@ -71,6 +71,50 @@ public enum SettlementErrorCode implements ErrorCode {
         HttpStatus.BAD_REQUEST,
         "SETTLEMENT-015",
         "멱등성 키가 올바르지 않습니다."
+    ),
+
+    /**
+     * 영수증 형식 불가
+     *
+     * 허용하지 않는 이미지 형식이거나, 확장자만 이미지이고 내용은 아닐 때 사용합니다.
+     */
+    SETTLEMENT_RECEIPT_FORMAT_INVALID(
+        HttpStatus.BAD_REQUEST,
+        "SETTLEMENT-016",
+        "지원하지 않는 영수증 이미지 형식입니다."
+    ),
+
+    /**
+     * 영수증 연결 불가
+     *
+     * 남이 올린 영수증이거나 이미 다른 정산에 쓰인 영수증을 연결하려 할 때 사용합니다.
+     */
+    SETTLEMENT_RECEIPT_NOT_LINKABLE(
+        HttpStatus.CONFLICT,
+        "SETTLEMENT-017",
+        "이 영수증은 정산에 연결할 수 없습니다."
+    ),
+
+    /**
+     * 영수증 없음
+     *
+     * 정산에 연결된 영수증이 없거나 조회 권한이 없을 때 사용합니다.
+     */
+    SETTLEMENT_RECEIPT_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "SETTLEMENT-018",
+        "영수증을 찾을 수 없습니다."
+    ),
+
+    /**
+     * 영수증 저장소 오류
+     *
+     * S3 업로드나 조회가 실패했을 때 사용합니다.
+     */
+    SETTLEMENT_RECEIPT_STORAGE_UNAVAILABLE(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "SETTLEMENT-019",
+        "영수증 저장소를 사용할 수 없습니다."
     );
 
     private final HttpStatus status;

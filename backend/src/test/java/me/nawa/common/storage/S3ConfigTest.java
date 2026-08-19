@@ -14,22 +14,22 @@ class S3ConfigTest {
     }
 
     @Test
-    void 자격증명이_비어도_클라이언트가_생성된다() {
+    void s3Client_blankCredentials_createsClient() {
         assertDoesNotThrow(() -> config.s3Client(properties("", "")).close());
     }
 
     @Test
-    void 자격증명이_있으면_클라이언트가_생성된다() {
+    void s3Client_bothCredentialsPresent_createsClient() {
         assertDoesNotThrow(() -> config.s3Client(properties("AKIAEXAMPLE", "secret")).close());
     }
 
     @Test
-    void 액세스키만_설정되면_기동을_막는다() {
+    void s3Client_accessKeyIdOnly_throwsIllegalState() {
         assertThrows(IllegalStateException.class, () -> config.s3Client(properties("AKIAEXAMPLE", "")));
     }
 
     @Test
-    void 시크릿키만_설정되면_기동을_막는다() {
+    void s3Client_secretAccessKeyOnly_throwsIllegalState() {
         assertThrows(IllegalStateException.class, () -> config.s3Client(properties("", "secret")));
     }
 }

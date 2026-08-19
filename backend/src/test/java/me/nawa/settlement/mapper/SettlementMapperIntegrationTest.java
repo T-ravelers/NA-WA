@@ -1,6 +1,8 @@
 package me.nawa.settlement.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -13,6 +15,7 @@ import me.nawa.settlement.domain.Settlement;
 import me.nawa.settlement.domain.SettlementItem;
 import me.nawa.settlement.domain.SettlementItemShare;
 import me.nawa.settlement.domain.SettlementMember;
+import me.nawa.settlement.domain.SettlementReceipt;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -33,6 +36,7 @@ class SettlementMapperIntegrationTest {
     private static HikariDataSource dataSource;
     private static JdbcTemplate jdbcTemplate;
     private static SettlementMapper mapper;
+    private static SettlementReceiptMapper receiptMapper;
 
     @BeforeAll
     static void setUpDatabase() throws Exception {
@@ -49,14 +53,20 @@ class SettlementMapperIntegrationTest {
         SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
         factoryBean.setDataSource(dataSource);
         factoryBean.setConfigLocation(new ClassPathResource("mybatis-config.xml"));
-        factoryBean.setMapperLocations(new ClassPathResource(
-            "me/nawa/settlement/mapper/SettlementMapper.xml"
-        ));
+        factoryBean.setMapperLocations(
+            new ClassPathResource("me/nawa/settlement/mapper/SettlementMapper.xml"),
+            new ClassPathResource("me/nawa/settlement/mapper/SettlementReceiptMapper.xml")
+        );
         SqlSessionFactory sqlSessionFactory = factoryBean.getObject();
         if (!sqlSessionFactory.getConfiguration().hasMapper(SettlementMapper.class)) {
             sqlSessionFactory.getConfiguration().addMapper(SettlementMapper.class);
         }
-        mapper = new SqlSessionTemplate(sqlSessionFactory).getMapper(SettlementMapper.class);
+        if (!sqlSessionFactory.getConfiguration().hasMapper(SettlementReceiptMapper.class)) {
+            sqlSessionFactory.getConfiguration().addMapper(SettlementReceiptMapper.class);
+        }
+        SqlSessionTemplate sqlSession = new SqlSessionTemplate(sqlSessionFactory);
+        mapper = sqlSession.getMapper(SettlementMapper.class);
+        receiptMapper = sqlSession.getMapper(SettlementReceiptMapper.class);
     }
 
     @AfterAll
@@ -129,6 +139,97 @@ class SettlementMapperIntegrationTest {
         }
     }
 
+    @Test
+    void linkToSettlement_ownDraft_fillsSettlementIdOnce() {
+        Fixture fixture = createFixture();
+        try {
+            Settlement settlement = settlement(fixture);
+            mapper.insertSettlement(settlement);
+            SettlementReceipt draft = draft(fixture);
+            receiptMapper.insertReceipt(draft);
+
+            assertNotNull(draft.getSettlementReceiptId());
+            assertNull(jdbcTemplate.queryForObject(
+                "SELECT settlement_id FROM settlement_receipts WHERE settlement_receipt_id = ?",
+                Long.class,
+                draft.getSettlementReceiptId()
+            ));
+
+            int linked = receiptMapper.linkToSettlement(
+                draft.getSettlementReceiptId(), settlement.getSettlementId(), fixture.memberId()
+            );
+
+            assertEquals(1, linked);
+            assertEquals(settlement.getSettlementId(), jdbcTemplate.queryForObject(
+                "SELECT settlement_id FROM settlement_receipts WHERE settlement_receipt_id = ?",
+                Long.class,
+                draft.getSettlementReceiptId()
+            ));
+
+            // 이미 쓰인 초안은 두 번째 연결에서 아무 행도 바꾸지 못해야 한다.
+            assertEquals(0, receiptMapper.linkToSettlement(
+                draft.getSettlementReceiptId(), settlement.getSettlementId(), fixture.memberId()
+            ));
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    @Test
+    void linkToSettlement_draftOfAnotherMember_changesNothing() {
+        Fixture fixture = createFixture();
+        try {
+            Settlement settlement = settlement(fixture);
+            mapper.insertSettlement(settlement);
+            SettlementReceipt draft = draft(fixture);
+            receiptMapper.insertReceipt(draft);
+
+            int linked = receiptMapper.linkToSettlement(
+                draft.getSettlementReceiptId(), settlement.getSettlementId(), fixture.memberId() + 1
+            );
+
+            assertEquals(0, linked);
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    @Test
+    void findBySettlementIdForViewer_participantAndOutsider_returnsRowOnlyForParticipant() {
+        Fixture fixture = createFixture();
+        try {
+            Settlement settlement = settlement(fixture);
+            mapper.insertSettlement(settlement);
+            SettlementReceipt draft = draft(fixture);
+            receiptMapper.insertReceipt(draft);
+            receiptMapper.linkToSettlement(
+                draft.getSettlementReceiptId(), settlement.getSettlementId(), fixture.memberId()
+            );
+
+            SettlementReceipt visible = receiptMapper.findBySettlementIdForViewer(
+                settlement.getSettlementId(), fixture.memberId()
+            );
+            SettlementReceipt hidden = receiptMapper.findBySettlementIdForViewer(
+                settlement.getSettlementId(), fixture.memberId() + 1
+            );
+
+            assertNotNull(visible);
+            assertEquals(draft.getObjectKey(), visible.getObjectKey());
+            assertNull(hidden);
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    private static SettlementReceipt draft(Fixture fixture) {
+        return new SettlementReceipt(
+            fixture.memberId(),
+            "receipts/" + fixture.memberId() + "/" + UUID.randomUUID() + ".png",
+            "image/png",
+            1024
+        );
+    }
+
     private static Settlement settlement(Fixture fixture) {
         return Settlement.builder()
             .appointmentId(fixture.appointmentId())
@@ -193,6 +294,11 @@ class SettlementMapperIntegrationTest {
     }
 
     private static void deleteFixture(Fixture fixture) {
+        // settlements와 members를 참조하므로 그 둘보다 먼저 지운다.
+        jdbcTemplate.update(
+            "DELETE FROM settlement_receipts WHERE uploaded_by_member_id = ?",
+            fixture.memberId()
+        );
         jdbcTemplate.update(
             "DELETE sis FROM settlement_item_shares sis "
                 + "JOIN settlement_items si ON si.settlement_item_id = sis.settlement_item_id "

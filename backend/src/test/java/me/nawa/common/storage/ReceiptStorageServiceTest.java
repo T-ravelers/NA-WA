@@ -30,6 +30,8 @@ class ReceiptStorageServiceTest {
 
     private static final String BUCKET = "nawa-receipts-test";
 
+    private static final long UPLOADER_MEMBER_ID = 42L;
+
     @Mock
     private S3Client client;
 
@@ -39,10 +41,10 @@ class ReceiptStorageServiceTest {
     }
 
     @Test
-    void 업로드는_접두사_규칙대로_키를_만들어_올린다() {
+    void upload_allowedExtension_putsObjectWithUploaderScopedKey() {
         byte[] content = "receipt".getBytes(StandardCharsets.UTF_8);
 
-        String objectKey = service().upload(42L, "png", "image/png", content);
+        String objectKey = service().upload(UPLOADER_MEMBER_ID, "png", "image/png", content);
 
         assertTrue(objectKey.matches("receipts/42/[0-9a-f-]{36}\\.png"), objectKey);
 
@@ -54,21 +56,21 @@ class ReceiptStorageServiceTest {
     }
 
     @Test
-    void 확장자가_규칙을_벗어나면_업로드를_거부한다() {
+    void upload_extensionOutsideAllowedPattern_throwsIllegalArgument() {
         ReceiptStorageService service = service();
         byte[] content = "receipt".getBytes(StandardCharsets.UTF_8);
 
-        assertThrows(IllegalArgumentException.class, () -> service.upload(42L, "../png", "image/png", content));
-        assertThrows(IllegalArgumentException.class, () -> service.upload(42L, "p/ng", "image/png", content));
-        assertThrows(IllegalArgumentException.class, () -> service.upload(42L, "PNG", "image/png", content));
-        assertThrows(IllegalArgumentException.class, () -> service.upload(42L, "", "image/png", content));
-        assertThrows(IllegalArgumentException.class, () -> service.upload(42L, null, "image/png", content));
+        assertThrows(IllegalArgumentException.class, () -> service.upload(UPLOADER_MEMBER_ID, "../png", "image/png", content));
+        assertThrows(IllegalArgumentException.class, () -> service.upload(UPLOADER_MEMBER_ID, "p/ng", "image/png", content));
+        assertThrows(IllegalArgumentException.class, () -> service.upload(UPLOADER_MEMBER_ID, "PNG", "image/png", content));
+        assertThrows(IllegalArgumentException.class, () -> service.upload(UPLOADER_MEMBER_ID, "", "image/png", content));
+        assertThrows(IllegalArgumentException.class, () -> service.upload(UPLOADER_MEMBER_ID, null, "image/png", content));
 
         verifyNoInteractions(client);
     }
 
     @Test
-    void 조회는_본문과_MIME_타입을_돌려준다() {
+    void download_storedKey_returnsContentAndContentType() {
         byte[] content = "receipt".getBytes(StandardCharsets.UTF_8);
         when(client.getObjectAsBytes(any(GetObjectRequest.class))).thenReturn(
             ResponseBytes.fromByteArray(
@@ -86,7 +88,7 @@ class ReceiptStorageServiceTest {
     }
 
     @Test
-    void 삭제는_해당_키를_버킷에서_지운다() {
+    void delete_storedKey_removesObjectFromBucket() {
         service().delete("receipts/42/probe.png");
 
         ArgumentCaptor<DeleteObjectRequest> request = ArgumentCaptor.forClass(DeleteObjectRequest.class);
@@ -96,7 +98,7 @@ class ReceiptStorageServiceTest {
     }
 
     @Test
-    void 접두사를_벗어난_키는_조회를_거부한다() {
+    void download_keyOutsideReceiptsPrefix_throwsIllegalArgument() {
         ReceiptStorageService service = service();
 
         assertThrows(IllegalArgumentException.class, () -> service.download("elsewhere/probe.png"));
@@ -107,7 +109,7 @@ class ReceiptStorageServiceTest {
     }
 
     @Test
-    void 접두사를_벗어난_키는_삭제를_거부한다() {
+    void delete_keyOutsideReceiptsPrefix_throwsIllegalArgument() {
         ReceiptStorageService service = service();
 
         assertThrows(IllegalArgumentException.class, () -> service.delete("elsewhere/probe.png"));

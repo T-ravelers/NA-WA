@@ -64,6 +64,15 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   `AWS_ACCESS_KEY_ID`·`AWS_SECRET_ACCESS_KEY`로 받아 씁니다. 이 정적 자격증명을 인스턴스
   역할로 "정리"하면 운영에서 접근이 끊깁니다. IAM 정책이 `receipts/` 접두사로 좁혀져 있어
   객체 키가 이 접두사를 벗어나면 런타임에 `AccessDenied`가 납니다.
+- 영수증 사진은 **정산보다 먼저** 올립니다. 정산 품목이 영수증에서 나온 값이라, 품목을
+  먼저 확정하고 사진을 나중에 붙이면 그 사진이 품목의 근거라는 보장이 사라집니다.
+  `POST /api/v1/settlement-receipts`로 받은 `receiptId`를 정산 생성 요청에 실어 연결하고,
+  **연결된 뒤에는 교체하지 않습니다.** 이 순서를 뒤집으면 영수증 OCR을 얹을 자리가 없어집니다.
+- 이 백엔드는 Spring Boot가 아니라서 `spring.servlet.multipart.*`가 동작하지 않습니다.
+  업로드 크기는 `WebConfig`의 `MultipartConfigElement`가 `RECEIPT_MAX_UPLOAD_BYTES`
+  환경변수로 정하고, `ServletConfig`의 `multipartResolver` 빈이 요청을 해석합니다.
+  `nginx/nginx.conf`의 `client_max_body_size`가 이 값보다 작으면 요청이 백엔드에 닿기도
+  전에 잘려서 애플리케이션이 오류 코드를 돌려줄 기회조차 없습니다. 둘을 함께 조정합니다.
 
 ## 검증
 

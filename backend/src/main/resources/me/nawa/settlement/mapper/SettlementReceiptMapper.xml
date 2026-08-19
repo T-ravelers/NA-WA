@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.settlement.mapper.SettlementReceiptMapper">
+    <insert id="insertReceipt" useGeneratedKeys="true" keyProperty="settlementReceiptId">
+        INSERT INTO settlement_receipts (
+            uploaded_by_member_id, object_key, content_type, byte_size
+        ) VALUES (
+            #{uploadedByMemberId}, #{objectKey}, #{contentType}, #{byteSize}
+        )
+    </insert>
+
+    <update id="linkToSettlement">
+        UPDATE settlement_receipts
+        SET settlement_id = #{settlementId}
+        WHERE settlement_receipt_id = #{settlementReceiptId}
+          AND uploaded_by_member_id = #{memberId}
+          AND settlement_id IS NULL
+          AND deleted_at IS NULL
+    </update>
+
+    <select id="findBySettlementIdForViewer"
+            resultType="me.nawa.settlement.domain.SettlementReceipt">
+        SELECT sr.settlement_receipt_id, sr.uploaded_by_member_id, sr.settlement_id,
+               sr.object_key, sr.content_type, sr.byte_size
+        FROM settlement_receipts sr
+        JOIN settlements s ON s.settlement_id = sr.settlement_id AND s.deleted_at IS NULL
+        WHERE sr.settlement_id = #{settlementId}
+          AND sr.deleted_at IS NULL
+          AND (s.created_by_member_id = #{memberId} OR EXISTS (
+              SELECT 1 FROM settlement_members sm
+              JOIN appointment_members am
+                  ON am.appointment_member_id = sm.appointment_member_id
+              WHERE sm.settlement_id = s.settlement_id AND am.member_id = #{memberId}
+                AND sm.deleted_at IS NULL AND am.deleted_at IS NULL
+          ))
+    </select>
+</mapper>

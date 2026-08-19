@@ -12,6 +12,8 @@
 | `POST /api/v1/appointments/{appointmentId}/settlements` | 원거래와 분담 규칙으로 정산을 생성한다. |
 | `GET /api/v1/settlements/{settlementId}` | 참여한 정산의 상태, 개인 부담금과 ITEMIZED 품목 배분을 조회한다. |
 | `POST /api/v1/settlements/{settlementId}/members/me/pay` | 현재 사용자의 미지급 부담금을 지급한다. |
+| `POST /api/v1/settlement-receipts` | 영수증 사진을 올리고 `receiptId`를 받는다. |
+| `GET /api/v1/settlements/{settlementId}/receipt` | 정산에 붙은 영수증 사진을 조회한다. |
 
 생성 요청과 지급 요청에는 각각 `Idempotency-Key` 헤더가 필요하며, 값은 1~100자다.
 
@@ -41,9 +43,10 @@ URL의 경로 변수이고, `transferId`는 생성 요청의 `sourceTransferId`�
 
 `ITEMIZED` 요청에는 `items`를 추가한다. 각 품목은 `name`, `unitPrice`, `quantity`와
 `allocations`를 가지며, 각 allocation은 `appointmentMemberId`, `quantity`를 가진다.
-클라이언트는 품목별 또는 참여자별 금액, 영수증 파일, OCR 결과, 영수증 분석 ID를 보내지
-않는다. 서버가 `unitPrice × quantity`로 품목·배분 금액을 계산하고
-`settlement_items`, `settlement_item_shares`에 스냅샷으로 저장한다.
+클라이언트는 품목별 또는 참여자별 금액, OCR 결과, 영수증 분석 ID를 보내지 않는다. 서버가
+`unitPrice × quantity`로 품목·배분 금액을 계산하고 `settlement_items`,
+`settlement_item_shares`에 스냅샷으로 저장한다. 영수증 사진은 요청 본문에 담지 않고,
+미리 올려 받은 `receiptId`만 보낸다. 자세한 내용은 [영수증과 multipart](#영수증과-multipart)에 있다.
 
 품목명은 최대 200자다. `unitPrice`, 품목 금액과 배분 금액은 `DECIMAL(19,4)`, 품목 및
 배분 수량은 `DECIMAL(12,3)` 범위를 벗어나면 서버가 `SETTLEMENT-005`(400)으로 거절한다.
@@ -82,3 +85,57 @@ URL의 경로 변수이고, `transferId`는 생성 요청의 `sourceTransferId`�
 | `SETTLEMENT-010` | 409 | 원거래가 이미 다른 정산에 사용됨 |
 | `SETTLEMENT-014` | 409 | 정산 지급이 이미 다른 멱등성 키로 처리됨 |
 | `SETTLEMENT-015` | 400 | 멱등성 키가 비었거나 길이 제한을 초과함 |
+| `SETTLEMENT-016` | 400 | 영수증 이미지 형식이 허용 목록에 없거나 내용과 다름 |
+| `SETTLEMENT-017` | 409 | 남이 올렸거나 이미 사용된 영수증을 연결하려 함 |
+| `SETTLEMENT-018` | 404 | 정산에 연결된 영수증이 없거나 조회 권한이 없음 |
+| `SETTLEMENT-019` | 503 | 영수증 저장소를 사용할 수 없음 |
+
+업로드 크기 초과는 정산 코드가 아니라 공통 코드 `COMMON-004`(413)로 응답한다. multipart
+해석 단계에서 실패해 정산 컨트롤러에 닿지 못하기 때문이다.
+
+## 영수증과 multipart
+
+영수증 사진은 정산보다 **먼저** 올린다. 정산 품목이 영수증에서 나온 값이라, 품목을 먼저
+확정하고 사진을 나중에 붙이면 그 사진이 그 품목의 근거라는 보장이 사라지기 때문이다.
+
+```
+POST /api/v1/settlement-receipts        → { "receiptId": 12 }
+POST /api/v1/appointments/{id}/settlements  (본문에 receiptId: 12)
+GET  /api/v1/settlements/{id}/receipt   → 이미지 바이트
+```
+
+`receiptId`는 정산 생성 요청의 선택 필드다. 넣지 않으면 사진 없는 정산이 만들어진다.
+`receiptId`는 생성 요청 지문에도 들어가므로, 같은 멱등성 키로 영수증만 바꿔 다시 보내면
+`SETTLEMENT-009`로 거절한다.
+
+**연결된 영수증은 교체하거나 삭제할 수 없다.** 품목이 그 사진에서 뽑은 스냅샷이라 사진만
+바꾸면 대응이 깨진다. 잘못 올렸다면 정산을 만들기 전에 다시 올린다. 정산에 연결되지 않은
+사진은 버킷의 수명주기 규칙이 정리한다.
+
+### 업로드 규칙
+
+| 항목 | 값 |
+| --- | --- |
+| 요청 형식 | `multipart/form-data`, 파트 이름 `file` |
+| 허용 형식 | `image/jpeg`, `image/png`, `image/webp` |
+| 크기 상한 | `RECEIPT_MAX_UPLOAD_BYTES` (기본 8MiB) |
+| 정산당 장수 | 한 장 |
+
+브라우저가 알려준 형식과 파일 내용에서 읽어낸 실제 형식이 모두 허용 목록에 있고 서로 같아야
+통과한다. 확장자만 이미지로 바꾼 파일을 거르기 위해서다.
+
+크기 상한을 올릴 때는 `nginx/nginx.conf`의 `client_max_body_size`도 함께 올린다. nginx가 더
+작으면 요청이 백엔드에 닿기도 전에 잘려서 애플리케이션이 오류 코드를 돌려줄 기회조차 없다.
+
+### 조회
+
+`GET /api/v1/settlements/{settlementId}/receipt`는 이미지 바이트를 그대로 돌려주며 공통 응답
+봉투를 쓰지 않는다. 정산 참여자와 생성자만 볼 수 있고, 그 밖의 사용자에게는
+`SETTLEMENT-018`(404)로 응답해 정산의 존재 여부까지 감춘다.
+
+응답에는 `X-Content-Type-Options: nosniff`와 `Cache-Control: private, no-store`를 함께
+내린다. 사용자가 올린 파일이라 브라우저가 형식을 임의로 재해석하지 못하게 막고, 다른
+참여자에게 보이면 안 되는 사진이라 중간 캐시에 남기지 않기 위해서다.
+
+인증은 쿠키 기반이므로 프론트엔드와 API의 오리진이 다르면 `<img src>`로는 쿠키가 실리지
+않는다. 이 경우 클라이언트가 인증을 실어 직접 받아 표시해야 한다.
