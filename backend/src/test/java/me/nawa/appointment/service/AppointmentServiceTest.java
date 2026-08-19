@@ -23,6 +23,7 @@ import me.nawa.deposit.domain.ResolutionReason;
 import me.nawa.deposit.mapper.DepositMapper;
 import me.nawa.deposit.mapper.DepositPayoutBatchMapper;
 import me.nawa.journey.domain.Journey;
+import me.nawa.journey.exception.JourneyErrorCode;
 import me.nawa.journey.mapper.JourneyMapper;
 import me.nawa.wallet.domain.SystemWalletCode;
 import me.nawa.wallet.domain.enums.TransferType;
@@ -33,6 +34,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -131,6 +133,132 @@ class AppointmentServiceTest {
 
         assertEquals(CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
         verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyNotFound_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_NOT_FOUND, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyNotOwned_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(2L)
+                        .startDate(LocalDate.of(2026, 8, 1))
+                        .endDate(LocalDate.of(2026, 8, 31))
+                        .build()
+        );
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_FORBIDDEN, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_visitDateOutsideJourneyRange_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(LocalDate.of(2026, 9, 1))
+                        .endDate(LocalDate.of(2026, 9, 30))
+                        .build()
+        );
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(
+                JourneyErrorCode.JOURNEY_ITEM_DATE_OUT_OF_RANGE,
+                exception.getErrorCode()
+        );
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyItemAlreadyExists_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(LocalDate.of(2026, 8, 1))
+                        .endDate(LocalDate.of(2026, 8, 31))
+                        .build()
+        );
+        when(journeyMapper.existsJourneyItem(1L, 100L, LocalDate.of(2026, 8, 21)))
+                .thenReturn(true);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyItemRaceCondition_rejectsRequestAfterInsert() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(LocalDate.of(2026, 8, 1))
+                        .endDate(LocalDate.of(2026, 8, 31))
+                        .build()
+        );
+        stubInsertAppointment(10L);
+        org.mockito.Mockito.doThrow(new DuplicateKeyException("duplicate"))
+                .when(journeyMapper).insertConfirmedJourneyItem(any());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointmentMember(any());
+    }
+
+    @Test
+    void createAppointment_activityStartInPast_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        request.setVisitDate(LocalDate.now());
+        request.setActivityStartTime(LocalTime.now().minusMinutes(1));
+        request.setActivityEndTime(LocalTime.now().plusHours(1));
+        request.setJoinDeadline(LocalDateTime.now().minusMinutes(2));
+
+        assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+        verify(appointmentMapper, never()).findAvailableItemType(any());
     }
 
     @Test
