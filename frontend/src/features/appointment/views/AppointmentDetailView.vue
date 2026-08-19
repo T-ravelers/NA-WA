@@ -423,7 +423,6 @@ function confirmJoin(): void {
         <AppButton
           block
           :disabled="!isJoinButtonEnabled"
-          :title="joinDisabledReason"
           @click="openDepositSheet"
         >
           {{ t('appointment.detail.join') }}
