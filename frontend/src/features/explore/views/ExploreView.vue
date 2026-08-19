@@ -337,7 +337,7 @@ function buildPlaceQuery(next: PlaceSearchFilters): LocationQueryRaw {
   addQueryList(query, 'placeRegion2', next.region2)
   addQueryValue(query, 'placeRegion2Other', next.region2Other)
   addQueryValue(query, 'placeKeyword', next.keyword)
-  addQueryValue(query, 'placeSort', next.sort === 'NEWEST' ? undefined : next.sort)
+  addQueryValue(query, 'placeSort', next.sort === 'POPULAR' ? undefined : next.sort)
   addQueryValue(query, 'hasForeignLang', next.hasForeignLang)
   addQueryValue(query, 'hasParking', next.hasParking)
   addQueryValue(query, 'reservable', next.reservable)
@@ -496,7 +496,7 @@ function applyPlaceSheet(next: PlaceSearchFilters): void {
       ? (next.region2 ?? []).filter((value) => VALID_SEOUL_REGION2_VALUES.has(value))
       : (next.region2 ?? [])
   selectedPlaceRegion2Other.value = next.region2Other ?? false
-  placeSort.value = next.sort ?? 'NEWEST'
+  placeSort.value = next.sort ?? 'POPULAR'
   selectedPlaceHasForeignLang.value = next.hasForeignLang ?? false
   selectedPlaceHasParking.value = next.hasParking ?? false
   selectedPlaceReservable.value = next.reservable ?? false
@@ -659,7 +659,7 @@ function removePlaceFilter(key: string): void {
     selectedPlaceRegion1.value = [SEOUL_REGION1]
     selectedPlaceRegion2.value = []
     selectedPlaceRegion2Other.value = false
-    placeSort.value = 'NEWEST'
+    placeSort.value = 'POPULAR'
     selectedPlaceHasForeignLang.value = false
     selectedPlaceHasParking.value = false
     selectedPlaceReservable.value = false
@@ -826,8 +826,7 @@ function readSort(value: string | undefined): EventSort {
 
 function readPlaceSort(value: string | undefined): PlaceSort {
   if (value === 'NEWEST' || value === 'LATEST') return 'NEWEST'
-  if (value === 'POPULAR') return 'POPULAR'
-  return 'NEWEST'
+  return 'POPULAR'
 }
 
 function isEventKind(value: string): value is EventKind {

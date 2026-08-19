@@ -142,6 +142,13 @@ describe('ExploreView Place branch', () => {
     expect(fetchEventList).toHaveBeenCalledWith(expect.objectContaining({ sort: 'NEWEST' }))
   })
 
+  it('requests the Place list with the POPULAR sort by default', async () => {
+    await mountView('/explore?tab=places')
+    await flushPromises()
+
+    expect(fetchPlaceList).toHaveBeenCalledWith(expect.objectContaining({ sort: 'POPULAR' }))
+  })
+
   it('reads a legacy LATEST place sort from an old URL as NEWEST', async () => {
     await mountView('/explore?tab=places&placeSort=LATEST')
     await flushPromises()
