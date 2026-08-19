@@ -24,9 +24,14 @@ import me.nawa.deposit.domain.DepositPayoutBatch;
 import me.nawa.deposit.domain.ResolutionReason;
 import me.nawa.deposit.mapper.DepositMapper;
 import me.nawa.deposit.mapper.DepositPayoutBatchMapper;
+import me.nawa.journey.domain.Journey;
+import me.nawa.journey.domain.JourneyItem;
+import me.nawa.journey.exception.JourneyErrorCode;
+import me.nawa.journey.mapper.JourneyMapper;
 import me.nawa.wallet.domain.SystemWalletCode;
 import me.nawa.wallet.domain.enums.TransferType;
 import me.nawa.wallet.service.WalletTransferService;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,12 +73,21 @@ public class AppointmentService {
     private final DepositMapper depositMapper;
     private final DepositPayoutBatchMapper depositPayoutBatchMapper;
     private final WalletTransferService walletTransferService;
+    private final JourneyMapper journeyMapper;
 
     @Transactional
     public Appointment createAppointment(
             Long memberId,
             AppointmentCreateRequest request) {
         validateCreateRequest(memberId, request);
+        validateJourneyLink(memberId, request);
+
+        // 활동 시작·종료는 visitDate 하루 위에서만 조립된다. 그래서 시작·종료가
+        // 같은 날짜인지 별도로 검사할 필요가 없다 — 애초에 다른 날짜가 될 수 없다.
+        LocalDateTime activityStartAt = LocalDateTime.of(
+                request.getVisitDate(), request.getActivityStartTime());
+        LocalDateTime activityEndAt = LocalDateTime.of(
+                request.getVisitDate(), request.getActivityEndTime());
 
         Appointment appointment = Appointment.builder()
                 .itemId(request.getItemId())
@@ -86,12 +100,13 @@ public class AppointmentService {
                 .appointmentStatus(AppointmentStatus.PAYMENT_PENDING)
                 .meetingPlace(request.getMeetingPlace().trim())
                 .meetingAddress(request.getMeetingAddress())
-                .activityStartAt(request.getActivityStartAt())
-                .activityEndAt(request.getActivityEndAt())
+                .activityStartAt(activityStartAt)
+                .activityEndAt(activityEndAt)
                 .build();
         if (appointmentMapper.insertAppointment(appointment) != 1) {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
+        confirmJourneyItem(appointment, request);
 
         AppointmentMember host = AppointmentMember.builder()
                 .appointmentId(appointment.getAppointmentId())
@@ -739,6 +754,8 @@ public class AppointmentService {
         if (memberId == null || memberId <= 0 || request == null
                 || request.getItemId() == null || request.getItemId() <= 0
                 || request.getItemType() == null
+                || request.getTripId() == null || request.getTripId() <= 0
+                || request.getVisitDate() == null
                 || request.getLanguageCode() == null) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
@@ -757,20 +774,79 @@ public class AppointmentService {
                 || request.getMeetingPlace().trim().length() > 200
                 || lengthExceeds(request.getMeetingAddress(), 500)
                 || request.getJoinDeadline() == null
-                || request.getActivityStartAt() == null
-                || request.getActivityEndAt() == null
-                || request.getJoinDeadline().isAfter(
-                        request.getActivityStartAt()
-                )
-                || !request.getActivityStartAt().isBefore(
-                        request.getActivityEndAt()
+                || request.getActivityStartTime() == null
+                || request.getActivityEndTime() == null
+                || !request.getActivityStartTime().isBefore(
+                        request.getActivityEndTime()
                 )) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
+
+        // activityStartAt/activityEndAt은 visitDate 위에서만 조립되므로, 종료가
+        // 시작보다 늦은지는 시각 비교(위)만으로 항상 하루 안에서 성립한다.
+        LocalDateTime activityStartAt = LocalDateTime.of(
+                request.getVisitDate(), request.getActivityStartTime());
+        if (request.getJoinDeadline().isAfter(activityStartAt)
+                || activityStartAt.isBefore(LocalDateTime.now())) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
         if (!request.getItemType().equals(
                 appointmentMapper.findAvailableItemType(request.getItemId())
         )) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+    }
+
+    // 여정 소유자인지, 방문 날짜가 여정 기간 안인지 확인한다. 실제 trip_items
+    // 저장은 insertAppointment로 appointmentId를 확보한 뒤 confirmJourneyItem에서
+    // 한다 — 여기서는 조기에 실패시키는 역할만 한다.
+    private void validateJourneyLink(
+            Long memberId,
+            AppointmentCreateRequest request) {
+        Journey journey = journeyMapper.findJourneyByIdForUpdate(request.getTripId());
+        if (journey == null) {
+            throw new BusinessException(JourneyErrorCode.JOURNEY_NOT_FOUND);
+        }
+        if (!journey.getMemberId().equals(memberId)) {
+            throw new BusinessException(JourneyErrorCode.JOURNEY_FORBIDDEN);
+        }
+        if (request.getVisitDate().isBefore(journey.getStartDate())
+                || request.getVisitDate().isAfter(journey.getEndDate())) {
+            throw new BusinessException(
+                    JourneyErrorCode.JOURNEY_ITEM_DATE_OUT_OF_RANGE
+            );
+        }
+        if (journeyMapper.existsJourneyItem(
+                request.getTripId(),
+                request.getItemId(),
+                request.getVisitDate()
+        )) {
+            throw new BusinessException(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE);
+        }
+    }
+
+    // 같은 트랜잭션 안에서 여정 항목을 CONFIRMED로 만든다. validateJourneyLink가
+    // 미리 중복을 걸렀더라도, 같은 계정의 다른 세션이 그 사이 먼저 확정해버리는
+    // 드문 경쟁 상태가 있을 수 있어 유니크 제약 위반을 별도로 처리한다.
+    private void confirmJourneyItem(
+            Appointment appointment,
+            AppointmentCreateRequest request) {
+        JourneyItem journeyItem = JourneyItem.builder()
+                .tripId(request.getTripId())
+                .itemId(request.getItemId())
+                .visitDate(request.getVisitDate())
+                .tripItemStatus("CONFIRMED")
+                .displayOrder(0)
+                .appointmentId(appointment.getAppointmentId())
+                .build();
+        try {
+            journeyMapper.insertConfirmedJourneyItem(journeyItem);
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessException(
+                    JourneyErrorCode.JOURNEY_ITEM_DUPLICATE,
+                    exception
+            );
         }
     }
 

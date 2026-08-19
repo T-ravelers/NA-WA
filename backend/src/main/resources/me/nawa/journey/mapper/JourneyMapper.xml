@@ -287,6 +287,17 @@
              'ADDED', #{displayOrder}, #{note}, NULL)
     </insert>
 
+    <insert id="insertConfirmedJourneyItem"
+            useGeneratedKeys="true"
+            keyProperty="tripItemId">
+        INSERT INTO trip_items
+            (trip_id, item_id, appointment_id, visit_date,
+             trip_item_status, display_order, note, confirmed_at)
+        VALUES
+            (#{tripId}, #{itemId}, #{appointmentId}, #{visitDate},
+             'CONFIRMED', #{displayOrder}, #{note}, CURRENT_TIMESTAMP)
+    </insert>
+
     <select id="findJourneyItemById"
             resultType="me.nawa.journey.domain.JourneyItem">
         SELECT

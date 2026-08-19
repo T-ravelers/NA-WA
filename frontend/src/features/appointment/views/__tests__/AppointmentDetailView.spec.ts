@@ -9,6 +9,8 @@ import { appointmentMemberIntegrationKey } from '../../model/memberIntegration'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
+const fetchMyAppointmentParticipation = vi.fn()
+const joinAppointment = vi.fn()
 const profileQuery = {
   data: ref({ memberId: 11 }),
   isPending: ref(false),
@@ -20,6 +22,9 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
   fetchAppointment: (appointmentId: number) => fetchAppointment(appointmentId),
   fetchAppointmentMembers: (appointmentId: number) => fetchAppointmentMembers(appointmentId),
+  fetchMyAppointmentParticipation: (appointmentId: number) =>
+    fetchMyAppointmentParticipation(appointmentId),
+  joinAppointment: (appointmentId: number) => joinAppointment(appointmentId),
 }))
 
 const AppointmentDetailView = (await import('../AppointmentDetailView.vue')).default
@@ -122,15 +127,35 @@ async function mountView() {
   return { wrapper, router }
 }
 
+const notJoinedParticipation = {
+  joined: false,
+  appointmentMemberId: null,
+  membershipStatus: null,
+  attendanceStatus: null,
+  host: false,
+}
+
+const hostParticipation = {
+  joined: true,
+  appointmentMemberId: 1,
+  membershipStatus: 'ACTIVE' as const,
+  attendanceStatus: 'ATTENDED' as const,
+  host: true,
+}
+
 describe('AppointmentDetailView', () => {
   beforeEach(() => {
     fetchAppointment.mockReset()
     fetchAppointmentMembers.mockReset()
+    fetchMyAppointmentParticipation.mockReset()
+    joinAppointment.mockReset()
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue([...members, leftMember])
+    fetchMyAppointmentParticipation.mockResolvedValue(hostParticipation)
+    profileQuery.data.value = { memberId: 11 }
   })
 
-  it('renders appointment details, members, and opens deposit confirmation', async () => {
+  it('renders appointment details and members', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Seongsu K-Beauty Tour')
@@ -142,6 +167,72 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).not.toContain('Jamie Lee')
     expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Confirm attendance')
+  })
+
+  it('disables Join appointment and shows an already-joined notice for the host', async () => {
+    const { wrapper } = await mountView()
+
+    const joinButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+    const notice = wrapper
+      .findAll('p')
+      .find((p) => p.text() === 'You have already joined this appointment.')
+
+    // 버튼 title 툴팁은 비활성 버튼·모바일에서 뜨지 않으므로, 이유는 상시
+    // 텍스트로 보여준다. 완료된 약속에서도 보일 수 있어 경고색(text-danger)이
+    // 아니라 중립색(text-ink-3)이어야 한다.
+    expect(notice).toBeDefined()
+    expect(notice?.classes()).toContain('text-ink-3')
+    expect(notice?.classes()).not.toContain('text-danger')
+    expect(joinButton?.attributes('disabled')).toBeDefined()
+
+    await joinButton?.trigger('click')
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('disables Join appointment when the participation check fails', async () => {
+    fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
+    const { wrapper } = await mountView()
+
+    const joinButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+
+    expect(wrapper.text()).toContain(
+      'We could not check your participation status. Please try again.',
+    )
+    expect(joinButton?.attributes('disabled')).toBeDefined()
+  })
+
+  it('shows a neutral (not red) notice on a normally closed appointment', async () => {
+    // 모집 종료(COMPLETED 등)는 정상 상태지 오류가 아니다. 버튼 title
+    // 툴팁은 비활성 버튼·모바일에서 뜨지 않으므로 이유는 상시 텍스트로
+    // 보여주되, 경고색이 아니라 중립색으로 보여준다.
+    fetchAppointment.mockResolvedValue({ ...appointment, appointmentStatus: 'COMPLETED' })
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    profileQuery.data.value = { memberId: 99 }
+    const { wrapper } = await mountView()
+
+    const joinButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+    const notice = wrapper
+      .findAll('p')
+      .find((p) => p.text() === 'This appointment is not open for joining.')
+
+    expect(notice).toBeDefined()
+    expect(notice?.classes()).toContain('text-ink-3')
+    expect(notice?.classes()).not.toContain('text-danger')
+    expect(joinButton?.attributes('disabled')).toBeDefined()
+  })
+
+  it('opens the deposit sheet with an enabled confirm button for a member who has not joined', async () => {
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    profileQuery.data.value = { memberId: 99 }
+    const { wrapper } = await mountView()
+
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
@@ -154,7 +245,37 @@ describe('AppointmentDetailView', () => {
         .findAll('button')
         .find((button) => button.text().includes('Pay'))
         ?.attributes('disabled'),
-    ).toBeDefined()
+    ).toBeUndefined()
+  })
+
+  it('joins the appointment and closes the sheet once confirmed', async () => {
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    joinAppointment.mockResolvedValue({
+      appointmentMemberId: 4,
+      memberId: 99,
+      displayName: 'Jordan Lee',
+      profileImageUrl: null,
+      preferredLanguage: 'en',
+      membershipStatus: 'PENDING',
+      attendanceStatus: 'PENDING',
+      isHost: false,
+    })
+    profileQuery.data.value = { memberId: 99 }
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Pay'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(joinAppointment).toHaveBeenCalledWith(7)
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
   it('renders the member cards directly without a View all action', async () => {

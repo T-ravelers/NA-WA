@@ -84,7 +84,7 @@
         SET appointment_status = 'CLOSED',
             updated_at = CURRENT_TIMESTAMP
         WHERE appointment_status = 'RECRUITING'
-          AND join_deadline &lt; CURRENT_TIMESTAMP
+          AND join_deadline &lt; #{now}
           AND deleted_at IS NULL
     </update>
 
@@ -93,7 +93,7 @@
         SET appointment_status = 'IN_PROGRESS',
             updated_at = CURRENT_TIMESTAMP
         WHERE appointment_status = 'CLOSED'
-          AND activity_start_at &lt;= CURRENT_TIMESTAMP
+          AND activity_start_at &lt;= #{now}
           AND deleted_at IS NULL
     </update>
 

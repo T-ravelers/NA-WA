@@ -35,10 +35,17 @@ public interface AppointmentMapper {
     // 참여 마감 시각이 지난 RECRUITING 약속을 일괄로 CLOSED로 전환한다.
     // 정원이 차서 CLOSED가 되는 경로는 시간과 무관해 joinAppointment가 동기로
     // 처리하므로 여기서 다루지 않는다.
-    int closeExpiredRecruitingAppointments();
+    //
+    // 비교 기준 시각은 DB의 CURRENT_TIMESTAMP가 아니라 애플리케이션이 넘긴
+    // now를 쓴다. join_deadline·activity_start_at은 모두 애플리케이션의
+    // LocalDateTime.now() 기준으로 저장되는데, DB 서버 컨테이너의 시간대가
+    // 애플리케이션(TZ=Asia/Seoul)과 다르면 CURRENT_TIMESTAMP가 그만큼 어긋나
+    // 마감·시작 전환이 실제보다 늦게(또는 빠르게) 일어난다.
+    int closeExpiredRecruitingAppointments(@Param("now") LocalDateTime now);
 
     // 활동 시작 시각이 된 CLOSED 약속을 일괄로 IN_PROGRESS로 전환한다.
-    int startDueClosedAppointments();
+    // now를 넘기는 이유는 closeExpiredRecruitingAppointments와 같다.
+    int startDueClosedAppointments(@Param("now") LocalDateTime now);
 
     List<Appointment> searchAppointments(
             @Param("request") AppointmentSearchRequest request,

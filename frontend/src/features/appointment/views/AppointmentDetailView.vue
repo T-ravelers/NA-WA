@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { IconMenu2 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -15,16 +15,26 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
-import { type AppointmentDateTimeValue, type AppointmentStatus } from '../api/appointmentApi'
+import {
+  joinAppointment,
+  type AppointmentDateTimeValue,
+  type AppointmentStatus,
+} from '../api/appointmentApi'
+import { appointmentKeys } from '../model/appointmentKeys'
+import { appointmentErrorMessageKey } from '../model/appointmentErrors'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
+  appointmentParticipationQueryOptions,
 } from '../model/appointmentQueries'
 import { useAppointmentMemberProfile } from '../model/memberIntegration'
 
 const route = useRoute()
 const router = useRouter()
-const { locale, t } = useI18n()
+const queryClient = useQueryClient()
+const i18n = useI18n()
+const { locale, t } = i18n
+const hasMessage = (key: string): boolean => i18n.te(key)
 
 const appointmentId = computed(() => {
   const raw = Array.isArray(route.params.appointmentId)
@@ -45,6 +55,11 @@ const membersQuery = useQuery({
   enabled: computed(() => appointmentId.value !== null),
   retry: false,
 })
+const participationQuery = useQuery({
+  ...appointmentParticipationQueryOptions(appointmentId),
+  enabled: computed(() => appointmentId.value !== null),
+  retry: false,
+})
 const appointment = computed(() => detailQuery.data.value)
 const members = computed(() =>
   (membersQuery.data.value ?? appointment.value?.members ?? []).filter(
@@ -55,6 +70,12 @@ const profileQuery = useAppointmentMemberProfile()
 
 const depositSheetOpen = ref(false)
 const menuOpen = ref(false)
+const hasJoined = computed(() => participationQuery.data.value?.joined === true)
+// 조회 실패 시 hasJoined는 false로 남는다. 서버가 최종적으로 중복 참여를
+// 막아주니 데이터는 안전하지만, 그대로 두면 사용자가 결제 시트까지 갔다가
+// 거기서야 오류를 보게 된다. 조회 자체가 실패했을 때는 참여 여부를 확신할 수
+// 없다는 걸 버튼 단계에서 미리 알려준다.
+const participationCheckFailed = computed(() => participationQuery.isError.value)
 
 const statusTone = computed(() =>
   appointment.value?.appointmentStatus === 'RECRUITING' ? 'ongoing' : 'neutral',
@@ -64,6 +85,20 @@ const isJoinAvailable = computed(() => {
   if (appointment.value?.appointmentStatus !== 'RECRUITING') return false
   const deadline = parseServerDateTime(appointment.value.joinDeadline)
   return deadline !== null && Date.now() < deadline.getTime()
+})
+const isJoinButtonEnabled = computed(
+  () => isJoinAvailable.value && !hasJoined.value && !participationCheckFailed.value,
+)
+// 버튼 title 툴팁은 비활성 버튼에 pointer-events-none이 걸려 뜨지 않고,
+// 390px 모바일 PWA라 애초에 hover도 없다. 그래서 비활성 이유는 버튼 아래에
+// 상시 텍스트로 보여준다. 모집 종료(CLOSED/COMPLETED/CANCELLED)는 사용자
+// 잘못이 아닌 정상 상태라 text-danger(빨강)로 알릴 일이 아니어서, 세 경우
+// 모두 중립색(text-ink-3)으로 통일한다.
+const joinDisabledReason = computed(() => {
+  if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
+  if (hasJoined.value) return t('appointment.detail.alreadyJoined')
+  if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
+  return undefined
 })
 const currentMemberId = computed(() => profileQuery.data.value?.memberId)
 const isHost = computed(
@@ -153,10 +188,34 @@ function openReviews(): void {
 function retry(): void {
   void detailQuery.refetch()
   void membersQuery.refetch()
+  void participationQuery.refetch()
 }
 
+const joinMutation = useMutation({
+  mutationFn: () => joinAppointment(appointmentId.value as number),
+  onSuccess: async () => {
+    depositSheetOpen.value = false
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.detail(appointmentId.value) }),
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.members(appointmentId.value) }),
+      queryClient.invalidateQueries({
+        queryKey: appointmentKeys.participation(appointmentId.value),
+      }),
+    ])
+  },
+})
+
+const joinErrorMessage = computed(() =>
+  joinMutation.error.value === null
+    ? undefined
+    : t(appointmentErrorMessageKey(joinMutation.error.value, hasMessage)),
+)
+
 function openDepositSheet(): void {
-  if (isJoinAvailable.value) depositSheetOpen.value = true
+  if (!isJoinButtonEnabled.value) return
+
+  joinMutation.reset()
+  depositSheetOpen.value = true
 }
 
 function closeDepositSheet(): void {
@@ -164,7 +223,7 @@ function closeDepositSheet(): void {
 }
 
 function confirmJoin(): void {
-  depositSheetOpen.value = false
+  if (!joinMutation.isPending.value) joinMutation.mutate()
 }
 </script>
 
@@ -355,10 +414,16 @@ function confirmJoin(): void {
       <div
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
+        <p
+          v-if="joinDisabledReason !== undefined"
+          class="mb-2 text-center text-body-sm text-ink-3"
+        >
+          {{ joinDisabledReason }}
+        </p>
         <AppButton
           block
-          :disabled="!isJoinAvailable"
-          :title="!isJoinAvailable ? t('appointment.detail.joinUnavailable') : undefined"
+          :disabled="!isJoinButtonEnabled"
+          :title="joinDisabledReason"
           @click="openDepositSheet"
         >
           {{ t('appointment.detail.join') }}
@@ -369,7 +434,8 @@ function confirmJoin(): void {
         v-if="depositSheetOpen"
         :appointment-name="appointment.appointmentName"
         :deposit-amount="appointment.depositAmount"
-        confirm-disabled
+        :confirm-disabled="joinMutation.isPending.value"
+        :error-message="joinErrorMessage"
         @close="closeDepositSheet"
         @confirm="confirmJoin"
       />

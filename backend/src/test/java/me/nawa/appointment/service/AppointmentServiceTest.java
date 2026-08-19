@@ -22,6 +22,9 @@ import me.nawa.deposit.domain.DepositPayoutBatch;
 import me.nawa.deposit.domain.ResolutionReason;
 import me.nawa.deposit.mapper.DepositMapper;
 import me.nawa.deposit.mapper.DepositPayoutBatchMapper;
+import me.nawa.journey.domain.Journey;
+import me.nawa.journey.exception.JourneyErrorCode;
+import me.nawa.journey.mapper.JourneyMapper;
 import me.nawa.wallet.domain.SystemWalletCode;
 import me.nawa.wallet.domain.enums.TransferType;
 import me.nawa.wallet.service.WalletTransferService;
@@ -31,9 +34,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,6 +54,12 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AppointmentServiceTest {
+    // 절대 날짜로 고정하면 그 시점이 지나는 순간 activityStartAt이 과거가 되어
+    // validRequest()를 쓰는 테스트가 전부 깨진다. 실행 시점 기준 상대 날짜로 둔다.
+    private static final LocalDate VISIT_DATE = LocalDate.now().plusDays(7);
+    private static final LocalDate JOURNEY_START_DATE = LocalDate.now();
+    private static final LocalDate JOURNEY_END_DATE = VISIT_DATE.plusDays(30);
+
     @Mock
     private AppointmentMapper appointmentMapper;
     @Mock
@@ -56,6 +68,8 @@ class AppointmentServiceTest {
     private DepositPayoutBatchMapper depositPayoutBatchMapper;
     @Mock
     private WalletTransferService walletTransferService;
+    @Mock
+    private JourneyMapper journeyMapper;
     @InjectMocks
     private AppointmentService appointmentService;
 
@@ -63,6 +77,14 @@ class AppointmentServiceTest {
     void createAppointment_success_holdsHostDepositAndBecomesRecruiting() {
         AppointmentCreateRequest request = validRequest();
         when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
         stubInsertAppointment(10L);
         stubInsertAppointmentMember(20L);
         when(depositMapper.insert(any())).thenReturn(1);
@@ -117,6 +139,132 @@ class AppointmentServiceTest {
 
         assertEquals(CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
         verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyNotFound_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_NOT_FOUND, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyNotOwned_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(2L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_FORBIDDEN, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_visitDateOutsideJourneyRange_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(VISIT_DATE.plusDays(60))
+                        .endDate(VISIT_DATE.plusDays(90))
+                        .build()
+        );
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(
+                JourneyErrorCode.JOURNEY_ITEM_DATE_OUT_OF_RANGE,
+                exception.getErrorCode()
+        );
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyItemAlreadyExists_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
+        when(journeyMapper.existsJourneyItem(1L, 100L, VISIT_DATE))
+                .thenReturn(true);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyItemRaceCondition_rejectsRequestAfterInsert() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
+        stubInsertAppointment(10L);
+        org.mockito.Mockito.doThrow(new DuplicateKeyException("duplicate"))
+                .when(journeyMapper).insertConfirmedJourneyItem(any());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointmentMember(any());
+    }
+
+    @Test
+    void createAppointment_activityStartInPast_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        request.setVisitDate(LocalDate.now());
+        request.setActivityStartTime(LocalTime.now().minusMinutes(1));
+        request.setActivityEndTime(LocalTime.now().plusHours(1));
+        request.setJoinDeadline(LocalDateTime.now().minusMinutes(2));
+
+        assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+        verify(appointmentMapper, never()).findAvailableItemType(any());
     }
 
     @Test
@@ -875,9 +1023,11 @@ class AppointmentServiceTest {
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Olive Young N Seongsu");
         request.setMeetingAddress("Seongdong-gu, Seoul");
-        request.setJoinDeadline(LocalDateTime.of(2026, 8, 20, 18, 0));
-        request.setActivityStartAt(LocalDateTime.of(2026, 8, 21, 18, 30));
-        request.setActivityEndAt(LocalDateTime.of(2026, 8, 21, 22, 0));
+        request.setJoinDeadline(LocalDateTime.of(VISIT_DATE, LocalTime.of(17, 30)));
+        request.setTripId(1L);
+        request.setVisitDate(VISIT_DATE);
+        request.setActivityStartTime(LocalTime.of(18, 30));
+        request.setActivityEndTime(LocalTime.of(22, 0));
         return request;
     }
 
@@ -897,9 +1047,9 @@ class AppointmentServiceTest {
                 .depositAmount(BigDecimal.valueOf(10_000))
                 .appointmentStatus(status)
                 .meetingPlace("Olive Young N Seongsu")
-                .activityStartAt(LocalDateTime.of(2026, 8, 21, 18, 30))
-                .activityEndAt(LocalDateTime.of(2026, 8, 21, 22, 0))
-                .joinDeadline(LocalDateTime.of(2026, 8, 20, 18, 0))
+                .activityStartAt(LocalDateTime.of(VISIT_DATE, LocalTime.of(18, 30)))
+                .activityEndAt(LocalDateTime.of(VISIT_DATE, LocalTime.of(22, 0)))
+                .joinDeadline(LocalDateTime.of(VISIT_DATE.minusDays(1), LocalTime.of(18, 0)))
                 .build();
     }
 

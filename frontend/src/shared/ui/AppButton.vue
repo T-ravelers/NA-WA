@@ -10,7 +10,7 @@ import { useI18n } from 'vue-i18n'
  *
  * 시안 실측: primary h52 · 나머지 h48 · 라운드 12.
  */
-type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'settle'
+type ButtonVariant = 'primary' | 'secondary' | 'secondary-on-paper' | 'tertiary' | 'settle'
 
 interface Props {
   variant?: ButtonVariant
@@ -52,6 +52,9 @@ const { t } = useI18n()
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
   primary: 'rounded-sm bg-paper-fill text-on-paper',
   secondary: 'rounded-sm border border-hairline-strong bg-transparent text-ink',
+  // `paper`/`paper-fill` 카드 위(밝은 바탕)에 놓이는 보조 버튼 전용. `secondary`의
+  // `text-ink`는 어두운 캔버스 기준 흰 글자라 밝은 카드 위에서는 거의 안 보인다.
+  'secondary-on-paper': 'rounded-sm border border-hairline-strong bg-transparent text-on-paper',
   tertiary: 'text-ink underline underline-offset-4',
   settle: 'rounded-sm bg-settlement text-on-paper',
 }
@@ -59,6 +62,7 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
 const HEIGHT_CLASS: Record<ButtonVariant, string> = {
   primary: 'h-13',
   secondary: 'h-12',
+  'secondary-on-paper': 'h-12',
   tertiary: 'h-11',
   settle: 'h-12',
 }

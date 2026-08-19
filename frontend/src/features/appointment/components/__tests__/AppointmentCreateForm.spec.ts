@@ -24,9 +24,9 @@ async function fillSettings(wrapper: ReturnType<typeof mount>): Promise<void> {
 }
 
 async function fillSchedule(wrapper: ReturnType<typeof mount>): Promise<void> {
-  await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T18:30')
-  await wrapper.findAll('input[type="datetime-local"]')[1]?.setValue('2026-08-08T22:00')
-  await wrapper.findAll('input[type="datetime-local"]')[2]?.setValue('2026-08-08T17:30')
+  await wrapper.find('input[type="time"]').setValue('18:30')
+  await wrapper.findAll('input[type="time"]')[1]?.setValue('22:00')
+  await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T17:30')
 }
 
 describe('AppointmentCreateForm', () => {
@@ -73,7 +73,7 @@ describe('AppointmentCreateForm', () => {
 
   it('emits a normalized request after confirming valid details', async () => {
     const wrapper = mount(AppointmentCreateForm, {
-      props: { itemId: 42, itemType: 'EVENT' },
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
       global: { plugins: [i18n] },
     })
 
@@ -91,6 +91,8 @@ describe('AppointmentCreateForm', () => {
     expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({
       itemId: 42,
       itemType: 'EVENT',
+      tripId: 7,
+      visitDate: '2026-08-08',
       languageCode: 'en',
       appointmentName: 'Seongsu K-Beauty Tour',
       maxMembers: 4,
@@ -98,9 +100,67 @@ describe('AppointmentCreateForm', () => {
       depositAmount: '10000',
       meetingPlace: 'Seongsu Beauty Lab',
       meetingAddress: undefined,
-      activityStartAt: '2026-08-08T18:30:00',
-      activityEndAt: '2026-08-08T22:00:00',
+      activityStartTime: '18:30:00',
+      activityEndTime: '22:00:00',
     })
+  })
+
+  it('clears a basics validation error once the user starts fixing it', async () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT' },
+      global: { plugins: [i18n] },
+    })
+
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.text()).toContain('Enter an appointment name.')
+
+    await wrapper
+      .find('input[placeholder="e.g. Seongsu K-Beauty Tour"]')
+      .setValue('Seongsu K-Beauty Tour')
+
+    expect(wrapper.text()).not.toContain('Enter an appointment name.')
+  })
+
+  it('clears a settings validation error once the user starts fixing it', async () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'PLACE' },
+      global: { plugins: [i18n] },
+    })
+
+    await fillBasics(wrapper)
+    await wrapper.find('input[inputmode="numeric"]').setValue('0')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.text()).toContain('Choose a deposit between ₩5,000 and ₩50,000.')
+
+    await wrapper.find('input[inputmode="numeric"]').setValue('10000')
+
+    expect(wrapper.text()).not.toContain('Choose a deposit between ₩5,000 and ₩50,000.')
+  })
+
+  it('clears a schedule validation error once the user starts fixing it', async () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
+      global: { plugins: [i18n] },
+    })
+
+    await fillBasics(wrapper)
+    await fillSettings(wrapper)
+    await wrapper.get('form').trigger('submit')
+
+    await wrapper.find('input[type="time"]').setValue('18:30')
+    // 종료가 시작보다 늦지 않아 endAfterStart 에러가 나야 하는 값.
+    await wrapper.findAll('input[type="time"]')[1]?.setValue('18:30')
+    await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T17:30')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.text()).toContain('The end time must be after the start time.')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+
+    await wrapper.findAll('input[type="time"]')[1]?.setValue('22:00')
+
+    expect(wrapper.text()).not.toContain('The end time must be after the start time.')
   })
 
   it('rejects a deposit outside the configured range', async () => {

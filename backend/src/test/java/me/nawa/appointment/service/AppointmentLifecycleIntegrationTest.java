@@ -110,7 +110,7 @@ class AppointmentLifecycleIntegrationTest {
         long notYetDueId = insertAppointment(eventId, "RECRUITING",
                 LocalDateTime.now().plusDays(1), LocalDateTime.now().plusDays(2));
 
-        appointmentMapper.closeExpiredRecruitingAppointments();
+        appointmentMapper.closeExpiredRecruitingAppointments(LocalDateTime.now());
 
         assertEquals("CLOSED", appointmentStatus(expiredId));
         assertEquals("RECRUITING", appointmentStatus(notYetDueId));
@@ -124,7 +124,7 @@ class AppointmentLifecycleIntegrationTest {
         long notYetDueId = insertAppointment(eventId, "CLOSED",
                 LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1));
 
-        appointmentMapper.startDueClosedAppointments();
+        appointmentMapper.startDueClosedAppointments(LocalDateTime.now());
 
         assertEquals("IN_PROGRESS", appointmentStatus(dueId));
         assertEquals("CLOSED", appointmentStatus(notYetDueId));

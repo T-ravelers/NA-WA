@@ -1,6 +1,7 @@
 package me.nawa.journey.controller;
 
 import io.swagger.annotations.ApiOperation;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import me.nawa.auth.security.AuthenticatedMember;
@@ -8,11 +9,13 @@ import me.nawa.common.response.ApiResponse;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyUpdateRequest;
+import me.nawa.journey.dto.response.JourneyItemExistsResponse;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineResponse;
 import me.nawa.journey.dto.response.JourneySummaryResponse;
 import me.nawa.journey.service.JourneyService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -91,6 +95,26 @@ public class JourneyController {
     ) {
         return ApiResponse.success(
             journeyService.getJourney(member.getMemberId(), tripId)
+        );
+    }
+
+    @GetMapping("/{tripId}/items/exists")
+    @ApiOperation("Journey 항목·방문 날짜 조합 중복 확인")
+    public ApiResponse<JourneyItemExistsResponse> existsJourneyItem(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long tripId,
+        @RequestParam Long itemId,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate visitDate
+    ) {
+        return ApiResponse.success(
+            JourneyItemExistsResponse.builder()
+                .exists(journeyService.existsJourneyItem(
+                    member.getMemberId(),
+                    tripId,
+                    itemId,
+                    visitDate
+                ))
+                .build()
         );
     }
 

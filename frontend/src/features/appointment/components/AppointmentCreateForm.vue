@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import AmountInput from '@/shared/ui/AmountInput.vue'
@@ -27,6 +27,9 @@ import {
 interface Props {
   itemId?: number
   itemType?: AppointmentItemType
+  /** 약속을 확정할 여정. 여정·날짜 선택 시트를 마친 뒤에만 이 폼이 렌더링된다. */
+  tripId?: number
+  visitDate?: string
   pending?: boolean
   errorMessage?: string
 }
@@ -34,6 +37,8 @@ interface Props {
 const {
   itemId = undefined,
   itemType = undefined,
+  tripId = undefined,
+  visitDate = '',
   pending = false,
   errorMessage = undefined,
 } = defineProps<Props>()
@@ -47,16 +52,59 @@ const confirmationOpen = ref(false)
 const draft = reactive<AppointmentFormDraft>({
   itemId,
   itemType,
+  tripId,
+  visitDate,
   appointmentName: '',
   maxMembers: 4,
   languageCode: 'en',
   depositAmount: null,
   meetingPlace: '',
   meetingAddress: '',
-  activityStartAt: '',
-  activityEndAt: '',
+  activityStartTime: '',
+  activityEndTime: '',
   joinDeadline: '',
 })
+
+// tripId·itemId·itemType는 이 폼이 렌더링된 뒤 바뀌지 않지만, visitDate는 날짜
+// 충돌로 제출이 실패했을 때 폼을 유지한 채 부모가 다시 고르게 할 수 있다 — 그
+// 경우에만 draft에 반영되도록 prop 변화를 지켜본다.
+watch(
+  () => visitDate,
+  (value) => {
+    draft.visitDate = value
+  },
+)
+
+// 같은 스텝 안의 필드들은 서로 맞물려 검증되는 경우가 있다(예: 종료가 시작보다
+// 늦어야 함, 마감이 시작보다 빨라야 함). 제출 실패로 에러가 뜬 뒤 관련 필드
+// 중 하나라도 고치기 시작하면, 다음 제출 전까지 오래된 에러 문구가 그대로
+// 남아있지 않게 그 스텝의 에러를 지운다 — 다시 제출하면 해당 validate가 새로
+// 채운다.
+function clearErrorsOnEdit(
+  source: () => unknown[],
+  keys: readonly (keyof AppointmentFormErrors)[],
+): void {
+  watch(source, () => {
+    if (keys.every((key) => errors.value[key] === undefined)) return
+
+    const cleared = { ...errors.value }
+    for (const key of keys) cleared[key] = undefined
+    errors.value = cleared
+  })
+}
+
+clearErrorsOnEdit(
+  () => [draft.appointmentName, draft.maxMembers, draft.languageCode],
+  ['appointmentName', 'maxMembers', 'languageCode'],
+)
+clearErrorsOnEdit(
+  () => [draft.depositAmount, draft.meetingPlace],
+  ['depositAmount', 'meetingPlace'],
+)
+clearErrorsOnEdit(
+  () => [draft.activityStartTime, draft.activityEndTime, draft.joinDeadline],
+  ['activityStartTime', 'activityEndTime', 'joinDeadline'],
+)
 
 const languageOptions: AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
 const memberOptions = Array.from(
@@ -316,18 +364,21 @@ defineExpose({ goToPreviousStep })
         <h2 class="font-display text-section-header text-ink-display">
           {{ t('appointment.create.scheduleHeading') }}
         </h2>
+        <p class="text-body-sm text-ink-3">
+          {{ t('appointment.create.visitDateNote', { date: draft.visitDate }) }}
+        </p>
         <div class="grid gap-4">
           <TextInput
-            v-model="draft.activityStartAt"
-            type="datetime-local"
+            v-model="draft.activityStartTime"
+            type="time"
             :label="t('appointment.create.startAt')"
-            :error="translatedError(errors.activityStartAt)"
+            :error="translatedError(errors.activityStartTime)"
           />
           <TextInput
-            v-model="draft.activityEndAt"
-            type="datetime-local"
+            v-model="draft.activityEndTime"
+            type="time"
             :label="t('appointment.create.endAt')"
-            :error="translatedError(errors.activityEndAt)"
+            :error="translatedError(errors.activityEndTime)"
           />
           <TextInput
             v-model="draft.joinDeadline"
@@ -398,7 +449,7 @@ defineExpose({ goToPreviousStep })
       <div class="mt-5 grid grid-cols-2 gap-3">
         <AppButton
           block
-          variant="secondary"
+          variant="secondary-on-paper"
           @click="cancelConfirmation"
         >
           {{ t('appointment.create.cancel') }}

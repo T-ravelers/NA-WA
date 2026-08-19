@@ -113,6 +113,44 @@ PUT /api/v1/journeys/{tripId}
 | 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
 | 409 | `JOURNEY-009` | 변경 기간 밖에 활성 일정 항목이 존재함 |
 
+## Journey 항목·방문 날짜 조합 중복 확인
+
+```http
+GET /api/v1/journeys/{tripId}/items/exists?itemId={itemId}&visitDate={visitDate}
+```
+
+- 약속 생성 폼의 날짜 선택 단계에서, 선택하려는 `(tripId, itemId, visitDate)`
+  조합이 이미 `trip_items`에 있는지 미리 확인하기 위한 조회 전용 API입니다.
+- 인증 회원이 소유한 Journey만 조회할 수 있습니다.
+- `visitDate`는 `yyyy-MM-dd` 형식입니다.
+- 이 API는 조회만 하며 아무것도 저장하지 않습니다. 실제 확정은
+  `POST /api/v1/appointments`([APPOINTMENT_DEPOSIT_STATE_MACHINE.md](APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
+  참고)가 같은 트랜잭션에서 처리하므로, 이 조회와 실제 약속 생성 사이의 시간차
+  동안 다른 세션이 같은 조합을 먼저 확정하면 최종 생성 요청이 `JOURNEY-004`로
+  거부될 수 있습니다.
+
+### 성공 응답
+
+`200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "exists": false
+  }
+}
+```
+
+### 오류 코드
+
+| HTTP | 오류 코드 | 발생 조건 |
+| ---: | --- | --- |
+| 400 | `COMMON-001` | `itemId`가 숫자가 아니거나 `visitDate`가 `yyyy-MM-dd` 형식이 아니거나 누락됨(Spring이 컨트롤러 진입 전에 파라미터 바인딩에서 거부) |
+| 400 | `JOURNEY-003` | `itemId`가 파싱은 되지만 0 이하로 유효하지 않음 |
+| 403 | `JOURNEY-002` | 다른 회원이 소유한 Journey 조회 요청 |
+| 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
+
 ## Journey 개별 일정 삭제
 
 ```http

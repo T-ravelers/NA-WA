@@ -7,8 +7,12 @@
 
 ## 공통 정책
 
-- 날짜와 시각은 `yyyy-MM-dd'T'HH:mm:ss` 형식의 문자열을 사용합니다.
+- 날짜와 시각은 `yyyy-MM-dd'T'HH:mm:ss` 형식의 문자열을 사용합니다. 단, 약속
+  생성 요청의 `visitDate`는 `yyyy-MM-dd`, `activityStartTime`/
+  `activityEndTime`은 `HH:mm:ss`(시각만)입니다.
 - 약속 대상 `itemType`은 `EVENT`, `PLACE` 중 하나입니다.
+- 약속은 항상 여정(Journey) 항목 하나에 연결되어 생성됩니다. 여정 없이 만드는
+  경로는 없습니다.
 - 지원 언어는 `en`, `ja`, `zh-TW`, `vi`입니다.
 - `maxMembers`는 방장을 포함하여 2명 이상 10명 이하입니다.
 - 보증금은 5,000원 이상 50,000원 이하의 정수 금액입니다.
@@ -125,6 +129,8 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 {
   "itemId": 100,
   "itemType": "EVENT",
+  "tripId": 20,
+  "visitDate": "2026-08-21",
   "languageCode": "en",
   "appointmentName": "Seongsu K-Beauty Tour",
   "maxMembers": 5,
@@ -132,14 +138,28 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
   "depositAmount": 10000,
   "meetingPlace": "Olive Young N Seongsu",
   "meetingAddress": "Seongdong-gu, Seoul",
-  "activityStartAt": "2026-08-21T18:30:00",
-  "activityEndAt": "2026-08-21T22:00:00"
+  "activityStartTime": "18:30:00",
+  "activityEndTime": "22:00:00"
 }
 ```
 
-참여 마감은 활동 시작 시각보다 늦을 수 없으며, 활동 시작 시각은 종료 시각보다
-빨라야 합니다. 성공하면 방장의 보증금을 즉시 예치(`DEPOSIT_HOLD`)하고 약속을
-`RECRUITING` 상태로 생성합니다.
+`tripId`는 이 약속을 확정할 Journey입니다. `visitDate`는 그 Journey 안에서
+활동이 이루어지는 방문 날짜이며, `activityStartTime`/`activityEndTime`은
+`visitDate` 하루 위에서의 시각만 받습니다 — 서버가 둘을 합쳐 실제
+`activity_start_at`/`activity_end_at`을 만들므로, 활동 시작·종료는 항상 같은
+날짜 안에서만 성립합니다.
+
+`tripId`는 요청 회원이 소유한 Journey여야 하고, `visitDate`는 그 Journey의
+`startDate`~`endDate` 안이어야 하며, 같은 `(tripId, itemId, visitDate)`
+조합이 이미 있으면 안 됩니다 — 위반 시 각각 `JOURNEY-002`, `JOURNEY-007`,
+`JOURNEY-004`를 반환합니다([JOURNEY_API.md](./JOURNEY_API.md) 참고). 참여
+마감은 조립된 활동 시작 시각보다 늦을 수 없고, 활동 시작 시각은 종료 시각보다
+빨라야 하며 현재 시각 이후여야 합니다.
+
+성공하면 방장의 보증금을 즉시 예치(`DEPOSIT_HOLD`)하고 약속을 `RECRUITING`
+상태로 생성하는 것과 같은 트랜잭션에서, 해당 Journey 항목(`trip_items`)을
+`ADDED`를 거치지 않고 곧바로 `CONFIRMED`로 만듭니다. `appointment_id`와
+`confirmed_at`이 이때 채워집니다.
 
 ## 참여 요청과 취소
 

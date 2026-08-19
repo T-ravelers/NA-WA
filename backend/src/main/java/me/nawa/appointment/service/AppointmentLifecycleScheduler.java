@@ -1,5 +1,6 @@
 package me.nawa.appointment.service;
 
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,7 +28,12 @@ public class AppointmentLifecycleScheduler {
     @Scheduled(fixedDelay = 60_000)
     @Transactional
     public void advanceLifecycle() {
-        appointmentMapper.closeExpiredRecruitingAppointments();
-        appointmentMapper.startDueClosedAppointments();
+        // DB의 CURRENT_TIMESTAMP 대신 애플리케이션 시각을 넘긴다. join_deadline·
+        // activity_start_at 모두 애플리케이션이 LocalDateTime.now()로 저장한
+        // 값이라, DB 서버 컨테이너의 시간대가 다르면 CURRENT_TIMESTAMP 비교가
+        // 어긋난다.
+        LocalDateTime now = LocalDateTime.now();
+        appointmentMapper.closeExpiredRecruitingAppointments(now);
+        appointmentMapper.startDueClosedAppointments(now);
     }
 }

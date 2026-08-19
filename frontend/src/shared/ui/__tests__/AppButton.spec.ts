@@ -27,6 +27,15 @@ describe('AppButton', () => {
     expect(mountButton({ variant }).get('button').classes()).toContain(expected)
   })
 
+  // paper 카드 위(밝은 바탕)의 보조 버튼은 secondary의 text-ink(밝은 캔버스 기준
+  // 흰 글자) 대신 어두운 text-on-paper를 써야 읽힌다.
+  it('draws the secondary-on-paper variant with paper-safe text color', () => {
+    const classes = mountButton({ variant: 'secondary-on-paper' }).get('button').classes()
+
+    expect(classes).toContain('text-on-paper')
+    expect(classes).not.toContain('text-ink')
+  })
+
   it('keeps the minimum touch target for dense buttons', () => {
     expect(mountButton({ dense: true }).get('button').classes()).toContain('h-11')
   })

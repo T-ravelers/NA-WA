@@ -173,6 +173,19 @@ export async function fetchJourneys(): Promise<JourneySummary[]> {
   return response.data
 }
 
+export async function checkJourneyItemExists(
+  tripId: number,
+  itemId: number,
+  visitDate: string,
+): Promise<boolean> {
+  const response = await httpClient.get<{ exists: boolean }>(
+    `/api/v1/journeys/${tripId}/items/exists`,
+    { params: { itemId, visitDate } },
+  )
+
+  return response.data.exists
+}
+
 export async function addJourneyItem(
   journeyId: number,
   request: JourneyItemAddRequest,

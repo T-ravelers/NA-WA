@@ -13,8 +13,9 @@ import {
   handleSignOutBarrier,
 } from '@/app/session/sessionHandlers'
 import { useMyOngoingAppointmentsQuery } from '@/features/appointment/composables/useMyOngoingAppointmentsQuery'
+import { appointmentJourneyIntegrationKey } from '@/features/appointment/model/journeyIntegration'
 import { appointmentMemberIntegrationKey } from '@/features/appointment/model/memberIntegration'
-import { addJourneyItem } from '@/features/journey/api/journeyApi'
+import { addJourneyItem, checkJourneyItemExists } from '@/features/journey/api/journeyApi'
 import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
 import { parseJourneyRouteQuery } from '@/features/journey/model/journeyRouteQuery'
 import {
@@ -63,6 +64,10 @@ app.provide(exploreJourneyIntegrationKey, {
 app.provide(appointmentMemberIntegrationKey, {
   useMemberProfile,
   useMemberStats: useMemberAppointmentProfile,
+})
+app.provide(appointmentJourneyIntegrationKey, {
+  useJourneyListQuery,
+  checkJourneyItemExists,
 })
 app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
 app.provide(walletAppointmentIntegrationKey, { useMyOngoingAppointmentsQuery })

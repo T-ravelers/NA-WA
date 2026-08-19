@@ -1,5 +1,9 @@
 export default {
   appointment: {
+    errorCode: {
+      'APPOINTMENT-002': 'This appointment is not open for joining.',
+      'APPOINTMENT-003': 'You have already joined this appointment.',
+    },
     list: {
       title: 'Appointments',
       titleEvent: 'Appointments for this event',
@@ -57,6 +61,7 @@ export default {
       meetingAddress: 'Meeting address (optional)',
       meetingAddressPlaceholder: 'e.g. 26-14 Wangsimni-ro 4-gil, Seoul',
       meetingAddressHelper: 'Add a street address or landmark to make the meeting point clear.',
+      visitDateNote: 'This activity happens on {date}, based on the journey day you chose.',
       startAt: 'Activity starts',
       endAt: 'Activity ends',
       joinDeadline: 'Join deadline',
@@ -66,6 +71,11 @@ export default {
       confirm: 'Confirm',
       cancel: 'Cancel',
       close: 'Close confirmation',
+      exitConfirmTitle: 'Leave without creating?',
+      exitConfirmDescription:
+        'Your appointment has not been created yet. If you leave now, this progress will be lost.',
+      exitConfirmStay: 'Stay',
+      exitConfirmLeave: 'Leave',
       loadFailed: 'Appointment could not be created. Please try again.',
       validation: {
         itemContext: 'Open this form from an Event or Place.',
@@ -76,10 +86,45 @@ export default {
         depositInvalid: 'Choose a deposit between ₩5,000 and ₩50,000.',
         meetingPlaceRequired: 'Enter a meeting place.',
         startRequired: 'Choose a start time.',
+        startInPast: 'Choose a start time later than now.',
         endRequired: 'Choose an end time.',
         endAfterStart: 'The end time must be after the start time.',
         deadlineRequired: 'Choose a join deadline.',
         deadlineBeforeStart: 'The join deadline must be before the activity starts.',
+      },
+    },
+    journeySelect: {
+      close: 'Close journey selector',
+      back: 'Go back',
+      title: 'Choose a journey',
+      description: 'Choose a journey for this appointment.',
+      loading: 'Loading your journeys…',
+      error: 'We could not load your journeys. Please try again.',
+      empty: 'Create a journey before creating this appointment.',
+      createJourney: 'Create a journey',
+    },
+    journeyDate: {
+      close: 'Close date picker',
+      back: 'Go back',
+      title: 'Which day?',
+      description: 'Choose a day within {journey}.',
+      previousMonth: 'Previous month',
+      nextMonth: 'Next month',
+      chooseDate: 'Choose a date',
+      selectDate: 'Select {date}',
+      apply: 'Continue with {date}',
+      alreadyLinked: 'This activity is already linked to an appointment on this day.',
+      checkFailed: 'We could not check this date. Please try again.',
+    },
+    calendar: {
+      weekdays: {
+        sun: 'S',
+        mon: 'M',
+        tue: 'T',
+        wed: 'W',
+        thu: 'T',
+        fri: 'F',
+        sat: 'S',
       },
     },
     detail: {
@@ -95,6 +140,8 @@ export default {
       join: 'Join appointment',
       cancelParticipation: 'Cancel participation',
       joinUnavailable: 'This appointment is not open for joining.',
+      alreadyJoined: 'You have already joined this appointment.',
+      participationCheckFailed: 'We could not check your participation status. Please try again.',
       attendance: 'Confirm attendance',
       openMenu: 'Open appointment menu',
       menu: {
@@ -151,7 +198,8 @@ export default {
       close: 'Close deposit confirmation',
       description: 'A deposit is required to secure your place in {name}.',
       refundable: 'Refundable deposit',
-      paymentPending: 'Payment integration is required before participation can be confirmed.',
+      paymentPending:
+        'The deposit will be held from your wallet balance and refunded once you attend. If you no-show, your deposit is forfeited and shared among the members who attended.',
       confirm: 'Pay ₩{amount}',
       cancel: 'Cancel',
     },
