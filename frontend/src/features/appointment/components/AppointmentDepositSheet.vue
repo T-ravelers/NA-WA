@@ -7,9 +7,15 @@ interface Props {
   appointmentName: string
   depositAmount: string
   confirmDisabled?: boolean
+  errorMessage?: string
 }
 
-const { appointmentName, depositAmount, confirmDisabled = true } = defineProps<Props>()
+const {
+  appointmentName,
+  depositAmount,
+  confirmDisabled = false,
+  errorMessage = undefined,
+} = defineProps<Props>()
 
 const emit = defineEmits<{
   close: []
@@ -62,6 +68,13 @@ function formatDeposit(value: string): string {
 
       <p class="mt-3 text-caption text-on-paper/60">
         {{ t('appointment.deposit.paymentPending') }}
+      </p>
+
+      <p
+        v-if="errorMessage !== undefined"
+        class="mt-3 text-body-sm text-danger"
+      >
+        {{ errorMessage }}
       </p>
 
       <div class="mt-5 grid grid-cols-2 gap-3">

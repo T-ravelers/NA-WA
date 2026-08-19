@@ -1,5 +1,9 @@
 export default {
   appointment: {
+    errorCode: {
+      'APPOINTMENT-002': 'This appointment is not open for joining.',
+      'APPOINTMENT-003': 'You have already joined this appointment.',
+    },
     list: {
       title: 'Appointments',
       titleEvent: 'Appointments for this event',
@@ -136,6 +140,7 @@ export default {
       join: 'Join appointment',
       cancelParticipation: 'Cancel participation',
       joinUnavailable: 'This appointment is not open for joining.',
+      alreadyJoined: 'You have already joined this appointment.',
       attendance: 'Confirm attendance',
       openMenu: 'Open appointment menu',
       menu: {
@@ -192,7 +197,8 @@ export default {
       close: 'Close deposit confirmation',
       description: 'A deposit is required to secure your place in {name}.',
       refundable: 'Refundable deposit',
-      paymentPending: 'Payment integration is required before participation can be confirmed.',
+      paymentPending:
+        'The deposit will be held from your wallet balance and refunded after the appointment.',
       confirm: 'Pay ₩{amount}',
       cancel: 'Cancel',
     },
