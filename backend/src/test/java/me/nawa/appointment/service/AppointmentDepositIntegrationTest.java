@@ -21,6 +21,7 @@ import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentCreateRequest;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.mapper.AppointmentMapper;
+import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.deposit.domain.AttendanceStatus;
 import me.nawa.deposit.domain.Deposit;
 import me.nawa.deposit.domain.DepositPayoutBatch;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
@@ -59,6 +61,7 @@ import org.springframework.jdbc.support.KeyHolder;
  * 아니라, 성공 경로의 SQL이 실제 스키마에서 그대로 동작하고 최종 상태가 맞는지가
  * 이 테스트의 목적이다.
  */
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
     named = "RUN_MYSQL_INTEGRATION_TESTS",
     matches = "(?i)true"

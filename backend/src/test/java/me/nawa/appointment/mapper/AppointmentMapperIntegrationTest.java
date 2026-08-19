@@ -3,11 +3,13 @@ package me.nawa.appointment.mapper;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import me.nawa.appointment.domain.MyOngoingAppointment;
+import me.nawa.config.MySqlSchemaExtension;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
@@ -26,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *
  * 모든 테스트는 rollback-only 트랜잭션 안에서 돌므로 데이터가 남지 않는다.
  */
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
         named = "RUN_MYSQL_INTEGRATION_TESTS",
         matches = "(?i)true"

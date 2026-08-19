@@ -18,6 +18,7 @@ import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentCreateRequest;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.appointment.service.AppointmentService;
+import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.deposit.domain.AttendanceStatus;
 import me.nawa.deposit.domain.DepositPayout;
 import me.nawa.deposit.domain.DepositPayoutBatch;
@@ -39,6 +40,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
@@ -52,6 +54,7 @@ import org.springframework.jdbc.support.KeyHolder;
  * 환급되고, 노쇼 회원의 보증금은 출석 회원에게 분배되어 최종적으로 DEPOSIT_POOL
  * 잔액이 0으로 돌아오는지 확인한다.
  */
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
     named = "RUN_MYSQL_INTEGRATION_TESTS",
     matches = "(?i)true"

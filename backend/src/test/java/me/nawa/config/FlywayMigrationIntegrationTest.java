@@ -4,6 +4,7 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -14,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
         named = "RUN_MYSQL_INTEGRATION_TESTS",
         matches = "(?i)true"
@@ -21,16 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FlywayMigrationIntegrationTest {
     @Test
     void migrations_applyThroughLatestVersion() {
-        Flyway flyway = Flyway.configure()
-                .dataSource(
-                        requiredEnvironment("DATABASE_URL"),
-                        requiredEnvironment("DATABASE_USERNAME"),
-                        requiredEnvironment("DATABASE_PASSWORD")
-                )
-                .locations("classpath:db/migration")
-                .load();
-
-        flyway.migrate();
+        // 마이그레이션 적용은 MySqlSchemaExtension이 이 클래스가 시작되기 전에
+        // 이미 끝냈다(#278). 여기서는 그 결과만 검증한다.
+        Flyway flyway = MySqlIntegrationSchema.flyway();
 
         // 최신 버전을 리터럴로 하드코딩하면 새 마이그레이션이 추가될 때마다
         // 이 값을 함께 올려야 하는데, V13 도입(#254) 때 놓쳐서 게이트 ON
@@ -239,15 +234,5 @@ class FlywayMigrationIntegrationTest {
                 return resultSet.getString(1);
             }
         }
-    }
-
-    private static String requiredEnvironment(String name) {
-        String value = System.getenv(name);
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException(
-                    name + " is required for MySQL integration tests"
-            );
-        }
-        return value;
     }
 }
