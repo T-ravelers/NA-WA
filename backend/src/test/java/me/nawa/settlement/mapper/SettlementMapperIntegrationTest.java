@@ -222,11 +222,12 @@ class SettlementMapperIntegrationTest {
     }
 
     /**
-     * 사진이 저장소에서 사라진 것을 알아챈 시각을 남기고, 그 뒤로는 조회에서 빠지는지 본다.
-     * 두 번째 호출이 0을 돌려주는 것은 처음 알아챈 시각이 덮어써지지 않는다는 뜻이다.
+     * 만료로 표시한 뒤에도 행은 계속 조회돼야 한다. 여기서 걸러 버리면 처음 알아챈 한 명만
+     * "사라졌다"는 답을 받고 나머지 참여자는 "처음부터 없었다"와 구분할 수 없게 된다.
+     * 두 번째 markExpired가 0을 돌려주는 것은 처음 알아챈 시각이 덮어써지지 않는다는 뜻이다.
      */
     @Test
-    void markExpired_onceMarked_isHiddenFromViewerAndNotMarkedAgain() {
+    void markExpired_onceMarked_stillVisibleWithTimestampAndNotMarkedAgain() {
         Fixture fixture = createFixture();
         try {
             Settlement settlement = settlement(fixture);
@@ -239,15 +240,17 @@ class SettlementMapperIntegrationTest {
 
             assertEquals(1, receiptMapper.markExpired(draft.getSettlementReceiptId()));
 
-            assertNotNull(jdbcTemplate.queryForObject(
-                "SELECT deleted_at FROM settlement_receipts WHERE settlement_receipt_id = ?",
-                java.sql.Timestamp.class,
-                draft.getSettlementReceiptId()
-            ));
-            assertNull(receiptMapper.findBySettlementIdForViewer(
+            SettlementReceipt expired = receiptMapper.findBySettlementIdForViewer(
                 settlement.getSettlementId(), fixture.memberId()
-            ));
+            );
+            assertNotNull(expired);
+            assertNotNull(expired.getDeletedAt());
             assertEquals(0, receiptMapper.markExpired(draft.getSettlementReceiptId()));
+
+            // 만료된 뒤에도 비참여자에게는 여전히 보이지 않아야 한다.
+            assertNull(receiptMapper.findBySettlementIdForViewer(
+                settlement.getSettlementId(), fixture.memberId() + 1
+            ));
         } finally {
             deleteFixture(fixture);
         }

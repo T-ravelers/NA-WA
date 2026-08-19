@@ -1,6 +1,7 @@
 package me.nawa.settlement.service;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.storage.ReceiptStorageService;
 import me.nawa.common.storage.StoredReceipt;
@@ -220,6 +221,29 @@ class SettlementReceiptServiceTest {
         assertEquals(
             SettlementErrorCode.SETTLEMENT_RECEIPT_EXPIRED, exception.getErrorCode()
         );
+    }
+
+    /**
+     * 두 번째 조회부터가 진짜 문제다. 이미 만료로 기록된 행이면 저장소를 부르지 않고 바로
+     * 만료로 답해야 한다. 참여자마다 다른 코드를 받으면 구분해 알려주려던 목적이 깨진다.
+     */
+    @Test
+    void getReceipt_alreadyMarkedExpired_throwsExpiredWithoutCallingStorage() {
+        SettlementReceipt expired = receiptRow();
+        expired.setDeletedAt(LocalDateTime.now());
+        when(settlementReceiptMapper.findBySettlementIdForViewer(SETTLEMENT_ID, MEMBER_ID))
+            .thenReturn(expired);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class, () -> service.getReceipt(MEMBER_ID, SETTLEMENT_ID)
+        );
+
+        assertEquals(
+            SettlementErrorCode.SETTLEMENT_RECEIPT_EXPIRED, exception.getErrorCode()
+        );
+        verifyNoInteractions(receiptStorageService);
+        // 이미 남아 있는 시각을 덮어쓰지 않는다.
+        verify(settlementReceiptMapper, never()).markExpired(anyLong());
     }
 
     /** 저장소 자체가 죽은 것은 만료가 아니다. 행을 만료로 표시하면 안 된다. */

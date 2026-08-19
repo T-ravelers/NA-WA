@@ -69,6 +69,12 @@ public class SettlementReceiptServiceImpl implements SettlementReceiptService {
         if (receipt == null) {
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_RECEIPT_NOT_FOUND);
         }
+        // 이미 사라진 것으로 기록된 사진이면 저장소를 부를 필요가 없다. 참여자 누구에게나
+        // 같은 답이 나가야 하므로, 처음 알아챈 사람에게만 만료를 알려주고 나머지에게는
+        // "영수증 없음"으로 답하는 일이 없게 여기서 먼저 걸러낸다.
+        if (receipt.getDeletedAt() != null) {
+            throw new BusinessException(SettlementErrorCode.SETTLEMENT_RECEIPT_EXPIRED);
+        }
         try {
             return receiptStorageService.download(receipt.getObjectKey());
         } catch (NoSuchKeyException exception) {
