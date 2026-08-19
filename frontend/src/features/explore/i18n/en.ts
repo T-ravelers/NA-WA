@@ -1,6 +1,6 @@
 export default {
   explore: {
-    title: 'Discover',
+    title: 'Explore',
     tabs: {
       events: 'Events',
       places: 'Places',
