@@ -501,4 +501,34 @@ describe('SettlementCreateView', () => {
 
     expect(wrapper.find('[data-action="create"]').exists()).toBe(true)
   })
+
+  it('shows what each person owes and what is actually requested', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '12.50', quantity: '2' })
+    await allocate(wrapper, 0, '12', '1')
+    await allocate(wrapper, 0, '19', '1')
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    expect(wrapper.get('[data-share-for="12"]').text()).toContain('12.5')
+    expect(wrapper.get('[data-share-for="19"]').text()).toContain('12.5')
+
+    // 원결제자(12)는 자기 자신에게 청구하지 않는다. 25 중 12.5만 요청한다.
+    expect(wrapper.get('[data-testid="request-total"]').text()).toContain('12.5')
+    expect(wrapper.get('[data-action="create"]').text()).toContain('12.5')
+  })
+
+  it('does not invent per-person amounts for an even split', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 나머지를 누가 더 낼지는 통화 단위에 달려 있어 화면이 알 수 없다. 규칙만 알린다.
+    expect(wrapper.find('[data-testid="request-total"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Split evenly across 2 people')
+  })
 })

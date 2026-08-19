@@ -77,6 +77,11 @@ export default {
       overview: 'Request overview',
       overviewHint: 'Check the amounts before sending. Go back to change anything.',
       breakdown: 'Split with',
+      sharesTitle: 'Who owes what',
+      payerShare: 'paid this',
+      requestTotal: 'You are requesting',
+      evenSplitNote:
+        'Split evenly across {count} people. If it does not divide exactly, one person covers one unit more.',
       request: 'Request {amount}',
       requesting: 'Sending your request',
       requestingHint: 'Keep this screen open while we create the split.',

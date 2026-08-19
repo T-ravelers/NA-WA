@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ItemizedSettlementItem } from '../settlement'
-import { compareItemizedTotal, validateItemizedItems } from '../settlementRules'
+import {
+  compareItemizedTotal,
+  summarizeItemizedShares,
+  validateItemizedItems,
+} from '../settlementRules'
 
 function item(unitPrice: string, quantity: string): ItemizedSettlementItem {
   return { name: 'x', unitPrice, quantity, allocations: [] }
@@ -74,5 +78,63 @@ describe('compareItemizedTotal', () => {
     expect(compareItemizedTotal([item('abc', '1')], '25.00')).toBeNull()
     expect(compareItemizedTotal([item('10', '1')], 'not-a-number')).toBeNull()
     expect(compareItemizedTotal([], '25.00')).toBeNull()
+  })
+})
+
+describe('summarizeItemizedShares', () => {
+  const dinner: ItemizedSettlementItem = {
+    name: 'Dinner',
+    unitPrice: '10.00',
+    quantity: '3',
+    allocations: [
+      { appointmentMemberId: '12', quantity: '1' },
+      { appointmentMemberId: '19', quantity: '2' },
+    ],
+  }
+
+  it('adds up what each person owes', () => {
+    const summary = summarizeItemizedShares([dinner], '12')
+
+    expect(summary?.shares).toEqual([
+      { appointmentMemberId: '12', amount: '10' },
+      { appointmentMemberId: '19', amount: '20' },
+    ])
+    expect(summary?.total).toBe('30')
+  })
+
+  it('leaves the payer share out of the requested amount', () => {
+    // 원결제자가 자기 자신에게 청구하지는 않는다. 30 중 자기 몫 10을 뺀 20만 요청한다.
+    expect(summarizeItemizedShares([dinner], '12')?.requested).toBe('20')
+    expect(summarizeItemizedShares([dinner], '19')?.requested).toBe('10')
+  })
+
+  it('counts fractional allocations exactly', () => {
+    const summary = summarizeItemizedShares(
+      [
+        {
+          name: 'Wine',
+          unitPrice: '0.1',
+          quantity: '3',
+          allocations: [
+            { appointmentMemberId: '12', quantity: '1' },
+            { appointmentMemberId: '19', quantity: '2' },
+          ],
+        },
+      ],
+      '12',
+    )
+
+    expect(summary?.shares.map((share) => share.amount)).toEqual(['0.1', '0.2'])
+    expect(summary?.total).toBe('0.3')
+  })
+
+  it('gives nothing back when a value cannot be read', () => {
+    expect(summarizeItemizedShares([], '12')).toBeNull()
+    expect(
+      summarizeItemizedShares(
+        [{ name: 'x', unitPrice: 'abc', quantity: '1', allocations: [] }],
+        '12',
+      ),
+    ).toBeNull()
   })
 })

@@ -23,7 +23,11 @@ import {
   clearSettlementCreateIdempotencyKey,
   resolveSettlementCreateIdempotencyKey,
 } from '../model/settlementIdempotency'
-import { compareItemizedTotal, validateItemizedItems } from '../model/settlementRules'
+import {
+  compareItemizedTotal,
+  summarizeItemizedShares,
+  validateItemizedItems,
+} from '../model/settlementRules'
 
 /**
  * 정산 요청서를 만드는 세 단계.
@@ -92,6 +96,25 @@ const itemsTotal = computed(() =>
     : compareItemizedTotal(items.value, selectedCandidate.value.amount),
 )
 const totalMatchesSource = computed(() => itemsTotal.value?.matches !== false)
+/*
+ * 품목별 정산에서만 사람별 금액을 미리 보여준다. 균등 분할은 나머지를 누가 더 낼지가
+ * 통화의 최소 단위에 달려 있는데 화면은 그 단위를 모른다. 여기서 어림잡아 보여주면
+ * 실제 청구 금액과 1단위 어긋난 숫자를 확정된 것처럼 내보이게 된다.
+ */
+const itemizedShares = computed(() =>
+  type.value !== 'ITEMIZED' || selectedCandidate.value === null
+    ? null
+    : summarizeItemizedShares(items.value, selectedCandidate.value.payerAppointmentMemberId),
+)
+
+/** 배분이 없는 사람은 0으로 보여 준다. 빈칸이면 왜 없는지 알 수 없다. */
+function shareAmountOf(appointmentMemberId: string): string {
+  return (
+    itemizedShares.value?.shares.find((share) => share.appointmentMemberId === appointmentMemberId)
+      ?.amount ?? '0'
+  )
+}
+
 const canContinueDetails = computed(
   () =>
     hasEnoughParticipants.value &&
@@ -680,7 +703,10 @@ defineExpose({ back })
             <dt class="text-ink-3">{{ t('settlement.create.method') }}</dt>
             <dd>{{ t(`settlement.type.${type}`) }}</dd>
           </div>
-          <div class="flex justify-between gap-3">
+          <div
+            v-if="itemizedShares === null"
+            class="flex justify-between gap-3"
+          >
             <dt class="text-ink-3">{{ t('settlement.create.breakdown') }}</dt>
             <dd class="text-right">
               {{ chosenParticipants.map((participant) => participant.name).join(', ') }}
@@ -692,6 +718,44 @@ defineExpose({ back })
           </div>
         </dl>
       </AppCard>
+
+      <template v-if="itemizedShares !== null">
+        <h3 class="mt-6 text-title">{{ t('settlement.create.sharesTitle') }}</h3>
+        <AppCard class="mt-3">
+          <dl class="space-y-3 text-body-sm">
+            <div
+              v-for="participant in chosenParticipants"
+              :key="participant.id"
+              :data-share-for="participant.id"
+              class="flex justify-between gap-3"
+            >
+              <dt class="text-ink-3">
+                {{ participant.name
+                }}<span
+                  v-if="participant.id === selectedCandidate?.payerAppointmentMemberId"
+                  class="ml-1 text-caption"
+                  >{{ t('settlement.create.payerShare') }}</span
+                >
+              </dt>
+              <dd>{{ points(shareAmountOf(participant.id)) }}</dd>
+            </div>
+          </dl>
+          <div
+            class="mt-4 flex justify-between gap-3 border-t border-hairline pt-3 text-title-sm"
+            data-testid="request-total"
+          >
+            <span>{{ t('settlement.create.requestTotal') }}</span>
+            <span>{{ points(itemizedShares.requested) }}</span>
+          </div>
+        </AppCard>
+      </template>
+
+      <p
+        v-else
+        class="mt-4 text-body-sm text-ink-2"
+      >
+        {{ t('settlement.create.evenSplitNote', { count: chosenParticipants.length }) }}
+      </p>
 
       <ul
         v-if="type === 'ITEMIZED'"
@@ -723,7 +787,9 @@ defineExpose({ back })
           variant="settle"
           @click="create"
           >{{
-            t('settlement.create.request', { amount: points(selectedCandidate?.amount ?? '0') })
+            t('settlement.create.request', {
+              amount: points(itemizedShares?.requested ?? selectedCandidate?.amount ?? '0'),
+            })
           }}</AppButton
         >
       </div>

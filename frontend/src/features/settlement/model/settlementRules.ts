@@ -98,3 +98,53 @@ function formatScaled(value: bigint, decimals: number): string {
   const fraction = (value % unit).toString().padStart(decimals, '0').replace(/0+$/, '')
   return fraction === '' ? `${value / unit}` : `${value / unit}.${fraction}`
 }
+
+export interface ItemizedShare {
+  appointmentMemberId: string
+  amount: string
+}
+
+/**
+ * 품목별 정산에서 사람마다 얼마를 맡는지 계산한다.
+ *
+ * 단가 × 배분 수량을 더할 뿐이라 나누어떨어지지 않는 문제가 없다. 서버도 같은 식으로
+ * 계산하므로 화면에서 미리 보여줘도 어긋나지 않는다. 균등 분할(EQUAL)은 나머지를 누구에게
+ * 줄지가 통화 단위에 달려 있는데 화면은 그 단위를 모르므로 여기서 다루지 않는다.
+ *
+ * `requested`는 원결제자 몫을 뺀 금액이다. 자기 자신에게 청구하지는 않기 때문이다.
+ */
+export function summarizeItemizedShares(
+  items: ItemizedSettlementItem[],
+  payerAppointmentMemberId: string,
+): { shares: ItemizedShare[]; total: string; requested: string } | null {
+  if (items.length === 0) return null
+
+  const scaled = new Map<string, bigint>()
+  let total = 0n
+
+  for (const item of items) {
+    const price = parseScaled(item.unitPrice, PRICE_DECIMALS)
+    if (price === null) return null
+
+    for (const allocation of item.allocations) {
+      const quantity = parseQuantity(allocation.quantity)
+      if (quantity === null) return null
+
+      const amount = price * quantity
+      total += amount
+      scaled.set(
+        allocation.appointmentMemberId,
+        (scaled.get(allocation.appointmentMemberId) ?? 0n) + amount,
+      )
+    }
+  }
+
+  return {
+    shares: [...scaled].map(([appointmentMemberId, amount]) => ({
+      appointmentMemberId,
+      amount: formatScaled(amount, TOTAL_DECIMALS),
+    })),
+    total: formatScaled(total, TOTAL_DECIMALS),
+    requested: formatScaled(total - (scaled.get(payerAppointmentMemberId) ?? 0n), TOTAL_DECIMALS),
+  }
+}
