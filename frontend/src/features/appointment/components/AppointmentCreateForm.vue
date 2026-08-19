@@ -75,6 +75,37 @@ watch(
   },
 )
 
+// 같은 스텝 안의 필드들은 서로 맞물려 검증되는 경우가 있다(예: 종료가 시작보다
+// 늦어야 함, 마감이 시작보다 빨라야 함). 제출 실패로 에러가 뜬 뒤 관련 필드
+// 중 하나라도 고치기 시작하면, 다음 제출 전까지 오래된 에러 문구가 그대로
+// 남아있지 않게 그 스텝의 에러를 지운다 — 다시 제출하면 해당 validate가 새로
+// 채운다.
+function clearErrorsOnEdit(
+  source: () => unknown[],
+  keys: readonly (keyof AppointmentFormErrors)[],
+): void {
+  watch(source, () => {
+    if (keys.every((key) => errors.value[key] === undefined)) return
+
+    const cleared = { ...errors.value }
+    for (const key of keys) cleared[key] = undefined
+    errors.value = cleared
+  })
+}
+
+clearErrorsOnEdit(
+  () => [draft.appointmentName, draft.maxMembers, draft.languageCode],
+  ['appointmentName', 'maxMembers', 'languageCode'],
+)
+clearErrorsOnEdit(
+  () => [draft.depositAmount, draft.meetingPlace],
+  ['depositAmount', 'meetingPlace'],
+)
+clearErrorsOnEdit(
+  () => [draft.activityStartTime, draft.activityEndTime, draft.joinDeadline],
+  ['activityStartTime', 'activityEndTime', 'joinDeadline'],
+)
+
 const languageOptions: AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
 const memberOptions = Array.from(
   { length: MAX_APPOINTMENT_MEMBERS - MIN_APPOINTMENT_MEMBERS + 1 },
