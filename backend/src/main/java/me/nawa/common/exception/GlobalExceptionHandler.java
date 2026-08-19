@@ -11,6 +11,7 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MultipartException;
 
 /**
  * Controller 밖으로 전달된 예외를
@@ -93,6 +94,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ServletRequestBindingException.class)
     public ResponseEntity<ApiResponse<Void>> handleServletRequestBinding() {
         return createErrorResponse(CommonErrorCode.INVALID_INPUT);
+    }
+
+    /**
+     * 업로드 파일이 상한을 넘겨 multipart 해석이 실패했을 때 처리합니다.
+     *
+     * 이 예외는 컨트롤러에 닿기 전에 나므로 전역에서만 잡을 수 있습니다.
+     */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMultipartException() {
+        return createErrorResponse(CommonErrorCode.PAYLOAD_TOO_LARGE);
     }
 
     /**

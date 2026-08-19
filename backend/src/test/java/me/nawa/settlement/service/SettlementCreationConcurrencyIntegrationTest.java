@@ -388,7 +388,35 @@ class SettlementCreationConcurrencyIntegrationTest {
             SettlementMapper settlementMapper,
             List<SettlementCreationHandler> handlers
         ) {
-            return new SettlementCreationAttemptService(settlementMapper, handlers);
+            return new SettlementCreationAttemptService(
+                settlementMapper, handlers, noOpReceiptService()
+            );
+        }
+
+        /*
+         * 이 테스트는 원거래 하나를 두고 두 스레드가 경쟁할 때 한쪽만 성공하는지를 본다.
+         * 영수증은 이 경쟁과 무관하고 요청에도 담기지 않으므로 아무 일도 하지 않는 대역을 쓴다.
+         */
+        private SettlementReceiptService noOpReceiptService() {
+            return new SettlementReceiptService() {
+                @Override
+                public me.nawa.settlement.dto.response.SettlementReceiptUploadResponse upload(
+                    Long memberId, String declaredContentType, byte[] content
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public void linkToSettlement(Long memberId, Long settlementId, Long receiptId) {
+                }
+
+                @Override
+                public me.nawa.common.storage.StoredReceipt getReceipt(
+                    Long memberId, Long settlementId
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+            };
         }
 
         @Bean

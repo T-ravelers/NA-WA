@@ -29,6 +29,12 @@ public enum CommonErrorCode implements ErrorCode {
         "지원하지 않는 HTTP 메서드입니다."
     ),
 
+    PAYLOAD_TOO_LARGE(
+        HttpStatus.PAYLOAD_TOO_LARGE,
+        "COMMON-004",
+        "요청 크기가 허용 범위를 초과했습니다."
+    ),
+
     INTERNAL_SERVER_ERROR(
         HttpStatus.INTERNAL_SERVER_ERROR,
         "COMMON-999",

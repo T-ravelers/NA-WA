@@ -121,7 +121,7 @@ describe('PlaceDetailView', () => {
     addJourneyItem.mockResolvedValue({})
   })
 
-  it('renders Place details and keeps Directions disabled', async () => {
+  it('renders Place details with enabled map buttons', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Seongsu Onsil')
@@ -131,15 +131,58 @@ describe('PlaceDetailView', () => {
     expect(
       wrapper
         .findAll('button')
+        .find((button) => button.text() === 'Google Maps')
+        ?.attributes('disabled'),
+    ).toBeUndefined()
+    expect(
+      wrapper
+        .findAll('button')
         .find((button) => button.text() === 'Directions')
         ?.attributes('disabled'),
-    ).toBeDefined()
+    ).toBeUndefined()
     expect(
       wrapper
         .findAll('button')
         .find((button) => button.text() === 'Find companions')
         ?.attributes('disabled'),
     ).toBeUndefined()
+  })
+
+  it('opens Google Maps for the Place coordinates', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Google Maps')
+      ?.trigger('click')
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://www.google.com/maps/search/?api=1&query=37.54%2C127.05',
+      '_blank',
+      'noopener,noreferrer',
+    )
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Directions')
+      ?.trigger('click')
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://www.google.com/maps/dir/?api=1&destination=37.54%2C127.05',
+      '_blank',
+      'noopener,noreferrer',
+    )
+
+    openSpy.mockRestore()
+  })
+
+  it('hides map buttons when the Place has no coordinates', async () => {
+    fetchPlaceDetail.mockResolvedValue({ ...place, latitude: null, longitude: null })
+
+    const { wrapper } = await mountView()
+
+    const buttonLabels = wrapper.findAll('button').map((button) => button.text())
+    expect(buttonLabels).not.toContain('Google Maps')
+    expect(buttonLabels).not.toContain('Directions')
   })
 
   it('translates operational region values on the detail screen', async () => {

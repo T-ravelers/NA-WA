@@ -14,6 +14,8 @@ erDiagram
     WALLET_TRANSFERS o|--o| SETTLEMENT_MEMBERS : pays
     SETTLEMENT_ITEMS ||--o{ SETTLEMENT_ITEM_SHARES : splits
     SETTLEMENT_MEMBERS ||--o{ SETTLEMENT_ITEM_SHARES : owes
+    SETTLEMENTS ||--o| SETTLEMENT_RECEIPTS : proves
+    MEMBERS ||--o{ SETTLEMENT_RECEIPTS : uploads
 
     APPOINTMENTS ||--o{ MEMBER_REVIEWS : reviews_after
     APPOINTMENT_MEMBERS ||--o{ MEMBER_REVIEWS : reviewer
@@ -79,6 +81,15 @@ erDiagram
         DECIMAL allocated_amount
     }
 
+    SETTLEMENT_RECEIPTS {
+        BIGINT settlement_receipt_id PK
+        BIGINT uploaded_by_member_id FK
+        BIGINT settlement_id FK
+        VARCHAR object_key
+        VARCHAR content_type
+        INT byte_size
+    }
+
     MEMBER_REVIEWS {
         BIGINT review_id PK
         BIGINT appointment_id FK
@@ -116,3 +127,18 @@ erDiagram
 - `paid_transfer_id` UNIQUE와 `PAID` 상태의 이체·시각 CHECK는 지급을 한 번만 확정한다.
 - ITEMIZED 정산의 품목과 품목별 수량 배분은 정산 자체의 스냅샷으로 보관한다.
 - 리뷰 작성자와 대상자는 같은 약속의 `appointment_members`로 제한한다.
+
+## 영수증
+
+`settlement_receipts`는 영수증 사진이 S3 어디에 있는지만 가리킨다. 사진 자체는 DB에 넣지
+않는다.
+
+`settlement_id`가 비어 있는 행은 아직 정산에 붙지 않은 **초안**이다. 사용자가 사진을 먼저
+올리고 품목을 확정한 뒤 정산을 만들 때 이 값이 채워진다. 정산 품목이 영수증에서 나온
+값이라 사진이 먼저 있어야 하기 때문이다.
+
+`settlement_id`에 UNIQUE가 걸려 있다. MySQL은 UNIQUE 열에 NULL을 여러 개 허용하므로 초안
+여러 개가 공존하면서도 정산 하나에는 사진이 한 장만 붙는다.
+
+`object_key`는 반드시 `receipts/`로 시작한다. IAM 정책이 이 접두사로 좁혀져 있어 벗어난
+키는 런타임에 접근이 거부된다.

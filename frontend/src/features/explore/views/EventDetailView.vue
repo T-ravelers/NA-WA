@@ -13,6 +13,7 @@ import {
 } from '@tabler/icons-vue'
 
 import { formatCalendarDateString } from '@/shared/lib/datetime'
+import { buildGoogleMapsDirectionsUrl, buildGoogleMapsSearchUrl } from '@/shared/lib/mapLink'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -98,6 +99,13 @@ const activeJourneyId = computed(
 )
 const journeyListQuery = useJourneyListQuery(journeySelectSheetOpen)
 const journeys = computed(() => journeyListQuery.data.value ?? [])
+
+const mapSearchUrl = computed(() =>
+  buildGoogleMapsSearchUrl(event.value?.latitude, event.value?.longitude),
+)
+const mapDirectionsUrl = computed(() =>
+  buildGoogleMapsDirectionsUrl(event.value?.latitude, event.value?.longitude),
+)
 
 const hours = computed(() => (event.value ? toDetailEntries(event.value.operatingHours) : []))
 const openDays = computed(() => (event.value ? toStringList(event.value.openDays).join(', ') : ''))
@@ -194,6 +202,10 @@ async function shareEvent(): Promise<void> {
 
 function openReservation(): void {
   if (reservationUrl.value) window.open(reservationUrl.value, '_blank', 'noopener,noreferrer')
+}
+
+function openMapUrl(url: string | null): void {
+  if (url) window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function openAppointmentList(): void {
@@ -505,14 +517,30 @@ function retry(): void {
               class="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-pill bg-show ring-4 ring-show/20"
               aria-hidden="true"
             />
-            <div class="absolute inset-x-3 bottom-3 flex justify-end">
-              <button
-                type="button"
-                class="rounded-pill bg-canvas/85 px-3 py-2 text-caption text-ink shadow-raised disabled:pointer-events-none disabled:opacity-40"
-                disabled
+          </div>
+          <div
+            v-if="mapSearchUrl"
+            class="flex min-w-0 gap-2"
+          >
+            <div class="min-w-0 flex-1">
+              <AppButton
+                block
+                compact
+                variant="secondary"
+                @click="openMapUrl(mapSearchUrl)"
+              >
+                {{ t('explore.detail.openInGoogleMaps') }}
+              </AppButton>
+            </div>
+            <div class="min-w-0 flex-1">
+              <AppButton
+                block
+                compact
+                variant="secondary"
+                @click="openMapUrl(mapDirectionsUrl)"
               >
                 {{ t('explore.detail.directions') }}
-              </button>
+              </AppButton>
             </div>
           </div>
         </section>

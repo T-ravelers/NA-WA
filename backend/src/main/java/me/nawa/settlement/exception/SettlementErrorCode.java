@@ -71,6 +71,74 @@ public enum SettlementErrorCode implements ErrorCode {
         HttpStatus.BAD_REQUEST,
         "SETTLEMENT-015",
         "멱등성 키가 올바르지 않습니다."
+    ),
+
+    /**
+     * 영수증 형식 불가
+     *
+     * 허용하지 않는 이미지 형식이거나, 확장자만 이미지이고 내용은 아닐 때 사용합니다.
+     */
+    SETTLEMENT_RECEIPT_FORMAT_INVALID(
+        HttpStatus.BAD_REQUEST,
+        "SETTLEMENT-016",
+        "지원하지 않는 영수증 이미지 형식입니다."
+    ),
+
+    /**
+     * 영수증 연결 불가
+     *
+     * 남이 올린 영수증이거나 이미 다른 정산에 쓰인 영수증을 연결하려 할 때 사용합니다.
+     */
+    SETTLEMENT_RECEIPT_NOT_LINKABLE(
+        HttpStatus.CONFLICT,
+        "SETTLEMENT-017",
+        "이 영수증은 정산에 연결할 수 없습니다."
+    ),
+
+    /**
+     * 영수증 없음
+     *
+     * 정산에 연결된 영수증이 없거나 조회 권한이 없을 때 사용합니다.
+     */
+    SETTLEMENT_RECEIPT_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "SETTLEMENT-018",
+        "영수증을 찾을 수 없습니다."
+    ),
+
+    /**
+     * 영수증 저장소 오류
+     *
+     * S3 업로드나 조회가 실패했을 때 사용합니다.
+     */
+    SETTLEMENT_RECEIPT_STORAGE_UNAVAILABLE(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "SETTLEMENT-019",
+        "영수증 저장소를 사용할 수 없습니다."
+    ),
+
+    /**
+     * 영수증 보관 기한 만료
+     *
+     * 사진은 보관 기한이 지나면 저장소에서 사라진다. "처음부터 없었다"(018)와 구분하려고
+     * 코드를 따로 둔다. 둘이 같은 코드로 나가면 장애 조사 때 어느 쪽인지 알 수 없다.
+     */
+    SETTLEMENT_RECEIPT_EXPIRED(
+        HttpStatus.GONE,
+        "SETTLEMENT-020",
+        "영수증 보관 기한이 지나 더 이상 볼 수 없습니다."
+    ),
+
+    /**
+     * 영수증 파일 읽기 실패
+     *
+     * 업로드된 파일을 서버가 읽어내지 못한 경우다. 파일 형식 문제(016)가 아니라 서버 쪽
+     * 문제이므로 분리한다. 형식 오류로 뭉뚱그리면 사용자 잘못으로 오해하게 된다.
+     */
+    SETTLEMENT_RECEIPT_READ_FAILED(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        "SETTLEMENT-021",
+        "영수증 파일을 읽지 못했습니다."
     );
 
     private final HttpStatus status;

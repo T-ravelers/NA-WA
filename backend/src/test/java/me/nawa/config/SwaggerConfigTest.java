@@ -460,6 +460,21 @@ class SwaggerConfigTest {
         }
 
         @Bean
+        me.nawa.settlement.service.SettlementReceiptService settlementReceiptService() {
+            return new me.nawa.settlement.service.SettlementReceiptService() {
+                @Override public me.nawa.settlement.dto.response.SettlementReceiptUploadResponse upload(
+                    Long memberId, String declaredContentType, byte[] content
+                ) { throw new UnsupportedOperationException(); }
+                @Override public void linkToSettlement(
+                    Long memberId, Long settlementId, Long receiptId
+                ) { throw new UnsupportedOperationException(); }
+                @Override public me.nawa.common.storage.StoredReceipt getReceipt(
+                    Long memberId, Long settlementId
+                ) { throw new UnsupportedOperationException(); }
+            };
+        }
+
+        @Bean
         SettlementCreationService settlementCreationService() {
             return new SettlementCreationService() {
                 @Override public me.nawa.settlement.dto.response.SettlementCreateResponse createSettlement(

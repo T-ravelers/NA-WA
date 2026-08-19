@@ -288,6 +288,7 @@ export default {
       phone: 'Phone',
       homepage: 'Homepage',
       location: 'Location',
+      openInGoogleMaps: 'Google Maps',
       directions: 'Directions',
       signatureMenu: 'Signature menu',
       options: {
@@ -328,6 +329,7 @@ export default {
       activities: 'Activities',
       description: 'About this event',
       program: 'Program',
+      openInGoogleMaps: 'Google Maps',
       directions: 'Directions',
       addToJourney: 'Add to journey',
       addedToJourney: 'Added to journey',
