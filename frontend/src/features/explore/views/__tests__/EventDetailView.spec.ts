@@ -192,6 +192,22 @@ describe('EventDetailView', () => {
 
     expect(wrapper.text()).toContain('Seoul concert')
     expect(wrapper.text()).toContain('Seoul · Seocho-gu')
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Google Maps')
+        ?.attributes('disabled'),
+    ).toBeUndefined()
+  })
+
+  it('hides map buttons when the Event has no coordinates', async () => {
+    fetchEventDetail.mockResolvedValue({ ...event, latitude: null, longitude: null })
+
+    const { wrapper } = await mountView()
+
+    const buttonLabels = wrapper.findAll('button').map((button) => button.text())
+    expect(buttonLabels).not.toContain('Google Maps')
+    expect(buttonLabels).not.toContain('Directions')
   })
 
   it('translates operational region values and hides the raw hours key', async () => {
