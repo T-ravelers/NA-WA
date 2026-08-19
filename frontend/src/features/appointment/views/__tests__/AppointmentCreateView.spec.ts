@@ -295,4 +295,29 @@ describe('AppointmentCreateView', () => {
     expect(wrapper.text()).toContain('Your wallet balance is too low for this transfer.')
     expect(router.currentRoute.value.name).toBe('appointment-create')
   })
+
+  it('reopens the date sheet with the form preserved when the journey item was already confirmed', async () => {
+    createAppointment.mockRejectedValueOnce(
+      new NormalizedApiError('JOURNEY-004', 409, 'duplicate journey item'),
+    )
+    const { wrapper } = await mountView()
+    await completeJourneySelection(wrapper)
+
+    await fillAndConfirm(wrapper)
+    await flushPromises()
+
+    // 날짜 시트가 폼 위에 다시 뜨고, 폼은 여전히(같은 3단계에) 입력값을 유지한 채 있다.
+    expect(wrapper.text()).toContain('Which day?')
+    expect(wrapper.text()).toContain('Set the appointment schedule')
+    expect(wrapper.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
+
+    checkJourneyItemExists.mockResolvedValueOnce(false)
+    await wrapper.get('button[aria-label="Select August 30, 2026"]').trigger('click')
+    await buttonByText(wrapper, 'Continue with').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Set the appointment schedule')
+    expect(wrapper.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
+  })
 })

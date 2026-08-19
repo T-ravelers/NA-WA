@@ -36,9 +36,24 @@ const createMutation = useMutation({
   },
 })
 
+// 날짜 선택 시 미리 확인했더라도, 같은 계정의 다른 세션이 그 사이 먼저 같은
+// 조합을 확정해버리는 드문 경쟁 상태가 있을 수 있다(JOURNEY-004). 이 경우 폼
+// 입력은 그대로 둔 채 날짜 선택 시트만 다시 띄운다.
+const JOURNEY_ITEM_DUPLICATE_CODE = 'JOURNEY-004'
+const dateConflictRetryOpen = ref(false)
+
+watch(
+  () => createMutation.error.value,
+  (error) => {
+    if (error instanceof NormalizedApiError && error.code === JOURNEY_ITEM_DUPLICATE_CODE) {
+      dateConflictRetryOpen.value = true
+    }
+  },
+)
+
 const errorMessage = computed(() => {
   const error = createMutation.error.value
-  if (error === null) return undefined
+  if (error === null || dateConflictRetryOpen.value) return undefined
 
   if (!(error instanceof NormalizedApiError) || !i18n.te(error.messageKey)) {
     return t('appointment.create.loadFailed')
@@ -157,6 +172,42 @@ async function confirmDate(date: string): Promise<void> {
   }
 }
 
+async function retryDate(date: string): Promise<void> {
+  if (dateCheckPending.value) return
+  if (selectedTripId.value === null || itemId.value === undefined) {
+    dateCheckError.value = t('appointment.journeyDate.checkFailed')
+    return
+  }
+
+  dateCheckPending.value = true
+  dateCheckError.value = undefined
+
+  try {
+    const exists = await journeyIntegration.checkJourneyItemExists(
+      selectedTripId.value,
+      itemId.value,
+      date,
+    )
+    if (exists) {
+      dateCheckError.value = t('appointment.journeyDate.alreadyLinked')
+      return
+    }
+
+    selectedVisitDate.value = date
+    dateConflictRetryOpen.value = false
+    createMutation.reset()
+  } catch {
+    dateCheckError.value = t('appointment.journeyDate.checkFailed')
+  } finally {
+    dateCheckPending.value = false
+  }
+}
+
+function closeDateConflictRetry(): void {
+  dateCheckError.value = undefined
+  dateConflictRetryOpen.value = false
+}
+
 type AppointmentCreateFormExposed = {
   goToPreviousStep: () => boolean
 }
@@ -239,6 +290,18 @@ function confirmExit(): void {
       :error-message="dateCheckError"
       @close="closeJourneyDate"
       @confirm="confirmDate"
+    />
+
+    <AppointmentJourneyDateSheet
+      v-if="dateConflictRetryOpen && selectedJourney"
+      :journey-title="selectedJourney.title"
+      :start-date="selectedJourney.startDate"
+      :end-date="selectedJourney.endDate"
+      :initial-date="selectedVisitDate"
+      :loading="dateCheckPending"
+      :error-message="dateCheckError"
+      @close="closeDateConflictRetry"
+      @confirm="retryDate"
     />
 
     <div

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import AmountInput from '@/shared/ui/AmountInput.vue'
@@ -64,6 +64,16 @@ const draft = reactive<AppointmentFormDraft>({
   activityEndTime: '',
   joinDeadline: '',
 })
+
+// tripId·itemId·itemType는 이 폼이 렌더링된 뒤 바뀌지 않지만, visitDate는 날짜
+// 충돌로 제출이 실패했을 때 폼을 유지한 채 부모가 다시 고르게 할 수 있다 — 그
+// 경우에만 draft에 반영되도록 prop 변화를 지켜본다.
+watch(
+  () => visitDate,
+  (value) => {
+    draft.visitDate = value
+  },
+)
 
 const languageOptions: AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
 const memberOptions = Array.from(
