@@ -7,8 +7,57 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import type { SettlementCandidate } from '../../model/settlement'
 import SettlementCreateView from '../SettlementCreateView.vue'
 
-const { create } = vi.hoisted(() => ({ create: vi.fn() }))
-vi.mock('../../api/settlementGateway', () => ({ settlementGateway: { create } }))
+const { create, uploadReceipt } = vi.hoisted(() => ({ create: vi.fn(), uploadReceipt: vi.fn() }))
+vi.mock('../../api/settlementGateway', () => ({ settlementGateway: { create, uploadReceipt } }))
+
+/** jsdom에는 미리보기 주소를 만드는 기능이 없어 대역을 둔다. */
+const revokeObjectURL = vi.fn()
+Object.defineProperty(URL, 'createObjectURL', { value: () => 'blob:receipt', writable: true })
+Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, writable: true })
+
+/**
+ * jsdom에는 카메라가 없다. getUserMedia를 흉내 내 촬영 화면이 열리는 경우와, 아예
+ * 열리지 않는 경우를 모두 확인한다.
+ */
+function stubCamera(stream: unknown = { getTracks: () => [] }): void {
+  Object.defineProperty(navigator, 'mediaDevices', {
+    value:
+      stream === null
+        ? undefined
+        : { getUserMedia: vi.fn().mockResolvedValue(stream as MediaStream) },
+    configurable: true,
+  })
+  Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+    value: vi.fn().mockResolvedValue(undefined),
+    configurable: true,
+  })
+}
+
+async function openCamera(wrapper: ReturnType<typeof mountCreate>): Promise<void> {
+  await wrapper.get('[data-action="add-receipt"]').trigger('click')
+  await wrapper.get('[data-action="receipt-source-camera"]').trigger('click')
+  await flushPromises()
+}
+
+function pngFile(name = 'receipt.png', type = 'image/png', size = 1024): File {
+  const file = new File([new Uint8Array(1)], name, { type })
+  Object.defineProperty(file, 'size', { value: size })
+  return file
+}
+
+/** 영수증 버튼 → 출처 선택 시트 → 저장소 선택까지, 사용자가 밟는 순서 그대로 간다. */
+async function pickReceipt(
+  wrapper: ReturnType<typeof mountCreate>,
+  file: File = pngFile(),
+): Promise<void> {
+  await wrapper.get('[data-action="add-receipt"]').trigger('click')
+  await wrapper.get('[data-action="receipt-source-library"]').trigger('click')
+
+  const input = wrapper.get('[data-testid="receipt-library-input"]')
+  Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+  await input.trigger('change')
+  await flushPromises()
+}
 
 function candidate(overrides: Partial<SettlementCandidate> = {}): SettlementCandidate {
   return {
@@ -44,7 +93,10 @@ async function drillDownToTransaction(wrapper: ReturnType<typeof mountCreate>) {
 }
 
 describe('SettlementCreateView', () => {
-  beforeEach(() => create.mockReset().mockResolvedValue({ id: '42' }))
+  beforeEach(() => {
+    create.mockReset().mockResolvedValue({ id: '42' })
+    uploadReceipt.mockReset().mockResolvedValue({ receiptId: '31' })
+  })
 
   it('narrows a journey to an appointment before offering its payments', async () => {
     const wrapper = mountCreate([
@@ -267,10 +319,89 @@ describe('SettlementCreateView', () => {
     expect(wrapper.text()).not.toContain('no longer available')
   })
 
-  it('keeps the receipt entry point disabled until receipt capture ships', async () => {
+  it('uploads the chosen receipt and sends its id with the split', async () => {
+    uploadReceipt.mockResolvedValue({ receiptId: '31' })
+    create.mockResolvedValue({ id: '77' })
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)
 
-    expect(wrapper.get('[data-action="add-receipt"]').attributes('disabled')).toBeDefined()
+    await pickReceipt(wrapper)
+
+    expect(uploadReceipt).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    expect(create.mock.calls[0]?.[2]).toMatchObject({ receiptId: '31' })
+  })
+
+  it('omits receiptId when no receipt was attached', async () => {
+    create.mockResolvedValue({ id: '77' })
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    expect(create.mock.calls[0]?.[2]).not.toHaveProperty('receiptId')
+    expect(uploadReceipt).not.toHaveBeenCalled()
+  })
+
+  it('rejects an oversized photo before spending the upload', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await pickReceipt(wrapper, pngFile('big.png', 'image/png', 9 * 1024 * 1024))
+
+    expect(uploadReceipt).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('over 8 MB')
+  })
+
+  it('offers both the camera and the photo library', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await wrapper.get('[data-action="add-receipt"]').trigger('click')
+
+    // 영수증은 즉석에서 찍기도 하고 이미 찍어 둔 것을 고르기도 한다. 둘 다 열려 있어야 한다.
+    expect(wrapper.find('[data-action="receipt-source-camera"]').exists()).toBe(true)
+    expect(wrapper.find('[data-action="receipt-source-library"]').exists()).toBe(true)
+  })
+
+  it('opens an in-app camera instead of a file dialog', async () => {
+    // 노트북에서는 파일 입력의 capture 속성이 무시돼 파일 창만 열린다. 촬영은 앱 안에서 한다.
+    stubCamera()
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await openCamera(wrapper)
+
+    expect(wrapper.find('[data-action="receipt-camera-shoot"]').exists()).toBe(true)
+  })
+
+  it('offers the photo library when the camera cannot open', async () => {
+    stubCamera(null)
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await openCamera(wrapper)
+
+    expect(wrapper.find('[data-action="receipt-camera-shoot"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('cannot open the camera')
+    // 막혀 있어도 빠져나갈 길은 남아 있어야 한다.
+    expect(wrapper.find('[data-action="receipt-camera-library"]').exists()).toBe(true)
+  })
+
+  it('rejects a format the server does not accept', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await pickReceipt(wrapper, pngFile('photo.heic', 'image/heic'))
+
+    expect(uploadReceipt).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('JPEG, PNG, or WebP')
   })
 })

@@ -83,7 +83,35 @@ export default {
     },
     receipt: {
       label: 'Receipt',
-      comingSoon: 'Receipt capture becomes available in a later release.',
+      change: 'Change receipt',
+      view: 'View receipt',
+      none: 'No receipt attached',
+      pending: 'Uploading receipt',
+      hint: 'JPEG, PNG, or WebP · up to 8 MB',
+      source: {
+        title: 'Add receipt',
+        camera: 'Take a photo',
+        library: 'Choose from photos',
+      },
+      camera: {
+        title: 'Take a receipt photo',
+        shutter: 'Capture',
+        cancel: 'Close camera',
+        denied:
+          'Camera access is blocked. Allow it in your browser settings, or choose a photo instead.',
+        unsupported: 'This browser cannot open the camera. Choose a photo instead.',
+        unavailable: 'The camera is not available right now. Choose a photo instead.',
+      },
+      sheetLabel: 'Receipt photo',
+      alt: 'Receipt photo for this split',
+      error: {
+        type: 'Choose a JPEG, PNG, or WebP photo. Photos taken on iPhone may need Most Compatible format.',
+        size: 'That photo is over 8 MB. Choose a smaller one.',
+        storage: 'Receipt storage is unavailable right now. Try again in a moment.',
+        missing: 'No receipt was attached to this split.',
+        expired: 'Receipts are kept for one year. This one is no longer available.',
+        unknown: 'We could not handle that receipt. Try again.',
+      },
     },
     detail: {
       loading: 'Loading split',

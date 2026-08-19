@@ -97,3 +97,34 @@ export async function paySettlement(
   )
   return data
 }
+
+/**
+ * 영수증 사진 업로드
+ *
+ * 정산을 만들기 전에 먼저 올린다. 돌려받은 'receiptId'를 정산 생성 요청에 실어 보내면
+ * 서버가 그 사진을 정산에 연결한다.
+ */
+export async function uploadSettlementReceipt(file: File): Promise<{ receiptId: string }> {
+  const form = new FormData()
+  form.append('file', file)
+
+  const { data } = await httpClient.post<{ receiptId: string | number }>(
+    '/api/v1/settlement-receipts',
+    form,
+  )
+  return { receiptId: String(data.receiptId) }
+}
+
+/**
+ * 영수증 사진 조회
+ *
+ * 이미지 바이트를 그대로 받는다. img 태그에 주소를 그대로 박으면 안 된다. 인증이 쿠키로
+ * 오가는데 프론트와 API가 서로 다른 사이트라, 브라우저가 그런 이미지 요청에는 쿠키를
+ * 싣지 않아 거절당한다. 그래서 여기서 직접 받아 화면에 넘긴다.
+ */
+export async function fetchSettlementReceipt(settlementId: string): Promise<Blob> {
+  const { data } = await httpClient.get<Blob>(`/api/v1/settlements/${settlementId}/receipt`, {
+    responseType: 'blob',
+  })
+  return data
+}

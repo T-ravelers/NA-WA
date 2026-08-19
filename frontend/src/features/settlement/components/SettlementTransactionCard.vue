@@ -23,9 +23,23 @@ interface Props {
    */
   paidAt?: string
   payerName?: string
+  /** 생성 화면은 'add', 상세 화면은 'view'. 영수증 자리의 역할을 정한다. */
+  receiptMode?: 'add' | 'view'
+  receiptUrl?: string | null
+  receiptPending?: boolean
 }
 
-const { gatheringName, amount, paidAt = undefined, payerName = undefined } = defineProps<Props>()
+const {
+  gatheringName,
+  amount,
+  paidAt = undefined,
+  payerName = undefined,
+  receiptMode = 'add',
+  receiptUrl = null,
+  receiptPending = false,
+} = defineProps<Props>()
+
+const emit = defineEmits<{ receiptSelect: [file: File]; receiptOpen: [] }>()
 
 const { t } = useI18n()
 const points = useSettlementPoints()
@@ -52,7 +66,13 @@ const points = useSettlementPoints()
           {{ paidAt }}
         </p>
       </div>
-      <SettlementReceiptBox />
+      <SettlementReceiptBox
+        :mode="receiptMode"
+        :preview-url="receiptUrl"
+        :pending="receiptPending"
+        @select="emit('receiptSelect', $event)"
+        @open="emit('receiptOpen')"
+      />
     </div>
     <p class="mt-4 text-data-lg">{{ points(amount) }}</p>
   </AppCard>

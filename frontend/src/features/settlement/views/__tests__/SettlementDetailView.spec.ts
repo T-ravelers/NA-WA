@@ -4,11 +4,16 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 import SettlementDetailView from '../SettlementDetailView.vue'
 
-const { getDetail } = vi.hoisted(() => ({ getDetail: vi.fn() }))
-vi.mock('../../api/settlementGateway', () => ({ settlementGateway: { getDetail } }))
+const { getDetail, getReceipt } = vi.hoisted(() => ({ getDetail: vi.fn(), getReceipt: vi.fn() }))
+vi.mock('../../api/settlementGateway', () => ({ settlementGateway: { getDetail, getReceipt } }))
+
+/** jsdom에는 미리보기 주소를 만드는 기능이 없어 대역을 둔다. */
+Object.defineProperty(URL, 'createObjectURL', { value: () => 'blob:receipt', writable: true })
+Object.defineProperty(URL, 'revokeObjectURL', { value: () => {}, writable: true })
 
 const detail = {
   id: '42',
@@ -68,6 +73,7 @@ async function mountDetail(path = '/settlements/42') {
 describe('SettlementDetailView', () => {
   beforeEach(() => {
     getDetail.mockReset().mockResolvedValue(detail)
+    getReceipt.mockReset()
   })
 
   it('shows the participant who to send to, how much, and the amount on the pay button', async () => {
@@ -161,5 +167,45 @@ describe('SettlementDetailView', () => {
     expect(wrapper.find('[data-action="pay"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="participant-status-placeholder"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('Send to')
+  })
+
+  it('fetches the receipt only when asked, then opens it', async () => {
+    getReceipt.mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
+    const { wrapper } = await mountDetail()
+
+    // 영수증은 최대 8MB라 상세를 열 때 미리 받지 않는다.
+    expect(getReceipt).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-action="add-receipt"]').trigger('click')
+    await flushPromises()
+
+    expect(getReceipt).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+
+    // 이미 받아 둔 사진을 다시 받지 않는다.
+    await wrapper.get('[data-action="add-receipt"]').trigger('click')
+    await flushPromises()
+    expect(getReceipt).toHaveBeenCalledTimes(1)
+  })
+
+  it('tells an expired receipt apart from one that was never attached', async () => {
+    getReceipt.mockRejectedValue(new NormalizedApiError('SETTLEMENT-020', 410, 'gone'))
+    const { wrapper } = await mountDetail()
+
+    await wrapper.get('[data-action="add-receipt"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('kept for one year')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('shows an empty notice when no receipt was attached', async () => {
+    getReceipt.mockRejectedValue(new NormalizedApiError('SETTLEMENT-018', 404, 'missing'))
+    const { wrapper } = await mountDetail()
+
+    await wrapper.get('[data-action="add-receipt"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No receipt was attached')
   })
 })

@@ -7,9 +7,11 @@ import AppCard from '@/shared/ui/AppCard.vue'
 
 import { settlementGateway } from '../api/settlementGateway'
 import SettlementEmptyState from '../components/SettlementEmptyState.vue'
+import SettlementReceiptSheet from '../components/SettlementReceiptSheet.vue'
 import SettlementStatusScreen from '../components/SettlementStatusScreen.vue'
 import SettlementTransactionCard from '../components/SettlementTransactionCard.vue'
 import { useSettlementPoints } from '../composables/useSettlementPoints'
+import { useSettlementReceiptUpload } from '../composables/useSettlementReceipt'
 import type {
   ItemizedSettlementItem,
   SettlementCandidate,
@@ -230,6 +232,9 @@ function goToReview(): void {
   emit('update:step', step.value)
 }
 
+const receipt = useSettlementReceiptUpload()
+const receiptSheetOpen = ref(false)
+
 async function create(): Promise<void> {
   const candidate = selectedCandidate.value
   if (candidate === null || !canContinueDetails.value || submitting.value) return
@@ -238,6 +243,7 @@ async function create(): Promise<void> {
     type: type.value,
     participantAppointmentMemberIds: [...selectedParticipantIds.value].sort(),
     ...(type.value === 'ITEMIZED' ? { items: items.value } : {}),
+    ...(receipt.receiptId.value !== null ? { receiptId: receipt.receiptId.value } : {}),
   }
   submitting.value = true
   error.value = null
@@ -472,7 +478,23 @@ defineExpose({ back })
         :amount="selectedCandidate.amount"
         :paid-at="selectedCandidate.paidAt"
         :payer-name="selectedCandidate.payerName"
+        :receipt-url="receipt.previewUrl.value"
+        :receipt-pending="receipt.pending.value"
+        @receipt-select="receipt.select"
       />
+      <p
+        v-if="receipt.errorKey.value !== null"
+        class="mt-2 text-caption text-danger"
+        role="alert"
+      >
+        {{ t(receipt.errorKey.value) }}
+      </p>
+      <p
+        v-else-if="selectedCandidate !== null"
+        class="mt-2 text-caption text-ink-3"
+      >
+        {{ t('settlement.receipt.hint') }}
+      </p>
 
       <h3 class="mt-8 text-title">{{ t('settlement.create.participants') }}</h3>
       <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.participantsHint') }}</p>
@@ -597,6 +619,9 @@ defineExpose({ back })
         :amount="selectedCandidate.amount"
         :paid-at="selectedCandidate.paidAt"
         :payer-name="selectedCandidate.payerName"
+        receipt-mode="view"
+        :receipt-url="receipt.previewUrl.value"
+        @receipt-open="receiptSheetOpen = true"
       />
 
       <AppCard class="mt-4">
@@ -653,5 +678,11 @@ defineExpose({ back })
         >
       </div>
     </div>
+
+    <SettlementReceiptSheet
+      v-if="receiptSheetOpen && receipt.previewUrl.value !== null"
+      :url="receipt.previewUrl.value"
+      @close="receiptSheetOpen = false"
+    />
   </div>
 </template>

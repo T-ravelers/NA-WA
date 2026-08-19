@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -10,8 +10,10 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import SettlementPageHeader from '../components/SettlementPageHeader.vue'
+import SettlementReceiptSheet from '../components/SettlementReceiptSheet.vue'
 import SettlementTransactionCard from '../components/SettlementTransactionCard.vue'
 import { useSettlementPoints } from '../composables/useSettlementPoints'
+import { useSettlementReceiptViewer } from '../composables/useSettlementReceipt'
 import { resolveSettlementError } from '../model/settlementErrors'
 import { resolveSide } from '../model/settlementList'
 import { useSettlementDetail } from '../model/settlementQueries'
@@ -42,6 +44,17 @@ const queryErrorKey = computed(() => resolveSettlementError(detailQuery.error.va
 const side = computed(() =>
   route.query.side === undefined && isCreator.value ? 'sent' : resolveSide(route.query.side),
 )
+
+const receipt = useSettlementReceiptViewer(() => settlementId.value)
+const receiptSheetOpen = ref(false)
+
+/** 눌렀을 때 받아서 연다. 이미 받아 뒀으면 다시 받지 않는다. */
+async function openReceipt(): Promise<void> {
+  await receipt.load()
+  if (receipt.url.value !== null) {
+    receiptSheetOpen.value = true
+  }
+}
 
 function backToList(): void {
   void router.push({ name: 'settlements', query: { side: side.value } })
@@ -95,7 +108,18 @@ function startPayment(): void {
         :gathering-name="detail.gatheringName"
         :amount="detail.totalAmount"
         :payer-name="detail.paidBy"
+        receipt-mode="view"
+        :receipt-url="receipt.url.value"
+        :receipt-pending="receipt.pending.value"
+        @receipt-open="openReceipt"
       />
+      <p
+        v-if="receipt.errorKey.value !== null"
+        class="mt-2 text-caption text-ink-3"
+        role="status"
+      >
+        {{ t(receipt.errorKey.value) }}
+      </p>
 
       <AppCard
         v-if="!isCreator"
@@ -215,5 +239,11 @@ function startPayment(): void {
         >
       </div>
     </template>
+
+    <SettlementReceiptSheet
+      v-if="receiptSheetOpen && receipt.url.value !== null"
+      :url="receipt.url.value"
+      @close="receiptSheetOpen = false"
+    />
   </section>
 </template>
