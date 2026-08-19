@@ -89,20 +89,17 @@ const isJoinAvailable = computed(() => {
 const isJoinButtonEnabled = computed(
   () => isJoinAvailable.value && !hasJoined.value && !participationCheckFailed.value,
 )
-// 모집이 끝난 약속(CLOSED/COMPLETED/CANCELLED)은 정상 상태이지, 사용자가
-// 뭔가 잘못해서 막힌 게 아니다. 그 경우는 버튼 title 툴팁으로만 안내하고,
-// 상시 노출되는 빨간 배너는 실제로 조치가 필요한 두 경우(이미 참여함,
-// 참여 여부 확인 실패)에만 보여준다.
-const joinBlockedNotice = computed(() => {
+// 버튼 title 툴팁은 비활성 버튼에 pointer-events-none이 걸려 뜨지 않고,
+// 390px 모바일 PWA라 애초에 hover도 없다. 그래서 비활성 이유는 버튼 아래에
+// 상시 텍스트로 보여준다. 모집 종료(CLOSED/COMPLETED/CANCELLED)는 사용자
+// 잘못이 아닌 정상 상태라 text-danger(빨강)로 알릴 일이 아니어서, 세 경우
+// 모두 중립색(text-ink-3)으로 통일한다.
+const joinDisabledReason = computed(() => {
   if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
   if (hasJoined.value) return t('appointment.detail.alreadyJoined')
+  if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
   return undefined
 })
-const joinDisabledReason = computed(
-  () =>
-    joinBlockedNotice.value ??
-    (!isJoinAvailable.value ? t('appointment.detail.joinUnavailable') : undefined),
-)
 const currentMemberId = computed(() => profileQuery.data.value?.memberId)
 const isHost = computed(
   () =>
@@ -418,10 +415,10 @@ function confirmJoin(): void {
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
         <p
-          v-if="joinBlockedNotice !== undefined"
-          class="mb-2 text-center text-body-sm text-danger"
+          v-if="joinDisabledReason !== undefined"
+          class="mb-2 text-center text-body-sm text-ink-3"
         >
-          {{ joinBlockedNotice }}
+          {{ joinDisabledReason }}
         </p>
         <AppButton
           block

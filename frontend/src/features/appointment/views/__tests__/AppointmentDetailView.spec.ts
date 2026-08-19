@@ -175,8 +175,16 @@ describe('AppointmentDetailView', () => {
     const joinButton = wrapper
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
+    const notice = wrapper
+      .findAll('p')
+      .find((p) => p.text() === 'You have already joined this appointment.')
 
-    expect(wrapper.text()).toContain('You have already joined this appointment.')
+    // 버튼 title 툴팁은 비활성 버튼·모바일에서 뜨지 않으므로, 이유는 상시
+    // 텍스트로 보여준다. 완료된 약속에서도 보일 수 있어 경고색(text-danger)이
+    // 아니라 중립색(text-ink-3)이어야 한다.
+    expect(notice).toBeDefined()
+    expect(notice?.classes()).toContain('text-ink-3')
+    expect(notice?.classes()).not.toContain('text-danger')
     expect(joinButton?.attributes('disabled')).toBeDefined()
 
     await joinButton?.trigger('click')
@@ -198,9 +206,10 @@ describe('AppointmentDetailView', () => {
     expect(joinButton?.attributes('disabled')).toBeDefined()
   })
 
-  it('does not show a red join-unavailable banner on a normally closed appointment', async () => {
-    // 모집 종료(COMPLETED 등)는 정상 상태지 오류가 아니다. 참여한 적 없는
-    // 사용자에게 상시 빨간 배너로 알릴 일은 아니고, 버튼 title 툴팁이면 충분하다.
+  it('shows a neutral (not red) notice on a normally closed appointment', async () => {
+    // 모집 종료(COMPLETED 등)는 정상 상태지 오류가 아니다. 버튼 title
+    // 툴팁은 비활성 버튼·모바일에서 뜨지 않으므로 이유는 상시 텍스트로
+    // 보여주되, 경고색이 아니라 중립색으로 보여준다.
     fetchAppointment.mockResolvedValue({ ...appointment, appointmentStatus: 'COMPLETED' })
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
     profileQuery.data.value = { memberId: 99 }
@@ -209,10 +218,14 @@ describe('AppointmentDetailView', () => {
     const joinButton = wrapper
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
+    const notice = wrapper
+      .findAll('p')
+      .find((p) => p.text() === 'This appointment is not open for joining.')
 
-    expect(wrapper.text()).not.toContain('This appointment is not open for joining.')
+    expect(notice).toBeDefined()
+    expect(notice?.classes()).toContain('text-ink-3')
+    expect(notice?.classes()).not.toContain('text-danger')
     expect(joinButton?.attributes('disabled')).toBeDefined()
-    expect(joinButton?.attributes('title')).toBe('This appointment is not open for joining.')
   })
 
   it('opens the deposit sheet with an enabled confirm button for a member who has not joined', async () => {
