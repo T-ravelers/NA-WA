@@ -279,9 +279,11 @@ DB 컬럼: `appointments.item_type`
 
 ## 11. 전체 정상 흐름
 
-    1. 방장이 약속 생성 요청
+    1. 방장이 여정(Journey) 항목과 방문 날짜를 골라 약속 생성 요청
        → 같은 트랜잭션 안에서 host 보증금 HELD, host MembershipStatus ACTIVE,
-         AppointmentStatus RECRUITING까지 한 번에 확정 (2절 참고)
+         AppointmentStatus RECRUITING, 해당 Journey 항목(trip_items) CONFIRMED
+         까지 한 번에 확정 (2절, JOURNEY_API.md 참고). 활동 시작·종료 시각은
+         이 방문 날짜 하루 위에서만 조립된다.
 
     2. 일반 회원 참여 및 보증금 결제 성공
        MembershipStatus: PENDING → ACTIVE
