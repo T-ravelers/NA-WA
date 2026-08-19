@@ -25,6 +25,7 @@ import type { Category } from '@/shared/ui/category'
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
 import JourneySelectSheet from '../components/JourneySelectSheet.vue'
 import { usePlaceDetailQuery } from '../composables/usePlaceDetailQuery'
+import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMutation'
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
 import { findExploreRegionLabelKey } from '../model/exploreRegions'
@@ -41,6 +42,14 @@ const returnContext = useExploreReturnContextStore()
 const placeId = computed(() => String(route.params.placeId ?? ''))
 const placeQuery = usePlaceDetailQuery(placeId, locale)
 const place = computed(() => placeQuery.data.value)
+const likeMutation = useExploreItemLikeMutation()
+const saved = computed(() => place.value?.saved ?? false)
+
+function toggleSaved(): void {
+  const current = place.value
+  if (!current || likeMutation.isPending.value) return
+  likeMutation.mutate({ itemId: current.itemId, saved: !current.saved })
+}
 
 const selectedImage = ref(0)
 const shared = ref(false)
@@ -507,12 +516,14 @@ async function confirmJourneyDate(date: string): Promise<void> {
         <button
           type="button"
           class="flex size-12 shrink-0 items-center justify-center rounded-sm border border-hairline-strong bg-transparent text-ink"
-          :aria-label="t('explore.placeDetail.saveUnavailable')"
-          disabled
+          :aria-label="saved ? t('explore.placeDetail.unsave') : t('explore.placeDetail.save')"
+          :aria-pressed="saved"
+          @click="toggleSaved"
         >
           <IconHeart
             :size="21"
             :stroke-width="1.8"
+            :class="saved ? 'fill-danger text-danger' : ''"
             aria-hidden="true"
           />
         </button>
