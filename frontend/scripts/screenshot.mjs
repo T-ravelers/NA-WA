@@ -1070,6 +1070,24 @@ const SCREENS = [
   // 정산 화면은 낱장으로 두지 않고 `FLOWS`에서 클릭으로 이어 찍는다. 여기 남은 둘은
   // 후보가 없거나 조회가 실패한 상태라 지갑에서 눌러서는 도달할 수 없다.
   {
+    name: '23-settlement-create-empty',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEmptySettlementCandidates(page)
+    },
+    prepare: (page) => page.getByText('No payments available', { exact: true }).waitFor(),
+  },
+  {
+    name: '24-settlement-create-error',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementCandidatesError(page)
+    },
+    prepare: (page) => page.getByRole('alert').waitFor({ timeout: 10_000 }),
+  },
+  {
     name: '25-explore-place-detail',
     path: '/explore/places/501',
     setup: async (page) => {
@@ -1110,24 +1128,6 @@ const SCREENS = [
       await locationHeading.waitFor()
       await locationHeading.scrollIntoViewIfNeeded()
     },
-  },
-  {
-    name: '23-settlement-create-empty',
-    path: '/settlements/new',
-    setup: async (page) => {
-      await stubMemberProfile(page)
-      await stubEmptySettlementCandidates(page)
-    },
-    prepare: (page) => page.getByText('No payments available', { exact: true }).waitFor(),
-  },
-  {
-    name: '24-settlement-create-error',
-    path: '/settlements/new',
-    setup: async (page) => {
-      await stubMemberProfile(page)
-      await stubSettlementCandidatesError(page)
-    },
-    prepare: (page) => page.getByRole('alert').waitFor({ timeout: 10_000 }),
   },
 
   // 조작이 필요한 상태는 이렇게 찍는다.

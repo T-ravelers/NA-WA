@@ -525,8 +525,8 @@ function retry(): void {
             <div class="min-w-0 flex-1">
               <AppButton
                 block
+                compact
                 variant="secondary"
-                class="h-12 whitespace-nowrap px-2"
                 @click="openMapUrl(mapSearchUrl)"
               >
                 {{ t('explore.detail.openInGoogleMaps') }}
@@ -535,8 +535,8 @@ function retry(): void {
             <div class="min-w-0 flex-1">
               <AppButton
                 block
+                compact
                 variant="secondary"
-                class="h-12 whitespace-nowrap px-2"
                 @click="openMapUrl(mapDirectionsUrl)"
               >
                 {{ t('explore.detail.directions') }}

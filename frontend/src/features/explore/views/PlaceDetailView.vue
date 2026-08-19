@@ -464,8 +464,8 @@ async function confirmJourneyDate(date: string): Promise<void> {
             <div class="min-w-0 flex-1">
               <AppButton
                 block
+                compact
                 variant="secondary"
-                class="h-12 whitespace-nowrap px-2"
                 @click="openMapUrl(mapSearchUrl)"
               >
                 {{ t('explore.placeDetail.openInGoogleMaps') }}
@@ -474,8 +474,8 @@ async function confirmJourneyDate(date: string): Promise<void> {
             <div class="min-w-0 flex-1">
               <AppButton
                 block
+                compact
                 variant="secondary"
-                class="h-12 whitespace-nowrap px-2"
                 @click="openMapUrl(mapDirectionsUrl)"
               >
                 {{ t('explore.placeDetail.directions') }}
