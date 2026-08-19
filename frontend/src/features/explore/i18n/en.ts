@@ -221,7 +221,7 @@ export default {
     },
     sort: {
       defaultHint: 'Default',
-      latest: 'Newest',
+      newest: 'Newest',
       popular: 'Popular',
       ending_soon: 'Ending soon',
       saved: 'Saved',

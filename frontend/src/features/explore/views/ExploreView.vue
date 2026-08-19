@@ -319,7 +319,7 @@ function buildEventQuery(next: EventSearchFilters): LocationQueryRaw {
   addQueryValue(query, 'endDate', next.endDate)
   addQueryValue(query, 'eventKeyword', next.keyword)
   addQueryValue(query, 'eventPage', next.page && next.page > 0 ? String(next.page) : undefined)
-  addQueryValue(query, 'sort', next.sort === 'LATEST' ? undefined : next.sort)
+  addQueryValue(query, 'sort', next.sort === 'NEWEST' ? undefined : next.sort)
   addQueryValue(query, 'freeOnly', next.freeOnly)
   addQueryValue(query, 'openWeekendOnly', next.openWeekendOnly)
   addQueryValue(query, 'opensLateOnly', next.opensLateOnly)
@@ -337,7 +337,7 @@ function buildPlaceQuery(next: PlaceSearchFilters): LocationQueryRaw {
   addQueryList(query, 'placeRegion2', next.region2)
   addQueryValue(query, 'placeRegion2Other', next.region2Other)
   addQueryValue(query, 'placeKeyword', next.keyword)
-  addQueryValue(query, 'placeSort', next.sort === 'LATEST' ? undefined : next.sort)
+  addQueryValue(query, 'placeSort', next.sort === 'NEWEST' ? undefined : next.sort)
   addQueryValue(query, 'hasForeignLang', next.hasForeignLang)
   addQueryValue(query, 'hasParking', next.hasParking)
   addQueryValue(query, 'reservable', next.reservable)
@@ -474,7 +474,7 @@ function applySheet(next: EventSearchFilters): void {
   datePreset.value = next.datePreset
   startDate.value = next.startDate
   endDate.value = next.endDate
-  sort.value = next.sort ?? 'LATEST'
+  sort.value = next.sort ?? 'NEWEST'
   freeOnly.value = next.freeOnly ?? false
   openWeekendOnly.value = next.openWeekendOnly ?? false
   opensLateOnly.value = next.opensLateOnly ?? false
@@ -496,7 +496,7 @@ function applyPlaceSheet(next: PlaceSearchFilters): void {
       ? (next.region2 ?? []).filter((value) => VALID_SEOUL_REGION2_VALUES.has(value))
       : (next.region2 ?? [])
   selectedPlaceRegion2Other.value = next.region2Other ?? false
-  placeSort.value = next.sort ?? 'LATEST'
+  placeSort.value = next.sort ?? 'NEWEST'
   selectedPlaceHasForeignLang.value = next.hasForeignLang ?? false
   selectedPlaceHasParking.value = next.hasParking ?? false
   selectedPlaceReservable.value = next.reservable ?? false
@@ -603,7 +603,7 @@ function removeFilter(key: string): void {
     endDate.value = undefined
     eventKeywordInput.value = ''
     eventKeyword.value = ''
-    sort.value = 'LATEST'
+    sort.value = 'NEWEST'
     freeOnly.value = false
     openWeekendOnly.value = false
     opensLateOnly.value = false
@@ -659,7 +659,7 @@ function removePlaceFilter(key: string): void {
     selectedPlaceRegion1.value = [SEOUL_REGION1]
     selectedPlaceRegion2.value = []
     selectedPlaceRegion2Other.value = false
-    placeSort.value = 'LATEST'
+    placeSort.value = 'NEWEST'
     selectedPlaceHasForeignLang.value = false
     selectedPlaceHasParking.value = false
     selectedPlaceReservable.value = false
@@ -818,12 +818,16 @@ function readQueryPage(key: string): number {
   return Number.isInteger(value) && value >= 0 ? value : 0
 }
 
+// 개명 전에 만들어진 URL이 남아 있을 수 있어 레거시 'LATEST'는 'NEWEST'로
+// 해석한다. 기본값 처리에 맡기면 기본 정렬이 다른 탭에서 의도가 뒤집힌다.
 function readSort(value: string | undefined): EventSort {
-  return value === 'POPULAR' || value === 'ENDING_SOON' ? value : 'LATEST'
+  return value === 'POPULAR' || value === 'ENDING_SOON' ? value : 'NEWEST'
 }
 
 function readPlaceSort(value: string | undefined): PlaceSort {
-  return value === 'POPULAR' ? value : 'LATEST'
+  if (value === 'NEWEST' || value === 'LATEST') return 'NEWEST'
+  if (value === 'POPULAR') return 'POPULAR'
+  return 'NEWEST'
 }
 
 function isEventKind(value: string): value is EventKind {

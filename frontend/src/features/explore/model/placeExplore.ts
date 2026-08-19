@@ -1,4 +1,4 @@
-export type PlaceSort = 'LATEST' | 'POPULAR'
+export type PlaceSort = 'NEWEST' | 'POPULAR'
 
 export const PLACE_KINDS = ['RESTAURANT', 'CAFE', 'MARKET', 'BEAUTY', 'ETC'] as const
 

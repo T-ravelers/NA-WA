@@ -61,7 +61,7 @@ describe('exploreApi', () => {
     }
     get.mockResolvedValueOnce({ data })
 
-    await expect(fetchEventList({ sort: 'LATEST' })).resolves.toEqual(data)
+    await expect(fetchEventList({ sort: 'NEWEST' })).resolves.toEqual(data)
     expect(get).toHaveBeenCalledWith('/api/v1/explore/events', {
       params: expect.any(URLSearchParams),
       responseSchema: eventListResponseSchema,
@@ -103,7 +103,7 @@ describe('exploreApi', () => {
     }
     get.mockResolvedValueOnce({ data })
 
-    await expect(fetchPlaceList({ sort: 'LATEST' })).resolves.toEqual({ ...data, content: [] })
+    await expect(fetchPlaceList({ sort: 'NEWEST' })).resolves.toEqual({ ...data, content: [] })
     expect(get).toHaveBeenCalledWith('/api/v1/explore/places', {
       params: expect.any(URLSearchParams),
       responseSchema: placeListResponseSchema,

@@ -9,7 +9,7 @@ describe('PlaceFilterSheet', () => {
   it('keeps Saved independent from the sort choice', async () => {
     const wrapper = mount(PlaceFilterSheet, {
       global: { plugins: [i18n] },
-      props: { kind: 'sort', filters: { sort: 'LATEST' }, resultCount: 3 },
+      props: { kind: 'sort', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
     await wrapper
@@ -19,7 +19,7 @@ describe('PlaceFilterSheet', () => {
 
     const changes = wrapper.emitted('change') ?? []
     expect(changes[changes.length - 1]?.[0]).toMatchObject({
-      sort: 'LATEST',
+      sort: 'NEWEST',
       savedOnly: true,
     })
 
@@ -34,7 +34,7 @@ describe('PlaceFilterSheet', () => {
   it('uses the same All of Seoul and Other areas behavior as Event', async () => {
     const wrapper = mount(PlaceFilterSheet, {
       global: { plugins: [i18n] },
-      props: { kind: 'region', filters: { sort: 'LATEST' }, resultCount: 3 },
+      props: { kind: 'region', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
     await wrapper
@@ -56,7 +56,7 @@ describe('PlaceFilterSheet', () => {
   it('normalizes option deselection to undefined', async () => {
     const wrapper = mount(PlaceFilterSheet, {
       global: { plugins: [i18n] },
-      props: { kind: 'options', filters: { sort: 'LATEST' }, resultCount: 3 },
+      props: { kind: 'options', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
     const parkingButton = wrapper.findAll('button').find((button) => button.text() === 'Parking')

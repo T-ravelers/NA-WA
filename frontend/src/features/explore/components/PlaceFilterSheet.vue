@@ -231,7 +231,7 @@ function resetSheet(): void {
   } else if (props.kind === 'options') {
     PLACE_OPTIONS.forEach(({ key }) => (draft[key] = undefined))
   } else {
-    draft.sort = 'LATEST'
+    draft.sort = 'NEWEST'
     draft.savedOnly = undefined
   }
 }
@@ -448,8 +448,8 @@ function apply(): void {
             <button
               v-for="sortOption in [
                 {
-                  value: 'LATEST',
-                  labelKey: 'explore.sort.latest',
+                  value: 'NEWEST',
+                  labelKey: 'explore.sort.newest',
                   hintKey: 'explore.sort.defaultHint',
                 },
                 { value: 'POPULAR', labelKey: 'explore.sort.popular', hintKey: '' },

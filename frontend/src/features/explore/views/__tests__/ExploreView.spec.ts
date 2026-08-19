@@ -130,6 +130,25 @@ describe('ExploreView Place branch', () => {
     expect(wrapper.get('[role="radio"][aria-checked="true"]').text()).toBe('Events')
   })
 
+  it('requests the Event list with the NEWEST sort by default', async () => {
+    await mountView()
+
+    expect(fetchEventList).toHaveBeenCalledWith(expect.objectContaining({ sort: 'NEWEST' }))
+  })
+
+  it('reads a legacy LATEST event sort from an old URL as NEWEST', async () => {
+    await mountView('/explore?sort=LATEST')
+
+    expect(fetchEventList).toHaveBeenCalledWith(expect.objectContaining({ sort: 'NEWEST' }))
+  })
+
+  it('reads a legacy LATEST place sort from an old URL as NEWEST', async () => {
+    await mountView('/explore?tab=places&placeSort=LATEST')
+    await flushPromises()
+
+    expect(fetchPlaceList).toHaveBeenCalledWith(expect.objectContaining({ sort: 'NEWEST' }))
+  })
+
   it('applies a translated Seoul region2 using the operational_v9 API value', async () => {
     const { wrapper, router } = await mountView()
 

@@ -3,7 +3,7 @@ export const EVENT_STATUSES = ['SCHEDULED', 'ONGOING', 'ENDED'] as const
 
 export type EventKind = (typeof EVENT_KINDS)[number]
 export type EventStatus = (typeof EVENT_STATUSES)[number]
-export type EventSort = 'LATEST' | 'POPULAR' | 'ENDING_SOON'
+export type EventSort = 'NEWEST' | 'POPULAR' | 'ENDING_SOON'
 
 export interface EventSummary {
   itemId: number

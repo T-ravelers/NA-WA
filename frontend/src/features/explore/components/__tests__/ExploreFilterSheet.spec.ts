@@ -9,7 +9,7 @@ describe('ExploreFilterSheet', () => {
   it('does not expose saved sorting before the saved API is connected', () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
-      props: { kind: 'sort', filters: { sort: 'LATEST' }, resultCount: 3 },
+      props: { kind: 'sort', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
     expect(wrapper.findAll('button').some((button) => button.text() === 'Saved')).toBe(false)
@@ -18,7 +18,7 @@ describe('ExploreFilterSheet', () => {
   it('emits close when the scrim is pressed', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
-      props: { kind: 'options', filters: { sort: 'LATEST' }, resultCount: 3 },
+      props: { kind: 'options', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
     await wrapper.get('button[aria-label="Close filter sheet"]').trigger('click')
@@ -29,7 +29,7 @@ describe('ExploreFilterSheet', () => {
   it('keeps option changes local until Apply is pressed', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
-      props: { kind: 'options', filters: { sort: 'LATEST' }, resultCount: 3 },
+      props: { kind: 'options', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
     await wrapper
@@ -71,7 +71,7 @@ describe('ExploreFilterSheet', () => {
   it('only exposes Seoul and sends operational_v9 region values', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
-      props: { kind: 'region', filters: { sort: 'LATEST' }, resultCount: 3 },
+      props: { kind: 'region', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
     expect(wrapper.text()).toContain('Seoul')
@@ -95,7 +95,7 @@ describe('ExploreFilterSheet', () => {
   it('can select unclassified region2 values as other areas', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
-      props: { kind: 'region', filters: { sort: 'LATEST' }, resultCount: 3 },
+      props: { kind: 'region', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
     await wrapper
@@ -116,7 +116,7 @@ describe('ExploreFilterSheet', () => {
   it('can combine a named subregion with other areas', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
-      props: { kind: 'region', filters: { sort: 'LATEST' }, resultCount: 3 },
+      props: { kind: 'region', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
     await wrapper
@@ -142,7 +142,7 @@ describe('ExploreFilterSheet', () => {
   it('selects a sector and its activities using operational_v9 IDs', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
-      props: { kind: 'category', filters: { sort: 'LATEST' }, resultCount: 3 },
+      props: { kind: 'category', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
     const foodHeader = wrapper.findAll('button').find((button) => button.text().includes('Food'))
