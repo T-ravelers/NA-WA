@@ -113,15 +113,21 @@ describe('MerchantView', () => {
     vi.mocked(registerAsMerchant).mockResolvedValue(account('MERCHANT'))
 
     const { wrapper, queryClient } = await mountView()
-    const clear = vi.spyOn(queryClient, 'clear')
+    const removed = vi.spyOn(queryClient, 'removeQueries')
 
     await wrapper.find('input[type="text"]').setValue('Blue Bottle Hongdae')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(registerAsMerchant).toHaveBeenCalledWith('Blue Bottle Hongdae')
+
+    // 등록에 성공하면 화면이 곧바로 가맹점 모드로 바뀌어야 한다. 캐시만 비우고 이 화면이
+    // 다시 그려지지 않으면 사용자는 등록 폼을 계속 보고, 다시 누르면 MEMBER-009를 받는다.
+    expect(wrapper.text()).toContain('Charge a customer')
+    expect(wrapper.text()).not.toContain('Set up your store')
+
     // guard가 보는 회원 프로필 캐시가 TRAVELER로 남으면 등록 직후 손님 화면으로 나갈 수 있다.
-    expect(clear).toHaveBeenCalled()
+    expect(removed).toHaveBeenCalled()
   })
 
   it('shows income and the charge form for a merchant', async () => {
