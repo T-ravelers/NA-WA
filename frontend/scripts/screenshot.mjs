@@ -392,13 +392,16 @@ function stubJson(page, pathname, data) {
 }
 
 /**
- * 응답을 일부러 늦춘다.
+ * 응답을 붙잡아 두는 문.
  *
- * "보내는 중" 화면은 응답이 도착하는 순간 사라진다. 늦추지 않으면 찍으려는 시점에는
- * 이미 다음 화면으로 넘어가 있어 그 상태가 존재했다는 증거를 남길 수 없다.
+ * "보내는 중" 화면은 응답이 도착하는 순간 사라진다. 그 상태를 찍으려면 응답을 잡아둬야 하는데,
+ * 몇 초처럼 시간으로 잡으면 실행 속도에 따라 결과가 달라진다. 느리면 이미 넘어간 화면을 찍고,
+ * 빠르면 남은 시간만큼 그냥 기다린다. 그래서 시간이 아니라 신호로 잡는다. 흐름이 그 화면을
+ * 찍은 다음 `open()`을 부르면 그때 응답이 나간다.
  */
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+function createGate() {
+  const { promise, resolve } = Promise.withResolvers()
+  return { promise, open: resolve }
 }
 
 /**
@@ -723,13 +726,15 @@ function stubSettlementApis(page) {
  * 수 없다. POST가 뒤집는 플래그를 조회 핸들러가 함께 읽게 해서 서버가 상태를 바꾼 것처럼
  * 보이게 한다.
  */
-async function stubPayableSettlement(page, { delayMs = 2500 } = {}) {
+async function stubPayableSettlement(page, { gate }) {
   let paid = false
 
   await page.route(
     (url) => url.pathname === '/api/v1/settlements/42/members/me/pay',
     async (route) => {
-      await delay(delayMs)
+      await gate.promise
+      // 순서를 지킨다. 결제 직후 다시 나가는 상세·목록 조회가 이 플래그를 읽으므로,
+      // 응답보다 먼저 세워 두지 않으면 결제 전 데이터가 돌아간다.
       paid = true
       await fulfillJson(route, {
         settlementId: 42,
@@ -754,17 +759,19 @@ async function stubPayableSettlement(page, { delayMs = 2500 } = {}) {
 }
 
 /**
- * 요청 생성. 응답을 늦춰 "Sending your request" 화면이 사라지기 전에 찍는다.
+ * 요청 생성. 흐름이 문을 열 때까지 응답을 잡아둬 "Sending your request" 화면을 찍게 한다.
  *
  * 요청 완료 화면은 서버가 나를 이 정산의 요청자로 인정해야 완료를 표시한다. 만든 정산의
  * 상세를 함께 서빙하지 않으면 완료 화면이 영원히 처리 중에 머문다.
+ *
+ * 생성까지 가지 않는 흐름은 문을 열지 않아도 된다. 열리지 않은 문은 아무 일도 하지 않는다.
  */
-function stubSettlementCreate(page, { id = 77, delayMs = 2000 } = {}) {
+function stubSettlementCreate(page, { id = 77, gate }) {
   return Promise.all([
     page.route(
       (url) => url.pathname === '/api/v1/appointments/9/settlements',
       async (route) => {
-        await delay(delayMs)
+        await gate.promise
         await fulfillJson(route, { id })
       },
     ),
@@ -1006,8 +1013,12 @@ async function drillIntoRequestDetails(page) {
  * 단계는 버리고 실패로 센다.
  *
  * `act`가 도착 화면을 직접 기다린다. 러너가 `networkidle`을 걸지 않는 것은, "보내는 중"
- * 화면이 일부러 늦춘 응답을 기다리는 그 사이에만 존재하기 때문이다. 러너가 응답을 끝까지
- * 기다리면 찍으려던 화면은 이미 지나가 있다.
+ * 화면이 응답을 기다리는 그 사이에만 존재하기 때문이다. 러너가 응답을 끝까지 기다리면
+ * 찍으려던 화면은 이미 지나가 있다.
+ *
+ * 그 사이를 만드는 것이 `createGate`다. 스텁이 문 앞에서 응답을 잡고 있다가, 그 화면을 찍은
+ * 뒤 다음 단계의 `act` 첫 줄에서 `open()`을 부르면 그때 응답이 나간다. 캡처는 앞 단계 `act`가
+ * 끝난 직후에 일어나므로 다음 `act`의 첫 줄이 곧 "찍은 직후"다.
  *
  * `focus`는 찍기 직전의 화면 위치다. 뷰포트만 찍히므로 접힌 아래쪽을 보여줘야 하면 선택자를
  * 준다. 기본값은 맨 위이며, 하단 버튼을 누른 뒤 스크롤이 남아 머리말이 잘리는 것도 막는다.
@@ -1015,6 +1026,15 @@ async function drillIntoRequestDetails(page) {
  * @typedef {{ name: string, act?: Hook, focus?: string }} Step
  * @type {{ name: string, path: string, setup?: Hook, steps: Step[] }[]}
  */
+/**
+ * 흐름이 직접 여는 응답의 문. 흐름 하나가 문 하나를 갖는다. 나눠 쓰면 앞 흐름이 연 문이
+ * 뒤 흐름에서 이미 열려 있어, 찍으려던 "보내는 중" 화면을 그냥 지나친다.
+ */
+const payResponseGate = createGate()
+const createResponseGate = createGate()
+/** 32번은 생성까지 가지 않아 이 문을 열 일이 없다. 스텁의 짝을 맞추려고 둔다. */
+const itemizedCreateGate = createGate()
+
 const FLOWS = [
   {
     // 지갑에서 시작해 내 몫을 결제하기까지. 도중에 서버 상태가 바뀌는 유일한 흐름이다.
@@ -1024,7 +1044,7 @@ const FLOWS = [
       await stubMemberProfile(page)
       await stubWalletHome(page, WALLET_TRANSACTIONS)
       await stubCsrf(page)
-      await stubPayableSettlement(page)
+      await stubPayableSettlement(page, { gate: payResponseGate })
     },
     steps: [
       { name: '01-wallet' },
@@ -1050,9 +1070,12 @@ const FLOWS = [
         },
       },
       {
-        // 늦춰 둔 결제 응답이 도착하면 스스로 완료 화면으로 넘어간다.
+        // 앞 단계를 찍은 뒤다. 여기서 결제 응답을 내보내면 화면이 스스로 완료로 넘어간다.
         name: '05-paid',
-        act: (page) => page.getByText('Payment sent').waitFor({ timeout: 10_000 }),
+        act: async (page) => {
+          payResponseGate.open()
+          await page.getByText('Payment sent').waitFor({ timeout: 10_000 })
+        },
       },
       {
         name: '06-detail-paid',
@@ -1082,7 +1105,7 @@ const FLOWS = [
       await stubWalletHome(page, WALLET_TRANSACTIONS)
       await stubCsrf(page)
       await stubSettlementApis(page)
-      await stubSettlementCreate(page)
+      await stubSettlementCreate(page, { gate: createResponseGate })
     },
     steps: [
       { name: '01-wallet' },
@@ -1153,8 +1176,12 @@ const FLOWS = [
         },
       },
       {
+        // 앞 단계를 찍은 뒤다. 여기서 생성 응답을 내보내면 화면이 스스로 완료로 넘어간다.
         name: '11-requested',
-        act: (page) => page.getByText('Request sent').waitFor({ timeout: 10_000 }),
+        act: async (page) => {
+          createResponseGate.open()
+          await page.getByText('Request sent').waitFor({ timeout: 10_000 })
+        },
       },
       {
         name: '12-collect-list',
@@ -1174,7 +1201,7 @@ const FLOWS = [
       await stubMemberProfile(page)
       await stubCsrf(page)
       await stubSettlementApis(page)
-      await stubSettlementCreate(page)
+      await stubSettlementCreate(page, { gate: itemizedCreateGate })
     },
     steps: [
       {
