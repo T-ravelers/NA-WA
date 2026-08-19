@@ -89,12 +89,20 @@ const isJoinAvailable = computed(() => {
 const isJoinButtonEnabled = computed(
   () => isJoinAvailable.value && !hasJoined.value && !participationCheckFailed.value,
 )
-const joinDisabledReason = computed(() => {
+// 모집이 끝난 약속(CLOSED/COMPLETED/CANCELLED)은 정상 상태이지, 사용자가
+// 뭔가 잘못해서 막힌 게 아니다. 그 경우는 버튼 title 툴팁으로만 안내하고,
+// 상시 노출되는 빨간 배너는 실제로 조치가 필요한 두 경우(이미 참여함,
+// 참여 여부 확인 실패)에만 보여준다.
+const joinBlockedNotice = computed(() => {
   if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
   if (hasJoined.value) return t('appointment.detail.alreadyJoined')
-  if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
   return undefined
 })
+const joinDisabledReason = computed(
+  () =>
+    joinBlockedNotice.value ??
+    (!isJoinAvailable.value ? t('appointment.detail.joinUnavailable') : undefined),
+)
 const currentMemberId = computed(() => profileQuery.data.value?.memberId)
 const isHost = computed(
   () =>
@@ -410,10 +418,10 @@ function confirmJoin(): void {
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
         <p
-          v-if="joinDisabledReason !== undefined"
+          v-if="joinBlockedNotice !== undefined"
           class="mb-2 text-center text-body-sm text-danger"
         >
-          {{ joinDisabledReason }}
+          {{ joinBlockedNotice }}
         </p>
         <AppButton
           block

@@ -198,6 +198,23 @@ describe('AppointmentDetailView', () => {
     expect(joinButton?.attributes('disabled')).toBeDefined()
   })
 
+  it('does not show a red join-unavailable banner on a normally closed appointment', async () => {
+    // 모집 종료(COMPLETED 등)는 정상 상태지 오류가 아니다. 참여한 적 없는
+    // 사용자에게 상시 빨간 배너로 알릴 일은 아니고, 버튼 title 툴팁이면 충분하다.
+    fetchAppointment.mockResolvedValue({ ...appointment, appointmentStatus: 'COMPLETED' })
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    profileQuery.data.value = { memberId: 99 }
+    const { wrapper } = await mountView()
+
+    const joinButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+
+    expect(wrapper.text()).not.toContain('This appointment is not open for joining.')
+    expect(joinButton?.attributes('disabled')).toBeDefined()
+    expect(joinButton?.attributes('title')).toBe('This appointment is not open for joining.')
+  })
+
   it('opens the deposit sheet with an enabled confirm button for a member who has not joined', async () => {
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
     profileQuery.data.value = { memberId: 99 }
