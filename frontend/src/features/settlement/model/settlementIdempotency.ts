@@ -34,6 +34,9 @@ function createFingerprint(appointmentId: string, request: CreateSettlementReque
     appointmentId,
     sourceTransferId: request.sourceTransferId,
     type: request.type,
+    // 서버도 영수증 번호를 지문에 넣는다. 여기서 빠뜨리면 영수증만 바꿔 다시 낼 때 같은
+    // 키로 다른 요청이 나가 서버가 SETTLEMENT-009로 거절한다.
+    receiptId: request.receiptId ?? null,
     participantAppointmentMemberIds: [...request.participantAppointmentMemberIds].sort(),
     items:
       request.items?.map((item) => ({

@@ -40,6 +40,8 @@ export interface CreateSettlementRequest {
   type: SettlementType
   participantAppointmentMemberIds: string[]
   items?: ItemizedSettlementItem[]
+  /** 미리 올려 둔 영수증 사진의 번호. 사진을 붙이지 않으면 비운다. */
+  receiptId?: string
 }
 
 export interface SettlementViewer {
