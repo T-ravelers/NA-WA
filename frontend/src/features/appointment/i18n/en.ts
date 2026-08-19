@@ -199,7 +199,7 @@ export default {
       description: 'A deposit is required to secure your place in {name}.',
       refundable: 'Refundable deposit',
       paymentPending:
-        'The deposit will be held from your wallet balance and refunded after the appointment.',
+        'The deposit will be held from your wallet balance and refunded once you attend. If you no-show, your deposit is forfeited and shared among the members who attended.',
       confirm: 'Pay ₩{amount}',
       cancel: 'Cancel',
     },
