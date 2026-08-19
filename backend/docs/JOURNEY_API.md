@@ -146,7 +146,8 @@ GET /api/v1/journeys/{tripId}/items/exists?itemId={itemId}&visitDate={visitDate}
 
 | HTTP | 오류 코드 | 발생 조건 |
 | ---: | --- | --- |
-| 400 | `JOURNEY-003` | `tripId`, `itemId` 또는 `visitDate`가 유효하지 않음 |
+| 400 | `COMMON-001` | `itemId`가 숫자가 아니거나 `visitDate`가 `yyyy-MM-dd` 형식이 아니거나 누락됨(Spring이 컨트롤러 진입 전에 파라미터 바인딩에서 거부) |
+| 400 | `JOURNEY-003` | `itemId`가 파싱은 되지만 0 이하로 유효하지 않음 |
 | 403 | `JOURNEY-002` | 다른 회원이 소유한 Journey 조회 요청 |
 | 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
 

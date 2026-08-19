@@ -269,6 +269,77 @@ class JourneyControllerTest {
     }
 
     @Test
+    void existsJourneyItem_returns200WithExistsFlag() throws Exception {
+        when(journeyService.existsJourneyItem(
+            1L, 12L, 990001L, LocalDate.of(2026, 8, 8)
+        )).thenReturn(true);
+
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/12/items/exists")
+                    .param("itemId", "990001")
+                    .param("visitDate", "2026-08-08")
+            )
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertTrue(body.path("success").asBoolean());
+        assertTrue(body.path("data").path("exists").asBoolean());
+    }
+
+    @Test
+    void existsJourneyItem_returns400ForMalformedVisitDate() throws Exception {
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/12/items/exists")
+                    .param("itemId", "990001")
+                    .param("visitDate", "not-a-date")
+            )
+            .andExpect(status().isBadRequest())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals("COMMON-001", body.path("error").path("code").asText());
+    }
+
+    @Test
+    void existsJourneyItem_returns400ForMissingVisitDate() throws Exception {
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/12/items/exists")
+                    .param("itemId", "990001")
+            )
+            .andExpect(status().isBadRequest())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals("COMMON-001", body.path("error").path("code").asText());
+    }
+
+    @Test
+    void existsJourneyItem_returns400ForMalformedItemId() throws Exception {
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/12/items/exists")
+                    .param("itemId", "abc")
+                    .param("visitDate", "2026-08-08")
+            )
+            .andExpect(status().isBadRequest())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals("COMMON-001", body.path("error").path("code").asText());
+    }
+
+    @Test
     void getJourney_returns200WithJourneyData() throws Exception {
         JourneyResponse response = JourneyResponse.builder()
             .tripId(20L)

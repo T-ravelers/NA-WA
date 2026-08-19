@@ -1010,6 +1010,28 @@ class JourneyServiceTest {
     }
 
     @Test
+    void existsJourneyItem_rejectsNonPositiveItemId() {
+        Journey journey = Journey.builder()
+            .tripId(20L)
+            .memberId(1L)
+            .build();
+        when(journeyMapper.findJourneyById(20L)).thenReturn(journey);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.existsJourneyItem(
+                1L, 20L, 0L, LocalDate.of(2026, 8, 21)
+            )
+        );
+
+        assertEquals(
+            JourneyErrorCode.INVALID_JOURNEY_INPUT,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).existsJourneyItem(any(), any(), any());
+    }
+
+    @Test
     void getTimeline_returnsEmptyTimeline_whenJourneyHasNoItems() {
         when(journeyMapper.findJourneyById(50L)).thenReturn(ownedJourney(50L));
         when(journeyMapper.findTimelineItemsByTripId(50L)).thenReturn(null);
