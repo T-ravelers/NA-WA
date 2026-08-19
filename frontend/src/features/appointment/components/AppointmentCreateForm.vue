@@ -60,8 +60,8 @@ const draft = reactive<AppointmentFormDraft>({
   depositAmount: null,
   meetingPlace: '',
   meetingAddress: '',
-  activityStartAt: '',
-  activityEndAt: '',
+  activityStartTime: '',
+  activityEndTime: '',
   joinDeadline: '',
 })
 
@@ -323,18 +323,21 @@ defineExpose({ goToPreviousStep })
         <h2 class="font-display text-section-header text-ink-display">
           {{ t('appointment.create.scheduleHeading') }}
         </h2>
+        <p class="text-body-sm text-ink-3">
+          {{ t('appointment.create.visitDateNote', { date: draft.visitDate }) }}
+        </p>
         <div class="grid gap-4">
           <TextInput
-            v-model="draft.activityStartAt"
-            type="datetime-local"
+            v-model="draft.activityStartTime"
+            type="time"
             :label="t('appointment.create.startAt')"
-            :error="translatedError(errors.activityStartAt)"
+            :error="translatedError(errors.activityStartTime)"
           />
           <TextInput
-            v-model="draft.activityEndAt"
-            type="datetime-local"
+            v-model="draft.activityEndTime"
+            type="time"
             :label="t('appointment.create.endAt')"
-            :error="translatedError(errors.activityEndAt)"
+            :error="translatedError(errors.activityEndTime)"
           />
           <TextInput
             v-model="draft.joinDeadline"

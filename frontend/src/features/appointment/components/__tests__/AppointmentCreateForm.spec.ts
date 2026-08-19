@@ -24,9 +24,9 @@ async function fillSettings(wrapper: ReturnType<typeof mount>): Promise<void> {
 }
 
 async function fillSchedule(wrapper: ReturnType<typeof mount>): Promise<void> {
-  await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T18:30')
-  await wrapper.findAll('input[type="datetime-local"]')[1]?.setValue('2026-08-08T22:00')
-  await wrapper.findAll('input[type="datetime-local"]')[2]?.setValue('2026-08-08T17:30')
+  await wrapper.find('input[type="time"]').setValue('18:30')
+  await wrapper.findAll('input[type="time"]')[1]?.setValue('22:00')
+  await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T17:30')
 }
 
 describe('AppointmentCreateForm', () => {
@@ -73,7 +73,7 @@ describe('AppointmentCreateForm', () => {
 
   it('emits a normalized request after confirming valid details', async () => {
     const wrapper = mount(AppointmentCreateForm, {
-      props: { itemId: 42, itemType: 'EVENT' },
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
       global: { plugins: [i18n] },
     })
 
@@ -91,6 +91,8 @@ describe('AppointmentCreateForm', () => {
     expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({
       itemId: 42,
       itemType: 'EVENT',
+      tripId: 7,
+      visitDate: '2026-08-08',
       languageCode: 'en',
       appointmentName: 'Seongsu K-Beauty Tour',
       maxMembers: 4,
@@ -98,8 +100,8 @@ describe('AppointmentCreateForm', () => {
       depositAmount: '10000',
       meetingPlace: 'Seongsu Beauty Lab',
       meetingAddress: undefined,
-      activityStartAt: '2026-08-08T18:30:00',
-      activityEndAt: '2026-08-08T22:00:00',
+      activityStartTime: '18:30:00',
+      activityEndTime: '22:00:00',
     })
   })
 

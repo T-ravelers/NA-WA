@@ -22,8 +22,9 @@ export interface AppointmentFormDraft {
   depositAmount: number | null
   meetingPlace: string
   meetingAddress: string
-  activityStartAt: string
-  activityEndAt: string
+  /** `visitDate` 하루 안에서의 시각만(`HH:mm`). 날짜 입력은 없다. */
+  activityStartTime: string
+  activityEndTime: string
   joinDeadline: string
 }
 
@@ -34,8 +35,8 @@ export interface AppointmentFormErrors {
   languageCode?: string
   depositAmount?: string
   meetingPlace?: string
-  activityStartAt?: string
-  activityEndAt?: string
+  activityStartTime?: string
+  activityEndTime?: string
   joinDeadline?: string
 }
 
@@ -47,6 +48,29 @@ function isAppointmentLanguage(value: string): value is AppointmentLanguage {
 
 function toDateTimeRequest(value: string): string {
   return value.length === 16 ? `${value}:00` : value
+}
+
+function toTimeRequest(value: string): string {
+  return value.length === 5 ? `${value}:00` : value
+}
+
+/** `visitDate`(yyyy-MM-dd) + 시각(HH:mm)을 `joinDeadline`과 같은 형식으로 합친다. */
+function toLocalDateTimeString(visitDate: string, time: string): string {
+  return `${visitDate}T${time}`
+}
+
+function todayDateString(): string {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
+function nowTimeString(): string {
+  const now = new Date()
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
 }
 
 export function validateAppointmentBasics(draft: AppointmentFormDraft): AppointmentFormErrors {
@@ -105,19 +129,25 @@ export function validateAppointmentSettings(draft: AppointmentFormDraft): Appoin
 export function validateAppointmentSchedule(draft: AppointmentFormDraft): AppointmentFormErrors {
   const errors: AppointmentFormErrors = {}
 
-  if (draft.activityStartAt === '') {
-    errors.activityStartAt = 'appointment.create.validation.startRequired'
+  if (draft.activityStartTime === '') {
+    errors.activityStartTime = 'appointment.create.validation.startRequired'
+  } else if (draft.visitDate === todayDateString() && draft.activityStartTime <= nowTimeString()) {
+    errors.activityStartTime = 'appointment.create.validation.startInPast'
   }
 
-  if (draft.activityEndAt === '') {
-    errors.activityEndAt = 'appointment.create.validation.endRequired'
-  } else if (draft.activityStartAt !== '' && draft.activityEndAt <= draft.activityStartAt) {
-    errors.activityEndAt = 'appointment.create.validation.endAfterStart'
+  if (draft.activityEndTime === '') {
+    errors.activityEndTime = 'appointment.create.validation.endRequired'
+  } else if (draft.activityStartTime !== '' && draft.activityEndTime <= draft.activityStartTime) {
+    errors.activityEndTime = 'appointment.create.validation.endAfterStart'
   }
 
   if (draft.joinDeadline === '') {
     errors.joinDeadline = 'appointment.create.validation.deadlineRequired'
-  } else if (draft.activityStartAt !== '' && draft.joinDeadline > draft.activityStartAt) {
+  } else if (
+    draft.activityStartTime !== '' &&
+    draft.visitDate !== '' &&
+    draft.joinDeadline > toLocalDateTimeString(draft.visitDate, draft.activityStartTime)
+  ) {
     errors.joinDeadline = 'appointment.create.validation.deadlineBeforeStart'
   }
 
@@ -133,13 +163,20 @@ export function validateAppointmentForm(draft: AppointmentFormDraft): Appointmen
 }
 
 export function toAppointmentCreateRequest(draft: AppointmentFormDraft): AppointmentCreateRequest {
-  if (draft.itemId === undefined || draft.itemType === undefined || draft.depositAmount === null) {
-    throw new Error('Appointment context and deposit are required before submission')
+  if (
+    draft.itemId === undefined ||
+    draft.itemType === undefined ||
+    draft.tripId === undefined ||
+    draft.depositAmount === null
+  ) {
+    throw new Error('Appointment context, journey and deposit are required before submission')
   }
 
   return {
     itemId: draft.itemId,
     itemType: draft.itemType,
+    tripId: draft.tripId,
+    visitDate: draft.visitDate,
     languageCode: draft.languageCode,
     appointmentName: draft.appointmentName.trim(),
     maxMembers: draft.maxMembers,
@@ -147,7 +184,7 @@ export function toAppointmentCreateRequest(draft: AppointmentFormDraft): Appoint
     depositAmount: String(draft.depositAmount),
     meetingPlace: draft.meetingPlace.trim(),
     meetingAddress: draft.meetingAddress.trim() || undefined,
-    activityStartAt: toDateTimeRequest(draft.activityStartAt),
-    activityEndAt: toDateTimeRequest(draft.activityEndAt),
+    activityStartTime: toTimeRequest(draft.activityStartTime),
+    activityEndTime: toTimeRequest(draft.activityEndTime),
   }
 }

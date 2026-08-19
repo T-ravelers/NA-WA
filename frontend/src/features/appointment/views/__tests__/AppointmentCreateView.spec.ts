@@ -81,6 +81,9 @@ async function mountView() {
 async function completeJourneySelection(wrapper: ReturnType<typeof mount>): Promise<void> {
   await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
   await flushPromises()
+  // 실제 시각과 무관하게 항상 미래인 날짜를 골라, 활동 시작 시각의 "과거 금지" 검증이
+  // 테스트 실행 시각에 따라 흔들리지 않게 한다.
+  await wrapper.get('button[aria-label="Select August 31, 2026"]').trigger('click')
   await buttonByText(wrapper, 'Continue with').trigger('click')
   await flushPromises()
 }
@@ -95,9 +98,9 @@ async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> 
   await wrapper.find('input[placeholder="e.g. Seongsu Beauty Lab"]').setValue('Seongsu Beauty Lab')
   await wrapper.get('form').trigger('submit')
 
-  await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T18:30')
-  await wrapper.findAll('input[type="datetime-local"]')[1]?.setValue('2026-08-08T22:00')
-  await wrapper.findAll('input[type="datetime-local"]')[2]?.setValue('2026-08-08T17:30')
+  await wrapper.find('input[type="time"]').setValue('18:30')
+  await wrapper.findAll('input[type="time"]')[1]?.setValue('22:00')
+  await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T17:30')
   await wrapper.get('form').trigger('submit')
   await buttonByText(wrapper, 'Confirm').trigger('click')
 }

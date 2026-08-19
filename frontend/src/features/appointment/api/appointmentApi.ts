@@ -54,6 +54,10 @@ export interface AppointmentListFilters {
 export interface AppointmentCreateRequest {
   itemId: number
   itemType: AppointmentItemType
+  /** 이 약속을 확정할 여정. */
+  tripId: number
+  /** 여정 안에서 활동이 이루어지는 방문 날짜(`yyyy-MM-dd`). */
+  visitDate: string
   languageCode: AppointmentLanguage
   appointmentName: string
   maxMembers: number
@@ -61,8 +65,9 @@ export interface AppointmentCreateRequest {
   depositAmount: string
   meetingPlace: string
   meetingAddress?: string
-  activityStartAt: string
-  activityEndAt: string
+  /** `visitDate` 위에서의 시각만(`HH:mm:ss`). 날짜는 서버가 `visitDate`와 합친다. */
+  activityStartTime: string
+  activityEndTime: string
 }
 
 export interface AppointmentMember {
