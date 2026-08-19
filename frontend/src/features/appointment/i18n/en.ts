@@ -82,6 +82,16 @@ export default {
         deadlineBeforeStart: 'The join deadline must be before the activity starts.',
       },
     },
+    journeySelect: {
+      close: 'Close journey selector',
+      back: 'Go back',
+      title: 'Choose a journey',
+      description: 'Choose which journey this appointment belongs to.',
+      loading: 'Loading your journeys…',
+      error: 'We could not load your journeys. Please try again.',
+      empty: 'Create a journey before creating this appointment.',
+      createJourney: 'Create a journey',
+    },
     detail: {
       title: 'Appointment details',
       event: 'Event appointment',
