@@ -66,4 +66,25 @@ describe('AppointmentJourneySelectSheet', () => {
 
     expect(wrapper.emitted('createJourney')).toHaveLength(1)
   })
+
+  it('shows a loading state instead of the list', () => {
+    const wrapper = mount(AppointmentJourneySelectSheet, {
+      global: { plugins: [i18n] },
+      props: { journeys, loading: true },
+    })
+
+    expect(wrapper.text()).toContain('Loading your journeys…')
+    expect(wrapper.text()).not.toContain('Seoul Foodie Week')
+  })
+
+  it('shows an error message instead of the list', () => {
+    const wrapper = mount(AppointmentJourneySelectSheet, {
+      global: { plugins: [i18n] },
+      props: { journeys, errorMessage: 'We could not load your journeys. Please try again.' },
+    })
+
+    expect(wrapper.get('[role="alert"]').text()).toBe(
+      'We could not load your journeys. Please try again.',
+    )
+  })
 })

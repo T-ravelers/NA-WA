@@ -74,4 +74,17 @@ describe('AppointmentJourneyDateSheet', () => {
       'This activity is already linked to an appointment on this day.',
     )
   })
+
+  it('disables the apply button while checking the date', () => {
+    const wrapper = mount(AppointmentJourneyDateSheet, {
+      global: { plugins: [i18n] },
+      props: { ...props, loading: true },
+    })
+
+    const applyButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Continue with'))
+
+    expect(applyButton?.attributes('disabled')).toBeDefined()
+  })
 })
