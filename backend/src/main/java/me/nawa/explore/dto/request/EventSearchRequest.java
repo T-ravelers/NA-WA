@@ -26,7 +26,6 @@ public class EventSearchRequest {
     private List<String> region3;
     private String keyword;
 
-    private String datePreset;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate startDate;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -40,7 +39,7 @@ public class EventSearchRequest {
     private Boolean photoZoneOnly;
     private Boolean savedOnly;
 
-    private String sort = "LATEST";
+    private String sort = "NEWEST";
     private String language = "en";
     private int page = 0;
     private int size = 20;

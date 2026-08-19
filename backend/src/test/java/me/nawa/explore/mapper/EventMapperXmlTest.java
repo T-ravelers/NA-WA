@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -143,43 +144,45 @@ class EventMapperXmlTest {
             ).parse();
         }
 
-        EventSearchRequest ongoingRequest = new EventSearchRequest();
-        ongoingRequest.setDatePreset("ONGOING");
-        Map<String, Object> ongoingParameters = new HashMap<>();
-        ongoingParameters.put("request", ongoingRequest);
-        ongoingParameters.put("offset", 0);
-        String ongoingSql = normalizedSql(
+        // 날짜 프리셋 분기는 제거됐다(#275). 프론트가 환원해 보낸 날짜 범위가
+        // 파라미터 조건으로 들어가고, 저장된 status 컬럼은 여전히 쓰지 않는다.
+        EventSearchRequest oneDayRequest = new EventSearchRequest();
+        oneDayRequest.setStartDate(LocalDate.of(2026, 8, 20));
+        oneDayRequest.setEndDate(LocalDate.of(2026, 8, 20));
+        Map<String, Object> oneDayParameters = new HashMap<>();
+        oneDayParameters.put("request", oneDayRequest);
+        oneDayParameters.put("offset", 0);
+        String oneDaySql = normalizedSql(
             configuration,
             "me.nawa.explore.mapper.EventMapper.searchEvents",
-            ongoingParameters
+            oneDayParameters
         );
 
-        assertTrue(ongoingSql.contains(
+        assertTrue(oneDaySql.contains(
             "(e.end_date IS NULL OR e.end_date >= CURRENT_DATE())"
         ));
-        assertTrue(ongoingSql.contains(
-            "e.start_date <= CURRENT_DATE()"
-        ));
-        assertFalse(ongoingSql.contains("e.status = 'ONGOING'"));
-        assertFalse(ongoingSql.contains(
+        assertTrue(oneDaySql.contains("(e.end_date IS NULL OR e.end_date >= ?)"));
+        assertTrue(oneDaySql.contains("e.start_date <= ?"));
+        assertFalse(oneDaySql.contains("datePreset"));
+        assertFalse(oneDaySql.contains("e.status = 'ONGOING'"));
+        assertFalse(oneDaySql.contains(
             "e.status IN ('SCHEDULED', 'ONGOING')"
         ));
 
-        EventSearchRequest openingSoonRequest = new EventSearchRequest();
-        openingSoonRequest.setDatePreset("OPENING_SOON");
-        Map<String, Object> openingSoonParameters = new HashMap<>();
-        openingSoonParameters.put("request", openingSoonRequest);
-        openingSoonParameters.put("offset", 0);
-        String openingSoonSql = normalizedSql(
+        EventSearchRequest openEndedRequest = new EventSearchRequest();
+        openEndedRequest.setStartDate(LocalDate.of(2026, 8, 21));
+        Map<String, Object> openEndedParameters = new HashMap<>();
+        openEndedParameters.put("request", openEndedRequest);
+        openEndedParameters.put("offset", 0);
+        String openEndedSql = normalizedSql(
             configuration,
             "me.nawa.explore.mapper.EventMapper.searchEvents",
-            openingSoonParameters
+            openEndedParameters
         );
 
-        assertTrue(openingSoonSql.contains(
-            "e.start_date > CURRENT_DATE()"
-        ));
-        assertFalse(openingSoonSql.contains("e.status = 'SCHEDULED'"));
+        assertTrue(openEndedSql.contains("(e.end_date IS NULL OR e.end_date >= ?)"));
+        assertFalse(openEndedSql.contains("e.start_date <= ?"));
+        assertFalse(openEndedSql.contains("e.status = 'SCHEDULED'"));
 
         EventSearchRequest otherRegionRequest = new EventSearchRequest();
         otherRegionRequest.setRegion1(List.of("서울"));

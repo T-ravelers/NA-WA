@@ -141,7 +141,6 @@ class EventServiceTest {
         request.setEventKinds(List.of(" popup ", "CONCERT", "popup"));
         request.setRegion1(List.of("서울", " 서울 ", "경기"));
         request.setRegion2(List.of("성수", " 홍대 "));
-        request.setDatePreset("opening_soon");
         request.setSort("ending_soon");
         request.setFreeOnly(true);
         request.setOpenWeekendOnly(true);
@@ -173,7 +172,6 @@ class EventServiceTest {
         assertEquals(List.of("POPUP", "CONCERT"), normalized.getEventKinds());
         assertEquals(List.of("서울", "경기"), normalized.getRegion1());
         assertEquals(List.of("성수", "홍대"), normalized.getRegion2());
-        assertEquals("OPENING_SOON", normalized.getDatePreset());
         assertEquals("ENDING_SOON", normalized.getSort());
         assertEquals(true, normalized.getFreeOnly());
         assertEquals(true, normalized.getOpenWeekendOnly());
@@ -184,16 +182,28 @@ class EventServiceTest {
     }
 
     @Test
-    void searchEvents_throwsInvalidInput_whenDatePresetAndDateRangeAreCombined() {
+    void searchEvents_acceptsLegacyLatestSortAsNewest() {
         EventSearchRequest request = new EventSearchRequest();
-        request.setDatePreset("ONGOING");
-        request.setStartDate(LocalDate.of(2026, 8, 1));
+        request.setSort("LATEST");
+        when(eventMapper.searchEvents(
+            any(EventSearchRequest.class),
+            eq(0),
+            isNull(Long.class)
+        )).thenReturn(List.of());
+        when(eventMapper.countEvents(
+            any(EventSearchRequest.class),
+            isNull(Long.class)
+        )).thenReturn(0L);
 
-        assertThrows(
-            BusinessException.class,
-            () -> eventService.searchEvents(request)
+        eventService.searchEvents(request);
+
+        var requestCaptor = forClass(EventSearchRequest.class);
+        verify(eventMapper).searchEvents(
+            requestCaptor.capture(),
+            eq(0),
+            isNull(Long.class)
         );
-        verifyNoInteractions(eventMapper);
+        assertEquals("NEWEST", requestCaptor.getValue().getSort());
     }
 
     @Test
