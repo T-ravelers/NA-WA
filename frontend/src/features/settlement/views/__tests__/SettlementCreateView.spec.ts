@@ -234,6 +234,39 @@ describe('SettlementCreateView', () => {
     expect(wrapper.get('[data-participant-id="19"]').attributes('aria-pressed')).toBe('true')
   })
 
+  it('leaves the wizard alone when candidates change after a successful submit', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    // 성공 직후 부모의 무효화가 정산된 결제를 뺀 목록을 내려보낸다. 이때 1단계로 되돌리면
+    // 부모가 다음 화면으로 넘기기 전까지 살아 있는 성공 화면 뒤에서 상태가 뒤집힌다.
+    await wrapper.setProps({ candidates: [] })
+    await flushPromises()
+
+    const steps = wrapper.emitted('update:step') ?? []
+    expect(steps[steps.length - 1]).toEqual([3])
+  })
+
+  it('clears the gone-payment notice when the user changes the journey', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+
+    await wrapper.setProps({ candidates: [] })
+    await flushPromises()
+    await wrapper.setProps({ candidates: [candidate({ transferId: '8' })] })
+    await flushPromises()
+    expect(wrapper.text()).toContain('no longer available')
+
+    // 여정을 갈아타는 순간은 이미 다른 결제를 고르는 중이라 안내가 소임을 다한 시점이다.
+    await wrapper.get('[data-action="change-journey"]').trigger('click')
+    expect(wrapper.text()).not.toContain('no longer available')
+  })
+
   it('keeps the receipt entry point disabled until receipt capture ships', async () => {
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)

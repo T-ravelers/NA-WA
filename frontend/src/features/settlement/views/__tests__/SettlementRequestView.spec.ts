@@ -84,6 +84,21 @@ describe('SettlementRequestView', () => {
     expect(wrapper.find('[data-journey-key]').exists()).toBe(false)
   })
 
+  it('shows the error state when the first load fails, then opens the wizard on retry', async () => {
+    getCandidates.mockRejectedValue(new Error('network'))
+    const { wrapper } = await mountRequest()
+
+    expect(wrapper.text()).toContain('We could not complete this split action')
+    expect(wrapper.find('[data-journey-key]').exists()).toBe(false)
+
+    // 최초 실패는 지금처럼 오류 화면을 유지하고, 재시도가 성공해야 래치가 잠긴다.
+    getCandidates.mockResolvedValue([candidate()])
+    await wrapper.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-journey-key="Seoul"]').exists()).toBe(true)
+  })
+
   it('keeps the wizard mounted when a later refetch comes back empty', async () => {
     const { wrapper, refetchCandidates } = await mountRequest()
     await wrapper.get('[data-journey-key="Seoul"]').trigger('click')

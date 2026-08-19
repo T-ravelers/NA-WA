@@ -96,6 +96,10 @@ watch(submitting, (value) => emit('submittingChange', value))
 watch(
   () => props.candidates,
   (candidates) => {
+    // 제출 중에는 손대지 않는다. 성공 직후 부모의 무효화가 정산된 결제를 뺀 목록을
+    // 내려보내는데, 여기서 1단계로 되돌리면 성공 화면 뒤에서 상태가 뒤집힌다.
+    // 놓친 변경은 실패 시 REFETCH_CANDIDATES 복구 경로의 재조회가 다시 가져온다.
+    if (submitting.value) return
     const selected = selectedCandidate.value
     if (selected === null) return
     if (candidates.some((entry) => entry.transferId === selected.transferId)) return
@@ -115,11 +119,13 @@ function resetJourney(): void {
   journeyKey.value = null
   appointmentId.value = null
   selectedCandidate.value = null
+  candidateNotice.value = null
 }
 
 function resetAppointment(): void {
   appointmentId.value = null
   selectedCandidate.value = null
+  candidateNotice.value = null
 }
 
 function selectJourney(key: string): void {
