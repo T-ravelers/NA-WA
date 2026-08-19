@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -21,6 +21,22 @@ const step = ref(1)
 const submitting = ref(false)
 const createView = useTemplateRef('createView')
 const errorKey = computed(() => resolveSettlementError(candidatesQuery.error.value).messageKey)
+
+/**
+ * 위저드를 한 번이라도 열었는지 기억한다.
+ *
+ * 후보 목록은 창 포커스만 돌아와도 다시 조회된다. 그 결과로 로딩·오류·빈 화면을 다시 띄우면
+ * 작성 중이던 입력과 사용자가 읽어야 할 실패 이유가 함께 사라진다. 그래서 이 세 화면은
+ * 처음 열 때만 쓰고, 그 뒤에는 위저드를 그대로 둔다.
+ */
+const wizardOpened = ref(false)
+watch(
+  () => candidatesQuery.data.value,
+  (candidates) => {
+    if (candidates !== undefined && candidates.length > 0) wizardOpened.value = true
+  },
+  { immediate: true },
+)
 
 async function handleComplete(settlementId: string): Promise<void> {
   await Promise.all([
@@ -54,18 +70,18 @@ function back(): void {
       @back="back"
     />
     <SettlementInlineLoading
-      v-if="candidatesQuery.isPending.value"
+      v-if="!wizardOpened && candidatesQuery.isPending.value"
       class="mt-8"
       :label="t('settlement.create.loadingCandidates')"
     />
     <StateError
-      v-else-if="candidatesQuery.isError.value"
+      v-else-if="!wizardOpened && candidatesQuery.isError.value"
       class="my-auto"
       :title="t(errorKey)"
       @retry="candidatesQuery.refetch()"
     />
     <SettlementEmptyState
-      v-else-if="candidatesQuery.data.value?.length === 0"
+      v-else-if="!wizardOpened && candidatesQuery.data.value?.length === 0"
       class="flex-1"
       :title="t('settlement.create.noPaymentsTitle')"
       :description="t('settlement.create.noPaymentsDescription')"
