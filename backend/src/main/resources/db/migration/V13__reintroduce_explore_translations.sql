@@ -2,22 +2,18 @@
 -- 원본 이슈: T-ravelers/NA-WA#239
 -- V11 은 V11__add_member_account_type (PR #249) 이 선점했다.
 -- 번호만 V13 으로 올렸고 내용은 동일하다.
--- 이 파일은 백엔드 저장소의 backend/src/main/resources/db/migration/ 에 들어간다.
 
 SET NAMES utf8mb4;
 
--- 1. 상시 운영이면서 종료일이 있는 데이터를 허용하도록 기간 제약을 완화한다.
---    두 값이 모두 있을 때만 순서를 검사한다.
-ALTER TABLE event DROP CHECK chk_event_period;
-ALTER TABLE event
-    ADD CONSTRAINT chk_event_period CHECK (
-        start_date IS NULL OR end_date IS NULL OR start_date <= end_date
-    );
-
--- 2. 회차·등급별 가격 안내문이 300자를 넘는 사례가 있어 길이 제한을 푼다.
+-- 1. 회차·등급별 가격 안내문이 300자를 넘는 사례가 있어 길이 제한을 푼다.
 ALTER TABLE event MODIFY COLUMN price_text TEXT NULL;
 
--- 3. V7에서 제거한 번역 테이블을 파이프라인 번역 구조에 맞춰 재도입한다.
+-- chk_event_period 는 건드리지 않는다.
+-- 리뷰에서 지적된 대로 기존 제약은 순서 검사가 아니라 불변식이었다.
+-- "상시 + 종료일" 77건은 크롤러가 end_date 를 진실로 보고 is_permanent 를
+-- 정규화하도록 고쳤다. 그 결과 기존 제약 위반이 0이 되어 완화가 불필요해졌다.
+
+-- 2. V7에서 제거한 번역 테이블을 파이프라인 번역 구조에 맞춰 재도입한다.
 --    한국어 원문은 event/place 본체에 유지하고, 여기에는 en/ja/zh-TW/vi만 저장한다.
 CREATE TABLE event_translations (
     event_id         BIGINT       NOT NULL,
