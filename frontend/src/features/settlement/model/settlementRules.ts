@@ -1,15 +1,30 @@
 import type { ItemizedSettlementItem } from './settlement'
 
-function parseQuantity(value: string): bigint | null {
-  const match = /^(\d+)(?:\.(\d{1,3}))?$/.exec(value.trim())
+const QUANTITY_DECIMALS = 3
+const PRICE_DECIMALS = 4
+/** 단가 × 수량이라 소수 자릿수도 더해진다. */
+const TOTAL_DECIMALS = PRICE_DECIMALS + QUANTITY_DECIMALS
+
+/**
+ * 소수를 정수로 바꿔 센다.
+ *
+ * 0.1 + 0.2가 0.3이 아닌 부동소수점으로는 금액을 비교할 수 없다. 정해진 자릿수만큼 곱해
+ * 정수로 만든 뒤 정수끼리 비교한다.
+ */
+function parseScaled(value: string, decimals: number): bigint | null {
+  const match = new RegExp(`^(\\d+)(?:\\.(\\d{1,${decimals}}))?$`).exec(value.trim())
   if (match === null) return null
   const integer = match[1] ?? '0'
-  const fraction = (match[2] ?? '').padEnd(3, '0')
+  const fraction = (match[2] ?? '').padEnd(decimals, '0')
   try {
-    return BigInt(integer) * 1000n + BigInt(fraction)
+    return BigInt(integer) * 10n ** BigInt(decimals) + BigInt(fraction)
   } catch {
     return null
   }
+}
+
+function parseQuantity(value: string): bigint | null {
+  return parseScaled(value, QUANTITY_DECIMALS)
 }
 
 function hasValidPrice(value: string): boolean {
@@ -47,4 +62,39 @@ export function validateItemizedItems(
   })
 
   return { valid: invalidItemIndexes.length === 0 && items.length > 0, invalidItemIndexes }
+}
+
+/**
+ * 품목 금액의 합이 원거래 금액과 맞는지 본다.
+ *
+ * 서버는 둘이 정확히 같을 때만 정산을 만든다. 화면에서 걸러 주지 않으면 사용자가 마지막
+ * 제출 단계까지 다 채운 뒤에야 거절당한다.
+ *
+ * 값을 읽을 수 없으면 `null`을 돌려주고 막지 않는다. 형식 오류는 품목별 검증이 이미
+ * 잡으며, 여기서 겹쳐 막으면 원인이 헷갈린다.
+ */
+export function compareItemizedTotal(
+  items: ItemizedSettlementItem[],
+  sourceAmount: string,
+): { matches: boolean; total: string } | null {
+  const source = parseScaled(sourceAmount, TOTAL_DECIMALS)
+  if (source === null || items.length === 0) return null
+
+  let total = 0n
+
+  for (const item of items) {
+    const price = parseScaled(item.unitPrice, PRICE_DECIMALS)
+    const quantity = parseQuantity(item.quantity)
+    if (price === null || quantity === null) return null
+    total += price * quantity
+  }
+
+  return { matches: total === source, total: formatScaled(total, TOTAL_DECIMALS) }
+}
+
+/** 정수로 세던 값을 다시 소수 문자열로 돌린다. 뒤에 남는 0은 떼어 읽기 쉽게 둔다. */
+function formatScaled(value: bigint, decimals: number): string {
+  const unit = 10n ** BigInt(decimals)
+  const fraction = (value % unit).toString().padStart(decimals, '0').replace(/0+$/, '')
+  return fraction === '' ? `${value / unit}` : `${value / unit}.${fraction}`
 }

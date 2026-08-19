@@ -23,7 +23,7 @@ import {
   clearSettlementCreateIdempotencyKey,
   resolveSettlementCreateIdempotencyKey,
 } from '../model/settlementIdempotency'
-import { validateItemizedItems } from '../model/settlementRules'
+import { compareItemizedTotal, validateItemizedItems } from '../model/settlementRules'
 
 /**
  * 정산 요청서를 만드는 세 단계.
@@ -82,8 +82,29 @@ const chosenParticipants = computed(
 )
 const itemValidation = computed(() => validateItemizedItems(items.value, selectedIds.value))
 const hasEnoughParticipants = computed(() => selectedParticipantIds.value.length >= 2)
+/*
+ * 서버는 품목 금액의 합이 원거래 금액과 정확히 같을 때만 정산을 만든다. 여기서 막지 않으면
+ * 사용자가 검토 단계까지 다 채운 뒤 제출에서야 거절당한다.
+ */
+const itemsTotal = computed(() =>
+  selectedCandidate.value === null
+    ? null
+    : compareItemizedTotal(items.value, selectedCandidate.value.amount),
+)
+const totalMatchesSource = computed(() => itemsTotal.value?.matches !== false)
 const canContinueDetails = computed(
-  () => hasEnoughParticipants.value && (type.value === 'EQUAL' || itemValidation.value.valid),
+  () =>
+    hasEnoughParticipants.value &&
+    (type.value === 'EQUAL' || (itemValidation.value.valid && totalMatchesSource.value)),
+)
+
+/*
+ * 잘못된 품목 표시는 "계속"을 누른 뒤부터 켠다. 입력하는 도중에 빨간 표시가 따라다니면
+ * 아직 다 적지도 않은 칸을 틀렸다고 말하는 꼴이 된다.
+ */
+const showItemErrors = ref(false)
+const invalidItemIndexes = computed(() =>
+  showItemErrors.value ? new Set(itemValidation.value.invalidItemIndexes) : new Set<number>(),
 )
 
 watch(submitting, (value) => emit('submittingChange', value))
@@ -223,11 +244,17 @@ function goToReview(): void {
     return
   }
   if (!canContinueDetails.value) {
-    validationMessage.value = t('settlement.create.allocationIncomplete')
+    // 합계가 어긋난 것과 품목 입력이 덜 된 것은 고쳐야 할 곳이 달라 문구를 나눈다.
+    validationMessage.value =
+      itemValidation.value.valid && !totalMatchesSource.value
+        ? t('settlement.create.totalMismatch')
+        : t('settlement.create.allocationIncomplete')
+    showItemErrors.value = true
     return
   }
 
   validationMessage.value = null
+  showItemErrors.value = false
   step.value = 3
   emit('update:step', step.value)
 }
@@ -532,10 +559,31 @@ defineExpose({ back })
         </div>
         <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.itemsHint') }}</p>
         <div
+          v-if="itemsTotal !== null"
+          data-testid="items-total"
+          class="mt-3 flex items-baseline justify-between gap-3 text-body-sm"
+          :class="itemsTotal.matches ? 'text-ink-2' : 'text-danger'"
+        >
+          <span>{{ t('settlement.create.itemsTotal') }}</span>
+          <span
+            >{{ points(itemsTotal.total) }} / {{ points(selectedCandidate?.amount ?? '0') }}</span
+          >
+        </div>
+        <div
           v-for="(item, index) in items"
           :key="index"
+          :data-item-invalid="invalidItemIndexes.has(index) ? 'true' : undefined"
           class="mt-4 rounded-sm bg-surface-1 p-4"
+          :class="{ 'ring-1 ring-danger': invalidItemIndexes.has(index) }"
         >
+          <p
+            v-if="invalidItemIndexes.has(index)"
+            :id="`item-error-${index}`"
+            class="mb-3 text-caption text-danger"
+            role="alert"
+          >
+            {{ t('settlement.create.itemInvalid') }}
+          </p>
           <label
             class="block text-caption text-ink-2"
             :for="`item-name-${index}`"
@@ -544,6 +592,8 @@ defineExpose({ back })
           <input
             :id="`item-name-${index}`"
             :data-item-name="index"
+            :aria-invalid="invalidItemIndexes.has(index) ? 'true' : undefined"
+            :aria-describedby="invalidItemIndexes.has(index) ? `item-error-${index}` : undefined"
             :value="item.name"
             class="mt-1 min-h-11 w-full rounded-sm bg-surface-2 px-3 text-body-sm"
             @input="updateItem(index, 'name', ($event.target as HTMLInputElement).value)"

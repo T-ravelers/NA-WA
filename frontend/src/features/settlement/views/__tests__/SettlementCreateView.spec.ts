@@ -39,6 +39,25 @@ async function openCamera(wrapper: ReturnType<typeof mountCreate>): Promise<void
   await flushPromises()
 }
 
+async function fillItem(
+  wrapper: ReturnType<typeof mountCreate>,
+  index: number,
+  values: { name: string; unitPrice: string; quantity: string },
+): Promise<void> {
+  await wrapper.get(`[data-item-name="${index}"]`).setValue(values.name)
+  await wrapper.get(`[data-item-unit-price="${index}"]`).setValue(values.unitPrice)
+  await wrapper.get(`[data-item-quantity="${index}"]`).setValue(values.quantity)
+}
+
+async function allocate(
+  wrapper: ReturnType<typeof mountCreate>,
+  index: number,
+  participantId: string,
+  quantity: string,
+): Promise<void> {
+  await wrapper.get(`[data-allocation-quantity="${index}:${participantId}"]`).setValue(quantity)
+}
+
 function pngFile(name = 'receipt.png', type = 'image/png', size = 1024): File {
   const file = new File([new Uint8Array(1)], name, { type })
   Object.defineProperty(file, 'size', { value: size })
@@ -403,5 +422,83 @@ describe('SettlementCreateView', () => {
 
     expect(uploadReceipt).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('JPEG, PNG, or WebP')
+  })
+
+  it('points at the item that blocks the step, and only after Continue', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '10', quantity: '1' })
+    await allocate(wrapper, 0, '12', '1')
+    // 두 번째 품목은 배분 합이 수량과 어긋난다.
+    await fillItem(wrapper, 1, { name: 'Wine', unitPrice: '20', quantity: '2' })
+    await allocate(wrapper, 1, '12', '1')
+
+    // 아직 누르기 전에는 아무 표시도 하지 않는다.
+    expect(wrapper.find('[data-item-invalid="true"]').exists()).toBe(false)
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 합이 어긋난 두 번째 품목만 표시돼야 한다. 멀쩡한 첫 품목까지 빨개지면 소용이 없다.
+    const flagged = wrapper.findAll('[data-item-invalid="true"]')
+    expect(flagged).toHaveLength(1)
+    expect(flagged[0]?.find('[data-item-name="1"]').exists()).toBe(true)
+  })
+
+  it('clears the item marks once the step goes through', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '25', quantity: '2' })
+    await allocate(wrapper, 0, '12', '1')
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+    expect(wrapper.find('[data-item-invalid="true"]').exists()).toBe(true)
+
+    await allocate(wrapper, 0, '19', '1')
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    expect(wrapper.find('[data-item-invalid="true"]').exists()).toBe(false)
+  })
+
+  it('blocks the step when item totals do not match the payment', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+
+    // 원거래는 25.00인데 품목 합계가 30.00이다. 서버가 거절할 요청이라 여기서 막는다.
+    await fillItem(wrapper, 0, { name: 'Wine', unitPrice: '30.00', quantity: '1' })
+    await allocate(wrapper, 0, '12', '1')
+
+    expect(wrapper.get('[data-testid="items-total"]').text()).toContain('30')
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 품목 자체는 흠이 없으니 배분 안내가 아니라 합계 안내가 떠야 고칠 곳을 안다.
+    expect(wrapper.text()).toContain('must match the payment')
+    expect(wrapper.text()).not.toContain('settlement.create.overview')
+  })
+
+  it('lets the step through once the totals line up', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '12.50', quantity: '2' })
+    await allocate(wrapper, 0, '12', '1')
+    await allocate(wrapper, 0, '19', '1')
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(true)
   })
 })
