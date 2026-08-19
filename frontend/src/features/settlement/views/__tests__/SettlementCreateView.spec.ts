@@ -169,6 +169,104 @@ describe('SettlementCreateView', () => {
     expect(wrapper.emitted('complete')).toBeUndefined()
   })
 
+  it('drops the allocations of a participant who is removed', async () => {
+    const wrapper = mountCreate([
+      candidate({
+        participants: [
+          { id: '12', name: 'Alex', initials: 'AL' },
+          { id: '19', name: 'Mina', initials: 'MI' },
+          { id: '27', name: 'Sora', initials: 'SO' },
+        ],
+      }),
+    ])
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-participant-id="27"]').trigger('click')
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+
+    await wrapper.get('[data-item-name="0"]').setValue('Pasta')
+    await wrapper.get('[data-item-unit-price="0"]').setValue('12.50')
+    await wrapper.get('[data-item-quantity="0"]').setValue('3')
+    await wrapper.get('[data-allocation-quantity="0:12"]').setValue('1')
+    await wrapper.get('[data-allocation-quantity="0:19"]').setValue('1')
+    await wrapper.get('[data-allocation-quantity="0:27"]').setValue('1')
+
+    await wrapper.get('[data-participant-id="27"]').trigger('click')
+
+    // 다시 선택하면 이전 값이 아니라 빈 칸으로 시작한다. 값이 지워졌다는 증거다.
+    await wrapper.get('[data-participant-id="27"]').trigger('click')
+    expect(
+      (wrapper.get('[data-allocation-quantity="0:27"]').element as HTMLInputElement).value,
+    ).toBe('')
+
+    // 해제한 사람의 배분값이 남으면, 보이는 칸이 모두 맞아도 검증이 숨은 1을 계속 더해
+    // 어떤 편집으로도 다음 단계로 넘어갈 수 없다.
+    await wrapper.get('[data-participant-id="27"]').trigger('click')
+    await wrapper.get('[data-item-quantity="0"]').setValue('2')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    expect(wrapper.text()).toContain('Request overview')
+  })
+
+  it('returns to the first step when the chosen payment disappears from a refetch', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+
+    await wrapper.setProps({ candidates: [] })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('no longer available')
+    expect(wrapper.text()).toContain('No payments available')
+    const steps = wrapper.emitted('update:step') ?? []
+    expect(steps[steps.length - 1]).toEqual([1])
+  })
+
+  it('keeps the wizard on its step when a refetch still holds the chosen payment', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+
+    await wrapper.setProps({ candidates: [candidate(), candidate({ transferId: '8' })] })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('no longer available')
+    expect(wrapper.get('[data-participant-id="19"]').attributes('aria-pressed')).toBe('true')
+  })
+
+  it('leaves the wizard alone when candidates change after a successful submit', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    // 성공 직후 부모의 무효화가 정산된 결제를 뺀 목록을 내려보낸다. 이때 1단계로 되돌리면
+    // 부모가 다음 화면으로 넘기기 전까지 살아 있는 성공 화면 뒤에서 상태가 뒤집힌다.
+    await wrapper.setProps({ candidates: [] })
+    await flushPromises()
+
+    const steps = wrapper.emitted('update:step') ?? []
+    expect(steps[steps.length - 1]).toEqual([3])
+  })
+
+  it('clears the gone-payment notice when the user changes the journey', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+
+    await wrapper.setProps({ candidates: [] })
+    await flushPromises()
+    await wrapper.setProps({ candidates: [candidate({ transferId: '8' })] })
+    await flushPromises()
+    expect(wrapper.text()).toContain('no longer available')
+
+    // 여정을 갈아타는 순간은 이미 다른 결제를 고르는 중이라 안내가 소임을 다한 시점이다.
+    await wrapper.get('[data-action="change-journey"]').trigger('click')
+    expect(wrapper.text()).not.toContain('no longer available')
+  })
+
   it('keeps the receipt entry point disabled until receipt capture ships', async () => {
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)

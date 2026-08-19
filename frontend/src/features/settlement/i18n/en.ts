@@ -52,6 +52,7 @@ export default {
       selectJourney: 'Choose the journey you paid for.',
       selectAppointment: 'Choose the appointment inside this journey.',
       selectTransaction: 'Choose the payment to split.',
+      candidateGone: 'The payment you chose is no longer available. Choose another payment.',
       unassignedJourney: 'Not linked to a journey',
       paymentCount: '{count} payment | {count} payments',
       changeJourney: 'Change journey',

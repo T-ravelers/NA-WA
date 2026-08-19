@@ -6,6 +6,7 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import { settlementGateway } from '../api/settlementGateway'
+import SettlementEmptyState from '../components/SettlementEmptyState.vue'
 import SettlementStatusScreen from '../components/SettlementStatusScreen.vue'
 import SettlementTransactionCard from '../components/SettlementTransactionCard.vue'
 import { useSettlementPoints } from '../composables/useSettlementPoints'
@@ -52,6 +53,8 @@ const items = ref<ItemizedSettlementItem[]>([])
 const submitting = ref(false)
 const error = ref<unknown>(null)
 const validationMessage = ref<string | null>(null)
+/** 1단계 위쪽에 뜨는 안내. 2단계 전용인 validationMessage와 자리가 달라 따로 둔다. */
+const candidateNotice = ref<string | null>(null)
 
 const journeys = computed(() => groupCandidates(props.candidates))
 const selectedJourney = computed(
@@ -83,15 +86,46 @@ const canContinueDetails = computed(
 
 watch(submitting, (value) => emit('submittingChange', value))
 
+/**
+ * 고른 결제가 목록에서 사라졌는지 지켜본다.
+ *
+ * selectedCandidate는 목록에서 떼어낸 사본이라 목록이 새로 와도 저절로 맞춰지지 않는다.
+ * 그대로 두면 이미 없어진 결제 번호로 요청을 보내게 되므로, 선택을 비우고 왜 그런지 알린 뒤
+ * 1단계로 돌려보낸다.
+ */
+watch(
+  () => props.candidates,
+  (candidates) => {
+    // 제출 중에는 손대지 않는다. 성공 직후 부모의 무효화가 정산된 결제를 뺀 목록을
+    // 내려보내는데, 여기서 1단계로 되돌리면 성공 화면 뒤에서 상태가 뒤집힌다.
+    // 놓친 변경은 실패 시 REFETCH_CANDIDATES 복구 경로의 재조회가 다시 가져온다.
+    if (submitting.value) return
+    const selected = selectedCandidate.value
+    if (selected === null) return
+    if (candidates.some((entry) => entry.transferId === selected.transferId)) return
+
+    selectedCandidate.value = null
+    selectedParticipantIds.value = []
+    items.value = []
+    error.value = null
+    validationMessage.value = null
+    candidateNotice.value = t('settlement.create.candidateGone')
+    step.value = 1
+    emit('update:step', step.value)
+  },
+)
+
 function resetJourney(): void {
   journeyKey.value = null
   appointmentId.value = null
   selectedCandidate.value = null
+  candidateNotice.value = null
 }
 
 function resetAppointment(): void {
   appointmentId.value = null
   selectedCandidate.value = null
+  candidateNotice.value = null
 }
 
 function selectJourney(key: string): void {
@@ -110,6 +144,7 @@ function selectTransaction(candidate: SettlementCandidate): void {
   selectedParticipantIds.value = [candidate.payerAppointmentMemberId]
   items.value = []
   error.value = null
+  candidateNotice.value = null
 }
 
 function goToDetails(): void {
@@ -126,9 +161,23 @@ function setType(nextType: SettlementType): void {
 function toggleParticipant(participantId: string): void {
   const candidate = selectedCandidate.value
   if (candidate === null || participantId === candidate.payerAppointmentMemberId) return
-  selectedParticipantIds.value = selectedIds.value.has(participantId)
+
+  const removing = selectedIds.value.has(participantId)
+  selectedParticipantIds.value = removing
     ? selectedParticipantIds.value.filter((id) => id !== participantId)
     : [...selectedParticipantIds.value, participantId]
+
+  // 배분 입력칸은 선택된 사람만 그리므로 해제하면 화면에서 사라진다. 그런데 값이 남아 있으면
+  // 검증은 보이지 않는 수량을 계속 더한다. 그러면 보이는 어떤 편집으로도 통과할 수 없다.
+  if (removing) {
+    items.value = items.value.map((item) => ({
+      ...item,
+      allocations: item.allocations.filter(
+        (allocation) => allocation.appointmentMemberId !== participantId,
+      ),
+    }))
+  }
+
   validationMessage.value = null
 }
 
@@ -241,7 +290,20 @@ defineExpose({ back })
       v-if="step === 1"
       class="flex flex-1 flex-col"
     >
-      <template v-if="selectedJourney === null">
+      <p
+        v-if="candidateNotice !== null"
+        class="mt-4 text-body-sm text-danger"
+        role="alert"
+      >
+        {{ candidateNotice }}
+      </p>
+      <SettlementEmptyState
+        v-if="candidates.length === 0"
+        class="flex-1"
+        :title="t('settlement.create.noPaymentsTitle')"
+        :description="t('settlement.create.noPaymentsDescription')"
+      />
+      <template v-else-if="selectedJourney === null">
         <h2 class="mt-8 text-section-header">{{ t('settlement.create.journeys') }}</h2>
         <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.selectJourney') }}</p>
         <ul class="mt-5 space-y-3">
