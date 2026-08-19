@@ -26,6 +26,7 @@ import me.nawa.deposit.domain.ResolutionStatus;
 import me.nawa.deposit.mapper.DepositMapper;
 import me.nawa.deposit.mapper.DepositPayoutBatchMapper;
 import me.nawa.deposit.mapper.DepositPayoutMapper;
+import me.nawa.journey.mapper.JourneyMapper;
 import me.nawa.settlement.service.SettlementAmountAllocator;
 import me.nawa.wallet.mapper.WalletLedgerMapper;
 import me.nawa.wallet.mapper.WalletMapper;
@@ -63,6 +64,7 @@ class DepositPayoutBatchProcessorIntegrationTest {
     private static DepositPayoutBatchMapper depositPayoutBatchMapper;
     private static DepositPayoutMapper depositPayoutMapper;
     private static WalletMapper walletMapper;
+    private static JourneyMapper journeyMapper;
     private static JdbcTemplate jdbcTemplate;
     private static AppointmentService appointmentService;
     private static DepositPayoutBatchProcessor processor;
@@ -70,6 +72,7 @@ class DepositPayoutBatchProcessorIntegrationTest {
     private final List<Long> memberIds = new ArrayList<>();
     private final List<Long> eventIds = new ArrayList<>();
     private final List<Long> appointmentIds = new ArrayList<>();
+    private final List<Long> tripIds = new ArrayList<>();
     private BigDecimal poolBalanceBeforeTest;
 
     @BeforeAll
@@ -94,6 +97,7 @@ class DepositPayoutBatchProcessorIntegrationTest {
         sqlSessionFactory.getConfiguration().addMapper(WalletMapper.class);
         sqlSessionFactory.getConfiguration().addMapper(WalletTransferMapper.class);
         sqlSessionFactory.getConfiguration().addMapper(WalletLedgerMapper.class);
+        sqlSessionFactory.getConfiguration().addMapper(JourneyMapper.class);
 
         SqlSessionTemplate sqlSessionTemplate = new SqlSessionTemplate(sqlSessionFactory);
         appointmentMapper = sqlSessionTemplate.getMapper(AppointmentMapper.class);
@@ -101,6 +105,7 @@ class DepositPayoutBatchProcessorIntegrationTest {
         depositPayoutBatchMapper = sqlSessionTemplate.getMapper(DepositPayoutBatchMapper.class);
         depositPayoutMapper = sqlSessionTemplate.getMapper(DepositPayoutMapper.class);
         walletMapper = sqlSessionTemplate.getMapper(WalletMapper.class);
+        journeyMapper = sqlSessionTemplate.getMapper(JourneyMapper.class);
         WalletTransferMapper walletTransferMapper =
                 sqlSessionTemplate.getMapper(WalletTransferMapper.class);
         WalletLedgerMapper walletLedgerMapper =
@@ -117,7 +122,8 @@ class DepositPayoutBatchProcessorIntegrationTest {
                 appointmentMapper,
                 depositMapper,
                 depositPayoutBatchMapper,
-                walletTransferService
+                walletTransferService,
+                journeyMapper
         );
         processor = new DepositPayoutBatchProcessor(
                 depositPayoutBatchMapper,
@@ -158,6 +164,12 @@ class DepositPayoutBatchProcessorIntegrationTest {
                             + " WHERE m.appointment_id IN (" + placeholders + ")",
                     ids
             );
+            // trip_items가 fk_trip_items_appointment_item으로 appointments를 참조하므로
+            // 약속을 지우기 전에 먼저 지운다.
+            jdbcTemplate.update(
+                    "DELETE FROM trip_items WHERE appointment_id IN (" + placeholders + ")",
+                    ids
+            );
             jdbcTemplate.update(
                     "DELETE FROM appointment_members WHERE appointment_id IN (" + placeholders + ")",
                     ids
@@ -165,6 +177,13 @@ class DepositPayoutBatchProcessorIntegrationTest {
             jdbcTemplate.update(
                     "DELETE FROM appointments WHERE appointment_id IN (" + placeholders + ")",
                     ids
+            );
+        }
+        if (!tripIds.isEmpty()) {
+            String placeholders = String.join(", ", tripIds.stream().map(id -> "?").toList());
+            jdbcTemplate.update(
+                    "DELETE FROM trips WHERE trip_id IN (" + placeholders + ")",
+                    tripIds.toArray()
             );
         }
         if (!eventIds.isEmpty()) {
@@ -245,7 +264,7 @@ class DepositPayoutBatchProcessorIntegrationTest {
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Test Meeting Place");
         request.setJoinDeadline(LocalDateTime.now().plusDays(1));
-        request.setTripId(1L);
+        request.setTripId(createJourney(hostMemberId));
         request.setVisitDate(LocalDate.now().plusDays(2));
         request.setActivityStartTime(LocalTime.of(10, 0));
         request.setActivityEndTime(LocalTime.of(12, 0));
@@ -355,6 +374,18 @@ class DepositPayoutBatchProcessorIntegrationTest {
                 walletOwnerId, balance
         );
         return memberId;
+    }
+
+    private long createJourney(long memberId) {
+        jdbcTemplate.update(
+                "INSERT INTO trips (member_id, title, start_date, end_date)"
+                        + " VALUES (?, 'Integration Test Trip', CURRENT_DATE(),"
+                        + " DATE_ADD(CURRENT_DATE(), INTERVAL 30 DAY))",
+                memberId
+        );
+        long tripId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        tripIds.add(tripId);
+        return tripId;
     }
 
     private long createApprovedEvent() {

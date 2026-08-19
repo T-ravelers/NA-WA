@@ -22,6 +22,8 @@ import me.nawa.deposit.domain.DepositPayoutBatch;
 import me.nawa.deposit.domain.ResolutionReason;
 import me.nawa.deposit.mapper.DepositMapper;
 import me.nawa.deposit.mapper.DepositPayoutBatchMapper;
+import me.nawa.journey.domain.Journey;
+import me.nawa.journey.mapper.JourneyMapper;
 import me.nawa.wallet.domain.SystemWalletCode;
 import me.nawa.wallet.domain.enums.TransferType;
 import me.nawa.wallet.service.WalletTransferService;
@@ -58,6 +60,8 @@ class AppointmentServiceTest {
     private DepositPayoutBatchMapper depositPayoutBatchMapper;
     @Mock
     private WalletTransferService walletTransferService;
+    @Mock
+    private JourneyMapper journeyMapper;
     @InjectMocks
     private AppointmentService appointmentService;
 
@@ -65,6 +69,14 @@ class AppointmentServiceTest {
     void createAppointment_success_holdsHostDepositAndBecomesRecruiting() {
         AppointmentCreateRequest request = validRequest();
         when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(java.time.LocalDate.of(2026, 8, 1))
+                        .endDate(java.time.LocalDate.of(2026, 8, 31))
+                        .build()
+        );
         stubInsertAppointment(10L);
         stubInsertAppointmentMember(20L);
         when(depositMapper.insert(any())).thenReturn(1);

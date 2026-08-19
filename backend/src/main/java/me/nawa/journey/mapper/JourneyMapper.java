@@ -51,6 +51,11 @@ public interface JourneyMapper {
 
     void insertJourneyItem(JourneyItem journeyItem);
 
+    // 약속 생성과 동시에 여정 항목을 CONFIRMED로 만든다. ADDED로 넣고 나중에
+    // 승격하는 경로가 아니라, 처음부터 CONFIRMED로 INSERT한다 — appointment_id
+    // 없이 CONFIRMED가 될 수 없다는 chk_trip_items_status 제약과 맞물린다.
+    void insertConfirmedJourneyItem(JourneyItem journeyItem);
+
     JourneyItem findJourneyItemById(@Param("tripItemId") Long tripItemId);
 
     JourneyItem findJourneyItemForUpdate(
