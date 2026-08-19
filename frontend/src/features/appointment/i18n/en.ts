@@ -66,6 +66,11 @@ export default {
       confirm: 'Confirm',
       cancel: 'Cancel',
       close: 'Close confirmation',
+      exitConfirmTitle: 'Leave without creating?',
+      exitConfirmDescription:
+        'Your appointment has not been created yet. If you leave now, this progress will be lost.',
+      exitConfirmStay: 'Stay',
+      exitConfirmLeave: 'Leave',
       loadFailed: 'Appointment could not be created. Please try again.',
       validation: {
         itemContext: 'Open this form from an Event or Place.',
@@ -103,6 +108,7 @@ export default {
       selectDate: 'Select {date}',
       apply: 'Continue with {date}',
       alreadyLinked: 'This activity is already linked to an appointment on this day.',
+      checkFailed: 'We could not check this date. Please try again.',
     },
     calendar: {
       weekdays: {

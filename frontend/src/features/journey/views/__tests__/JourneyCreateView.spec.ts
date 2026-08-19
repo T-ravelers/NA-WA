@@ -26,7 +26,7 @@ const input: JourneyCreateInput = {
   regions: [],
 }
 
-async function mountView() {
+async function mountView(initialPath = '/journeys/new') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -36,13 +36,18 @@ async function mountView() {
         name: 'journey-detail',
         component: { template: '<div>Journey detail</div>' },
       },
+      {
+        path: '/appointments/new',
+        name: 'appointment-create',
+        component: { template: '<div>Appointment create</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
 
-  await router.push('/journeys/new')
+  await router.push(initialPath)
   await router.isReady()
 
   const wrapper = mount(JourneyCreateView, {
@@ -70,6 +75,23 @@ describe('JourneyCreateView', () => {
     expect(createJourney).toHaveBeenCalledWith(input)
     expect(router.currentRoute.value.fullPath).toBe('/journeys/42')
     expect(queryClient.getQueryData(['journeys', 'detail', 42])).toMatchObject({ tripId: 42 })
+  })
+
+  it('returns to the requesting route with the new tripId when returnRouteName is set', async () => {
+    createJourney.mockResolvedValue({ ...input, tripId: 42 })
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=appointment-create&itemId=100&itemType=EVENT',
+    )
+
+    wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+    expect(router.currentRoute.value.query).toEqual({
+      itemId: '100',
+      itemType: 'EVENT',
+      tripId: '42',
+    })
   })
 
   it('shows the normalized creation error without navigating', async () => {

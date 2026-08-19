@@ -12,6 +12,10 @@ export const MAX_APPOINTMENT_MEMBERS = 10
 export interface AppointmentFormDraft {
   itemId: number | undefined
   itemType: AppointmentItemType | undefined
+  /** 약속을 확정할 여정. 여정·날짜 선택 시트를 통과해야만 폼이 렌더링되므로 항상 있다. */
+  tripId: number | undefined
+  /** 선택한 여정 안에서의 방문 날짜. 활동 시작·종료는 이 날짜 위에서만 조립된다. */
+  visitDate: string
   appointmentName: string
   maxMembers: number
   languageCode: AppointmentLanguage

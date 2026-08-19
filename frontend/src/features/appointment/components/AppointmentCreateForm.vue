@@ -27,6 +27,9 @@ import {
 interface Props {
   itemId?: number
   itemType?: AppointmentItemType
+  /** 약속을 확정할 여정. 여정·날짜 선택 시트를 마친 뒤에만 이 폼이 렌더링된다. */
+  tripId?: number
+  visitDate?: string
   pending?: boolean
   errorMessage?: string
 }
@@ -34,6 +37,8 @@ interface Props {
 const {
   itemId = undefined,
   itemType = undefined,
+  tripId = undefined,
+  visitDate = '',
   pending = false,
   errorMessage = undefined,
 } = defineProps<Props>()
@@ -47,6 +52,8 @@ const confirmationOpen = ref(false)
 const draft = reactive<AppointmentFormDraft>({
   itemId,
   itemType,
+  tripId,
+  visitDate,
   appointmentName: '',
   maxMembers: 4,
   languageCode: 'en',

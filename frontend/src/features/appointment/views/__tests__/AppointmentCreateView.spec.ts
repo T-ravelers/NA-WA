@@ -1,12 +1,16 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
+import { appointmentJourneyIntegrationKey } from '../../model/journeyIntegration'
+
 const createAppointment = vi.fn()
+const checkJourneyItemExists = vi.fn()
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
@@ -14,6 +18,10 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
 }))
 
 const AppointmentCreateView = (await import('../AppointmentCreateView.vue')).default
+
+const journeys = [
+  { tripId: 7, title: 'Seoul Foodie Week', startDate: '2026-08-01', endDate: '2026-08-31' },
+]
 
 function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
   const button = wrapper.findAll('button').find((candidate) => candidate.text().includes(text))
@@ -29,6 +37,11 @@ async function mountView() {
         path: '/appointments/new',
         name: 'appointment-create',
         component: AppointmentCreateView,
+      },
+      {
+        path: '/journeys/new',
+        name: 'journey-create',
+        component: { template: '<div>Journey create</div>' },
       },
       {
         path: '/appointments/:appointmentId',
@@ -49,10 +62,27 @@ async function mountView() {
   const wrapper = mount(AppointmentCreateView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+      provide: {
+        [appointmentJourneyIntegrationKey as symbol]: {
+          useJourneyListQuery: () => ({
+            data: ref(journeys),
+            isPending: ref(false),
+            isError: ref(false),
+          }),
+          checkJourneyItemExists,
+        },
+      },
     },
   })
   await flushPromises()
   return { wrapper, router }
+}
+
+async function completeJourneySelection(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+  await flushPromises()
+  await buttonByText(wrapper, 'Continue with').trigger('click')
+  await flushPromises()
 }
 
 async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> {
@@ -73,8 +103,114 @@ async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> 
 }
 
 describe('AppointmentCreateView', () => {
-  it('moves to the previous form step before leaving the route', async () => {
+  beforeEach(() => {
+    createAppointment.mockReset()
+    checkJourneyItemExists.mockReset()
+    checkJourneyItemExists.mockResolvedValue(false)
+  })
+
+  it('opens the journey select sheet on entry and hides the form', async () => {
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Choose a journey')
+    expect(wrapper.text()).toContain('Seoul Foodie Week')
+    expect(wrapper.find('form').exists()).toBe(false)
+  })
+
+  it('moves to the date sheet after selecting a journey, then to the form after choosing a date', async () => {
+    const { wrapper } = await mountView()
+
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    expect(wrapper.text()).toContain('Which day?')
+
+    await buttonByText(wrapper, 'Continue with').trigger('click')
+    await flushPromises()
+
+    expect(checkJourneyItemExists).toHaveBeenCalledWith(7, 42, expect.any(String))
+    expect(wrapper.text()).toContain('Start with your appointment details')
+  })
+
+  it('shows an error and keeps the date sheet open when the combination already exists', async () => {
+    checkJourneyItemExists.mockResolvedValueOnce(true)
+    const { wrapper } = await mountView()
+
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    await buttonByText(wrapper, 'Continue with').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(
+      'This activity is already linked to an appointment on this day.',
+    )
+    expect(wrapper.text()).toContain('Which day?')
+    expect(wrapper.find('form').exists()).toBe(false)
+  })
+
+  it('returns to the journey select sheet when the date sheet is closed', async () => {
+    const { wrapper } = await mountView()
+
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    expect(wrapper.text()).toContain('Which day?')
+
+    await wrapper.get('button[aria-label="Go back"]').trigger('click')
+
+    expect(wrapper.text()).toContain('Choose a journey')
+  })
+
+  it('confirms and leaves the flow when the journey select sheet is closed', async () => {
     const { wrapper, router } = await mountView()
+
+    await wrapper.get('button[aria-label="Close journey selector"]').trigger('click')
+    expect(wrapper.text()).toContain('Leave without creating?')
+
+    await buttonByText(wrapper, 'Leave').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-list')
+  })
+
+  it('navigates to journey creation with a return route when there are no journeys', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/appointments/new', name: 'appointment-create', component: AppointmentCreateView },
+        { path: '/journeys/new', name: 'journey-create', component: { template: '<div />' } },
+      ],
+    })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    await router.push('/appointments/new?itemId=42&itemType=EVENT')
+    await router.isReady()
+
+    const wrapper = mount(AppointmentCreateView, {
+      global: {
+        plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+        provide: {
+          [appointmentJourneyIntegrationKey as symbol]: {
+            useJourneyListQuery: () => ({
+              data: ref([]),
+              isPending: ref(false),
+              isError: ref(false),
+            }),
+            checkJourneyItemExists,
+          },
+        },
+      },
+    })
+    await flushPromises()
+
+    await buttonByText(wrapper, 'Create a journey').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-create')
+    expect(router.currentRoute.value.query).toMatchObject({
+      returnRouteName: 'appointment-create',
+      itemId: '42',
+      itemType: 'EVENT',
+    })
+  })
+
+  it('moves to the previous form step, then opens an exit confirmation on the first step', async () => {
+    const { wrapper, router } = await mountView()
+    await completeJourneySelection(wrapper)
 
     await wrapper
       .find('input[placeholder="e.g. Seongsu K-Beauty Tour"]')
@@ -95,7 +231,9 @@ describe('AppointmentCreateView', () => {
 
     await wrapper.find('header button').trigger('click')
     expect(wrapper.text()).toContain('Start with your appointment details')
-    expect(router.currentRoute.value.name).toBe('appointment-create')
+
+    await wrapper.find('header button').trigger('click')
+    expect(wrapper.text()).toContain('Leave without creating?')
   })
 
   it('creates the appointment and navigates to its detail page on success', async () => {
@@ -119,6 +257,7 @@ describe('AppointmentCreateView', () => {
       members: [],
     })
     const { wrapper, router } = await mountView()
+    await completeJourneySelection(wrapper)
 
     await fillAndConfirm(wrapper)
     await flushPromises()
@@ -131,6 +270,7 @@ describe('AppointmentCreateView', () => {
   it('shows a generic error message and stays on the form when creation fails', async () => {
     createAppointment.mockRejectedValueOnce(new Error('network error'))
     const { wrapper, router } = await mountView()
+    await completeJourneySelection(wrapper)
 
     await fillAndConfirm(wrapper)
     await flushPromises()
@@ -144,6 +284,7 @@ describe('AppointmentCreateView', () => {
       new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
     )
     const { wrapper, router } = await mountView()
+    await completeJourneySelection(wrapper)
 
     await fillAndConfirm(wrapper)
     await flushPromises()
