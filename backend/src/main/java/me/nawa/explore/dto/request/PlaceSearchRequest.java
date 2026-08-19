@@ -39,8 +39,8 @@ public class PlaceSearchRequest {
     private Boolean hasRestroom;
     private Boolean savedOnly;
 
-    @ApiModelProperty("LATEST 또는 POPULAR")
-    private String sort = "LATEST";
+    @ApiModelProperty("NEWEST 또는 POPULAR. 기본 POPULAR")
+    private String sort = "POPULAR";
     @ApiModelProperty("Activity/Sector 이름 언어. en이면 영문, 그 외에는 한글")
     private String language = "en";
     @ApiModelProperty("0부터 시작하는 페이지 번호")
