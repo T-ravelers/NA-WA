@@ -95,6 +95,24 @@ describe('ExploreFilterSheet date presets', () => {
     expect(day22?.attributes('disabled')).toBeUndefined()
   })
 
+  it('paints the whole selected range white and keeps the endpoints as pills', async () => {
+    const wrapper = mountDateSheet()
+
+    await pressButton(wrapper, '21')
+    await pressButton(wrapper, '23')
+
+    const day21 = wrapper.findAll('button').find((button) => button.text() === '21')
+    const day22 = wrapper.findAll('button').find((button) => button.text() === '22')
+    const day23 = wrapper.findAll('button').find((button) => button.text() === '23')
+    expect(day21?.classes()).toContain('bg-paper-fill')
+    expect(day21?.classes()).not.toContain('rounded-none')
+    expect(day22?.classes()).toContain('bg-paper-fill')
+    expect(day22?.classes()).toContain('rounded-none')
+    expect(day23?.classes()).toContain('bg-paper-fill')
+    expect(day23?.classes()).not.toContain('rounded-none')
+    expect(wrapper.html()).not.toContain('bg-surface-2')
+  })
+
   it('disables past days when no preset is chosen', () => {
     const wrapper = mountDateSheet()
 

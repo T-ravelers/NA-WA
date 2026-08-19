@@ -552,8 +552,12 @@ function apply(): void {
                   !isDateSelected(cell.date) &&
                   !isDateInRange(cell.date) &&
                   'text-ink-2',
-                isDateInRange(cell.date) && 'rounded-none bg-surface-2',
-                isDateSelected(cell.date) && 'bg-paper-fill text-on-paper',
+                // 선택 칩과 범위 배경이 같은 셀에 겹치면 CSS 순서에 따라 칩이
+                // 묻힌다 — 양 끝 날짜는 범위 배경을 받지 않게 상호 배타로 가른다.
+                // 범위도 칩과 같은 흰 배경을 써서 선택 구간 전체가 밝게 보인다.
+                isDateSelected(cell.date)
+                  ? 'bg-paper-fill text-on-paper'
+                  : isDateInRange(cell.date) && 'rounded-none bg-paper-fill text-on-paper',
               ]"
               :disabled="!cell.inMonth || !isDateAllowed(cell.date)"
               @click="cell.inMonth && setCalendarDate(cell.date)"
