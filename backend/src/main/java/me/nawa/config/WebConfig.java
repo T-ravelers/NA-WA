@@ -1,5 +1,7 @@
 package me.nawa.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.filter.CharacterEncodingFilter;
 import org.springframework.web.servlet.support.AbstractAnnotationConfigDispatcherServletInitializer;
 
@@ -7,6 +9,10 @@ import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletRegistration;
 
 public class WebConfig extends AbstractAnnotationConfigDispatcherServletInitializer {
+
+    // 이 클래스는 스프링 빈이 아니라 서블릿 부팅 코드라서 롬복의 @Slf4j를 쓰지 않고
+    // 로거를 직접 만든다.
+    private static final Logger LOGGER = LoggerFactory.getLogger(WebConfig.class);
 
     /*
      * 영수증 사진 업로드 크기 상한.
@@ -58,6 +64,10 @@ public class WebConfig extends AbstractAnnotationConfigDispatcherServletInitiali
         ));
     }
 
+    /*
+     * 값이 이상하면 기본값으로 돌아가되 반드시 흔적을 남긴다. 조용히 넘어가면 오타 하나로
+     * 상한이 8MB로 되돌아간 것을 아무도 모른 채 "왜 큰 사진만 실패하지"를 헤매게 된다.
+     */
     private long resolveMaxUploadBytes() {
         String configured = System.getenv(MAX_UPLOAD_BYTES_ENV);
         if (configured == null || configured.isBlank()) {
@@ -65,9 +75,20 @@ public class WebConfig extends AbstractAnnotationConfigDispatcherServletInitiali
         }
         try {
             long parsed = Long.parseLong(configured.trim());
-            return parsed > 0 ? parsed : DEFAULT_MAX_UPLOAD_BYTES;
+            if (parsed > 0) {
+                return parsed;
+            }
+            warnFallback(configured, "0보다 커야 합니다");
         } catch (NumberFormatException exception) {
-            return DEFAULT_MAX_UPLOAD_BYTES;
+            warnFallback(configured, "숫자가 아닙니다");
         }
+        return DEFAULT_MAX_UPLOAD_BYTES;
+    }
+
+    private void warnFallback(String configured, String reason) {
+        LOGGER.warn(
+            "{} 값이 올바르지 않아({}) 기본값 {}바이트를 사용합니다. 설정값={}",
+            MAX_UPLOAD_BYTES_ENV, reason, DEFAULT_MAX_UPLOAD_BYTES, configured
+        );
     }
 }

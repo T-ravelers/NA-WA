@@ -115,6 +115,30 @@ public enum SettlementErrorCode implements ErrorCode {
         HttpStatus.SERVICE_UNAVAILABLE,
         "SETTLEMENT-019",
         "영수증 저장소를 사용할 수 없습니다."
+    ),
+
+    /**
+     * 영수증 보관 기한 만료
+     *
+     * 사진은 보관 기한이 지나면 저장소에서 사라진다. "처음부터 없었다"(018)와 구분하려고
+     * 코드를 따로 둔다. 둘이 같은 코드로 나가면 장애 조사 때 어느 쪽인지 알 수 없다.
+     */
+    SETTLEMENT_RECEIPT_EXPIRED(
+        HttpStatus.GONE,
+        "SETTLEMENT-020",
+        "영수증 보관 기한이 지나 더 이상 볼 수 없습니다."
+    ),
+
+    /**
+     * 영수증 파일 읽기 실패
+     *
+     * 업로드된 파일을 서버가 읽어내지 못한 경우다. 파일 형식 문제(016)가 아니라 서버 쪽
+     * 문제이므로 분리한다. 형식 오류로 뭉뚱그리면 사용자 잘못으로 오해하게 된다.
+     */
+    SETTLEMENT_RECEIPT_READ_FAILED(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        "SETTLEMENT-021",
+        "영수증 파일을 읽지 못했습니다."
     );
 
     private final HttpStatus status;

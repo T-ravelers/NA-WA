@@ -23,6 +23,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -179,8 +181,12 @@ class SettlementReceiptServiceTest {
         assertEquals(PNG_BYTES.length, receipt.content().length);
     }
 
+    /**
+     * 보관 기한이 지나면 저장소가 사진을 지우지만 지웠다고 알려주지는 않는다. "그런 파일
+     * 없다"는 응답을 받은 이 순간이 유일한 삭제 신호라, 여기서 행에 기록을 남겨야 한다.
+     */
     @Test
-    void getReceipt_objectMissingInStorage_throwsNotFound() {
+    void getReceipt_objectExpiredInStorage_marksRowAndThrowsExpired() {
         when(settlementReceiptMapper.findBySettlementIdForViewer(SETTLEMENT_ID, MEMBER_ID))
             .thenReturn(receiptRow());
         when(receiptStorageService.download(eq(OBJECT_KEY)))
@@ -190,9 +196,48 @@ class SettlementReceiptServiceTest {
             BusinessException.class, () -> service.getReceipt(MEMBER_ID, SETTLEMENT_ID)
         );
 
+        // 처음부터 없었던 것(018)과 기한이 지나 사라진 것(020)은 구분해서 내보낸다.
         assertEquals(
-            SettlementErrorCode.SETTLEMENT_RECEIPT_NOT_FOUND, exception.getErrorCode()
+            SettlementErrorCode.SETTLEMENT_RECEIPT_EXPIRED, exception.getErrorCode()
         );
+        verify(settlementReceiptMapper).markExpired(RECEIPT_ID);
+    }
+
+    /** 기록에 실패했다고 응답까지 바꾸면 원인이 더 헷갈린다. 사진은 어차피 사라졌다. */
+    @Test
+    void getReceipt_markExpiredFails_stillThrowsExpired() {
+        when(settlementReceiptMapper.findBySettlementIdForViewer(SETTLEMENT_ID, MEMBER_ID))
+            .thenReturn(receiptRow());
+        when(receiptStorageService.download(eq(OBJECT_KEY)))
+            .thenThrow(NoSuchKeyException.builder().message("gone").build());
+        doThrow(new IllegalStateException("db down"))
+            .when(settlementReceiptMapper).markExpired(RECEIPT_ID);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class, () -> service.getReceipt(MEMBER_ID, SETTLEMENT_ID)
+        );
+
+        assertEquals(
+            SettlementErrorCode.SETTLEMENT_RECEIPT_EXPIRED, exception.getErrorCode()
+        );
+    }
+
+    /** 저장소 자체가 죽은 것은 만료가 아니다. 행을 만료로 표시하면 안 된다. */
+    @Test
+    void getReceipt_storageUnavailable_doesNotMarkExpired() {
+        when(settlementReceiptMapper.findBySettlementIdForViewer(SETTLEMENT_ID, MEMBER_ID))
+            .thenReturn(receiptRow());
+        when(receiptStorageService.download(eq(OBJECT_KEY)))
+            .thenThrow(S3Exception.builder().message("boom").build());
+
+        BusinessException exception = assertThrows(
+            BusinessException.class, () -> service.getReceipt(MEMBER_ID, SETTLEMENT_ID)
+        );
+
+        assertEquals(
+            SettlementErrorCode.SETTLEMENT_RECEIPT_STORAGE_UNAVAILABLE, exception.getErrorCode()
+        );
+        verify(settlementReceiptMapper, never()).markExpired(anyLong());
     }
 
     private SettlementReceipt receiptRow() {

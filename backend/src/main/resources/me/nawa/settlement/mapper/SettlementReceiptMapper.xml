@@ -21,6 +21,11 @@
           AND deleted_at IS NULL
     </update>
 
+    <!--
+        아래 WHERE의 "참여자인가" 판정은 SettlementMapper.xml의 findDetail과 같은 조건이다.
+        참여자 규칙이 바뀌면 두 쿼리를 함께 고친다. 한쪽만 고치면 정산 상세는 보이는데
+        영수증만 안 보이는(또는 그 반대의) 어긋난 상태가 된다.
+    -->
     <select id="findBySettlementIdForViewer"
             resultType="me.nawa.settlement.domain.SettlementReceipt">
         SELECT sr.settlement_receipt_id, sr.uploaded_by_member_id, sr.settlement_id,
@@ -37,4 +42,15 @@
                 AND sm.deleted_at IS NULL AND am.deleted_at IS NULL
           ))
     </select>
+
+    <!--
+        이미 만료로 표시된 행을 다시 건드리지 않도록 deleted_at IS NULL을 조건에 둔다.
+        사진이 사라진 것을 처음 알아챈 시각이 그대로 남아야 기록으로서 값어치가 있다.
+    -->
+    <update id="markExpired">
+        UPDATE settlement_receipts
+        SET deleted_at = CURRENT_TIMESTAMP
+        WHERE settlement_receipt_id = #{settlementReceiptId}
+          AND deleted_at IS NULL
+    </update>
 </mapper>

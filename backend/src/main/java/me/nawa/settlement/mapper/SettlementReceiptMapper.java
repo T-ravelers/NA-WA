@@ -21,9 +21,23 @@ public interface SettlementReceiptMapper {
         @Param("memberId") Long memberId
     );
 
-    /** 정산 참여자에게만 영수증을 돌려준다. 참여자가 아니면 null이다. */
+    /**
+     * 정산 참여자에게만 영수증을 돌려준다. 참여자가 아니면 null이다.
+     *
+     * 누가 참여자인지 판단하는 조건은 {@code SettlementMapper.findDetail}과 같다. 참여자
+     * 판정 규칙이 바뀌면 두 쿼리를 함께 고쳐야 한다.
+     */
     SettlementReceipt findBySettlementIdForViewer(
         @Param("settlementId") Long settlementId,
         @Param("memberId") Long memberId
     );
+
+    /**
+     * 저장소에서 사라진 사진의 행을 만료로 표시한다.
+     *
+     * 사진은 보관 기한이 지나면 저장소가 알아서 지우는데, 지웠다고 알려주지는 않는다.
+     * 그래서 조회하다 "그런 파일 없다"는 답을 받은 그 순간을 삭제 신호로 삼는다. 언제
+     * 사라졌는지가 기록으로 남아야 나중에 "원래 없었는지, 지워졌는지"를 구분할 수 있다.
+     */
+    int markExpired(@Param("settlementReceiptId") Long settlementReceiptId);
 }

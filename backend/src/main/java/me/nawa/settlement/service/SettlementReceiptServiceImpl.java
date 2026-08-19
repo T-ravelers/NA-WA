@@ -2,6 +2,7 @@ package me.nawa.settlement.service;
 
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.storage.ReceiptStorageService;
 import me.nawa.common.storage.StoredReceipt;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SettlementReceiptServiceImpl implements SettlementReceiptService {
@@ -55,8 +57,11 @@ public class SettlementReceiptServiceImpl implements SettlementReceiptService {
         }
     }
 
+    /**
+     * 트랜잭션을 걸지 않는다. 사진을 내려받는 동안(수 MB) DB 커넥션을 붙들고 있을 이유가
+     * 없고, 아래에서 만료 표시를 남기는 쓰기가 있어 읽기 전용으로 묶을 수도 없다.
+     */
     @Override
-    @Transactional(readOnly = true)
     public StoredReceipt getReceipt(Long memberId, Long settlementId) {
         SettlementReceipt receipt = settlementReceiptMapper.findBySettlementIdForViewer(
             settlementId, memberId
@@ -67,10 +72,30 @@ public class SettlementReceiptServiceImpl implements SettlementReceiptService {
         try {
             return receiptStorageService.download(receipt.getObjectKey());
         } catch (NoSuchKeyException exception) {
-            throw new BusinessException(SettlementErrorCode.SETTLEMENT_RECEIPT_NOT_FOUND);
+            // 사진은 보관 기한이 지나면 저장소가 지우는데 지웠다고 알려주지는 않는다.
+            // "그런 파일 없다"는 이 응답이 사라졌다는 유일하게 확실한 신호라, 이때 기록을
+            // 남긴다. 그래야 다음 조회부터 저장소를 헛되이 부르지 않고, 사진이 언제
+            // 사라졌는지도 남는다.
+            markExpired(receipt);
+            throw new BusinessException(SettlementErrorCode.SETTLEMENT_RECEIPT_EXPIRED);
         } catch (SdkException exception) {
             throw new BusinessException(
                 SettlementErrorCode.SETTLEMENT_RECEIPT_STORAGE_UNAVAILABLE
+            );
+        }
+    }
+
+    /**
+     * 기록에 실패해도 사용자에게는 원래의 만료 응답을 그대로 준다. 사진은 어차피 사라졌고,
+     * 기록을 못 남긴 것 때문에 응답까지 500으로 바뀌면 원인이 더 헷갈린다.
+     */
+    private void markExpired(SettlementReceipt receipt) {
+        try {
+            settlementReceiptMapper.markExpired(receipt.getSettlementReceiptId());
+        } catch (RuntimeException exception) {
+            log.warn(
+                "영수증 만료 표시 실패, settlementReceiptId={}",
+                receipt.getSettlementReceiptId(), exception
             );
         }
     }

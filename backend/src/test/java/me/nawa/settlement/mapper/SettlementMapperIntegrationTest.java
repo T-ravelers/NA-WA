@@ -221,6 +221,38 @@ class SettlementMapperIntegrationTest {
         }
     }
 
+    /**
+     * 사진이 저장소에서 사라진 것을 알아챈 시각을 남기고, 그 뒤로는 조회에서 빠지는지 본다.
+     * 두 번째 호출이 0을 돌려주는 것은 처음 알아챈 시각이 덮어써지지 않는다는 뜻이다.
+     */
+    @Test
+    void markExpired_onceMarked_isHiddenFromViewerAndNotMarkedAgain() {
+        Fixture fixture = createFixture();
+        try {
+            Settlement settlement = settlement(fixture);
+            mapper.insertSettlement(settlement);
+            SettlementReceipt draft = draft(fixture);
+            receiptMapper.insertReceipt(draft);
+            receiptMapper.linkToSettlement(
+                draft.getSettlementReceiptId(), settlement.getSettlementId(), fixture.memberId()
+            );
+
+            assertEquals(1, receiptMapper.markExpired(draft.getSettlementReceiptId()));
+
+            assertNotNull(jdbcTemplate.queryForObject(
+                "SELECT deleted_at FROM settlement_receipts WHERE settlement_receipt_id = ?",
+                java.sql.Timestamp.class,
+                draft.getSettlementReceiptId()
+            ));
+            assertNull(receiptMapper.findBySettlementIdForViewer(
+                settlement.getSettlementId(), fixture.memberId()
+            ));
+            assertEquals(0, receiptMapper.markExpired(draft.getSettlementReceiptId()));
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
     private static SettlementReceipt draft(Fixture fixture) {
         return new SettlementReceipt(
             fixture.memberId(),

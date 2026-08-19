@@ -75,6 +75,11 @@ public class SettlementReceiptController {
             .body(receipt.content());
     }
 
+    /**
+     * 파일이 비어 있는 것은 사용자 잘못이지만, 올라온 파일을 서버가 읽어내지 못한 것은
+     * 서버 잘못이다. 둘을 같은 오류로 내보내면 장애 조사 때 사용자 탓으로 오해하게 되므로
+     * 코드를 나누고, 원인 예외를 함께 실어 로그에 스택이 남게 한다.
+     */
     private byte[] readBytes(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_RECEIPT_FORMAT_INVALID);
@@ -82,7 +87,9 @@ public class SettlementReceiptController {
         try {
             return file.getBytes();
         } catch (IOException exception) {
-            throw new BusinessException(SettlementErrorCode.SETTLEMENT_RECEIPT_FORMAT_INVALID);
+            throw new BusinessException(
+                SettlementErrorCode.SETTLEMENT_RECEIPT_READ_FAILED, exception
+            );
         }
     }
 }

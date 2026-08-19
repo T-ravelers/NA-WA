@@ -4,9 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Collections;
 import me.nawa.auth.security.AuthenticatedMember;
+import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.common.storage.StoredReceipt;
 import me.nawa.settlement.dto.response.SettlementReceiptUploadResponse;
+import me.nawa.settlement.exception.SettlementErrorCode;
 import me.nawa.settlement.service.SettlementReceiptService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,5 +104,22 @@ class SettlementReceiptControllerTest {
         assertEquals("nosniff", response.getHeader("X-Content-Type-Options"));
         assertEquals("private, no-store", response.getHeader("Cache-Control"));
         assertEquals(PNG_BYTES.length, response.getContentAsByteArray().length);
+    }
+
+    /** 보관 기한이 지난 사진은 "없음"(404)이 아니라 "사라짐"(410)으로 구분해 내려간다. */
+    @Test
+    void getReceipt_expired_returnsGoneWithEnvelope() throws Exception {
+        when(settlementReceiptService.getReceipt(1L, 69L)).thenThrow(
+            new BusinessException(SettlementErrorCode.SETTLEMENT_RECEIPT_EXPIRED)
+        );
+
+        String responseBody = mockMvc.perform(get("/api/v1/settlements/69/receipt"))
+            .andExpect(status().isGone())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertEquals("SETTLEMENT-020", body.path("error").path("code").asText());
     }
 }
