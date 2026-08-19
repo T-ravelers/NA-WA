@@ -36,7 +36,11 @@ function parseDate(value: string | null | undefined): Date | null {
 }
 
 function isDateAllowed(value: string): boolean {
-  return value >= props.startDate && value <= props.endDate
+  // 여정 기간 안이라도 진행 중인(시작일이 과거인) 여정이면 지난 날짜가 섞여
+  // 있을 수 있다. 지난 날짜를 고르면 백엔드의 "활동 시작이 현재 이후" 검증에
+  // 항상 걸려 제출이 실패하므로, 여기서 오늘 이전 날짜를 먼저 걸러낸다.
+  const lowerBound = props.startDate > today() ? props.startDate : today()
+  return value >= lowerBound && value <= props.endDate
 }
 
 function getInitialDate(): string | null {
