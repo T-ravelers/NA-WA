@@ -77,6 +77,18 @@ describe('JourneyCreateView', () => {
     expect(queryClient.getQueryData(['journeys', 'detail', 42])).toMatchObject({ tripId: 42 })
   })
 
+  it('invalidates the cached journey list so the new journey shows up elsewhere', async () => {
+    createJourney.mockResolvedValue({ ...input, tripId: 42 })
+    const { wrapper, queryClient } = await mountView()
+    // 다른 화면(예: 약속 생성의 여정 선택 시트)이 이미 조회해둔 빈 목록 캐시를 흉내낸다.
+    queryClient.setQueryData(['journeys', 'list'], [])
+
+    wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
+    await flushPromises()
+
+    expect(queryClient.getQueryState(['journeys', 'list'])?.isInvalidated).toBe(true)
+  })
+
   it('returns to the requesting route with the new tripId when returnRouteName is set', async () => {
     createJourney.mockResolvedValue({ ...input, tripId: 42 })
     const { wrapper, router } = await mountView(

@@ -32,6 +32,10 @@ const createMutation = useMutation({
   mutationFn: createJourney,
   onSuccess: async (journey) => {
     queryClient.setQueryData(journeyKeys.detail(journey.tripId), journey)
+    // 여정 목록 쿼리(다른 feature의 journeyKeys.list()도 같은 'journeys' 루트를
+    // 쓴다)를 무효화한다. 안 하면 30초 staleTime 안에 목록을 다시 조회할 때
+    // (예: 약속 생성의 여정 선택 시트) 방금 만든 여정이 안 보인다.
+    await queryClient.invalidateQueries({ queryKey: journeyKeys.all })
 
     const returnTo = returnRouteName()
     if (returnTo !== null) {
