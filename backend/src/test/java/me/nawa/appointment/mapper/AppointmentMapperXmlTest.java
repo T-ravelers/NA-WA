@@ -97,7 +97,8 @@ class AppointmentMapperXmlTest {
     void closeExpiredRecruitingAppointments_onlyTargetsExpiredRecruiting()
             throws Exception {
         String sql = boundSql(
-                "closeExpiredRecruitingAppointments", Map.of()
+                "closeExpiredRecruitingAppointments",
+                Map.of("now", java.time.LocalDateTime.now())
         );
 
         assertTrue(sql.contains("appointment_status = 'CLOSED'"));
@@ -109,7 +110,8 @@ class AppointmentMapperXmlTest {
     void startDueClosedAppointments_onlyTargetsClosedPastActivityStart()
             throws Exception {
         String sql = boundSql(
-                "startDueClosedAppointments", Map.of()
+                "startDueClosedAppointments",
+                Map.of("now", java.time.LocalDateTime.now())
         );
 
         assertTrue(sql.contains("appointment_status = 'IN_PROGRESS'"));
