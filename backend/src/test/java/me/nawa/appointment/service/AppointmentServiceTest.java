@@ -54,6 +54,12 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AppointmentServiceTest {
+    // 절대 날짜로 고정하면 그 시점이 지나는 순간 activityStartAt이 과거가 되어
+    // validRequest()를 쓰는 테스트가 전부 깨진다. 실행 시점 기준 상대 날짜로 둔다.
+    private static final LocalDate VISIT_DATE = LocalDate.now().plusDays(7);
+    private static final LocalDate JOURNEY_START_DATE = LocalDate.now();
+    private static final LocalDate JOURNEY_END_DATE = VISIT_DATE.plusDays(30);
+
     @Mock
     private AppointmentMapper appointmentMapper;
     @Mock
@@ -75,8 +81,8 @@ class AppointmentServiceTest {
                 Journey.builder()
                         .tripId(1L)
                         .memberId(1L)
-                        .startDate(java.time.LocalDate.of(2026, 8, 1))
-                        .endDate(java.time.LocalDate.of(2026, 8, 31))
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
                         .build()
         );
         stubInsertAppointment(10L);
@@ -158,8 +164,8 @@ class AppointmentServiceTest {
                 Journey.builder()
                         .tripId(1L)
                         .memberId(2L)
-                        .startDate(LocalDate.of(2026, 8, 1))
-                        .endDate(LocalDate.of(2026, 8, 31))
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
                         .build()
         );
 
@@ -180,8 +186,8 @@ class AppointmentServiceTest {
                 Journey.builder()
                         .tripId(1L)
                         .memberId(1L)
-                        .startDate(LocalDate.of(2026, 9, 1))
-                        .endDate(LocalDate.of(2026, 9, 30))
+                        .startDate(VISIT_DATE.plusDays(60))
+                        .endDate(VISIT_DATE.plusDays(90))
                         .build()
         );
 
@@ -205,11 +211,11 @@ class AppointmentServiceTest {
                 Journey.builder()
                         .tripId(1L)
                         .memberId(1L)
-                        .startDate(LocalDate.of(2026, 8, 1))
-                        .endDate(LocalDate.of(2026, 8, 31))
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
                         .build()
         );
-        when(journeyMapper.existsJourneyItem(1L, 100L, LocalDate.of(2026, 8, 21)))
+        when(journeyMapper.existsJourneyItem(1L, 100L, VISIT_DATE))
                 .thenReturn(true);
 
         BusinessException exception = assertThrows(
@@ -229,8 +235,8 @@ class AppointmentServiceTest {
                 Journey.builder()
                         .tripId(1L)
                         .memberId(1L)
-                        .startDate(LocalDate.of(2026, 8, 1))
-                        .endDate(LocalDate.of(2026, 8, 31))
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
                         .build()
         );
         stubInsertAppointment(10L);
@@ -1017,9 +1023,9 @@ class AppointmentServiceTest {
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Olive Young N Seongsu");
         request.setMeetingAddress("Seongdong-gu, Seoul");
-        request.setJoinDeadline(LocalDateTime.of(2026, 8, 20, 18, 0));
+        request.setJoinDeadline(LocalDateTime.of(VISIT_DATE, LocalTime.of(17, 30)));
         request.setTripId(1L);
-        request.setVisitDate(LocalDate.of(2026, 8, 21));
+        request.setVisitDate(VISIT_DATE);
         request.setActivityStartTime(LocalTime.of(18, 30));
         request.setActivityEndTime(LocalTime.of(22, 0));
         return request;
@@ -1041,9 +1047,9 @@ class AppointmentServiceTest {
                 .depositAmount(BigDecimal.valueOf(10_000))
                 .appointmentStatus(status)
                 .meetingPlace("Olive Young N Seongsu")
-                .activityStartAt(LocalDateTime.of(2026, 8, 21, 18, 30))
-                .activityEndAt(LocalDateTime.of(2026, 8, 21, 22, 0))
-                .joinDeadline(LocalDateTime.of(2026, 8, 20, 18, 0))
+                .activityStartAt(LocalDateTime.of(VISIT_DATE, LocalTime.of(18, 30)))
+                .activityEndAt(LocalDateTime.of(VISIT_DATE, LocalTime.of(22, 0)))
+                .joinDeadline(LocalDateTime.of(VISIT_DATE.minusDays(1), LocalTime.of(18, 0)))
                 .build();
     }
 
