@@ -971,6 +971,45 @@ class JourneyServiceTest {
     }
 
     @Test
+    void existsJourneyItem_returnsMapperResult_whenJourneyIsOwned() {
+        Journey journey = Journey.builder()
+            .tripId(20L)
+            .memberId(1L)
+            .build();
+        when(journeyMapper.findJourneyById(20L)).thenReturn(journey);
+        when(journeyMapper.existsJourneyItem(20L, 100L, LocalDate.of(2026, 8, 21)))
+            .thenReturn(true);
+
+        boolean result = journeyService.existsJourneyItem(
+            1L, 20L, 100L, LocalDate.of(2026, 8, 21)
+        );
+
+        assertEquals(true, result);
+    }
+
+    @Test
+    void existsJourneyItem_throwsForbidden_whenJourneyHasDifferentOwner() {
+        Journey journey = Journey.builder()
+            .tripId(20L)
+            .memberId(2L)
+            .build();
+        when(journeyMapper.findJourneyById(20L)).thenReturn(journey);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.existsJourneyItem(
+                1L, 20L, 100L, LocalDate.of(2026, 8, 21)
+            )
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_FORBIDDEN,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).existsJourneyItem(any(), any(), any());
+    }
+
+    @Test
     void getTimeline_returnsEmptyTimeline_whenJourneyHasNoItems() {
         when(journeyMapper.findJourneyById(50L)).thenReturn(ownedJourney(50L));
         when(journeyMapper.findTimelineItemsByTripId(50L)).thenReturn(null);

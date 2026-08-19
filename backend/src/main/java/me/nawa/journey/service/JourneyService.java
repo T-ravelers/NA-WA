@@ -257,6 +257,23 @@ public class JourneyService {
         }
     }
 
+    // 약속 생성 시 여정 항목 날짜를 고르는 시점에, 그 조합이 이미 있는지 미리
+    // 확인하기 위한 조회다. 존재하면 그 날짜는 고를 수 없다는 뜻이지, 실제 저장은
+    // 하지 않는다 — 최종 확정은 AppointmentService.createAppointment가 한다.
+    @Transactional(readOnly = true)
+    public boolean existsJourneyItem(
+        Long memberId,
+        Long tripId,
+        Long itemId,
+        java.time.LocalDate visitDate
+    ) {
+        findOwnedJourney(memberId, tripId);
+        if (itemId == null || itemId <= 0 || visitDate == null) {
+            throw new BusinessException(JourneyErrorCode.INVALID_JOURNEY_INPUT);
+        }
+        return journeyMapper.existsJourneyItem(tripId, itemId, visitDate);
+    }
+
     @Transactional(readOnly = true)
     public JourneyResponse getJourney(Long memberId, Long tripId) {
         Journey journey = findOwnedJourney(memberId, tripId);
