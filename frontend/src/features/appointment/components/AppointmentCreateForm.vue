@@ -418,7 +418,7 @@ defineExpose({ goToPreviousStep })
       <div class="mt-5 grid grid-cols-2 gap-3">
         <AppButton
           block
-          variant="secondary"
+          variant="secondary-on-paper"
           @click="cancelConfirmation"
         >
           {{ t('appointment.create.cancel') }}
