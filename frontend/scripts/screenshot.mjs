@@ -801,6 +801,111 @@ function stubSettlementCandidatesError(page) {
   )
 }
 
+/** Place 상세 응답을 세운다. 좌표가 있어 지도 버튼 두 개가 함께 찍힌다(#221). */
+function stubPlaceDetail(page) {
+  // 상세 API는 `?language=` 쿼리를 붙이므로 패턴이 쿼리까지 매칭해야 한다.
+  return page.route('**/api/v1/explore/places/501?*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          placeId: 501,
+          itemId: 501,
+          name: 'Onion Anguk',
+          brand: 'Onion',
+          branch: 'Anguk',
+          placeKind: 'CAFE',
+          thumbnailUrl: null,
+          imageUrls: [],
+          region1: 'Seoul',
+          region2: 'Jongno-gu',
+          region3: null,
+          addressRoad: '5 Gyedong-gil, Jongno-gu',
+          addressDetail: null,
+          latitude: 37.5768,
+          longitude: 126.9857,
+          hasForeignLang: true,
+          hasParking: false,
+          reservable: null,
+          takeoutAvailable: true,
+          cardPaymentAvailable: true,
+          smokeFree: true,
+          kidFacility: null,
+          hasRestroom: true,
+          isActive: true,
+          viewCount: 1024,
+          favoriteCount: 87,
+          sourceUrl: null,
+          postalCode: null,
+          openingHours: { 'Mon–Sun': '10:00–21:00' },
+          closedDays: [],
+          menuSummary: 'Pandoro · Espresso · Ssuk latte',
+          tel: '02-0000-0000',
+          activities: [],
+        },
+      }),
+    }),
+  )
+}
+
+/**
+ * Event 상세 응답을 세운다. 좌표가 있는 상세와, 좌표가 NULL이라 지도 버튼이 숨는
+ * 상세(#221 완료 기준)를 id로 나눠 찍는다.
+ */
+function stubEventDetail(page, { withCoordinates }) {
+  const eventId = withCoordinates ? 301 : 302
+  return page.route(`**/api/v1/explore/events/${eventId}?*`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          eventId,
+          eventType: null,
+          eventKind: 'FESTIVAL',
+          title: withCoordinates ? 'Seoul Lantern Festival' : 'Hidden Alley Pop-up',
+          subtitle: null,
+          description: 'Evening lantern walk along the stream with local food stalls.',
+          programText: null,
+          thumbnailUrl: null,
+          imageUrls: [],
+          links: null,
+          reservationUrl: null,
+          preReservation: null,
+          status: 'ONGOING',
+          isPermanent: false,
+          startDate: '2026-08-10',
+          endDate: '2026-08-31',
+          operatingHours: { 'Mon–Sun': '18:00–22:00' },
+          openDays: null,
+          openWeekend: true,
+          opensLate: true,
+          venueName: 'Cheonggyecheon Plaza',
+          region1: 'Seoul',
+          region2: 'Jung-gu',
+          region3: null,
+          addressRoad: '1 Cheonggyecheon-ro, Jung-gu',
+          latitude: withCoordinates ? 37.5696 : null,
+          longitude: withCoordinates ? 126.9784 : null,
+          hasPhotoZone: true,
+          isExperience: false,
+          ageLimit: null,
+          isFree: true,
+          priceText: null,
+          hasBenefit: null,
+          reservable: null,
+          contact: null,
+          organizer: 'Seoul Metropolitan Government',
+          activities: [],
+        },
+      }),
+    }),
+  )
+}
+
 /**
  * 찍을 화면.
  *
@@ -964,6 +1069,48 @@ const SCREENS = [
   },
   // 정산 화면은 낱장으로 두지 않고 `FLOWS`에서 클릭으로 이어 찍는다. 여기 남은 둘은
   // 후보가 없거나 조회가 실패한 상태라 지갑에서 눌러서는 도달할 수 없다.
+  {
+    name: '25-explore-place-detail',
+    path: '/explore/places/501',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubPlaceDetail(page)
+    },
+    // 지도 버튼은 접힌 아래쪽에 있어 스크롤해야 뷰포트에 들어온다.
+    prepare: async (page) => {
+      const mapButton = page.getByRole('button', { name: 'Google Maps' })
+      await mapButton.waitFor()
+      await mapButton.scrollIntoViewIfNeeded()
+    },
+  },
+  {
+    name: '26-explore-event-detail',
+    path: '/explore/events/301',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEventDetail(page, { withCoordinates: true })
+    },
+    prepare: async (page) => {
+      const mapButton = page.getByRole('button', { name: 'Google Maps' })
+      await mapButton.waitFor()
+      await mapButton.scrollIntoViewIfNeeded()
+    },
+  },
+  {
+    // 좌표가 NULL인 Event 상세. 지도 버튼이 숨는 것을 이미지로 증명한다(#221).
+    name: '27-explore-event-detail-no-coords',
+    path: '/explore/events/302',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEventDetail(page, { withCoordinates: false })
+    },
+    // 버튼이 없는 것을 보여줘야 하므로 위치 섹션 자체로 스크롤한다.
+    prepare: async (page) => {
+      const locationHeading = page.getByRole('heading', { name: 'Location' })
+      await locationHeading.waitFor()
+      await locationHeading.scrollIntoViewIfNeeded()
+    },
+  },
   {
     name: '23-settlement-create-empty',
     path: '/settlements/new',
