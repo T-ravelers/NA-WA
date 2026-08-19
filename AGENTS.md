@@ -37,10 +37,9 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   [renew-cert.yml](./.github/workflows/renew-cert.yml)이 매일 스케줄로 담당합니다.
   이 두 경로 중 하나만 보고 판단하면 발급·갱신 흐름을 놓칩니다.
 - **운영 백엔드는 `https://api.clearpng.cloud`입니다.** nginx가 443에서 TLS를 종료하고
-  80으로 온 요청은 `308`로 https에 넘깁니다. 예외는 `/.well-known/acme-challenge/`
-  하나뿐이며, 이 경로는 갱신에 필요해 80에서 직접 응답해야 합니다 — 리다이렉트가
-  이 경로를 삼키면 약 60일 뒤 갱신 실패로만 드러나므로 `deploy/deploy.sh`가
-  배포마다 확인합니다.
+  80으로 온 요청은 `308`로 https에 넘깁니다. 우선 `/.well-known/acme-challenge/`는
+  갱신에 필요해 80에서 직접 응답해야 합니다 — 리다이렉트가 이 경로를 삼키면 약 60일
+  뒤 갱신 실패로만 드러나므로 `deploy/deploy.sh`가 배포마다 확인합니다.
 - ALB 도입을 준비하면서 80에 두 갈래가 더 생겼습니다. `X-Forwarded-Proto`가 붙은 요청은
   ALB를 거쳐 온 것으로 보고 백엔드로 프록시하고, 헬스 체크용 `/alb-health`는 헤더와
   무관하게 항상 프록시합니다. 헤더가 없는 직접 접속은 위의 `308` 규칙 그대로입니다.
