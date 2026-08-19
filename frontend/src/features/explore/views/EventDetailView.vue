@@ -35,10 +35,10 @@ import {
   toStringList,
   type DetailEntry,
 } from '../model/eventDetail'
+import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMutation'
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
 import { findExploreRegionLabelKey } from '../model/exploreRegions'
-import { useSavedEventsStore } from '../model/savedEvents'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,11 +50,8 @@ const returnContext = useExploreReturnContextStore()
 const eventId = computed(() => String(route.params.eventId ?? ''))
 const eventQuery = useEventDetailQuery(eventId, locale)
 const event = computed(() => eventQuery.data.value)
-const savedEvents = useSavedEventsStore()
-const saved = computed(() => {
-  const current = event.value
-  return current ? savedEvents.isSaved(current.eventId) : false
-})
+const likeMutation = useExploreItemLikeMutation()
+const saved = computed(() => event.value?.saved ?? false)
 
 const selectedImage = ref(0)
 const journeyAdded = ref(false)
@@ -223,7 +220,8 @@ function openAppointmentList(): void {
 
 function toggleSaved(): void {
   const current = event.value
-  if (current) savedEvents.toggle(current.eventId)
+  if (!current || likeMutation.isPending.value) return
+  likeMutation.mutate({ itemId: current.eventId, saved: !current.saved })
 }
 
 function openJourneyDateSheet(): void {

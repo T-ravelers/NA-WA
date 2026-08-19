@@ -24,6 +24,7 @@ describe('PlaceCard', () => {
     isActive: true,
     viewCount: 10,
     favoriteCount: 2,
+    saved: false,
     hasForeignLang: null,
     hasParking: true,
     reservable: true,

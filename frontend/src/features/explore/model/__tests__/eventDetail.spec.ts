@@ -46,6 +46,7 @@ const event = (overrides: Partial<EventDetail> = {}): EventDetail => ({
   reservable: null,
   contact: null,
   organizer: null,
+  saved: false,
   activities: [],
   ...overrides,
 })

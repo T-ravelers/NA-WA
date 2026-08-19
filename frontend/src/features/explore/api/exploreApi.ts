@@ -5,6 +5,7 @@ import type { EventListResponse, EventSearchFilters } from '../model/eventExplor
 import {
   eventDetailResponseSchema,
   eventListResponseSchema,
+  exploreItemLikeResponseSchema,
   placeDetailResponseSchema,
   placeListResponseSchema,
 } from './exploreResponseSchemas'
@@ -24,6 +25,14 @@ const EVENT_LIST_PATH = '/api/v1/explore/events'
 const EVENT_DETAIL_PATH = '/api/v1/explore/events'
 const PLACE_LIST_PATH = '/api/v1/explore/places'
 const PLACE_DETAIL_PATH = '/api/v1/explore/places'
+
+export interface ExploreItemLikeResponse {
+  saved: boolean
+}
+
+function itemLikePath(itemId: number): string {
+  return `/api/v1/explore/items/${itemId}/like`
+}
 
 function appendList(
   params: URLSearchParams,
@@ -140,6 +149,24 @@ export async function fetchPlaceList(filters: PlaceSearchFilters = {}): Promise<
   })
 
   return normalizePlaceListResponse(response.data)
+}
+
+// 찜 등록·취소는 EVENT·PLACE 공통으로 explore_items의 itemId를 쓴다.
+// 두 호출 모두 멱등이라 재시도해도 같은 최종 상태(saved)를 돌려받는다.
+export async function likeExploreItem(itemId: number): Promise<ExploreItemLikeResponse> {
+  const response = await httpClient.post<ExploreItemLikeResponse>(itemLikePath(itemId), undefined, {
+    responseSchema: exploreItemLikeResponseSchema,
+  })
+
+  return response.data
+}
+
+export async function unlikeExploreItem(itemId: number): Promise<ExploreItemLikeResponse> {
+  const response = await httpClient.delete<ExploreItemLikeResponse>(itemLikePath(itemId), {
+    responseSchema: exploreItemLikeResponseSchema,
+  })
+
+  return response.data
 }
 
 export async function fetchPlaceDetail(

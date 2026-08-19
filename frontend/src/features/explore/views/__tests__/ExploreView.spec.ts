@@ -34,6 +34,7 @@ const place = {
   isActive: true,
   viewCount: 10,
   favoriteCount: 2,
+  saved: false,
   hasParking: true,
   reservable: true,
   takeoutAvailable: false,

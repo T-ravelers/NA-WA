@@ -10,9 +10,9 @@ import CategoryDot from '@/shared/ui/CategoryDot.vue'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import type { Category } from '@/shared/ui/category'
 
+import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMutation'
 import type { EventSummary } from '../model/eventExplore'
 import { findExploreRegionLabelKey } from '../model/exploreRegions'
-import { useSavedEventsStore } from '../model/savedEvents'
 
 interface Props {
   event: EventSummary
@@ -21,8 +21,8 @@ interface Props {
 const { event } = defineProps<Props>()
 const emit = defineEmits<{ open: [eventId: number] }>()
 const { t } = useI18n()
-const savedEvents = useSavedEventsStore()
-const saved = computed(() => savedEvents.isSaved(event.itemId))
+const likeMutation = useExploreItemLikeMutation()
+const saved = computed(() => event.saved)
 
 const statusTone = computed(() => {
   if (event.status === 'ONGOING') return 'ongoing'
@@ -69,7 +69,8 @@ function openEvent(): void {
 }
 
 function toggleSaved(): void {
-  savedEvents.toggle(event.itemId)
+  if (likeMutation.isPending.value) return
+  likeMutation.mutate({ itemId: event.itemId, saved: !event.saved })
 }
 
 function handleKeydown(event: KeyboardEvent): void {

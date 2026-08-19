@@ -75,6 +75,7 @@ export interface PlaceSummaryResponse {
   isActive: boolean | null
   viewCount: number
   favoriteCount: number
+  saved: boolean
 }
 
 export interface PlaceSummary extends Omit<PlaceSummaryResponse, 'imageUrls' | 'isActive'> {

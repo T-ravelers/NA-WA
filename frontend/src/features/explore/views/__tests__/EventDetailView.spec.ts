@@ -62,6 +62,7 @@ const event: EventDetail = {
   reservable: true,
   contact: null,
   organizer: 'NA-WA',
+  saved: false,
   activities: [],
 }
 
