@@ -2,6 +2,7 @@ package me.nawa.journey.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -265,7 +266,7 @@ public class JourneyService {
         Long memberId,
         Long tripId,
         Long itemId,
-        java.time.LocalDate visitDate
+        LocalDate visitDate
     ) {
         findOwnedJourney(memberId, tripId);
         if (itemId == null || itemId <= 0 || visitDate == null) {
@@ -305,7 +306,7 @@ public class JourneyService {
                 .thenComparing(JourneyTimelineItem::getTripItemId)
         );
 
-        Map<java.time.LocalDate, List<JourneyTimelineItemResponse>> grouped =
+        Map<LocalDate, List<JourneyTimelineItemResponse>> grouped =
             new LinkedHashMap<>();
         for (JourneyTimelineItem item : sortedItems) {
             grouped.computeIfAbsent(
@@ -490,8 +491,8 @@ public class JourneyService {
 
     private void validateJourneyFields(
         String title,
-        java.time.LocalDate startDate,
-        java.time.LocalDate endDate,
+        LocalDate startDate,
+        LocalDate endDate,
         BigDecimal budgetAmount,
         String companionPreference,
         List<JourneyRegionRequest> regions

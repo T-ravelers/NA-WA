@@ -9,6 +9,7 @@ import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -84,7 +85,7 @@ class AppointmentMapperXmlTest {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("appointmentMemberId", 1L);
         parameters.put("attendanceStatus", me.nawa.deposit.domain.AttendanceStatus.ATTENDED);
-        parameters.put("confirmedAt", java.time.LocalDateTime.now());
+        parameters.put("confirmedAt", LocalDateTime.now());
 
         String sql = boundSql("updateAttendance", parameters);
 
@@ -98,7 +99,7 @@ class AppointmentMapperXmlTest {
             throws Exception {
         String sql = boundSql(
                 "closeExpiredRecruitingAppointments",
-                Map.of("now", java.time.LocalDateTime.now())
+                Map.of("now", LocalDateTime.now())
         );
 
         assertTrue(sql.contains("appointment_status = 'CLOSED'"));
@@ -111,7 +112,7 @@ class AppointmentMapperXmlTest {
             throws Exception {
         String sql = boundSql(
                 "startDueClosedAppointments",
-                Map.of("now", java.time.LocalDateTime.now())
+                Map.of("now", LocalDateTime.now())
         );
 
         assertTrue(sql.contains("appointment_status = 'IN_PROGRESS'"));
