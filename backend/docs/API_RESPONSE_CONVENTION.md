@@ -182,6 +182,7 @@ enum 상수 이름을 외부 오류 코드로 직접 사용하지 마세요.
 | `INVALID_INPUT`         | `COMMON-001` |       400 | 입력값이 올바르지 않음                       |
 | `MALFORMED_JSON`        | `COMMON-002` |       400 | JSON 문법 오류 또는 요청 본문을 읽을 수 없음 |
 | `METHOD_NOT_ALLOWED`    | `COMMON-003` |       405 | 지원하지 않는 HTTP Method 요청               |
+| `PAYLOAD_TOO_LARGE`     | `COMMON-004` |       413 | 업로드 파일이 허용 크기를 초과함             |
 | `INTERNAL_SERVER_ERROR` | `COMMON-999` |       500 | 예상하지 못한 서버 내부 오류                 |
 
 회원, 여행과 지갑의 업무 규칙은 `CommonErrorCode`에 추가하지 마세요. 다음 오류는
@@ -331,6 +332,7 @@ Controller에서 비즈니스 예외를 반복해서 `try-catch`하지 마세요
 | `BusinessException`                      | 예외가 가진 도메인 또는 공통 ErrorCode |
 | `HttpMessageNotReadableException`        | `COMMON-002`                           |
 | `HttpRequestMethodNotSupportedException` | `COMMON-003`                           |
+| `MultipartException`                     | `COMMON-004`                           |
 | 별도로 처리하지 않은 `Exception`         | `COMMON-999`                           |
 
 예상하지 못한 예외는 stack trace와 함께 서버 로그에 기록합니다. 클라이언트에는 실제
@@ -412,6 +414,7 @@ API 응답에 다음 정보를 포함하지 마세요.
 | 후기 중복 작성            | 409       | `REVIEW-002`                 |
 | 변경할 항목 없음          | 400       | `MEMBER-004`                 |
 | 지원하지 않는 HTTP Method | 405       | `COMMON-003`                 |
+| 업로드 파일 크기 초과     | 413       | `COMMON-004`                 |
 | 예상하지 못한 서버 오류   | 500       | `COMMON-999`                 |
 
 정산 API에서 추가로 사용하는 오류 코드는 다음과 같습니다.
@@ -427,3 +430,9 @@ API 응답에 다음 정보를 포함하지 마세요.
 | `SETTLEMENT-010` | 409 | 원거래가 이미 다른 정산에 사용됨 |
 | `SETTLEMENT-014` | 409 | 정산 지급이 이미 다른 멱등성 키로 처리됨 |
 | `SETTLEMENT-015` | 400 | 멱등성 키가 비었거나 길이 제한을 초과함 |
+| `SETTLEMENT-016` | 400 | 영수증 이미지 형식이 허용 목록에 없거나 내용과 다름 |
+| `SETTLEMENT-017` | 409 | 남이 올렸거나 이미 사용된 영수증을 연결하려 함 |
+| `SETTLEMENT-018` | 404 | 정산에 연결된 영수증이 없거나 조회 권한이 없음 |
+| `SETTLEMENT-019` | 503 | 영수증 저장소를 사용할 수 없음 |
+| `SETTLEMENT-020` | 410 | 영수증 보관 기한이 지나 저장소에서 사라짐 |
+| `SETTLEMENT-021` | 500 | 올라온 영수증 파일을 서버가 읽지 못함 |

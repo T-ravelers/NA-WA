@@ -27,10 +27,16 @@ public class ReceiptStorageService {
         this.client = client;
     }
 
-    public String upload(long settlementId, String extension, String contentType, byte[] content) {
+    /**
+     * 사진을 올리고 그 사진이 놓인 자리(객체 키)를 돌려준다.
+     *
+     * 자리 이름에 정산 번호가 아니라 올린 사람 번호가 들어간다. 사용자가 사진을 먼저 올리고
+     * 품목을 확인한 뒤에 정산을 만들기 때문에, 올리는 시점에는 정산이 아직 없다.
+     */
+    public String upload(long uploaderMemberId, String extension, String contentType, byte[] content) {
         requireExtension(extension);
 
-        String objectKey = KEY_PREFIX + settlementId + "/" + UUID.randomUUID() + "." + extension;
+        String objectKey = KEY_PREFIX + uploaderMemberId + "/" + UUID.randomUUID() + "." + extension;
 
         client.putObject(
             PutObjectRequest.builder()

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.settlement.mapper.SettlementReceiptMapper">
+    <insert id="insertReceipt" useGeneratedKeys="true" keyProperty="settlementReceiptId">
+        INSERT INTO settlement_receipts (
+            uploaded_by_member_id, object_key, content_type, byte_size
+        ) VALUES (
+            #{uploadedByMemberId}, #{objectKey}, #{contentType}, #{byteSize}
+        )
+    </insert>
+
+    <update id="linkToSettlement">
+        UPDATE settlement_receipts
+        SET settlement_id = #{settlementId}
+        WHERE settlement_receipt_id = #{settlementReceiptId}
+          AND uploaded_by_member_id = #{memberId}
+          AND settlement_id IS NULL
+          AND deleted_at IS NULL
+    </update>
+
+    <!--
+        아래 WHERE의 "참여자인가" 판정은 SettlementMapper.xml의 findDetail과 같은 조건이다.
+        참여자 규칙이 바뀌면 두 쿼리를 함께 고친다. 한쪽만 고치면 정산 상세는 보이는데
+        영수증만 안 보이는(또는 그 반대의) 어긋난 상태가 된다.
+
+        영수증 행은 만료(sr.deleted_at)로 거르지 않고 그대로 돌려준다. 여기서 걸러 버리면
+        사진이 사라진 뒤로는 "처음부터 안 붙인 정산"과 똑같이 보여서, 만료를 구분해 알려주려고
+        남긴 기록이 정작 쓰이지 못한다. 만료 여부의 판단은 서비스가 한다.
+        정산 자체가 지워진 경우(s.deleted_at)는 그대로 걸러낸다.
+    -->
+    <select id="findBySettlementIdForViewer"
+            resultType="me.nawa.settlement.domain.SettlementReceipt">
+        SELECT sr.settlement_receipt_id, sr.uploaded_by_member_id, sr.settlement_id,
+               sr.object_key, sr.content_type, sr.byte_size, sr.deleted_at
+        FROM settlement_receipts sr
+        JOIN settlements s ON s.settlement_id = sr.settlement_id AND s.deleted_at IS NULL
+        WHERE sr.settlement_id = #{settlementId}
+          AND (s.created_by_member_id = #{memberId} OR EXISTS (
+              SELECT 1 FROM settlement_members sm
+              JOIN appointment_members am
+                  ON am.appointment_member_id = sm.appointment_member_id
+              WHERE sm.settlement_id = s.settlement_id AND am.member_id = #{memberId}
+                AND sm.deleted_at IS NULL AND am.deleted_at IS NULL
+          ))
+    </select>
+
+    <!--
+        이미 만료로 표시된 행을 다시 건드리지 않도록 deleted_at IS NULL을 조건에 둔다.
+        사진이 사라진 것을 처음 알아챈 시각이 그대로 남아야 기록으로서 값어치가 있다.
+    -->
+    <update id="markExpired">
+        UPDATE settlement_receipts
+        SET deleted_at = CURRENT_TIMESTAMP
+        WHERE settlement_receipt_id = #{settlementReceiptId}
+          AND deleted_at IS NULL
+    </update>
+</mapper>

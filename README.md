@@ -59,6 +59,11 @@ cp -n .env.example .env
 보이다가 영수증을 처음 올릴 때 실패하고, 원인이 "키 하나 누락"이라는 것을
 찾기 어렵습니다.
 
+`RECEIPT_MAX_UPLOAD_BYTES`는 영수증 사진 한 장의 최대 크기(바이트)이며 비워두면 8MiB를
+씁니다. 이 값을 올릴 때는 `nginx/nginx.conf`의 `client_max_body_size`도 함께 올립니다.
+nginx가 더 작으면 요청이 백엔드에 닿기도 전에 잘려서, 서버가 "크기 초과"라고 알려줄
+기회조차 없이 끊깁니다.
+
 `DOCKERHUB_USERNAME=local`은 로컬에서 빌드하는 backend 이미지의 이름 공간입니다.
 이미 빌드된 Docker Hub 이미지를 받으려면 해당 이미지의 실제 Docker Hub 이름으로
 바꿉니다.

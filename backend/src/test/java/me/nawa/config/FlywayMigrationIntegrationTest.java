@@ -51,6 +51,42 @@ class FlywayMigrationIntegrationTest {
         verifyReviewKeywordSeed(flyway);
         verifyMemberAccountTypeSchema(flyway);
         verifyDepositPoolWalletSeed(flyway);
+        verifySettlementReceiptSchema(flyway);
+    }
+
+    private static void verifySettlementReceiptSchema(Flyway flyway) {
+        String sql = """
+                SELECT
+                    (SELECT is_nullable FROM information_schema.columns
+                      WHERE table_schema = DATABASE()
+                        AND table_name = 'settlement_receipts'
+                        AND column_name = 'settlement_id') AS settlement_id_nullable,
+                    (SELECT COUNT(*) FROM information_schema.statistics
+                      WHERE table_schema = DATABASE()
+                        AND table_name = 'settlement_receipts'
+                        AND index_name = 'uq_settlement_receipts_settlement'
+                        AND non_unique = 0) AS settlement_id_unique
+                """;
+
+        try (Connection connection = flyway.getConfiguration()
+                .getDataSource()
+                .getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            assertTrue(resultSet.next());
+            /*
+             * settlement_id는 NULL을 허용하면서 UNIQUE여야 한다. NULL이 초안을 뜻하고,
+             * MySQL은 UNIQUE 열에 NULL을 여러 개 허용하므로 초안 여러 개가 공존하면서도
+             * 정산 하나에는 영수증이 한 장만 붙는다. 둘 중 하나라도 빠지면 이 규칙이 깨진다.
+             */
+            assertEquals("YES", resultSet.getString("settlement_id_nullable"));
+            assertEquals(1, resultSet.getInt("settlement_id_unique"));
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                    "Failed to verify settlement receipt migration",
+                    exception
+            );
+        }
     }
 
     private static void verifyMemberAccountTypeSchema(Flyway flyway) {

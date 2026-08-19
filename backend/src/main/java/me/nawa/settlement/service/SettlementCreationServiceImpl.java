@@ -102,6 +102,8 @@ public class SettlementCreationServiceImpl implements SettlementCreationService 
         append(canonical, appointmentId);
         append(canonical, request.getSourceTransferId());
         append(canonical, request.getType());
+        // 영수증만 다른 두 요청이 같은 지문으로 뭉뚱그려지지 않도록 함께 넣는다.
+        append(canonical, request.getReceiptId());
         request.getParticipantAppointmentMemberIds().stream().sorted().forEach(id -> append(canonical, id));
         if ("ITEMIZED".equals(request.getType())) {
             request.getItems().forEach(item -> appendItem(canonical, item));

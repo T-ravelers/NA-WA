@@ -19,6 +19,7 @@ public class SettlementCreationAttemptService {
 
     private final SettlementMapper settlementMapper;
     private final List<SettlementCreationHandler> handlers;
+    private final SettlementReceiptService settlementReceiptService;
 
     @Transactional
     public SettlementCreateResponse create(
@@ -43,8 +44,13 @@ public class SettlementCreationAttemptService {
             .orElseThrow(() -> new BusinessException(
                 SettlementErrorCode.SETTLEMENT_CREATE_INVALID
             ));
-        return handler.create(
+        SettlementCreateResponse created = handler.create(
             memberId, request, source, idempotencyKey, requestFingerprint
         );
+        // 정산과 영수증이 함께 남거나 함께 없어야 하므로 같은 트랜잭션 안에서 연결한다.
+        settlementReceiptService.linkToSettlement(
+            memberId, created.getId(), request.getReceiptId()
+        );
+        return created;
     }
 }

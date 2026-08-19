@@ -4,6 +4,12 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="me.nawa.settlement.mapper.SettlementMapper">
+    <!--
+        아래 WHERE의 "참여자인가" 판정은 SettlementReceiptMapper.xml의
+        findBySettlementIdForViewer와 같은 조건이다. 참여자 규칙이 바뀌면 두 쿼리를 함께
+        고친다. 한쪽만 고치면 정산 상세는 보이는데 영수증만 안 보이는(또는 그 반대의)
+        어긋난 상태가 된다.
+    -->
     <select id="findDetail" resultType="me.nawa.settlement.domain.SettlementDetail">
         SELECT s.settlement_id, s.split_method, s.total_amount, s.settlement_status,
                s.created_by_member_id, vsm.share_amount AS viewer_share_amount,
