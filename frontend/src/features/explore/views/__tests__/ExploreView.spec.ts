@@ -145,6 +145,14 @@ describe('ExploreView Place branch', () => {
     )
   })
 
+  it('keeps an Opening soon filter open ended and off the API params', async () => {
+    await mountView('/explore?datePreset=OPENING_SOON&startDate=2026-08-21')
+
+    expect(fetchEventList).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: '2026-08-21', endDate: undefined }),
+    )
+  })
+
   it('sends a completed range with its own end date', async () => {
     await mountView('/explore?startDate=2026-08-21&endDate=2026-08-23')
 

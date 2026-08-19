@@ -9,7 +9,7 @@ import {
   IconCheck,
 } from '@tabler/icons-vue'
 
-import { serializeCalendarDate } from '@/shared/lib/datetime'
+import { parseCalendarDate, serializeCalendarDate } from '@/shared/lib/datetime'
 import AppButton from '@/shared/ui/AppButton.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 
@@ -224,16 +224,93 @@ function cloneFilters(filters: EventSearchFilters): EventSearchFilters {
   }
 }
 
+// 프리셋은 서버로 보내는 필터 값이 아니라 달력의 선택 가능 범위를 정하는
+// 단축키다. 실제 필터는 항상 startDate/endDate로 나간다(상태 전이는 #275 참고).
+interface PresetDateRange {
+  min: string
+  // Opening soon은 상한이 없다 — max가 없으면 그 날짜 이후 전체가 선택 가능하다.
+  max?: string
+}
+
+function todayDate(): Date {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
+}
+
+function presetDateRange(preset: string): PresetDateRange | null {
+  const today = todayDate()
+  if (preset === 'ONGOING') {
+    const value = serializeCalendarDate(today)
+    return { min: value, max: value }
+  }
+  if (preset === 'OPENING_SOON') {
+    return { min: serializeCalendarDate(addDays(today, 1)) }
+  }
+  if (preset === 'THIS_WEEKEND') {
+    // 이번 주 토·일. 주말이 이미 시작됐으면 오늘부터 일요일까지다.
+    const dayOfWeek = today.getDay()
+    const saturday = addDays(today, dayOfWeek === 0 ? -1 : 6 - dayOfWeek)
+    const sunday = addDays(saturday, 1)
+    return {
+      min: serializeCalendarDate(saturday < today ? today : saturday),
+      max: serializeCalendarDate(sunday),
+    }
+  }
+  if (preset === 'THIS_MONTH') {
+    return {
+      min: serializeCalendarDate(today),
+      max: serializeCalendarDate(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
+    }
+  }
+  return null
+}
+
+const selectableRange = computed<PresetDateRange>(() => {
+  const preset = draft.datePreset ? presetDateRange(draft.datePreset) : null
+  // 프리셋이 없으면 오늘부터 고를 수 있다. 지난 날짜의 이벤트를 찾을 일은 없다.
+  return preset ?? { min: serializeCalendarDate(todayDate()) }
+})
+
+function isDateAllowed(value: string): boolean {
+  const range = selectableRange.value
+  if (value < range.min) return false
+  return range.max === undefined || value <= range.max
+}
+
 function setDatePreset(value: string): void {
-  draft.datePreset = draft.datePreset === value ? undefined : value
-  draft.startDate = undefined
-  draft.endDate = undefined
+  if (draft.datePreset === value) {
+    draft.datePreset = undefined
+    draft.startDate = undefined
+    draft.endDate = undefined
+    return
+  }
+
+  // 프리셋만 골라도 그 범위 전체가 필터로 적용된다. 이후 달력에서 범위 안의
+  // 날짜로 더 좁힐 수 있다.
+  const range = presetDateRange(value)
+  draft.datePreset = value
+  draft.startDate = range?.min
+  draft.endDate = range?.max
+  const firstDay = parseCalendarDate(range?.min)
+  if (firstDay) {
+    monthCursor.value = new Date(firstDay.getFullYear(), firstDay.getMonth(), 1)
+  }
 }
 
 function setCalendarDate(value: string): void {
-  draft.datePreset = undefined
+  if (!isDateAllowed(value)) return
 
-  if (draft.startDate === undefined || draft.endDate !== undefined) {
+  // 프리셋 범위 전체가 그대로 선택돼 있는 상태라면, 첫 탭은 범위를 닫는 게
+  // 아니라 그 안에서 새로 고르기 시작하는 것으로 본다.
+  const presetRange = draft.datePreset ? presetDateRange(draft.datePreset) : null
+  const presetPristine =
+    presetRange !== null && draft.startDate === presetRange.min && draft.endDate === presetRange.max
+
+  if (presetPristine || draft.startDate === undefined || draft.endDate !== undefined) {
     draft.startDate = value
     draft.endDate = undefined
     return
@@ -469,14 +546,16 @@ function apply(): void {
               type="button"
               class="mx-auto flex size-9 items-center justify-center rounded-pill text-caption"
               :class="[
-                !cell.inMonth && 'text-ink-3/40',
+                (!cell.inMonth || !isDateAllowed(cell.date)) && 'text-ink-3/40',
                 cell.inMonth &&
+                  isDateAllowed(cell.date) &&
                   !isDateSelected(cell.date) &&
                   !isDateInRange(cell.date) &&
                   'text-ink-2',
                 isDateInRange(cell.date) && 'rounded-none bg-surface-2',
                 isDateSelected(cell.date) && 'bg-paper-fill text-on-paper',
               ]"
+              :disabled="!cell.inMonth || !isDateAllowed(cell.date)"
               @click="cell.inMonth && setCalendarDate(cell.date)"
             >
               {{ cell.day }}

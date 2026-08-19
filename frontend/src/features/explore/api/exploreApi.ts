@@ -55,7 +55,8 @@ function toSearchParams(filters: EventSearchFilters): URLSearchParams {
   if (filters.keyword !== undefined && filters.keyword !== '') {
     params.set('keyword', filters.keyword)
   }
-  if (filters.datePreset !== undefined) params.set('datePreset', filters.datePreset)
+  // datePreset은 달력 선택 가능 범위를 정하는 화면 전용 상태다. 서버로는 항상
+  // 프리셋에서 계산된 startDate/endDate만 보낸다.
   if (filters.startDate !== undefined) params.set('startDate', filters.startDate)
   if (filters.endDate !== undefined) params.set('endDate', filters.endDate)
   if (filters.sort !== undefined) params.set('sort', filters.sort)

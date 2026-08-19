@@ -50,6 +50,18 @@ describe('exploreApi', () => {
     expect(params.toString()).toBe('')
   })
 
+  it('keeps the UI-only datePreset out of the query string', () => {
+    const params = toSearchParams({
+      datePreset: 'THIS_WEEKEND',
+      startDate: '2026-08-22',
+      endDate: '2026-08-23',
+    })
+
+    expect(params.get('datePreset')).toBeNull()
+    expect(params.get('startDate')).toBe('2026-08-22')
+    expect(params.get('endDate')).toBe('2026-08-23')
+  })
+
   it('returns the unwrapped event list from the shared client', async () => {
     const data = {
       content: [],

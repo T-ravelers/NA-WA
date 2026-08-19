@@ -127,7 +127,8 @@ const filters = computed<EventSearchFilters>(() => ({
   startDate: startDate.value,
   // 단일 날짜 선택은 시작=종료의 하루짜리 기간으로 보낸다. 시작일만 보내면
   // 백엔드 겹침 조건에 상한이 없어 "그 날짜 이후 유효한 이벤트 전부"가 나온다.
-  endDate: endDate.value ?? startDate.value,
+  // 상한이 없는 Opening soon 프리셋만 시작일 그대로 열어 둔다.
+  endDate: resolveEndDate(datePreset.value, startDate.value, endDate.value),
   freeOnly: freeOnly.value || undefined,
   openWeekendOnly: openWeekendOnly.value || undefined,
   opensLateOnly: opensLateOnly.value || undefined,
@@ -520,7 +521,13 @@ let placePreviewTimer: ReturnType<typeof setTimeout> | undefined
 function previewSheet(next: EventSearchFilters): void {
   clearTimeout(eventPreviewTimer)
   eventPreviewTimer = setTimeout(() => {
-    sheetPreviewFilters.value = { ...next, page: 0, size: 20, language: locale.value }
+    sheetPreviewFilters.value = {
+      ...next,
+      endDate: resolveEndDate(next.datePreset, next.startDate, next.endDate),
+      page: 0,
+      size: 20,
+      language: locale.value,
+    }
   }, 250)
 }
 
@@ -818,6 +825,15 @@ function readQueryBoolean(key: string): boolean {
 function readQueryPage(key: string): number {
   const value = Number(readQueryString(key))
   return Number.isInteger(value) && value >= 0 ? value : 0
+}
+
+function resolveEndDate(
+  preset: string | undefined,
+  start: string | undefined,
+  end: string | undefined,
+): string | undefined {
+  if (end !== undefined) return end
+  return preset === 'OPENING_SOON' ? undefined : start
 }
 
 // 개명 전에 만들어진 URL이 남아 있을 수 있어 레거시 'LATEST'는 'NEWEST'로

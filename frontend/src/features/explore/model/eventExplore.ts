@@ -41,6 +41,7 @@ export interface EventSearchFilters {
   region2Other?: boolean
   region3?: string[]
   keyword?: string
+  /** 화면 전용 — 달력의 선택 가능 범위를 정하는 프리셋. 서버로 보내지 않는다. */
   datePreset?: string
   startDate?: string
   endDate?: string
