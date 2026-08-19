@@ -70,8 +70,12 @@ const profileQuery = useAppointmentMemberProfile()
 
 const depositSheetOpen = ref(false)
 const menuOpen = ref(false)
-const joinBlockedMessage = ref<string | null>(null)
 const hasJoined = computed(() => participationQuery.data.value?.joined === true)
+// 조회 실패 시 hasJoined는 false로 남는다. 서버가 최종적으로 중복 참여를
+// 막아주니 데이터는 안전하지만, 그대로 두면 사용자가 결제 시트까지 갔다가
+// 거기서야 오류를 보게 된다. 조회 자체가 실패했을 때는 참여 여부를 확신할 수
+// 없다는 걸 버튼 단계에서 미리 알려준다.
+const participationCheckFailed = computed(() => participationQuery.isError.value)
 
 const statusTone = computed(() =>
   appointment.value?.appointmentStatus === 'RECRUITING' ? 'ongoing' : 'neutral',
@@ -81,6 +85,15 @@ const isJoinAvailable = computed(() => {
   if (appointment.value?.appointmentStatus !== 'RECRUITING') return false
   const deadline = parseServerDateTime(appointment.value.joinDeadline)
   return deadline !== null && Date.now() < deadline.getTime()
+})
+const isJoinButtonEnabled = computed(
+  () => isJoinAvailable.value && !hasJoined.value && !participationCheckFailed.value,
+)
+const joinDisabledReason = computed(() => {
+  if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
+  if (hasJoined.value) return t('appointment.detail.alreadyJoined')
+  if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
+  return undefined
 })
 const currentMemberId = computed(() => profileQuery.data.value?.memberId)
 const isHost = computed(
@@ -194,14 +207,8 @@ const joinErrorMessage = computed(() =>
 )
 
 function openDepositSheet(): void {
-  if (!isJoinAvailable.value) return
+  if (!isJoinButtonEnabled.value) return
 
-  if (hasJoined.value) {
-    joinBlockedMessage.value = t('appointment.detail.alreadyJoined')
-    return
-  }
-
-  joinBlockedMessage.value = null
   joinMutation.reset()
   depositSheetOpen.value = true
 }
@@ -403,15 +410,15 @@ function confirmJoin(): void {
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
         <p
-          v-if="joinBlockedMessage"
+          v-if="joinDisabledReason !== undefined"
           class="mb-2 text-center text-body-sm text-danger"
         >
-          {{ joinBlockedMessage }}
+          {{ joinDisabledReason }}
         </p>
         <AppButton
           block
-          :disabled="!isJoinAvailable"
-          :title="!isJoinAvailable ? t('appointment.detail.joinUnavailable') : undefined"
+          :disabled="!isJoinButtonEnabled"
+          :title="joinDisabledReason"
           @click="openDepositSheet"
         >
           {{ t('appointment.detail.join') }}

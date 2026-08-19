@@ -141,6 +141,7 @@ export default {
       cancelParticipation: 'Cancel participation',
       joinUnavailable: 'This appointment is not open for joining.',
       alreadyJoined: 'You have already joined this appointment.',
+      participationCheckFailed: 'We could not check your participation status. Please try again.',
       attendance: 'Confirm attendance',
       openMenu: 'Open appointment menu',
       menu: {

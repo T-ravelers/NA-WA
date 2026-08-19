@@ -169,16 +169,33 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).not.toContain('Confirm attendance')
   })
 
-  it('shows an already-joined error when the host clicks Join appointment', async () => {
+  it('disables Join appointment and shows an already-joined notice for the host', async () => {
     const { wrapper } = await mountView()
 
-    await wrapper
+    const joinButton = wrapper
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
 
     expect(wrapper.text()).toContain('You have already joined this appointment.')
+    expect(joinButton?.attributes('disabled')).toBeDefined()
+
+    await joinButton?.trigger('click')
+
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('disables Join appointment when the participation check fails', async () => {
+    fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
+    const { wrapper } = await mountView()
+
+    const joinButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+
+    expect(wrapper.text()).toContain(
+      'We could not check your participation status. Please try again.',
+    )
+    expect(joinButton?.attributes('disabled')).toBeDefined()
   })
 
   it('opens the deposit sheet with an enabled confirm button for a member who has not joined', async () => {
