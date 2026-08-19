@@ -125,7 +125,9 @@ const filters = computed<EventSearchFilters>(() => ({
   region3: selectedRegion3.value.length > 0 ? selectedRegion3.value : undefined,
   datePreset: datePreset.value,
   startDate: startDate.value,
-  endDate: endDate.value,
+  // 단일 날짜 선택은 시작=종료의 하루짜리 기간으로 보낸다. 시작일만 보내면
+  // 백엔드 겹침 조건에 상한이 없어 "그 날짜 이후 유효한 이벤트 전부"가 나온다.
+  endDate: endDate.value ?? startDate.value,
   freeOnly: freeOnly.value || undefined,
   openWeekendOnly: openWeekendOnly.value || undefined,
   opensLateOnly: opensLateOnly.value || undefined,

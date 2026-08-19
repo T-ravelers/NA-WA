@@ -137,6 +137,22 @@ describe('ExploreView Place branch', () => {
     expect(fetchEventList).toHaveBeenCalledWith(expect.objectContaining({ sort: 'NEWEST' }))
   })
 
+  it('sends a single selected date as a one-day range', async () => {
+    await mountView('/explore?startDate=2026-08-21')
+
+    expect(fetchEventList).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: '2026-08-21', endDate: '2026-08-21' }),
+    )
+  })
+
+  it('sends a completed range with its own end date', async () => {
+    await mountView('/explore?startDate=2026-08-21&endDate=2026-08-23')
+
+    expect(fetchEventList).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: '2026-08-21', endDate: '2026-08-23' }),
+    )
+  })
+
   it('reads a legacy LATEST event sort from an old URL as NEWEST', async () => {
     await mountView('/explore?sort=LATEST')
 
