@@ -8,7 +8,9 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import me.nawa.appointment.domain.Appointment;
@@ -243,8 +245,10 @@ class DepositPayoutBatchProcessorIntegrationTest {
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Test Meeting Place");
         request.setJoinDeadline(LocalDateTime.now().plusDays(1));
-        request.setActivityStartAt(LocalDateTime.now().plusDays(2));
-        request.setActivityEndAt(LocalDateTime.now().plusDays(2).plusHours(2));
+        request.setTripId(1L);
+        request.setVisitDate(LocalDate.now().plusDays(2));
+        request.setActivityStartTime(LocalTime.of(10, 0));
+        request.setActivityEndTime(LocalTime.of(12, 0));
 
         Appointment created = appointmentService.createAppointment(hostMemberId, request);
         appointmentIds.add(created.getAppointmentId());

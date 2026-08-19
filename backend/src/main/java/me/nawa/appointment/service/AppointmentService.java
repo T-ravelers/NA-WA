@@ -75,6 +75,13 @@ public class AppointmentService {
             AppointmentCreateRequest request) {
         validateCreateRequest(memberId, request);
 
+        // 활동 시작·종료는 visitDate 하루 위에서만 조립된다. 그래서 시작·종료가
+        // 같은 날짜인지 별도로 검사할 필요가 없다 — 애초에 다른 날짜가 될 수 없다.
+        LocalDateTime activityStartAt = LocalDateTime.of(
+                request.getVisitDate(), request.getActivityStartTime());
+        LocalDateTime activityEndAt = LocalDateTime.of(
+                request.getVisitDate(), request.getActivityEndTime());
+
         Appointment appointment = Appointment.builder()
                 .itemId(request.getItemId())
                 .hostMemberId(memberId)
@@ -86,8 +93,8 @@ public class AppointmentService {
                 .appointmentStatus(AppointmentStatus.PAYMENT_PENDING)
                 .meetingPlace(request.getMeetingPlace().trim())
                 .meetingAddress(request.getMeetingAddress())
-                .activityStartAt(request.getActivityStartAt())
-                .activityEndAt(request.getActivityEndAt())
+                .activityStartAt(activityStartAt)
+                .activityEndAt(activityEndAt)
                 .build();
         if (appointmentMapper.insertAppointment(appointment) != 1) {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
@@ -739,6 +746,8 @@ public class AppointmentService {
         if (memberId == null || memberId <= 0 || request == null
                 || request.getItemId() == null || request.getItemId() <= 0
                 || request.getItemType() == null
+                || request.getTripId() == null || request.getTripId() <= 0
+                || request.getVisitDate() == null
                 || request.getLanguageCode() == null) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
@@ -757,16 +766,23 @@ public class AppointmentService {
                 || request.getMeetingPlace().trim().length() > 200
                 || lengthExceeds(request.getMeetingAddress(), 500)
                 || request.getJoinDeadline() == null
-                || request.getActivityStartAt() == null
-                || request.getActivityEndAt() == null
-                || request.getJoinDeadline().isAfter(
-                        request.getActivityStartAt()
-                )
-                || !request.getActivityStartAt().isBefore(
-                        request.getActivityEndAt()
+                || request.getActivityStartTime() == null
+                || request.getActivityEndTime() == null
+                || !request.getActivityStartTime().isBefore(
+                        request.getActivityEndTime()
                 )) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
+
+        // activityStartAt/activityEndAt은 visitDate 위에서만 조립되므로, 종료가
+        // 시작보다 늦은지는 시각 비교(위)만으로 항상 하루 안에서 성립한다.
+        LocalDateTime activityStartAt = LocalDateTime.of(
+                request.getVisitDate(), request.getActivityStartTime());
+        if (request.getJoinDeadline().isAfter(activityStartAt)
+                || activityStartAt.isBefore(LocalDateTime.now())) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
         if (!request.getItemType().equals(
                 appointmentMapper.findAvailableItemType(request.getItemId())
         )) {

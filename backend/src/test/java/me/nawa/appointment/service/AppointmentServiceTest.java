@@ -33,7 +33,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -876,8 +878,10 @@ class AppointmentServiceTest {
         request.setMeetingPlace("Olive Young N Seongsu");
         request.setMeetingAddress("Seongdong-gu, Seoul");
         request.setJoinDeadline(LocalDateTime.of(2026, 8, 20, 18, 0));
-        request.setActivityStartAt(LocalDateTime.of(2026, 8, 21, 18, 30));
-        request.setActivityEndAt(LocalDateTime.of(2026, 8, 21, 22, 0));
+        request.setTripId(1L);
+        request.setVisitDate(LocalDate.of(2026, 8, 21));
+        request.setActivityStartTime(LocalTime.of(18, 30));
+        request.setActivityEndTime(LocalTime.of(22, 0));
         return request;
     }
 
