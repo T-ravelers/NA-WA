@@ -32,9 +32,19 @@ class FlywayMigrationIntegrationTest {
 
         flyway.migrate();
 
+        // 최신 버전을 리터럴로 하드코딩하면 새 마이그레이션이 추가될 때마다
+        // 이 값을 함께 올려야 하는데, V13 도입(#254) 때 놓쳐서 게이트 ON
+        // 실행이 계속 실패했다(#274). classpath에서 실제로 발견된 마이그레이션
+        // 중 가장 높은 버전을 기대값으로 삼아, 새 마이그레이션이 추가돼도
+        // 이 단정문을 따로 갱신할 필요가 없게 한다.
+        MigrationInfo[] discovered = flyway.info().all();
+        assertTrue(discovered.length > 0);
+        String latestDiscoveredVersion =
+                discovered[discovered.length - 1].getVersion().getVersion();
+
         MigrationInfo current = flyway.info().current();
         assertNotNull(current);
-        assertEquals("12", current.getVersion().getVersion());
+        assertEquals(latestDiscoveredVersion, current.getVersion().getVersion());
         assertTrue(current.getState().isApplied());
 
         verifyAppointmentParticipationSchema(flyway);
