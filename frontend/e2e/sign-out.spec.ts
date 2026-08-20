@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test('signs out, clears the pending return path, and protects browser history', async ({
   page,
