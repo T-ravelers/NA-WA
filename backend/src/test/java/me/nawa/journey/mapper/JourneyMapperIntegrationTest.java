@@ -659,7 +659,7 @@ class JourneyMapperIntegrationTest {
     }
 
     private static JourneyItemFixture createEventFixture() {
-        String marker = "journey-appointment-" + UUID.randomUUID();
+        String marker = "journey-appt-" + UUID.randomUUID();
         long memberId = insertMember(marker);
         long tripId = insertTrip(memberId, marker);
         long itemId = insertExploreItem(memberId, "EVENT");
