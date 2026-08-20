@@ -289,8 +289,18 @@ function setCalendarDate(value: string): void {
   draft.endDate = value
 }
 
-function isDateSelected(value: string): boolean {
-  return value === draft.startDate || value === draft.endDate
+/** 기간의 양 끝. 여기만 둥글게 깎아 하나의 띠로 보이게 한다. */
+function isRangeStart(value: string): boolean {
+  return draft.endDate !== undefined && value === draft.startDate
+}
+
+function isRangeEnd(value: string): boolean {
+  return draft.startDate !== undefined && value === draft.endDate
+}
+
+/** 아직 시작일만 고른 상태. 띠가 아니라 점 하나로 보여야 한다. */
+function isLoneDate(value: string): boolean {
+  return draft.endDate === undefined && value === draft.startDate
 }
 
 function isDateInRange(value: string): boolean {
@@ -520,20 +530,20 @@ function apply(): void {
               v-for="cell in calendarDays"
               :key="cell.date"
               type="button"
-              class="mx-auto flex size-9 items-center justify-center rounded-pill text-caption"
+              class="flex h-9 w-full items-center justify-center text-caption"
               :class="[
                 (!cell.inMonth || !isDateAllowed(cell.date)) && 'text-ink-3/40',
                 cell.inMonth &&
                   isDateAllowed(cell.date) &&
-                  !isDateSelected(cell.date) &&
                   !isDateInRange(cell.date) &&
-                  'text-ink-2',
-                // 선택 칩과 범위 배경이 같은 셀에 겹치면 CSS 순서에 따라 칩이
-                // 묻힌다 — 양 끝 날짜는 범위 배경을 받지 않게 상호 배타로 가른다.
-                // 범위도 칩과 같은 흰 배경을 써서 선택 구간 전체가 밝게 보인다.
-                isDateSelected(cell.date)
-                  ? 'bg-paper-fill text-on-paper'
-                  : isDateInRange(cell.date) && 'rounded-none bg-paper-fill text-on-paper',
+                  'rounded-pill text-ink-2',
+                // 기간은 칸 전체를 채워 하나의 띠로 이어진다. 칸보다 좁은 칩을
+                // 가운데 두면 흰색이어도 날짜마다 끊겨 보여 기간으로 읽히지
+                // 않는다. 양 끝만 둥글게 깎고 사이는 각지게 둔다.
+                isDateInRange(cell.date) && 'bg-paper-fill text-on-paper',
+                isLoneDate(cell.date) && 'rounded-pill',
+                isRangeStart(cell.date) && 'rounded-l-pill',
+                isRangeEnd(cell.date) && 'rounded-r-pill',
               ]"
               :disabled="!cell.inMonth || !isDateAllowed(cell.date)"
               @click="cell.inMonth && setCalendarDate(cell.date)"

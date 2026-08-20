@@ -121,7 +121,7 @@ describe('ExploreFilterSheet date presets', () => {
     expect(day22?.attributes('disabled')).toBeUndefined()
   })
 
-  it('paints the whole selected range white and keeps the endpoints as pills', async () => {
+  it('paints the selected range as one continuous band', async () => {
     const wrapper = mountDateSheet()
 
     await pressButton(wrapper, '21')
@@ -130,13 +130,33 @@ describe('ExploreFilterSheet date presets', () => {
     const day21 = wrapper.findAll('button').find((button) => button.text() === '21')
     const day22 = wrapper.findAll('button').find((button) => button.text() === '22')
     const day23 = wrapper.findAll('button').find((button) => button.text() === '23')
-    expect(day21?.classes()).toContain('bg-paper-fill')
-    expect(day21?.classes()).not.toContain('rounded-none')
-    expect(day22?.classes()).toContain('bg-paper-fill')
-    expect(day22?.classes()).toContain('rounded-none')
-    expect(day23?.classes()).toContain('bg-paper-fill')
-    expect(day23?.classes()).not.toContain('rounded-none')
+
+    // 칸 전체를 채워야 날짜끼리 이어져 하나의 기간으로 읽힌다. 칸보다 좁은 칩을
+    // 가운데 두면 흰색이어도 끊겨 보인다.
+    for (const day of [day21, day22, day23]) {
+      expect(day?.classes()).toContain('bg-paper-fill')
+      expect(day?.classes()).toContain('w-full')
+      expect(day?.classes()).not.toContain('mx-auto')
+    }
+
+    // 양 끝만 둥글고 사이는 각지다.
+    expect(day21?.classes()).toContain('rounded-l-pill')
+    expect(day21?.classes()).not.toContain('rounded-r-pill')
+    expect(day22?.classes()).not.toContain('rounded-l-pill')
+    expect(day22?.classes()).not.toContain('rounded-r-pill')
+    expect(day23?.classes()).toContain('rounded-r-pill')
+    expect(day23?.classes()).not.toContain('rounded-l-pill')
     expect(wrapper.html()).not.toContain('bg-surface-2')
+  })
+
+  it('keeps a lone start date as a single dot, not a band', async () => {
+    const wrapper = mountDateSheet()
+
+    await pressButton(wrapper, '21')
+
+    const day21 = wrapper.findAll('button').find((button) => button.text() === '21')
+    expect(day21?.classes()).toContain('rounded-pill')
+    expect(day21?.classes()).not.toContain('rounded-l-pill')
   })
 
   it('disables past days when no preset is chosen', () => {
