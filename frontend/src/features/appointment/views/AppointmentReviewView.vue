@@ -98,6 +98,9 @@ const completedMemberIds = reactive(new Set<number>())
 
 // 서버가 준 목록을 화면 상태에 합친다. 지우지 않고 더하기만 한다 — 방금 이 화면에서
 // 저장한 건은 조회가 아직 갱신되기 전이라 목록에 없을 수 있다.
+//
+// 지금은 후기에 수정·삭제가 없어 지울 일이 없다. 후기 취소가 생기면 이 합치기를
+// 다시 봐야 한다 — 서버 목록에서 빠진 id를 여기서는 영영 지우지 못한다.
 watch(
   () => reviewStatusQuery.data.value?.reviewedAppointmentMemberIds,
   (ids) => {

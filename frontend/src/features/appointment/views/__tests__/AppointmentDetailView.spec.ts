@@ -1,24 +1,16 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { useToasts } from '@/shared/ui/toast'
-import { appointmentMemberIntegrationKey } from '../../model/memberIntegration'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
 const fetchMyAppointmentParticipation = vi.fn()
 const joinAppointment = vi.fn()
 const cancelAppointmentParticipation = vi.fn()
-const profileQuery = {
-  data: ref({ memberId: 11 }),
-  isPending: ref(false),
-  isError: ref(false),
-  refetch: vi.fn().mockResolvedValue(undefined),
-}
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
@@ -125,11 +117,6 @@ async function mountView() {
   const wrapper = mount(AppointmentDetailView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
-      provide: {
-        [appointmentMemberIntegrationKey as symbol]: {
-          useMemberProfile: () => profileQuery,
-        },
-      },
     },
   })
   await flushPromises()
@@ -180,7 +167,6 @@ describe('AppointmentDetailView', () => {
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue([...members, leftMember])
     fetchMyAppointmentParticipation.mockResolvedValue(hostParticipation)
-    profileQuery.data.value = { memberId: 11 }
   })
 
   it('renders appointment details and members', async () => {
@@ -279,12 +265,10 @@ describe('AppointmentDetailView', () => {
   })
 
   it('shows a neutral (not red) notice on a normally closed appointment', async () => {
-    // 모집 종료(COMPLETED 등)는 정상 상태지 오류가 아니다. 버튼 title
-    // 툴팁은 모바일에서 뜨지 않으므로 이유는 눌렀을 때 버튼 위 텍스트로
-    // 보여주되, 경고색이 아니라 중립색으로 보여준다.
+    // 모집 종료(COMPLETED 등)는 정상 상태지 오류가 아니다. 버튼 위에 이유는
+    // 적되 경고색이 아니라 중립색으로 보여준다.
     fetchAppointment.mockResolvedValue({ ...appointment, appointmentStatus: 'COMPLETED' })
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    profileQuery.data.value = { memberId: 99 }
     const { wrapper } = await mountView()
 
     const notice = wrapper
@@ -298,7 +282,6 @@ describe('AppointmentDetailView', () => {
 
   it('opens the deposit sheet with an enabled confirm button for a member who has not joined', async () => {
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    profileQuery.data.value = { memberId: 99 }
     const { wrapper } = await mountView()
 
     await wrapper
@@ -328,7 +311,6 @@ describe('AppointmentDetailView', () => {
       attendanceStatus: 'PENDING',
       isHost: false,
     })
-    profileQuery.data.value = { memberId: 99 }
     const { wrapper } = await mountView()
 
     await wrapper
