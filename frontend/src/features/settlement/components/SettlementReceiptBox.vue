@@ -20,9 +20,16 @@ interface Props {
   /** 썸네일 주소. 없으면 아이콘만 나온다. */
   previewUrl?: string | null
   pending?: boolean
+  /** 'empty'일 때 읽어 줄 문구. 왜 볼 수 없는지는 화면마다 다르다. */
+  emptyLabel?: string
 }
 
-const { mode = 'add', previewUrl = null, pending = false } = defineProps<Props>()
+const {
+  mode = 'add',
+  previewUrl = null,
+  pending = false,
+  emptyLabel = undefined,
+} = defineProps<Props>()
 const emit = defineEmits<{ select: [file: File]; open: [] }>()
 
 const { t } = useI18n()
@@ -30,16 +37,13 @@ const libraryInput = useTemplateRef('libraryInput')
 const sourceSheetOpen = ref(false)
 const cameraOpen = ref(false)
 
-/*
- * 보기 모드에서 사진을 미리 받아두지 않는다. 영수증은 최대 8MB라 상세를 열 때마다
- * 내려받으면 대부분 보지도 않을 사진에 데이터를 쓴다. 그래서 눌렀을 때 받는다.
- * 정산에 영수증이 붙어 있는지는 눌러 봐야 알 수 있고, 없으면 그때 안내한다.
- */
 const isDisabled = computed(() => pending || mode === 'empty')
 
 const label = computed(() => {
-  if (pending) return t('settlement.receipt.pending')
-  if (mode === 'empty') return t('settlement.receipt.none')
+  // 같은 "기다리는 중"이라도 올리는 것과 받는 것은 사용자에게 전혀 다른 일이다.
+  if (pending)
+    return mode === 'add' ? t('settlement.receipt.pending') : t('settlement.receipt.loading')
+  if (mode === 'empty') return emptyLabel ?? t('settlement.receipt.none')
   if (mode === 'view') return t('settlement.receipt.view')
   return previewUrl === null ? t('settlement.receipt.label') : t('settlement.receipt.change')
 })

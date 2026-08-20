@@ -169,59 +169,67 @@ describe('SettlementDetailView', () => {
     expect(wrapper.text()).not.toContain('Send to')
   })
 
-  it('fetches the receipt only when asked, then opens it', async () => {
+  it('shows the receipt without asking, and opens it full size when tapped', async () => {
     getReceipt.mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
     const { wrapper } = await mountDetail()
 
-    // 영수증은 최대 8MB라 상세를 열 때 미리 받지 않는다.
-    expect(getReceipt).not.toHaveBeenCalled()
+    // 붙어 있는 영수증은 한 번 더 누르지 않아도 자리에 보인다.
+    expect(getReceipt).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-action="add-receipt"] img').attributes('src')).toBe('blob:receipt')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
 
     await wrapper.get('[data-action="add-receipt"]').trigger('click')
     await flushPromises()
 
-    expect(getReceipt).toHaveBeenCalledTimes(1)
+    // 크게 볼 때도 이미 받아 둔 사진을 다시 받지 않는다.
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
-
-    // 이미 받아 둔 사진을 다시 받지 않는다.
-    await wrapper.get('[data-action="add-receipt"]').trigger('click')
-    await flushPromises()
     expect(getReceipt).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not fetch a receipt for a settlement it cannot even read', async () => {
+    getDetail.mockRejectedValue(new NormalizedApiError('SETTLEMENT-002', 403, 'forbidden'))
+    await mountDetail()
+
+    expect(getReceipt).not.toHaveBeenCalled()
   })
 
   it('tells an expired receipt apart from one that was never attached', async () => {
     getReceipt.mockRejectedValue(new NormalizedApiError('SETTLEMENT-020', 410, 'gone'))
     const { wrapper } = await mountDetail()
 
-    await wrapper.get('[data-action="add-receipt"]').trigger('click')
-    await flushPromises()
-
     expect(wrapper.text()).toContain('kept for one year')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+
+    // 열 수 없는 자리를 눌리게 두면 눌러도 같은 답만 돌아온다.
+    const box = wrapper.get('[data-action="add-receipt"]')
+    expect(box.attributes('disabled')).toBeDefined()
+    expect(box.attributes('aria-label')).toContain('kept for one year')
   })
 
   it('shows an empty notice when no receipt was attached', async () => {
     getReceipt.mockRejectedValue(new NormalizedApiError('SETTLEMENT-018', 404, 'missing'))
     const { wrapper } = await mountDetail()
 
-    await wrapper.get('[data-action="add-receipt"]').trigger('click')
-    await flushPromises()
-
     expect(wrapper.text()).toContain('No receipt was attached')
+    expect(wrapper.get('[data-action="add-receipt"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('keeps the slot usable when the failure is worth retrying', async () => {
+    getReceipt.mockRejectedValue(new NormalizedApiError('SETTLEMENT-019', 503, 'storage down'))
+    const { wrapper } = await mountDetail()
+
+    // 저장소 장애는 다시 해볼 만하다. 없는 것과 같이 묶어 잠가 버리면 손쓸 방법이 없다.
+    expect(wrapper.text()).toContain('unavailable right now')
+    expect(wrapper.get('[data-action="add-receipt"]').attributes('disabled')).toBeUndefined()
   })
 
   it('does not carry a receipt over to the next settlement', async () => {
     getReceipt.mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
-    const { wrapper, router } = await mountDetail()
-
-    await wrapper.get('[data-action="add-receipt"]').trigger('click')
-    await flushPromises()
-    expect(getReceipt).toHaveBeenCalledTimes(1)
+    const { router } = await mountDetail()
+    expect(getReceipt).toHaveBeenLastCalledWith('42')
 
     // 화면이 그대로 붙어 있어도 다른 정산을 보는 중이면 앞 사진은 남의 것이다.
     await router.push('/settlements/43')
-    await flushPromises()
-
-    await wrapper.get('[data-action="add-receipt"]').trigger('click')
     await flushPromises()
 
     expect(getReceipt).toHaveBeenCalledTimes(2)

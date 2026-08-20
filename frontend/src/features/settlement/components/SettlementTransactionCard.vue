@@ -27,6 +27,8 @@ interface Props {
   receiptMode?: 'add' | 'view' | 'empty'
   receiptUrl?: string | null
   receiptPending?: boolean
+  /** 'empty'일 때 읽어 줄 문구. 비우면 "붙은 영수증 없음"으로 읽는다. */
+  receiptEmptyLabel?: string
 }
 
 const {
@@ -37,6 +39,7 @@ const {
   receiptMode = 'add',
   receiptUrl = null,
   receiptPending = false,
+  receiptEmptyLabel = undefined,
 } = defineProps<Props>()
 
 const emit = defineEmits<{ receiptSelect: [file: File]; receiptOpen: [] }>()
@@ -70,6 +73,7 @@ const points = useSettlementPoints()
         :mode="receiptMode"
         :preview-url="receiptUrl"
         :pending="receiptPending"
+        :empty-label="receiptEmptyLabel"
         @select="emit('receiptSelect', $event)"
         @open="emit('receiptOpen')"
       />

@@ -98,6 +98,7 @@ export default {
       view: 'View receipt',
       none: 'No receipt attached',
       pending: 'Uploading receipt',
+      loading: 'Loading receipt',
       hint: 'JPEG, PNG, or WebP · up to 8 MB',
       source: {
         title: 'Add receipt',
