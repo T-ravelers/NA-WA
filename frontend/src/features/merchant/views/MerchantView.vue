@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
 import { parseServerDateTime } from '@/shared/lib/datetime'
+import { formatNumber } from '@/shared/lib/money'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import StateError from '@/shared/ui/StateError.vue'
@@ -45,7 +46,7 @@ const { t, locale } = i18n
 const queryClient = useQueryClient()
 
 const formatAmount = (value: number): string =>
-  new Intl.NumberFormat(locale.value, { maximumFractionDigits: 2 }).format(value)
+  formatNumber(value, locale.value, { maximumFractionDigits: 2 })
 
 const accountQuery = useMerchantAccount()
 const isMerchant = computed(() => accountQuery.data.value?.accountType === 'MERCHANT')
@@ -442,12 +443,6 @@ const createError = computed(() =>
                     <div
                       class="flex h-11 w-24 shrink-0 items-center gap-1 rounded-sm bg-surface-2 px-2 focus-within:outline-2 focus-within:outline-ink"
                     >
-                      <span
-                        aria-hidden="true"
-                        class="shrink-0 text-caption text-ink-3"
-                      >
-                        ₩
-                      </span>
                       <input
                         :id="`merchant-price-${item.id}`"
                         type="text"
@@ -457,6 +452,16 @@ const createError = computed(() =>
                         class="min-w-0 flex-1 bg-transparent text-right text-body-sm text-ink tabular-nums outline-none placeholder:text-ink-3"
                         @input="updateUnitPrice(item, $event)"
                       />
+                      <!--
+                        소계·합계가 P인데 단가만 ₩이면 한 카드 안에서 단위가 갈린다.
+                        표시 전용이라 값에는 들어가지 않는다.
+                      -->
+                      <span
+                        aria-hidden="true"
+                        class="shrink-0 text-caption text-ink-3"
+                      >
+                        P
+                      </span>
                     </div>
 
                     <div class="flex h-11 shrink-0 items-center rounded-sm bg-surface-2">
