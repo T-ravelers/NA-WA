@@ -180,8 +180,9 @@ public enum SettlementErrorCode implements ErrorCode {
     /**
      * 글자 인식 서비스 사용 불가
      *
-     * 인식 서버에 닿지 못했거나 오류를 응답했습니다. 접속 정보가 설정되지 않은 경우도
-     * 여기에 들어갑니다. 사용자가 할 수 있는 일이 없으므로 직접 입력으로 안내합니다.
+     * 인식 서버에 닿지 못했거나 오류를 응답했습니다. 접속 정보가 설정되지 않은 경우와
+     * 응답이 우리가 아는 모양이 아닌 경우도 여기에 들어갑니다. 사용자가 할 수 있는 일이
+     * 없으므로 직접 입력으로 안내합니다.
      */
     SETTLEMENT_RECEIPT_OCR_UNAVAILABLE(
         HttpStatus.SERVICE_UNAVAILABLE,

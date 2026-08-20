@@ -112,14 +112,32 @@ public class ClovaReceiptOcrClient implements ReceiptOcrClient {
     }
 
     private RecognizedReceipt parse(JsonNode payload) {
+        // 결과가 통째로 없으면 사진 탓이 아니라 응답이 우리가 아는 모양이 아니라는 뜻이다.
+        // 이때 "다시 찍어 보세요"라고 안내하면 사용자는 고쳐지지 않는 일을 계속 반복한다.
         JsonNode image = payload.path("images").path(0);
+        if (image.isMissingNode()) {
+            log.warn("CLOVA OCR 응답에 인식 결과가 없습니다.");
+            throw new ReceiptOcrException(
+                ReceiptOcrException.Reason.UNAVAILABLE, "CLOVA OCR 응답에 인식 결과가 없습니다."
+            );
+        }
         if (!INFER_SUCCESS.equals(image.path("inferResult").asText())) {
             throw new ReceiptOcrException(
                 ReceiptOcrException.Reason.UNREADABLE, "사진에서 영수증을 읽어내지 못했습니다."
             );
         }
 
+        // 읽기는 성공했는데 영수증 모양의 결과가 없는 경우다. 호출 주소가 영수증 도메인이
+        // 아닐 때 이렇게 온다. 사진 문제로 안내하면 주소가 잘못됐다는 사실이 끝까지 드러나지
+        // 않고, 사용자는 멀쩡한 영수증을 계속 다시 찍게 된다.
         JsonNode result = image.path("receipt").path("result");
+        if (result.isMissingNode()) {
+            log.warn("CLOVA OCR 응답에 영수증 결과가 없습니다. 호출 주소를 확인해야 합니다.");
+            throw new ReceiptOcrException(
+                ReceiptOcrException.Reason.UNAVAILABLE, "CLOVA OCR 응답이 영수증 결과가 아닙니다."
+            );
+        }
+
         List<RecognizedReceiptItem> items = new ArrayList<>();
         // 한 장에 매장이 나뉘어 찍히면 묶음(subResults)이 여러 개로 나온다. 사용자가 보기에는
         // 어차피 영수증 한 장이므로 묶음 구분 없이 한 줄로 이어 붙인다.

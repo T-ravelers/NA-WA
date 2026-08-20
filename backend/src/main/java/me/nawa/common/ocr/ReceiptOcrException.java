@@ -21,7 +21,7 @@ public class ReceiptOcrException extends RuntimeException {
         UNAVAILABLE
     }
 
-    private final transient Reason reason;
+    private final Reason reason;
 
     public ReceiptOcrException(Reason reason, String message) {
         super(message);

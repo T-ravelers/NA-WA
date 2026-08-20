@@ -129,6 +129,43 @@ class ClovaReceiptOcrClientTest {
         assertEquals(ReceiptOcrException.Reason.UNREADABLE, exception.getReason());
     }
 
+    /**
+     * 응답에 인식 결과가 아예 없으면 사진 문제가 아니다. 사진 탓으로 안내하면 사용자는
+     * 고쳐지지 않는 일을 반복하게 되므로 사용 불가로 갈라 놓는다.
+     */
+    @Test
+    void recognize_responseWithoutImages_throwsUnavailable() {
+        server.expect(anyRequest()).andRespond(withSuccess(
+            "{\"code\":\"0001\",\"message\":\"unexpected\"}", MediaType.APPLICATION_JSON
+        ));
+
+        ReceiptOcrException exception = assertThrows(
+            ReceiptOcrException.class,
+            () -> client(INVOKE_URL, SECRET_KEY).recognize(IMAGE, "png")
+        );
+
+        assertEquals(ReceiptOcrException.Reason.UNAVAILABLE, exception.getReason());
+    }
+
+    /**
+     * 읽기는 성공했는데 영수증 결과가 없는 응답은 호출 주소가 영수증 도메인이 아닐 때 온다.
+     * 이것을 사진 문제로 안내하면 주소가 잘못됐다는 사실이 끝내 드러나지 않는다.
+     */
+    @Test
+    void recognize_responseWithoutReceiptResult_throwsUnavailable() {
+        server.expect(anyRequest()).andRespond(withSuccess(
+            "{\"images\":[{\"inferResult\":\"SUCCESS\",\"fields\":[]}]}",
+            MediaType.APPLICATION_JSON
+        ));
+
+        ReceiptOcrException exception = assertThrows(
+            ReceiptOcrException.class,
+            () -> client(INVOKE_URL, SECRET_KEY).recognize(IMAGE, "png")
+        );
+
+        assertEquals(ReceiptOcrException.Reason.UNAVAILABLE, exception.getReason());
+    }
+
     @Test
     void recognize_serverError_throwsUnavailable() {
         server.expect(anyRequest()).andRespond(withServerError());
