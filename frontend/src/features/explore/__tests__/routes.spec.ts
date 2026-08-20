@@ -53,7 +53,7 @@ describe('explore routes', () => {
 
     await router.push('/explore/events/42')
     /* 필터를 한 번 바꾸면 URL에서 journeyId가 지워지므로, 뒤로 나올 때 맥락이 실려오지 않는다. */
-    await router.push('/explore?keyword=hongdae')
+    await router.push('/explore?eventKeyword=hongdae')
 
     const context = useExploreReturnContextStore()
     expect(context.visitDate).toBe('2026-09-03')
@@ -93,34 +93,34 @@ describe('explore routes', () => {
 
   it('restores the last filters when Discover is entered without any', async () => {
     const router = createTestRouter()
-    await router.push('/explore?keyword=hongdae')
+    await router.push('/explore?eventKeyword=hongdae')
 
     await router.push('/')
     await router.push('/explore')
 
-    expect(router.currentRoute.value.query).toEqual({ keyword: 'hongdae' })
+    expect(router.currentRoute.value.query).toEqual({ eventKeyword: 'hongdae' })
   })
 
   it('brings the filters back when returning from an item detail', async () => {
     const router = createTestRouter()
-    await router.push('/explore?keyword=hongdae')
+    await router.push('/explore?eventKeyword=hongdae')
 
     await router.push('/explore/events/42')
     /* 상세의 뒤로가기는 필터가 빠진 주소로 되돌아온다. */
     await router.push('/explore?tab=events')
 
-    expect(router.currentRoute.value.query).toEqual({ keyword: 'hongdae' })
+    expect(router.currentRoute.value.query).toEqual({ eventKeyword: 'hongdae' })
   })
 
   it('brings back a filter URL that was never touched after a refresh', async () => {
     /* 새로고침하면 이 주소가 첫 진입이 된다. 화면의 필터 watcher는 아직 한 번도 돌지 않았다. */
     const router = createTestRouter()
-    await router.push('/explore?keyword=hongdae&freeOnly=true')
+    await router.push('/explore?eventKeyword=hongdae&freeOnly=true')
 
     await router.push('/explore/events/42')
     await router.push('/explore?tab=events')
 
-    expect(router.currentRoute.value.query).toEqual({ keyword: 'hongdae', freeOnly: 'true' })
+    expect(router.currentRoute.value.query).toEqual({ eventKeyword: 'hongdae', freeOnly: 'true' })
   })
 
   it('brings back the Journey date after visiting an item detail', async () => {
@@ -154,14 +154,39 @@ describe('explore routes', () => {
     expect(context.returnTo).toBeNull()
   })
 
-  it('lets an explicit shared URL win over the remembered filters', async () => {
+  it('goes back to the page the item detail was opened from', async () => {
     const router = createTestRouter()
-    await router.push('/explore?keyword=hongdae')
+    await router.push('/explore?tab=places&placeKeyword=cafe&placePage=4')
+
+    await router.push('/explore/places/9')
+    await router.push('/explore?tab=places')
+
+    expect(router.currentRoute.value.query).toEqual({
+      tab: 'places',
+      placeKeyword: 'cafe',
+      placePage: '4',
+    })
+  })
+
+  it('starts the list over when Discover is entered from outside', async () => {
+    const router = createTestRouter()
+    await router.push('/explore?eventKeyword=hongdae&eventPage=3')
 
     await router.push('/')
-    await router.push('/explore?keyword=itaewon')
+    await router.push('/explore')
 
-    expect(router.currentRoute.value.query).toEqual({ keyword: 'itaewon' })
+    /* 필터는 되돌리되 쪽 번호는 버린다. Discover를 새로 누른 사람은 목록을 처음부터 본다. */
+    expect(router.currentRoute.value.query).toEqual({ eventKeyword: 'hongdae' })
+  })
+
+  it('lets an explicit shared URL win over the remembered filters', async () => {
+    const router = createTestRouter()
+    await router.push('/explore?eventKeyword=hongdae')
+
+    await router.push('/')
+    await router.push('/explore?eventKeyword=itaewon')
+
+    expect(router.currentRoute.value.query).toEqual({ eventKeyword: 'itaewon' })
   })
 
   it('does not mix the Places filters into an Events entry', async () => {
@@ -181,7 +206,7 @@ describe('explore routes', () => {
 
   it('keeps a cleared filter state cleared on the next entry', async () => {
     const router = createTestRouter()
-    await router.push('/explore?keyword=hongdae')
+    await router.push('/explore?eventKeyword=hongdae')
     /* 필터를 모두 지우는 것은 화면이 한다. 같은 라우트라 가드가 아니라 watcher가 기억한다. */
     useExploreFilterMemoryStore().remember({})
 

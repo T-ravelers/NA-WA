@@ -10,16 +10,16 @@ describe('useExploreFilterMemoryStore', () => {
 
   it('leaves an entry that already carries filters alone', () => {
     const store = useExploreFilterMemoryStore()
-    store.remember({ keyword: 'hongdae' })
+    store.remember({ eventKeyword: 'hongdae' })
 
-    expect(store.resolveEntry({ keyword: 'itaewon' })).toBeNull()
+    expect(store.resolveEntry({ eventKeyword: 'itaewon' })).toBeNull()
   })
 
   it('restores the remembered filters for an entry that carries none', () => {
     const store = useExploreFilterMemoryStore()
-    store.remember({ keyword: 'hongdae', freeOnly: 'true' })
+    store.remember({ eventKeyword: 'hongdae', freeOnly: 'true' })
 
-    expect(store.resolveEntry({})).toEqual({ keyword: 'hongdae', freeOnly: 'true' })
+    expect(store.resolveEntry({})).toEqual({ eventKeyword: 'hongdae', freeOnly: 'true' })
   })
 
   it('restores nothing before any filter has been seen', () => {
@@ -31,7 +31,7 @@ describe('useExploreFilterMemoryStore', () => {
 
   it('keeps a cleared filter state cleared', () => {
     const store = useExploreFilterMemoryStore()
-    store.remember({ keyword: 'hongdae' })
+    store.remember({ eventKeyword: 'hongdae' })
     store.remember({})
 
     expect(store.resolveEntry({})).toBeNull()
@@ -49,10 +49,10 @@ describe('useExploreFilterMemoryStore', () => {
 
   it('remembers each tab on its own', () => {
     const store = useExploreFilterMemoryStore()
-    store.remember({ keyword: 'hongdae' })
+    store.remember({ eventKeyword: 'hongdae' })
     store.remember({ tab: 'places', placeKinds: 'CAFE' })
 
-    expect(store.resolveEntry({})).toEqual({ keyword: 'hongdae' })
+    expect(store.resolveEntry({})).toEqual({ eventKeyword: 'hongdae' })
     expect(store.resolveEntry({ tab: 'places' })).toEqual({ tab: 'places', placeKinds: 'CAFE' })
   })
 
@@ -62,6 +62,17 @@ describe('useExploreFilterMemoryStore', () => {
 
     /* 날짜는 필터라 되돌리지만 journeyId는 일회성 맥락이라 되살리지 않는다. */
     expect(store.resolveEntry({})).toEqual({ startDate: '2026-09-03', endDate: '2026-09-03' })
+  })
+
+  it('drops the page number unless the entry came back from an item detail', () => {
+    const store = useExploreFilterMemoryStore()
+    store.remember({ eventKeyword: 'hongdae', eventPage: '3' })
+
+    expect(store.resolveEntry({})).toEqual({ eventKeyword: 'hongdae' })
+    expect(store.resolveEntry({}, { keepPage: true })).toEqual({
+      eventKeyword: 'hongdae',
+      eventPage: '3',
+    })
   })
 
   it('does not ask for a navigation that changes nothing', () => {

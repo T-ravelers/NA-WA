@@ -4,6 +4,7 @@ import { useExploreFilterMemoryStore } from './model/exploreFilterMemory'
 import { useExploreReturnContextStore } from './model/exploreReturnContext'
 
 const EXPLORE_ROUTE_NAMES = new Set(['explore', 'explore-event-detail', 'explore-place-detail'])
+const EXPLORE_DETAIL_ROUTE_NAMES = new Set(['explore-event-detail', 'explore-place-detail'])
 
 const routes: RouteRecordRaw[] = [
   {
@@ -22,10 +23,15 @@ const routes: RouteRecordRaw[] = [
        * 기억을 여기서도 하는 이유는 `ExploreView`의 필터 watcher가 `immediate`가 아니라서다.
        * 진입 주소의 필터는 화면이 다시 쓰지 않으므로, Journey의 날짜 지정 링크·공유 주소·
        * 새로고침으로 들어와 필터를 만지지 않고 상세로 갔다 오면 되돌릴 것이 없어진다.
+       *
+       * 쪽 번호는 상세를 보고 뒤로 나온 진입에서만 되돌린다. 보던 쪽으로 돌아가는 것과
+       * 목록을 처음부터 보는 것은 같은 빈 주소로 들어오므로 어디에서 왔는지로 가른다.
        */
-      (to) => {
+      (to, from) => {
         const filterMemory = useExploreFilterMemoryStore()
-        const restored = filterMemory.resolveEntry(to.query)
+        const restored = filterMemory.resolveEntry(to.query, {
+          keepPage: EXPLORE_DETAIL_ROUTE_NAMES.has(String(from.name)),
+        })
         if (restored !== null) return { name: 'explore', query: restored, replace: true }
 
         filterMemory.remember(to.query)

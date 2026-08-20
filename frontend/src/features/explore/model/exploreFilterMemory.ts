@@ -13,9 +13,21 @@ const TAB_KEY = 'tab'
  */
 const CONTEXT_KEYS = new Set(['journeyId'])
 
+/**
+ * 목록의 몇 번째 쪽인가. 필터이긴 하지만 되돌리는 조건이 다르다.
+ *
+ * 보던 항목의 상세를 열었다 돌아오면 있던 쪽으로 돌아가는 것이 맞다. 반대로 하단 탭으로
+ * Discover를 새로 누른 사람에게 3쪽을 보여주면 목록을 처음부터 보려는 의도와 어긋난다.
+ */
+const PAGE_KEYS = new Set(['eventPage', 'placePage'])
+
 /** 기억할 필터만 남긴다. */
 function filtersOf(query: LocationQuery | LocationQueryRaw): LocationQueryRaw {
   return Object.fromEntries(Object.entries(query).filter(([key]) => !CONTEXT_KEYS.has(key)))
+}
+
+function withoutPage(query: LocationQueryRaw): LocationQueryRaw {
+  return Object.fromEntries(Object.entries(query).filter(([key]) => !PAGE_KEYS.has(key)))
 }
 
 type ExploreTab = 'events' | 'places'
@@ -71,14 +83,21 @@ export const useExploreFilterMemoryStore = defineStore('explore-filter-memory', 
    *
    * 들어온 주소에 필터가 하나라도 있으면 그것이 정본이므로 건드리지 않는다. 어느 탭으로
    * 들어오는지도 들어온 주소가 정하고, 그 탭의 기억만 되돌린다.
+   *
+   * `keepPage`는 항목 상세를 보고 뒤로 나온 진입에서만 참이다. 보던 쪽으로 돌아가야 하는
+   * 경우와 목록을 처음부터 보려는 경우를 주소만으로는 구별할 수 없어 호출부가 알려준다.
    */
-  function resolveEntry(incoming: LocationQuery): LocationQueryRaw | null {
+  function resolveEntry(
+    incoming: LocationQuery,
+    { keepPage = false }: { keepPage?: boolean } = {},
+  ): LocationQueryRaw | null {
     if (hasFilter(incoming)) return null
 
     const remembered = lastQuery.value[tabOf(incoming)]
     if (remembered === null) return null
 
-    return isSameQuery(remembered, incoming) ? null : { ...remembered }
+    const restored = keepPage ? { ...remembered } : withoutPage(remembered)
+    return isSameQuery(restored, incoming) ? null : restored
   }
 
   return { lastQuery, remember, resolveEntry }
