@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import QRCode from 'qrcode'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { IconTrash } from '@tabler/icons-vue'
+import { IconMinus, IconPlus } from '@tabler/icons-vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
 import { parseServerDateTime } from '@/shared/lib/datetime'
-import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import StateError from '@/shared/ui/StateError.vue'
@@ -18,8 +17,11 @@ import { createMerchantQr, registerAsMerchant, type MerchantQr } from '../api/me
 import {
   calculateTotal,
   createEmptyItem,
+  decreaseQuantity,
+  increaseQuantity,
   isValidTotal,
   itemSubtotal,
+  parseAmount,
   parseQuantity,
   type MerchantQrItem,
 } from '../model/merchantQr'
@@ -377,40 +379,77 @@ const createError = computed(() =>
                 품목·수량·단가는 서버로 보내지 않는다. 합계를 손으로 더하지 않게 돕는
                 입력 보조이며, QR에는 아래에서 계산된 합계 금액만 실린다.
               -->
-              <ul class="space-y-4">
+              <ul class="space-y-2">
                 <li
                   v-for="(item, index) in items"
                   :key="item.id"
-                  class="rounded-sm border border-hairline p-3"
+                  class="rounded-sm border border-hairline p-2"
                 >
-                  <div class="flex items-end gap-2">
-                    <div class="min-w-0 flex-1">
-                      <TextInput
-                        v-model="item.name"
-                        :label="t('merchant.qr.itemName')"
-                        :placeholder="t('merchant.qr.itemNamePlaceholder')"
+                  <!--
+                    이름·단가·수량을 한 행에 둔다. 화면 폭이 390px이라 공용 입력
+                    컴포넌트(h-14 · px-4 · text-data-lg)를 쓰면 숫자가 잘린다.
+                    라벨은 스크린 리더에만 남기고 자리는 placeholder가 설명한다.
+                  -->
+                  <div class="flex items-center gap-1.5">
+                    <label
+                      :for="`merchant-name-${item.id}`"
+                      class="sr-only"
+                    >
+                      {{ t('merchant.qr.itemName') }}
+                    </label>
+                    <input
+                      :id="`merchant-name-${item.id}`"
+                      v-model="item.name"
+                      type="text"
+                      :placeholder="t('merchant.qr.itemNamePlaceholder')"
+                      class="h-11 min-w-0 flex-1 rounded-sm border-2 border-transparent bg-surface-2 px-2 text-body-sm text-ink outline-none placeholder:text-ink-3 focus-visible:border-ink"
+                    />
+
+                    <label
+                      :for="`merchant-price-${item.id}`"
+                      class="sr-only"
+                    >
+                      {{ t('merchant.qr.unitPrice') }}
+                    </label>
+                    <div
+                      class="flex h-11 w-24 shrink-0 items-center gap-1 rounded-sm bg-surface-2 px-2 focus-within:outline-2 focus-within:outline-ink"
+                    >
+                      <span
+                        aria-hidden="true"
+                        class="shrink-0 text-caption text-ink-3"
+                      >
+                        ₩
+                      </span>
+                      <input
+                        :id="`merchant-price-${item.id}`"
+                        type="text"
+                        inputmode="numeric"
+                        :value="item.unitPrice === null ? '' : formatAmount(item.unitPrice)"
+                        :placeholder="t('merchant.qr.unitPricePlaceholder')"
+                        class="min-w-0 flex-1 bg-transparent text-right text-body-sm text-ink tabular-nums outline-none placeholder:text-ink-3"
+                        @input="
+                          item.unitPrice = parseAmount(($event.target as HTMLInputElement).value)
+                        "
                       />
                     </div>
-                    <button
-                      type="button"
-                      class="grid size-13 shrink-0 place-items-center rounded-sm text-ink-3 transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                      :aria-label="t('merchant.qr.removeItem', { index: index + 1 })"
-                      @click="removeItem(item.id)"
-                    >
-                      <IconTrash
-                        :size="20"
-                        :stroke-width="2"
-                        aria-hidden="true"
-                      />
-                    </button>
-                  </div>
 
-                  <div class="mt-3 grid grid-cols-[5rem_1fr] items-end gap-2">
-                    <!-- 수량은 통화가 아니라 AmountInput을 쓰지 않고, TextInput은 숫자 바인딩이 없다. -->
-                    <div class="flex flex-col gap-1.5">
+                    <div class="flex h-11 shrink-0 items-center rounded-sm bg-surface-2">
+                      <button
+                        type="button"
+                        class="grid size-7 place-items-center rounded-sm text-ink transition-colors disabled:text-ink-3/40 focus-visible:outline-2 focus-visible:outline-ink"
+                        :aria-label="t('merchant.qr.decreaseQuantity', { index: index + 1 })"
+                        :disabled="(item.quantity ?? 0) <= 0"
+                        @click="item.quantity = decreaseQuantity(item.quantity)"
+                      >
+                        <IconMinus
+                          :size="16"
+                          :stroke-width="2.5"
+                          aria-hidden="true"
+                        />
+                      </button>
                       <label
                         :for="`merchant-qty-${item.id}`"
-                        class="text-caption text-ink-2"
+                        class="sr-only"
                       >
                         {{ t('merchant.qr.quantity') }}
                       </label>
@@ -419,22 +458,40 @@ const createError = computed(() =>
                         type="text"
                         inputmode="numeric"
                         :value="item.quantity ?? ''"
-                        class="h-14 w-full rounded-sm border-2 border-transparent bg-surface-2 px-4 text-right text-data-lg text-ink outline-none focus-visible:border-ink"
+                        class="w-8 min-w-0 bg-transparent text-center text-body-sm text-ink tabular-nums outline-none"
                         @input="
                           item.quantity = parseQuantity(($event.target as HTMLInputElement).value)
                         "
                       />
+                      <button
+                        type="button"
+                        class="grid size-7 place-items-center rounded-sm text-ink transition-colors focus-visible:outline-2 focus-visible:outline-ink"
+                        :aria-label="t('merchant.qr.increaseQuantity', { index: index + 1 })"
+                        @click="item.quantity = increaseQuantity(item.quantity)"
+                      >
+                        <IconPlus
+                          :size="16"
+                          :stroke-width="2.5"
+                          aria-hidden="true"
+                        />
+                      </button>
                     </div>
-                    <AmountInput
-                      v-model="item.unitPrice"
-                      :label="t('merchant.qr.unitPrice')"
-                      :placeholder="t('merchant.qr.unitPricePlaceholder')"
-                    />
                   </div>
 
-                  <p class="mt-2 text-right text-caption text-ink-3 tabular-nums">
-                    {{ t('merchant.qr.subtotal', { amount: formatAmount(itemSubtotal(item)) }) }}
-                  </p>
+                  <!-- 소계와 삭제는 아래 줄로 내린다. 입력 세 칸이 한 행을 차지한다. -->
+                  <div class="mt-1.5 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      class="text-caption text-ink-3 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                      :aria-label="t('merchant.qr.removeItem', { index: index + 1 })"
+                      @click="removeItem(item.id)"
+                    >
+                      {{ t('merchant.qr.remove') }}
+                    </button>
+                    <p class="text-caption text-ink-3 tabular-nums">
+                      {{ t('merchant.qr.subtotal', { amount: formatAmount(itemSubtotal(item)) }) }}
+                    </p>
+                  </div>
                 </li>
               </ul>
 

@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  MAX_QUANTITY,
   calculateTotal,
   createEmptyItem,
+  decreaseQuantity,
+  increaseQuantity,
   isValidTotal,
   itemSubtotal,
+  parseAmount,
+  parseQuantity,
   type MerchantQrItem,
 } from '../merchantQr'
 
@@ -63,5 +68,69 @@ describe('isValidTotal', () => {
 describe('createEmptyItem', () => {
   it('gives each row a distinct key', () => {
     expect(createEmptyItem().id).not.toBe(createEmptyItem().id)
+  })
+
+  /** 한 개를 파는 경우가 가장 흔하다. 단가만 넣어도 합계가 서야 한다. */
+  it('starts at one', () => {
+    expect(createEmptyItem().quantity).toBe(1)
+    expect(createEmptyItem().unitPrice).toBeNull()
+  })
+})
+
+describe('increaseQuantity', () => {
+  it('adds one', () => {
+    expect(increaseQuantity(2)).toBe(3)
+  })
+
+  it('treats an empty quantity as zero', () => {
+    expect(increaseQuantity(null)).toBe(1)
+  })
+
+  it('stops at the maximum', () => {
+    expect(increaseQuantity(MAX_QUANTITY)).toBe(MAX_QUANTITY)
+  })
+})
+
+describe('decreaseQuantity', () => {
+  it('subtracts one', () => {
+    expect(decreaseQuantity(2)).toBe(1)
+  })
+
+  /** 줄을 지우는 것과 수량을 0으로 두는 것은 다르다. */
+  it('stops at zero', () => {
+    expect(decreaseQuantity(0)).toBe(0)
+    expect(decreaseQuantity(null)).toBe(0)
+  })
+})
+
+describe('parseAmount', () => {
+  it('keeps digits only', () => {
+    expect(parseAmount('4,500')).toBe(4500)
+    expect(parseAmount('₩ 12000')).toBe(12000)
+  })
+
+  it('is null when empty', () => {
+    expect(parseAmount('')).toBeNull()
+  })
+
+  /** 단가는 수량 상한(9999)에 묶이지 않는다. */
+  it('is not capped at the quantity maximum', () => {
+    expect(parseAmount('50000')).toBe(50000)
+  })
+})
+
+describe('parseQuantity', () => {
+  it('keeps digits only', () => {
+    expect(parseQuantity('12개')).toBe(12)
+    expect(parseQuantity('3.5')).toBe(35)
+  })
+
+  it('is null when empty', () => {
+    expect(parseQuantity('')).toBeNull()
+    expect(parseQuantity('abc')).toBeNull()
+  })
+
+  it('caps at the maximum', () => {
+    expect(parseQuantity('999999')).toBe(MAX_QUANTITY)
   })
 })

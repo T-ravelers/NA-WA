@@ -57,15 +57,10 @@ async function fillItem(
     throw new Error(`품목 ${index}번 줄이 없다`)
   }
 
-  const numericInputs = row.findAll('input[inputmode="numeric"]')
-  const [quantityInput, unitPriceInput] = numericInputs
-
-  if (quantityInput === undefined || unitPriceInput === undefined) {
-    throw new Error(`품목 ${index}번 줄에 수량·단가 입력이 없다`)
-  }
-
-  await quantityInput.setValue(quantity)
-  await unitPriceInput.setValue(unitPrice)
+  // DOM 순서가 아니라 id로 고른다. 순서로 고르면 수량과 단가가 뒤바뀌어도 곱셈 결과가
+  // 같아 테스트가 통과해 버린다.
+  await row.get('input[id^="merchant-qty-"]').setValue(quantity)
+  await row.get('input[id^="merchant-price-"]').setValue(unitPrice)
 }
 
 async function mountView() {
@@ -196,6 +191,44 @@ describe('MerchantView', () => {
     await fillItem(wrapper, 0, '1', '4500')
 
     expect(submit.attributes('disabled')).toBeUndefined()
+  })
+
+  it('steps the quantity with the plus and minus buttons', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    const row = wrapper.get('li')
+    const quantity = row.get('input[id^="merchant-qty-"]')
+
+    await row.get('input[id^="merchant-price-"]').setValue('4500')
+
+    // 한 개를 파는 경우가 가장 흔해 새 줄은 1에서 시작한다.
+    expect((quantity.element as HTMLInputElement).value).toBe('1')
+    expect(wrapper.text()).toContain('4,500 P')
+
+    await row.get('button[aria-label^="Increase quantity"]').trigger('click')
+
+    expect((quantity.element as HTMLInputElement).value).toBe('2')
+    expect(wrapper.text()).toContain('9,000 P')
+
+    await row.get('button[aria-label^="Decrease quantity"]').trigger('click')
+
+    expect((quantity.element as HTMLInputElement).value).toBe('1')
+  })
+
+  it('stops the minus button at zero', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    const row = wrapper.get('li')
+    const decrease = row.get('button[aria-label^="Decrease quantity"]')
+
+    await decrease.trigger('click')
+
+    expect((row.get('input[id^="merchant-qty-"]').element as HTMLInputElement).value).toBe('0')
+    expect(decrease.attributes('disabled')).toBeDefined()
   })
 
   it('creates a QR code and renders it with a countdown', async () => {

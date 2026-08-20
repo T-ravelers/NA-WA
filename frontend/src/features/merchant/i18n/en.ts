@@ -41,8 +41,11 @@ export default {
       unitPrice: 'Price',
       unitPricePlaceholder: '0',
       addItem: 'Add item',
+      remove: 'Remove',
       /** `{index}`는 1부터 센 줄 번호다. 화면에는 안 보이고 스크린 리더만 읽는다. */
       removeItem: 'Remove item {index}',
+      decreaseQuantity: 'Decrease quantity of item {index}',
+      increaseQuantity: 'Increase quantity of item {index}',
       subtotal: '{amount} P',
       total: 'Total',
       totalAmount: '{amount} P',

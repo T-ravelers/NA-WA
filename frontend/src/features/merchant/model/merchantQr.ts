@@ -15,10 +15,27 @@ export interface MerchantQrItem {
 
 let nextItemId = 0
 
+/**
+ * 수량 상한.
+ *
+ * 합계 상한은 따로 검사하지만, 수량 칸이 한 행에 들어가야 해서 자릿수를 묶어 둔다.
+ */
+export const MAX_QUANTITY = 9999
+
 export function createEmptyItem(): MerchantQrItem {
   nextItemId += 1
 
-  return { id: nextItemId, name: '', quantity: null, unitPrice: null }
+  // 한 개를 파는 경우가 가장 흔하다. 1로 두면 단가만 넣어도 합계가 바로 선다.
+  return { id: nextItemId, name: '', quantity: 1, unitPrice: null }
+}
+
+export function increaseQuantity(quantity: number | null): number {
+  return Math.min(MAX_QUANTITY, (quantity ?? 0) + 1)
+}
+
+/** 0까지만 내린다. 줄을 지우는 것과 수량을 0으로 두는 것은 다르다. */
+export function decreaseQuantity(quantity: number | null): number {
+  return Math.max(0, (quantity ?? 0) - 1)
 }
 
 /** 한 줄의 금액. 수량이나 단가가 비어 있으면 아직 0으로 본다. */
@@ -49,6 +66,21 @@ export function isValidTotal(total: number): boolean {
   return Number.isFinite(total) && total > 0 && total <= MAX_AMOUNT
 }
 
+/**
+ * 단가 입력. 숫자가 아닌 글자는 버리고, 비면 0이 아니라 `null`로 둔다.
+ *
+ * 수량 파서와 나눠 둔다. 수량은 한 행에 들어가야 해서 자릿수를 묶지만 단가는 그럴 수 없다.
+ */
+export function parseAmount(value: string): number | null {
+  const digits = value.replace(/\D/g, '')
+
+  if (digits === '') {
+    return null
+  }
+
+  return Math.min(MAX_AMOUNT, Number.parseInt(digits, 10))
+}
+
 /** 수량 입력. 숫자가 아닌 글자는 버리고, 비면 0이 아니라 `null`로 둔다. */
 export function parseQuantity(value: string): number | null {
   const digits = value.replace(/\D/g, '')
@@ -57,5 +89,5 @@ export function parseQuantity(value: string): number | null {
     return null
   }
 
-  return Number.parseInt(digits, 10)
+  return Math.min(MAX_QUANTITY, Number.parseInt(digits, 10))
 }
