@@ -314,8 +314,13 @@ describe('AppointmentDetailView', () => {
     expect(router.currentRoute.value.name).toBe('appointment-member-profile')
   })
 
-  it('opens the attendance screen from the detail sheet', async () => {
-    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'IN_PROGRESS' })
+  it('opens the attendance screen once the activity is over', async () => {
+    fetchAppointment.mockResolvedValueOnce({
+      ...appointment,
+      appointmentStatus: 'IN_PROGRESS',
+      activityStartAt: '2020-01-01T10:00:00',
+      activityEndAt: '2020-01-01T12:00:00',
+    })
     const { wrapper, router } = await mountView()
 
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
@@ -326,6 +331,18 @@ describe('AppointmentDetailView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('appointment-attendance')
+  })
+
+  it('hides Attendance from a member who is not the host', async () => {
+    // 출석 확정은 방장만 할 수 있어(APPOINTMENT-004) 영영 켜지지 않는다.
+    fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+
+    expect(menuItem(wrapper)('Attendance')).toBeUndefined()
+    expect(menuItem(wrapper)('Reviews')).toBeDefined()
+    expect(menuItem(wrapper)('Leave group')).toBeDefined()
   })
 
   it('opens reviews from the detail sheet after completion', async () => {
@@ -352,18 +369,44 @@ describe('AppointmentDetailView', () => {
     expect(attendance?.text()).toContain('Attendance has already been confirmed.')
   })
 
-  it('hides the menu button from someone who never joined', async () => {
+  it('still shows the menu to someone who never joined, with every item disabled', async () => {
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
     const { wrapper } = await mountView()
 
-    expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(false)
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    const item = menuItem(wrapper)
+
+    expect(item('Attendance')).toBeUndefined()
+    expect(item('Reviews')?.attributes('disabled')).toBeDefined()
+    expect(item('Leave group')?.text()).toContain('You are not a member of this appointment.')
   })
 
   it('hides Leave group from the host', async () => {
+    // 방장은 어떤 상태에서도 자기 참여를 취소할 수 없어(APPOINTMENT-007) 비활성으로
+    // 둬도 영영 켜지지 않는다.
     const { wrapper } = await mountView()
 
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+
     expect(menuItem(wrapper)('Leave group')).toBeUndefined()
+    expect(menuItem(wrapper)('Attendance')).toBeDefined()
+    expect(menuItem(wrapper)('Reviews')).toBeDefined()
+  })
+
+  it('keeps attendance disabled while the activity is still running', async () => {
+    fetchAppointment.mockResolvedValueOnce({
+      ...appointment,
+      appointmentStatus: 'IN_PROGRESS',
+      activityStartAt: '2020-01-01T10:00:00',
+      activityEndAt: '2099-01-01T12:00:00',
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    const attendance = menuItem(wrapper)('Attendance')
+
+    expect(attendance?.attributes('disabled')).toBeDefined()
+    expect(attendance?.text()).toContain('Opens once the activity ends.')
   })
 
   it('leaves the appointment after confirming, and refunds are spelled out', async () => {
@@ -427,7 +470,7 @@ describe('AppointmentDetailView', () => {
     expect(invalidated).toContain(JSON.stringify(['appointments', 'mine']))
   })
 
-  // 버거 버튼은 "이 약속의 활성 회원인가"만 본다. 약속 상태나 출석 여부로
+  // 버거 버튼은 약속 상세를 받았으면 언제나 뜬다. 상태·방장 여부·참여 여부로
   // 갈리지 않는다 — 갈리는 것은 시트 안 항목의 활성 여부다.
   it.each([
     ['COMPLETED', true, 'ATTENDED'],

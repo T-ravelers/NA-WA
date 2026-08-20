@@ -118,13 +118,20 @@ const isJoinDeadlinePassed = computed(() => {
   const deadline = parseServerDateTime(appointment.value?.joinDeadline ?? null)
   return deadline === null || Date.now() >= deadline.getTime()
 })
+// 출석 확정은 활동이 끝난 뒤에 연다. 백엔드는 IN_PROGRESS이기만 하면 받아주지만
+// (활동 시작 시각에 스케줄러가 바꾼다), 진행 중에 미리 확정하면 늦게 온 사람이
+// 노쇼로 굳어 보증금을 잃는다.
+const isActivityOver = computed(() => {
+  const endAt = parseServerDateTime(appointment.value?.activityEndAt ?? null)
+  return endAt !== null && Date.now() >= endAt.getTime()
+})
 
-// 세 항목은 서로 다른 시점에만 열린다. joinDeadline은 활동 시작보다 늦을 수
-// 없으므로(생성 시 검증) IN_PROGRESS·COMPLETED는 이미 마감이 지난 상태고,
-// 그때는 나가기가 서버에서 막힌다(APPOINTMENT-007). 조건에 맞는 항목만 넣으면
-// 시트가 매번 달라지므로, 볼 자격이 있는 항목은 두고 이유만 붙인다.
+// 세 항목은 언제나 시트에 있고, 조건을 만족하지 않으면 이유와 함께 비활성이다.
+// 조건에 맞는 것만 넣으면 시트가 열 때마다 다른 모양이 되고 나머지 기능이
+// 있다는 것조차 알 수 없다.
 const canOpenAttendance = computed(
-  () => appointment.value?.appointmentStatus === 'IN_PROGRESS' && isHost.value,
+  () =>
+    isHost.value && isActivityOver.value && appointment.value?.appointmentStatus === 'IN_PROGRESS',
 )
 const canOpenReviews = computed(
   () => appointment.value?.appointmentStatus === 'COMPLETED' && isAttendedMember.value,
@@ -138,7 +145,7 @@ const attendanceDisabledReason = computed(() => {
   const status = appointment.value?.appointmentStatus
   if (status === 'CANCELLED') return t('appointment.detail.menu.attendanceCancelled')
   if (status === 'COMPLETED') return t('appointment.detail.menu.attendanceDone')
-  return t('appointment.detail.menu.attendanceNotStarted')
+  return t('appointment.detail.menu.attendanceNotEnded')
 })
 const reviewsDisabledReason = computed(() => {
   if (canOpenReviews.value) return undefined
@@ -147,18 +154,21 @@ const reviewsDisabledReason = computed(() => {
   }
   return t('appointment.detail.menu.reviewsNotAttended')
 })
-const leaveDisabledReason = computed(() =>
-  canLeave.value ? undefined : t('appointment.detail.menu.leaveDeadlinePassed'),
-)
+const leaveDisabledReason = computed(() => {
+  if (canLeave.value) return undefined
+  if (!isActiveMember.value) return t('appointment.detail.menu.leaveNotMember')
+  return t('appointment.detail.menu.leaveDeadlinePassed')
+})
 
-// 나가기는 방장에게 보여줄 이유가 없다. 방장은 어떤 상태에서도 자기 참여를
-// 취소할 수 없어 비활성 항목이 영영 활성화되지 않는다.
-const showLeaveItem = computed(() => isActiveMember.value && !isHost.value)
+// 영영 켜질 수 없는 항목은 아예 넣지 않는다. 출석 확정은 방장만 할 수 있고
+// (APPOINTMENT-004), 방장은 어떤 상태에서도 자기 참여를 취소할 수 없다
+// (APPOINTMENT-007). 비활성으로 둬 봐야 이유만 차지한다.
+const showAttendanceItem = computed(() => isHost.value)
+const showLeaveItem = computed(() => !isHost.value)
+
 // 시트는 상세를 다 받은 뒤에만 렌더되므로(약속 이름과 보증금이 필요하다) 버튼도
 // 같은 조건을 쓴다. 버튼만 헤더에서 먼저 뜨면 눌러도 아무것도 열리지 않는다.
-const canOpenMenu = computed(
-  () => appointment.value !== undefined && (isHost.value || isActiveMember.value),
-)
+const canOpenMenu = computed(() => appointment.value !== undefined)
 
 function formatDateTime(value: AppointmentDateTimeValue): string {
   if (!value) return t('appointment.detail.notProvided')
@@ -485,9 +495,8 @@ function confirmJoin(): void {
       <AppointmentMenuSheet
         v-if="menuOpen"
         :appointment-name="appointment.appointmentName"
-        :show-attendance="isHost"
+        :show-attendance="showAttendanceItem"
         :attendance-disabled-reason="attendanceDisabledReason"
-        :show-reviews="isActiveMember"
         :reviews-disabled-reason="reviewsDisabledReason"
         :show-leave="showLeaveItem"
         :leave-disabled-reason="leaveDisabledReason"
