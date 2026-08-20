@@ -39,7 +39,7 @@ const typeOptions: Array<{ value: TransactionType; labelKey: string }> = [
   { value: 'SETTLEMENT', labelKey: 'settlement' },
   { value: 'DEPOSIT_HOLD', labelKey: 'depositHold' },
   { value: 'DEPOSIT_REFUND', labelKey: 'depositRefund' },
-  { value: 'DEPOSIT_FORFEIT_DISTRIBUTION', labelKey: 'depositForfeiture' },
+  { value: 'DEPOSIT_NO_SHOW_DISTRIBUTION', labelKey: 'depositNoShowShare' },
   { value: 'REVERSAL', labelKey: 'reversal' },
 ]
 

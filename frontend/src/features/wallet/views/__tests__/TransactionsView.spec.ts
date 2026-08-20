@@ -6,6 +6,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { i18n } from '@/app/i18n'
 
 import { getTransactions } from '../../api/walletApi'
+import { TRANSFER_TYPES } from '../../model/walletHome'
 import TransactionsView from '../TransactionsView.vue'
 
 vi.mock('../../api/walletApi', () => ({
@@ -96,6 +97,27 @@ describe('TransactionsView', () => {
       cursor: undefined,
       size: 20,
     })
+  })
+
+  it('offers every backend transfer type as a labeled filter option', async () => {
+    const { wrapper } = await mountTransactions()
+
+    await flushPromises()
+
+    const options = wrapper
+      .get('select[aria-label="Transaction type"]')
+      .findAll('option')
+      .filter((option) => option.attributes('value') !== '')
+
+    expect(options.map((option) => option.attributes('value')).sort()).toEqual(
+      [...TRANSFER_TYPES].sort(),
+    )
+
+    for (const option of options) {
+      expect(option.text(), `${option.attributes('value')}의 필터 문구가 없다`).not.toContain(
+        'wallet.transactions.',
+      )
+    }
   })
 
   it('requests transactions with the selected filters', async () => {

@@ -58,7 +58,7 @@ const ACTIVITY_ICON: Record<ActivityKind, Component> = {
   SETTLEMENT: IconArrowsExchange,
   DEPOSIT_HOLD: IconLock,
   DEPOSIT_REFUND: IconArrowBackUp,
-  DEPOSIT_FORFEIT_DISTRIBUTION: IconAlertTriangle,
+  DEPOSIT_NO_SHOW_DISTRIBUTION: IconAlertTriangle,
   REVERSAL: IconRotateClockwise,
   UNKNOWN: IconReceipt,
 }
