@@ -29,7 +29,6 @@ public class Appointment {
     private BigDecimal depositAmount;
     private AppointmentStatus appointmentStatus;
     private String meetingPlace;
-    private String meetingAddress;
     private BigDecimal meetingLatitude;
     private BigDecimal meetingLongitude;
     private LocalDateTime activityStartAt;

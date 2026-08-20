@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import AmountInput from '@/shared/ui/AmountInput.vue'
@@ -18,11 +18,11 @@ import {
   MIN_APPOINTMENT_MEMBERS,
   toAppointmentCreateRequest,
   validateAppointmentBasics,
-  validateAppointmentSchedule,
   validateAppointmentSettings,
   type AppointmentFormDraft,
   type AppointmentFormErrors,
 } from '../model/appointmentForm'
+import { useAppointmentItemLocation } from '../model/exploreIntegration'
 
 interface Props {
   itemId?: number
@@ -46,7 +46,7 @@ const {
 const emit = defineEmits<{ submit: [request: AppointmentCreateRequest] }>()
 const { t } = useI18n()
 
-const step = ref<1 | 2 | 3>(1)
+const step = ref<1 | 2>(1)
 const errors = ref<AppointmentFormErrors>({})
 const confirmationOpen = ref(false)
 const draft = reactive<AppointmentFormDraft>({
@@ -58,12 +58,47 @@ const draft = reactive<AppointmentFormDraft>({
   maxMembers: 4,
   languageCode: 'en',
   depositAmount: null,
+  meetingPlaceMode: 'ITEM',
   meetingPlace: '',
-  meetingAddress: '',
   activityStartTime: '',
   activityEndTime: '',
   joinDeadline: '',
 })
+
+// "이 자리에서 그대로 만난다"를 고르면 항목 위치가 그대로 meetingPlace가 된다.
+// 사용자가 같은 주소를 손으로 옮겨 적을 이유가 없다.
+const itemLocationQuery = useAppointmentItemLocation(
+  computed(() => draft.itemId ?? null),
+  computed(() => draft.itemType ?? null),
+)
+const itemPlaceName = computed(() => itemLocationQuery.data.value?.placeName ?? null)
+
+// 조회 중과 조회 실패는 둘 다 meetingPlace가 비어 있어 같은 오류로 보인다. 아직
+// 읽는 중일 뿐인데 "못 읽었다"고 말하지 않도록 상태를 갈라 안내한다.
+const waitingForItemPlace = computed(
+  () => draft.meetingPlaceMode === 'ITEM' && itemLocationQuery.isLoading.value,
+)
+const itemPlaceFailed = computed(
+  () => draft.meetingPlaceMode === 'ITEM' && itemLocationQuery.isError.value,
+)
+
+// 직접 적은 장소는 모드를 오갔다 돌아와도 남는다 — 잘못 눌러 지워지면 다시 적어야 한다.
+const customMeetingPlace = ref('')
+
+watch(
+  [() => draft.meetingPlaceMode, itemPlaceName],
+  ([mode, placeName]) => {
+    draft.meetingPlace = mode === 'ITEM' ? (placeName ?? '') : customMeetingPlace.value
+  },
+  { immediate: true },
+)
+
+watch(
+  () => draft.meetingPlace,
+  (value) => {
+    if (draft.meetingPlaceMode === 'CUSTOM') customMeetingPlace.value = value
+  },
+)
 
 // tripId·itemId·itemType는 이 폼이 렌더링된 뒤 바뀌지 않지만, visitDate는 날짜
 // 충돌로 제출이 실패했을 때 폼을 유지한 채 부모가 다시 고르게 할 수 있다 — 그
@@ -94,16 +129,12 @@ function clearErrorsOnEdit(
 }
 
 clearErrorsOnEdit(
-  () => [draft.appointmentName, draft.maxMembers, draft.languageCode],
-  ['appointmentName', 'maxMembers', 'languageCode'],
+  () => [draft.appointmentName, draft.maxMembers, draft.languageCode, draft.meetingPlace],
+  ['appointmentName', 'maxMembers', 'languageCode', 'meetingPlace'],
 )
 clearErrorsOnEdit(
-  () => [draft.depositAmount, draft.meetingPlace],
-  ['depositAmount', 'meetingPlace'],
-)
-clearErrorsOnEdit(
-  () => [draft.activityStartTime, draft.activityEndTime, draft.joinDeadline],
-  ['activityStartTime', 'activityEndTime', 'joinDeadline'],
+  () => [draft.activityStartTime, draft.activityEndTime, draft.joinDeadline, draft.depositAmount],
+  ['activityStartTime', 'activityEndTime', 'joinDeadline', 'depositAmount'],
 )
 
 const languageOptions: AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
@@ -128,16 +159,7 @@ function backToBasics(): void {
   errors.value = {}
 }
 
-function backToSettings(): void {
-  step.value = 2
-  errors.value = {}
-}
-
 function goToPreviousStep(): boolean {
-  if (step.value === 3) {
-    backToSettings()
-    return true
-  }
   if (step.value === 2) {
     backToBasics()
     return true
@@ -145,19 +167,10 @@ function goToPreviousStep(): boolean {
   return false
 }
 
-function continueToSchedule(): void {
+function submitSettings(): void {
   if (pending) return
 
   const nextErrors = validateAppointmentSettings(draft)
-  errors.value = nextErrors
-
-  if (Object.keys(nextErrors).length === 0) step.value = 3
-}
-
-function submitSchedule(): void {
-  if (pending) return
-
-  const nextErrors = validateAppointmentSchedule(draft)
   errors.value = nextErrors
 
   if (Object.keys(nextErrors).length > 0) return
@@ -167,8 +180,7 @@ function submitSchedule(): void {
 
 function handleSubmit(): void {
   if (step.value === 1) continueToSettings()
-  else if (step.value === 2) continueToSchedule()
-  else submitSchedule()
+  else submitSettings()
 }
 
 function cancelConfirmation(): void {
@@ -222,22 +234,6 @@ defineExpose({ goToPreviousStep })
         </span>
         {{ t('appointment.create.settingsStep') }}
       </li>
-      <li
-        class="h-px flex-1 bg-hairline"
-        aria-hidden="true"
-      />
-      <li
-        class="flex items-center gap-2 text-micro uppercase tracking-[0.12em]"
-        :class="step === 3 ? 'text-ink' : 'text-ink-3'"
-      >
-        <span
-          class="flex size-6 items-center justify-center rounded-pill"
-          :class="step === 3 ? 'bg-paper-fill text-on-paper' : 'bg-surface-2 text-ink-3'"
-        >
-          3
-        </span>
-        {{ t('appointment.create.scheduleStep') }}
-      </li>
     </ol>
 
     <p
@@ -264,9 +260,7 @@ defineExpose({ goToPreviousStep })
         {{
           step === 1
             ? t('appointment.create.basicsHeading')
-            : step === 2
-              ? t('appointment.create.settingsHeading')
-              : t('appointment.create.scheduleHeading')
+            : t('appointment.create.settingsHeading')
         }}
       </legend>
 
@@ -308,6 +302,62 @@ defineExpose({ goToPreviousStep })
             {{ translatedError(errors.maxMembers) }}
           </p>
         </div>
+        <div class="flex flex-col gap-2">
+          <label
+            for="appointment-meeting-mode"
+            class="text-caption text-ink-2"
+          >
+            {{ t('appointment.create.meetingPlace') }}
+          </label>
+          <select
+            id="appointment-meeting-mode"
+            v-model="draft.meetingPlaceMode"
+            class="h-13 w-full rounded-sm border-2 border-transparent bg-surface-2 px-4 text-body text-ink outline-none focus-visible:border-ink"
+          >
+            <option value="ITEM">
+              {{
+                itemPlaceName === null
+                  ? t('appointment.create.meetingAtItem')
+                  : t('appointment.create.meetingAtItemNamed', { place: itemPlaceName })
+              }}
+            </option>
+            <option value="CUSTOM">{{ t('appointment.create.meetingElsewhere') }}</option>
+          </select>
+          <TextInput
+            v-if="draft.meetingPlaceMode === 'CUSTOM'"
+            v-model="draft.meetingPlace"
+            :label="t('appointment.create.meetingPlaceLabel')"
+            :placeholder="t('appointment.create.meetingPlacePlaceholder')"
+            :error="translatedError(errors.meetingPlace)"
+          />
+          <p
+            v-else-if="errors.meetingPlace !== undefined"
+            class="text-caption text-danger"
+            role="alert"
+          >
+            {{ translatedError(errors.meetingPlace) }}
+          </p>
+          <p
+            v-else-if="waitingForItemPlace"
+            class="text-caption text-ink-3"
+          >
+            {{ t('appointment.create.meetingPlaceLoading') }}
+          </p>
+          <p
+            v-else-if="itemPlaceFailed"
+            class="text-caption text-danger"
+            role="alert"
+          >
+            {{ t('appointment.create.validation.itemPlaceUnavailable') }}
+          </p>
+          <p
+            v-else-if="itemLocationQuery.data.value?.addressRoad"
+            class="text-caption text-ink-3"
+          >
+            {{ itemLocationQuery.data.value.addressRoad }}
+          </p>
+        </div>
+
         <fieldset class="flex flex-col gap-5">
           <legend class="text-caption text-ink-2">{{ t('appointment.create.language') }}</legend>
           <div class="flex flex-wrap gap-3 pt-4">
@@ -330,39 +380,9 @@ defineExpose({ goToPreviousStep })
         </fieldset>
       </template>
 
-      <template v-else-if="step === 2">
-        <h2 class="font-display text-section-header text-ink-display">
-          {{ t('appointment.create.settingsHeading') }}
-        </h2>
-        <AmountInput
-          v-model="draft.depositAmount"
-          :label="t('appointment.create.deposit')"
-          :helper="
-            t('appointment.create.depositHelper', {
-              min: MIN_APPOINTMENT_DEPOSIT.toLocaleString('en-US'),
-              max: MAX_APPOINTMENT_DEPOSIT.toLocaleString('en-US'),
-            })
-          "
-          :error="translatedError(errors.depositAmount)"
-        />
-        <TextInput
-          v-model="draft.meetingPlace"
-          :label="t('appointment.create.meetingPlace')"
-          :placeholder="t('appointment.create.meetingPlacePlaceholder')"
-          :helper="t('appointment.create.meetingPlaceHelper')"
-          :error="translatedError(errors.meetingPlace)"
-        />
-        <TextInput
-          v-model="draft.meetingAddress"
-          :label="t('appointment.create.meetingAddress')"
-          :placeholder="t('appointment.create.meetingAddressPlaceholder')"
-          :helper="t('appointment.create.meetingAddressHelper')"
-        />
-      </template>
-
       <template v-else>
         <h2 class="font-display text-section-header text-ink-display">
-          {{ t('appointment.create.scheduleHeading') }}
+          {{ t('appointment.create.settingsHeading') }}
         </h2>
         <p class="text-body-sm text-ink-3">
           {{ t('appointment.create.visitDateNote', { date: draft.visitDate }) }}
@@ -387,6 +407,17 @@ defineExpose({ goToPreviousStep })
             :error="translatedError(errors.joinDeadline)"
           />
         </div>
+        <AmountInput
+          v-model="draft.depositAmount"
+          :label="t('appointment.create.deposit')"
+          :helper="
+            t('appointment.create.depositHelper', {
+              min: MIN_APPOINTMENT_DEPOSIT.toLocaleString('en-US'),
+              max: MAX_APPOINTMENT_DEPOSIT.toLocaleString('en-US'),
+            })
+          "
+          :error="translatedError(errors.depositAmount)"
+        />
       </template>
     </fieldset>
 
@@ -400,7 +431,7 @@ defineExpose({ goToPreviousStep })
           type="button"
           variant="secondary"
           :disabled="pending"
-          @click="step === 2 ? backToBasics() : backToSettings()"
+          @click="backToBasics()"
         >
           {{ t('appointment.create.back') }}
         </AppButton>
@@ -408,9 +439,10 @@ defineExpose({ goToPreviousStep })
           block
           type="submit"
           :loading="pending"
+          :disabled="step === 1 && waitingForItemPlace"
           :class="step === 1 ? 'col-span-2' : ''"
         >
-          {{ step === 3 ? t('appointment.create.submit') : t('appointment.create.continue') }}
+          {{ step === 2 ? t('appointment.create.submit') : t('appointment.create.continue') }}
         </AppButton>
       </div>
     </div>
