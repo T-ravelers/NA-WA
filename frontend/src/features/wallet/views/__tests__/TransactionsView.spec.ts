@@ -99,7 +99,7 @@ describe('TransactionsView', () => {
     })
   })
 
-  it('offers every backend transfer type as a labeled filter option', async () => {
+  it('offers every transfer type in TRANSFER_TYPES as a labeled filter option', async () => {
     const { wrapper } = await mountTransactions()
 
     await flushPromises()
@@ -118,6 +118,30 @@ describe('TransactionsView', () => {
         'wallet.transactions.',
       )
     }
+  })
+
+  it('labels each row from the shared activity copy instead of the unknown fallback', async () => {
+    const row = (transferId: number, transferType: string) => ({
+      transferId,
+      transferType,
+      entryType: 'CREDIT',
+      amount: '25000',
+      balanceAfter: '109500',
+      createdAt: '2026-07-26T10:30:00',
+    })
+
+    vi.mocked(getTransactions).mockResolvedValue({
+      ...transactionsResponse,
+      transactions: [row(201, 'DEPOSIT_NO_SHOW_DISTRIBUTION'), row(202, 'REVERSAL')],
+    })
+
+    const { wrapper } = await mountTransactions()
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No-show deposit shared out')
+    expect(wrapper.text()).toContain('Transaction reversed')
+    expect(wrapper.text()).not.toContain('Wallet transaction')
   })
 
   it('requests transactions with the selected filters', async () => {

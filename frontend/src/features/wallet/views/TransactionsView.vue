@@ -10,7 +10,7 @@ import {
   formatTransactionAmount,
   formatTransactionDateTime,
   getTransactionStatusLabel,
-  getTransactionTypeLabel,
+  toActivityKind,
   walletKeys,
   type TransactionSearchParams,
   type TransactionStatus,
@@ -289,7 +289,7 @@ const openTransactionDetail = (transactionId: number): void => {
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="truncate text-sm font-semibold">
-                  {{ getTransactionTypeLabel(transaction.transferType) }}
+                  {{ t(`wallet.home.activity.${toActivityKind(transaction.transferType)}`) }}
                 </p>
                 <p class="mt-1 text-xs text-[#989898]">
                   {{ formatTransactionDateTime(transaction.createdAt) }}
