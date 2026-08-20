@@ -853,10 +853,6 @@ public class AppointmentService {
         return value == null || value.isBlank();
     }
 
-    private static boolean lengthExceeds(String value, int maxLength) {
-        return value != null && value.trim().length() > maxLength;
-    }
-
     private static String normalizeOptional(String value) {
         return isBlank(value) ? null : value.trim();
     }
