@@ -15,6 +15,7 @@ vi.mock('../../api/exploreApi', () => ({
 }))
 
 const ExploreView = (await import('../ExploreView.vue')).default
+const { presetDateRange } = await import('../../model/datePresets')
 
 const place = {
   itemId: 42,
@@ -142,6 +143,24 @@ describe('ExploreView Place branch', () => {
 
     expect(fetchEventList).toHaveBeenCalledWith(
       expect.objectContaining({ startDate: '2026-08-21', endDate: '2026-08-21' }),
+    )
+  })
+
+  it('derives dates from a legacy preset-only URL', async () => {
+    const range = presetDateRange('THIS_WEEKEND')
+
+    await mountView('/explore?datePreset=THIS_WEEKEND')
+
+    expect(fetchEventList).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: range?.min, endDate: range?.max }),
+    )
+  })
+
+  it('drops an unknown preset from an old URL', async () => {
+    await mountView('/explore?datePreset=GARBAGE')
+
+    expect(fetchEventList).toHaveBeenCalledWith(
+      expect.objectContaining({ datePreset: undefined, startDate: undefined }),
     )
   })
 

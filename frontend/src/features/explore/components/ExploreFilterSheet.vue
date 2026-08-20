@@ -13,6 +13,7 @@ import { parseCalendarDate, serializeCalendarDate } from '@/shared/lib/datetime'
 import AppButton from '@/shared/ui/AppButton.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 
+import { presetDateRange, todayDate, type PresetDateRange } from '../model/datePresets'
 import type { EventSearchFilters } from '../model/eventExplore'
 import { SEOUL_REGION1, SEOUL_REGION2_OPTIONS } from '../model/exploreRegions'
 import { EVENT_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
@@ -168,6 +169,7 @@ watch(
   (filters) => {
     Object.assign(draft, cloneFilters(filters))
     selectedRegion.value = SEOUL_REGION1
+    calendarTouched.value = false
   },
   { deep: true },
 )
@@ -224,51 +226,6 @@ function cloneFilters(filters: EventSearchFilters): EventSearchFilters {
   }
 }
 
-// 프리셋은 서버로 보내는 필터 값이 아니라 달력의 선택 가능 범위를 정하는
-// 단축키다. 실제 필터는 항상 startDate/endDate로 나간다(상태 전이는 #275 참고).
-interface PresetDateRange {
-  min: string
-  // Opening soon은 상한이 없다 — max가 없으면 그 날짜 이후 전체가 선택 가능하다.
-  max?: string
-}
-
-function todayDate(): Date {
-  const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
-}
-
-function addDays(date: Date, days: number): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
-}
-
-function presetDateRange(preset: string): PresetDateRange | null {
-  const today = todayDate()
-  if (preset === 'ONGOING') {
-    const value = serializeCalendarDate(today)
-    return { min: value, max: value }
-  }
-  if (preset === 'OPENING_SOON') {
-    return { min: serializeCalendarDate(addDays(today, 1)) }
-  }
-  if (preset === 'THIS_WEEKEND') {
-    // 이번 주 토·일. 주말이 이미 시작됐으면 오늘부터 일요일까지다.
-    const dayOfWeek = today.getDay()
-    const saturday = addDays(today, dayOfWeek === 0 ? -1 : 6 - dayOfWeek)
-    const sunday = addDays(saturday, 1)
-    return {
-      min: serializeCalendarDate(saturday < today ? today : saturday),
-      max: serializeCalendarDate(sunday),
-    }
-  }
-  if (preset === 'THIS_MONTH') {
-    return {
-      min: serializeCalendarDate(today),
-      max: serializeCalendarDate(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
-    }
-  }
-  return null
-}
-
 const selectableRange = computed<PresetDateRange>(() => {
   const preset = draft.datePreset ? presetDateRange(draft.datePreset) : null
   // 프리셋이 없으면 오늘부터 고를 수 있다. 지난 날짜의 이벤트를 찾을 일은 없다.
@@ -281,7 +238,13 @@ function isDateAllowed(value: string): boolean {
   return range.max === undefined || value <= range.max
 }
 
+// 사용자가 달력을 직접 만졌는지 여부. 프리셋 기본 상태(범위 전체 선택)와
+// "프리셋 시작일과 같은 날을 직접 고른 경우"를 값만으로는 구분할 수 없어서
+// 플래그로 기억한다.
+const calendarTouched = ref(false)
+
 function setDatePreset(value: string): void {
+  calendarTouched.value = false
   if (draft.datePreset === value) {
     draft.datePreset = undefined
     draft.startDate = undefined
@@ -303,6 +266,7 @@ function setDatePreset(value: string): void {
 
 function setCalendarDate(value: string): void {
   if (!isDateAllowed(value)) return
+  calendarTouched.value = true
 
   // 프리셋 범위 전체가 그대로 선택돼 있는 상태라면, 첫 탭은 범위를 닫는 게
   // 아니라 그 안에서 새로 고르기 시작하는 것으로 본다.
@@ -431,6 +395,7 @@ function resetSheet(): void {
     draft.datePreset = undefined
     draft.startDate = undefined
     draft.endDate = undefined
+    calendarTouched.value = false
   } else if (props.kind === 'region') {
     draft.region1 = [SEOUL_REGION1]
     draft.region2 = undefined
@@ -448,7 +413,17 @@ function resetSheet(): void {
 }
 
 function apply(): void {
-  emit('apply', cloneFilters(draft))
+  const filters = cloneFilters(draft)
+  // 하루만 고른 선택은 여기서 시작=종료의 하루짜리 기간으로 확정한다.
+  // 달력을 만지지 않은 Opening soon 기본 상태만 상한 없이 시작일을 열어 둔다.
+  if (
+    filters.startDate !== undefined &&
+    filters.endDate === undefined &&
+    (calendarTouched.value || draft.datePreset !== 'OPENING_SOON')
+  ) {
+    filters.endDate = filters.startDate
+  }
+  emit('apply', filters)
 }
 </script>
 

@@ -67,6 +67,32 @@ describe('ExploreFilterSheet date presets', () => {
     expect(applied.endDate).toBeUndefined()
   })
 
+  it('closes a single day narrowed inside Opening soon to a one-day range', async () => {
+    const wrapper = mountDateSheet()
+
+    await pressButton(wrapper, 'Opening soon')
+    await pressButton(wrapper, '25')
+    await pressApply(wrapper)
+
+    expect(lastApplied(wrapper)).toMatchObject({
+      datePreset: 'OPENING_SOON',
+      startDate: '2026-08-25',
+      endDate: '2026-08-25',
+    })
+  })
+
+  it('closes a plain single-day pick to a one-day range', async () => {
+    const wrapper = mountDateSheet()
+
+    await pressButton(wrapper, '25')
+    await pressApply(wrapper)
+
+    expect(lastApplied(wrapper)).toMatchObject({
+      startDate: '2026-08-25',
+      endDate: '2026-08-25',
+    })
+  })
+
   it('narrows dates inside the preset range instead of clearing the preset', async () => {
     const wrapper = mountDateSheet()
 

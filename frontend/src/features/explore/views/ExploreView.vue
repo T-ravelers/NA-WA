@@ -19,6 +19,7 @@ import PlaceCard from '../components/PlaceCard.vue'
 import ExplorePagination from '../components/ExplorePagination.vue'
 import { useEventListQuery } from '../composables/useEventListQuery'
 import { usePlaceListQuery } from '../composables/usePlaceListQuery'
+import { presetDateRange } from '../model/datePresets'
 import {
   EVENT_KINDS,
   type EventKind,
@@ -64,9 +65,10 @@ const selectedRegion1 = ref(readRegion1List('eventRegion1', 'region1'))
 const selectedRegion2 = ref(readRegion2List('eventRegion2', selectedRegion1.value))
 const selectedRegion2Other = ref(readQueryBoolean('region2Other'))
 const selectedRegion3 = ref(readQueryList('region3'))
-const datePreset = ref(readQueryString('datePreset'))
-const startDate = ref(readQueryString('startDate'))
-const endDate = ref(readQueryString('endDate'))
+const initialDateFilters = readDateFilters()
+const datePreset = ref(initialDateFilters.preset)
+const startDate = ref(initialDateFilters.startDate)
+const endDate = ref(initialDateFilters.endDate)
 const selectedEventPage = ref(readQueryPage('eventPage'))
 const eventKeywordInput = ref(readQueryString('eventKeyword') ?? '')
 const eventKeyword = ref(eventKeywordInput.value.trim())
@@ -402,9 +404,10 @@ watch(
       selectedRegion2.value = readRegion2List('eventRegion2', selectedRegion1.value)
       selectedRegion2Other.value = readQueryBoolean('region2Other')
       selectedRegion3.value = readQueryList('region3')
-      datePreset.value = readQueryString('datePreset')
-      startDate.value = readQueryString('startDate')
-      endDate.value = readQueryString('endDate')
+      const dateFilters = readDateFilters()
+      datePreset.value = dateFilters.preset
+      startDate.value = dateFilters.startDate
+      endDate.value = dateFilters.endDate
       selectedEventPage.value = readQueryPage('eventPage')
       eventKeywordInput.value = readQueryString('eventKeyword') ?? ''
       eventKeyword.value = eventKeywordInput.value.trim()
@@ -825,6 +828,27 @@ function readQueryBoolean(key: string): boolean {
 function readQueryPage(key: string): number {
   const value = Number(readQueryString(key))
   return Number.isInteger(value) && value >= 0 ? value : 0
+}
+
+// 개명 전 프론트는 프리셋 선택 시 날짜 없이 `?datePreset=…`만 URL에 남겼다.
+// 그런 링크에서 날짜를 역산해 채우지 않으면 칩만 켜지고 필터는 걸리지 않는다.
+// 알 수 없는 프리셋 값은 버린다.
+function readDateFilters(): {
+  preset: string | undefined
+  startDate: string | undefined
+  endDate: string | undefined
+} {
+  const preset = readQueryString('datePreset')
+  const startDate = readQueryString('startDate')
+  const endDate = readQueryString('endDate')
+  if (preset === undefined) return { preset, startDate, endDate }
+
+  const range = presetDateRange(preset)
+  if (range === null) return { preset: undefined, startDate, endDate }
+  if (startDate === undefined) {
+    return { preset, startDate: range.min, endDate: range.max }
+  }
+  return { preset, startDate, endDate }
 }
 
 function resolveEndDate(
