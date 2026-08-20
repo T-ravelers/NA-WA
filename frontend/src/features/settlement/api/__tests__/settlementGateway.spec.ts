@@ -31,12 +31,18 @@ describe('settlement gateway', () => {
     ])
   })
 
-  it('exposes only creation and payment mutations', () => {
+  it('exposes only creation, payment and receipt operations', () => {
     expect(settlementGateway).toEqual(
-      expect.objectContaining({ create: expect.any(Function), pay: expect.any(Function) }),
+      expect.objectContaining({
+        create: expect.any(Function),
+        pay: expect.any(Function),
+        uploadReceipt: expect.any(Function),
+        getReceipt: expect.any(Function),
+      }),
     )
     expect(settlementGateway).not.toHaveProperty('cancel')
     expect(settlementGateway).not.toHaveProperty('request')
+    // OCR은 이 이슈의 범위가 아니다. 영수증을 올리고 보는 것까지만 한다.
     expect(settlementGateway).not.toHaveProperty('analyzeReceipt')
   })
 })

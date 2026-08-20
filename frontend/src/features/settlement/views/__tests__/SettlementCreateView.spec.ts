@@ -7,8 +7,76 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import type { SettlementCandidate } from '../../model/settlement'
 import SettlementCreateView from '../SettlementCreateView.vue'
 
-const { create } = vi.hoisted(() => ({ create: vi.fn() }))
-vi.mock('../../api/settlementGateway', () => ({ settlementGateway: { create } }))
+const { create, uploadReceipt } = vi.hoisted(() => ({ create: vi.fn(), uploadReceipt: vi.fn() }))
+vi.mock('../../api/settlementGateway', () => ({ settlementGateway: { create, uploadReceipt } }))
+
+/** jsdom에는 미리보기 주소를 만드는 기능이 없어 대역을 둔다. */
+const revokeObjectURL = vi.fn()
+Object.defineProperty(URL, 'createObjectURL', { value: () => 'blob:receipt', writable: true })
+Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, writable: true })
+
+/**
+ * jsdom에는 카메라가 없다. getUserMedia를 흉내 내 촬영 화면이 열리는 경우와, 아예
+ * 열리지 않는 경우를 모두 확인한다.
+ */
+function stubCamera(stream: unknown = { getTracks: () => [] }): void {
+  Object.defineProperty(navigator, 'mediaDevices', {
+    value:
+      stream === null
+        ? undefined
+        : { getUserMedia: vi.fn().mockResolvedValue(stream as MediaStream) },
+    configurable: true,
+  })
+  Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+    value: vi.fn().mockResolvedValue(undefined),
+    configurable: true,
+  })
+}
+
+async function openCamera(wrapper: ReturnType<typeof mountCreate>): Promise<void> {
+  await wrapper.get('[data-action="add-receipt"]').trigger('click')
+  await wrapper.get('[data-action="receipt-source-camera"]').trigger('click')
+  await flushPromises()
+}
+
+async function fillItem(
+  wrapper: ReturnType<typeof mountCreate>,
+  index: number,
+  values: { name: string; unitPrice: string; quantity: string },
+): Promise<void> {
+  await wrapper.get(`[data-item-name="${index}"]`).setValue(values.name)
+  await wrapper.get(`[data-item-unit-price="${index}"]`).setValue(values.unitPrice)
+  await wrapper.get(`[data-item-quantity="${index}"]`).setValue(values.quantity)
+}
+
+async function allocate(
+  wrapper: ReturnType<typeof mountCreate>,
+  index: number,
+  participantId: string,
+  quantity: string,
+): Promise<void> {
+  await wrapper.get(`[data-allocation-quantity="${index}:${participantId}"]`).setValue(quantity)
+}
+
+function pngFile(name = 'receipt.png', type = 'image/png', size = 1024): File {
+  const file = new File([new Uint8Array(1)], name, { type })
+  Object.defineProperty(file, 'size', { value: size })
+  return file
+}
+
+/** 영수증 버튼 → 출처 선택 시트 → 저장소 선택까지, 사용자가 밟는 순서 그대로 간다. */
+async function pickReceipt(
+  wrapper: ReturnType<typeof mountCreate>,
+  file: File = pngFile(),
+): Promise<void> {
+  await wrapper.get('[data-action="add-receipt"]').trigger('click')
+  await wrapper.get('[data-action="receipt-source-library"]').trigger('click')
+
+  const input = wrapper.get('[data-testid="receipt-library-input"]')
+  Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+  await input.trigger('change')
+  await flushPromises()
+}
 
 function candidate(overrides: Partial<SettlementCandidate> = {}): SettlementCandidate {
   return {
@@ -44,7 +112,10 @@ async function drillDownToTransaction(wrapper: ReturnType<typeof mountCreate>) {
 }
 
 describe('SettlementCreateView', () => {
-  beforeEach(() => create.mockReset().mockResolvedValue({ id: '42' }))
+  beforeEach(() => {
+    create.mockReset().mockResolvedValue({ id: '42' })
+    uploadReceipt.mockReset().mockResolvedValue({ receiptId: '31' })
+  })
 
   it('narrows a journey to an appointment before offering its payments', async () => {
     const wrapper = mountCreate([
@@ -105,7 +176,7 @@ describe('SettlementCreateView', () => {
     await wrapper.get('[data-participant-id="19"]').trigger('click')
     await wrapper.get('[data-action="next"]').trigger('click')
 
-    expect(wrapper.get('[data-action="create"]').text()).toBe('Request 25.00 P')
+    expect(wrapper.get('[data-action="create"]').text()).toBe('Send request')
     await wrapper.get('[data-action="create"]').trigger('click')
     await flushPromises()
 
@@ -126,7 +197,6 @@ describe('SettlementCreateView', () => {
     await drillDownToTransaction(wrapper)
     await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
     await wrapper.get('[data-participant-id="19"]').trigger('click')
-    await wrapper.get('[data-action="add-item"]').trigger('click')
 
     await wrapper.get('[data-item-name="0"]').setValue('Pasta')
     await wrapper.get('[data-item-unit-price="0"]').setValue('12.50')
@@ -183,7 +253,6 @@ describe('SettlementCreateView', () => {
     await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
     await wrapper.get('[data-participant-id="19"]').trigger('click')
     await wrapper.get('[data-participant-id="27"]').trigger('click')
-    await wrapper.get('[data-action="add-item"]').trigger('click')
 
     await wrapper.get('[data-item-name="0"]').setValue('Pasta')
     await wrapper.get('[data-item-unit-price="0"]').setValue('12.50')
@@ -267,10 +336,365 @@ describe('SettlementCreateView', () => {
     expect(wrapper.text()).not.toContain('no longer available')
   })
 
-  it('keeps the receipt entry point disabled until receipt capture ships', async () => {
+  it('uploads the chosen receipt and sends its id with the split', async () => {
+    uploadReceipt.mockResolvedValue({ receiptId: '31' })
+    create.mockResolvedValue({ id: '77' })
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)
 
-    expect(wrapper.get('[data-action="add-receipt"]').attributes('disabled')).toBeDefined()
+    await pickReceipt(wrapper)
+
+    expect(uploadReceipt).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    expect(create.mock.calls[0]?.[2]).toMatchObject({ receiptId: '31' })
+  })
+
+  it('omits receiptId when no receipt was attached', async () => {
+    create.mockResolvedValue({ id: '77' })
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    expect(create.mock.calls[0]?.[2]).not.toHaveProperty('receiptId')
+    expect(uploadReceipt).not.toHaveBeenCalled()
+  })
+
+  it('rejects an oversized photo before spending the upload', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await pickReceipt(wrapper, pngFile('big.png', 'image/png', 9 * 1024 * 1024))
+
+    expect(uploadReceipt).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('over 8 MB')
+  })
+
+  it('offers both the camera and the photo library', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await wrapper.get('[data-action="add-receipt"]').trigger('click')
+
+    // 영수증은 즉석에서 찍기도 하고 이미 찍어 둔 것을 고르기도 한다. 둘 다 열려 있어야 한다.
+    expect(wrapper.find('[data-action="receipt-source-camera"]').exists()).toBe(true)
+    expect(wrapper.find('[data-action="receipt-source-library"]').exists()).toBe(true)
+  })
+
+  it('opens an in-app camera instead of a file dialog', async () => {
+    // 노트북에서는 파일 입력의 capture 속성이 무시돼 파일 창만 열린다. 촬영은 앱 안에서 한다.
+    stubCamera()
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await openCamera(wrapper)
+
+    expect(wrapper.find('[data-action="receipt-camera-shoot"]').exists()).toBe(true)
+  })
+
+  it('offers the photo library when the camera cannot open', async () => {
+    stubCamera(null)
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await openCamera(wrapper)
+
+    expect(wrapper.find('[data-action="receipt-camera-shoot"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('cannot open the camera')
+    // 막혀 있어도 빠져나갈 길은 남아 있어야 한다.
+    expect(wrapper.find('[data-action="receipt-camera-library"]').exists()).toBe(true)
+  })
+
+  it('rejects a format the server does not accept', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await pickReceipt(wrapper, pngFile('photo.heic', 'image/heic'))
+
+    expect(uploadReceipt).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('JPEG, PNG, or WebP')
+  })
+
+  it('points at the item that blocks the step, and only after Continue', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '10', quantity: '1' })
+    await allocate(wrapper, 0, '12', '1')
+    // 두 번째 품목은 배분 합이 수량과 어긋난다.
+    await fillItem(wrapper, 1, { name: 'Wine', unitPrice: '20', quantity: '2' })
+    await allocate(wrapper, 1, '12', '1')
+
+    // 아직 누르기 전에는 아무 표시도 하지 않는다.
+    expect(wrapper.find('[data-item-invalid="true"]').exists()).toBe(false)
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 합이 어긋난 두 번째 품목만 표시돼야 한다. 멀쩡한 첫 품목까지 빨개지면 소용이 없다.
+    const flagged = wrapper.findAll('[data-item-invalid="true"]')
+    expect(flagged).toHaveLength(1)
+    expect(flagged[0]?.find('[data-item-name="1"]').exists()).toBe(true)
+  })
+
+  it('clears the item marks once the step goes through', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '25', quantity: '2' })
+    await allocate(wrapper, 0, '12', '1')
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+    expect(wrapper.find('[data-item-invalid="true"]').exists()).toBe(true)
+
+    await allocate(wrapper, 0, '19', '1')
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    expect(wrapper.find('[data-item-invalid="true"]').exists()).toBe(false)
+  })
+
+  it('blocks the step when item totals do not match the payment', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    // 원거래는 25.00인데 품목 합계가 30.00이다. 서버가 거절할 요청이라 여기서 막는다.
+    await fillItem(wrapper, 0, { name: 'Wine', unitPrice: '30.00', quantity: '1' })
+    await allocate(wrapper, 0, '12', '1')
+
+    expect(wrapper.get('[data-testid="items-total"]').text()).toContain('30')
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 품목 자체는 흠이 없으니 배분 안내가 아니라 합계 안내가 떠야 고칠 곳을 안다.
+    expect(wrapper.text()).toContain('must match the payment')
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(false)
+  })
+
+  it('lets the step through once the totals line up', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '12.50', quantity: '2' })
+    await allocate(wrapper, 0, '12', '1')
+    await allocate(wrapper, 0, '19', '1')
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(true)
+  })
+
+  it('shows what each person owes and what is actually requested', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '12.50', quantity: '2' })
+    await allocate(wrapper, 0, '12', '1')
+    await allocate(wrapper, 0, '19', '1')
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    expect(wrapper.get('[data-share-for="12"]').text()).toContain('12.5')
+    expect(wrapper.get('[data-share-for="19"]').text()).toContain('12.5')
+
+    // 원결제자(12)는 자기 자신에게 청구하지 않는다. 25 중 12.5만 요청한다.
+    expect(wrapper.get('[data-testid="request-total"]').text()).toContain('12.5')
+    expect(wrapper.get('[data-action="create"]').text()).toContain('12.5')
+  })
+
+  it('does not invent per-person amounts for an even split', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 나머지를 누가 더 낼지는 통화 단위에 달려 있어 화면이 알 수 없다. 규칙만 알린다.
+    expect(wrapper.find('[data-testid="request-total"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Split evenly across 2 people')
+  })
+
+  it('drops an upload that lands after the payment was changed', async () => {
+    let finishUpload: (value: { receiptId: string }) => void = () => {}
+    uploadReceipt.mockReturnValueOnce(
+      new Promise<{ receiptId: string }>((resolve) => {
+        finishUpload = resolve
+      }),
+    )
+    const wrapper = mountCreate([
+      candidate(),
+      candidate({ transferId: '8', gatheringName: 'Cafe', amount: '10.00' }),
+    ])
+    await drillDownToTransaction(wrapper)
+    await pickReceipt(wrapper)
+
+    // 아직 올라가는 중에 다른 결제로 옮긴다.
+    ;(wrapper.vm as unknown as { back: () => void }).back()
+    await flushPromises()
+    await wrapper.get('[data-payment-id="8"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 버린 사진의 응답이 뒤늦게 도착한다.
+    finishUpload({ receiptId: '31' })
+    await flushPromises()
+
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    // 되살아나면 앞 결제의 영수증이 남의 정산에 붙고, 붙은 뒤에는 바꿀 수 없다.
+    expect(create.mock.calls[0]?.[2]).not.toHaveProperty('receiptId')
+  })
+
+  it('waits for the upload before letting the request through', async () => {
+    let finishUpload: (value: { receiptId: string }) => void = () => {}
+    uploadReceipt.mockReturnValueOnce(
+      new Promise<{ receiptId: string }>((resolve) => {
+        finishUpload = resolve
+      }),
+    )
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await pickReceipt(wrapper)
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 그냥 넘기면 영수증 번호가 아직 없어, 오류도 없이 사진만 빠진 정산이 만들어진다.
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Wait for the receipt')
+
+    finishUpload({ receiptId: '31' })
+    await flushPromises()
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    expect(create.mock.calls[0]?.[2]).toMatchObject({ receiptId: '31' })
+  })
+
+  it('drops the receipt when another payment is chosen', async () => {
+    const wrapper = mountCreate([
+      candidate(),
+      candidate({ transferId: '8', gatheringName: 'Cafe', amount: '10.00' }),
+    ])
+    await drillDownToTransaction(wrapper)
+    await pickReceipt(wrapper)
+    expect(uploadReceipt).toHaveBeenCalledTimes(1)
+
+    // 1단계로 돌아가 다른 결제를 고른다.
+    ;(wrapper.vm as unknown as { back: () => void }).back()
+    await flushPromises()
+    await wrapper.get('[data-payment-id="8"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    // 앞 결제의 영수증이 따라오면, 한 번 연결된 뒤에는 바꿀 수 없어 되돌릴 방법이 없다.
+    expect(create.mock.calls[0]?.[2]).not.toHaveProperty('receiptId')
+  })
+
+  it('shows computed amounts with the same decimals as the payment', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '12.50', quantity: '2' })
+    await allocate(wrapper, 0, '12', '1')
+    await allocate(wrapper, 0, '19', '1')
+
+    // 25.00과 25가 나란히 놓이면 같은 금액인지 눈으로 알아볼 수 없다.
+    expect(wrapper.get('[data-testid="items-total"]').text()).toContain('25.00 P / 25.00 P')
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    expect(wrapper.get('[data-share-for="12"]').text()).toContain('12.50 P')
+    expect(wrapper.get('[data-testid="request-total"]').text()).toContain('12.50 P')
+    expect(wrapper.get('[data-action="create"]').text()).toBe('Request 12.50 P')
+  })
+
+  it('does not offer a receipt to open when none was attached', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 눌러도 아무 일이 없는 버튼은 고장으로 보인다. 없다는 것을 아는 자리라 눌리지 않게 둔다.
+    const box = wrapper.get('[data-action="add-receipt"]')
+    expect(box.attributes('disabled')).toBeDefined()
+    expect(box.attributes('aria-label')).toBe('No receipt attached')
+  })
+
+  it('lays out the first item as soon as the itemized split is chosen', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    // 균등 분할에는 품목이 없다.
+    expect(wrapper.find('[data-item-name="0"]').exists()).toBe(false)
+
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    // 품목이 0개인 품목별 정산은 어차피 통과하지 못한다. 빈 자리부터 보여줄 이유가 없다.
+    expect(wrapper.find('[data-item-name="0"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-item-invalid]')).toHaveLength(0)
+  })
+
+  it('keeps what was typed when the split method is toggled back', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '25', quantity: '1' })
+
+    await wrapper.get('[data-type="EQUAL"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    // 자동으로 까는 것은 비어 있을 때뿐이다. 적어 둔 것을 밀어내면 안 된다.
+    expect((wrapper.get('[data-item-name="0"]').element as HTMLInputElement).value).toBe('Pasta')
+    expect(wrapper.findAll('[data-item-name]')).toHaveLength(1)
+  })
+
+  it('removes the item card that the x button belongs to', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '10', quantity: '1' })
+    await fillItem(wrapper, 1, { name: 'Wine', unitPrice: '15', quantity: '1' })
+
+    await wrapper.get('[data-remove-item="0"]').trigger('click')
+
+    // 지운 자리로 뒷 품목이 당겨진다. 잘못 눌러 남은 쪽이 사라지면 알아채기 어렵다.
+    expect(wrapper.findAll('[data-item-name]')).toHaveLength(1)
+    expect((wrapper.get('[data-item-name="0"]').element as HTMLInputElement).value).toBe('Wine')
+  })
+
+  it('hides the remove button on the last item card', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    // 마지막 한 장까지 지우면 어떤 편집으로도 빠져나올 수 없는 자리가 남는다.
+    expect(wrapper.find('[data-remove-item]').exists()).toBe(false)
+
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+    expect(wrapper.findAll('[data-remove-item]')).toHaveLength(2)
+
+    await wrapper.get('[data-remove-item="1"]').trigger('click')
+    expect(wrapper.find('[data-remove-item]').exists()).toBe(false)
   })
 })

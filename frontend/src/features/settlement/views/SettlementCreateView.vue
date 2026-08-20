@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { IconX } from '@tabler/icons-vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -7,9 +8,11 @@ import AppCard from '@/shared/ui/AppCard.vue'
 
 import { settlementGateway } from '../api/settlementGateway'
 import SettlementEmptyState from '../components/SettlementEmptyState.vue'
+import SettlementReceiptSheet from '../components/SettlementReceiptSheet.vue'
 import SettlementStatusScreen from '../components/SettlementStatusScreen.vue'
 import SettlementTransactionCard from '../components/SettlementTransactionCard.vue'
 import { useSettlementPoints } from '../composables/useSettlementPoints'
+import { useSettlementReceiptUpload } from '../composables/useSettlementReceipt'
 import type {
   ItemizedSettlementItem,
   SettlementCandidate,
@@ -21,7 +24,11 @@ import {
   clearSettlementCreateIdempotencyKey,
   resolveSettlementCreateIdempotencyKey,
 } from '../model/settlementIdempotency'
-import { validateItemizedItems } from '../model/settlementRules'
+import {
+  compareItemizedTotal,
+  summarizeItemizedShares,
+  validateItemizedItems,
+} from '../model/settlementRules'
 
 /**
  * 정산 요청서를 만드는 세 단계.
@@ -55,6 +62,8 @@ const error = ref<unknown>(null)
 const validationMessage = ref<string | null>(null)
 /** 1단계 위쪽에 뜨는 안내. 2단계 전용인 validationMessage와 자리가 달라 따로 둔다. */
 const candidateNotice = ref<string | null>(null)
+const receipt = useSettlementReceiptUpload()
+const receiptSheetOpen = ref(false)
 
 const journeys = computed(() => groupCandidates(props.candidates))
 const selectedJourney = computed(
@@ -80,8 +89,65 @@ const chosenParticipants = computed(
 )
 const itemValidation = computed(() => validateItemizedItems(items.value, selectedIds.value))
 const hasEnoughParticipants = computed(() => selectedParticipantIds.value.length >= 2)
+/*
+ * 서버는 품목 금액의 합이 원거래 금액과 정확히 같을 때만 정산을 만든다. 여기서 막지 않으면
+ * 사용자가 검토 단계까지 다 채운 뒤 제출에서야 거절당한다.
+ */
+const itemsTotal = computed(() =>
+  selectedCandidate.value === null
+    ? null
+    : compareItemizedTotal(items.value, selectedCandidate.value.amount),
+)
+const totalMatchesSource = computed(() => itemsTotal.value?.matches !== false)
+/*
+ * 품목별 정산에서만 사람별 금액을 미리 보여준다. 균등 분할은 나머지를 누가 더 낼지가
+ * 통화의 최소 단위에 달려 있는데 화면은 그 단위를 모른다. 여기서 어림잡아 보여주면
+ * 실제 청구 금액과 1단위 어긋난 숫자를 확정된 것처럼 내보이게 된다.
+ */
+const itemizedShares = computed(() =>
+  type.value !== 'ITEMIZED' || selectedCandidate.value === null
+    ? null
+    : summarizeItemizedShares(items.value, selectedCandidate.value.payerAppointmentMemberId),
+)
+
+/*
+ * 원거래 금액이 쓰는 소수 자릿수.
+ *
+ * 계산한 금액은 뒤의 0을 떼고 나오므로 그대로 두면 25.00과 25가 나란히 놓인다. 같은
+ * 금액인데 달라 보이면 합계가 맞는지 눈으로 확인할 수 없다.
+ */
+const amountFractionDigits = computed(
+  () => selectedCandidate.value?.amount.split('.')[1]?.length ?? 0,
+)
+
+/** 배분이 없는 사람은 0으로 보여 준다. 빈칸이면 왜 없는지 알 수 없다. */
+function shareAmountOf(appointmentMemberId: string): string {
+  return (
+    itemizedShares.value?.shares.find((share) => share.appointmentMemberId === appointmentMemberId)
+      ?.amount ?? '0'
+  )
+}
+
 const canContinueDetails = computed(
-  () => hasEnoughParticipants.value && (type.value === 'EQUAL' || itemValidation.value.valid),
+  () =>
+    hasEnoughParticipants.value &&
+    /*
+     * 사진이 다 올라가기 전에는 넘기지 않는다.
+     *
+     * 아직 영수증 번호가 없는 상태로 요청이 나가면 정산은 영수증 없이 만들어지고, 나중에
+     * 붙일 수도 없다. 오류도 안내도 없이 방금 찍은 사진만 사라진다.
+     */
+    !receipt.pending.value &&
+    (type.value === 'EQUAL' || (itemValidation.value.valid && totalMatchesSource.value)),
+)
+
+/*
+ * 잘못된 품목 표시는 "계속"을 누른 뒤부터 켠다. 입력하는 도중에 빨간 표시가 따라다니면
+ * 아직 다 적지도 않은 칸을 틀렸다고 말하는 꼴이 된다.
+ */
+const showItemErrors = ref(false)
+const invalidItemIndexes = computed(() =>
+  showItemErrors.value ? new Set(itemValidation.value.invalidItemIndexes) : new Set<number>(),
 )
 
 watch(submitting, (value) => emit('submittingChange', value))
@@ -143,18 +209,27 @@ function selectTransaction(candidate: SettlementCandidate): void {
   selectedCandidate.value = candidate
   selectedParticipantIds.value = [candidate.payerAppointmentMemberId]
   items.value = []
+  /*
+   * 앞서 고른 결제에 붙였던 영수증을 반드시 떼어낸다.
+   *
+   * 남겨 두면 다른 결제의 정산이 엉뚱한 영수증을 달고 만들어지고, 한 번 연결된 영수증은
+   * 바꿀 수 없어 되돌릴 방법이 없다.
+   */
+  receipt.reset()
   error.value = null
   candidateNotice.value = null
 }
 
 function goToDetails(): void {
   if (selectedCandidate.value === null) return
+  ensureFirstItem()
   step.value = 2
   emit('update:step', step.value)
 }
 
 function setType(nextType: SettlementType): void {
   type.value = nextType
+  ensureFirstItem()
   validationMessage.value = null
 }
 
@@ -183,6 +258,29 @@ function toggleParticipant(participantId: string): void {
 
 function addItem(): void {
   items.value.push({ name: '', unitPrice: '', quantity: '', allocations: [] })
+}
+
+/*
+ * 품목별 정산으로 들어오면 빈 품목 한 장을 미리 깔아 둔다.
+ *
+ * 품목이 하나도 없는 품목별 정산은 어차피 다음 단계로 넘어가지 못한다. 빈 자리를 두고
+ * "추가"부터 누르게 하면 무엇을 적는 화면인지 보여주지도 못한 채 한 번 더 두드리게 만든다.
+ * 이미 적어 둔 품목이 있으면 건드리지 않아서, 방식을 오갔다 돌아와도 값이 그대로 남는다.
+ */
+function ensureFirstItem(): void {
+  if (type.value === 'ITEMIZED' && items.value.length === 0) addItem()
+}
+
+/*
+ * 마지막 한 장은 지우지 않는다.
+ *
+ * 품목이 0개면 진행할 수 없는데, 그 상태에서는 왜 막혔는지 짚어 줄 카드조차 화면에 남지
+ * 않는다. 그래서 마지막 한 장에서는 버튼 자체를 감춘다. 내용을 비우려면 칸을 지우면 된다.
+ */
+function removeItem(index: number): void {
+  if (items.value.length <= 1) return
+  items.value.splice(index, 1)
+  validationMessage.value = null
 }
 
 function updateItem(index: number, field: 'name' | 'unitPrice' | 'quantity', value: string): void {
@@ -220,12 +318,22 @@ function goToReview(): void {
     validationMessage.value = t('settlement.create.participantsTooFew')
     return
   }
+  if (receipt.pending.value) {
+    validationMessage.value = t('settlement.receipt.uploading')
+    return
+  }
   if (!canContinueDetails.value) {
-    validationMessage.value = t('settlement.create.allocationIncomplete')
+    // 합계가 어긋난 것과 품목 입력이 덜 된 것은 고쳐야 할 곳이 달라 문구를 나눈다.
+    validationMessage.value =
+      itemValidation.value.valid && !totalMatchesSource.value
+        ? t('settlement.create.totalMismatch')
+        : t('settlement.create.allocationIncomplete')
+    showItemErrors.value = true
     return
   }
 
   validationMessage.value = null
+  showItemErrors.value = false
   step.value = 3
   emit('update:step', step.value)
 }
@@ -238,6 +346,7 @@ async function create(): Promise<void> {
     type: type.value,
     participantAppointmentMemberIds: [...selectedParticipantIds.value].sort(),
     ...(type.value === 'ITEMIZED' ? { items: items.value } : {}),
+    ...(receipt.receiptId.value !== null ? { receiptId: receipt.receiptId.value } : {}),
   }
   submitting.value = true
   error.value = null
@@ -472,7 +581,23 @@ defineExpose({ back })
         :amount="selectedCandidate.amount"
         :paid-at="selectedCandidate.paidAt"
         :payer-name="selectedCandidate.payerName"
+        :receipt-url="receipt.previewUrl.value"
+        :receipt-pending="receipt.pending.value"
+        @receipt-select="receipt.select"
       />
+      <p
+        v-if="receipt.errorKey.value !== null"
+        class="mt-2 text-caption text-danger"
+        role="alert"
+      >
+        {{ t(receipt.errorKey.value) }}
+      </p>
+      <p
+        v-else-if="selectedCandidate !== null"
+        class="mt-2 text-caption text-ink-3"
+      >
+        {{ t('settlement.receipt.hint') }}
+      </p>
 
       <h3 class="mt-8 text-title">{{ t('settlement.create.participants') }}</h3>
       <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.participantsHint') }}</p>
@@ -510,10 +635,51 @@ defineExpose({ back })
         </div>
         <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.itemsHint') }}</p>
         <div
+          v-if="itemsTotal !== null"
+          data-testid="items-total"
+          class="mt-3 flex items-baseline justify-between gap-3 text-body-sm"
+          :class="itemsTotal.matches ? 'text-ink-2' : 'text-danger'"
+        >
+          <span>{{ t('settlement.create.itemsTotal') }}</span>
+          <span
+            >{{ points(itemsTotal.total, amountFractionDigits) }} /
+            {{ points(selectedCandidate?.amount ?? '0') }}</span
+          >
+        </div>
+        <div
           v-for="(item, index) in items"
           :key="index"
+          :data-item-invalid="invalidItemIndexes.has(index) ? 'true' : undefined"
           class="mt-4 rounded-sm bg-surface-1 p-4"
+          :class="{ 'ring-1 ring-danger': invalidItemIndexes.has(index) }"
         >
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <p class="text-caption text-ink-3">
+              {{ t('settlement.create.itemNumber', { number: index + 1 }) }}
+            </p>
+            <button
+              v-if="items.length > 1"
+              type="button"
+              :data-remove-item="index"
+              class="-my-2 -mr-2 grid size-11 shrink-0 place-items-center rounded-sm text-ink-3"
+              :aria-label="t('settlement.create.removeItem', { number: index + 1 })"
+              @click="removeItem(index)"
+            >
+              <IconX
+                :size="18"
+                :stroke-width="1.8"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+          <p
+            v-if="invalidItemIndexes.has(index)"
+            :id="`item-error-${index}`"
+            class="mb-3 text-caption text-danger"
+            role="alert"
+          >
+            {{ t('settlement.create.itemInvalid') }}
+          </p>
           <label
             class="block text-caption text-ink-2"
             :for="`item-name-${index}`"
@@ -522,6 +688,8 @@ defineExpose({ back })
           <input
             :id="`item-name-${index}`"
             :data-item-name="index"
+            :aria-invalid="invalidItemIndexes.has(index) ? 'true' : undefined"
+            :aria-describedby="invalidItemIndexes.has(index) ? `item-error-${index}` : undefined"
             :value="item.name"
             class="mt-1 min-h-11 w-full rounded-sm bg-surface-2 px-3 text-body-sm"
             @input="updateItem(index, 'name', ($event.target as HTMLInputElement).value)"
@@ -597,6 +765,9 @@ defineExpose({ back })
         :amount="selectedCandidate.amount"
         :paid-at="selectedCandidate.paidAt"
         :payer-name="selectedCandidate.payerName"
+        :receipt-mode="receipt.previewUrl.value === null ? 'empty' : 'view'"
+        :receipt-url="receipt.previewUrl.value"
+        @receipt-open="receiptSheetOpen = true"
       />
 
       <AppCard class="mt-4">
@@ -605,7 +776,10 @@ defineExpose({ back })
             <dt class="text-ink-3">{{ t('settlement.create.method') }}</dt>
             <dd>{{ t(`settlement.type.${type}`) }}</dd>
           </div>
-          <div class="flex justify-between gap-3">
+          <div
+            v-if="itemizedShares === null"
+            class="flex justify-between gap-3"
+          >
             <dt class="text-ink-3">{{ t('settlement.create.breakdown') }}</dt>
             <dd class="text-right">
               {{ chosenParticipants.map((participant) => participant.name).join(', ') }}
@@ -617,6 +791,44 @@ defineExpose({ back })
           </div>
         </dl>
       </AppCard>
+
+      <template v-if="itemizedShares !== null">
+        <h3 class="mt-6 text-title">{{ t('settlement.create.sharesTitle') }}</h3>
+        <AppCard class="mt-3">
+          <dl class="space-y-3 text-body-sm">
+            <div
+              v-for="participant in chosenParticipants"
+              :key="participant.id"
+              :data-share-for="participant.id"
+              class="flex justify-between gap-3"
+            >
+              <dt class="text-ink-3">
+                {{ participant.name
+                }}<span
+                  v-if="participant.id === selectedCandidate?.payerAppointmentMemberId"
+                  class="ml-1 text-caption"
+                  >{{ t('settlement.create.payerShare') }}</span
+                >
+              </dt>
+              <dd>{{ points(shareAmountOf(participant.id), amountFractionDigits) }}</dd>
+            </div>
+          </dl>
+          <div
+            class="mt-4 flex justify-between gap-3 border-t border-hairline pt-3 text-title-sm"
+            data-testid="request-total"
+          >
+            <span>{{ t('settlement.create.requestTotal') }}</span>
+            <span>{{ points(itemizedShares.requested, amountFractionDigits) }}</span>
+          </div>
+        </AppCard>
+      </template>
+
+      <p
+        v-else-if="type === 'EQUAL'"
+        class="mt-4 text-body-sm text-ink-2"
+      >
+        {{ t('settlement.create.evenSplitNote', { count: chosenParticipants.length }) }}
+      </p>
 
       <ul
         v-if="type === 'ITEMIZED'"
@@ -648,10 +860,20 @@ defineExpose({ back })
           variant="settle"
           @click="create"
           >{{
-            t('settlement.create.request', { amount: points(selectedCandidate?.amount ?? '0') })
+            itemizedShares === null
+              ? t('settlement.create.send')
+              : t('settlement.create.request', {
+                  amount: points(itemizedShares.requested, amountFractionDigits),
+                })
           }}</AppButton
         >
       </div>
     </div>
+
+    <SettlementReceiptSheet
+      v-if="receiptSheetOpen && receipt.previewUrl.value !== null"
+      :url="receipt.previewUrl.value"
+      @close="receiptSheetOpen = false"
+    />
   </div>
 </template>

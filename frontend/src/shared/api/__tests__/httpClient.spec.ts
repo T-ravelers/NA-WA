@@ -500,4 +500,79 @@ describe('httpClient', () => {
   it('keeps axios importable for consumers that need error helpers', () => {
     expect(axios.isAxiosError(new AxiosError('x'))).toBe(true)
   })
+
+  it('reads the error code out of a binary response body', async () => {
+    // 이미지처럼 바이너리로 받는 요청은 실패해도 본문이 Blob으로 온다. 풀어내지 않으면
+    // 어떤 실패든 UNKNOWN이 되어 "기한 만료"와 "원래 없음"을 구분할 수 없다.
+    const { httpClient } = await loadClient({
+      'get /api/v1/settlements/42/receipt': [
+        {
+          status: 410,
+          body: new Blob(
+            [
+              JSON.stringify({
+                success: false,
+                error: { code: 'SETTLEMENT-020', message: 'gone' },
+              }),
+            ],
+            { type: 'application/json' },
+          ),
+        },
+      ],
+    })
+
+    await expect(
+      httpClient.get('/api/v1/settlements/42/receipt', { responseType: 'blob' }),
+    ).rejects.toMatchObject({ code: 'SETTLEMENT-020', status: 410 })
+  })
+
+  it('still retries a binary request whose CSRF token went stale', async () => {
+    // 봉투를 풀기 전에 CSRF를 판정하면, 바이너리로 받는 요청만 재시도에서 조용히 빠진다.
+    const { httpClient, calls } = await loadClient({
+      'get /api/v1/auth/csrf': [
+        {
+          status: 200,
+          body: { success: true, data: { token: 'csrf-token', headerName: 'X-CSRF-TOKEN' } },
+        },
+        {
+          status: 200,
+          body: { success: true, data: { token: 'fresh-csrf-token', headerName: 'X-CSRF-TOKEN' } },
+        },
+      ],
+      'post /api/v1/settlement-receipts': [
+        {
+          status: 403,
+          body: new Blob(
+            [
+              JSON.stringify({
+                success: false,
+                error: { code: 'AUTH-005', message: 'invalid csrf token' },
+              }),
+            ],
+            { type: 'application/json' },
+          ),
+        },
+        { status: 200, body: { success: true, data: { receiptId: '31' } } },
+      ],
+    })
+
+    const response = await httpClient.post('/api/v1/settlement-receipts', new FormData(), {
+      responseType: 'blob',
+    })
+
+    expect(response.data).toEqual({ receiptId: '31' })
+    expect(countCalls(calls, 'post', '/api/v1/settlement-receipts')).toBe(2)
+  })
+
+  it('leaves a binary error body alone when it is not JSON', async () => {
+    const { httpClient } = await loadClient({
+      'get /api/v1/settlements/42/receipt': [
+        { status: 503, body: new Blob(['<html>nginx</html>'], { type: 'text/html' }) },
+      ],
+    })
+
+    await expect(
+      httpClient.get('/api/v1/settlements/42/receipt', { responseType: 'blob' }),
+    ).rejects.toMatchObject({ code: 'UNKNOWN', status: 503 })
+  })
 })

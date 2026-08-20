@@ -23,9 +23,26 @@ interface Props {
    */
   paidAt?: string
   payerName?: string
+  /** 'add'는 고르는 자리, 'view'는 여는 자리, 'empty'는 볼 것이 없다고 아는 자리다. */
+  receiptMode?: 'add' | 'view' | 'empty'
+  receiptUrl?: string | null
+  receiptPending?: boolean
+  /** 'empty'일 때 읽어 줄 문구. 비우면 "붙은 영수증 없음"으로 읽는다. */
+  receiptEmptyLabel?: string
 }
 
-const { gatheringName, amount, paidAt = undefined, payerName = undefined } = defineProps<Props>()
+const {
+  gatheringName,
+  amount,
+  paidAt = undefined,
+  payerName = undefined,
+  receiptMode = 'add',
+  receiptUrl = null,
+  receiptPending = false,
+  receiptEmptyLabel = undefined,
+} = defineProps<Props>()
+
+const emit = defineEmits<{ receiptSelect: [file: File]; receiptOpen: [] }>()
 
 const { t } = useI18n()
 const points = useSettlementPoints()
@@ -52,7 +69,14 @@ const points = useSettlementPoints()
           {{ paidAt }}
         </p>
       </div>
-      <SettlementReceiptBox />
+      <SettlementReceiptBox
+        :mode="receiptMode"
+        :preview-url="receiptUrl"
+        :pending="receiptPending"
+        :empty-label="receiptEmptyLabel"
+        @select="emit('receiptSelect', $event)"
+        @open="emit('receiptOpen')"
+      />
     </div>
     <p class="mt-4 text-data-lg">{{ points(amount) }}</p>
   </AppCard>

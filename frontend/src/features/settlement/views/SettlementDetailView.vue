@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -10,8 +10,10 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import SettlementPageHeader from '../components/SettlementPageHeader.vue'
+import SettlementReceiptSheet from '../components/SettlementReceiptSheet.vue'
 import SettlementTransactionCard from '../components/SettlementTransactionCard.vue'
 import { useSettlementPoints } from '../composables/useSettlementPoints'
+import { useSettlementReceiptViewer } from '../composables/useSettlementReceipt'
 import { resolveSettlementError } from '../model/settlementErrors'
 import { resolveSide } from '../model/settlementList'
 import { useSettlementDetail } from '../model/settlementQueries'
@@ -41,6 +43,52 @@ const hasPaid = computed(() => detail.value?.viewer.requestStatus === 'PAID')
 const queryErrorKey = computed(() => resolveSettlementError(detailQuery.error.value).messageKey)
 const side = computed(() =>
   route.query.side === undefined && isCreator.value ? 'sent' : resolveSide(route.query.side),
+)
+
+const receipt = useSettlementReceiptViewer(() => settlementId.value)
+const receiptSheetOpen = ref(false)
+
+/*
+ * 정산이 열리면 영수증도 함께 받는다.
+ *
+ * 영수증이 붙어 있는지는 받아 봐야만 알 수 있어서 예전에는 눌러야 보여줬는데, 그러면
+ * 붙어 있는 경우(이 기능을 쓰는 이유)에 매번 한 번 더 두드리게 된다. 정산 상세를 여는
+ * 김에 사진 한 장을 같이 받고, 없으면 조용히 없다고 두는 편이 낫다.
+ *
+ * 정산 자체를 못 읽는 사람에게는 요청조차 보내지 않도록 상세가 온 뒤에 받는다.
+ */
+watch(
+  detail,
+  (value) => {
+    if (value !== undefined) void receipt.load()
+  },
+  { immediate: true },
+)
+
+/** 사진이 이미 손에 있으면 크게 연다. 아직이면 여기서 받아서 연다. */
+async function openReceipt(): Promise<void> {
+  await receipt.load()
+  if (receipt.url.value !== null) {
+    receiptSheetOpen.value = true
+  }
+}
+
+/*
+ * 없다는 것이 확인된 자리는 눌리지 않게 한다. 눌러도 아무 일이 없으면 고장으로 보이고,
+ * 다시 눌러 봐야 또 없다는 답만 돌아온다. 저장소 장애처럼 다시 해볼 만한 실패는 그대로
+ * 누를 수 있게 둔다.
+ */
+const receiptUnavailable = computed(
+  () =>
+    receipt.errorKey.value === 'settlement.receipt.error.missing' ||
+    receipt.errorKey.value === 'settlement.receipt.error.expired',
+)
+const receiptMode = computed(() => (receiptUnavailable.value ? 'empty' : 'view'))
+/** 없는 것과 기한이 지나 사라진 것은 다른 일이라, 눌리지 않는 자리에서도 구분해 읽어 준다. */
+const receiptEmptyLabel = computed(() =>
+  receiptUnavailable.value && receipt.errorKey.value !== null
+    ? t(receipt.errorKey.value)
+    : undefined,
 )
 
 function backToList(): void {
@@ -95,7 +143,19 @@ function startPayment(): void {
         :gathering-name="detail.gatheringName"
         :amount="detail.totalAmount"
         :payer-name="detail.paidBy"
+        :receipt-mode="receiptMode"
+        :receipt-empty-label="receiptEmptyLabel"
+        :receipt-url="receipt.url.value"
+        :receipt-pending="receipt.pending.value"
+        @receipt-open="openReceipt"
       />
+      <p
+        v-if="receipt.errorKey.value !== null"
+        class="mt-2 text-caption text-ink-3"
+        role="status"
+      >
+        {{ t(receipt.errorKey.value) }}
+      </p>
 
       <AppCard
         v-if="!isCreator"
@@ -215,5 +275,11 @@ function startPayment(): void {
         >
       </div>
     </template>
+
+    <SettlementReceiptSheet
+      v-if="receiptSheetOpen && receipt.url.value !== null"
+      :url="receipt.url.value"
+      @close="receiptSheetOpen = false"
+    />
   </section>
 </template>

@@ -2,8 +2,10 @@ import {
   createSettlement,
   fetchSettlementCandidates,
   fetchSettlementDetail,
+  fetchSettlementReceipt,
   fetchSettlements,
   paySettlement,
+  uploadSettlementReceipt,
 } from './settlementApi'
 import type {
   CreateSettlementRequest,
@@ -29,6 +31,8 @@ export interface SettlementGateway {
     request: CreateSettlementRequest,
   ): Promise<{ id: string }>
   pay(settlementId: string, idempotencyKey: string): Promise<SettlementPaymentResult>
+  uploadReceipt(file: File): Promise<{ receiptId: string }>
+  getReceipt(settlementId: string): Promise<Blob>
 }
 
 export const apiSettlementGateway: SettlementGateway = {
@@ -44,6 +48,8 @@ export const apiSettlementGateway: SettlementGateway = {
   create: createSettlement,
   pay: async (settlementId, idempotencyKey) =>
     mapSettlementPayment(await paySettlement(settlementId, idempotencyKey)),
+  uploadReceipt: uploadSettlementReceipt,
+  getReceipt: fetchSettlementReceipt,
 }
 
 export const settlementGateway: SettlementGateway = apiSettlementGateway
