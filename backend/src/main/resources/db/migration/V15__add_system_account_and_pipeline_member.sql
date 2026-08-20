@@ -21,3 +21,11 @@ ALTER TABLE members
 INSERT INTO members (member_id, display_name, preferred_language, account_type)
 SELECT 1000000, 'NA-WA 파이프라인', 'ko', 'SYSTEM'
 WHERE NOT EXISTS (SELECT 1 FROM members WHERE member_id = 1000000);
+
+-- 이 마이그레이션보다 먼저 회원이 들어간 환경이 있다. 일괄 적재를 이 PR 병합
+-- 전에 해야 했고, 그때는 enum 에 SYSTEM 이 없어 TRAVELER 로 넣었다.
+-- 사람 계정과 섞이지 않도록 여기서 올린다.
+UPDATE members SET account_type = 'SYSTEM' WHERE member_id = 1000000;
+
+-- 참고: member_id 를 명시 삽입하므로 AUTO_INCREMENT 가 1000001 로 점프한다.
+-- 이후 가입자 ID 가 100만대에서 시작한다. 동작에 문제는 없다.

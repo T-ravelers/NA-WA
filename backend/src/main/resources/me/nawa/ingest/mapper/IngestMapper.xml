@@ -11,6 +11,12 @@
 
   적재 키는 pipeline_id 입니다. 파이프라인 쪽 숫자 PK 는 쓰지 않습니다.
 
+  UPDATE 의 null 계약: null 은 "데이터 없음"이므로 기존값을 유지합니다.
+  "값이 FALSE 로 바뀌었다"가 아닙니다. 컬럼마다 방향이 다르면, 상시 이벤트에
+  is_permanent=null 이 오는 순간 FALSE 로 리셋돼 chk_event_period 를 위반하고
+  배치 전체가 실패합니다. INSERT 는 다릅니다 — 새 행에는 기존값이 없으므로
+  NOT NULL 컬럼에 기본값을 채웁니다.
+
   앱이 소유하는 값은 갱신하지 않습니다:
     view_count, favorite_count, created_at,
     explore_items 의 appointment_count / participant_count / popularity_score
@@ -142,7 +148,7 @@
             e.start_date      = s.start_date,
             e.end_date        = s.end_date,
             e.status          = COALESCE(UPPER(s.status), e.status),
-            e.is_permanent    = COALESCE(s.is_permanent, FALSE),
+            e.is_permanent    = COALESCE(s.is_permanent, e.is_permanent),
             e.operating_hours = s.operating_hours,
             e.open_days       = s.open_days,
             e.open_weekend    = s.open_weekend,
@@ -152,8 +158,8 @@
             e.address_road    = s.address_road,
             e.latitude        = s.latitude,
             e.longitude       = s.longitude,
-            e.has_photo_zone  = COALESCE(s.has_photo_zone, FALSE),
-            e.is_experience   = COALESCE(s.is_experience, FALSE),
+            e.has_photo_zone  = COALESCE(s.has_photo_zone, e.has_photo_zone),
+            e.is_experience   = COALESCE(s.is_experience, e.is_experience),
             e.age_limit       = s.age_limit,
             e.contact         = s.contact,
             e.organizer       = s.organizer,
@@ -246,7 +252,7 @@
             p.takeout_available = s.takeout_available,
             p.has_restroom      = s.has_restroom,
             p.menu_summary      = s.menu_summary,
-            p.is_active         = COALESCE(s.is_active, TRUE)
+            p.is_active         = COALESCE(s.is_active, p.is_active)
     </update>
 
     <!--

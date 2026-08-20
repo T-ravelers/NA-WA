@@ -24,6 +24,12 @@ public enum IngestErrorCode implements ErrorCode {
         "적재 권한이 없는 계정입니다."
     ),
 
+    INVALID_ITEM(
+        HttpStatus.BAD_REQUEST,
+        "INGEST-004",
+        "적재할 수 없는 항목이 있습니다. 값을 고쳐서 다시 보내주세요."
+    ),
+
     BATCH_TOO_LARGE(
         HttpStatus.PAYLOAD_TOO_LARGE,
         "INGEST-003",

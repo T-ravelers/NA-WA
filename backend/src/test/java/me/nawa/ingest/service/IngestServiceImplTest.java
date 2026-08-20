@@ -9,6 +9,7 @@ import me.nawa.ingest.mapper.IngestMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -92,6 +93,58 @@ class IngestServiceImplTest {
         assertTrue(mapper.callOrder.isEmpty(), "빈 배치로 DB 를 건드렸습니다");
     }
 
+
+    @Test
+    void ingestEvents_rejectsAnItemThatWouldBreakTheDatabase() {
+        // start_date 가 없으면 NOT NULL 위반으로 SQLException 이 나고 500 이 된다.
+        // 그러면 파이프라인이 같은 배치를 매일 재시도해 영원히 막힌다.
+        EventIngestItem noStart = event("a");
+        noStart.setStartDate(null);
+
+        assertThrows(BusinessException.class, () -> service.ingestEvents(List.of(noStart)));
+        assertTrue(mapper.callOrder.isEmpty(), "거절해야 할 배치가 DB 에 닿았습니다");
+    }
+
+    @Test
+    void ingestEvents_rejectsAPeriodThatBreaksTheInvariant() {
+        // 상시가 아닌데 종료일이 없으면 chk_event_period 위반이다.
+        EventIngestItem openEnded = event("a");
+        openEnded.setEndDate(null);
+
+        assertThrows(BusinessException.class, () -> service.ingestEvents(List.of(openEnded)));
+    }
+
+    @Test
+    void ingestEvents_acceptsAPermanentEventWithoutAnEndDate() {
+        EventIngestItem permanent = event("a");
+        permanent.setIsPermanent(true);
+        permanent.setEndDate(null);
+
+        service.ingestEvents(List.of(permanent));
+
+        assertEquals(List.of("insertExploreItems", "insertEvents"), mapper.callOrder);
+    }
+
+    @Test
+    void ingestEventTranslations_rejectsALanguageTheDatabaseWillNotAccept() {
+        // chk_event_translations_language 는 en·ja·zh-TW·vi 만 받는다.
+        assertThrows(BusinessException.class,
+                () -> service.ingestEventTranslations(List.of(translation("a", "fr"))));
+    }
+
+    @Test
+    void ingestEventTranslations_countsADuplicatedRowOnce() {
+        mapper.existingEventIds = List.of("a");
+
+        // 같은 (pipeline_id, language_code) 가 두 번 오면 마지막 값만 남는다.
+        // 건수까지 두 번 세면 리포트 숫자가 실제와 어긋난다.
+        IngestResultResponse result = service.ingestEventTranslations(
+                List.of(translation("a", "en"), translation("a", "en")));
+
+        assertEquals(1, result.getReceived());
+        assertEquals(1, result.getUpdated());
+    }
+
     private static List<String> pipelineIdsOf(List<EventIngestItem> items) {
         return items.stream().map(EventIngestItem::getPipelineId).toList();
     }
@@ -100,6 +153,10 @@ class IngestServiceImplTest {
         EventIngestItem item = new EventIngestItem();
         item.setPipelineId(pipelineId);
         item.setTitle("제목");
+        // start_date 는 NOT NULL 이고, 상시가 아니면 chk_event_period 가
+        // 종료일을 요구한다. 서비스가 이것을 미리 본다.
+        item.setStartDate(LocalDate.of(2026, 8, 20));
+        item.setEndDate(LocalDate.of(2026, 8, 21));
         return item;
     }
 
