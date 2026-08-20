@@ -4,6 +4,9 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+import { formatCalendarDate } from '@/shared/lib/datetime'
+import CalendarGrid from '@/shared/ui/CalendarGrid.vue'
+
 import { getTransactions } from '../api/walletApi'
 import {
   formatPointAmount,
@@ -20,7 +23,7 @@ import {
 
 const PAGE_SIZE = 20
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 
 const formType = ref<TransactionType | ''>('')
@@ -82,7 +85,44 @@ const goBack = (): void => {
   void router?.push({ name: 'wallet' })
 }
 
+/**
+ * 달력에서 기간을 고른다.
+ *
+ * 첫 탭이 시작일, 두 번째 탭이 종료일이다. 이미 기간이 닫혀 있으면 새로 시작한다.
+ * 시작일보다 이른 날짜를 고르면 두 값을 뒤집어 항상 from <= to를 유지한다.
+ */
+const selectDate = (date: string): void => {
+  if (!formFrom.value || formTo.value) {
+    formFrom.value = date
+    formTo.value = ''
+    return
+  }
+
+  if (date < formFrom.value) {
+    formTo.value = formFrom.value
+    formFrom.value = date
+    return
+  }
+
+  formTo.value = date
+}
+
+const clearDates = (): void => {
+  formFrom.value = ''
+  formTo.value = ''
+}
+
+const dateRangeLabel = computed(() => {
+  if (!formFrom.value) return t('wallet.transactions.anyDate')
+
+  const from = formatCalendarDate(formFrom.value, locale.value)
+
+  return formTo.value ? `${from} – ${formatCalendarDate(formTo.value, locale.value)}` : from
+})
+
 const applyFilters = (): void => {
+  // 달력이 두 값을 뒤집어 주므로 지금은 여기에 걸리지 않는다. 날짜를 넣는 다른 경로가
+  // 생겼을 때 잘못된 기간이 서버로 나가지 않게 남겨 둔다.
   if (formFrom.value && formTo.value && formFrom.value > formTo.value) {
     filterError.value = t('wallet.transactions.dateError')
     return
@@ -183,25 +223,33 @@ const openTransactionDetail = (transactionId: number): void => {
             </select>
           </label>
 
-          <label class="text-xs text-[#aaa8a3]">
-            {{ t('wallet.transactions.from') }}
-            <input
-              v-model="formFrom"
-              type="date"
-              class="mt-2 w-full rounded-xl border border-[#353533] bg-[#292927] px-3 py-3 text-sm text-[#f5f4f0] outline-none focus:border-[#91cdbb]"
-              :aria-label="t('wallet.transactions.from')"
+          <div class="col-span-2">
+            <p class="text-xs text-[#aaa8a3]">{{ t('wallet.transactions.dateRange') }}</p>
+            <p
+              class="mt-1 text-sm text-[#f5f4f0]"
+              aria-live="polite"
+            >
+              {{ dateRangeLabel }}
+            </p>
+            <!--
+              네이티브 <input type="date">를 쓰지 않는다. 표시 형식이 브라우저 UI 언어를
+              따라 한국어 브라우저에서 `연도. 월. 일.`로 나오고 lang 속성으로 바꿀 수 없다.
+            -->
+            <CalendarGrid
+              class="mt-3"
+              :range-start="formFrom || null"
+              :range-end="formTo || null"
+              @select="selectDate"
             />
-          </label>
-
-          <label class="text-xs text-[#aaa8a3]">
-            {{ t('wallet.transactions.to') }}
-            <input
-              v-model="formTo"
-              type="date"
-              class="mt-2 w-full rounded-xl border border-[#353533] bg-[#292927] px-3 py-3 text-sm text-[#f5f4f0] outline-none focus:border-[#91cdbb]"
-              :aria-label="t('wallet.transactions.to')"
-            />
-          </label>
+            <button
+              v-if="formFrom || formTo"
+              type="button"
+              class="mt-2 text-xs text-[#aaa8a3] underline underline-offset-4"
+              @click="clearDates"
+            >
+              {{ t('wallet.transactions.clearDates') }}
+            </button>
+          </div>
         </div>
 
         <p
