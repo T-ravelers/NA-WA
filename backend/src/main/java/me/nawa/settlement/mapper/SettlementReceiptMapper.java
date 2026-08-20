@@ -22,6 +22,17 @@ public interface SettlementReceiptMapper {
     );
 
     /**
+     * 아직 정산에 붙지 않은 자기 초안을 돌려준다. 남의 초안이거나 이미 쓰인 초안이면 null이다.
+     *
+     * 글자 인식은 정산을 만들기 전 단계에서만 쓴다. 이미 정산에 붙은 사진을 다시 읽어 봐야
+     * 품목은 확정된 뒤라 쓸 데가 없고, 인식 호출은 부를 때마다 요금이 나간다.
+     */
+    SettlementReceipt findDraftForUploader(
+        @Param("settlementReceiptId") Long settlementReceiptId,
+        @Param("memberId") Long memberId
+    );
+
+    /**
      * 정산 참여자에게만 영수증을 돌려준다. 참여자가 아니면 null이다.
      *
      * 누가 참여자인지 판단하는 조건은 {@code SettlementMapper.findDetail}과 같다. 참여자

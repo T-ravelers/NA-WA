@@ -4,6 +4,15 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="me.nawa.review.mapper.ReviewMapper">
+    <select id="findReviewedAppointmentMemberIds" resultType="long">
+        SELECT reviewed_appointment_member_id
+        FROM member_reviews
+        WHERE appointment_id = #{appointmentId}
+          AND reviewer_appointment_member_id = #{reviewerAppointmentMemberId}
+          AND deleted_at IS NULL
+        ORDER BY reviewed_appointment_member_id
+    </select>
+
     <select id="countReviewPair" resultType="int">
         SELECT COUNT(*)
         FROM member_reviews

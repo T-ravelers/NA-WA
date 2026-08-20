@@ -6,8 +6,10 @@ import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.common.storage.StoredReceipt;
+import me.nawa.settlement.dto.response.SettlementReceiptOcrResponse;
 import me.nawa.settlement.dto.response.SettlementReceiptUploadResponse;
 import me.nawa.settlement.exception.SettlementErrorCode;
+import me.nawa.settlement.service.SettlementReceiptOcrService;
 import me.nawa.settlement.service.SettlementReceiptService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -22,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * 정산 영수증 사진의 업로드와 조회 API다.
+ * 정산 영수증 사진의 업로드, 글자 인식과 조회 API다.
  *
  * 업로드 경로가 정산 아래에 있지 않은 이유는, 사진을 먼저 올리고 정산을 나중에 만들기
  * 때문이다. 올리는 시점에는 붙일 정산이 아직 없다.
@@ -33,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class SettlementReceiptController {
 
     private final SettlementReceiptService settlementReceiptService;
+    private final SettlementReceiptOcrService settlementReceiptOcrService;
 
     /**
      * 영수증 업로드
@@ -50,6 +53,25 @@ public class SettlementReceiptController {
         return ApiResponse.success(settlementReceiptService.upload(
             member.getMemberId(), file.getContentType(), readBytes(file)
         ));
+    }
+
+    /**
+     * 영수증 글자 인식
+     *
+     * 올려 둔 사진에서 품목 초안을 읽어 돌려줍니다. 결과는 저장하지 않습니다.
+     *
+     * 읽기만 하는데 POST인 이유는 두 가지다. 부를 때마다 바깥 서비스에 요금이 나가므로
+     * 브라우저나 중간 서버가 임의로 다시 부르면 안 되고, 사진 크기에 따라 응답이 수 초씩
+     * 걸려 캐시에 남아서도 안 된다.
+     */
+    @PostMapping("/settlement-receipts/{receiptId}/ocr")
+    public ApiResponse<SettlementReceiptOcrResponse> recognizeReceipt(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long receiptId
+    ) {
+        return ApiResponse.success(
+            settlementReceiptOcrService.recognize(member.getMemberId(), receiptId)
+        );
     }
 
     /**

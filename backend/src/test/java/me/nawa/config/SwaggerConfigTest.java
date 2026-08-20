@@ -49,6 +49,9 @@ import me.nawa.explore.service.ExploreItemLikeService;
 import me.nawa.explore.service.PlaceService;
 import me.nawa.journey.service.JourneyService;
 import me.nawa.report.controller.ReportController;
+import me.nawa.ingest.service.IngestService;
+import me.nawa.ingest.service.IngestServiceImpl;
+import me.nawa.auth.jwt.JwtTokenProvider;
 import me.nawa.report.service.ReportService;
 import me.nawa.review.service.ReviewService;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +72,8 @@ import org.springframework.web.context.WebApplicationContext;
 import springfox.documentation.spring.web.plugins.Docket;
 
 import java.net.URI;
+import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -91,6 +96,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.ExploreTestConfig.class,
         SwaggerConfigTest.JourneyTestConfig.class,
         SwaggerConfigTest.ReportTestConfig.class,
+        SwaggerConfigTest.IngestTestConfig.class,
         SwaggerConfigTest.SettlementTestConfig.class,
         SwaggerConfigTest.TopupTestConfig.class,
         SwaggerConfigTest.TransactionTestConfig.class,
@@ -475,6 +481,15 @@ class SwaggerConfigTest {
         }
 
         @Bean
+        me.nawa.settlement.service.SettlementReceiptOcrService settlementReceiptOcrService() {
+            return new me.nawa.settlement.service.SettlementReceiptOcrService() {
+                @Override public me.nawa.settlement.dto.response.SettlementReceiptOcrResponse recognize(
+                    Long memberId, Long receiptId
+                ) { throw new UnsupportedOperationException(); }
+            };
+        }
+
+        @Bean
         SettlementCreationService settlementCreationService() {
             return new SettlementCreationService() {
                 @Override public me.nawa.settlement.dto.response.SettlementCreateResponse createSettlement(
@@ -500,6 +515,29 @@ class SwaggerConfigTest {
         @Bean
         ReportService reportService() {
             return new ReportService(null);
+        }
+    }
+
+    /**
+     * 적재 컨트롤러가 서블릿 컨텍스트에 등록되므로 의존 빈이 있어야 합니다.
+     * 이 테스트는 ServletConfig 만 올리기 때문에 RootConfig 의 서비스가 없습니다.
+     */
+    @Configuration
+    static class IngestTestConfig {
+
+        @Bean
+        IngestService ingestService() {
+            return new IngestServiceImpl(null, 1000000L);
+        }
+
+        @Bean
+        JwtTokenProvider jwtTokenProvider() {
+            return new JwtTokenProvider(
+                    Base64.getEncoder().encodeToString(
+                            "swagger-test-signing-key-at-least-32-bytes"
+                                    .getBytes(StandardCharsets.UTF_8)),
+                    "nawa",
+                    900);
         }
     }
 

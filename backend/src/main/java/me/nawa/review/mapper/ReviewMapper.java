@@ -11,6 +11,11 @@ import java.util.Map;
 
 @Mapper
 public interface ReviewMapper {
+    List<Long> findReviewedAppointmentMemberIds(
+            @Param("appointmentId") Long appointmentId,
+            @Param("reviewerAppointmentMemberId") Long reviewerId
+    );
+
     int countReviewPair(
             @Param("appointmentId") Long appointmentId,
             @Param("reviewerAppointmentMemberId") Long reviewerId,

@@ -8,12 +8,15 @@ import { i18n } from '@/app/i18n'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
+const confirmAppointmentAttendance = vi.fn()
 const useAppointmentMemberProfileMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
   fetchAppointment: (appointmentId: number) => fetchAppointment(appointmentId),
   fetchAppointmentMembers: (appointmentId: number) => fetchAppointmentMembers(appointmentId),
+  confirmAppointmentAttendance: (appointmentId: number, request: unknown) =>
+    confirmAppointmentAttendance(appointmentId, request),
 }))
 
 vi.mock('../../model/memberIntegration', () => ({
@@ -111,6 +114,8 @@ describe('AppointmentAttendanceView', () => {
   beforeEach(() => {
     fetchAppointment.mockReset()
     fetchAppointmentMembers.mockReset()
+    confirmAppointmentAttendance.mockReset()
+    confirmAppointmentAttendance.mockResolvedValue(undefined)
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue(members)
     profileMemberId.value = 11
@@ -118,43 +123,77 @@ describe('AppointmentAttendanceView', () => {
     useAppointmentMemberProfileMock.mockReturnValue(profileQuery)
   })
 
-  it('renders attendance controls with a disabled save action until every member is decided', async () => {
+  function toggleFor(wrapper: Awaited<ReturnType<typeof mountView>>['wrapper'], name: string) {
+    return wrapper.find(`button[aria-label="Toggle attendance for ${name}"]`)
+  }
+
+  function saveButton(wrapper: Awaited<ReturnType<typeof mountView>>['wrapper']) {
+    return wrapper.findAll('button').find((button) => button.text() === 'Confirm attendance')
+  }
+
+  it('starts everyone as attended so a no-show is always a deliberate choice', async () => {
+    // NO_SHOW는 보증금을 몰수해 참석자에게 나누는 처리라 기본값이 되면 안 된다.
     const { wrapper } = await mountView()
 
-    expect(wrapper.text()).toContain('Confirm attendance')
-    expect(wrapper.text()).toContain('Mina Park')
-    expect(wrapper.text()).toContain('Attended')
-    expect(wrapper.text()).toContain('Not attended')
-    expect(
-      wrapper
-        .findAll('button')
-        .find((button) => button.text() === 'Attendance checked')
-        ?.attributes('disabled'),
-    ).toBeDefined()
+    expect(toggleFor(wrapper, 'Mina Park').attributes('aria-pressed')).toBe('true')
+    expect(toggleFor(wrapper, 'Alex Kim').attributes('aria-pressed')).toBe('true')
+    expect(saveButton(wrapper)?.attributes('disabled')).toBeUndefined()
   })
 
-  it('keeps member status controls disabled until payment integration is available', async () => {
+  it('toggles a member between attended and no-show', async () => {
     const { wrapper } = await mountView()
-    const pendingButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Not attended')
+    const toggle = toggleFor(wrapper, 'Alex Kim')
 
-    await pendingButton?.trigger('click')
+    await toggle.trigger('click')
+    expect(toggleFor(wrapper, 'Alex Kim').attributes('aria-pressed')).toBe('false')
 
-    expect(wrapper.text()).toContain('Not attended')
-    expect(pendingButton?.attributes('disabled')).toBeDefined()
+    await toggleFor(wrapper, 'Alex Kim').trigger('click')
+    expect(toggleFor(wrapper, 'Alex Kim').attributes('aria-pressed')).toBe('true')
   })
 
-  it('keeps the host on the attendance screen until every member is decided', async () => {
+  it('sends every active member and returns to the detail screen', async () => {
     const { wrapper, router } = await mountView()
 
+    await toggleFor(wrapper, 'Alex Kim').trigger('click')
+    await saveButton(wrapper)?.trigger('click')
+    await flushPromises()
+
+    expect(confirmAppointmentAttendance).toHaveBeenCalledWith(7, {
+      members: [
+        { memberId: 11, attendanceStatus: 'ATTENDED' },
+        { memberId: 12, attendanceStatus: 'NO_SHOW' },
+      ],
+    })
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
+  })
+
+  it('blocks saving when nobody is marked as attended', async () => {
+    // 서버가 APPOINTMENT-006으로 거부한다. 나눠 줄 상대가 없어 정산이 성립하지 않는다.
+    const { wrapper } = await mountView()
+
+    await toggleFor(wrapper, 'Mina Park').trigger('click')
+    await toggleFor(wrapper, 'Alex Kim').trigger('click')
+
+    expect(saveButton(wrapper)?.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('Mark at least one member as attended.')
+
+    await saveButton(wrapper)?.trigger('click')
+    await flushPromises()
+    expect(confirmAppointmentAttendance).not.toHaveBeenCalled()
+  })
+
+  it('shows the server error code message when confirmation fails', async () => {
+    const { NormalizedApiError } = await import('@/shared/api/apiError')
+    confirmAppointmentAttendance.mockRejectedValue(
+      new NormalizedApiError('APPOINTMENT-004', 403, 'forbidden'),
+    )
+    const { wrapper, router } = await mountView()
+
+    await saveButton(wrapper)?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Only the appointment host can do this.')
     expect(router.currentRoute.value.name).toBe('appointment-attendance')
-    expect(
-      wrapper
-        .findAll('button')
-        .find((button) => button.text() === 'Attendance checked')
-        ?.attributes('disabled'),
-    ).toBeDefined()
   })
 
   it('hides attendance controls from non-host members', async () => {
@@ -162,14 +201,14 @@ describe('AppointmentAttendanceView', () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Host access required')
-    expect(wrapper.text()).not.toContain('Attendance checked')
+    expect(saveButton(wrapper)).toBeUndefined()
   })
 
-  it('blocks attendance before the appointment is in progress', async () => {
+  it('blocks attendance before the activity starts', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'RECRUITING' })
     const { wrapper } = await mountView()
 
-    expect(wrapper.text()).toContain('Attendance is not available yet')
-    expect(wrapper.text()).not.toContain('Attendance checked')
+    expect(wrapper.text()).toContain('Attendance is not open')
+    expect(saveButton(wrapper)).toBeUndefined()
   })
 })

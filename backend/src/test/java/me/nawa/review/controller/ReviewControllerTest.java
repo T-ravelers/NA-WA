@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.review.dto.request.MemberReviewCreateRequest;
+import me.nawa.review.dto.response.MyReviewStatusResponse;
 import me.nawa.review.service.ReviewService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,10 +22,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -86,5 +91,28 @@ class ReviewControllerTest {
                 org.mockito.ArgumentMatchers.eq(10L),
                 any(MemberReviewCreateRequest.class)
         );
+    }
+
+    @Test
+    void getMyReviewStatus_returns200() throws Exception {
+        when(reviewService.getMyReviewStatus(1L, 10L))
+                .thenReturn(MyReviewStatusResponse.builder()
+                        .reviewedAppointmentMemberIds(List.of(30L, 31L))
+                        .build());
+
+        String response = mockMvc.perform(
+                        get("/api/v1/appointments/10/reviews/me")
+                )
+                .andExpect(status().isOk())
+                .andReturn().getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(response);
+        assertTrue(body.path("success").asBoolean());
+        JsonNode ids = body.path("data")
+                .path("reviewedAppointmentMemberIds");
+        assertEquals(2, ids.size());
+        assertEquals(30L, ids.get(0).asLong());
+        assertEquals(31L, ids.get(1).asLong());
     }
 }
