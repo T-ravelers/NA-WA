@@ -135,6 +135,34 @@ const removeItem = (id: number): void => {
   items.value = remaining.length === 0 ? [createEmptyItem()] : remaining
 }
 
+/*
+ * 숫자 칸은 파싱 결과를 DOM에 다시 써 준다.
+ *
+ * 숫자가 아닌 글자나 상한을 넘는 값을 치면 파싱 결과가 직전 값과 같아 Vue가 `:value`를
+ * 다시 패치하지 않고, 사용자가 친 글자가 칸에 그대로 남는다 — 빈 단가 칸에 `abc`를 치면
+ * 합계는 0인데 화면에는 `abc`가 남는다. `AmountInput`도 같은 이유로 `input.value`를
+ * 직접 되돌린다.
+ */
+const syncInputText = (event: Event, text: string): void => {
+  const input = event.target as HTMLInputElement
+
+  if (input.value !== text) input.value = text
+}
+
+const updateUnitPrice = (item: MerchantQrItem, event: Event): void => {
+  const unitPrice = parseAmount((event.target as HTMLInputElement).value)
+
+  item.unitPrice = unitPrice
+  syncInputText(event, unitPrice === null ? '' : formatAmount(unitPrice))
+}
+
+const updateQuantity = (item: MerchantQrItem, event: Event): void => {
+  const quantity = parseQuantity((event.target as HTMLInputElement).value)
+
+  item.quantity = quantity
+  syncInputText(event, quantity === null ? '' : String(quantity))
+}
+
 const createQr = (): void => {
   if (!canCreate.value) return
 
@@ -427,9 +455,7 @@ const createError = computed(() =>
                         :value="item.unitPrice === null ? '' : formatAmount(item.unitPrice)"
                         :placeholder="t('merchant.qr.unitPricePlaceholder')"
                         class="min-w-0 flex-1 bg-transparent text-right text-body-sm text-ink tabular-nums outline-none placeholder:text-ink-3"
-                        @input="
-                          item.unitPrice = parseAmount(($event.target as HTMLInputElement).value)
-                        "
+                        @input="updateUnitPrice(item, $event)"
                       />
                     </div>
 
@@ -459,9 +485,7 @@ const createError = computed(() =>
                         inputmode="numeric"
                         :value="item.quantity ?? ''"
                         class="w-8 min-w-0 bg-transparent text-center text-body-sm text-ink tabular-nums outline-none"
-                        @input="
-                          item.quantity = parseQuantity(($event.target as HTMLInputElement).value)
-                        "
+                        @input="updateQuantity(item, $event)"
                       />
                       <button
                         type="button"

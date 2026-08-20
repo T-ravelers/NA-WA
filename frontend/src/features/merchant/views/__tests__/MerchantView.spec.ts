@@ -231,6 +231,35 @@ describe('MerchantView', () => {
     expect(decrease.attributes('disabled')).toBeDefined()
   })
 
+  it('clears text that is not a number out of the price field', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    const price = wrapper.get('li').get('input[id^="merchant-price-"]')
+
+    await price.setValue('abc')
+
+    // 파싱 결과(null)가 직전과 같아 Vue는 다시 그리지 않는다. 되돌려 주지 않으면 합계는
+    // 0인데 칸에는 `abc`가 남아, 사용자는 금액이 아니라 지워지지 않는 글자를 보게 된다.
+    expect((price.element as HTMLInputElement).value).toBe('')
+    expect(wrapper.text()).toContain('Add at least one item')
+  })
+
+  it('snaps the quantity field back to the cap when the typed value exceeds it', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    const quantity = wrapper.get('li').get('input[id^="merchant-qty-"]')
+
+    await quantity.setValue('9999')
+    // 이미 상한이라 파싱 결과가 그대로다 — 되돌려 주지 않으면 `99999`가 칸에 남는다.
+    await quantity.setValue('99999')
+
+    expect((quantity.element as HTMLInputElement).value).toBe('9999')
+  })
+
   it('creates a QR code and renders it with a countdown', async () => {
     vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
     vi.mocked(createMerchantQr).mockResolvedValue({
