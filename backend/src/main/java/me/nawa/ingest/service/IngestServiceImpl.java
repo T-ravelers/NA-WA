@@ -189,10 +189,20 @@ public class IngestServiceImpl implements IngestService {
             return new IngestResultResponse(items.size(), 0, 0, items.size());
         }
 
-        ingestMapper.deleteMissingEventActivities(known);
-        if (known.stream().anyMatch(it -> !it.getActivities().isEmpty())) {
-            ingestMapper.upsertEventActivities(
-                    known.stream().filter(it -> !it.getActivities().isEmpty()).toList());
+        // 분류가 없는 항목과 있는 항목을 갈라서 보낸다. 없는 쪽은 남길 짝이
+        // 하나도 없어 파생 테이블이 비고, 그러면 SQL 이 성립하지 않는다.
+        List<ActivityIngestItem> withLinks = known.stream()
+                .filter(it -> !it.getActivities().isEmpty()).toList();
+        List<String> cleared = known.stream()
+                .filter(it -> it.getActivities().isEmpty())
+                .map(ActivityIngestItem::getPipelineId).toList();
+
+        if (!cleared.isEmpty()) {
+            ingestMapper.deleteAllEventActivities(cleared);
+        }
+        if (!withLinks.isEmpty()) {
+            ingestMapper.deleteMissingEventActivities(withLinks);
+            ingestMapper.upsertEventActivities(withLinks);
         }
 
         return new IngestResultResponse(
@@ -216,10 +226,20 @@ public class IngestServiceImpl implements IngestService {
             return new IngestResultResponse(items.size(), 0, 0, items.size());
         }
 
-        ingestMapper.deleteMissingPlaceActivities(known);
-        if (known.stream().anyMatch(it -> !it.getActivities().isEmpty())) {
-            ingestMapper.upsertPlaceActivities(
-                    known.stream().filter(it -> !it.getActivities().isEmpty()).toList());
+        // 분류가 없는 항목과 있는 항목을 갈라서 보낸다. 없는 쪽은 남길 짝이
+        // 하나도 없어 파생 테이블이 비고, 그러면 SQL 이 성립하지 않는다.
+        List<ActivityIngestItem> withLinks = known.stream()
+                .filter(it -> !it.getActivities().isEmpty()).toList();
+        List<String> cleared = known.stream()
+                .filter(it -> it.getActivities().isEmpty())
+                .map(ActivityIngestItem::getPipelineId).toList();
+
+        if (!cleared.isEmpty()) {
+            ingestMapper.deleteAllPlaceActivities(cleared);
+        }
+        if (!withLinks.isEmpty()) {
+            ingestMapper.deleteMissingPlaceActivities(withLinks);
+            ingestMapper.upsertPlaceActivities(withLinks);
         }
 
         return new IngestResultResponse(

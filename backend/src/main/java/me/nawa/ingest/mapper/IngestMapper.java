@@ -73,6 +73,16 @@ public interface IngestMapper {
     int deleteMissingPlaceActivities(@Param("items") List<ActivityIngestItem> items);
 
     /**
+     * 분류를 통째로 지웁니다.
+     *
+     * <p>분류가 하나도 없는 항목은 위 문장으로 보내지 않습니다. 남길 짝이 없어
+     * 파생 테이블이 비면 SQL 이 성립하지 않기 때문입니다.
+     */
+    int deleteAllEventActivities(@Param("pipelineIds") List<String> pipelineIds);
+
+    int deleteAllPlaceActivities(@Param("pipelineIds") List<String> pipelineIds);
+
+    /**
      * 본체가 있는 항목의 분류만 넣습니다. 없는 항목은 JOIN 이 걸러 냅니다.
      */
     int upsertEventActivities(@Param("items") List<ActivityIngestItem> items);

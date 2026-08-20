@@ -343,6 +343,14 @@
 
       지우는 범위는 이번 배치의 pipeline_id 로 한정합니다. 그러지 않으면
       배치에 없는 항목의 분류까지 사라집니다.
+
+      남길 짝은 UNION ALL 파생 테이블로 만들고 NOT EXISTS 로 거릅니다.
+      행 생성자 NOT IN 은 항목마다 괄호를 정확히 맞춰야 하는데, 중첩
+      foreach 로는 첫 행과 끝 행의 괄호가 빠져 문법 오류가 납니다.
+
+      분류가 하나도 없는 항목은 이 문장으로 오지 않습니다. 서비스가 미리
+      갈라서 deleteAllEventActivities 로 보냅니다. 그래야 파생 테이블이
+      비는 경우가 없습니다.
     -->
     <delete id="deleteMissingEventActivities">
         DELETE ea FROM event_activity ea
@@ -351,21 +359,17 @@
         <foreach collection="items" item="it" open="(" separator="," close=")">
             #{it.pipelineId}
         </foreach>
-        AND (e.pipeline_id, ea.activity_id) NOT IN
-        <foreach collection="items" item="it" open="(" separator="," close=")">
-            <choose>
-                <when test="it.activities != null and it.activities.size() > 0">
-                    <foreach collection="it.activities" item="link" separator="),(" open="" close="">
-                        #{it.pipelineId}, #{link.activityId}
-                    </foreach>
-                </when>
-                <otherwise>
-                    <!-- 분류가 하나도 없는 항목은 전부 지워야 하므로,
-                         어떤 행과도 맞지 않는 짝을 둔다. -->
-                    #{it.pipelineId}, -1
-                </otherwise>
-            </choose>
-        </foreach>
+        AND NOT EXISTS (
+            SELECT 1 FROM (
+            <foreach collection="items" item="it" separator=" UNION ALL ">
+                <foreach collection="it.activities" item="link" separator=" UNION ALL ">
+                    SELECT #{it.pipelineId} AS pipeline_id, #{link.activityId} AS activity_id
+                </foreach>
+            </foreach>
+            ) keep
+            WHERE keep.pipeline_id = e.pipeline_id
+              AND keep.activity_id = ea.activity_id
+        )
     </delete>
 
     <delete id="deleteMissingPlaceActivities">
@@ -375,18 +379,35 @@
         <foreach collection="items" item="it" open="(" separator="," close=")">
             #{it.pipelineId}
         </foreach>
-        AND (p.pipeline_id, pa.activity_id) NOT IN
-        <foreach collection="items" item="it" open="(" separator="," close=")">
-            <choose>
-                <when test="it.activities != null and it.activities.size() > 0">
-                    <foreach collection="it.activities" item="link" separator="),(" open="" close="">
-                        #{it.pipelineId}, #{link.activityId}
-                    </foreach>
-                </when>
-                <otherwise>
-                    #{it.pipelineId}, -1
-                </otherwise>
-            </choose>
+        AND NOT EXISTS (
+            SELECT 1 FROM (
+            <foreach collection="items" item="it" separator=" UNION ALL ">
+                <foreach collection="it.activities" item="link" separator=" UNION ALL ">
+                    SELECT #{it.pipelineId} AS pipeline_id, #{link.activityId} AS activity_id
+                </foreach>
+            </foreach>
+            ) keep
+            WHERE keep.pipeline_id = p.pipeline_id
+              AND keep.activity_id = pa.activity_id
+        )
+    </delete>
+
+    <!-- 분류를 통째로 지우는 요청입니다. 남길 짝이 없으니 파생 테이블도 없습니다. -->
+    <delete id="deleteAllEventActivities">
+        DELETE ea FROM event_activity ea
+        JOIN event e ON e.event_id = ea.event_id
+        WHERE e.pipeline_id IN
+        <foreach collection="pipelineIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteAllPlaceActivities">
+        DELETE pa FROM place_activity pa
+        JOIN place p ON p.place_id = pa.place_id
+        WHERE p.pipeline_id IN
+        <foreach collection="pipelineIds" item="id" open="(" separator="," close=")">
+            #{id}
         </foreach>
     </delete>
 

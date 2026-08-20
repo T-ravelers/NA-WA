@@ -209,9 +209,9 @@ class IngestServiceImplTest {
 
         service.ingestEventActivities(List.of(activities("a")));
 
-        // 분류가 하나도 없는 요청은 전부 지우라는 뜻이다. 넣을 것이 없으므로
-        // upsert 는 부르지 않는다.
-        assertEquals(List.of("deleteMissingEventActivities"), mapper.callOrder);
+        // 분류가 하나도 없는 요청은 전부 지우라는 뜻이다. 남길 짝이 없어
+        // deleteMissing 의 파생 테이블이 비므로 전용 문장으로 보낸다.
+        assertEquals(List.of("deleteAllEventActivities"), mapper.callOrder);
     }
 
     @Test
@@ -362,6 +362,18 @@ class IngestServiceImplTest {
         public int deleteMissingPlaceActivities(List<ActivityIngestItem> items) {
             callOrder.add("deleteMissingPlaceActivities");
             return items.size();
+        }
+
+        @Override
+        public int deleteAllEventActivities(List<String> pipelineIds) {
+            callOrder.add("deleteAllEventActivities");
+            return pipelineIds.size();
+        }
+
+        @Override
+        public int deleteAllPlaceActivities(List<String> pipelineIds) {
+            callOrder.add("deleteAllPlaceActivities");
+            return pipelineIds.size();
         }
 
         @Override
