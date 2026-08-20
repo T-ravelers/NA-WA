@@ -90,18 +90,18 @@ const isJoinAvailable = computed(() => {
   return deadline !== null && Date.now() < deadline.getTime()
 })
 // 참여 버튼은 어떤 경우에도 눌린다. 비활성 버튼은 왜 안 되는지 말해 줄 방법이
-// 마땅치 않고(모바일이라 hover도 없다), 눌렀을 때 이유를 그 자리에서 보여 주는
-// 편이 분명하다. 세 가지 사유(모집 종료·참여 확인 실패·이미 참여)를 모두 같은
-// 방식으로 다뤄, 어떤 사유든 버튼 위에 한 줄로 남는다.
-const joinBlockedReason = ref<string | undefined>(undefined)
-
-// 지금 누르면 막히는 이유. 없으면 결제 시트로 넘어간다.
-function currentJoinBlockedReason(): string | undefined {
+// 마땅치 않아서다(모바일이라 hover도 없다). 대신 막히는 이유는 누르기 전부터
+// 버튼 위에 한 줄로 떠 있는다. 눌러 봐야 아는 화면은 제일 큰 CTA를 "눌리기는
+// 하는데 아무 일도 없는 버튼"으로 만든다.
+//
+// 상태에서 그대로 끌어내므로 따로 지워 줄 자리가 없다. 누를 때 ref에 담아 두면
+// 이유가 해소된 뒤에도 남는다 — 나간 사람에게 "이미 참여했다"가 남던 식이다.
+const joinBlockedReason = computed<string | undefined>(() => {
   if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
   if (hasJoined.value) return t('appointment.detail.alreadyJoined')
   if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
   return undefined
-}
+})
 // 방장 여부·참여 상태는 members 목록에서 추리지 않고 participation 응답을 쓴다.
 // 목록은 ACTIVE만 담고 있어 LEFT가 된 내 참여를 구분하지 못하고, 목록 조회가
 // 실패하면 내 권한까지 함께 사라진다.
@@ -292,9 +292,6 @@ const joinMutation = useMutation({
   mutationFn: () => joinAppointment(appointmentId.value as number),
   onSuccess: async () => {
     depositSheetOpen.value = false
-    // 참여에 성공했으니 직전에 남겨 둔 안내는 지운다. 그대로 두면 이미 해결된
-    // 이유가 버튼 위에 남는다.
-    joinBlockedReason.value = undefined
     await invalidateParticipationScopes()
   },
 })
@@ -307,9 +304,6 @@ const leaveMutation = useMutation({
     // 닫히면 나간 것인지 확신할 수 없다.
     const refunded = appointment.value?.depositAmount
     leaveConfirmOpen.value = false
-    // 나갔으니 버튼 위의 안내도 지운다. 그대로 두면 방금 나간 사람에게 "이미
-    // 참여했다"가 남아, 같은 화면에서 환급 토스트와 반대되는 말을 한다.
-    joinBlockedReason.value = undefined
     await invalidateParticipationScopes()
     showToast(
       refunded === undefined
@@ -332,9 +326,8 @@ const joinErrorMessage = computed(() =>
 )
 
 function openDepositSheet(): void {
-  // 막히는 이유가 있으면 시트를 열지 않고 그 이유만 버튼 위에 남긴다. 이미 참여한
-  // 사람은 서버도 APPOINTMENT-003으로 막으므로 여기서 먼저 알려 주는 셈이다.
-  joinBlockedReason.value = currentJoinBlockedReason()
+  // 이유는 이미 버튼 위에 떠 있다. 여기서는 시트를 열지 않는 것으로 끝낸다. 이미
+  // 참여한 사람은 서버도 APPOINTMENT-003으로 막으므로 미리 알려 주는 셈이다.
   if (joinBlockedReason.value !== undefined) return
 
   joinMutation.reset()

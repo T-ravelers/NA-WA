@@ -214,21 +214,21 @@ describe('AppointmentDetailView', () => {
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
 
-    // 비활성 버튼은 왜 안 되는지 말해 줄 방법이 없다(모바일이라 hover도 없다).
-    // 눌리게 두고, 누르면 그 이유를 버튼 위에 한 줄로 남긴다.
+    // 사유는 누르기 전부터 버튼 위에 떠 있다. 눌러 봐야 아는 화면은 제일 큰 CTA를
+    // "눌리기는 하는데 아무 일도 없는 버튼"으로 만든다. 비활성으로 두지 않는 것은
+    // 모바일이라 hover가 없어 비활성 버튼이 이유를 말할 방법이 없어서다.
     expect(joinButton?.attributes('disabled')).toBeUndefined()
-    expect(wrapper.text()).not.toContain('You have already joined this appointment.')
+    expect(
+      wrapper.findAll('p').find((p) => p.text() === 'You have already joined this appointment.'),
+    ).toBeDefined()
 
     await joinButton?.trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(
-      wrapper.findAll('p').find((p) => p.text() === 'You have already joined this appointment.'),
-    ).toBeDefined()
   })
 
-  it('explains once pressed that recruiting is over', async () => {
+  it('says up front that recruiting is over', async () => {
     // 아직 참여하지 않은 사람이어야 모집 종료가 이유로 잡힌다. 이미 참여한
     // 사람에게는 "이미 참여 중"이 먼저 걸린다.
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'CLOSED' })
@@ -240,9 +240,6 @@ describe('AppointmentDetailView', () => {
 
     expect(joinButton?.attributes('disabled')).toBeUndefined()
 
-    await joinButton?.trigger('click')
-    await flushPromises()
-
     const notice = wrapper
       .findAll('p')
       .find((p) => p.text() === 'This appointment is not open for joining.')
@@ -253,21 +250,32 @@ describe('AppointmentDetailView', () => {
     expect(notice?.classes()).not.toContain('text-danger')
   })
 
-  it('explains once pressed that the participation check failed', async () => {
+  it('says up front that the participation check failed', async () => {
     fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
     const { wrapper } = await mountView()
-
-    const joinButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-
-    await joinButton?.trigger('click')
-    await flushPromises()
 
     expect(wrapper.text()).toContain(
       'We could not check your participation status. Please try again.',
     )
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('shows no notice when joining is actually possible', async () => {
+    // 사유를 상시로 띄우는 만큼, 막힐 이유가 없을 때 아무 말도 하지 않는 것이
+    // 같은 규칙의 반대쪽이다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).not.toContain('This appointment is not open for joining.')
+    expect(wrapper.text()).not.toContain('You have already joined this appointment.')
+    expect(wrapper.text()).not.toContain('We could not check your participation status.')
   })
 
   it('shows a neutral (not red) notice on a normally closed appointment', async () => {
@@ -278,12 +286,6 @@ describe('AppointmentDetailView', () => {
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
     profileQuery.data.value = { memberId: 99 }
     const { wrapper } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
 
     const notice = wrapper
       .findAll('p')
@@ -524,18 +526,16 @@ describe('AppointmentDetailView', () => {
     )
   })
 
-  it('clears the already-joined notice after leaving', async () => {
+  it('stops saying you already joined once you have left', async () => {
     // 나갔는데 안내가 남으면 같은 화면에서 "이미 참여했다"와 환급 토스트가
     // 서로 반대되는 말을 한다.
     fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
-    cancelAppointmentParticipation.mockResolvedValue(undefined)
+    cancelAppointmentParticipation.mockImplementation(() => {
+      fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+      return Promise.resolve()
+    })
     const { wrapper } = await mountView()
 
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
     expect(wrapper.text()).toContain('You have already joined this appointment.')
 
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
