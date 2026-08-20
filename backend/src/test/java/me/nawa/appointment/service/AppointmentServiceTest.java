@@ -813,7 +813,7 @@ class AppointmentServiceTest {
                 "EVENT",
                 "IN_PROGRESS"
         );
-        when(appointmentMapper.findMyOngoingAppointments(1L, false))
+        when(appointmentMapper.findMyOngoingAppointments(eq(1L), eq(false), any()))
                 .thenReturn(List.of(appointment));
 
         List<MyOngoingAppointmentResponse> result =
@@ -829,12 +829,13 @@ class AppointmentServiceTest {
 
     @Test
     void getMyOngoingAppointments_allScope_includesFinishedAppointments() {
-        when(appointmentMapper.findMyOngoingAppointments(1L, true))
+        when(appointmentMapper.findMyOngoingAppointments(eq(1L), eq(true), any()))
                 .thenReturn(List.of());
 
         appointmentService.getMyOngoingAppointments(1L, "ALL");
 
-        verify(appointmentMapper).findMyOngoingAppointments(1L, true);
+        verify(appointmentMapper)
+                .findMyOngoingAppointments(eq(1L), eq(true), any());
     }
 
     @Test

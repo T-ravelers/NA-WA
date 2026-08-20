@@ -548,7 +548,9 @@ public class AppointmentService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        return appointmentMapper.findMyOngoingAppointments(memberId, "ALL".equals(scope))
+        return appointmentMapper
+            .findMyOngoingAppointments(
+                memberId, "ALL".equals(scope), LocalDateTime.now())
             .stream()
             .map(MyOngoingAppointmentResponse::from)
             .toList();

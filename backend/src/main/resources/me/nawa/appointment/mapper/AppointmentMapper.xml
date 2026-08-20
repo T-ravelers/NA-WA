@@ -361,9 +361,14 @@
         <choose>
             <when test="includeAll">
                 AND a.appointment_status != 'CANCELLED'
-                <!-- 예정 약속(임박한 순)을 위에, 지난 약속(최근 순)을 아래에 둔다. -->
-                ORDER BY (a.activity_start_at &lt; NOW()),
-                         CASE WHEN a.activity_start_at &gt;= NOW()
+                <!--
+                    예정 약속(임박한 순)을 위에, 지난 약속(최근 순)을 아래에 둔다.
+                    경계는 DB의 NOW()가 아니라 애플리케이션이 넘긴 #{now}로 가른다.
+                    DB 서버 시간대가 애플리케이션과 다르면 그 시차만큼 경계가 어긋나,
+                    지금 시각 근처의 약속이 반대쪽으로 정렬된다.
+                -->
+                ORDER BY (a.activity_start_at &lt; #{now}),
+                         CASE WHEN a.activity_start_at &gt;= #{now}
                               THEN a.activity_start_at END ASC,
                          a.activity_start_at DESC,
                          a.appointment_id DESC
