@@ -245,6 +245,17 @@ export default {
       member: 'Member',
       you: 'You',
       requireAttended: 'Mark at least one member as attended.',
+      confirmSheet: {
+        title: 'Confirm attendance?',
+        close: 'Close attendance confirmation',
+        counts: '{attended} attended \u00b7 {noShow} no-show',
+        forfeit:
+          'Deposits from everyone marked as no-show are forfeited and shared among the members who attended.',
+        irreversible: 'Attendance cannot be changed once confirmed.',
+        selfNoShow: 'You are marked as no-show, so your own deposit will be forfeited too.',
+        cancel: 'Go back',
+        confirm: 'Confirm attendance',
+      },
       invalidTitle: 'Attendance could not be loaded',
       invalidDescription: 'The appointment link is invalid.',
       accessDeniedTitle: 'Host access required',

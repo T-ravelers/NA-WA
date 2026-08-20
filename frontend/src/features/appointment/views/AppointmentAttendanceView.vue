@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -12,6 +12,7 @@ import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
+import AppointmentAttendanceConfirmSheet from '../components/AppointmentAttendanceConfirmSheet.vue'
 import {
   confirmAppointmentAttendance,
   type AppointmentAttendanceStatus,
@@ -111,11 +112,25 @@ function toggleAttendance(member: AppointmentMember): void {
   draft[member.memberId] = attendanceStatus(member) === 'ATTENDED' ? 'NO_SHOW' : 'ATTENDED'
 }
 
+const attendedCount = computed(
+  () => members.value.filter((member) => attendanceStatus(member) === 'ATTENDED').length,
+)
+const noShowCount = computed(() => members.value.length - attendedCount.value)
 // 서버는 참석자가 한 명도 없는 확정을 거부한다(APPOINTMENT-006). 전원 노쇼면
 // 나눠 줄 상대가 없어 보증금 정산이 성립하지 않기 때문이다.
-const hasAttendedMember = computed(() =>
-  members.value.some((member) => attendanceStatus(member) === 'ATTENDED'),
+const hasAttendedMember = computed(() => attendedCount.value > 0)
+// 방장도 기본값이 미참석이라, 자기를 올리지 않은 채 제출하면 자기 보증금을 잃는다.
+// 화면에서는 "안 눌렀다"와 "안 왔다"가 같은 모양이라 확인 단계에서 따로 짚어 준다.
+const selfNoShow = computed(() =>
+  members.value.some(
+    (member) =>
+      member.appointmentMemberId === myAppointmentMemberId.value &&
+      attendanceStatus(member) !== 'ATTENDED',
+  ),
 )
+
+// 확정은 되돌리는 상태 전이가 없다. 누르자마자 보내지 않고 숫자로 한 번 되짚는다.
+const saveConfirmOpen = ref(false)
 
 const attendanceMutation = useMutation({
   mutationFn: () =>
@@ -126,6 +141,7 @@ const attendanceMutation = useMutation({
       })),
     }),
   onSuccess: async () => {
+    saveConfirmOpen.value = false
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: appointmentKeys.detail(appointmentId.value) }),
       queryClient.invalidateQueries({ queryKey: appointmentKeys.members(appointmentId.value) }),
@@ -148,8 +164,18 @@ const saveErrorMessage = computed(() =>
     : t(appointmentErrorMessageKey(attendanceMutation.error.value, hasMessage)),
 )
 
-function save(): void {
+function openSaveConfirm(): void {
   if (appointmentId.value === null || !hasAttendedMember.value) return
+
+  attendanceMutation.reset()
+  saveConfirmOpen.value = true
+}
+
+function closeSaveConfirm(): void {
+  saveConfirmOpen.value = false
+}
+
+function confirmSave(): void {
   if (!attendanceMutation.isPending.value) attendanceMutation.mutate()
 }
 
@@ -320,11 +346,22 @@ function retry(): void {
           block
           :loading="attendanceMutation.isPending.value"
           :disabled="!hasAttendedMember || attendanceMutation.isPending.value"
-          @click="save"
+          @click="openSaveConfirm"
         >
           {{ t('appointment.attendance.save') }}
         </AppButton>
       </div>
+
+      <AppointmentAttendanceConfirmSheet
+        v-if="saveConfirmOpen"
+        :attended-count="attendedCount"
+        :no-show-count="noShowCount"
+        :self-no-show="selfNoShow"
+        :confirm-disabled="attendanceMutation.isPending.value"
+        :error-message="saveErrorMessage"
+        @close="closeSaveConfirm"
+        @confirm="confirmSave"
+      />
     </template>
   </main>
 </template>
