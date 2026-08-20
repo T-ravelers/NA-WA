@@ -9,6 +9,7 @@ import { i18n } from '@/app/i18n'
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
 const submitAppointmentReview = vi.fn()
+const fetchMyAppointmentReviewStatus = vi.fn()
 const useAppointmentMemberProfileMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
@@ -17,6 +18,8 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   fetchAppointmentMembers: (appointmentId: number) => fetchAppointmentMembers(appointmentId),
   submitAppointmentReview: (appointmentId: number, request: unknown) =>
     submitAppointmentReview(appointmentId, request),
+  fetchMyAppointmentReviewStatus: (appointmentId: number) =>
+    fetchMyAppointmentReviewStatus(appointmentId),
 }))
 
 vi.mock('../../model/memberIntegration', () => ({
@@ -110,6 +113,8 @@ describe('AppointmentReviewView', () => {
     fetchAppointment.mockReset()
     fetchAppointmentMembers.mockReset()
     submitAppointmentReview.mockReset()
+    fetchMyAppointmentReviewStatus.mockReset()
+    fetchMyAppointmentReviewStatus.mockResolvedValue({ reviewedAppointmentMemberIds: [] })
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue(members)
     submitAppointmentReview.mockRejectedValue(new Error('save failed'))
@@ -131,7 +136,7 @@ describe('AppointmentReviewView', () => {
       ?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('Review could not be saved')
+    expect(wrapper.get('[role="alert"]').text()).toContain('Something went wrong')
     expect(wrapper.text()).toContain('Alex Kim')
   })
 
@@ -149,6 +154,41 @@ describe('AppointmentReviewView', () => {
 
     expect(wrapper.text()).toContain('Reviews are not available yet')
     expect(wrapper.text()).not.toContain('Save review')
+  })
+
+  it('restores what was already written from the server', async () => {
+    // 이게 없으면 재진입할 때마다 전원이 미작성으로 보이고, 다시 내면 REVIEW-002가 난다.
+    fetchMyAppointmentReviewStatus.mockResolvedValue({ reviewedAppointmentMemberIds: [2] })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Completed')
+    expect(wrapper.text()).not.toContain('Pending')
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Finish reviews')
+        ?.attributes('disabled'),
+    ).toBeUndefined()
+  })
+
+  it('tells the user a duplicate review apart from a generic failure', async () => {
+    const { NormalizedApiError } = await import('@/shared/api/apiError')
+    submitAppointmentReview.mockRejectedValue(
+      new NormalizedApiError('REVIEW-002', 409, 'duplicate'),
+    )
+    const { wrapper } = await mountView()
+    const scoreButtons = wrapper.findAll('button').filter((button) => button.text() === '★')
+
+    await scoreButtons[4]?.trigger('click')
+    await scoreButtons[9]?.trigger('click')
+    await scoreButtons[14]?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Save review')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('already reviewed this member')
   })
 
   it('does not offer reviews for members marked as no-show', async () => {

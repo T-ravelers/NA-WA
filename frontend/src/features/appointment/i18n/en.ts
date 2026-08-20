@@ -272,7 +272,6 @@ export default {
       pending: 'Pending',
       completed: 'Completed',
       finish: 'Finish reviews',
-      saveFailed: 'Review could not be saved. Please try again.',
       invalidTitle: 'Reviews could not be loaded',
       invalidDescription: 'The appointment link is invalid.',
       loadFailed: 'Reviews could not be loaded',
@@ -283,6 +282,18 @@ export default {
       accessDeniedDescription: 'Only active appointment members can write reviews.',
       emptyTitle: 'No reviews to write',
       emptyDescription: 'Active appointment members will appear here after the appointment.',
+    },
+  },
+  /**
+   * 후기 오류 코드는 `REVIEW-` 접두사를 쓴다. 공용 규칙이 코드 접두사로
+   * `<prefix>.errorCode.<CODE>` 키를 만들기 때문에(`resolveErrorMessageKey`)
+   * `appointment` 아래에 두면 찾지 못한다. 백엔드 도메인 이름(`me.nawa.review`)에
+   * 맞춰 최상위 `review` 네임스페이스에 둔다. 화면은 appointment feature가 갖는다.
+   */
+  review: {
+    errorCode: {
+      'REVIEW-001': 'Only members confirmed as attended can review this appointment.',
+      'REVIEW-002': 'You have already reviewed this member.',
     },
   },
 }
