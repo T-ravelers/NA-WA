@@ -121,6 +121,7 @@ cd backend && ./gradlew build --no-daemon
 | 약속·보증금·후기 ENUM·상태 전이 | [backend/docs/APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./backend/docs/APPOINTMENT_DEPOSIT_STATE_MACHINE.md) |
 | 정산 API·상태·멱등성 | [backend/docs/SETTLEMENT.md](./backend/docs/SETTLEMENT.md)                  |
 | QR 결제 API·상태·멱등성 | [backend/docs/QR_PAYMENT_API.md](./backend/docs/QR_PAYMENT_API.md)      |
+| 소비 카테고리 값 집합·칭호 | [backend/docs/SPENDING_CATEGORY.md](./backend/docs/SPENDING_CATEGORY.md) |
 | 소셜 로그인 운영     | [backend/docs/AUTHENTICATION.md](./backend/docs/AUTHENTICATION.md)          |
 | DB 지도·도메인 ERD   | [backend/docs/database/README.md](./backend/docs/database/README.md)         |
 
