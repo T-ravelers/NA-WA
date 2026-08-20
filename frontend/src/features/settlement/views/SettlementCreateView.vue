@@ -62,6 +62,8 @@ const error = ref<unknown>(null)
 const validationMessage = ref<string | null>(null)
 /** 1단계 위쪽에 뜨는 안내. 2단계 전용인 validationMessage와 자리가 달라 따로 둔다. */
 const candidateNotice = ref<string | null>(null)
+const receipt = useSettlementReceiptUpload()
+const receiptSheetOpen = ref(false)
 
 const journeys = computed(() => groupCandidates(props.candidates))
 const selectedJourney = computed(
@@ -106,6 +108,16 @@ const itemizedShares = computed(() =>
   type.value !== 'ITEMIZED' || selectedCandidate.value === null
     ? null
     : summarizeItemizedShares(items.value, selectedCandidate.value.payerAppointmentMemberId),
+)
+
+/*
+ * 원거래 금액이 쓰는 소수 자릿수.
+ *
+ * 계산한 금액은 뒤의 0을 떼고 나오므로 그대로 두면 25.00과 25가 나란히 놓인다. 같은
+ * 금액인데 달라 보이면 합계가 맞는지 눈으로 확인할 수 없다.
+ */
+const amountFractionDigits = computed(
+  () => selectedCandidate.value?.amount.split('.')[1]?.length ?? 0,
 )
 
 /** 배분이 없는 사람은 0으로 보여 준다. 빈칸이면 왜 없는지 알 수 없다. */
@@ -190,6 +202,13 @@ function selectTransaction(candidate: SettlementCandidate): void {
   selectedCandidate.value = candidate
   selectedParticipantIds.value = [candidate.payerAppointmentMemberId]
   items.value = []
+  /*
+   * 앞서 고른 결제에 붙였던 영수증을 반드시 떼어낸다.
+   *
+   * 남겨 두면 다른 결제의 정산이 엉뚱한 영수증을 달고 만들어지고, 한 번 연결된 영수증은
+   * 바꿀 수 없어 되돌릴 방법이 없다.
+   */
+  receipt.reset()
   error.value = null
   candidateNotice.value = null
 }
@@ -307,9 +326,6 @@ function goToReview(): void {
   step.value = 3
   emit('update:step', step.value)
 }
-
-const receipt = useSettlementReceiptUpload()
-const receiptSheetOpen = ref(false)
 
 async function create(): Promise<void> {
   const candidate = selectedCandidate.value
@@ -615,7 +631,8 @@ defineExpose({ back })
         >
           <span>{{ t('settlement.create.itemsTotal') }}</span>
           <span
-            >{{ points(itemsTotal.total) }} / {{ points(selectedCandidate?.amount ?? '0') }}</span
+            >{{ points(itemsTotal.total, amountFractionDigits) }} /
+            {{ points(selectedCandidate?.amount ?? '0') }}</span
           >
         </div>
         <div
@@ -782,7 +799,7 @@ defineExpose({ back })
                   >{{ t('settlement.create.payerShare') }}</span
                 >
               </dt>
-              <dd>{{ points(shareAmountOf(participant.id)) }}</dd>
+              <dd>{{ points(shareAmountOf(participant.id), amountFractionDigits) }}</dd>
             </div>
           </dl>
           <div
@@ -790,7 +807,7 @@ defineExpose({ back })
             data-testid="request-total"
           >
             <span>{{ t('settlement.create.requestTotal') }}</span>
-            <span>{{ points(itemizedShares.requested) }}</span>
+            <span>{{ points(itemizedShares.requested, amountFractionDigits) }}</span>
           </div>
         </AppCard>
       </template>
@@ -834,7 +851,9 @@ defineExpose({ back })
           >{{
             itemizedShares === null
               ? t('settlement.create.send')
-              : t('settlement.create.request', { amount: points(itemizedShares.requested) })
+              : t('settlement.create.request', {
+                  amount: points(itemizedShares.requested, amountFractionDigits),
+                })
           }}</AppButton
         >
       </div>

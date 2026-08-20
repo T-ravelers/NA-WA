@@ -525,6 +525,48 @@ describe('SettlementCreateView', () => {
     expect(wrapper.text()).toContain('Split evenly across 2 people')
   })
 
+  it('drops the receipt when another payment is chosen', async () => {
+    const wrapper = mountCreate([
+      candidate(),
+      candidate({ transferId: '8', gatheringName: 'Cafe', amount: '10.00' }),
+    ])
+    await drillDownToTransaction(wrapper)
+    await pickReceipt(wrapper)
+    expect(uploadReceipt).toHaveBeenCalledTimes(1)
+
+    // 1단계로 돌아가 다른 결제를 고른다.
+    ;(wrapper.vm as unknown as { back: () => void }).back()
+    await flushPromises()
+    await wrapper.get('[data-payment-id="8"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    // 앞 결제의 영수증이 따라오면, 한 번 연결된 뒤에는 바꿀 수 없어 되돌릴 방법이 없다.
+    expect(create.mock.calls[0]?.[2]).not.toHaveProperty('receiptId')
+  })
+
+  it('shows computed amounts with the same decimals as the payment', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '12.50', quantity: '2' })
+    await allocate(wrapper, 0, '12', '1')
+    await allocate(wrapper, 0, '19', '1')
+
+    // 25.00과 25가 나란히 놓이면 같은 금액인지 눈으로 알아볼 수 없다.
+    expect(wrapper.get('[data-testid="items-total"]').text()).toContain('25.00 P / 25.00 P')
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    expect(wrapper.get('[data-share-for="12"]').text()).toContain('12.50 P')
+    expect(wrapper.get('[data-testid="request-total"]').text()).toContain('12.50 P')
+    expect(wrapper.get('[data-action="create"]').text()).toBe('Request 12.50 P')
+  })
+
   it('does not offer a receipt to open when none was attached', async () => {
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)
