@@ -26,6 +26,9 @@ class ReviewMapperXmlTest {
         }
 
         String namespace = "me.nawa.review.mapper.ReviewMapper.";
+        assertTrue(configuration.hasStatement(
+                namespace + "findReviewedAppointmentMemberIds"
+        ));
         assertTrue(configuration.hasStatement(namespace + "countReviewPair"));
         assertTrue(configuration.hasStatement(namespace + "countActiveKeywords"));
         assertTrue(configuration.hasStatement(namespace + "insertReview"));
