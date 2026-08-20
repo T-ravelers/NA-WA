@@ -60,6 +60,13 @@ async function lint(source: string, relativeFilePath: string) {
     throw new Error('ESLint returned no result')
   }
 
+  // 위 인스턴스는 `**/*.ts`만 대상으로 한다. 매칭되는 설정이 없으면 ESLint는 규칙을 돌리지
+  // 않고 `ruleId`가 `null`인 안내 메시지만 돌려준다. 그러면 위반이 없기를 기대하는 검사가
+  // 규칙이 아예 돌지 않은 채로 통과한다 — 조용히 넘어가지 않고 여기서 던진다.
+  if (result.messages.some((message) => message.ruleId === null)) {
+    throw new Error(`No config matched ${relativeFilePath}. The rule did not run.`)
+  }
+
   return result.messages
 }
 
@@ -134,10 +141,21 @@ describe('Feature boundary rule wiring', () => {
 
     const featureConfig = await configFor('src/features/explore/routes.ts')
     const sharedConfig = await configFor('src/shared/api/httpClient.ts')
+    const featureVueConfig = await configFor('src/features/explore/components/EventCard.vue')
+    const sharedVueConfig = await configFor('src/shared/ui/StateEmpty.vue')
     const outsideConfig = await configFor('src/main.ts')
 
     expect(featureConfig.rules?.[RULE_ID]).toEqual(ERROR_SEVERITY)
     expect(sharedConfig.rules?.[RULE_ID]).toEqual(ERROR_SEVERITY)
+
+    // 두 블록의 대상은 `{ts,tsx,vue}`이고 Feature 코드의 대부분이 `.vue`다. `.ts`만 단언하면
+    // glob에서 `vue`가 빠져도 이 검사가 그대로 통과한다.
+    expect(featureVueConfig.rules?.[RULE_ID]).toEqual(ERROR_SEVERITY)
+    expect(sharedVueConfig.rules?.[RULE_ID]).toEqual(ERROR_SEVERITY)
+
+    // 오탐을 막는 단언이 아니다 — 규칙은 importer가 Feature도 shared도 아니면 아무것도
+    // 보고하지 않으므로 범위가 넓어져도 오탐은 생기지 않는다. 적용 범위를 의도적으로 좁게
+    // 유지한다는 선언으로 남긴다.
     expect(outsideConfig.rules?.[RULE_ID]).toBeUndefined()
   })
 })
