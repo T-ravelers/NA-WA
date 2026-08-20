@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.settlement.domain.Settlement;
+import me.nawa.settlement.domain.SettlementCollectionMember;
 import me.nawa.settlement.domain.SettlementItem;
 import me.nawa.settlement.domain.SettlementItemShare;
 import me.nawa.settlement.domain.SettlementMember;
@@ -305,6 +306,75 @@ class SettlementMapperIntegrationTest {
                 draft.getSettlementReceiptId(), fixture.memberId()
             ));
         } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    /**
+     * 원결제자가 볼 "누가 냈나" 목록은 돈을 낼 사람만 담는다.
+     *
+     * 정산을 만든 사람도 구성원 행을 가지지만 자기 자신에게 보낼 돈은 없어서 NOT_REQUESTED로
+     * 남는다. 이 행이 목록에 섞이면 전원이 다 내도 화면의 인원수가 끝까지 차지 않는다.
+     */
+    @Test
+    void findCollectionMembers_excludesPayerRowAndReadsNameShareAndStatus() {
+        Fixture fixture = createFixture();
+        String guestName = "settlement-it-" + UUID.randomUUID();
+        long guestMemberId = 0L;
+        long guestAppointmentMemberId = 0L;
+        try {
+            Settlement settlement = settlement(fixture);
+            mapper.insertSettlement(settlement);
+            guestMemberId = insert("members", "member_id", Map.of("display_name", guestName));
+            guestAppointmentMemberId = insert("appointment_members", "appointment_member_id", Map.of(
+                "appointment_id", fixture.appointmentId(),
+                "member_id", guestMemberId
+            ));
+            mapper.insertSettlementMembers(List.of(
+                new SettlementMember(
+                    null, settlement.getSettlementId(), fixture.appointmentMemberId(),
+                    fixture.memberId(), new BigDecimal("40"), "NOT_REQUESTED", null
+                ),
+                new SettlementMember(
+                    null, settlement.getSettlementId(), guestAppointmentMemberId,
+                    guestMemberId, new BigDecimal("60"), "PENDING", null
+                )
+            ));
+
+            List<SettlementCollectionMember> pending =
+                mapper.findCollectionMembers(settlement.getSettlementId());
+
+            assertEquals(1, pending.size());
+            assertEquals(guestAppointmentMemberId, pending.get(0).getAppointmentMemberId());
+            assertEquals(guestName, pending.get(0).getDisplayName());
+            assertEquals(0, new BigDecimal("60").compareTo(pending.get(0).getShareAmount()));
+            assertEquals("PENDING", pending.get(0).getRequestStatus());
+
+            mapper.markSettlementMemberPaid(
+                mapper.findMemberBySettlementAndMember(settlement.getSettlementId(), guestMemberId)
+                    .getSettlementMemberId(),
+                fixture.transferId(),
+                "settlement-it-" + UUID.randomUUID()
+            );
+
+            List<SettlementCollectionMember> paid =
+                mapper.findCollectionMembers(settlement.getSettlementId());
+
+            assertEquals(1, paid.size());
+            assertEquals("PAID", paid.get(0).getRequestStatus());
+        } finally {
+            // 참가 행과 회원을 지우려면 그것을 가리키는 정산 구성원 행이 먼저 없어져야 한다.
+            jdbcTemplate.update(
+                "DELETE sm FROM settlement_members sm "
+                    + "JOIN settlements s ON s.settlement_id = sm.settlement_id "
+                    + "WHERE s.source_transfer_id = ?",
+                fixture.transferId()
+            );
+            jdbcTemplate.update(
+                "DELETE FROM appointment_members WHERE appointment_member_id = ?",
+                guestAppointmentMemberId
+            );
+            jdbcTemplate.update("DELETE FROM members WHERE member_id = ?", guestMemberId);
             deleteFixture(fixture);
         }
     }

@@ -162,8 +162,9 @@ export default {
       sendTo: 'Send to',
       sendAmount: 'You send',
       participantStatus: 'Who has paid',
-      participantStatusPending:
-        'Payment status per participant becomes available in a later release.',
+      /** 원결제자 본인은 세지 않는다. 자기에게 보낼 돈이 없어 세면 숫자가 끝까지 차지 않는다. */
+      participantStatusSummary: '{paid} of {total} paid',
+      participantRequestStatus: { PENDING: 'Pending', PAID: 'Paid' },
       pay: 'Pay {amount}',
       payCompleted: 'Pay completed',
       backToCollect: 'Back to your requests',

@@ -2,6 +2,7 @@ package me.nawa.settlement.mapper;
 
 import java.util.List;
 import me.nawa.settlement.domain.Settlement;
+import me.nawa.settlement.domain.SettlementCollectionMember;
 import me.nawa.settlement.domain.SettlementDetail;
 import me.nawa.settlement.domain.SettlementItem;
 import me.nawa.settlement.domain.SettlementItemShare;
@@ -29,6 +30,10 @@ public interface SettlementMapper {
     List<SettlementSource> findCandidateSources(@Param("memberId") Long memberId);
 
     List<SettlementParticipant> findParticipants(@Param("appointmentId") Long appointmentId);
+
+    List<SettlementCollectionMember> findCollectionMembers(
+        @Param("settlementId") Long settlementId
+    );
 
     List<SettlementSummary> findReceivedSummaries(@Param("memberId") Long memberId);
 

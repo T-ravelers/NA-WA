@@ -90,6 +90,27 @@
         ORDER BY am.appointment_member_id
     </select>
 
+    <!--
+        원결제자가 볼 "누가 냈나" 목록이다.
+
+        request_status가 NOT_REQUESTED인 행을 빼는 것이 곧 원결제자 본인을 빼는 것이다.
+        이 상태는 정산을 만든 사람에게만 붙고, 만든 사람이 곧 돈을 낸 사람이다
+        (chk_settlements_creator_is_payer). 남은 PENDING이 하나도 없을 때 정산이 완료로
+        넘어가므로, 같은 기준으로 세야 화면의 "몇 명 중 몇 명"과 정산 상태가 어긋나지 않는다.
+
+        지운 행은 정산 쪽과 약속 참가 쪽 양쪽에서 걸러야 한 곳만 지워진 사람이 되살아나지 않는다.
+    -->
+    <select id="findCollectionMembers" resultType="me.nawa.settlement.domain.SettlementCollectionMember">
+        SELECT sm.appointment_member_id, m.display_name, sm.share_amount, sm.request_status
+        FROM settlement_members sm
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        JOIN members m ON m.member_id = am.member_id
+        WHERE sm.settlement_id = #{settlementId}
+          AND sm.request_status &lt;&gt; 'NOT_REQUESTED'
+          AND sm.deleted_at IS NULL AND am.deleted_at IS NULL
+        ORDER BY sm.appointment_member_id
+    </select>
+
     <select id="findReceivedSummaries" resultType="me.nawa.settlement.domain.SettlementSummary">
         SELECT s.settlement_id, a.appointment_name AS title,
                s.total_amount, s.receivable_amount, s.split_method, s.settlement_status,

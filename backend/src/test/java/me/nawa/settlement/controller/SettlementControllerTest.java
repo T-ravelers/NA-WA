@@ -23,6 +23,8 @@ import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.settlement.dto.request.CreateSettlementRequest;
 import me.nawa.settlement.dto.response.SettlementCreateResponse;
 import me.nawa.settlement.dto.response.SettlementCandidateResponse;
+import me.nawa.settlement.dto.response.SettlementCollectionParticipantResponse;
+import me.nawa.settlement.dto.response.SettlementCollectionResponse;
 import me.nawa.settlement.dto.response.SettlementDetailResponse;
 import me.nawa.settlement.dto.response.SettlementParticipantResponse;
 import me.nawa.settlement.dto.response.SettlementViewerResponse;
@@ -168,10 +170,68 @@ class SettlementControllerTest {
             .getResponse()
             .getContentAsString(StandardCharsets.UTF_8);
 
-        JsonNode viewer = objectMapper.readTree(responseBody).path("data").path("viewer");
+        JsonNode data = objectMapper.readTree(responseBody).path("data");
+        JsonNode viewer = data.path("viewer");
         assertEquals("PARTICIPANT", viewer.path("role").asText());
         assertEquals(50, viewer.path("payableAmount").asInt());
         assertEquals("PAY", viewer.path("allowedActions").path(0).asText());
+        // 낼 사람에게는 다른 사람이 냈는지가 아예 오지 않는다.
+        assertTrue(data.path("collection").isNull());
+    }
+
+    /**
+     * 돈을 받을 사람만 "누가 냈나"를 본다.
+     *
+     * 인원수는 청구한 상대만 센다. 원결제자 본인은 자기에게 돈을 보내지 않으므로 서비스가
+     * 넘겨준 목록에도 없고, 그래서 둘 다 냈을 때 2명 중 2명이 된다.
+     */
+    @Test
+    void getSettlement_creator_serializesCollectionWithPaidCount() throws Exception {
+        when(settlementQueryService.getSettlement(1L, 69L)).thenReturn(
+            SettlementDetailResponse.builder()
+                .id(69L)
+                .type("EQUAL")
+                .totalAmount(new BigDecimal("150"))
+                .status("REQUESTED")
+                .viewerItems(List.of())
+                .viewer(SettlementViewerResponse.builder()
+                    .role("CREATOR")
+                    .shareAmount(new BigDecimal("50"))
+                    .payableAmount(BigDecimal.ZERO)
+                    .requestStatus("NOT_REQUESTED")
+                    .allowedActions(List.of())
+                    .build())
+                .collection(SettlementCollectionResponse.builder()
+                    .totalCount(2)
+                    .paidCount(1)
+                    .participants(List.of(
+                        SettlementCollectionParticipantResponse.builder()
+                            .id(72L).name("Bora").initials("B")
+                            .shareAmount(new BigDecimal("50"))
+                            .requestStatus("PAID").build(),
+                        SettlementCollectionParticipantResponse.builder()
+                            .id(73L).name("Chan").initials("C")
+                            .shareAmount(new BigDecimal("50"))
+                            .requestStatus("PENDING").build()
+                    ))
+                    .build())
+                .build()
+        );
+
+        String responseBody = mockMvc.perform(get("/api/v1/settlements/69"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode collection = objectMapper.readTree(responseBody).path("data").path("collection");
+        assertEquals(2, collection.path("totalCount").asInt());
+        assertEquals(1, collection.path("paidCount").asInt());
+        assertEquals(72, collection.path("participants").path(0).path("id").asInt());
+        assertEquals("Bora", collection.path("participants").path(0).path("name").asText());
+        assertEquals(50, collection.path("participants").path(0).path("shareAmount").asInt());
+        assertEquals("PAID", collection.path("participants").path(0).path("requestStatus").asText());
+        assertEquals("PENDING", collection.path("participants").path(1).path("requestStatus").asText());
     }
 
     /**

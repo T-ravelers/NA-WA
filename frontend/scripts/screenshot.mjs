@@ -759,6 +759,8 @@ const PAYABLE_SETTLEMENT_DETAIL = {
     requestStatus: 'PENDING',
     allowedActions: ['PAY'],
   },
+  /* 낼 사람에게는 누가 냈는지가 오지 않는다. */
+  collection: null,
 }
 
 /** 결제를 마친 뒤의 같은 상세. 결제 완료 화면이 머물려면 이 모양이어야 한다. */
@@ -793,6 +795,15 @@ const COLLECT_SETTLEMENT_DETAIL = {
     requestStatus: 'NOT_REQUESTED',
     allowedActions: [],
   },
+  /* 셋이 나눈 48000원 중 요청자 본인 몫은 빠져서 받을 사람은 둘이다. */
+  collection: {
+    totalCount: 2,
+    paidCount: 1,
+    participants: [
+      { id: 72, name: 'Jisoo Han', initials: 'J', shareAmount: '16000', requestStatus: 'PAID' },
+      { id: 73, name: 'Tae Kim', initials: 'T', shareAmount: '16000', requestStatus: 'PENDING' },
+    ],
+  },
 }
 
 /** 이미 끝난 정산 상세. 완료 배지와 거래번호 행은 여기서만 나온다. */
@@ -814,6 +825,7 @@ const COMPLETED_SETTLEMENT_DETAIL = {
     requestStatus: 'PAID',
     allowedActions: [],
   },
+  collection: null,
 }
 
 function stubSettlementApis(page) {

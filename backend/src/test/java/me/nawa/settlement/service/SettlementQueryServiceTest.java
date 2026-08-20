@@ -2,12 +2,15 @@ package me.nawa.settlement.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import me.nawa.settlement.domain.SettlementAllowedAction;
+import me.nawa.settlement.domain.SettlementCollectionMember;
 import me.nawa.settlement.domain.SettlementDetail;
 import me.nawa.settlement.domain.SettlementParticipant;
 import me.nawa.settlement.domain.SettlementSource;
@@ -148,6 +151,55 @@ class SettlementQueryServiceTest {
             .map(item -> item.getName()).toList());
         assertEquals(List.of(new BigDecimal("6"), new BigDecimal("12")), response.getViewerItems().stream()
             .map(item -> item.getAllocatedAmount()).toList());
+    }
+
+    @Test
+    void getSettlement_creator_returnsCollectionWithPaidCount() {
+        SettlementDetail detail = new SettlementDetail();
+        detail.setSettlementId(90L);
+        detail.setSplitMethod("EQUAL");
+        detail.setTotalAmount(new BigDecimal("100"));
+        detail.setSettlementStatus("REQUESTED");
+        detail.setCreatedByMemberId(1L);
+        detail.setViewerShareAmount(new BigDecimal("25"));
+        detail.setViewerRequestStatus("NOT_REQUESTED");
+        when(settlementMapper.findDetail(90L, 1L)).thenReturn(detail);
+        // 조회는 청구한 상대만 돌려준다. 원결제자 본인 행은 쿼리에서 이미 빠져 있다.
+        when(settlementMapper.findCollectionMembers(90L)).thenReturn(List.of(
+            new SettlementCollectionMember(72L, "Bora", new BigDecimal("25"), "PAID"),
+            new SettlementCollectionMember(73L, "Chan", new BigDecimal("25"), "PENDING"),
+            new SettlementCollectionMember(74L, "Dain", new BigDecimal("25"), "PENDING")
+        ));
+
+        SettlementDetailResponse response = service().getSettlement(1L, 90L);
+
+        assertEquals(3, response.getCollection().getTotalCount());
+        assertEquals(1, response.getCollection().getPaidCount());
+        assertEquals(List.of(72L, 73L, 74L), response.getCollection().getParticipants().stream()
+            .map(participant -> participant.getId()).toList());
+        assertEquals(List.of("PAID", "PENDING", "PENDING"), response.getCollection().getParticipants().stream()
+            .map(participant -> participant.getRequestStatus()).toList());
+        assertEquals("B", response.getCollection().getParticipants().get(0).getInitials());
+        assertEquals(new BigDecimal("25"), response.getCollection().getParticipants().get(0).getShareAmount());
+    }
+
+    @Test
+    void getSettlement_participant_omitsCollection() {
+        SettlementDetail detail = new SettlementDetail();
+        detail.setSettlementId(90L);
+        detail.setSplitMethod("EQUAL");
+        detail.setTotalAmount(new BigDecimal("100"));
+        detail.setSettlementStatus("REQUESTED");
+        detail.setCreatedByMemberId(1L);
+        detail.setViewerShareAmount(new BigDecimal("25"));
+        detail.setViewerRequestStatus("PENDING");
+        when(settlementMapper.findDetail(90L, 2L)).thenReturn(detail);
+
+        SettlementDetailResponse response = service().getSettlement(2L, 90L);
+
+        // 낼 사람에게는 다른 사람이 냈는지가 보이지 않는다. 빈 목록조차 만들지 않는다.
+        assertNull(response.getCollection());
+        verify(settlementMapper, never()).findCollectionMembers(90L);
     }
 
     private SettlementQueryService service() {

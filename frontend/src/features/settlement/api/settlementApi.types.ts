@@ -94,6 +94,31 @@ export interface SettlementReceiptOcrDto {
 }
 
 /**
+ * 납부 현황의 참여자 한 줄
+ *
+ * 'id'는 회원 번호가 아니라 약속 참가 행 번호다. 정산은 이 값으로 사람을 가린다.
+ */
+export interface SettlementCollectionParticipantDto {
+  id: string | number
+  name: string
+  initials: string
+  shareAmount: ApiAmount
+  requestStatus: 'PENDING' | 'PAID'
+}
+
+/**
+ * 누가 냈는지의 현황
+ *
+ * 'totalCount'에 원결제자 본인은 들어 있지 않다. 자기 자신에게 보낼 돈이 없어서 세면
+ * 전원이 다 내도 숫자가 끝까지 차지 않는다
+ */
+export interface SettlementCollectionDto {
+  totalCount: number
+  paidCount: number
+  participants: SettlementCollectionParticipantDto[]
+}
+
+/**
  * 정산 상세
  */
 export interface SettlementDetailDto {
@@ -108,6 +133,8 @@ export interface SettlementDetailDto {
   transactionId: string | null
   paidBy: string | null
   viewer: SettlementViewerDto
+  /** 돈을 받을 원결제자에게만 온다. 그 밖에는 null이다. */
+  collection: SettlementCollectionDto | null
 }
 
 /**

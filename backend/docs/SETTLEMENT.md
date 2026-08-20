@@ -10,7 +10,7 @@
 | `GET /api/v1/settlements` | 현재 사용자가 생성했거나 지급할 정산 목록을 조회한다. |
 | `GET /api/v1/settlements/candidates` | 생성 가능한 원거래와 약속 참가자 후보를 조회한다. |
 | `POST /api/v1/appointments/{appointmentId}/settlements` | 원거래와 분담 규칙으로 정산을 생성한다. |
-| `GET /api/v1/settlements/{settlementId}` | 참여한 정산의 상태, 개인 부담금과 ITEMIZED 품목 배분을 조회한다. |
+| `GET /api/v1/settlements/{settlementId}` | 참여한 정산의 상태, 개인 부담금과 ITEMIZED 품목 배분을 조회한다. 원결제자에게는 참여자별 납부 현황도 함께 내려준다. |
 | `POST /api/v1/settlements/{settlementId}/members/me/pay` | 현재 사용자의 미지급 부담금을 지급한다. |
 | `POST /api/v1/settlement-receipts` | 영수증 사진을 올리고 `receiptId`를 받는다. |
 | `POST /api/v1/settlement-receipts/{receiptId}/ocr` | 올려 둔 사진에서 품목 초안을 읽는다. |
@@ -73,6 +73,30 @@ URL의 경로 변수이고, `transferId`는 생성 요청의 `sourceTransferId`�
 양수 부담금(`shareAmount > 0`)을 가진 지급 대상자가 최소 한 명 있어야 한다. 원결제자만
 선택한 요청은 `SETTLEMENT-005`(400)으로 거절한다. 원결제자 외 선택한 모든 참여자는
 양수 부담금을 가져야 한다.
+
+## 정산 상세의 납부 현황
+
+`GET /api/v1/settlements/{settlementId}`는 `collection`을 함께 반환한다. 원결제자에게만
+채워 주고 그 밖의 참여자에게는 `null`이다. 빈 배열이 아니라 `null`인 것은 "볼 수 없다"와
+"청구한 상대가 없다"를 구분하기 위해서다. 참여자가 다른 참여자의 납부 여부를 보는 경로는
+아직 없다.
+
+| 필드 | 내용 |
+| --- | --- |
+| `collection.totalCount` | 청구한 상대 수. **원결제자 본인은 세지 않는다.** |
+| `collection.paidCount` | 그중 지급을 마친 수 |
+| `collection.participants[].id` | 회원 ID가 아닌 `appointment_member_id` |
+| `collection.participants[].name` · `initials` | 표시용 이름과 이름 첫 글자 |
+| `collection.participants[].shareAmount` | 그 사람의 부담금 |
+| `collection.participants[].requestStatus` | `PENDING` 또는 `PAID` |
+
+`participants`에는 `request_status`가 `NOT_REQUESTED`가 아닌 구성원만 담는다. 이 상태는
+생성자에게만 붙고 생성자가 곧 원결제자이므로(`chk_settlements_creator_is_payer`), 결과적으로
+원결제자 본인 행이 빠진다. 본인을 세면 자기 자신에게 보낼 돈이 없어 전원이 지급해도
+`paidCount`가 `totalCount`에 닿지 못한다. settlement가 `COMPLETED`로 전이하는 조건과
+같은 기준을 써서 집계와 상태가 어긋나지 않게 한다.
+
+정렬은 `appointment_member_id` 오름차순이며, 이는 EQUAL 나머지 배분 순서와 같다.
 
 ## 멱등성
 

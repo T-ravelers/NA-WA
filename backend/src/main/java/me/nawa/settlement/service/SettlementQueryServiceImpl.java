@@ -3,11 +3,14 @@ package me.nawa.settlement.service;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.settlement.domain.SettlementCollectionMember;
 import me.nawa.settlement.domain.SettlementDetail;
 import me.nawa.settlement.domain.SettlementParticipant;
 import me.nawa.settlement.domain.SettlementSummary;
 import me.nawa.settlement.domain.SettlementViewerContext;
 import me.nawa.settlement.dto.response.SettlementCandidateResponse;
+import me.nawa.settlement.dto.response.SettlementCollectionParticipantResponse;
+import me.nawa.settlement.dto.response.SettlementCollectionResponse;
 import me.nawa.settlement.dto.response.SettlementDetailResponse;
 import me.nawa.settlement.dto.response.SettlementListResponse;
 import me.nawa.settlement.dto.response.SettlementParticipantResponse;
@@ -60,6 +63,8 @@ public class SettlementQueryServiceImpl implements SettlementQueryService {
                     .build())
                 .toList()
             : List.of();
+        SettlementCollectionResponse collection = "CREATOR".equals(role)
+            ? toCollectionResponse(settlementMapper.findCollectionMembers(settlementId)) : null;
         return SettlementDetailResponse.builder().id(detail.getSettlementId()).type(detail.getSplitMethod())
             .totalAmount(detail.getTotalAmount()).status(detail.getSettlementStatus()).requestedBy(detail.getRequestedBy())
             .gatheringName(detail.getGatheringName()).merchantName(detail.getMerchantName())
@@ -69,7 +74,23 @@ public class SettlementQueryServiceImpl implements SettlementQueryService {
                 .shareAmount(detail.getViewerShareAmount())
                 .requestStatus(detail.getViewerRequestStatus())
                 .settlementStatus(detail.getSettlementStatus())
-                .build())).build();
+                .build()))
+            .collection(collection).build();
+    }
+
+    /**
+     * 돈을 받을 사람에게만 보여 줄 납부 현황을 만든다.
+     *
+     * 몇 명이 냈는지는 여기서 센다. 조회는 있는 그대로 가져오는 일이고, 그 숫자가
+     * 무슨 뜻인지 정하는 것은 서비스의 몫이다.
+     */
+    private SettlementCollectionResponse toCollectionResponse(List<SettlementCollectionMember> members) {
+        return SettlementCollectionResponse.builder().totalCount(members.size())
+            .paidCount((int) members.stream().filter(member -> "PAID".equals(member.getRequestStatus())).count())
+            .participants(members.stream().map(member -> SettlementCollectionParticipantResponse.builder()
+                .id(member.getAppointmentMemberId()).name(member.getDisplayName())
+                .initials(initialsOf(member.getDisplayName())).shareAmount(member.getShareAmount())
+                .requestStatus(member.getRequestStatus()).build()).toList()).build();
     }
 
     private List<SettlementSummaryResponse> toSummaryResponses(
@@ -92,7 +113,11 @@ public class SettlementQueryServiceImpl implements SettlementQueryService {
     private List<SettlementParticipantResponse> toParticipantResponses(List<SettlementParticipant> participants) {
         return participants.stream().map(participant -> SettlementParticipantResponse.builder()
             .id(participant.getAppointmentMemberId())
-            .name(participant.getDisplayName()).initials(participant.getDisplayName() == null || participant.getDisplayName().isBlank()
-                ? "?" : participant.getDisplayName().substring(0, 1).toUpperCase()).build()).toList();
+            .name(participant.getDisplayName()).initials(initialsOf(participant.getDisplayName())).build()).toList();
+    }
+
+    /** 사진이 없는 자리에 대신 넣을 이름 첫 글자다. 이름을 알 수 없으면 물음표로 둔다. */
+    private String initialsOf(String displayName) {
+        return displayName == null || displayName.isBlank() ? "?" : displayName.substring(0, 1).toUpperCase();
     }
 }

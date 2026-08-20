@@ -152,7 +152,7 @@ describe('SettlementDetailView', () => {
     expect(router.currentRoute.value.query.side).toBe('sent')
   })
 
-  it('shows the creator the participant status placeholder and no payment action', async () => {
+  it('shows the creator who has paid, how many are left, and no payment action', async () => {
     getDetail.mockResolvedValue({
       ...detail,
       viewer: {
@@ -161,12 +161,45 @@ describe('SettlementDetailView', () => {
         requestStatus: 'NOT_REQUESTED' as const,
         allowedActions: [],
       },
+      collection: {
+        totalCount: 2,
+        paidCount: 1,
+        participants: [
+          {
+            id: '72',
+            name: 'Bora',
+            initials: 'B',
+            shareAmount: '12.50',
+            requestStatus: 'PAID' as const,
+          },
+          {
+            id: '73',
+            name: 'Chan',
+            initials: 'C',
+            shareAmount: '12.50',
+            requestStatus: 'PENDING' as const,
+          },
+        ],
+      },
     })
     const { wrapper } = await mountDetail()
 
     expect(wrapper.find('[data-action="pay"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="participant-status-placeholder"]').exists()).toBe(true)
+    // 원결제자 본인은 세지 않으므로 둘 중 하나가 낸 상태는 "1 of 2"다.
+    expect(wrapper.get('[data-testid="collection-summary"]').text()).toBe('1 of 2 paid')
+    expect(wrapper.get('[data-collection-for="72"]').text()).toContain('Bora')
+    expect(wrapper.get('[data-collection-for="72"]').text()).toContain('12.50 P')
+    expect(wrapper.get('[data-collection-for="72"]').text()).toContain('Paid')
+    expect(wrapper.get('[data-collection-for="73"]').text()).toContain('Pending')
     expect(wrapper.text()).not.toContain('Send to')
+  })
+
+  it('does not tell a participant who else has paid', async () => {
+    const { wrapper } = await mountDetail()
+
+    // 서버가 낼 사람에게는 이 목록을 내려주지 않는다. 화면도 자리를 만들지 않는다.
+    expect(wrapper.find('[data-testid="collection-summary"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Who has paid')
   })
 
   it('shows the receipt without asking, and opens it full size when tapped', async () => {

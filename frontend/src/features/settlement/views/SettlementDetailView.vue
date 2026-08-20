@@ -9,6 +9,7 @@ import AppCard from '@/shared/ui/AppCard.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
+import SettlementCollectionCard from '../components/SettlementCollectionCard.vue'
 import SettlementPageHeader from '../components/SettlementPageHeader.vue'
 import SettlementReceiptSheet from '../components/SettlementReceiptSheet.vue'
 import SettlementTransactionCard from '../components/SettlementTransactionCard.vue'
@@ -224,21 +225,14 @@ function startPayment(): void {
       </AppCard>
 
       <!--
-        TODO: 참여자별 납부 현황. 상세 응답에 참여자 배열이 없어 아직 채울 수 없다.
-        서버가 참여자와 납부 상태를 내려주면 이 자리에 목록을 그린다.
+        누가 냈는지는 돈을 받을 사람에게만 온다. 낼 사람에게는 아예 오지 않으므로 이
+        자리가 비고, 화면이 역할로 다시 가릴 필요가 없다.
       -->
-      <AppCard
-        v-if="isCreator"
+      <SettlementCollectionCard
+        v-if="detail.collection !== undefined && detail.collection.participants.length > 0"
         class="mt-4"
-      >
-        <p class="text-caption text-ink-3">{{ t('settlement.detail.participantStatus') }}</p>
-        <p
-          class="mt-2 text-body-sm text-ink-3"
-          data-testid="participant-status-placeholder"
-        >
-          {{ t('settlement.detail.participantStatusPending') }}
-        </p>
-      </AppCard>
+        :collection="detail.collection"
+      />
 
       <div class="mt-auto pt-8">
         <AppButton
