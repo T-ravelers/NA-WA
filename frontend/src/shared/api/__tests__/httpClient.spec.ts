@@ -526,6 +526,44 @@ describe('httpClient', () => {
     ).rejects.toMatchObject({ code: 'SETTLEMENT-020', status: 410 })
   })
 
+  it('still retries a binary request whose CSRF token went stale', async () => {
+    // 봉투를 풀기 전에 CSRF를 판정하면, 바이너리로 받는 요청만 재시도에서 조용히 빠진다.
+    const { httpClient, calls } = await loadClient({
+      'get /api/v1/auth/csrf': [
+        {
+          status: 200,
+          body: { success: true, data: { token: 'csrf-token', headerName: 'X-CSRF-TOKEN' } },
+        },
+        {
+          status: 200,
+          body: { success: true, data: { token: 'fresh-csrf-token', headerName: 'X-CSRF-TOKEN' } },
+        },
+      ],
+      'post /api/v1/settlement-receipts': [
+        {
+          status: 403,
+          body: new Blob(
+            [
+              JSON.stringify({
+                success: false,
+                error: { code: 'AUTH-005', message: 'invalid csrf token' },
+              }),
+            ],
+            { type: 'application/json' },
+          ),
+        },
+        { status: 200, body: { success: true, data: { receiptId: '31' } } },
+      ],
+    })
+
+    const response = await httpClient.post('/api/v1/settlement-receipts', new FormData(), {
+      responseType: 'blob',
+    })
+
+    expect(response.data).toEqual({ receiptId: '31' })
+    expect(countCalls(calls, 'post', '/api/v1/settlement-receipts')).toBe(2)
+  })
+
   it('leaves a binary error body alone when it is not JSON', async () => {
     const { httpClient } = await loadClient({
       'get /api/v1/settlements/42/receipt': [

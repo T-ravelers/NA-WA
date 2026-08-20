@@ -91,6 +91,10 @@ httpClient.interceptors.response.use(
     )
   },
   async (error: unknown) => {
+    // 아래 검사들이 모두 오류 본문의 봉투를 읽으므로, 풀어내는 일이 가장 먼저 와야 한다.
+    // 뒤로 밀면 바이너리로 받는 요청만 CSRF 재시도에서 조용히 빠진다.
+    await unwrapBlobErrorBody(error)
+
     if (isInvalidCsrfResponse(error)) {
       const config = error.config as CsrfRetriableConfig | undefined
 
@@ -109,8 +113,6 @@ httpClient.interceptors.response.use(
         return retried
       }
     }
-
-    await unwrapBlobErrorBody(error)
 
     throw normalizeApiError(error)
   },
