@@ -44,7 +44,13 @@ class IngestMapperXmlTest {
                 "insertPlaces",
                 "updatePlaces",
                 "upsertEventTranslations",
-                "upsertPlaceTranslations")) {
+                "upsertPlaceTranslations",
+                "deleteMissingEventActivities",
+                "deleteMissingPlaceActivities",
+                "deleteAllEventActivities",
+                "deleteAllPlaceActivities",
+                "upsertEventActivities",
+                "upsertPlaceActivities")) {
             assertTrue(configuration.hasStatement(NS + id), id + " 문장이 없습니다");
         }
     }
@@ -103,6 +109,48 @@ class IngestMapperXmlTest {
 
         assertTrue(sql.startsWith("INSERT INTO event"), "INSERT 문이 아닙니다");
         assertEquals(1, countOccurrences(sql, "INSERT INTO event"), "INSERT 가 여러 번 나갑니다");
+    }
+
+
+    @Test
+    void deleteMissingEventActivities_keepsRowsWithADerivedTable() throws Exception {
+        String sql = sqlOf("deleteMissingEventActivities",
+                Map.of("items", List.of(activityItem("a", 10L, 20L), activityItem("b", 30L))));
+
+        // 행 생성자 NOT IN 은 항목마다 괄호를 정확히 맞춰야 한다. 중첩 foreach 로는
+        // 첫 행과 끝 행의 괄호가 빠져 MySQL 이 문법 오류를 낸다. 실제로 CI 의
+        // MapperSqlSchemaIntegrationTest 가 이것을 잡았다.
+        assertFalse(sql.contains("NOT IN"), "행 생성자 NOT IN 으로 되돌아갔습니다");
+        assertTrue(sql.contains("NOT EXISTS"), "남길 짝을 파생 테이블로 거르지 않습니다");
+        // 짝 3개(a-10, a-20, b-30)가 UNION ALL 로 이어져야 한다.
+        assertEquals(2, countOccurrences(sql, "UNION ALL"), "짝 수만큼 UNION ALL 이 있어야 합니다");
+    }
+
+    @Test
+    void deleteAllEventActivities_takesOnlyPipelineIds() throws Exception {
+        String sql = sqlOf("deleteAllEventActivities", Map.of("pipelineIds", List.of("a", "b")));
+
+        // 분류를 통째로 지우는 문장이다. 남길 짝이 없으므로 파생 테이블이 없어야 한다.
+        assertFalse(sql.contains("NOT EXISTS"), "지울 대상을 거르고 있습니다");
+        assertTrue(sql.contains("DELETE ea FROM event_activity"), "삭제 대상이 다릅니다");
+    }
+
+    private static me.nawa.ingest.dto.request.ActivityIngestItem activityItem(
+            String pipelineId, Long... activityIds) {
+        me.nawa.ingest.dto.request.ActivityIngestItem item =
+                new me.nawa.ingest.dto.request.ActivityIngestItem();
+        item.setPipelineId(pipelineId);
+        java.util.List<me.nawa.ingest.dto.request.ActivityIngestItem.ActivityLink> links =
+                new java.util.ArrayList<>();
+        for (int i = 0; i < activityIds.length; i += 1) {
+            me.nawa.ingest.dto.request.ActivityIngestItem.ActivityLink link =
+                    new me.nawa.ingest.dto.request.ActivityIngestItem.ActivityLink();
+            link.setActivityId(activityIds[i]);
+            link.setIsPrimary(i == 0);
+            links.add(link);
+        }
+        item.setActivities(links);
+        return item;
     }
 
     private static EventIngestItem event(String pipelineId) {

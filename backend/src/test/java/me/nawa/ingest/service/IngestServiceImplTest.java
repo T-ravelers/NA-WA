@@ -1,6 +1,7 @@
 package me.nawa.ingest.service;
 
 import me.nawa.common.exception.BusinessException;
+import me.nawa.ingest.dto.request.ActivityIngestItem;
 import me.nawa.ingest.dto.request.EventIngestItem;
 import me.nawa.ingest.dto.request.EventTranslationIngestItem;
 import me.nawa.ingest.dto.request.PlaceIngestItem;
@@ -189,6 +190,105 @@ class IngestServiceImplTest {
                 () -> service.ingestPlaces(List.of(halfCoordinate)));
     }
 
+
+    @Test
+    void ingestEventActivities_removesRelationsThatAreNoLongerSent() {
+        mapper.existingEventIds = List.of("a");
+
+        service.ingestEventActivities(List.of(activities("a", 10L, 20L)));
+
+        // 목록에 없는 분류는 지워야 한다. 분류는 더해지기만 하는 값이 아니라
+        // "지금 이 항목이 속한 분류"라서, 빠진 것을 남기면 영영 붙어 있게 된다.
+        assertEquals(List.of("deleteMissingEventActivities", "upsertEventActivities"),
+                mapper.callOrder);
+    }
+
+    @Test
+    void ingestEventActivities_deletesEverythingWhenAnEmptyListArrives() {
+        mapper.existingEventIds = List.of("a");
+
+        service.ingestEventActivities(List.of(activities("a")));
+
+        // 분류가 하나도 없는 요청은 전부 지우라는 뜻이다. 남길 짝이 없어
+        // deleteMissing 의 파생 테이블이 비므로 전용 문장으로 보낸다.
+        assertEquals(List.of("deleteAllEventActivities"), mapper.callOrder);
+    }
+
+    @Test
+    void ingestEventActivities_skipsItemsWithoutABody() {
+        mapper.existingEventIds = List.of("has-body");
+
+        IngestResultResponse result = service.ingestEventActivities(
+                List.of(activities("has-body", 10L), activities("no-body", 11L)));
+
+        assertEquals(2, result.getReceived());
+        assertEquals(1, result.getUpdated());
+        assertEquals(1, result.getSkipped());
+    }
+
+    @Test
+    void ingestEventActivities_rejectsTwoPrimaryActivities() {
+        // 대표가 둘이면 화면이 어느 것을 보여줄지 정할 수 없다.
+        ActivityIngestItem item = activities("a", 10L, 20L);
+        item.getActivities().forEach(link -> link.setIsPrimary(true));
+
+        assertThrows(BusinessException.class,
+                () -> service.ingestEventActivities(List.of(item)));
+        assertTrue(mapper.callOrder.isEmpty());
+    }
+
+
+    @Test
+    void ingestEventActivities_rejectsALinkWithoutThePrimaryFlag() {
+        // is_primary 는 NOT NULL 이다. 빠진 채로 들어가면 배치 전체가 롤백되고
+        // 500 이 나가, 파이프라인이 같은 배치를 계속 재시도한다.
+        ActivityIngestItem item = activities("a", 10L);
+        item.getActivities().get(0).setIsPrimary(null);
+
+        assertThrows(BusinessException.class,
+                () -> service.ingestEventActivities(List.of(item)));
+        assertTrue(mapper.callOrder.isEmpty());
+    }
+
+    @Test
+    void ingestEventActivities_keepsOnlyTheLastEntryForARepeatedItem() {
+        mapper.existingEventIds = List.of("a");
+
+        // 각 항목은 대표가 하나씩이라 항목 단위 검증은 통과한다. 줄이지 않으면
+        // 같은 이벤트에 대표가 2행 남아 이 PR 이 세운 규칙이 깨진다.
+        IngestResultResponse result = service.ingestEventActivities(
+                List.of(activities("a", 10L), activities("a", 20L)));
+
+        assertEquals(1, result.getReceived());
+        assertEquals(1, result.getUpdated());
+    }
+
+    @Test
+    void ingestEventActivities_doesNotSendTheSameItemToBothDeletePaths() {
+        mapper.existingEventIds = List.of("a");
+
+        // 앞이 빈 목록, 뒤가 분류 있는 목록이면 줄이기 전에는 deleteAll 과
+        // upsert 가 같은 항목에 동시에 걸려 결과가 호출 순서에 의존한다.
+        service.ingestEventActivities(List.of(activities("a"), activities("a", 10L)));
+
+        assertEquals(List.of("deleteMissingEventActivities", "upsertEventActivities"),
+                mapper.callOrder);
+    }
+
+    private static ActivityIngestItem activities(String pipelineId, Long... activityIds) {
+        ActivityIngestItem item = new ActivityIngestItem();
+        item.setPipelineId(pipelineId);
+        List<ActivityIngestItem.ActivityLink> links = new ArrayList<>();
+        for (int i = 0; i < activityIds.length; i += 1) {
+            ActivityIngestItem.ActivityLink link = new ActivityIngestItem.ActivityLink();
+            link.setActivityId(activityIds[i]);
+            link.setIsPrimary(i == 0);
+            links.add(link);
+        }
+        item.setActivities(links);
+        return item;
+    }
+
     private static List<String> pipelineIdsOf(List<EventIngestItem> items) {
         return items.stream().map(EventIngestItem::getPipelineId).toList();
     }
@@ -287,6 +387,42 @@ class IngestServiceImplTest {
         public int upsertPlaceTranslations(
                 List<me.nawa.ingest.dto.request.PlaceTranslationIngestItem> items) {
             callOrder.add("upsertPlaceTranslations");
+            return items.size();
+        }
+
+        @Override
+        public int deleteMissingEventActivities(List<ActivityIngestItem> items) {
+            callOrder.add("deleteMissingEventActivities");
+            return items.size();
+        }
+
+        @Override
+        public int deleteMissingPlaceActivities(List<ActivityIngestItem> items) {
+            callOrder.add("deleteMissingPlaceActivities");
+            return items.size();
+        }
+
+        @Override
+        public int deleteAllEventActivities(List<String> pipelineIds) {
+            callOrder.add("deleteAllEventActivities");
+            return pipelineIds.size();
+        }
+
+        @Override
+        public int deleteAllPlaceActivities(List<String> pipelineIds) {
+            callOrder.add("deleteAllPlaceActivities");
+            return pipelineIds.size();
+        }
+
+        @Override
+        public int upsertEventActivities(List<ActivityIngestItem> items) {
+            callOrder.add("upsertEventActivities");
+            return items.size();
+        }
+
+        @Override
+        public int upsertPlaceActivities(List<ActivityIngestItem> items) {
+            callOrder.add("upsertPlaceActivities");
             return items.size();
         }
     }

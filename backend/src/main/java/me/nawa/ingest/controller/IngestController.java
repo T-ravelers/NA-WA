@@ -2,6 +2,7 @@ package me.nawa.ingest.controller;
 
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
+import me.nawa.ingest.dto.request.ActivityIngestItem;
 import me.nawa.ingest.dto.request.EventIngestItem;
 import me.nawa.ingest.dto.request.EventTranslationIngestItem;
 import me.nawa.ingest.dto.request.PlaceIngestItem;
@@ -78,6 +79,22 @@ public class IngestController {
             @RequestBody List<PlaceTranslationIngestItem> items) {
         guard(member, items.size());
         return ApiResponse.success(ingestService.ingestPlaceTranslations(items));
+    }
+
+    @PostMapping("/event-activities")
+    public ApiResponse<IngestResultResponse> ingestEventActivities(
+            @AuthenticationPrincipal AuthenticatedMember member,
+            @RequestBody List<ActivityIngestItem> items) {
+        guard(member, items.size());
+        return ApiResponse.success(ingestService.ingestEventActivities(items));
+    }
+
+    @PostMapping("/place-activities")
+    public ApiResponse<IngestResultResponse> ingestPlaceActivities(
+            @AuthenticationPrincipal AuthenticatedMember member,
+            @RequestBody List<ActivityIngestItem> items) {
+        guard(member, items.size());
+        return ApiResponse.success(ingestService.ingestPlaceActivities(items));
     }
 
     /**
