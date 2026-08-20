@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import QRCode from 'qrcode'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
+import { IconTrash } from '@tabler/icons-vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -14,6 +15,14 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 import TextInput from '@/shared/ui/TextInput.vue'
 
 import { createMerchantQr, registerAsMerchant, type MerchantQr } from '../api/merchantApi'
+import {
+  calculateTotal,
+  createEmptyItem,
+  isValidTotal,
+  itemSubtotal,
+  parseQuantity,
+  type MerchantQrItem,
+} from '../model/merchantQr'
 import {
   creditEntries,
   merchantKeys,
@@ -32,6 +41,9 @@ import {
 const i18n = useI18n()
 const { t, locale } = i18n
 const queryClient = useQueryClient()
+
+const formatAmount = (value: number): string =>
+  new Intl.NumberFormat(locale.value, { maximumFractionDigits: 2 }).format(value)
 
 const accountQuery = useMerchantAccount()
 const isMerchant = computed(() => accountQuery.data.value?.accountType === 'MERCHANT')
@@ -82,13 +94,15 @@ const incomeEntries = computed(() => creditEntries(incomeQuery.data.value))
 const incomeTotal = computed(() => sumIncome(incomeEntries.value))
 const incomeCount = computed(() => incomeEntries.value.length)
 
-const formattedIncome = computed(() =>
-  new Intl.NumberFormat(locale.value, { maximumFractionDigits: 2 }).format(incomeTotal.value),
-)
+const formattedIncome = computed(() => formatAmount(incomeTotal.value))
 
 /* --------------------------------- QR 생성 --------------------------------- */
 
-const amount = ref<number | null>(null)
+/*
+ * 품목 입력은 화면 안에서만 산다. 서버로 보내지 않으므로 Vue Query가 아니라 ref가 소유한다.
+ * QR에는 계산된 합계만 실린다.
+ */
+const items = ref<MerchantQrItem[]>([createEmptyItem()])
 const memo = ref('')
 const activeQr = ref<MerchantQr | null>(null)
 const qrImageSrc = ref<string | null>(null)
@@ -104,22 +118,36 @@ const createMutation = useMutation({
   },
 })
 
-const canCreate = computed(
-  () => amount.value !== null && amount.value > 0 && !createMutation.isPending.value,
-)
+const totalAmount = computed(() => calculateTotal(items.value))
+
+const canCreate = computed(() => isValidTotal(totalAmount.value) && !createMutation.isPending.value)
+
+const addItem = (): void => {
+  items.value.push(createEmptyItem())
+}
+
+const removeItem = (id: number): void => {
+  const remaining = items.value.filter((item) => item.id !== id)
+
+  // 줄이 하나도 없으면 입력할 곳이 사라진다. 마지막 줄은 비우기만 한다.
+  items.value = remaining.length === 0 ? [createEmptyItem()] : remaining
+}
 
 const createQr = (): void => {
-  if (!canCreate.value || amount.value === null) return
+  if (!canCreate.value) return
 
   const trimmedMemo = memo.value.trim()
 
-  createMutation.mutate({ value: amount.value, note: trimmedMemo === '' ? null : trimmedMemo })
+  createMutation.mutate({
+    value: totalAmount.value,
+    note: trimmedMemo === '' ? null : trimmedMemo,
+  })
 }
 
 const resetQr = (): void => {
   activeQr.value = null
   qrImageSrc.value = null
-  amount.value = null
+  items.value = [createEmptyItem()]
   memo.value = ''
 }
 
@@ -345,16 +373,101 @@ const createError = computed(() =>
               class="mt-5 space-y-4"
               @submit.prevent="createQr"
             >
-              <AmountInput
-                v-model="amount"
-                :label="t('merchant.qr.amount')"
-                :placeholder="t('merchant.qr.amountPlaceholder')"
-              />
+              <!--
+                품목·수량·단가는 서버로 보내지 않는다. 합계를 손으로 더하지 않게 돕는
+                입력 보조이며, QR에는 아래에서 계산된 합계 금액만 실린다.
+              -->
+              <ul class="space-y-4">
+                <li
+                  v-for="(item, index) in items"
+                  :key="item.id"
+                  class="rounded-sm border border-hairline p-3"
+                >
+                  <div class="flex items-end gap-2">
+                    <div class="min-w-0 flex-1">
+                      <TextInput
+                        v-model="item.name"
+                        :label="t('merchant.qr.itemName')"
+                        :placeholder="t('merchant.qr.itemNamePlaceholder')"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      class="grid size-13 shrink-0 place-items-center rounded-sm text-ink-3 transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                      :aria-label="t('merchant.qr.removeItem', { index: index + 1 })"
+                      @click="removeItem(item.id)"
+                    >
+                      <IconTrash
+                        :size="20"
+                        :stroke-width="2"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </div>
+
+                  <div class="mt-3 grid grid-cols-[5rem_1fr] items-end gap-2">
+                    <!-- 수량은 통화가 아니라 AmountInput을 쓰지 않고, TextInput은 숫자 바인딩이 없다. -->
+                    <div class="flex flex-col gap-1.5">
+                      <label
+                        :for="`merchant-qty-${item.id}`"
+                        class="text-caption text-ink-2"
+                      >
+                        {{ t('merchant.qr.quantity') }}
+                      </label>
+                      <input
+                        :id="`merchant-qty-${item.id}`"
+                        type="text"
+                        inputmode="numeric"
+                        :value="item.quantity ?? ''"
+                        class="h-14 w-full rounded-sm border-2 border-transparent bg-surface-2 px-4 text-right text-data-lg text-ink outline-none focus-visible:border-ink"
+                        @input="
+                          item.quantity = parseQuantity(($event.target as HTMLInputElement).value)
+                        "
+                      />
+                    </div>
+                    <AmountInput
+                      v-model="item.unitPrice"
+                      :label="t('merchant.qr.unitPrice')"
+                      :placeholder="t('merchant.qr.unitPricePlaceholder')"
+                    />
+                  </div>
+
+                  <p class="mt-2 text-right text-caption text-ink-3 tabular-nums">
+                    {{ t('merchant.qr.subtotal', { amount: formatAmount(itemSubtotal(item)) }) }}
+                  </p>
+                </li>
+              </ul>
+
+              <AppButton
+                variant="secondary"
+                block
+                @click="addItem"
+              >
+                {{ t('merchant.qr.addItem') }}
+              </AppButton>
+
               <TextInput
                 v-model="memo"
                 :label="t('merchant.qr.memo')"
                 :placeholder="t('merchant.qr.memoPlaceholder')"
               />
+
+              <!-- 합계는 QR에 실제로 실리는 값이라 맨 아래에서 크게 보여준다. -->
+              <div
+                class="flex items-baseline justify-between border-t border-hairline pt-4"
+                role="status"
+              >
+                <span class="text-body">{{ t('merchant.qr.total') }}</span>
+                <span class="text-title font-bold tabular-nums">
+                  {{ t('merchant.qr.totalAmount', { amount: formatAmount(totalAmount) }) }}
+                </span>
+              </div>
+              <p
+                v-if="totalAmount === 0"
+                class="text-caption text-ink-3"
+              >
+                {{ t('merchant.qr.totalHint') }}
+              </p>
               <p
                 v-if="createError !== null"
                 class="text-caption text-danger"

@@ -39,6 +39,35 @@ function account(accountType: string): MerchantAccount {
   }
 }
 
+/**
+ * 품목 한 줄을 채운다.
+ *
+ * 품목·수량·단가는 서버로 보내지 않는다. 합계만 QR에 실리므로 여기서 확인할 것은
+ * 입력이 합계로 이어지는지다.
+ */
+async function fillItem(
+  wrapper: Awaited<ReturnType<typeof mountView>>['wrapper'],
+  index: number,
+  quantity: string,
+  unitPrice: string,
+) {
+  const row = wrapper.findAll('li')[index]
+
+  if (row === undefined) {
+    throw new Error(`품목 ${index}번 줄이 없다`)
+  }
+
+  const numericInputs = row.findAll('input[inputmode="numeric"]')
+  const [quantityInput, unitPriceInput] = numericInputs
+
+  if (quantityInput === undefined || unitPriceInput === undefined) {
+    throw new Error(`품목 ${index}번 줄에 수량·단가 입력이 없다`)
+  }
+
+  await quantityInput.setValue(quantity)
+  await unitPriceInput.setValue(unitPrice)
+}
+
 async function mountView() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const wrapper = mount(MerchantView, {
@@ -142,6 +171,33 @@ describe('MerchantView', () => {
     expect(wrapper.text()).not.toContain('Set up your store')
   })
 
+  it('adds up every item into the total', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    await fillItem(wrapper, 0, '2', '4500')
+    await wrapper.get('button[type="button"].w-full').trigger('click')
+    await fillItem(wrapper, 1, '1', '3000')
+
+    expect(wrapper.text()).toContain('12,000 P')
+  })
+
+  it('keeps the QR button unavailable until an item has a quantity and a price', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    const submit = wrapper.get('button[type="submit"]')
+
+    expect(submit.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('Add at least one item')
+
+    await fillItem(wrapper, 0, '1', '4500')
+
+    expect(submit.attributes('disabled')).toBeUndefined()
+  })
+
   it('creates a QR code and renders it with a countdown', async () => {
     vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
     vi.mocked(createMerchantQr).mockResolvedValue({
@@ -157,11 +213,12 @@ describe('MerchantView', () => {
 
     const { wrapper } = await mountView()
 
-    await wrapper.find('input[inputmode="numeric"]').setValue('4500')
+    await fillItem(wrapper, 0, '2', '4500')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(createMerchantQr).toHaveBeenCalledWith(4500, null)
+    // 품목이 아니라 계산된 합계만 서버로 간다.
+    expect(createMerchantQr).toHaveBeenCalledWith(9000, null)
     expect(wrapper.find('img').attributes('src')).toBe('data:image/png;base64,stub')
     // 기기 시간대로 해석하면 9시간이 더해져 남은 시간이 전혀 달라진다.
     expect(wrapper.text()).toContain('Expires in 0:45')
@@ -182,7 +239,7 @@ describe('MerchantView', () => {
 
     const { wrapper } = await mountView()
 
-    await wrapper.find('input[inputmode="numeric"]').setValue('4500')
+    await fillItem(wrapper, 0, '1', '4500')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
