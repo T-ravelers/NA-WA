@@ -205,12 +205,23 @@ function statusLabel(status: AppointmentStatus): string {
 }
 
 /**
- * 뒤로 가면 이 약속이 속한 약속 목록으로 돌아간다.
+ * 뒤로 가면 왔던 길을 되감는다. 출석·후기 화면과 같은 규칙이다.
  *
- * 목록은 `itemId`·`itemType` 쿼리로 대상 Event·Place를 좁히므로 상세가 가진 값을
- * 그대로 넘긴다. 상세를 아직 못 받았으면 좁히지 않은 전체 목록으로 보낸다.
+ * 히스토리가 없을 때(딥링크·PWA 재진입)만 목적지를 정해 보낸다. 이 약속이 속한
+ * 약속 목록이고, 목록은 `itemId`·`itemType` 쿼리로 대상 Event·Place를 좁히므로
+ * 상세가 가진 값을 그대로 넘긴다. 상세를 아직 못 받았으면 좁히지 않은 전체 목록이다.
+ *
+ * 한때는 히스토리와 무관하게 목록으로 push했다. 생성 직후 뒤로 가기가 방금 제출한
+ * 폼으로 돌아가는 것을 막으려던 것인데, 그 대가로 여정 타임라인에서 들어온 사람이
+ * 타임라인으로 못 돌아갔다. 생성 쪽을 replace로 바꿔 폼을 히스토리에서 뺐으니
+ * 목적지를 고정할 이유가 없어졌다.
  */
 function goBack(): void {
+  if (window.history.length > 1) {
+    void router.back()
+    return
+  }
+
   const current = appointment.value
   const scoped = current?.itemType === 'EVENT' || current?.itemType === 'PLACE'
 

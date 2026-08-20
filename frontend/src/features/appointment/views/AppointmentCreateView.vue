@@ -29,7 +29,9 @@ const createMutation = useMutation({
   onSuccess: async (appointment) => {
     queryClient.setQueryData(appointmentKeys.detail(appointment.appointmentId), appointment)
     await queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() })
-    await router.push({
+    // push가 아니라 replace다. 상세의 뒤로 가기는 왔던 길을 되감으므로, 제출한
+    // 폼이 히스토리에 남아 있으면 만들자마자 그 폼으로 돌아간다.
+    await router.replace({
       name: 'appointment-detail',
       params: { appointmentId: appointment.appointmentId },
     })

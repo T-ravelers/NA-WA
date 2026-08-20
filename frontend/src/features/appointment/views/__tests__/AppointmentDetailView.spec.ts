@@ -184,7 +184,8 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
   })
 
-  it('goes back to the appointment list for this item', async () => {
+  it('goes back to the appointment list for this item when there is no history', async () => {
+    // 딥링크·PWA 재진입처럼 되감을 것이 없을 때만 목적지를 정해 보낸다.
     const { wrapper, router } = await mountView()
 
     await wrapper.get('button[aria-label="Go back"]').trigger('click')
@@ -192,6 +193,23 @@ describe('AppointmentDetailView', () => {
 
     expect(router.currentRoute.value.name).toBe('appointment-list')
     expect(router.currentRoute.value.query).toEqual({ itemId: '42', itemType: 'EVENT' })
+  })
+
+  it('goes back the way you came when there is history', async () => {
+    // 여정 타임라인에서 들어왔으면 타임라인으로 돌아가야 한다. 목적지를 고정하면
+    // 어디서 왔든 약속 목록으로 튄다.
+    const { wrapper, router } = await mountView()
+    const back = vi.spyOn(router, 'back').mockImplementation(() => {})
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(3)
+
+    await wrapper.get('button[aria-label="Go back"]').trigger('click')
+    await flushPromises()
+
+    expect(back).toHaveBeenCalledOnce()
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
+
+    historyLength.mockRestore()
+    back.mockRestore()
   })
 
   it('tells an existing member they are already in, instead of opening the deposit sheet', async () => {
