@@ -15,18 +15,28 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.journey.domain.Journey;
 import me.nawa.journey.domain.JourneyExploreItem;
 import me.nawa.journey.domain.JourneyItem;
 import me.nawa.journey.domain.JourneyTimelineItem;
+import me.nawa.journey.domain.TripRegion;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -34,6 +44,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
     named = "RUN_MYSQL_INTEGRATION_TESTS",
     matches = "(?i)true"
@@ -357,6 +368,198 @@ class JourneyMapperIntegrationTest {
             );
         } finally {
             deleteFixture(fixture);
+        }
+    }
+
+    @Test
+    void updateJourney_replacesRegionsAndDetectsDateConflict() {
+        JourneyItemFixture fixture = createFixture();
+        try {
+            insertTripItem(
+                fixture.tripId(),
+                fixture.itemId(),
+                LocalDate.of(2026, 8, 20)
+            );
+
+            assertTrue(mapper.hasJourneyItemsOutsideRange(
+                fixture.tripId(),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 10)
+            ));
+
+            Journey updated = Journey.builder()
+                .tripId(fixture.tripId())
+                .title("Updated integration journey")
+                .startDate(LocalDate.of(2026, 8, 1))
+                .endDate(LocalDate.of(2026, 8, 31))
+                .companionPreference("FRIENDS")
+                .build();
+            assertEquals(1, mapper.updateJourney(updated));
+
+            TripRegion first = TripRegion.builder()
+                .tripId(fixture.tripId())
+                .regionCode("SEOUL")
+                .regionName("Seoul")
+                .displayOrder(0)
+                .build();
+            mapper.insertRegions(List.of(first));
+            assertEquals(1, mapper.softDeleteRegionsByTripId(fixture.tripId()));
+
+            TripRegion restored = TripRegion.builder()
+                .tripId(fixture.tripId())
+                .regionCode("SEOUL")
+                .regionName("Seoul City")
+                .displayOrder(1)
+                .build();
+            mapper.insertRegions(List.of(restored));
+
+            Journey reloaded = mapper.findJourneyById(fixture.tripId());
+            List<TripRegion> regions = mapper.findRegionsByTripId(
+                fixture.tripId()
+            );
+            assertEquals("Updated integration journey", reloaded.getTitle());
+            assertEquals("FRIENDS", reloaded.getCompanionPreference());
+            assertEquals(1, regions.size());
+            assertEquals("Seoul City", regions.get(0).getRegionName());
+            assertEquals(1, regions.get(0).getDisplayOrder());
+        } finally {
+            jdbcTemplate.update(
+                "DELETE FROM trip_regions WHERE trip_id = ?",
+                fixture.tripId()
+            );
+            deleteFixture(fixture);
+        }
+    }
+
+    @Test
+    void journeyRowLock_serializesSettingsUpdateAndItemAddition()
+        throws Exception {
+        JourneyItemFixture fixture = createFixture();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch settingsLockAcquired = new CountDownLatch(1);
+        CountDownLatch releaseSettingsUpdate = new CountDownLatch(1);
+        CountDownLatch itemAdditionStarted = new CountDownLatch(1);
+
+        try {
+            Future<Void> settingsUpdate = executor.submit(() -> {
+                transactionTemplate.executeWithoutResult(status -> {
+                    Journey locked = mapper.findJourneyByIdForUpdate(
+                        fixture.tripId()
+                    );
+                    settingsLockAcquired.countDown();
+                    await(releaseSettingsUpdate);
+                    locked.setTitle("Locked settings update");
+                    assertEquals(1, mapper.updateJourney(locked));
+                });
+                return null;
+            });
+
+            assertTrue(settingsLockAcquired.await(5, TimeUnit.SECONDS));
+
+            Future<String> itemAddition = executor.submit(() ->
+                transactionTemplate.execute(status -> {
+                    itemAdditionStarted.countDown();
+                    Journey locked = mapper.findJourneyByIdForUpdate(
+                        fixture.tripId()
+                    );
+                    mapper.insertJourneyItem(journeyItem(fixture));
+                    return locked.getTitle();
+                })
+            );
+
+            assertTrue(itemAdditionStarted.await(5, TimeUnit.SECONDS));
+            assertThrows(
+                TimeoutException.class,
+                () -> itemAddition.get(300, TimeUnit.MILLISECONDS)
+            );
+
+            releaseSettingsUpdate.countDown();
+            settingsUpdate.get(5, TimeUnit.SECONDS);
+            assertEquals(
+                "Locked settings update",
+                itemAddition.get(5, TimeUnit.SECONDS)
+            );
+            assertEquals(
+                1L,
+                jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM trip_items WHERE trip_id = ? "
+                        + "AND deleted_at IS NULL",
+                    Long.class,
+                    fixture.tripId()
+                )
+            );
+        } finally {
+            releaseSettingsUpdate.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+            deleteFixture(fixture);
+        }
+    }
+
+    @Test
+    void updateJourney_middleFailureRollsBackSettingsAndRegions() {
+        JourneyItemFixture fixture = createFixture();
+        Journey before = mapper.findJourneyById(fixture.tripId());
+        TripRegion originalRegion = TripRegion.builder()
+            .tripId(fixture.tripId())
+            .regionCode("SEOUL")
+            .regionName("Seoul")
+            .displayOrder(0)
+            .build();
+        mapper.insertRegions(List.of(originalRegion));
+
+        try {
+            assertThrows(
+                DataIntegrityViolationException.class,
+                () -> transactionTemplate.executeWithoutResult(status -> {
+                    Journey locked = mapper.findJourneyByIdForUpdate(
+                        fixture.tripId()
+                    );
+                    locked.setTitle("Must roll back");
+                    assertEquals(1, mapper.updateJourney(locked));
+                    assertEquals(
+                        1,
+                        mapper.softDeleteRegionsByTripId(fixture.tripId())
+                    );
+                    jdbcTemplate.update(
+                        "INSERT INTO trip_regions "
+                            + "(trip_id, region_code, region_name, "
+                            + "display_order) VALUES (?, NULL, ?, ?)",
+                        fixture.tripId(),
+                        "Invalid region",
+                        1
+                    );
+                })
+            );
+
+            Journey reloaded = mapper.findJourneyById(fixture.tripId());
+            List<TripRegion> regions = mapper.findRegionsByTripId(
+                fixture.tripId()
+            );
+            assertEquals(before.getTitle(), reloaded.getTitle());
+            assertEquals(1, regions.size());
+            assertEquals("SEOUL", regions.get(0).getRegionCode());
+            assertEquals("Seoul", regions.get(0).getRegionName());
+        } finally {
+            jdbcTemplate.update(
+                "DELETE FROM trip_regions WHERE trip_id = ?",
+                fixture.tripId()
+            );
+            deleteFixture(fixture);
+        }
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timed out waiting for test latch");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(
+                "Interrupted while waiting for test latch",
+                exception
+            );
         }
     }
 

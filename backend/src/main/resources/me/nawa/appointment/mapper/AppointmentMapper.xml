@@ -62,6 +62,51 @@
              #{attendanceConfirmedAt})
     </insert>
 
+    <update id="updateAppointmentStatus">
+        UPDATE appointments
+        SET appointment_status = #{toStatus},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = #{appointmentId}
+          AND appointment_status = #{fromStatus}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markMemberActive">
+        UPDATE appointment_members
+        SET membership_status = 'ACTIVE'
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="closeExpiredRecruitingAppointments">
+        UPDATE appointments
+        SET appointment_status = 'CLOSED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_status = 'RECRUITING'
+          AND join_deadline &lt; #{now}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="startDueClosedAppointments">
+        UPDATE appointments
+        SET appointment_status = 'IN_PROGRESS',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_status = 'CLOSED'
+          AND activity_start_at &lt;= #{now}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="updateAttendance">
+        UPDATE appointment_members
+        SET attendance_status = #{attendanceStatus},
+            attendance_confirmed_at = #{confirmedAt}
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status = 'ACTIVE'
+          AND attendance_status = 'PENDING'
+          AND deleted_at IS NULL
+    </update>
+
     <sql id="appointmentColumns">
         a.appointment_id,
         a.item_id,
@@ -217,37 +262,6 @@
           AND am.deleted_at IS NULL
     </select>
 
-    <select id="findHostSuccessorForUpdate"
-            resultType="me.nawa.appointment.domain.AppointmentMember">
-        SELECT
-            appointment_member_id,
-            appointment_id,
-            member_id,
-            trip_id,
-            membership_status,
-            attendance_status,
-            joined_at,
-            left_at,
-            attendance_confirmed_at
-        FROM appointment_members
-        WHERE appointment_id = #{appointmentId}
-          AND member_id &lt;&gt; #{hostMemberId}
-          AND membership_status = 'PENDING'
-          AND deleted_at IS NULL
-        ORDER BY joined_at ASC, appointment_member_id ASC
-        LIMIT 1
-        FOR UPDATE
-    </select>
-
-    <update id="updateHostMember">
-        UPDATE appointments
-        SET host_member_id = #{nextHostMemberId},
-            updated_at = CURRENT_TIMESTAMP
-        WHERE appointment_id = #{appointmentId}
-          AND host_member_id = #{currentHostMemberId}
-          AND deleted_at IS NULL
-    </update>
-
     <select id="findMemberByIdForUpdate"
             resultType="me.nawa.appointment.domain.AppointmentMember">
         SELECT
@@ -274,6 +288,18 @@
             updated_at = CURRENT_TIMESTAMP
         WHERE appointment_member_id = #{appointmentMemberId}
           AND membership_status IN ('PENDING', 'ACTIVE')
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="reviveLeftMember">
+        UPDATE appointment_members
+        SET membership_status = 'PENDING',
+            attendance_status = 'PENDING',
+            joined_at = CURRENT_TIMESTAMP,
+            left_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_member_id = #{appointmentMemberId}
+          AND membership_status = 'LEFT'
           AND deleted_at IS NULL
     </update>
 
@@ -304,6 +330,54 @@
           AND am.membership_status = 'ACTIVE'
           AND am.deleted_at IS NULL
         ORDER BY host DESC, am.joined_at ASC, am.appointment_member_id ASC
+    </select>
+
+    <!--
+        includeAll=false: 기존 계약 그대로 진행 중(IN_PROGRESS) 약속만, 다가오는 순.
+        includeAll=true: 취소를 제외한 전체. 예정 약속을 임박한 순으로 먼저,
+        지난 약속을 최근 순으로 뒤에. 프로필의 약속 목록이 쓴다.
+    -->
+    <select id="findMyOngoingAppointments" resultType="me.nawa.appointment.domain.MyOngoingAppointment">
+        SELECT
+            a.appointment_id,
+            a.appointment_name,
+            am.trip_id,
+            a.meeting_place,
+            a.activity_start_at,
+            a.activity_end_at,
+            a.item_id,
+            ei.item_type,
+            a.appointment_status
+        FROM appointment_members am
+                 JOIN appointments a
+                      ON a.appointment_id = am.appointment_id
+                          AND a.deleted_at IS NULL
+                 JOIN explore_items ei
+                      ON ei.item_id = a.item_id
+        WHERE am.member_id = #{memberId}
+          AND am.membership_status = 'ACTIVE'
+          AND am.trip_id IS NOT NULL
+          AND am.deleted_at IS NULL
+        <choose>
+            <when test="includeAll">
+                AND a.appointment_status != 'CANCELLED'
+                <!--
+                    예정 약속(임박한 순)을 위에, 지난 약속(최근 순)을 아래에 둔다.
+                    경계는 DB의 NOW()가 아니라 애플리케이션이 넘긴 #{now}로 가른다.
+                    DB 서버 시간대가 애플리케이션과 다르면 그 시차만큼 경계가 어긋나,
+                    지금 시각 근처의 약속이 반대쪽으로 정렬된다.
+                -->
+                ORDER BY (a.activity_start_at &lt; #{now}),
+                         CASE WHEN a.activity_start_at &gt;= #{now}
+                              THEN a.activity_start_at END ASC,
+                         a.activity_start_at DESC,
+                         a.appointment_id DESC
+            </when>
+            <otherwise>
+                AND a.appointment_status = 'IN_PROGRESS'
+                ORDER BY a.activity_start_at ASC
+            </otherwise>
+        </choose>
     </select>
 
 </mapper>

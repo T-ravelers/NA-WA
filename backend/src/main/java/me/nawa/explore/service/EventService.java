@@ -33,7 +33,7 @@ public class EventService {
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
     private static final Set<String> SORTS = Set.of(
-        "LATEST",
+        "NEWEST",
         "POPULAR",
         "ENDING_SOON"
     );
@@ -43,12 +43,6 @@ public class EventService {
         "ETC",
         "FESTIVAL",
         "EXHIBITION"
-    );
-    private static final Set<String> DATE_PRESETS = Set.of(
-        "ONGOING",
-        "OPENING_SOON",
-        "THIS_WEEKEND",
-        "THIS_MONTH"
     );
     private final EventMapper eventMapper;
 
@@ -119,29 +113,26 @@ public class EventService {
         request.setRegion1(normalizeTextValues(request.getRegion1()));
         request.setRegion2(normalizeTextValues(request.getRegion2()));
         request.setRegion3(normalizeTextValues(request.getRegion3()));
+        request.setKnownRegion2Values(
+            ExploreRegionPolicy.knownRegion2Values(request.getRegion1())
+        );
 
-        String datePreset = normalizeOptionalUppercase(request.getDatePreset());
-        if (datePreset != null && !DATE_PRESETS.contains(datePreset)) {
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-        }
-        if (datePreset != null
-            && (request.getStartDate() != null || request.getEndDate() != null)) {
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-        }
         validateDateRange(request.getStartDate(), request.getEndDate());
-        request.setDatePreset(datePreset);
 
         String sort = StringUtils.hasText(request.getSort())
             ? request.getSort().toUpperCase(Locale.ROOT)
-            : "LATEST";
+            : "NEWEST";
+        // 개명 전 프론트 번들(PWA 캐시)이 보낼 수 있는 레거시 값을 수용한다.
+        if ("LATEST".equals(sort)) {
+            sort = "NEWEST";
+        }
         if (!SORTS.contains(sort)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         request.setSort(sort);
 
-        if (!StringUtils.hasText(request.getLanguage())) {
-            request.setLanguage("en");
-        }
+        request.setLanguage(StringUtils.hasText(request.getLanguage())
+            ? request.getLanguage().trim().toLowerCase(Locale.ROOT) : "en");
     }
 
     private List<String> normalizeUppercaseValues(List<String> values) {
@@ -166,12 +157,6 @@ public class EventService {
             .toList();
     }
 
-    private String normalizeOptionalUppercase(String value) {
-        return StringUtils.hasText(value)
-            ? value.trim().toUpperCase(Locale.ROOT)
-            : null;
-    }
-
     private void validateDateRange(LocalDate startDate, LocalDate endDate) {
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
@@ -187,6 +172,15 @@ public class EventService {
 
     @Transactional(readOnly = true)
     public EventDetailResponse getEventDetail(Long eventId, String language) {
+        return getEventDetail(eventId, language, null);
+    }
+
+    @Transactional(readOnly = true)
+    public EventDetailResponse getEventDetail(
+        Long eventId,
+        String language,
+        Long memberId
+    ) {
         if (eventId == null || eventId <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
@@ -198,7 +192,8 @@ public class EventService {
 
         EventDetailResponse event = eventMapper.findEventDetail(
             eventId,
-            normalizedLanguage
+            normalizedLanguage,
+            memberId
         );
 
         if (event == null) {

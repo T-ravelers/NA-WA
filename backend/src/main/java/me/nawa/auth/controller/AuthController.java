@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.exception.AuthErrorCode;
+import me.nawa.auth.oauth.authorization.OAuthAuthorizationRedirect;
 import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.oauth.callback.OAuthCallbackResult;
 import me.nawa.auth.oauth.callback.OAuthCallbackService;
@@ -26,7 +27,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import javax.servlet.http.HttpServletRequest;
-import java.net.URI;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -43,12 +43,21 @@ public class AuthController {
             @PathVariable("provider") String provider,
             @RequestParam(name = "returnPath", required = false)
             String returnPath) {
-        URI authorizationUri = oauthAuthorizationService
-                .createAuthorizationUri(provider, returnPath);
+        OAuthAuthorizationRedirect redirect = oauthAuthorizationService
+                .createAuthorizationRedirect(provider, returnPath);
 
         return ResponseEntity
                 .status(HttpStatus.FOUND)
-                .location(authorizationUri)
+                .location(redirect.getAuthorizationUri())
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        authCookieManager
+                                .createOAuthStateCookie(
+                                        redirect.getBrowserBinding(),
+                                        redirect.getExpiresAt()
+                                )
+                                .toString()
+                )
                 .build();
     }
 
@@ -57,13 +66,17 @@ public class AuthController {
             @PathVariable("provider") String provider,
             @RequestParam(name = "state", required = false) String state,
             @RequestParam(name = "code", required = false) String code,
-            @RequestParam(name = "error", required = false) String error) {
+            @RequestParam(name = "error", required = false) String error,
+            HttpServletRequest request) {
         try {
             OAuthCallbackResult result = oauthCallbackService.handle(
                     provider,
                     state,
                     code,
-                    error
+                    error,
+                    authCookieManager
+                            .findOAuthStateBinding(request.getCookies())
+                            .orElse(null)
             );
             AuthTokens tokens = result.getTokens();
             return ResponseEntity
@@ -80,6 +93,9 @@ public class AuthController {
                                     .createRefreshTokenCookie(
                                             tokens.getRefreshToken()
                                     )
+                                    .toString(),
+                            authCookieManager
+                                    .deleteOAuthStateCookie()
                                     .toString()
                     )
                     .build();
@@ -116,6 +132,9 @@ public class AuthController {
                                 .toString(),
                         authCookieManager
                                 .deleteRefreshTokenCookie()
+                                .toString(),
+                        authCookieManager
+                                .deleteOAuthStateCookie()
                                 .toString()
                 )
                 .build();

@@ -50,6 +50,18 @@ describe('exploreApi', () => {
     expect(params.toString()).toBe('')
   })
 
+  it('keeps the UI-only datePreset out of the query string', () => {
+    const params = toSearchParams({
+      datePreset: 'THIS_WEEKEND',
+      startDate: '2026-08-22',
+      endDate: '2026-08-23',
+    })
+
+    expect(params.get('datePreset')).toBeNull()
+    expect(params.get('startDate')).toBe('2026-08-22')
+    expect(params.get('endDate')).toBe('2026-08-23')
+  })
+
   it('returns the unwrapped event list from the shared client', async () => {
     const data = {
       content: [],
@@ -61,7 +73,7 @@ describe('exploreApi', () => {
     }
     get.mockResolvedValueOnce({ data })
 
-    await expect(fetchEventList({ sort: 'LATEST' })).resolves.toEqual(data)
+    await expect(fetchEventList({ sort: 'NEWEST' })).resolves.toEqual(data)
     expect(get).toHaveBeenCalledWith('/api/v1/explore/events', {
       params: expect.any(URLSearchParams),
       responseSchema: eventListResponseSchema,
@@ -72,6 +84,7 @@ describe('exploreApi', () => {
     const params = toPlaceSearchParams({
       region1: ['Seoul'],
       region2: ['Seongsu', 'Hongdae'],
+      region2Other: true,
       sectorIds: [2],
       activityIds: [9, 10],
       placeKinds: ['RESTAURANT', 'CAFE'],
@@ -84,6 +97,7 @@ describe('exploreApi', () => {
     })
 
     expect(params.getAll('region2')).toEqual(['Seongsu', 'Hongdae'])
+    expect(params.get('region2Other')).toBe('true')
     expect(params.getAll('activityIds')).toEqual(['9', '10'])
     expect(params.getAll('placeKinds')).toEqual(['RESTAURANT', 'CAFE'])
     expect(params.get('hasParking')).toBe('true')
@@ -101,7 +115,7 @@ describe('exploreApi', () => {
     }
     get.mockResolvedValueOnce({ data })
 
-    await expect(fetchPlaceList({ sort: 'LATEST' })).resolves.toEqual({ ...data, content: [] })
+    await expect(fetchPlaceList({ sort: 'NEWEST' })).resolves.toEqual({ ...data, content: [] })
     expect(get).toHaveBeenCalledWith('/api/v1/explore/places', {
       params: expect.any(URLSearchParams),
       responseSchema: placeListResponseSchema,

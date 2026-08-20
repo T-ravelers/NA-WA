@@ -31,6 +31,7 @@ describe('placeDetail model helpers', () => {
         isActive: null,
         viewCount: 0,
         favoriteCount: 0,
+        saved: false,
         sourceUrl: null,
         postalCode: null,
         openingHours: { mon: '11:30–21:00' },

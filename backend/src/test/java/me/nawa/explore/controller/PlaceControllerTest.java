@@ -52,7 +52,8 @@ class PlaceControllerTest {
     @Test
     void searchPlaces_returnsSuccessResponse() throws Exception {
         PlaceSummaryResponse place = PlaceSummaryResponse.builder()
-            .itemId(1L).name("테스트 Place").placeKind("CAFE").build();
+            .itemId(1L).name("테스트 Place").placeKind("CAFE").saved(true)
+            .build();
         when(placeService.searchPlaces(any(), isNull()))
             .thenReturn(new PlaceListResponse(
                 List.of(place), 0, 20, 1L, 1, false
@@ -67,6 +68,8 @@ class PlaceControllerTest {
         assertTrue(body.path("success").asBoolean());
         assertEquals(1L, body.path("data").path("content").get(0)
             .path("itemId").asLong());
+        assertTrue(body.path("data").path("content").get(0)
+            .path("saved").asBoolean());
         assertFalse(body.path("data").path("content").get(0)
             .has("openingHours"));
     }
@@ -79,6 +82,7 @@ class PlaceControllerTest {
         mockMvc.perform(get("/api/v1/explore/places")
                 .param("placeKinds", "CAFE", "ETC")
                 .param("region1", "서울")
+                .param("region2Other", "true")
                 .param("sectorIds", "1", "2"))
             .andExpect(status().isOk());
 
@@ -86,11 +90,12 @@ class PlaceControllerTest {
         verify(placeService).searchPlaces(captor.capture(), isNull());
         assertEquals(List.of("CAFE", "ETC"), captor.getValue().getPlaceKinds());
         assertEquals(List.of(1L, 2L), captor.getValue().getSectorIds());
+        assertTrue(captor.getValue().getRegion2Other());
     }
 
     @Test
     void getPlaceDetail_returnsDetail() throws Exception {
-        when(placeService.getPlaceDetail(1L, "en"))
+        when(placeService.getPlaceDetail(1L, "en", null))
             .thenReturn(PlaceDetailResponse.builder()
                 .placeId(1L).itemId(1L).name("테스트 Place")
                 .activities(List.of()).build());
@@ -104,7 +109,7 @@ class PlaceControllerTest {
 
     @Test
     void getPlaceDetail_returnsExplore002_whenNotFound() throws Exception {
-        when(placeService.getPlaceDetail(1L, "en"))
+        when(placeService.getPlaceDetail(1L, "en", null))
             .thenThrow(new BusinessException(ExploreErrorCode.PLACE_NOT_FOUND));
         String response = mockMvc.perform(get("/api/v1/explore/places/1"))
             .andExpect(status().isNotFound())

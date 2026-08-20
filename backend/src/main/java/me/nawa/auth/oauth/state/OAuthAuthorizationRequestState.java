@@ -10,6 +10,7 @@ public class OAuthAuthorizationRequestState {
     private final String nonce;
     private final String codeChallenge;
     private final String codeChallengeMethod;
+    private final String browserBinding;
     private final Instant expiresAt;
 
     public OAuthAuthorizationRequestState(
@@ -17,11 +18,13 @@ public class OAuthAuthorizationRequestState {
             String nonce,
             String codeChallenge,
             String codeChallengeMethod,
+            String browserBinding,
             Instant expiresAt) {
         this.state = state;
         this.nonce = nonce;
         this.codeChallenge = codeChallenge;
         this.codeChallengeMethod = codeChallengeMethod;
+        this.browserBinding = browserBinding;
         this.expiresAt = expiresAt;
     }
 }

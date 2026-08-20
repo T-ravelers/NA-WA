@@ -2,13 +2,16 @@ package me.nawa.common.exception;
 
 import lombok.extern.log4j.Log4j2;
 import me.nawa.common.response.ApiResponse;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MultipartException;
 
 /**
  * Controller 밖으로 전달된 예외를
@@ -72,6 +75,35 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingRequestHeader() {
         return createErrorResponse(CommonErrorCode.INVALID_INPUT);
+    }
+
+    /**
+     * `@RequestParam`/`@PathVariable` 값을 선언한 타입으로 바꾸지 못했을 때
+     * 처리합니다(예: `LocalDate` 파라미터에 날짜 형식이 아닌 문자열).
+     * `MethodArgumentTypeMismatchException`이 이 타입의 하위 클래스입니다.
+     */
+    @ExceptionHandler(TypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch() {
+        return createErrorResponse(CommonErrorCode.INVALID_INPUT);
+    }
+
+    /**
+     * 필수 `@RequestParam`이 요청에 없을 때 처리합니다.
+     * `MissingServletRequestParameterException`이 이 타입의 하위 클래스입니다.
+     */
+    @ExceptionHandler(ServletRequestBindingException.class)
+    public ResponseEntity<ApiResponse<Void>> handleServletRequestBinding() {
+        return createErrorResponse(CommonErrorCode.INVALID_INPUT);
+    }
+
+    /**
+     * 업로드 파일이 상한을 넘겨 multipart 해석이 실패했을 때 처리합니다.
+     *
+     * 이 예외는 컨트롤러에 닿기 전에 나므로 전역에서만 잡을 수 있습니다.
+     */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMultipartException() {
+        return createErrorResponse(CommonErrorCode.PAYLOAD_TOO_LARGE);
     }
 
     /**

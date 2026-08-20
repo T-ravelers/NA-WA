@@ -7,6 +7,7 @@ import me.nawa.auth.oauth.OAuthProvider;
 import me.nawa.auth.oauth.account.OAuthLoginAccount;
 import me.nawa.auth.oauth.account.OAuthMemberTransactionImpl;
 import me.nawa.auth.oauth.identity.OAuthUserProfile;
+import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.member.mapper.MemberMapper;
 import me.nawa.wallet.domain.Wallet;
 import me.nawa.wallet.mapper.WalletMapper;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
@@ -37,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 단위 테스트(WalletProvisioningServiceImplTest)는 fake mapper로 호출 순서만 보므로
  * 스키마 제약·기본값·롤백은 여기서만 확인된다. V8이 시드한 KRW 통화도 함께 검증된다.
  */
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
         named = "RUN_MYSQL_INTEGRATION_TESTS",
         matches = "(?i)true"

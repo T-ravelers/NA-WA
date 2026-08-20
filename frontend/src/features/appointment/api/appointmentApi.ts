@@ -54,6 +54,10 @@ export interface AppointmentListFilters {
 export interface AppointmentCreateRequest {
   itemId: number
   itemType: AppointmentItemType
+  /** 이 약속을 확정할 여정. */
+  tripId: number
+  /** 여정 안에서 활동이 이루어지는 방문 날짜(`yyyy-MM-dd`). */
+  visitDate: string
   languageCode: AppointmentLanguage
   appointmentName: string
   maxMembers: number
@@ -61,8 +65,9 @@ export interface AppointmentCreateRequest {
   depositAmount: string
   meetingPlace: string
   meetingAddress?: string
-  activityStartAt: string
-  activityEndAt: string
+  /** `visitDate` 위에서의 시각만(`HH:mm:ss`). 날짜는 서버가 `visitDate`와 합친다. */
+  activityStartTime: string
+  activityEndTime: string
 }
 
 export interface AppointmentMember {
@@ -102,6 +107,20 @@ export interface AppointmentParticipation {
   membershipStatus: AppointmentMembershipStatus | null
   attendanceStatus: AppointmentAttendanceStatus | null
   host: boolean
+}
+
+/**
+ * `GET /api/v1/appointments/me` 응답 항목. 백엔드 `MyOngoingAppointmentResponse`와 1:1.
+ * `activityStartAt`/`activityEndAt`은 `@JsonFormat(shape = STRING)`으로 고정돼 있어
+ * 다른 약속 필드와 달리 배열 형태로 오지 않는다.
+ */
+export interface MyOngoingAppointment {
+  appointmentId: number
+  appointmentName: string
+  tripId: number
+  meetingPlace: string | null
+  activityStartAt: string
+  activityEndAt: string
 }
 
 function normalizePageResponse(response: AppointmentListResponse): AppointmentListResponse {
@@ -168,6 +187,12 @@ export async function fetchMyAppointmentParticipation(
 
 export async function cancelAppointmentParticipation(appointmentId: number): Promise<void> {
   await httpClient.delete(`${APPOINTMENT_LIST_PATH}/${appointmentId}/members/me`)
+}
+
+export async function fetchMyOngoingAppointments(): Promise<MyOngoingAppointment[]> {
+  const response = await httpClient.get<MyOngoingAppointment[]>(`${APPOINTMENT_LIST_PATH}/me`)
+
+  return response.data ?? []
 }
 
 export interface AppointmentAttendanceRequest {

@@ -37,8 +37,12 @@ public class PlaceController {
     @ApiOperation("탐색 Place 상세 조회")
     public ApiResponse<PlaceDetailResponse> getPlaceDetail(
         @PathVariable Long placeId,
-        @RequestParam(name = "language", defaultValue = "en") String language
+        @RequestParam(name = "language", defaultValue = "en") String language,
+        @AuthenticationPrincipal AuthenticatedMember member
     ) {
-        return ApiResponse.success(placeService.getPlaceDetail(placeId, language));
+        Long memberId = member == null ? null : member.getMemberId();
+        return ApiResponse.success(
+            placeService.getPlaceDetail(placeId, language, memberId)
+        );
     }
 }

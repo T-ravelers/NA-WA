@@ -15,7 +15,9 @@ vi.mock('@/features/member/model/localeSync', () => ({
 const { authGuard } = await import('../guard')
 
 function routeTo(fullPath: string, meta: RouteLocationNormalized['meta']): RouteLocationNormalized {
-  return { fullPath, meta } as RouteLocationNormalized
+  const [path] = fullPath.split('?')
+
+  return { fullPath, path, meta } as RouteLocationNormalized
 }
 
 const from = routeTo('/', {})
@@ -110,6 +112,71 @@ describe('authGuard', () => {
   it('does not block navigation when locale sync fails', async () => {
     ensureMemberProfile.mockResolvedValue({ memberId: 1, preferredLanguage: 'vi' })
     syncLocaleWithProfile.mockRejectedValue(new Error('offline'))
+
+    const result = await authGuard(routeTo('/wallet', { requiresAuth: true }), from, next)
+
+    expect(result).toBe(true)
+  })
+
+  it('keeps a merchant account inside the merchant screen', async () => {
+    ensureMemberProfile.mockResolvedValue({
+      memberId: 1,
+      preferredLanguage: 'en',
+      accountType: 'MERCHANT',
+    })
+
+    const result = await authGuard(routeTo('/wallet', { requiresAuth: true }), from, next)
+
+    expect(result).toEqual({ path: '/merchant' })
+  })
+
+  it('lets a merchant account through its own screen', async () => {
+    ensureMemberProfile.mockResolvedValue({
+      memberId: 1,
+      preferredLanguage: 'en',
+      accountType: 'MERCHANT',
+    })
+
+    const result = await authGuard(routeTo('/merchant', { requiresAuth: true }), from, next)
+
+    expect(result).toBe(true)
+  })
+
+  // 소셜 로그인은 계정을 항상 TRAVELER로 만든다. 등록 전 가맹점주가 여기서 막히면 가입이 끊긴다.
+  it('lets a not-yet-registered account reach the merchant screen', async () => {
+    ensureMemberProfile.mockResolvedValue({
+      memberId: 1,
+      preferredLanguage: 'en',
+      accountType: 'TRAVELER',
+    })
+
+    const result = await authGuard(routeTo('/merchant', { requiresAuth: true }), from, next)
+
+    expect(result).toBe(true)
+  })
+
+  it('does not treat a neighbouring path as the merchant screen', async () => {
+    ensureMemberProfile.mockResolvedValue({
+      memberId: 1,
+      preferredLanguage: 'en',
+      accountType: 'MERCHANT',
+    })
+
+    const result = await authGuard(
+      routeTo('/merchant-settings', { requiresAuth: true }),
+      from,
+      next,
+    )
+
+    expect(result).toEqual({ path: '/merchant' })
+  })
+
+  it('does not redirect a traveller away from customer screens', async () => {
+    ensureMemberProfile.mockResolvedValue({
+      memberId: 1,
+      preferredLanguage: 'en',
+      accountType: 'TRAVELER',
+    })
 
     const result = await authGuard(routeTo('/wallet', { requiresAuth: true }), from, next)
 

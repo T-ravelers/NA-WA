@@ -1,23 +1,33 @@
 package me.nawa.explore.mapper;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.util.List;
+import java.util.UUID;
+import me.nawa.config.MySqlSchemaExtension;
+import me.nawa.explore.dto.request.PlaceSearchRequest;
 import me.nawa.explore.dto.response.PlaceDetailResponse;
+import me.nawa.explore.dto.response.PlaceSummaryResponse;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
     named = "RUN_MYSQL_INTEGRATION_TESTS",
     matches = "(?i)true"
@@ -27,6 +37,7 @@ class PlaceMapperIntegrationTest {
     private static HikariDataSource dataSource;
     private static PlaceMapper mapper;
     private static JdbcTemplate jdbcTemplate;
+    private static TransactionTemplate transactionTemplate;
 
     @BeforeAll
     static void setUpDatabase() throws Exception {
@@ -61,6 +72,9 @@ class PlaceMapperIntegrationTest {
         }
         mapper = new SqlSessionTemplate(sqlSessionFactory)
             .getMapper(PlaceMapper.class);
+        transactionTemplate = new TransactionTemplate(
+            new DataSourceTransactionManager(dataSource)
+        );
     }
 
     @AfterAll
@@ -96,7 +110,10 @@ class PlaceMapperIntegrationTest {
             "A public active Place with JSON values is required"
         );
 
-        PlaceDetailResponse result = mapper.findPlaceDetail(placeIds.get(0));
+        PlaceDetailResponse result = mapper.findPlaceDetail(
+            placeIds.get(0),
+            null
+        );
 
         assertNotNull(result);
         assertNotNull(result.getPlaceKind());
@@ -106,6 +123,60 @@ class PlaceMapperIntegrationTest {
         assertTrue(result.getOpeningHours().isObject());
         assertNotNull(result.getClosedDays());
         assertTrue(result.getClosedDays().isArray());
+    }
+
+    /** rollback-only 트랜잭션에서 fixture를 만들어 데이터가 남지 않는다. */
+    @Test
+    void savedColumn_marksOnlyRequestingMembersLikes() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            String name = "찜 플래그 테스트 " + UUID.randomUUID();
+
+            jdbcTemplate.update(
+                "INSERT INTO members (display_name) VALUES ('찜 플래그 테스트 회원')"
+            );
+            Long memberId = jdbcTemplate.queryForObject(
+                "SELECT LAST_INSERT_ID()", Long.class
+            );
+            jdbcTemplate.update(
+                "INSERT INTO explore_items "
+                    + "(item_type, approval_status, visibility_status, "
+                    + "reviewed_by, reviewed_at) "
+                    + "VALUES ('PLACE', 'APPROVED', 'VISIBLE', ?, "
+                    + "CURRENT_TIMESTAMP)",
+                memberId
+            );
+            Long itemId = jdbcTemplate.queryForObject(
+                "SELECT LAST_INSERT_ID()", Long.class
+            );
+            jdbcTemplate.update(
+                "INSERT INTO place (place_id, name) VALUES (?, ?)",
+                itemId, name
+            );
+            jdbcTemplate.update(
+                "INSERT INTO explore_item_likes (item_id, member_id) "
+                    + "VALUES (?, ?)",
+                itemId, memberId
+            );
+
+            PlaceSearchRequest request = new PlaceSearchRequest();
+            request.setKeyword(name);
+
+            List<PlaceSummaryResponse> memberResults = mapper.searchPlaces(
+                request, 0, 20, memberId
+            );
+            assertEquals(1, memberResults.size());
+            assertTrue(memberResults.get(0).isSaved());
+
+            List<PlaceSummaryResponse> anonymousResults = mapper.searchPlaces(
+                request, 0, 20, null
+            );
+            assertEquals(1, anonymousResults.size());
+            assertFalse(anonymousResults.get(0).isSaved());
+
+            assertTrue(mapper.findPlaceDetail(itemId, memberId).isSaved());
+            assertFalse(mapper.findPlaceDetail(itemId, null).isSaved());
+        });
     }
 
     private static String requiredEnvironment(String name) {

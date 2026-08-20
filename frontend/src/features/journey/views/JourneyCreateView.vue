@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import JourneyCreateForm from '../components/JourneyCreateForm.vue'
 import { createJourney, type JourneyCreateInput } from '../api/journeyApi'
@@ -11,14 +11,43 @@ import { journeyKeys } from '../model/journeyQueries'
 
 const i18n = useI18n()
 const { t } = i18n
+const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
 const hasMessage = (key: string): boolean => i18n.te(key)
+
+/**
+ * 다른 화면이 여정이 없어 이 화면으로 보낸 경우, 생성 후 그 화면으로 돌아간다.
+ *
+ * `returnRouteName`은 임의의 route 이름 문자열이라 이 feature가 호출자를 알 필요가
+ * 없다. 나머지 query(예: appointment-create의 itemId·itemType)는 그대로 들고
+ * 돌아가고, 새로 만든 tripId만 더한다.
+ */
+function returnRouteName(): string | null {
+  const value = route.query.returnRouteName
+  return typeof value === 'string' && value !== '' ? value : null
+}
 
 const createMutation = useMutation({
   mutationFn: createJourney,
   onSuccess: async (journey) => {
     queryClient.setQueryData(journeyKeys.detail(journey.tripId), journey)
+    // 여정 목록 쿼리(다른 feature의 journeyKeys.list()도 같은 'journeys' 루트를
+    // 쓴다)를 무효화한다. 안 하면 30초 staleTime 안에 목록을 다시 조회할 때
+    // (예: 약속 생성의 여정 선택 시트) 방금 만든 여정이 안 보인다.
+    await queryClient.invalidateQueries({ queryKey: journeyKeys.all })
+
+    const returnTo = returnRouteName()
+    if (returnTo !== null) {
+      const restQuery = { ...route.query }
+      delete restQuery.returnRouteName
+      await router.push({
+        name: returnTo,
+        query: { ...restQuery, tripId: String(journey.tripId) },
+      })
+      return
+    }
+
     await router.push({ name: 'journey-detail', params: { tripId: journey.tripId } })
   },
 })

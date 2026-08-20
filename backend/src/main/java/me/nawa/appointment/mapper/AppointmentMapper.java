@@ -2,10 +2,14 @@ package me.nawa.appointment.mapper;
 
 import me.nawa.appointment.domain.Appointment;
 import me.nawa.appointment.domain.AppointmentMember;
+import me.nawa.appointment.domain.AppointmentStatus;
+import me.nawa.appointment.domain.MyOngoingAppointment;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
+import me.nawa.deposit.domain.AttendanceStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -16,6 +20,32 @@ public interface AppointmentMapper {
     int insertAppointment(Appointment appointment);
 
     int insertAppointmentMember(AppointmentMember appointmentMember);
+
+    // fromStatus 조건이 안 맞으면 0행을 반환한다 — 낙관적 상태 전이 가드.
+    int updateAppointmentStatus(
+            @Param("appointmentId") Long appointmentId,
+            @Param("fromStatus") AppointmentStatus fromStatus,
+            @Param("toStatus") AppointmentStatus toStatus
+    );
+
+    int markMemberActive(
+            @Param("appointmentMemberId") Long appointmentMemberId
+    );
+
+    // 참여 마감 시각이 지난 RECRUITING 약속을 일괄로 CLOSED로 전환한다.
+    // 정원이 차서 CLOSED가 되는 경로는 시간과 무관해 joinAppointment가 동기로
+    // 처리하므로 여기서 다루지 않는다.
+    //
+    // 비교 기준 시각은 DB의 CURRENT_TIMESTAMP가 아니라 애플리케이션이 넘긴
+    // now를 쓴다. join_deadline·activity_start_at은 모두 애플리케이션의
+    // LocalDateTime.now() 기준으로 저장되는데, DB 서버 컨테이너의 시간대가
+    // 애플리케이션(TZ=Asia/Seoul)과 다르면 CURRENT_TIMESTAMP가 그만큼 어긋나
+    // 마감·시작 전환이 실제보다 늦게(또는 빠르게) 일어난다.
+    int closeExpiredRecruitingAppointments(@Param("now") LocalDateTime now);
+
+    // 활동 시작 시각이 된 CLOSED 약속을 일괄로 IN_PROGRESS로 전환한다.
+    // now를 넘기는 이유는 closeExpiredRecruitingAppointments와 같다.
+    int startDueClosedAppointments(@Param("now") LocalDateTime now);
 
     List<Appointment> searchAppointments(
             @Param("request") AppointmentSearchRequest request,
@@ -44,17 +74,6 @@ public interface AppointmentMapper {
             @Param("memberId") Long memberId
     );
 
-    AppointmentMember findHostSuccessorForUpdate(
-            @Param("appointmentId") Long appointmentId,
-            @Param("hostMemberId") Long hostMemberId
-    );
-
-    int updateHostMember(
-            @Param("appointmentId") Long appointmentId,
-            @Param("currentHostMemberId") Long currentHostMemberId,
-            @Param("nextHostMemberId") Long nextHostMemberId
-    );
-
     AppointmentMember findMemberByIdForUpdate(
             @Param("appointmentId") Long appointmentId,
             @Param("appointmentMemberId") Long appointmentMemberId
@@ -64,8 +83,32 @@ public interface AppointmentMapper {
             @Param("appointmentMemberId") Long appointmentMemberId
     );
 
+    // 참여 취소(LEFT) 후 재참여를 위해 기존 행을 되돌린다. appointment_id·
+    // member_id UNIQUE 제약 때문에 재참여 시 새 행을 만들 수 없어 재활용한다.
+    int reviveLeftMember(
+            @Param("appointmentMemberId") Long appointmentMemberId
+    );
+
     List<AppointmentMember> findActiveMembersByAppointmentId(
             @Param("appointmentId") Long appointmentId
     );
 
+    // includeAll=true의 예정/지난 분류 기준도 DB의 NOW()가 아니라 애플리케이션이 넘긴
+    // now를 쓴다. 이유는 closeExpiredRecruitingAppointments와 같다 — activity_start_at은
+    // 애플리케이션의 LocalDateTime.now() 기준으로 저장되는데, DB 서버 컨테이너의 시간대가
+    // 애플리케이션(TZ=Asia/Seoul)과 다르면 그 시차만큼 경계가 어긋나 지금 시각 근처의
+    // 약속이 예정/지난 반대쪽으로 정렬된다.
+    List<MyOngoingAppointment> findMyOngoingAppointments(
+        @Param("memberId") Long memberId,
+        @Param("includeAll") boolean includeAll,
+        @Param("now") LocalDateTime now
+    );
+
+    // ACTIVE·PENDING(출석 미확정) 회원만 대상으로 한다 — 출석 확정은 한 번만
+    // 허용하는 낙관적 상태 전이 가드.
+    int updateAttendance(
+            @Param("appointmentMemberId") Long appointmentMemberId,
+            @Param("attendanceStatus") AttendanceStatus attendanceStatus,
+            @Param("confirmedAt") LocalDateTime confirmedAt
+    );
 }

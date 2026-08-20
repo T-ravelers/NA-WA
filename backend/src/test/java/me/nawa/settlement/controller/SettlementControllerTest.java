@@ -174,8 +174,12 @@ class SettlementControllerTest {
         assertEquals("PAY", viewer.path("allowedActions").path(0).asText());
     }
 
+    /**
+     * 이 컨트롤러가 다루는 경로는 다섯 개뿐이다. 영수증 업로드·조회는
+     * SettlementReceiptController가 따로 맡으므로 여기에 늘어나지 않는다.
+     */
     @Test
-    void settlementEndpoints_exposesOnlyFiveSupportedPaths() throws Exception {
+    void settlementController_exposesOnlyFiveSupportedPaths() throws Exception {
         mockMvc.perform(get("/api/v1/settlements"))
             .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/settlements/candidates"))

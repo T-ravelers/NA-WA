@@ -7,6 +7,7 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 
 import { PLACE_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
+import { SEOUL_REGION1, SEOUL_REGION2_OPTIONS } from '../model/exploreRegions'
 import type { PlaceSearchFilters, PlaceSort } from '../model/placeExplore'
 import type { PlaceSheetKind } from './PlaceFilterBar.vue'
 
@@ -25,6 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const REGION2_OTHER = '__OTHER_REGION2__'
 
 const SHEET_TITLES: Record<PlaceSheetKind, string> = {
   region: 'explore.placeSheets.region',
@@ -36,8 +38,12 @@ const SHEET_TITLES: Record<PlaceSheetKind, string> = {
 const REGION_OPTIONS = [
   {
     labelKey: 'explore.regions.seoul',
-    value: 'Seoul',
-    areas: ['Seongsu', 'Gangnam', 'Seocho', 'Apgujeong·Dosan', 'Cheongdam'],
+    value: SEOUL_REGION1,
+    areas: [
+      { labelKey: 'explore.areas.allSeoul', apiValue: '__ALL_SEOUL__' },
+      ...SEOUL_REGION2_OPTIONS,
+      { labelKey: 'explore.areas.other', apiValue: REGION2_OTHER },
+    ],
   },
   {
     labelKey: 'explore.regions.gyeonggi',
@@ -98,14 +104,14 @@ const PLACE_OPTIONS: Array<{ key: PlaceOptionKey; labelKey: string }> = [
 ]
 
 const draft = reactive<PlaceSearchFilters>(cloneFilters(props.filters))
-const selectedRegion = ref(props.filters.region1?.[0] ?? 'Seoul')
-const expandedCategories = ref<string[]>(['explore.categories.food'])
+const selectedRegion = ref(SEOUL_REGION1)
+const expandedCategories = ref<string[]>(['explore.categories.beauty'])
 
 watch(
   () => props.filters,
   (filters) => {
     Object.assign(draft, cloneFilters(filters))
-    selectedRegion.value = filters.region1?.[0] ?? 'Seoul'
+    selectedRegion.value = SEOUL_REGION1
   },
   { deep: true },
 )
@@ -114,9 +120,7 @@ watch(draft, (filters) => emit('change', cloneFilters(filters)), { deep: true })
 
 const selectedSectors = computed(() => new Set(draft.sectorIds ?? []))
 const selectedActivities = computed(() => new Set(draft.activityIds ?? []))
-const currentRegion = computed(
-  () => REGION_OPTIONS.find((region) => region.value === selectedRegion.value) ?? REGION_OPTIONS[0],
-)
+const currentRegion = computed(() => REGION_OPTIONS[0])
 const selectedAreas = computed(() => new Set(draft.region2 ?? []))
 
 function cloneFilters(filters: PlaceSearchFilters): PlaceSearchFilters {
@@ -125,7 +129,7 @@ function cloneFilters(filters: PlaceSearchFilters): PlaceSearchFilters {
     sectorIds: filters.sectorIds ? [...filters.sectorIds] : undefined,
     activityIds: filters.activityIds ? [...filters.activityIds] : undefined,
     placeKinds: filters.placeKinds ? [...filters.placeKinds] : undefined,
-    region1: filters.region1 ? [...filters.region1] : undefined,
+    region1: filters.region1 ? [...filters.region1] : [SEOUL_REGION1],
     region2: filters.region2 ? [...filters.region2] : undefined,
   }
 }
@@ -134,9 +138,21 @@ function selectRegion(value: string): void {
   selectedRegion.value = value
   draft.region1 = [value]
   draft.region2 = undefined
+  draft.region2Other = undefined
 }
 
 function toggleArea(value: string): void {
+  if (value === REGION2_OTHER) {
+    draft.region2Other = !draft.region2Other
+    return
+  }
+
+  if (value === '__ALL_SEOUL__') {
+    draft.region2 = undefined
+    draft.region2Other = undefined
+    return
+  }
+
   const current = new Set(draft.region2 ?? [])
   if (current.has(value)) current.delete(value)
   else current.add(value)
@@ -183,6 +199,12 @@ function toggleActivity(sectorId: number, activityId: number): void {
   else activityIds.add(activityId)
   sectorIds.delete(sectorId)
 
+  const sector = PLACE_SECTOR_OPTIONS.find((option) => option.id === sectorId)
+  if (sector?.activities.every((activity) => activityIds.has(activity.id))) {
+    sector.activities.forEach((activity) => activityIds.delete(activity.id))
+    sectorIds.add(sectorId)
+  }
+
   draft.sectorIds = sectorIds.size > 0 ? [...sectorIds] : undefined
   draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
 }
@@ -199,8 +221,9 @@ function toggleOption(key: PlaceOptionKey): void {
 
 function resetSheet(): void {
   if (props.kind === 'region') {
-    draft.region1 = undefined
+    draft.region1 = [SEOUL_REGION1]
     draft.region2 = undefined
+    draft.region2Other = undefined
     selectedRegion.value = REGION_OPTIONS[0].value
   } else if (props.kind === 'category') {
     draft.sectorIds = undefined
@@ -208,7 +231,7 @@ function resetSheet(): void {
   } else if (props.kind === 'options') {
     PLACE_OPTIONS.forEach(({ key }) => (draft[key] = undefined))
   } else {
-    draft.sort = 'LATEST'
+    draft.sort = 'POPULAR'
     draft.savedOnly = undefined
   }
 }
@@ -256,7 +279,7 @@ function apply(): void {
           <div class="grid min-h-80 grid-cols-[112px_1fr] border-y border-hairline">
             <div class="border-r border-hairline">
               <button
-                v-for="region in REGION_OPTIONS"
+                v-for="region in REGION_OPTIONS.slice(0, 1)"
                 :key="region.value"
                 type="button"
                 class="flex w-full items-center justify-between px-1 py-3 text-left text-body-sm"
@@ -269,23 +292,41 @@ function apply(): void {
             <div class="flex flex-col gap-1 p-2">
               <button
                 v-for="area in currentRegion.areas"
-                :key="area"
+                :key="area.apiValue"
                 type="button"
                 class="flex min-h-11 items-center justify-between rounded-sm px-3 text-left text-body-sm"
-                :class="isAreaSelected(area) ? 'text-ink' : 'text-ink-2'"
-                @click="toggleArea(area)"
+                :class="
+                  (area.apiValue === '__ALL_SEOUL__' &&
+                    selectedAreas.size === 0 &&
+                    !draft.region2Other) ||
+                  isAreaSelected(area.apiValue) ||
+                  (area.apiValue === REGION2_OTHER && draft.region2Other)
+                    ? 'text-ink'
+                    : 'text-ink-2'
+                "
+                @click="toggleArea(area.apiValue)"
               >
-                {{ area }}
+                {{ t(area.labelKey) }}
                 <span
                   class="flex size-6 items-center justify-center rounded-xs"
                   :class="
-                    isAreaSelected(area)
+                    (area.apiValue === '__ALL_SEOUL__' &&
+                      selectedAreas.size === 0 &&
+                      !draft.region2Other) ||
+                    isAreaSelected(area.apiValue) ||
+                    (area.apiValue === REGION2_OTHER && draft.region2Other)
                       ? 'bg-paper-fill text-on-paper'
                       : 'border border-hairline-2'
                   "
                 >
                   <IconCheck
-                    v-if="isAreaSelected(area)"
+                    v-if="
+                      (area.apiValue === '__ALL_SEOUL__' &&
+                        selectedAreas.size === 0 &&
+                        !draft.region2Other) ||
+                      isAreaSelected(area.apiValue) ||
+                      (area.apiValue === REGION2_OTHER && draft.region2Other)
+                    "
                     :size="15"
                     :stroke-width="2.5"
                     aria-hidden="true"
@@ -407,11 +448,11 @@ function apply(): void {
             <button
               v-for="sortOption in [
                 {
-                  value: 'LATEST',
-                  labelKey: 'explore.sort.latest',
+                  value: 'POPULAR',
+                  labelKey: 'explore.sort.popular',
                   hintKey: 'explore.sort.defaultHint',
                 },
-                { value: 'POPULAR', labelKey: 'explore.sort.popular', hintKey: '' },
+                { value: 'NEWEST', labelKey: 'explore.sort.newest', hintKey: '' },
               ]"
               :key="sortOption.value"
               type="button"

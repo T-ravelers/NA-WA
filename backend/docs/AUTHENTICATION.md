@@ -9,7 +9,7 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 | 단계        | 요청                                                            | 결과                                           |
 | ----------- | --------------------------------------------------------------- | ---------------------------------------------- |
 | CSRF 준비   | `GET /api/v1/auth/csrf`                                         | CSRF 쿠키와 요청 헤더 이름 반환                |
-| 로그인 시작 | `GET /api/v1/auth/oauth2/authorization/{provider}?returnPath=/` | Google 또는 LINE으로 `302` 이동                |
+| 로그인 시작 | `GET /api/v1/auth/oauth2/authorization/{provider}?returnPath=/` | 상태 쿠키 발급 후 Google 또는 LINE으로 `302` 이동 |
 | 공급자 콜백 | `GET /api/v1/auth/oauth2/callback/{provider}`                   | 자체 토큰 쿠키 발급 후 프런트엔드로 `302` 이동 |
 | 로그인 확인 | `GET /api/v1/members/me`                                        | 현재 회원 정보와 `onboardingRequired` 반환     |
 | 토큰 갱신   | `POST /api/v1/auth/refresh`                                     | access·refresh 쿠키 교체                       |
@@ -18,6 +18,27 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 `provider`는 `google` 또는 `line`만 허용합니다. 성공·실패 리다이렉트 URL에는
 토큰이나 개인정보를 넣지 않습니다. 실패 시에는 프런트엔드가 처리할 안정적인
 `error` 코드만 전달합니다.
+
+### 로그인을 시작한 브라우저에서만 콜백을 완료할 수 있습니다
+
+`GET /api/v1/auth/oauth2/authorization/{provider}`는 공급자로 보내기 전에 난수를
+하나 만들어 `oauth_state` 쿠키로 브라우저에 심고, 그 SHA-256 해시를 Redis의 state
+세션에 함께 저장합니다. 쿠키는 HttpOnly이며 `Path=/api/v1/auth`, `Max-Age`는 state
+TTL(기본 600초)과 같습니다.
+
+**이 쿠키만 `SameSite=Lax`로 고정합니다.** 공급자 콜백은 외부 사이트에서 오는
+top-level 이동이라 `AUTH_COOKIE_SAME_SITE=Strict`로 운영하면 쿠키가 실려 오지 않고
+모든 로그인이 실패합니다. access·refresh 쿠키는 설정값을 그대로 씁니다.
+
+`GET /api/v1/auth/oauth2/callback/{provider}`는 이 쿠키 값을 다시 해시해 저장된
+해시와 상수 시간으로 비교합니다. 쿠키가 없거나 값이 다르면 공급자와 통신하기 전에
+`AUTH-014`로 거부합니다. state는 조회와 동시에 Redis에서 삭제되므로 검증에 실패해도
+같은 state를 다시 쓸 수 없습니다. 성공·실패·만료 세 경로 모두 응답에서 `oauth_state`
+쿠키를 삭제합니다.
+
+쿠키 이름은 `AUTH_OAUTH_STATE_COOKIE_NAME`으로 바꿀 수 있고 기본값은 `oauth_state`
+입니다. 브라우저마다 쿠키가 하나이므로 **탭 두 개에서 동시에 로그인을 시작하면
+나중에 시작한 쪽만 완료됩니다.**
 
 ### 토큰 갱신은 현재 회원 상태를 다시 확인합니다
 
@@ -67,6 +88,7 @@ token을 발급하지 않지만, 확인되지 않은 Redis 세션까지 폐기�
     "memberId": 1,
     "displayName": "여행자",
     "profileImageUrl": null,
+    "nationalityCode": null,
     "preferredLanguage": "en",
     "preferredCurrencyCode": null,
     "onboardingRequired": true
@@ -74,12 +96,26 @@ token을 발급하지 않지만, 확인되지 않은 Redis 세션까지 폐기�
 }
 ```
 
-`PATCH /api/v1/members/me`는 같은 형태의 응답을 반환하며 `preferredLanguage`와
-`preferredCurrencyCode`만 부분 수정합니다. 필드를 아예 보내지 않는 것과 값에
-`null`을 보내는 것은 모두 "변경하지 않음"으로 취급하며, 두 필드 모두 없으면
-`MEMBER-004`를 반환합니다. 지원 언어는 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며
-이 백엔드 allow-list가 정본입니다(한국어는 서비스 locale이 아닙니다). 목록에
-없는 언어는 `MEMBER-002`, 활성 통화 코드가 아니면 `MEMBER-003`을 반환합니다.
+`PATCH /api/v1/members/me`는 같은 형태의 응답을 반환하며 `displayName`·
+`profileImageUrl`·`nationalityCode`·`preferredLanguage`·`preferredCurrencyCode`를
+부분 수정합니다. 필드를 아예 보내지 않는 것과 값에 `null`을 보내는 것은 모두
+"변경하지 않음"으로 취급하며, 모든 필드가 없으면 `MEMBER-004`를 반환합니다.
+지원 언어는 `en`, `ja`, `zh-TW`, `vi`이며 이 백엔드 allow-list가 정본입니다
+(한국어는 서비스 locale이 아닙니다). 목록에 없는 언어는 `MEMBER-002`, 활성 통화
+코드가 아니면 `MEMBER-003`, ISO 3166-1 alpha-2가 아닌 국적은 `MEMBER-005`를
+반환합니다. 국적은 대소문자를 가리지 않고 받아 대문자로 저장합니다. 표시 이름
+길이는 code point 기준 50자입니다. 프로필 이미지는 `http`·`https` URL만 받습니다 —
+이 값은 다른 회원 화면에 이미지로 렌더되므로 그 밖의 스킴은 `MEMBER-007`로
+거부합니다.
+
+`PATCH /api/v1/members/me/onboarding`은 온보딩 프로필을 저장하고 완료를
+기록합니다. `displayName`·`nationalityCode`·`preferredLanguage`·
+`preferredCurrencyCode` 네 필드가 모두 필수이며 하나라도 없으면 `MEMBER-008`을
+반환합니다. 성공 시 `onboarding_completed_at`이 기록되어 이후 응답의
+`onboardingRequired`가 `false`가 됩니다. 재호출은 값만 갱신하고 완료 시각은
+최초 값을 유지합니다(멱등). 검증 규칙과 오류 코드는 `PATCH /me`와 같습니다.
+서버는 온보딩 미완료 회원의 다른 업무 API를 차단하지 않습니다 — 미완료 회원의
+화면 진입 통제는 프런트엔드 라우터 guard가 담당합니다.
 
 access token이 없거나 유효하지 않으면 `AUTH-003`, 정지 회원은 `AUTH-016`,
 탈퇴 또는 삭제 회원은 `AUTH-017`을 반환합니다. 회원을 찾을 수 없으면
@@ -92,6 +128,7 @@ access token이 없거나 유효하지 않으면 `AUTH-003`, 정지 회원은 `A
 - 같은 이메일이라는 이유만으로 서로 다른 소셜 계정을 자동 병합하지 않습니다.
 - Redis에는 `state`와 refresh token 세션만 TTL과 함께 저장합니다. Redis 데이터는
   재생성 가능한 인증 상태이며 회원 원본으로 사용하지 않습니다.
+- `state` 세션에는 브라우저 상태 쿠키의 원본이 아니라 SHA-256 해시만 넣습니다.
 - access token은 짧게 유지하고, refresh token은 회전시킵니다. 재사용이 감지되면
   해당 세션을 폐기합니다.
 
@@ -149,13 +186,16 @@ Tomcat을 재시작하고 브라우저의 네트워크 탭을 연 뒤 Google과 
 
 1. `/api/v1/auth/oauth2/authorization/google?returnPath=/` 또는 `line` 경로를 엽니다.
 2. 공급자 동의 후 프런트엔드 콜백으로 돌아오며 URL에 토큰·이메일이 없는지 봅니다.
-3. `access_token`과 `refresh_token`이 HttpOnly 쿠키로 저장됐는지 확인합니다.
+3. `access_token`과 `refresh_token`이 HttpOnly 쿠키로 저장되고 `oauth_state` 쿠키가
+   삭제됐는지 확인합니다.
 4. `GET /api/v1/members/me`가 `200`과 회원 정보를 반환하는지 확인합니다.
 5. `POST /api/v1/auth/refresh` 후 두 쿠키가 교체되는지 확인합니다.
 6. `POST /api/v1/auth/logout` 후 두 쿠키가 삭제되고, 다시
    `GET /api/v1/members/me`를 호출하면 `401 AUTH-003`인지 확인합니다.
 7. MySQL에서 동일 `(provider, provider_user_id)`로 회원과 소셜 계정이 중복 생성되지
    않았는지 확인합니다.
+8. 로그인을 시작한 뒤 공급자 화면에 머문 상태로 `oauth_state` 쿠키를 지우고 동의를
+   마칩니다. 프런트엔드 실패 URL로 `error=AUTH-014`가 오는지 확인합니다.
 
 Swagger UI는 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있습니다.
 OAuth 콜백은 브라우저 리다이렉트 API이므로 Swagger에서 공급자 로그인을 끝까지

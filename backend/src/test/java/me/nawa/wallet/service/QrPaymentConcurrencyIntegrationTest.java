@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.wallet.domain.enums.SpendingScope;
 import me.nawa.wallet.dto.request.QrPaymentExecuteRequest;
 import me.nawa.wallet.dto.response.QrPaymentExecuteResponse;
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
@@ -59,6 +61,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 실제 잠금·트랜잭션 격리 수준 문제(갭 락 교착, 스냅샷 가시성)는 재현하지 못한다. 여기서는
  * 두 스레드가 각자의 트랜잭션(각자의 커넥션)으로 진짜 동시에 executePayment를 호출해 검증한다.
  */
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
     named = "RUN_MYSQL_INTEGRATION_TESTS",
     matches = "(?i)true"
@@ -201,7 +204,7 @@ class QrPaymentConcurrencyIntegrationTest {
 
         String idempotencyKey = "concurrency-idem-" + UUID.randomUUID();
         QrPaymentExecuteRequest request =
-            new QrPaymentExecuteRequest(qrToken, null, SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(qrToken, null, SpendingScope.PERSONAL, null, null);
 
         Callable<QrPaymentExecuteResponse> attempt = () -> transactionTemplate.execute(
             status -> qrPaymentService.executePayment(payerMemberId, idempotencyKey, request)
@@ -270,9 +273,9 @@ class QrPaymentConcurrencyIntegrationTest {
 
         String idempotencyKey = "concurrency-idem-" + UUID.randomUUID();
         QrPaymentExecuteRequest requestA =
-            new QrPaymentExecuteRequest(qrTokenA, null, SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(qrTokenA, null, SpendingScope.PERSONAL, null, null);
         QrPaymentExecuteRequest requestB =
-            new QrPaymentExecuteRequest(qrTokenB, null, SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(qrTokenB, null, SpendingScope.PERSONAL, null, null);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
@@ -342,9 +345,9 @@ class QrPaymentConcurrencyIntegrationTest {
         createActiveQr(qrTokenB, payeeWalletId2, new BigDecimal("15000.0000"));
 
         QrPaymentExecuteRequest requestA =
-            new QrPaymentExecuteRequest(qrTokenA, null, SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(qrTokenA, null, SpendingScope.PERSONAL, null, null);
         QrPaymentExecuteRequest requestB =
-            new QrPaymentExecuteRequest(qrTokenB, null, SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(qrTokenB, null, SpendingScope.PERSONAL, null, null);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         QrPaymentExecuteResponse responseA;

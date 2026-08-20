@@ -487,6 +487,7 @@ class SecurityConfigTest {
             return new AuthCookieManager(
                     "access_token",
                     "refresh_token",
+                    "oauth_state",
                     false,
                     "Lax",
                     ""

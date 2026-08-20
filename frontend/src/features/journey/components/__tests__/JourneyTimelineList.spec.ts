@@ -12,39 +12,81 @@ function createRouterStub() {
     history: createMemoryHistory(),
     routes: [
       { path: '/explore', name: 'explore', component: { template: '<div>Explore</div>' } },
+      {
+        path: '/explore/events/:eventId',
+        name: 'explore-event-detail',
+        component: { template: '<div />' },
+      },
+      {
+        path: '/explore/places/:placeId',
+        name: 'explore-place-detail',
+        component: { template: '<div />' },
+      },
+      { path: '/appointments', name: 'appointment-list', component: { template: '<div />' } },
+      {
+        path: '/appointments/:appointmentId',
+        name: 'appointment-detail',
+        component: { template: '<div />' },
+      },
       { path: '/journeys/:tripId', name: 'journey-detail', component: { template: '<div />' } },
     ],
   })
 }
 
-function dayWithItem(visitDate: string, title: string): JourneyTimelineDay {
+type TimelineItem = JourneyTimelineDay['items'][number]
+
+interface ItemOverrides extends Partial<Omit<TimelineItem, 'exploreItem'>> {
+  exploreItem?: Partial<TimelineItem['exploreItem']>
+}
+
+function makeItem(title: string, overrides: ItemOverrides = {}): TimelineItem {
+  const { exploreItem, ...rest } = overrides
+
   return {
-    visitDate,
-    items: [
-      {
-        tripItemId: 1,
-        itemId: 11,
-        status: 'ADDED',
-        displayOrder: 0,
-        note: null,
-        exploreItem: {
-          itemType: 'EVENT',
-          title,
-          thumbnailUrl: null,
-          imageUrls: [],
-          location: {
-            region1: 'Seoul',
-            region2: null,
-            region3: null,
-            addressRoad: null,
-            addressDetail: null,
-            latitude: null,
-            longitude: null,
-          },
-        },
+    tripItemId: 1,
+    itemId: 11,
+    status: 'ADDED',
+    displayOrder: 0,
+    note: null,
+    ...rest,
+    exploreItem: {
+      itemType: 'EVENT',
+      title,
+      thumbnailUrl: null,
+      imageUrls: [],
+      location: {
+        region1: 'Seoul',
+        region2: null,
+        region3: null,
+        addressRoad: null,
+        addressDetail: null,
+        latitude: null,
+        longitude: null,
       },
-    ],
+      ...exploreItem,
+    },
   }
+}
+
+/** 확정 항목은 약속을 갖는다. `appointmentId`는 #189가 응답에 추가한 필드다. */
+function confirmedItem(title: string, appointmentId: number | undefined): TimelineItem {
+  return makeItem(title, {
+    status: 'CONFIRMED',
+    appointment: {
+      ...(appointmentId === undefined ? {} : { appointmentId }),
+      activityStartAt: '2026-08-11T10:20:00',
+      activityEndAt: '2026-08-11T12:00:00',
+      appointmentStatus: 'CONFIRMED',
+    } as TimelineItem['appointment'],
+  })
+}
+
+function dayWith(visitDate: string, ...items: TimelineItem[]): JourneyTimelineDay {
+  return { visitDate, items }
+}
+
+function dayWithItem(visitDate: string, title: string): JourneyTimelineDay {
+  return dayWith(visitDate, makeItem(title))
 }
 
 async function mountList(props: {
@@ -65,6 +107,10 @@ async function mountList(props: {
 
 function addLinks(wrapper: Awaited<ReturnType<typeof mountList>>, prefix: string) {
   return wrapper.findAll(`a[aria-label^="${prefix}"]`)
+}
+
+function ctaFor(wrapper: Awaited<ReturnType<typeof mountList>>, name: string) {
+  return wrapper.findAll(`a[aria-label="${name}"]`)[0]
 }
 
 describe('JourneyTimelineList', () => {
@@ -160,6 +206,93 @@ describe('JourneyTimelineList', () => {
     expect(addLinks(wrapper, 'Add event on')).toHaveLength(2)
     expect(addLinks(wrapper, 'Add place on')).toHaveLength(2)
     expect(wrapper.findAll('a[href*="2026-08-20"]')).toHaveLength(0)
+  })
+
+  it('links Event detail to the event page and Place detail to the place page', async () => {
+    const wrapper = await mountList({
+      days: [
+        dayWith(
+          '2026-08-10',
+          makeItem('Night market'),
+          makeItem('Roastery', {
+            tripItemId: 2,
+            itemId: 22,
+            exploreItem: { itemType: 'PLACE' },
+          }),
+        ),
+      ],
+      startDate: '2026-08-10',
+      endDate: '2026-08-10',
+    })
+
+    expect(ctaFor(wrapper, 'Event detail for Night market')?.attributes('href')).toBe(
+      '/explore/events/11',
+    )
+    expect(ctaFor(wrapper, 'Place detail for Roastery')?.attributes('href')).toBe(
+      '/explore/places/22',
+    )
+  })
+
+  it('sends an unconfirmed item to the appointment list filtered to that item', async () => {
+    const wrapper = await mountList({
+      days: [dayWithItem('2026-08-10', 'Night market')],
+      startDate: '2026-08-10',
+      endDate: '2026-08-10',
+    })
+
+    const link = ctaFor(wrapper, 'Find companions for Night market')
+
+    expect(link?.text()).toBe('Find companions')
+    expect(link?.attributes('href')).toBe('/appointments?itemId=11&itemType=EVENT')
+  })
+
+  it('sends a confirmed item to its appointment detail', async () => {
+    const wrapper = await mountList({
+      days: [dayWith('2026-08-10', confirmedItem('Night market', 501))],
+      startDate: '2026-08-10',
+      endDate: '2026-08-10',
+    })
+
+    const link = ctaFor(wrapper, 'View companions for Night market')
+
+    expect(link?.text()).toBe('View companions')
+    expect(link?.attributes('href')).toBe('/appointments/501')
+    expect(wrapper.text()).not.toContain('Find companions')
+  })
+
+  it('drops the companions CTA when a confirmed item has no appointment id', async () => {
+    const wrapper = await mountList({
+      days: [dayWith('2026-08-10', confirmedItem('Night market', undefined))],
+      startDate: '2026-08-10',
+      endDate: '2026-08-10',
+    })
+
+    // 갈 곳이 없는 링크를 만들지 않는다. 상세 진입은 그대로 남는다.
+    expect(wrapper.text()).not.toContain('View companions')
+    expect(wrapper.findAll('a[href^="/appointments"]')).toHaveLength(0)
+    expect(ctaFor(wrapper, 'Event detail for Night market')?.exists()).toBe(true)
+  })
+
+  it('gives every repeated CTA an item-specific accessible name', async () => {
+    const wrapper = await mountList({
+      days: [
+        dayWith(
+          '2026-08-10',
+          makeItem('Night market'),
+          makeItem('Roastery', { tripItemId: 2, itemId: 22 }),
+        ),
+      ],
+      startDate: '2026-08-10',
+      endDate: '2026-08-10',
+    })
+
+    const names = wrapper
+      .findAll('a[aria-label^="Event detail for"], a[aria-label^="Find companions for"]')
+      .map((link) => link.attributes('aria-label'))
+
+    expect(new Set(names).size).toBe(4)
+    // 보이는 라벨이 접근 가능한 이름 앞부분에 그대로 들어간다 (WCAG 2.5.3).
+    names.forEach((name) => expect(name).toMatch(/^(Event detail|Find companions) for .+/))
   })
 
   it('handles a journey longer than a month', async () => {

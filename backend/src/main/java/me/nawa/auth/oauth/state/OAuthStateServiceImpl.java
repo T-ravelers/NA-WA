@@ -81,6 +81,7 @@ public class OAuthStateServiceImpl implements OAuthStateService {
             Instant expiresAt = issuedAt.plusSeconds(ttlSeconds);
             String state = generateRandomValue();
             String nonce = generateRandomValue();
+            String browserBinding = generateRandomValue();
             String codeVerifier = provider.isPkceRequired()
                     ? generateRandomValue()
                     : null;
@@ -89,6 +90,7 @@ public class OAuthStateServiceImpl implements OAuthStateService {
                     provider,
                     nonce,
                     codeVerifier,
+                    sha256(browserBinding),
                     allowedReturnPath,
                     issuedAt,
                     expiresAt
@@ -100,6 +102,7 @@ public class OAuthStateServiceImpl implements OAuthStateService {
                         nonce,
                         createCodeChallenge(codeVerifier),
                         codeVerifier == null ? null : PKCE_METHOD,
+                        browserBinding,
                         expiresAt
                 );
             }
@@ -111,11 +114,30 @@ public class OAuthStateServiceImpl implements OAuthStateService {
     }
 
     @Override
-    public Optional<OAuthStateSession> consume(String state) {
+    public Optional<OAuthStateSession> consume(
+            String state,
+            String browserBinding) {
         if (!isValidState(state)) {
             return Optional.empty();
         }
-        return stateStore.consume(state);
+        return stateStore.consume(state)
+                .filter(session -> matchesBrowserBinding(
+                        session,
+                        browserBinding
+                ));
+    }
+
+    private boolean matchesBrowserBinding(
+            OAuthStateSession session,
+            String browserBinding) {
+        if (!StringUtils.hasText(browserBinding)) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                session.getBrowserBindingHash()
+                        .getBytes(StandardCharsets.US_ASCII),
+                sha256(browserBinding).getBytes(StandardCharsets.US_ASCII)
+        );
     }
 
     private String generateRandomValue() {
@@ -130,9 +152,13 @@ public class OAuthStateServiceImpl implements OAuthStateService {
         if (codeVerifier == null) {
             return null;
         }
+        return sha256(codeVerifier);
+    }
+
+    private String sha256(String value) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(codeVerifier.getBytes(StandardCharsets.US_ASCII));
+                    .digest(value.getBytes(StandardCharsets.US_ASCII));
             return Base64.getUrlEncoder()
                     .withoutPadding()
                     .encodeToString(digest);

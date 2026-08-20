@@ -3,6 +3,7 @@ package me.nawa.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import me.nawa.auth.cookie.AuthCookieManager;
+import me.nawa.auth.oauth.authorization.OAuthAuthorizationRedirect;
 import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.oauth.callback.OAuthCallbackResult;
 import me.nawa.auth.oauth.callback.OAuthCallbackService;
@@ -12,6 +13,8 @@ import me.nawa.appointment.service.AppointmentService;
 import me.nawa.common.exception.ErrorCode;
 import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.MemberAppointmentProfileResponse;
+import me.nawa.member.dto.MerchantRegisterRequest;
+import me.nawa.member.dto.OnboardingProfileRequest;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.service.MemberProfileService;
 import me.nawa.settlement.service.SettlementCreationService;
@@ -42,9 +45,13 @@ import me.nawa.wallet.service.TopupService;
 import me.nawa.wallet.service.TransactionService;
 import me.nawa.wallet.service.WalletService;
 import me.nawa.explore.service.EventService;
+import me.nawa.explore.service.ExploreItemLikeService;
 import me.nawa.explore.service.PlaceService;
 import me.nawa.journey.service.JourneyService;
 import me.nawa.report.controller.ReportController;
+import me.nawa.ingest.service.IngestService;
+import me.nawa.ingest.service.IngestServiceImpl;
+import me.nawa.auth.jwt.JwtTokenProvider;
 import me.nawa.report.service.ReportService;
 import me.nawa.review.service.ReviewService;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +72,9 @@ import org.springframework.web.context.WebApplicationContext;
 import springfox.documentation.spring.web.plugins.Docket;
 
 import java.net.URI;
+import java.util.Base64;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -86,6 +96,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.ExploreTestConfig.class,
         SwaggerConfigTest.JourneyTestConfig.class,
         SwaggerConfigTest.ReportTestConfig.class,
+        SwaggerConfigTest.IngestTestConfig.class,
         SwaggerConfigTest.SettlementTestConfig.class,
         SwaggerConfigTest.TopupTestConfig.class,
         SwaggerConfigTest.TransactionTestConfig.class,
@@ -178,6 +189,7 @@ class SwaggerConfigTest {
             return new AuthCookieManager(
                     "access_token",
                     "refresh_token",
+                    "oauth_state",
                     false,
                     "Lax",
                     ""
@@ -186,8 +198,12 @@ class SwaggerConfigTest {
 
         @Bean
         OAuthAuthorizationService oauthAuthorizationService() {
-            return (provider, returnPath) -> URI.create(
-                    "https://accounts.google.com/o/oauth2/v2/auth"
+            return (provider, returnPath) -> new OAuthAuthorizationRedirect(
+                    URI.create(
+                            "https://accounts.google.com/o/oauth2/v2/auth"
+                    ),
+                    "browser-binding-value",
+                    Instant.parse("2026-08-03T00:10:00Z")
             );
         }
 
@@ -199,7 +215,8 @@ class SwaggerConfigTest {
                         String provider,
                         String state,
                         String authorizationCode,
-                        String authorizationError) {
+                        String authorizationError,
+                        String browserBinding) {
                     throw new UnsupportedOperationException();
                 }
 
@@ -353,6 +370,18 @@ class SwaggerConfigTest {
                 }
 
                 @Override
+                public MemberProfileResponse completeOnboarding(
+                        long memberId, OnboardingProfileRequest request) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public MemberProfileResponse registerAsMerchant(
+                        long memberId, MerchantRegisterRequest request) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
                 public MemberAppointmentProfileResponse getAppointmentProfile(long memberId) {
                     throw new UnsupportedOperationException();
                 }
@@ -387,6 +416,11 @@ class SwaggerConfigTest {
         }
 
         @Bean
+        ExploreItemLikeService exploreItemLikeService() {
+            return new ExploreItemLikeService(null);
+        }
+
+        @Bean
         PlaceService placeService() {
             return new PlaceService(null);
         }
@@ -397,7 +431,7 @@ class SwaggerConfigTest {
 
         @Bean
         JourneyService journeyService() {
-            return new JourneyService(null);
+            return new JourneyService(null, null);
         }
     }
 
@@ -406,7 +440,7 @@ class SwaggerConfigTest {
 
         @Bean
         AppointmentService appointmentService() {
-            return new AppointmentService(null, null);
+            return new AppointmentService(null, null, null, null, null);
         }
     }
 
@@ -428,6 +462,30 @@ class SwaggerConfigTest {
                 @Override public me.nawa.settlement.dto.response.SettlementListResponse getSettlements(Long memberId) { throw new UnsupportedOperationException(); }
                 @Override public java.util.List<me.nawa.settlement.dto.response.SettlementCandidateResponse> getCandidates(Long memberId) { throw new UnsupportedOperationException(); }
                 @Override public me.nawa.settlement.dto.response.SettlementDetailResponse getSettlement(Long memberId, Long settlementId) { throw new UnsupportedOperationException(); }
+            };
+        }
+
+        @Bean
+        me.nawa.settlement.service.SettlementReceiptService settlementReceiptService() {
+            return new me.nawa.settlement.service.SettlementReceiptService() {
+                @Override public me.nawa.settlement.dto.response.SettlementReceiptUploadResponse upload(
+                    Long memberId, String declaredContentType, byte[] content
+                ) { throw new UnsupportedOperationException(); }
+                @Override public void linkToSettlement(
+                    Long memberId, Long settlementId, Long receiptId
+                ) { throw new UnsupportedOperationException(); }
+                @Override public me.nawa.common.storage.StoredReceipt getReceipt(
+                    Long memberId, Long settlementId
+                ) { throw new UnsupportedOperationException(); }
+            };
+        }
+
+        @Bean
+        me.nawa.settlement.service.SettlementReceiptOcrService settlementReceiptOcrService() {
+            return new me.nawa.settlement.service.SettlementReceiptOcrService() {
+                @Override public me.nawa.settlement.dto.response.SettlementReceiptOcrResponse recognize(
+                    Long memberId, Long receiptId
+                ) { throw new UnsupportedOperationException(); }
             };
         }
 
@@ -457,6 +515,29 @@ class SwaggerConfigTest {
         @Bean
         ReportService reportService() {
             return new ReportService(null);
+        }
+    }
+
+    /**
+     * 적재 컨트롤러가 서블릿 컨텍스트에 등록되므로 의존 빈이 있어야 합니다.
+     * 이 테스트는 ServletConfig 만 올리기 때문에 RootConfig 의 서비스가 없습니다.
+     */
+    @Configuration
+    static class IngestTestConfig {
+
+        @Bean
+        IngestService ingestService() {
+            return new IngestServiceImpl(null, 1000000L);
+        }
+
+        @Bean
+        JwtTokenProvider jwtTokenProvider() {
+            return new JwtTokenProvider(
+                    Base64.getEncoder().encodeToString(
+                            "swagger-test-signing-key-at-least-32-bytes"
+                                    .getBytes(StandardCharsets.UTF_8)),
+                    "nawa",
+                    900);
         }
     }
 

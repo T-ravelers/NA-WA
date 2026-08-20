@@ -6,12 +6,24 @@ export interface MemberProfile {
   memberId: number
   displayName: string
   profileImageUrl: string | null
+  /** ISO 3166-1 alpha-2. 온보딩 전에는 null이다. */
+  nationalityCode: string | null
   preferredLanguage: string
   preferredCurrencyCode: string | null
+  /**
+   * 계정 유형. 백엔드 `members.account_type`이며 소셜 가입 직후에는 항상 `TRAVELER`다.
+   *
+   * 서버가 새 값을 추가해도 화면이 깨지지 않도록 열어 둔다. 가맹점 판정은
+   * `MERCHANT` 일치로만 하므로 모르는 값은 손님으로 취급된다.
+   */
+  accountType: string
   onboardingRequired: boolean
 }
 
 export interface UpdateMemberProfilePayload {
+  displayName?: string
+  profileImageUrl?: string
+  nationalityCode?: string
   preferredLanguage?: AppLocale
   preferredCurrencyCode?: string
 }

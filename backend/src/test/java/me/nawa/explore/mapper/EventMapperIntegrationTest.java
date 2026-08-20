@@ -12,10 +12,13 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.explore.dto.request.EventSearchRequest;
 import me.nawa.explore.dto.response.EventDetailResponse;
 import me.nawa.explore.dto.response.EventSummaryResponse;
@@ -26,6 +29,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
@@ -33,6 +37,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
     named = "RUN_MYSQL_INTEGRATION_TESTS",
     matches = "(?i)true"
@@ -90,6 +95,10 @@ class EventMapperIntegrationTest {
     void cleanUpFixture() {
         for (Long eventId : eventIds) {
             jdbcTemplate.update(
+                "DELETE FROM explore_item_likes WHERE item_id = ?",
+                eventId
+            );
+            jdbcTemplate.update(
                 "DELETE FROM event WHERE event_id = ?",
                 eventId
             );
@@ -122,7 +131,7 @@ class EventMapperIntegrationTest {
             "ENDED"
         );
 
-        EventDetailResponse result = mapper.findEventDetail(eventId, "en");
+        EventDetailResponse result = mapper.findEventDetail(eventId, "en", null);
 
         assertNotNull(result);
         assertNotNull(result.getEventKind());
@@ -139,7 +148,7 @@ class EventMapperIntegrationTest {
     }
 
     @Test
-    void searchAndDetail_useCurrentDatesForVisibilityAndPresets() {
+    void searchAndDetail_useCurrentDatesForVisibilityAndDateRanges() {
         LocalDate today = currentDatabaseDate();
         long endedYesterday = insertEvent(
             "ended-yesterday",
@@ -171,31 +180,95 @@ class EventMapperIntegrationTest {
             "ENDED"
         );
 
-        Set<Long> visibleIds = searchIds(null);
+        Set<Long> visibleIds = searchIds(null, null);
         assertFalse(visibleIds.contains(endedYesterday));
         assertTrue(visibleIds.contains(endsToday));
         assertTrue(visibleIds.contains(startsTomorrow));
         assertTrue(visibleIds.contains(startedWithScheduledStatus));
         assertTrue(visibleIds.contains(permanentWithEndedStatus));
-        assertEquals(4L, countEvents(null));
+        assertEquals(4L, countEvents(null, null));
 
-        Set<Long> ongoingIds = searchIds("ONGOING");
+        // 날짜 프리셋은 프론트가 날짜 범위로 환원해 보낸다(#275). "오늘 진행 중"은
+        // 오늘 하루짜리 기간(시작=종료)으로 온다.
+        Set<Long> overlappingToday = searchIds(today, today);
         assertEquals(Set.of(
             endsToday,
             startedWithScheduledStatus,
             permanentWithEndedStatus
-        ), ongoingIds);
+        ), overlappingToday);
 
-        Set<Long> openingSoonIds = searchIds("OPENING_SOON");
-        assertEquals(Set.of(startsTomorrow), openingSoonIds);
+        // "곧 시작"은 내일부터 상한 없는 기간이다 — 내일 이후에도 진행 중인
+        // 이벤트를 모두 포함하는 겹침 기준이다.
+        Set<Long> visibleFromTomorrow = searchIds(today.plusDays(1), null);
+        assertEquals(Set.of(
+            startsTomorrow,
+            startedWithScheduledStatus,
+            permanentWithEndedStatus
+        ), visibleFromTomorrow);
 
-        assertNull(mapper.findEventDetail(endedYesterday, "en"));
-        assertNotNull(mapper.findEventDetail(endsToday, "en"));
-        assertNotNull(mapper.findEventDetail(permanentWithEndedStatus, "en"));
+        assertNull(mapper.findEventDetail(endedYesterday, "en", null));
+        assertNotNull(mapper.findEventDetail(endsToday, "en", null));
+        assertNotNull(mapper.findEventDetail(
+            permanentWithEndedStatus,
+            "en",
+            null
+        ));
     }
 
-    private Set<Long> searchIds(String datePreset) {
-        EventSearchRequest request = request(datePreset);
+    @Test
+    void savedColumn_marksOnlyRequestingMembersActiveLikes() {
+        LocalDate today = currentDatabaseDate();
+        long likedId = insertEvent(
+            "saved-liked",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        long unlikedId = insertEvent(
+            "saved-unliked",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        long canceledId = insertEvent(
+            "saved-canceled",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        jdbcTemplate.update(
+            "INSERT INTO explore_item_likes (item_id, member_id) "
+                + "VALUES (?, ?)",
+            likedId,
+            memberId
+        );
+        jdbcTemplate.update(
+            "INSERT INTO explore_item_likes (item_id, member_id, deleted_at) "
+                + "VALUES (?, ?, CURRENT_TIMESTAMP)",
+            canceledId,
+            memberId
+        );
+
+        Map<Long, Boolean> savedById = new HashMap<>();
+        for (EventSummaryResponse result
+            : mapper.searchEvents(request(null, null), 0, memberId)) {
+            savedById.put(result.getItemId(), result.isSaved());
+        }
+        assertEquals(Boolean.TRUE, savedById.get(likedId));
+        assertEquals(Boolean.FALSE, savedById.get(unlikedId));
+        assertEquals(Boolean.FALSE, savedById.get(canceledId));
+
+        for (EventSummaryResponse result
+            : mapper.searchEvents(request(null, null), 0, null)) {
+            assertFalse(result.isSaved());
+        }
+
+        assertTrue(mapper.findEventDetail(likedId, "en", memberId).isSaved());
+        assertFalse(mapper.findEventDetail(likedId, "en", null).isSaved());
+    }
+
+    private Set<Long> searchIds(LocalDate startDate, LocalDate endDate) {
+        EventSearchRequest request = request(startDate, endDate);
         List<EventSummaryResponse> results = mapper.searchEvents(
             request,
             0,
@@ -208,14 +281,15 @@ class EventMapperIntegrationTest {
         return ids;
     }
 
-    private long countEvents(String datePreset) {
-        return mapper.countEvents(request(datePreset), null);
+    private long countEvents(LocalDate startDate, LocalDate endDate) {
+        return mapper.countEvents(request(startDate, endDate), null);
     }
 
-    private EventSearchRequest request(String datePreset) {
+    private EventSearchRequest request(LocalDate startDate, LocalDate endDate) {
         EventSearchRequest request = new EventSearchRequest();
         request.setKeyword(marker);
-        request.setDatePreset(datePreset);
+        request.setStartDate(startDate);
+        request.setEndDate(endDate);
         request.setSize(20);
         return request;
     }

@@ -164,6 +164,7 @@ enum 상수 이름을 외부 오류 코드로 직접 사용하지 마세요.
 | 지갑   | `WALLET-001`  |
 | 약속   | `APPOINTMENT-001` |
 | 후기   | `REVIEW-001`  |
+| 적재   | `INGEST-001`  |
 
 - 같은 오류에는 항상 같은 코드를 사용합니다.
 - 프론트엔드에서 다르게 처리할 오류는 코드를 분리합니다.
@@ -182,6 +183,7 @@ enum 상수 이름을 외부 오류 코드로 직접 사용하지 마세요.
 | `INVALID_INPUT`         | `COMMON-001` |       400 | 입력값이 올바르지 않음                       |
 | `MALFORMED_JSON`        | `COMMON-002` |       400 | JSON 문법 오류 또는 요청 본문을 읽을 수 없음 |
 | `METHOD_NOT_ALLOWED`    | `COMMON-003` |       405 | 지원하지 않는 HTTP Method 요청               |
+| `PAYLOAD_TOO_LARGE`     | `COMMON-004` |       413 | 업로드 파일이 허용 크기를 초과함             |
 | `INTERNAL_SERVER_ERROR` | `COMMON-999` |       500 | 예상하지 못한 서버 내부 오류                 |
 
 회원, 여행과 지갑의 업무 규칙은 `CommonErrorCode`에 추가하지 마세요. 다음 오류는
@@ -211,8 +213,8 @@ me.nawa.wallet.exception.WalletErrorCode
 미리 만들지 마세요.
 
 회원 도메인 오류 코드는 다음과 같이 구현할 수 있습니다.
-(`DUPLICATE_EMAIL`/`MEMBER-005`는 형식을 보여주기 위한 예시일 뿐 실제 구현된 코드가
-아닙니다. 실제 코드는 아래 표의 `MEMBER-001`~`MEMBER-004`를 참고하세요.)
+(`DUPLICATE_EMAIL`/`MEMBER-999`는 형식을 보여주기 위한 예시일 뿐 실제 구현된 코드가
+아닙니다. 실제 코드는 아래 표의 `MEMBER-001`~`MEMBER-008`을 참고하세요.)
 
 ```java
 package me.nawa.member.exception;
@@ -234,7 +236,7 @@ public enum MemberErrorCode implements ErrorCode {
 
     DUPLICATE_EMAIL(
         HttpStatus.CONFLICT,
-        "MEMBER-005",
+        "MEMBER-999",
         "이미 사용 중인 이메일입니다."
     );
 
@@ -249,16 +251,22 @@ public enum MemberErrorCode implements ErrorCode {
 
 회원 도메인에는 다음 오류 코드가 실제로 구현돼 있습니다.
 
-| enum 상수             | 오류 코드    | HTTP 상태 | 의미                    |
-| ---------------------- | ------------ | --------: | ----------------------- |
-| `MEMBER_NOT_FOUND`     | `MEMBER-001` |       404 | 회원 정보를 찾을 수 없음 |
-| `UNSUPPORTED_LANGUAGE` | `MEMBER-002` |       400 | 지원하지 않는 언어       |
-| `UNSUPPORTED_CURRENCY` | `MEMBER-003` |       400 | 지원하지 않는 통화       |
-| `NO_UPDATABLE_FIELD`   | `MEMBER-004` |       400 | 변경할 항목 없음         |
+| enum 상수                   | 오류 코드    | HTTP 상태 | 의미                        |
+| --------------------------- | ------------ | --------: | --------------------------- |
+| `MEMBER_NOT_FOUND`          | `MEMBER-001` |       404 | 회원 정보를 찾을 수 없음     |
+| `UNSUPPORTED_LANGUAGE`      | `MEMBER-002` |       400 | 지원하지 않는 언어           |
+| `UNSUPPORTED_CURRENCY`      | `MEMBER-003` |       400 | 지원하지 않는 통화           |
+| `NO_UPDATABLE_FIELD`        | `MEMBER-004` |       400 | 변경할 항목 없음             |
+| `UNSUPPORTED_NATIONALITY`   | `MEMBER-005` |       400 | 지원하지 않는 국가 코드      |
+| `INVALID_DISPLAY_NAME`      | `MEMBER-006` |       400 | 표시 이름 형식 오류          |
+| `INVALID_PROFILE_IMAGE_URL` | `MEMBER-007` |       400 | 프로필 이미지 주소 형식 오류 |
+| `ONBOARDING_FIELD_MISSING`  | `MEMBER-008` |       400 | 온보딩 필수 항목 누락        |
 
-`PATCH /api/v1/members/me`가 `preferredLanguage`·`preferredCurrencyCode`를
-부분 수정할 때 사용합니다. 언어 allow-list는 `en`, `ja`, `zh-CN`, `zh-TW`,
-`vi`이며 이 백엔드 목록이 정본입니다.
+`PATCH /api/v1/members/me`가 `displayName`·`profileImageUrl`·`nationalityCode`·
+`preferredLanguage`·`preferredCurrencyCode`를 부분 수정할 때, 그리고
+`PATCH /api/v1/members/me/onboarding`이 온보딩 프로필을 저장·완료할 때 사용합니다.
+언어 allow-list는 `en`, `ja`, `zh-TW`, `vi`이며 이 백엔드 목록이 정본입니다.
+국적은 ISO 3166-1 alpha-2 코드만 받습니다.
 
 약속 도메인에는 다음 오류 코드가 구현돼 있습니다.
 
@@ -266,12 +274,12 @@ public enum MemberErrorCode implements ErrorCode {
 | --- | --- | ---: | --- |
 | `APPOINTMENT_NOT_FOUND` | `APPOINTMENT-001` | 404 | 약속을 찾을 수 없음 |
 | `JOIN_NOT_AVAILABLE` | `APPOINTMENT-002` | 409 | 현재 상태·기한·정원상 참여 불가 |
-| `ALREADY_JOINED` | `APPOINTMENT-003` | 409 | 기존 참여 이력이 있어 재참여 불가 |
+| `ALREADY_JOINED` | `APPOINTMENT-003` | 409 | 이미 `PENDING`/`ACTIVE`로 참여 중 (참여 취소 후 재참여는 허용) |
 | `APPOINTMENT_FORBIDDEN` | `APPOINTMENT-004` | 403 | 약속 처리 권한 없음 |
 | `APPOINTMENT_MEMBER_NOT_FOUND` | `APPOINTMENT-005` | 404 | 참여 정보를 찾을 수 없음 |
 | `INVALID_ATTENDANCE_CONFIRMATION` | `APPOINTMENT-006` | 409 | 출석 확정 조건 불충족 |
 | `CANCELLATION_NOT_AVAILABLE` | `APPOINTMENT-007` | 409 | 약속 참여 취소 조건 불충족 |
-| `PAYMENT_INTEGRATION_REQUIRED` | `APPOINTMENT-008` | 409 | 결제 연동 전에는 약속 생성·참여·출석 확정 불가 |
+| `PAYMENT_INTEGRATION_REQUIRED` | `APPOINTMENT-008` | 409 | 약속 생성·참여·출석 확정이 모두 실제로 구현된 뒤로는 코드에만 남아있고 어디서도 던지지 않음 |
 
 후기 도메인에는 다음 오류 코드가 구현돼 있습니다.
 
@@ -325,6 +333,7 @@ Controller에서 비즈니스 예외를 반복해서 `try-catch`하지 마세요
 | `BusinessException`                      | 예외가 가진 도메인 또는 공통 ErrorCode |
 | `HttpMessageNotReadableException`        | `COMMON-002`                           |
 | `HttpRequestMethodNotSupportedException` | `COMMON-003`                           |
+| `MultipartException`                     | `COMMON-004`                           |
 | 별도로 처리하지 않은 `Exception`         | `COMMON-999`                           |
 
 예상하지 못한 예외는 stack trace와 함께 서버 로그에 기록합니다. 클라이언트에는 실제
@@ -400,11 +409,13 @@ API 응답에 다음 정보를 포함하지 마세요.
 | 지원하지 않는 언어        | 400       | `MEMBER-002`                 |
 | Event를 찾을 수 없음      | 404       | `EXPLORE-001`                |
 | Place를 찾을 수 없음      | 404       | `EXPLORE-002`                |
+| 탐색 항목을 찾을 수 없음  | 404       | `EXPLORE-003`                |
 | 약속을 찾을 수 없음       | 404       | `APPOINTMENT-001`            |
 | 약속 재참여 요청          | 409       | `APPOINTMENT-003`            |
 | 후기 중복 작성            | 409       | `REVIEW-002`                 |
 | 변경할 항목 없음          | 400       | `MEMBER-004`                 |
 | 지원하지 않는 HTTP Method | 405       | `COMMON-003`                 |
+| 업로드 파일 크기 초과     | 413       | `COMMON-004`                 |
 | 예상하지 못한 서버 오류   | 500       | `COMMON-999`                 |
 
 정산 API에서 추가로 사용하는 오류 코드는 다음과 같습니다.
@@ -420,3 +431,13 @@ API 응답에 다음 정보를 포함하지 마세요.
 | `SETTLEMENT-010` | 409 | 원거래가 이미 다른 정산에 사용됨 |
 | `SETTLEMENT-014` | 409 | 정산 지급이 이미 다른 멱등성 키로 처리됨 |
 | `SETTLEMENT-015` | 400 | 멱등성 키가 비었거나 길이 제한을 초과함 |
+| `SETTLEMENT-016` | 400 | 영수증 이미지 형식이 허용 목록에 없거나 내용과 다름 |
+| `SETTLEMENT-017` | 409 | 남이 올렸거나 이미 사용된 영수증을 연결하려 함 |
+| `SETTLEMENT-018` | 404 | 정산에 연결된 영수증이 없거나 조회 권한이 없음 |
+| `SETTLEMENT-019` | 503 | 영수증 저장소를 사용할 수 없음 |
+| `SETTLEMENT-020` | 410 | 영수증 보관 기한이 지나 저장소에서 사라짐 |
+| `SETTLEMENT-021` | 500 | 올라온 영수증 파일을 서버가 읽지 못함 |
+| `SETTLEMENT-022` | 400 | 글자 인식이 다루지 못하는 이미지 형식(webp) |
+| `SETTLEMENT-023` | 422 | 사진에서 품목을 하나도 읽지 못함 |
+| `SETTLEMENT-024` | 504 | 글자 인식이 정해진 시간 안에 끝나지 않음 |
+| `SETTLEMENT-025` | 503 | 글자 인식 서비스에 닿지 못했거나, 설정되지 않았거나, 알 수 없는 응답을 보냄 |

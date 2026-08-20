@@ -16,8 +16,53 @@ jobs:
       run:
         working-directory: backend
 
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: nawa
+          MYSQL_USER: nawa
+          MYSQL_PASSWORD: ci-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      # 러너 안에서만 유효한 CI 전용 더미 값입니다. 운영 비밀값이 아닙니다.
+      RUN_MYSQL_INTEGRATION_TESTS: "true"
+      RUN_REDIS_INTEGRATION_TESTS: "true"
+      DATABASE_DRIVER: com.mysql.cj.jdbc.Driver
+      DATABASE_URL: "jdbc:mysql://127.0.0.1:3306/nawa?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul"
+      DATABASE_USERNAME: nawa
+      DATABASE_PASSWORD: ci-password
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: "6379"
+      # JVM만 앱 컨테이너(backend/Dockerfile ENV TZ)와 같게 두고, MySQL은 이미지 기본값인
+      # UTC로 남깁니다. 운영과 같은 9시간 불일치를 일부러 재현해, DB 시계에 의존하는
+      # 코드가 CI에서 구조적으로 걸리게 하려는 것입니다. 양쪽을 맞추면 약속 마감·시작
+      # 전환이 밀리던 유형의 버그가 다시 들어와도 CI가 통과합니다.
+      TZ: Asia/Seoul
+
     steps:
       - uses: actions/checkout@v7
+        with:
+          # 아래 마이그레이션 불변성 확인이 base 브랜치와 비교해야 해서 전체 이력이 필요합니다.
+          fetch-depth: 0
 
       - name: JDK 17 설정
         uses: actions/setup-java@v5
@@ -35,8 +80,54 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: 병합된 마이그레이션 파일 불변성 확인
+        if: github.event_name == 'pull_request'
+        # base_ref를 스크립트에 직접 보간하지 않고 환경 변수로 받는다. 이 워크플로는
+        # main 대상 PR에서만 도는 데다 값이 고정이지만, 보간 패턴 자체를 두지 않는다.
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags origin "$BASE_REF"
+          # 수정(M)만으로는 부족하다. 삭제와 이름 변경도 적용 이력만 남고 파일이
+          # 사라져 같은 방식으로 배포 시점 Flyway validate에서 터진다. 게다가 git은
+          # rename 감지가 기본이라 이름만 바꾸면 M도 D도 아닌 R로 분류돼 그냥 통과한다.
+          # --no-renames로 이름 변경을 D+A로 분해해 D에 걸리게 한다.
+          changed=$(git diff --no-renames --diff-filter=MD --name-only FETCH_HEAD...HEAD \
+            -- 'src/main/resources/db/migration/V*.sql')
+          if [ -n "$changed" ]; then
+            echo "::error::이미 병합된 마이그레이션은 수정·삭제·이름 변경할 수 없습니다. Flyway 체크섬이 어긋나 배포가 실패합니다. 새 버전 파일을 추가하세요."
+            echo "$changed"
+            exit 1
+          fi
+          echo "마이그레이션 파일 불변성 확인 완료"
+
+      - name: MySQL 준비 대기
+        run: |
+          # 서비스 컨테이너의 health check(mysqladmin ping)는 MySQL 엔트리포인트가
+          # 초기화용 임시 서버를 띄운 동안에도 통과합니다. 실제 질의가 되는지까지
+          # 확인해야 첫 테스트가 접속 실패로 깨지지 않습니다.
+          for i in $(seq 1 60); do
+            if docker run --rm --network host mysql:8.4 \
+                 mysql -h 127.0.0.1 -P 3306 -unawa -p"$DATABASE_PASSWORD" \
+                 -e "SELECT 1" nawa >/dev/null 2>&1; then
+              echo "MySQL 준비 완료 (${i}회 시도)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::MySQL이 120초 안에 준비되지 않았습니다"
+          exit 1
+
       - name: 빌드 + 테스트
         run: ./gradlew build --no-daemon
+
+      - name: 테스트 리포트 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: backend/build/reports/tests/test
+          retention-days: 7
 
   frontend-test:
     runs-on: ubuntu-latest
@@ -73,3 +164,53 @@ jobs:
 
       - name: 프로덕션 빌드
         run: pnpm build
+
+  # 실제 브라우저를 띄워 사람이 조작하듯 확인한다. 탭 두 개에 걸친 로그아웃 장벽처럼
+  # 유닛 테스트로는 잡히지 않는 흐름이 여기에 있다. frontend-test와 나눠 둔 이유는
+  # 린트 하나를 고칠 때마다 브라우저 세 종을 기다리지 않기 위해서다.
+  e2e-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: pnpm 설정
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      # 브라우저 세 종이 200MB를 넘는다. 잠금 파일이 그대로면 다시 받지 않는다.
+      - name: Playwright 브라우저 캐시
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      # 캐시가 맞아도 시스템 라이브러리는 매번 필요해 --with-deps를 유지한다.
+      - name: Playwright 브라우저 설치
+        run: pnpm --filter @na-wa/frontend exec playwright install --with-deps chromium firefox webkit
+
+      # 빌드와 preview 서버 기동은 playwright.config.ts의 webServer가 맡는다.
+      # CI 환경 변수는 GitHub Actions가 넣어 주며, 그 값으로 preview 모드로 전환된다.
+      - name: E2E 테스트
+        run: pnpm test:e2e
+
+      # CI 리포터는 line이라 HTML 리포트가 없다. 실패 시에는 trace와 스냅샷이 남는
+      # test-results가 원인 파악에 필요하다.
+      - name: 실패 시 실행 기록 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: frontend/test-results
+          retention-days: 7

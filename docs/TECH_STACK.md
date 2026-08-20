@@ -23,7 +23,7 @@
 | Test         | Vitest, Vue Test Utils, Playwright    | 단위, 컴포넌트와 브라우저 테스트      |
 | Quality      | ESLint, Prettier, Husky, lint-staged  | 정적 검사와 커밋 전 검사              |
 
-지원 로케일은 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
+지원 로케일은 `en`, `ja`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
 방한 외국인이 대상이라 한국어는 서비스 로케일이 아닙니다. 최종 기준은
 `frontend/src/shared/i18n/locales.ts`입니다.
 
@@ -97,6 +97,7 @@ PWA는 필수 기능입니다. 개인정보와 정산 데이터의 안전을 위
 | ------------------- | -------------- | ---------------------------------------------------- |
 | Backend CI          | 구현됨         | `main` PR과 push에서 Gradle 빌드·테스트              |
 | Backend CD          | 구현됨         | CI 성공 후 Docker Hub push와 EC2 Docker Compose 배포 |
+| TLS 인증서 갱신     | 구현됨         | 매일 스케줄로 Let's Encrypt 갱신 후 nginx reload (`.github/workflows/renew-cert.yml`) |
 | Frontend CI         | 구현됨         | `main` PR과 push에서 설치, 품질 검사와 빌드          |
 | Frontend Preview    | 운영 방향 확정 | Vercel PR Preview                                    |
 | Frontend Production | 운영 방향 확정 | Vercel `main` Production                             |
@@ -106,9 +107,38 @@ test와 build를 실행합니다. Vercel은 프론트엔드 배포를 담당하�
 품질 검증을 담당합니다. 같은 프론트엔드 배포를 두 시스템에서 중복 실행하지
 마세요.
 
-백엔드 컨테이너는 `TZ=Asia/Seoul`로 고정되어 있습니다(`backend/Dockerfile`).
-`LocalDateTime.now()`가 컨테이너 기본값인 UTC가 아니라 서비스 기준 시간대로
-찍히도록 하기 위함이며, JDBC URL의 `serverTimezone=Asia/Seoul`과 짝을 맞춥니다.
+운영 백엔드는 `https://api.clearpng.cloud`이고 TLS는 nginx가 443에서 종료합니다.
+인증서는 Let's Encrypt에서 발급받아 `certbot_conf` 볼륨으로 nginx와 공유하며, 80은
+`/.well-known/acme-challenge/`(갱신 검증 경로)만 직접 응답하고 나머지는 `308`로
+https에 넘깁니다. ALB 도입 준비로 `X-Forwarded-Proto`가 붙은 요청과 헬스 체크용
+`/alb-health`만 `308` 대신 백엔드로 프록시합니다. 리다이렉트 응답에는 CORS 헤더가
+없으므로 프론트엔드의
+`VITE_API_BASE_URL`은 반드시 https 주소여야 합니다.
+
+시간대는 **서로 다른 일을 하는 세 곳**에서 정해집니다. 하나로 뭉뚱그리면 반드시
+틀리므로 구분해서 봅니다.
+
+| 설정 | 위치 | 정하는 것 |
+| --- | --- | --- |
+| `TZ=Asia/Seoul` | `backend/Dockerfile` | JVM의 `LocalDateTime.now()`가 찍는 시각 |
+| `--default-time-zone=+09:00` | `docker-compose.yml`의 `mysql` | **DB 서버가 평가하는 `NOW()`·`CURRENT_TIMESTAMP`** |
+| `serverTimezone=Asia/Seoul` | `DATABASE_URL` | JDBC 드라이버가 값을 주고받을 때의 해석 |
+
+`serverTimezone`은 **드라이버 설정일 뿐이라 DB 서버가 평가하는 `CURRENT_TIMESTAMP`를
+바꾸지 못합니다.** 이 점을 놓치면 "URL에 이미 Asia/Seoul이 있으니 맞춰져 있다"고
+오해하기 쉽습니다. 실제로 `mysql` 서비스에 시간대 설정이 없던 동안 DB는 이미지
+기본값인 UTC로 돌았고, 약속 마감·시작 전환 스케줄러가 DB의 `CURRENT_TIMESTAMP`에
+기대고 있어 전환이 9시간씩 밀렸습니다.
+
+세 곳을 맞춰도 **시각을 근거로 판단하는 주체는 애플리케이션이어야 합니다.** DB 시계에
+기대는 쿼리는 컨테이너 설정 하나로 다시 어긋날 수 있으므로, `WHERE`·`ORDER BY`에서
+`NOW()`·`CURRENT_TIMESTAMP`로 분기하지 말고 앱이 넘긴 시각을 씁니다. `updated_at`
+같은 값에 대입하는 용도는 그대로 두어도 됩니다.
+
+CI는 이 정렬을 **일부러 깨서** 돌립니다. MySQL 서비스를 UTC로 두고 JVM만
+`TZ=Asia/Seoul`로 맞춰 운영과 같은 시차를 재현하므로, DB 시계에 의존하는 코드가
+`.github/workflows/test.yml`의 통합 테스트에서 걸립니다. 양쪽을 맞추면 이 유형의
+버그를 CI가 잡지 못합니다.
 
 ## 아직 구현하지 않았거나 정리할 항목
 

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { IconMenu2 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { formatServerDateTime, parseServerDateTime } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -14,17 +15,28 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
-import { type AppointmentDateTimeValue, type AppointmentStatus } from '../api/appointmentApi'
+import AppointmentLeaveConfirmSheet from '../components/AppointmentLeaveConfirmSheet.vue'
+import AppointmentMenuSheet from '../components/AppointmentMenuSheet.vue'
+import {
+  cancelAppointmentParticipation,
+  joinAppointment,
+  type AppointmentDateTimeValue,
+  type AppointmentStatus,
+} from '../api/appointmentApi'
+import { appointmentKeys } from '../model/appointmentKeys'
+import { appointmentErrorMessageKey } from '../model/appointmentErrors'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
+  appointmentParticipationQueryOptions,
 } from '../model/appointmentQueries'
-import { parseAppointmentDateTime } from '../model/appointmentDateTime'
-import { useAppointmentMemberProfile } from '../model/memberIntegration'
 
 const route = useRoute()
 const router = useRouter()
-const { locale, t } = useI18n()
+const queryClient = useQueryClient()
+const i18n = useI18n()
+const { locale, t } = i18n
+const hasMessage = (key: string): boolean => i18n.te(key)
 
 const appointmentId = computed(() => {
   const raw = Array.isArray(route.params.appointmentId)
@@ -45,16 +57,27 @@ const membersQuery = useQuery({
   enabled: computed(() => appointmentId.value !== null),
   retry: false,
 })
+const participationQuery = useQuery({
+  ...appointmentParticipationQueryOptions(appointmentId),
+  enabled: computed(() => appointmentId.value !== null),
+  retry: false,
+})
 const appointment = computed(() => detailQuery.data.value)
 const members = computed(() =>
   (membersQuery.data.value ?? appointment.value?.members ?? []).filter(
     (member) => member.membershipStatus === 'ACTIVE',
   ),
 )
-const profileQuery = useAppointmentMemberProfile()
 
 const depositSheetOpen = ref(false)
 const menuOpen = ref(false)
+const leaveConfirmOpen = ref(false)
+const hasJoined = computed(() => participationQuery.data.value?.joined === true)
+// 조회 실패 시 hasJoined는 false로 남는다. 서버가 최종적으로 중복 참여를
+// 막아주니 데이터는 안전하지만, 그대로 두면 사용자가 결제 시트까지 갔다가
+// 거기서야 오류를 보게 된다. 조회 자체가 실패했을 때는 참여 여부를 확신할 수
+// 없다는 걸 버튼 단계에서 미리 알려준다.
+const participationCheckFailed = computed(() => participationQuery.isError.value)
 
 const statusTone = computed(() =>
   appointment.value?.appointmentStatus === 'RECRUITING' ? 'ongoing' : 'neutral',
@@ -62,42 +85,89 @@ const statusTone = computed(() =>
 
 const isJoinAvailable = computed(() => {
   if (appointment.value?.appointmentStatus !== 'RECRUITING') return false
-  const deadline = parseAppointmentDateTime(appointment.value.joinDeadline)
+  const deadline = parseServerDateTime(appointment.value.joinDeadline)
   return deadline !== null && Date.now() < deadline.getTime()
 })
-const currentMemberId = computed(() => profileQuery.data.value?.memberId)
-const isHost = computed(
-  () =>
-    currentMemberId.value !== undefined &&
-    members.value.some((member) => member.memberId === currentMemberId.value && member.isHost),
+const isJoinButtonEnabled = computed(
+  () => isJoinAvailable.value && !hasJoined.value && !participationCheckFailed.value,
 )
-const isActiveParticipant = computed(
-  () =>
-    currentMemberId.value !== undefined &&
-    members.value.some(
-      (member) =>
-        member.memberId === currentMemberId.value &&
-        member.membershipStatus === 'ACTIVE' &&
-        member.attendanceStatus === 'ATTENDED',
-    ),
+// 버튼 title 툴팁은 비활성 버튼에 pointer-events-none이 걸려 뜨지 않고,
+// 390px 모바일 PWA라 애초에 hover도 없다. 그래서 비활성 이유는 버튼 아래에
+// 상시 텍스트로 보여준다. 모집 종료(CLOSED/COMPLETED/CANCELLED)는 사용자
+// 잘못이 아닌 정상 상태라 text-danger(빨강)로 알릴 일이 아니어서, 세 경우
+// 모두 중립색(text-ink-3)으로 통일한다.
+const joinDisabledReason = computed(() => {
+  if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
+  if (hasJoined.value) return t('appointment.detail.alreadyJoined')
+  if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
+  return undefined
+})
+// 방장 여부·참여 상태는 members 목록에서 추리지 않고 participation 응답을 쓴다.
+// 목록은 ACTIVE만 담고 있어 LEFT가 된 내 참여를 구분하지 못하고, 목록 조회가
+// 실패하면 내 권한까지 함께 사라진다.
+const participation = computed(() => participationQuery.data.value)
+const isHost = computed(() => participation.value?.host === true)
+const isActiveMember = computed(
+  () => participation.value?.joined === true && participation.value.membershipStatus === 'ACTIVE',
 )
+const isAttendedMember = computed(
+  () => isActiveMember.value && participation.value?.attendanceStatus === 'ATTENDED',
+)
+
+const isJoinDeadlinePassed = computed(() => {
+  const deadline = parseServerDateTime(appointment.value?.joinDeadline ?? null)
+  return deadline === null || Date.now() >= deadline.getTime()
+})
+
+// 세 항목은 서로 다른 시점에만 열린다. joinDeadline은 활동 시작보다 늦을 수
+// 없으므로(생성 시 검증) IN_PROGRESS·COMPLETED는 이미 마감이 지난 상태고,
+// 그때는 나가기가 서버에서 막힌다(APPOINTMENT-007). 조건에 맞는 항목만 넣으면
+// 시트가 매번 달라지므로, 볼 자격이 있는 항목은 두고 이유만 붙인다.
 const canOpenAttendance = computed(
   () => appointment.value?.appointmentStatus === 'IN_PROGRESS' && isHost.value,
 )
 const canOpenReviews = computed(
-  () => appointment.value?.appointmentStatus === 'COMPLETED' && isActiveParticipant.value,
+  () => appointment.value?.appointmentStatus === 'COMPLETED' && isAttendedMember.value,
 )
-const canOpenPostEventMenu = computed(() => canOpenAttendance.value || canOpenReviews.value)
+const canLeave = computed(
+  () => isActiveMember.value && !isHost.value && !isJoinDeadlinePassed.value,
+)
+
+const attendanceDisabledReason = computed(() => {
+  if (canOpenAttendance.value) return undefined
+  const status = appointment.value?.appointmentStatus
+  if (status === 'CANCELLED') return t('appointment.detail.menu.attendanceCancelled')
+  if (status === 'COMPLETED') return t('appointment.detail.menu.attendanceDone')
+  return t('appointment.detail.menu.attendanceNotStarted')
+})
+const reviewsDisabledReason = computed(() => {
+  if (canOpenReviews.value) return undefined
+  if (appointment.value?.appointmentStatus !== 'COMPLETED') {
+    return t('appointment.detail.menu.reviewsNotCompleted')
+  }
+  return t('appointment.detail.menu.reviewsNotAttended')
+})
+const leaveDisabledReason = computed(() =>
+  canLeave.value ? undefined : t('appointment.detail.menu.leaveDeadlinePassed'),
+)
+
+// 나가기는 방장에게 보여줄 이유가 없다. 방장은 어떤 상태에서도 자기 참여를
+// 취소할 수 없어 비활성 항목이 영영 활성화되지 않는다.
+const showLeaveItem = computed(() => isActiveMember.value && !isHost.value)
+// 시트는 상세를 다 받은 뒤에만 렌더되므로(약속 이름과 보증금이 필요하다) 버튼도
+// 같은 조건을 쓴다. 버튼만 헤더에서 먼저 뜨면 눌러도 아무것도 열리지 않는다.
+const canOpenMenu = computed(
+  () => appointment.value !== undefined && (isHost.value || isActiveMember.value),
+)
 
 function formatDateTime(value: AppointmentDateTimeValue): string {
   if (!value) return t('appointment.detail.notProvided')
-  const parsed = parseAppointmentDateTime(value)
+  const parsed = parseServerDateTime(value)
   if (!parsed) return typeof value === 'string' ? value : t('appointment.detail.notProvided')
-  return new Intl.DateTimeFormat(locale.value, {
+  return formatServerDateTime(parsed, locale.value, {
     dateStyle: 'medium',
     timeStyle: 'short',
-    timeZone: 'Asia/Seoul',
-  }).format(parsed)
+  })
 }
 
 function formatDeposit(value: string): string {
@@ -151,13 +221,78 @@ function openReviews(): void {
   })
 }
 
+function openLeaveConfirm(): void {
+  if (!canLeave.value) return
+
+  leaveMutation.reset()
+  menuOpen.value = false
+  leaveConfirmOpen.value = true
+}
+
+function closeLeaveConfirm(): void {
+  leaveConfirmOpen.value = false
+}
+
+function confirmLeave(): void {
+  if (!leaveMutation.isPending.value) leaveMutation.mutate()
+}
+
 function retry(): void {
   void detailQuery.refetch()
   void membersQuery.refetch()
+  void participationQuery.refetch()
 }
 
+/**
+ * 참여·탈퇴는 이 약속만 바꾸지 않는다. 목록 카드의 "{current}/{max} members"와
+ * 내 약속 목록(지갑 QR 결제가 공동 지출 약속을 고를 때 쓴다)도 함께 어긋나므로
+ * 다섯 갈래를 같이 무효화한다.
+ */
+async function invalidateParticipationScopes(): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.detail(appointmentId.value) }),
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.members(appointmentId.value) }),
+    queryClient.invalidateQueries({
+      queryKey: appointmentKeys.participation(appointmentId.value),
+    }),
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() }),
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.mine() }),
+  ])
+}
+
+const joinMutation = useMutation({
+  mutationFn: () => joinAppointment(appointmentId.value as number),
+  onSuccess: async () => {
+    depositSheetOpen.value = false
+    await invalidateParticipationScopes()
+  },
+})
+
+const leaveMutation = useMutation({
+  mutationFn: () => cancelAppointmentParticipation(appointmentId.value as number),
+  onSuccess: async () => {
+    leaveConfirmOpen.value = false
+    await invalidateParticipationScopes()
+  },
+})
+
+const leaveErrorMessage = computed(() =>
+  leaveMutation.error.value === null
+    ? undefined
+    : t(appointmentErrorMessageKey(leaveMutation.error.value, hasMessage)),
+)
+
+const joinErrorMessage = computed(() =>
+  joinMutation.error.value === null
+    ? undefined
+    : t(appointmentErrorMessageKey(joinMutation.error.value, hasMessage)),
+)
+
 function openDepositSheet(): void {
-  if (isJoinAvailable.value) depositSheetOpen.value = true
+  if (!isJoinButtonEnabled.value) return
+
+  joinMutation.reset()
+  depositSheetOpen.value = true
 }
 
 function closeDepositSheet(): void {
@@ -165,13 +300,13 @@ function closeDepositSheet(): void {
 }
 
 function confirmJoin(): void {
-  depositSheetOpen.value = false
+  if (!joinMutation.isPending.value) joinMutation.mutate()
 }
 </script>
 
 <template>
   <main class="flex min-h-dvh w-full flex-col gap-8 px-screen pb-28 pt-6">
-    <header class="relative flex items-center gap-3">
+    <header class="flex items-center gap-3">
       <AppButton
         compact
         variant="secondary"
@@ -184,13 +319,13 @@ function confirmJoin(): void {
         {{ t('appointment.detail.title') }}
       </h1>
       <AppButton
-        v-if="canOpenPostEventMenu"
+        v-if="canOpenMenu"
         compact
         variant="secondary"
         :aria-label="t('appointment.detail.openMenu')"
         :aria-expanded="menuOpen"
-        aria-controls="appointment-detail-menu"
-        @click="menuOpen = !menuOpen"
+        aria-haspopup="dialog"
+        @click="menuOpen = true"
       >
         <IconMenu2
           :size="20"
@@ -198,31 +333,6 @@ function confirmJoin(): void {
           aria-hidden="true"
         />
       </AppButton>
-      <div
-        v-if="menuOpen"
-        id="appointment-detail-menu"
-        role="menu"
-        class="absolute right-0 top-14 z-30 flex w-48 flex-col gap-1 rounded-sm border border-hairline bg-surface-1 p-2 shadow-sheet"
-      >
-        <button
-          v-if="canOpenAttendance"
-          type="button"
-          role="menuitem"
-          class="rounded-xs px-3 py-3 text-left text-body-sm text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          @click="openAttendance"
-        >
-          {{ t('appointment.detail.menu.attendance') }}
-        </button>
-        <button
-          v-if="canOpenReviews"
-          type="button"
-          role="menuitem"
-          class="rounded-xs px-3 py-3 text-left text-body-sm text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          @click="openReviews"
-        >
-          {{ t('appointment.detail.menu.reviews') }}
-        </button>
-      </div>
     </header>
 
     <StateEmpty
@@ -342,24 +452,20 @@ function confirmJoin(): void {
           :members="members"
           @select="openMemberProfile"
         />
-
-        <AppButton
-          v-if="canOpenAttendance"
-          block
-          variant="secondary"
-          @click="openAttendance"
-        >
-          {{ t('appointment.detail.attendance') }}
-        </AppButton>
       </section>
 
       <div
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
+        <p
+          v-if="joinDisabledReason !== undefined"
+          class="mb-2 text-center text-body-sm text-ink-3"
+        >
+          {{ joinDisabledReason }}
+        </p>
         <AppButton
           block
-          :disabled="!isJoinAvailable"
-          :title="!isJoinAvailable ? t('appointment.detail.joinUnavailable') : undefined"
+          :disabled="!isJoinButtonEnabled"
           @click="openDepositSheet"
         >
           {{ t('appointment.detail.join') }}
@@ -370,9 +476,35 @@ function confirmJoin(): void {
         v-if="depositSheetOpen"
         :appointment-name="appointment.appointmentName"
         :deposit-amount="appointment.depositAmount"
-        confirm-disabled
+        :confirm-disabled="joinMutation.isPending.value"
+        :error-message="joinErrorMessage"
         @close="closeDepositSheet"
         @confirm="confirmJoin"
+      />
+
+      <AppointmentMenuSheet
+        v-if="menuOpen"
+        :appointment-name="appointment.appointmentName"
+        :show-attendance="isHost"
+        :attendance-disabled-reason="attendanceDisabledReason"
+        :show-reviews="isActiveMember"
+        :reviews-disabled-reason="reviewsDisabledReason"
+        :show-leave="showLeaveItem"
+        :leave-disabled-reason="leaveDisabledReason"
+        @close="menuOpen = false"
+        @attendance="openAttendance"
+        @reviews="openReviews"
+        @leave="openLeaveConfirm"
+      />
+
+      <AppointmentLeaveConfirmSheet
+        v-if="leaveConfirmOpen"
+        :appointment-name="appointment.appointmentName"
+        :deposit-amount="appointment.depositAmount"
+        :confirm-disabled="leaveMutation.isPending.value"
+        :error-message="leaveErrorMessage"
+        @close="closeLeaveConfirm"
+        @confirm="confirmLeave"
       />
     </template>
   </main>

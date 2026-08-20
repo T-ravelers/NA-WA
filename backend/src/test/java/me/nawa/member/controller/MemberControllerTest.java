@@ -21,6 +21,7 @@ import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.member.domain.MemberProfile;
 import me.nawa.member.dto.MemberProfileResponse;
+import me.nawa.member.dto.OnboardingProfileRequest;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.exception.MemberErrorCode;
 import me.nawa.member.service.MemberProfileService;
@@ -116,6 +117,49 @@ class MemberControllerTest {
         verify(memberProfileService).updateProfile(eq(1L), requestCaptor.capture());
         assertEquals("ja", requestCaptor.getValue().getPreferredLanguage());
         assertNull(requestCaptor.getValue().getPreferredCurrencyCode());
+    }
+
+    @Test
+    void patchOnboarding_returns200WithCompletedProfile() throws Exception {
+        when(memberProfileService.completeOnboarding(eq(1L), any(OnboardingProfileRequest.class)))
+                .thenReturn(sampleResponse("ja"));
+
+        String body = mockMvc.perform(patch("/api/v1/members/me/onboarding")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"여행자\",\"nationalityCode\":\"JP\","
+                                + "\"preferredLanguage\":\"ja\",\"preferredCurrencyCode\":\"JPY\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode json = objectMapper.readTree(body);
+
+        assertTrue(json.path("success").asBoolean());
+        assertFalse(json.path("data").path("onboardingRequired").asBoolean());
+
+        ArgumentCaptor<OnboardingProfileRequest> requestCaptor =
+                ArgumentCaptor.forClass(OnboardingProfileRequest.class);
+        verify(memberProfileService).completeOnboarding(eq(1L), requestCaptor.capture());
+        assertEquals("여행자", requestCaptor.getValue().getDisplayName());
+        assertEquals("JP", requestCaptor.getValue().getNationalityCode());
+        assertEquals("ja", requestCaptor.getValue().getPreferredLanguage());
+        assertEquals("JPY", requestCaptor.getValue().getPreferredCurrencyCode());
+    }
+
+    @Test
+    void patchOnboarding_returns400WithErrorBody_whenFieldMissing() throws Exception {
+        when(memberProfileService.completeOnboarding(eq(1L), any(OnboardingProfileRequest.class)))
+                .thenThrow(new BusinessException(MemberErrorCode.ONBOARDING_FIELD_MISSING));
+
+        String body = mockMvc.perform(patch("/api/v1/members/me/onboarding")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"여행자\"}"))
+                .andExpect(status().isBadRequest())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode json = objectMapper.readTree(body);
+
+        assertFalse(json.path("success").asBoolean());
+        assertEquals("MEMBER-008", json.path("error").path("code").asText());
     }
 
     @Test

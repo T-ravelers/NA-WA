@@ -99,8 +99,8 @@
   --shadow-sheet: 0 -8px 32px rgb(0 0 0 / 0.55);
 
   /* ── 폰트 ──
-   * Display는 로케일별로 달라진다. en·vi는 Sztos를 쓰고 CJK Display 3종
-   * (Smiley Sans·Taipei Sans TC Beta·M PLUS 1)은 아직 번들에 없으므로 Body 폰트로
+   * Display는 로케일별로 달라진다. en·vi는 Sztos를 쓰고 CJK Display 2종
+   * (Taipei Sans TC Beta·M PLUS 1)은 아직 번들에 없으므로 Body 폰트로
    * 폴백한다. `NAWA` 워드마크는 Ria Sans 조판을 SVG 패스로 고정하므로 이 토큰을
    * 사용하지 않는다.
    *

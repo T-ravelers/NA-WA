@@ -2,6 +2,7 @@ package me.nawa.auth.controller;
 
 import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.jwt.AccessToken;
+import me.nawa.auth.oauth.authorization.OAuthAuthorizationRedirect;
 import me.nawa.auth.oauth.authorization.OAuthAuthorizationService;
 import me.nawa.auth.oauth.callback.OAuthCallbackResult;
 import me.nawa.auth.oauth.callback.OAuthCallbackService;
@@ -48,6 +49,7 @@ class AuthControllerTest {
         AuthCookieManager authCookieManager = new AuthCookieManager(
                 "access_token",
                 "refresh_token",
+                "oauth_state",
                 false,
                 "Lax",
                 ""
@@ -72,6 +74,8 @@ class AuthControllerTest {
         oauthAuthorizationService.authorizationUri = URI.create(
                 "https://accounts.google.com/o/oauth2/v2/auth?state=value"
         );
+        oauthAuthorizationService.expiresAt =
+                Instant.now().plusSeconds(600);
 
         MockHttpServletResponse response = mockMvc.perform(
                         get("/api/v1/auth/oauth2/authorization/google")
@@ -87,6 +91,17 @@ class AuthControllerTest {
         );
         assertEquals("google", oauthAuthorizationService.provider);
         assertEquals("/journeys", oauthAuthorizationService.returnPath);
+        List<String> setCookies = response.getHeaders(HttpHeaders.SET_COOKIE);
+        assertEquals(1, setCookies.size());
+        assertTrue(setCookies.get(0).contains(
+                "oauth_state=browser-binding-value"
+        ));
+        assertTrue(setCookies.get(0).contains("HttpOnly"));
+        assertTrue(setCookies.get(0).contains("SameSite=Lax"));
+        assertTrue(setCookies.get(0).contains("Path=/api/v1/auth;"));
+        assertFalse(response.getHeader(HttpHeaders.LOCATION).contains(
+                "browser-binding-value"
+        ));
     }
 
     @Test
@@ -104,6 +119,10 @@ class AuthControllerTest {
                         get("/api/v1/auth/oauth2/callback/google")
                                 .param("state", "state-value")
                                 .param("code", "authorization-code")
+                                .cookie(new Cookie(
+                                        "oauth_state",
+                                        "browser-binding-value"
+                                ))
                 )
                 .andReturn()
                 .getResponse();
@@ -117,11 +136,43 @@ class AuthControllerTest {
         assertEquals("state-value", oauthCallbackService.state);
         assertEquals("authorization-code", oauthCallbackService.code);
         assertNull(oauthCallbackService.error);
+        assertEquals(
+                "browser-binding-value",
+                oauthCallbackService.browserBinding
+        );
         List<String> setCookies = response.getHeaders(HttpHeaders.SET_COOKIE);
-        assertEquals(2, setCookies.size());
+        assertEquals(3, setCookies.size());
         assertTrue(setCookies.get(0).contains("access_token=access-value"));
         assertTrue(setCookies.get(1).contains("refresh_token=refresh-value"));
+        assertTrue(setCookies.get(2).contains("oauth_state="));
+        assertTrue(setCookies.get(2).contains("Max-Age=0"));
         assertTrue(response.getContentAsString().isEmpty());
+    }
+
+    @Test
+    void callback_withoutStateCookie_passesNoBrowserBinding()
+            throws Exception {
+        oauthCallbackService.failure = new BusinessException(
+                me.nawa.auth.exception.AuthErrorCode
+                        .INVALID_OAUTH_CALLBACK_STATE
+        );
+        oauthCallbackService.failureUri = URI.create(
+                "http://localhost:5173/auth/callback?error=AUTH-014"
+        );
+
+        MockHttpServletResponse response = mockMvc.perform(
+                        get("/api/v1/auth/oauth2/callback/google")
+                                .param("state", "state-value")
+                                .param("code", "authorization-code")
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(302, response.getStatus());
+        assertNull(oauthCallbackService.browserBinding);
+        assertDeletedCallbackCookies(
+                response.getHeaders(HttpHeaders.SET_COOKIE)
+        );
     }
 
     @Test
@@ -156,7 +207,9 @@ class AuthControllerTest {
         assertFalse(response.getHeader(HttpHeaders.LOCATION).contains(
                 "description"
         ));
-        assertDeletedCookies(response.getHeaders(HttpHeaders.SET_COOKIE));
+        assertDeletedCallbackCookies(
+                response.getHeaders(HttpHeaders.SET_COOKIE)
+        );
         assertTrue(response.getContentAsString().isEmpty());
     }
 
@@ -183,7 +236,9 @@ class AuthControllerTest {
                 oauthCallbackService.failureUri.toString(),
                 response.getHeader(HttpHeaders.LOCATION)
         );
-        assertDeletedCookies(response.getHeaders(HttpHeaders.SET_COOKIE));
+        assertDeletedCallbackCookies(
+                response.getHeaders(HttpHeaders.SET_COOKIE)
+        );
         assertTrue(response.getContentAsString().isEmpty());
     }
 
@@ -371,6 +426,17 @@ class AuthControllerTest {
         );
     }
 
+    private void assertDeletedCallbackCookies(List<String> setCookies) {
+        assertEquals(3, setCookies.size());
+        assertTrue(setCookies.get(0).contains("access_token="));
+        assertTrue(setCookies.get(0).contains("Max-Age=0"));
+        assertTrue(setCookies.get(1).contains("refresh_token="));
+        assertTrue(setCookies.get(1).contains("Max-Age=0"));
+        assertTrue(setCookies.get(2).contains("oauth_state="));
+        assertTrue(setCookies.get(2).contains("Max-Age=0"));
+        assertTrue(setCookies.get(2).contains("Path=/api/v1/auth;"));
+    }
+
     private void assertDeletedCookies(List<String> setCookies) {
         assertEquals(2, setCookies.size());
         assertTrue(setCookies.get(0).contains("access_token="));
@@ -415,16 +481,22 @@ class AuthControllerTest {
     private static final class FakeOAuthAuthorizationService
             implements OAuthAuthorizationService {
         private URI authorizationUri;
+        private String browserBinding = "browser-binding-value";
+        private Instant expiresAt;
         private String provider;
         private String returnPath;
 
         @Override
-        public URI createAuthorizationUri(
+        public OAuthAuthorizationRedirect createAuthorizationRedirect(
                 String provider,
                 String returnPath) {
             this.provider = provider;
             this.returnPath = returnPath;
-            return authorizationUri;
+            return new OAuthAuthorizationRedirect(
+                    authorizationUri,
+                    browserBinding,
+                    expiresAt
+            );
         }
     }
 
@@ -437,16 +509,19 @@ class AuthControllerTest {
         private String state;
         private String code;
         private String error;
+        private String browserBinding;
 
         @Override
         public OAuthCallbackResult handle(
                 String provider,
                 String state,
                 String authorizationCode,
-                String authorizationError) {
+                String authorizationError,
+                String browserBinding) {
             this.provider = provider;
             this.state = state;
             this.code = authorizationCode;
+            this.browserBinding = browserBinding;
             this.error = authorizationError;
             if (failure != null) {
                 throw failure;

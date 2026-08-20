@@ -43,6 +43,22 @@
         END
     </sql>
 
+    <!-- 요청한 회원의 찜 여부. 비인증 요청(memberId IS NULL)은 항상 FALSE다. -->
+    <sql id="savedColumn">
+        <choose>
+            <when test="memberId != null">
+                EXISTS (
+                    SELECT 1
+                    FROM explore_item_likes saved_like
+                    WHERE saved_like.item_id = ei.item_id
+                      AND saved_like.member_id = #{memberId}
+                      AND saved_like.deleted_at IS NULL
+                ) AS saved
+            </when>
+            <otherwise>FALSE AS saved</otherwise>
+        </choose>
+    </sql>
+
     <sql id="placeListWhere">
         ei.item_type = 'PLACE'
         AND ei.approval_status = 'APPROVED'
@@ -63,11 +79,40 @@
             <foreach collection="request.region1" item="value"
                      open="(" separator="," close=")">#{value}</foreach>
         </if>
-        <if test="request.region2 != null and request.region2.size() > 0">
-            AND p.region2 IN
-            <foreach collection="request.region2" item="value"
-                     open="(" separator="," close=")">#{value}</foreach>
-        </if>
+        <choose>
+            <when test="request.region2Other == true and request.region1 != null and request.region1.size() > 0 and request.region2 != null and request.region2.size() > 0">
+                AND (
+                    p.region2 IN
+                    <foreach collection="request.region2" item="value"
+                             open="(" separator="," close=")">#{value}</foreach>
+                    OR p.region2 IS NULL
+                    OR TRIM(p.region2) = ''
+                    <if test="request.knownRegion2Values != null and request.knownRegion2Values.size() > 0">
+                        OR p.region2 NOT IN
+                        <foreach collection="request.knownRegion2Values" item="knownRegion2"
+                                 open="(" separator="," close=")">#{knownRegion2}</foreach>
+                    </if>
+                )
+            </when>
+            <when test="request.region2Other == true and request.region1 != null and request.region1.size() > 0">
+                AND (
+                    p.region2 IS NULL OR TRIM(p.region2) = ''
+                    <if test="request.knownRegion2Values != null and request.knownRegion2Values.size() > 0">
+                        OR p.region2 NOT IN
+                        <foreach collection="request.knownRegion2Values" item="knownRegion2"
+                                 open="(" separator="," close=")">#{knownRegion2}</foreach>
+                    </if>
+                )
+            </when>
+            <when test="request.region2Other == true">
+                AND 1 = 0
+            </when>
+            <when test="request.region2 != null and request.region2.size() > 0">
+                AND p.region2 IN
+                <foreach collection="request.region2" item="value"
+                         open="(" separator="," close=")">#{value}</foreach>
+            </when>
+        </choose>
         <if test="request.region3 != null and request.region3.size() > 0">
             AND p.region3 IN
             <foreach collection="request.region3" item="value"
@@ -135,7 +180,8 @@
             p.has_parking, p.reservable, p.takeout_available,
             p.card_payment_available, p.smoke_free, p.kid_facility,
             p.has_restroom, p.is_active, p.view_count, p.favorite_count,
-            p.opening_hours, p.closed_days
+            p.opening_hours, p.closed_days,
+            <include refid="savedColumn"/>
         FROM explore_items ei
         JOIN place p ON p.place_id = ei.item_id
         WHERE <include refid="placeListWhere"/>
@@ -169,7 +215,8 @@
             p.has_foreign_lang, p.has_parking, p.reservable,
             p.takeout_available, p.card_payment_available, p.smoke_free,
             p.kid_facility, p.has_restroom, p.is_active,
-            p.view_count, p.favorite_count
+            p.view_count, p.favorite_count,
+            <include refid="savedColumn"/>
         FROM explore_items ei
         JOIN place p ON p.place_id = ei.item_id
         WHERE ei.item_type = 'PLACE'

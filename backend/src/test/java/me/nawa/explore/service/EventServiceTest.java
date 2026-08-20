@@ -141,7 +141,6 @@ class EventServiceTest {
         request.setEventKinds(List.of(" popup ", "CONCERT", "popup"));
         request.setRegion1(List.of("서울", " 서울 ", "경기"));
         request.setRegion2(List.of("성수", " 홍대 "));
-        request.setDatePreset("opening_soon");
         request.setSort("ending_soon");
         request.setFreeOnly(true);
         request.setOpenWeekendOnly(true);
@@ -173,7 +172,6 @@ class EventServiceTest {
         assertEquals(List.of("POPUP", "CONCERT"), normalized.getEventKinds());
         assertEquals(List.of("서울", "경기"), normalized.getRegion1());
         assertEquals(List.of("성수", "홍대"), normalized.getRegion2());
-        assertEquals("OPENING_SOON", normalized.getDatePreset());
         assertEquals("ENDING_SOON", normalized.getSort());
         assertEquals(true, normalized.getFreeOnly());
         assertEquals(true, normalized.getOpenWeekendOnly());
@@ -184,16 +182,28 @@ class EventServiceTest {
     }
 
     @Test
-    void searchEvents_throwsInvalidInput_whenDatePresetAndDateRangeAreCombined() {
+    void searchEvents_acceptsLegacyLatestSortAsNewest() {
         EventSearchRequest request = new EventSearchRequest();
-        request.setDatePreset("ONGOING");
-        request.setStartDate(LocalDate.of(2026, 8, 1));
+        request.setSort("LATEST");
+        when(eventMapper.searchEvents(
+            any(EventSearchRequest.class),
+            eq(0),
+            isNull(Long.class)
+        )).thenReturn(List.of());
+        when(eventMapper.countEvents(
+            any(EventSearchRequest.class),
+            isNull(Long.class)
+        )).thenReturn(0L);
 
-        assertThrows(
-            BusinessException.class,
-            () -> eventService.searchEvents(request)
+        eventService.searchEvents(request);
+
+        var requestCaptor = forClass(EventSearchRequest.class);
+        verify(eventMapper).searchEvents(
+            requestCaptor.capture(),
+            eq(0),
+            isNull(Long.class)
         );
-        verifyNoInteractions(eventMapper);
+        assertEquals("NEWEST", requestCaptor.getValue().getSort());
     }
 
     @Test
@@ -257,7 +267,7 @@ class EventServiceTest {
             .title("서울 야시장 푸드 팝업(테스트)")
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -271,7 +281,7 @@ class EventServiceTest {
         assertEquals("FESTIVAL", result.getEventKind());
         assertEquals("서울 야시장 푸드 팝업(테스트)", result.getTitle());
         assertEquals(0, result.getActivities().size());
-        verify(eventMapper).findEventDetail(990001L, "ko");
+        verify(eventMapper).findEventDetail(990001L, "ko", null);
         verify(eventMapper).findEventActivities(990001L, "ko");
     }
 
@@ -286,7 +296,7 @@ class EventServiceTest {
 
     @Test
     void getEventDetail_throwsEventNotFound_whenMapperReturnsNull() {
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(null);
 
         BusinessException exception = assertThrows(
@@ -298,7 +308,7 @@ class EventServiceTest {
             ExploreErrorCode.EVENT_NOT_FOUND,
             exception.getErrorCode()
         );
-        verify(eventMapper).findEventDetail(990001L, "ko");
+        verify(eventMapper).findEventDetail(990001L, "ko", null);
     }
 
     @Test
@@ -308,7 +318,7 @@ class EventServiceTest {
             .title("서울 야시장 푸드 팝업(테스트)")
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(null);
@@ -339,7 +349,7 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "en"))
+        when(eventMapper.findEventDetail(990001L, "en", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "en"))
             .thenReturn(List.of());
@@ -381,7 +391,7 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -407,7 +417,7 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -432,7 +442,7 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko"))
+        when(eventMapper.findEventDetail(990001L, "ko", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -449,19 +459,35 @@ class EventServiceTest {
     }
 
     @Test
+    void getEventDetail_passesMemberIdToMapper() {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .build();
+
+        when(eventMapper.findEventDetail(990001L, "ko", 7L))
+            .thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ko"))
+            .thenReturn(List.of());
+
+        eventService.getEventDetail(990001L, "ko", 7L);
+
+        verify(eventMapper).findEventDetail(990001L, "ko", 7L);
+    }
+
+    @Test
     void getEventDetail_usesEnglishAsDefaultLanguage() {
         EventDetailResponse event = EventDetailResponse.builder()
             .eventId(990001L)
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "en"))
+        when(eventMapper.findEventDetail(990001L, "en", null))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "en"))
             .thenReturn(List.of());
 
         eventService.getEventDetail(990001L, null);
 
-        verify(eventMapper).findEventDetail(990001L, "en");
+        verify(eventMapper).findEventDetail(990001L, "en", null);
         verify(eventMapper).findEventActivities(990001L, "en");
     }
 }

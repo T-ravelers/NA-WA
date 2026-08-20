@@ -21,8 +21,10 @@
             member_id,
             display_name,
             profile_image_url,
+            nationality_code,
             preferred_language,
             preferred_currency_code,
+            account_type,
             member_status,
             (onboarding_completed_at IS NOT NULL) AS onboarding_completed,
             (deleted_at IS NOT NULL) AS deleted
@@ -75,6 +77,15 @@
     <update id="updateProfile">
         UPDATE members
         <set>
+            <if test="displayName != null">
+                display_name = #{displayName},
+            </if>
+            <if test="profileImageUrl != null">
+                profile_image_url = #{profileImageUrl},
+            </if>
+            <if test="nationalityCode != null">
+                nationality_code = #{nationalityCode},
+            </if>
             <if test="preferredLanguage != null">
                 preferred_language = #{preferredLanguage},
             </if>
@@ -84,6 +95,35 @@
             updated_at = CURRENT_TIMESTAMP
         </set>
         WHERE member_id = #{memberId}
+          AND deleted_at IS NULL
+    </update>
+
+    <!-- 재호출은 값만 갱신한다. 완료 시각은 COALESCE로 최초 값을 보존해 멱등을 지킨다. -->
+    <update id="completeOnboarding">
+        UPDATE members
+        SET display_name = #{displayName},
+            nationality_code = #{nationalityCode},
+            preferred_language = #{preferredLanguage},
+            preferred_currency_code = #{preferredCurrencyCode},
+            onboarding_completed_at = COALESCE(onboarding_completed_at, CURRENT_TIMESTAMP),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE member_id = #{memberId}
+          AND deleted_at IS NULL
+    </update>
+
+    <!--
+        가맹점 등록. TRAVELER 계정만 MERCHANT로 바꾸므로 재등록은 0행으로 돌아온다.
+        손님용 온보딩 화면이 생겨도 가맹점이 국적·선호 통화 입력으로 끌려가지 않게
+        onboarding_completed_at을 함께 채운다.
+    -->
+    <update id="markAsMerchant">
+        UPDATE members
+        SET account_type = 'MERCHANT',
+            display_name = #{businessName},
+            onboarding_completed_at = COALESCE(onboarding_completed_at, CURRENT_TIMESTAMP),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE member_id = #{memberId}
+          AND account_type = 'TRAVELER'
           AND deleted_at IS NULL
     </update>
 

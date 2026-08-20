@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   addJourneyItem,
   buildJourneyCreateRequest,
+  checkJourneyItemExists,
   createJourney,
   fetchJourney,
   fetchJourneyTimeline,
@@ -123,6 +124,16 @@ describe('journeyApi', () => {
 
     await expect(fetchJourneys()).resolves.toEqual(data)
     expect(get).toHaveBeenCalledWith('/api/v1/journeys')
+  })
+
+  it('checks whether a journey item already exists on a visit date', async () => {
+    get.mockResolvedValueOnce({ data: { exists: true } })
+
+    await expect(checkJourneyItemExists(12, 990001, '2026-08-08')).resolves.toBe(true)
+
+    expect(get).toHaveBeenCalledWith('/api/v1/journeys/12/items/exists', {
+      params: { itemId: 990001, visitDate: '2026-08-08' },
+    })
   })
 
   it('adds an explore item to the selected journey on the selected date', async () => {

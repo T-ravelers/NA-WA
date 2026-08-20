@@ -72,6 +72,11 @@ ISO 문자열을 기대하므로 **날짜만 조용히 사라집니다.** 예외
 access cookie `Path=/`, refresh cookie `Path=/api/v1/auth`, 둘 다 HttpOnly.
 운영 기본값은 host-only, `Secure=true`, `SameSite=Lax`입니다.
 
+로그인 시작이 발급하는 `oauth_state` 쿠키(`Path=/api/v1/auth`, HttpOnly)는
+**`auth.cookie.same-site` 설정과 무관하게 항상 `SameSite=Lax`입니다.** 공급자
+콜백이 외부 사이트에서 오는 top-level 이동이라 Strict면 쿠키가 실려 오지 않아
+모든 로그인이 실패합니다. 이 쿠키를 다른 두 개와 같은 설정으로 묶지 마세요.
+
 - `/api/**` CORS는 명시적 allowlist + `credentials=true`입니다. wildcard Origin 금지.
 - **CORS 책임은 Spring Security 한 곳에 둡니다.** Nginx에서 중복 헤더를 넣지 않습니다.
 - refresh 실패 `AUTH-001`, 재사용 감지 `AUTH-002`, 인증 필요 `AUTH-003`.

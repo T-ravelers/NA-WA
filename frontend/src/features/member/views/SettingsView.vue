@@ -36,7 +36,6 @@ const currentLocale = computed(() => locale.value as AppLocale)
 const NATIVE_LABEL: Record<AppLocale, string> = {
   en: 'English',
   ja: '日本語',
-  'zh-CN': '简体中文',
   'zh-TW': '繁體中文',
   vi: 'Tiếng Việt',
 }

@@ -11,6 +11,9 @@ public interface WalletMapper {
 
     Wallet findByMemberId(@Param("memberId")Long memberId);
 
+    // DEPOSIT_POOL 같은 시스템 지갑을 owner_type='SYSTEM' + system_code로 찾는다.
+    Wallet findBySystemCode(@Param("systemCode") String systemCode);
+
     // 가입 시 지갑 생성 — wallet_owners 먼저, 생성된 wallet_owner_id로 wallets를 만든다
     int insertMemberWalletOwner(MemberWalletProvision provision);
 

@@ -20,9 +20,17 @@ import java.util.Optional;
 public class AuthCookieManager {
     private static final String ACCESS_TOKEN_PATH = "/";
     private static final String REFRESH_TOKEN_PATH = "/api/v1/auth";
+    private static final String OAUTH_STATE_PATH = "/api/v1/auth";
+
+    /**
+     * 공급자 콜백은 외부 사이트에서 오는 top-level 이동이라 SameSite=Strict 쿠키는
+     * 실려 오지 않는다. 이 쿠키만 Lax로 고정한다.
+     */
+    private static final String OAUTH_STATE_SAME_SITE = "Lax";
 
     private final String accessTokenName;
     private final String refreshTokenName;
+    private final String oauthStateName;
     private final boolean secure;
     private final String sameSite;
     private final String domain;
@@ -32,12 +40,14 @@ public class AuthCookieManager {
     public AuthCookieManager(
             @Value("${auth.cookie.access-token-name}") String accessTokenName,
             @Value("${auth.cookie.refresh-token-name}") String refreshTokenName,
+            @Value("${auth.cookie.oauth-state-name}") String oauthStateName,
             @Value("${auth.cookie.secure}") boolean secure,
             @Value("${auth.cookie.same-site}") String sameSite,
             @Value("${auth.cookie.domain:}") String domain) {
         this(
                 accessTokenName,
                 refreshTokenName,
+                oauthStateName,
                 secure,
                 sameSite,
                 domain,
@@ -48,20 +58,25 @@ public class AuthCookieManager {
     AuthCookieManager(
             String accessTokenName,
             String refreshTokenName,
+            String oauthStateName,
             boolean secure,
             String sameSite,
             String domain,
             Clock clock) {
         if (!StringUtils.hasText(accessTokenName)
-                || !StringUtils.hasText(refreshTokenName)) {
+                || !StringUtils.hasText(refreshTokenName)
+                || !StringUtils.hasText(oauthStateName)) {
             throw new IllegalArgumentException("Auth cookie names must not be blank");
         }
-        if (accessTokenName.equals(refreshTokenName)) {
+        if (accessTokenName.equals(refreshTokenName)
+                || accessTokenName.equals(oauthStateName)
+                || refreshTokenName.equals(oauthStateName)) {
             throw new IllegalArgumentException("Auth cookie names must be different");
         }
 
         this.accessTokenName = accessTokenName;
         this.refreshTokenName = refreshTokenName;
+        this.oauthStateName = oauthStateName;
         this.secure = secure;
         this.sameSite = normalizeSameSite(sameSite);
         if ("None".equals(this.sameSite) && !secure) {
@@ -93,6 +108,33 @@ public class AuthCookieManager {
         );
     }
 
+    public ResponseCookie createOAuthStateCookie(
+            String browserBinding,
+            Instant expiresAt) {
+        if (!StringUtils.hasText(browserBinding)) {
+            throw new IllegalArgumentException(
+                    "OAuth browser binding must not be blank"
+            );
+        }
+        return createCookie(
+                oauthStateName,
+                browserBinding,
+                OAUTH_STATE_PATH,
+                remainingMaxAge(expiresAt),
+                OAUTH_STATE_SAME_SITE
+        );
+    }
+
+    public ResponseCookie deleteOAuthStateCookie() {
+        return createCookie(
+                oauthStateName,
+                "",
+                OAUTH_STATE_PATH,
+                Duration.ZERO,
+                OAUTH_STATE_SAME_SITE
+        );
+    }
+
     public ResponseCookie deleteAccessTokenCookie() {
         return createCookie(accessTokenName, "", ACCESS_TOKEN_PATH, Duration.ZERO);
     }
@@ -112,6 +154,10 @@ public class AuthCookieManager {
 
     public Optional<String> findAccessToken(Cookie[] cookies) {
         return findCookieValue(cookies, accessTokenName);
+    }
+
+    public Optional<String> findOAuthStateBinding(Cookie[] cookies) {
+        return findCookieValue(cookies, oauthStateName);
     }
 
     private Optional<String> findCookieValue(
@@ -135,11 +181,20 @@ public class AuthCookieManager {
             String value,
             String path,
             Duration maxAge) {
+        return createCookie(name, value, path, maxAge, sameSite);
+    }
+
+    private ResponseCookie createCookie(
+            String name,
+            String value,
+            String path,
+            Duration maxAge,
+            String cookieSameSite) {
         ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
                 .from(name, value)
                 .httpOnly(true)
                 .secure(secure)
-                .sameSite(sameSite)
+                .sameSite(cookieSameSite)
                 .path(path)
                 .maxAge(maxAge);
 

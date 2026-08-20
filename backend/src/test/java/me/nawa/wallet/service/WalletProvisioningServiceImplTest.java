@@ -115,6 +115,11 @@ class WalletProvisioningServiceImplTest {
         }
 
         @Override
+        public Wallet findBySystemCode(String systemCode) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public int insertMemberWalletOwner(MemberWalletProvision provision) {
             callOrder.add("owner");
             this.provision = provision;

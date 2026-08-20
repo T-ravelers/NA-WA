@@ -8,11 +8,12 @@ import {
 } from '../exploreTaxonomy'
 
 describe('explore taxonomy', () => {
-  it('keeps the existing Event sector and activity IDs stable', () => {
+  it('uses the operational_v9 sector and activity IDs', () => {
     expect(EVENT_SECTOR_OPTIONS.map((sector) => sector.id)).toEqual([1, 2, 3, 4])
-    expect(EVENT_SECTOR_OPTIONS[0]?.activities.map((activity) => activity.id)).toEqual([
-      101, 102, 103, 104, 105, 106,
-    ])
+    expect(EVENT_ACTIVITY_OPTIONS.map((activity) => activity.id)).toEqual(
+      Array.from({ length: 56 }, (_, index) => index + 1),
+    )
+    expect(EVENT_SECTOR_OPTIONS.map((sector) => sector.activities.length)).toEqual([8, 8, 21, 19])
   })
 
   it('reuses the Event taxonomy for Place filters', () => {

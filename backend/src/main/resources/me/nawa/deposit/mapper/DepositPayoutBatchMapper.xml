@@ -57,6 +57,14 @@
         deleted_at
     </sql>
 
+    <select id="findPendingOrFailedBatchIds" resultType="long">
+        SELECT deposit_payout_batch_id
+        FROM deposit_payout_batches
+        WHERE resolution_status IN ('PENDING', 'FAILED')
+        AND deleted_at IS NULL
+        ORDER BY deposit_payout_batch_id ASC
+    </select>
+
     <select id="findById"
             resultMap="depositPayoutBatchResultMap">
         SELECT

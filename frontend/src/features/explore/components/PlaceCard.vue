@@ -9,7 +9,9 @@ import CategoryDot from '@/shared/ui/CategoryDot.vue'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import type { Category } from '@/shared/ui/category'
 
+import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMutation'
 import { normalizePlaceKind, type PlaceKind, type PlaceSummary } from '../model/placeExplore'
+import { findExploreRegionLabelKey } from '../model/exploreRegions'
 
 interface Props {
   place: PlaceSummary
@@ -18,6 +20,8 @@ interface Props {
 const { place } = defineProps<Props>()
 const emit = defineEmits<{ open: [placeId: number] }>()
 const { t } = useI18n()
+const likeMutation = useExploreItemLikeMutation()
+const saved = computed(() => place.saved)
 
 const normalizedKind = computed<PlaceKind>(() => normalizePlaceKind(place.placeKind))
 
@@ -33,7 +37,13 @@ const category = computed<Category>(() => {
 const categoryLabel = computed(() => t(`explore.categories.${category.value}`))
 
 const regionLabel = computed(() =>
-  [place.region1, place.region2, place.region3].filter(Boolean).join(' · '),
+  [place.region1, place.region2, place.region3]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      const labelKey = findExploreRegionLabelKey(value)
+      return labelKey ? t(labelKey) : value
+    })
+    .join(' · '),
 )
 
 const subtitle = computed(() => [place.brand, place.branch].filter(Boolean).join(' · '))
@@ -54,6 +64,11 @@ const optionBadges = computed(() => {
 
 function openPlace(): void {
   emit('open', place.itemId)
+}
+
+function toggleSaved(): void {
+  if (likeMutation.isPending.value) return
+  likeMutation.mutate({ itemId: place.itemId, saved: !place.saved })
 }
 </script>
 
@@ -98,12 +113,14 @@ function openPlace(): void {
           <button
             type="button"
             class="flex size-11 shrink-0 items-center justify-center text-ink-3"
-            :aria-label="t('explore.savePlaceUnavailable')"
-            disabled
+            :aria-label="saved ? t('explore.unsavePlace') : t('explore.savePlace')"
+            :aria-pressed="saved"
+            @click.stop="toggleSaved"
           >
             <IconHeart
               :size="21"
               :stroke-width="1.8"
+              :class="saved ? 'fill-danger text-danger' : ''"
               aria-hidden="true"
             />
           </button>

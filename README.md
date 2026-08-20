@@ -45,9 +45,31 @@ cp -n .env.example .env
 `cp -n`은 이미 `.env`가 있을 때 기존 파일을 덮어쓰지 않습니다. 기존 `.env`가
 있다면 `.env.example`에 새로 추가된 변수만 기존 파일에 직접 추가합니다. 이
 예시 파일에는 Docker Compose가 참조하는 전체 환경 변수와 로컬 기본값이 정리되어
-있습니다. MySQL 값은 로컬 컨테이너 전용 기본값이며, JWT·OAuth·Stripe 관련
+있습니다. MySQL 값은 로컬 컨테이너 전용 기본값이며, JWT·OAuth·Stripe·AWS 관련
 실제 비밀값은 별도로 발급받아 `.env`에만 입력합니다. `.env`는 Git에 커밋하지
 않습니다.
+
+`AWS_*` 값은 정산 영수증 이미지를 저장하는 S3에 쓰입니다. 버킷은 백엔드가 도는
+계정과 **다른 AWS 계정**이 소유하므로 EC2 인스턴스 역할이 아니라 버킷 소유 계정이
+발급한 IAM 사용자 키로 접근합니다. `AWS_ACCESS_KEY_ID`와 `AWS_SECRET_ACCESS_KEY`는 항상 **한 쌍**입니다. 둘 다
+비워두면 AWS SDK가 다른 경로에서 자격증명을 찾으므로, 영수증 기능을 쓰지 않는
+로컬 개발에서는 값 없이 그대로 실행할 수 있습니다. 반대로 하나만 채우면 서버가
+뜨지 않습니다. 이때 서버를 그냥 띄우면 SDK가 EC2에 붙은 권한을 대신 집어 드는데,
+이 버킷은 다른 계정 소유라 그 권한으로는 열리지 않습니다. 그러면 서버는 정상으로
+보이다가 영수증을 처음 올릴 때 실패하고, 원인이 "키 하나 누락"이라는 것을
+찾기 어렵습니다.
+
+`CLOVA_OCR_*` 값은 영수증 사진에서 품목 글자를 읽는 데 쓰입니다. 호출 주소와 Secret Key는
+네이버 클라우드 콘솔에서 영수증(Receipt) 도메인을 만들면 그 도메인 전용으로 함께 나오므로
+**항상 한 쌍**입니다. 하나만 채우면 서버가 시작할 때 멈춥니다. 안 막으면 서버는 정상으로
+보이다가 사용자가 영수증을 찍는 순간에야 실패해서, 원인이 "값 하나 누락"이라는 것을 찾기
+어렵습니다. 둘 다 비워두면 글자 인식 기능만 꺼지므로 이 기능을 쓰지 않는 로컬 개발에서는
+값 없이 그대로 실행할 수 있습니다.
+
+`RECEIPT_MAX_UPLOAD_BYTES`는 영수증 사진 한 장의 최대 크기(바이트)이며 비워두면 8MiB를
+씁니다. 이 값을 올릴 때는 `nginx/nginx.conf`의 `client_max_body_size`도 함께 올립니다.
+nginx가 더 작으면 요청이 백엔드에 닿기도 전에 잘려서, 서버가 "크기 초과"라고 알려줄
+기회조차 없이 끊깁니다.
 
 `DOCKERHUB_USERNAME=local`은 로컬에서 빌드하는 backend 이미지의 이름 공간입니다.
 이미 빌드된 Docker Hub 이미지를 받으려면 해당 이미지의 실제 Docker Hub 이름으로
@@ -71,6 +93,18 @@ docker compose up
   (`.github/workflows/deploy.yml`이 `docker-compose.yml`, `nginx/nginx.conf`,
   `deploy/deploy.sh`만 전송합니다). 운영에만 필요한 `nginx` 서비스는 로컬에서
   기본적으로 실행되지 않습니다.
+- `certbot` 서비스는 `profiles: ["ops"]`로 묶여 있어 평소 `docker compose up -d`에는
+  포함되지 않습니다. TLS 인증서 최초 발급은 EC2에서
+  `docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d <도메인> ...`로
+  1회 실행하고, 갱신과 nginx reload는 `.github/workflows/renew-cert.yml`이 매일
+  자동으로 수행합니다.
+- 운영 백엔드는 `https://api.clearpng.cloud`입니다. nginx가 443에서 TLS를 종료하고,
+  80으로 온 요청은 `/.well-known/acme-challenge/`(인증서 갱신용)만 직접 응답한 뒤
+  나머지는 `308`로 https에 넘깁니다. ALB 도입 준비로 `X-Forwarded-Proto`가 붙은
+  요청과 헬스 체크용 `/alb-health`만 `308` 대신 백엔드로 프록시합니다.
+  프론트엔드의 `VITE_API_BASE_URL`도 https
+  주소여야 합니다 — 리다이렉트 응답에는 CORS 헤더가 없어 `http://`로 두면 브라우저가
+  API 호출을 차단합니다.
 - 프론트엔드는 `frontend/` 디렉터리를 컨테이너에 바인드 마운트하므로 소스를
   고치면 Vite가 자동으로 반영합니다.
 - 백엔드는 Spring Legacy WAR라 소스를 바꾸면 다시 빌드해야 반영됩니다.

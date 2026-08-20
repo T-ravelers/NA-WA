@@ -11,6 +11,7 @@ import {
   IconShare2,
 } from '@tabler/icons-vue'
 
+import { buildGoogleMapsDirectionsUrl, buildGoogleMapsSearchUrl } from '@/shared/lib/mapLink'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -24,8 +25,10 @@ import type { Category } from '@/shared/ui/category'
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
 import JourneySelectSheet from '../components/JourneySelectSheet.vue'
 import { usePlaceDetailQuery } from '../composables/usePlaceDetailQuery'
+import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMutation'
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
+import { findExploreRegionLabelKey } from '../model/exploreRegions'
 import { normalizePlaceKind, type PlaceKind } from '../model/placeExplore'
 import { toClosedDays, toDetailEntries } from '../model/placeDetail'
 
@@ -39,6 +42,14 @@ const returnContext = useExploreReturnContextStore()
 const placeId = computed(() => String(route.params.placeId ?? ''))
 const placeQuery = usePlaceDetailQuery(placeId, locale)
 const place = computed(() => placeQuery.data.value)
+const likeMutation = useExploreItemLikeMutation()
+const saved = computed(() => place.value?.saved ?? false)
+
+function toggleSaved(): void {
+  const current = place.value
+  if (!current || likeMutation.isPending.value) return
+  likeMutation.mutate({ itemId: current.itemId, saved: !current.saved })
+}
 
 const selectedImage = ref(0)
 const shared = ref(false)
@@ -66,7 +77,13 @@ const category = computed<Category>(() => {
 const categoryLabel = computed(() => t(`explore.categories.${category.value}`))
 
 const regionLabel = computed(() =>
-  [place.value?.region1, place.value?.region2, place.value?.region3].filter(Boolean).join(' · '),
+  [place.value?.region1, place.value?.region2, place.value?.region3]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      const labelKey = findExploreRegionLabelKey(value)
+      return labelKey ? t(labelKey) : value
+    })
+    .join(' · '),
 )
 
 const addressLabel = computed(() =>
@@ -75,6 +92,13 @@ const addressLabel = computed(() =>
 
 const locationLabel = computed(() =>
   [regionLabel.value, addressLabel.value].filter(Boolean).join(' · '),
+)
+
+const mapSearchUrl = computed(() =>
+  buildGoogleMapsSearchUrl(place.value?.latitude, place.value?.longitude),
+)
+const mapDirectionsUrl = computed(() =>
+  buildGoogleMapsDirectionsUrl(place.value?.latitude, place.value?.longitude),
 )
 
 const hours = computed(() => (place.value ? toDetailEntries(place.value.openingHours) : []))
@@ -183,6 +207,10 @@ async function sharePlace(): Promise<void> {
   } catch {
     // The native share sheet can be dismissed without completing the action.
   }
+}
+
+function openMapUrl(url: string | null): void {
+  if (url) window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function retry(): void {
@@ -437,14 +465,30 @@ async function confirmJourneyDate(date: string): Promise<void> {
               class="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-pill bg-food ring-4 ring-food/20"
               aria-hidden="true"
             />
-            <div class="absolute inset-x-3 bottom-3 flex justify-end">
-              <button
-                type="button"
-                class="rounded-pill bg-canvas/85 px-3 py-2 text-caption text-ink shadow-raised disabled:pointer-events-none disabled:opacity-40"
-                disabled
+          </div>
+          <div
+            v-if="mapSearchUrl"
+            class="flex min-w-0 gap-2"
+          >
+            <div class="min-w-0 flex-1">
+              <AppButton
+                block
+                compact
+                variant="secondary"
+                @click="openMapUrl(mapSearchUrl)"
+              >
+                {{ t('explore.placeDetail.openInGoogleMaps') }}
+              </AppButton>
+            </div>
+            <div class="min-w-0 flex-1">
+              <AppButton
+                block
+                compact
+                variant="secondary"
+                @click="openMapUrl(mapDirectionsUrl)"
               >
                 {{ t('explore.placeDetail.directions') }}
-              </button>
+              </AppButton>
             </div>
           </div>
         </section>
@@ -472,12 +516,14 @@ async function confirmJourneyDate(date: string): Promise<void> {
         <button
           type="button"
           class="flex size-12 shrink-0 items-center justify-center rounded-sm border border-hairline-strong bg-transparent text-ink"
-          :aria-label="t('explore.placeDetail.saveUnavailable')"
-          disabled
+          :aria-label="saved ? t('explore.placeDetail.unsave') : t('explore.placeDetail.save')"
+          :aria-pressed="saved"
+          @click="toggleSaved"
         >
           <IconHeart
             :size="21"
             :stroke-width="1.8"
+            :class="saved ? 'fill-danger text-danger' : ''"
             aria-hidden="true"
           />
         </button>

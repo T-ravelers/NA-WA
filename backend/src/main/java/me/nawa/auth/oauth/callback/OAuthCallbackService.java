@@ -9,7 +9,8 @@ public interface OAuthCallbackService {
             String provider,
             String state,
             String authorizationCode,
-            String authorizationError
+            String authorizationError,
+            String browserBinding
     );
 
     URI createFailureRedirectUri(ErrorCode errorCode);

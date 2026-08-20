@@ -34,6 +34,8 @@ route는 `features/<domain>/routes.ts`, 문구는 `features/<domain>/i18n/<local
 - `NormalizedApiError`(`code` / `status` / `messageKey`) 정규화
 - CSRF 헤더 부착
 - 401을 받으면 갱신 1회 후 원 요청 재시도
+- `responseType: 'blob'` 요청의 오류 본문(Blob)을 글자로 풀어 오류 코드를 살림. 이 해제는
+  CSRF·401 판정보다 먼저 일어나므로 바이너리 요청도 두 재시도를 그대로 탐
 
 **feature에서 재시도 로직을 다시 만들지 마세요.** 백엔드의 refresh 재사용 감지에
 걸립니다. 오류 분기는 메시지가 아니라 `error.code`로 합니다.
@@ -49,9 +51,13 @@ method·상태와 issue path/code/expected만 기록하며 response body, issue 
 인증·개인정보와 Axios error 전체를 기록하지 않습니다. feature API 테스트는
 `responseSchema` 전달을 확인하고, 스키마 fixture 테스트로 실제 검증도 별도로 증명합니다.
 
+정산 화면은 모든 환경에서 API 계약만 호출합니다. API 오류나 빈 응답을 예시 데이터로
+대체하지 않습니다. 테스트와 화면 캡처는 production source의 데이터 분기를 만들지 말고
+API mock 또는 Playwright route stub을 사용합니다.
+
 ## 문구 — 한국어는 서비스 locale이 아니다
 
-지원 locale은 `en`, `ja`, `zh-CN`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
+지원 locale은 `en`, `ja`, `zh-TW`, `vi`이며 기본과 폴백 모두 `en`입니다.
 방한 외국인이 대상이라 한국어 UI 문구를 만들지 않습니다. 최종 기준은
 `src/shared/i18n/locales.ts`입니다.
 
@@ -80,6 +86,9 @@ method·상태와 issue path/code/expected만 기록하며 response body, issue 
 > 발견이 늦습니다. 새 날짜 필드를 쓸 때는 백엔드 DTO에 `@JsonFormat`이 있는지
 > 먼저 확인하세요. 프론트 타입 선언과 단위 테스트로는 잡히지 않습니다.
 
+공용 파서는 `src/shared/lib/datetime.ts`의 `parseServerDateTime`만 사용합니다. 날짜 전용
+`YYYY-MM-DD` 값은 같은 파일의 달력 전용 함수를 사용하고 서버 시각 파서에 넘기지 않습니다.
+
 ## PWA 캐시 경계
 
 앱 셸과 정적 자원만 precache합니다. 인증·개인정보·정산·mutation 응답, 일반 API,
@@ -93,6 +102,12 @@ pnpm --filter @na-wa/frontend screenshot
 ```
 
 PR에 첨부합니다. 자동 검사가 없어 사람이 붙이지 않으면 그대로 넘어갑니다.
+
+낱장은 `scripts/screenshot.mjs`의 `SCREENS`, 눌러서 넘어가는 과정은 같은 파일의 `FLOWS`에
+적습니다. 흐름 도중에만 존재하는 화면(보내는 중, 결제 직후 상태)은 스텁이 응답을 잡아두거나
+상태를 바꿔 줘야 찍힙니다. 잡아둘 때는 `createGate()`를 쓰고 그 화면을 찍은 **다음 단계
+첫 줄**에서 `open()`으로 내보냅니다. 몇 초처럼 시간으로 늦추면 느린 실행에서는 이미 넘어간
+화면이 찍히는데, 뒤 단계의 `waitFor`가 그냥 통과해 **오류 없이 잘못된 산출물이 나갑니다.**
 
 ## 범위 밖
 

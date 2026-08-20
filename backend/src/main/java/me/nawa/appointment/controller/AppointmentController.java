@@ -9,6 +9,7 @@ import me.nawa.appointment.dto.response.AppointmentDetailResponse;
 import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.dto.response.AppointmentParticipationResponse;
+import me.nawa.appointment.dto.response.MyOngoingAppointmentResponse;
 import me.nawa.appointment.service.AppointmentService;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -131,4 +133,14 @@ public class AppointmentController {
         return ApiResponse.success();
     }
 
+    @GetMapping("/me")
+    @ApiOperation("내가 참여 중인 약속 목록 조회 — scope=ONGOING(기본)·ALL")
+    public ApiResponse<List<MyOngoingAppointmentResponse>> getMyOngoingAppointments(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @RequestParam(name = "scope", defaultValue = "ONGOING") String scope
+    ){
+        return ApiResponse.success(
+            appointmentService.getMyOngoingAppointments(member.getMemberId(), scope)
+        );
+    }
 }

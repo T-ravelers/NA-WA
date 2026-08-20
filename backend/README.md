@@ -14,7 +14,7 @@ NA-WA 백엔드는 Java 17과 Spring MVC로 구성한 WAR 애플리케이션입�
 | 탐색 목록 필터 요청과 결합 규칙 확인   | [탐색 API 계약](docs/EXPLORE_API.md)                             |
 | 약속 생성·참여·출석·후기 계약 확인     | [약속 및 후기 API 계약](docs/APPOINTMENT_API.md)                 |
 | 정산 생성·상태·금액·영수증 계약 확인  | [정산 API 계약](docs/SETTLEMENT.md)                              |
-| 전체 DB 구조와 도메인별 ERD 확인       | [V10 데이터베이스 지도](docs/database/README.md)                 |
+| 전체 DB 구조와 도메인별 ERD 확인       | [V14 데이터베이스 지도](docs/database/README.md)                 |
 | 프로젝트 전체 기술 경계 확인           | [기술 스택과 운영 경계](../docs/TECH_STACK.md)                  |
 
 ## 로컬 실행

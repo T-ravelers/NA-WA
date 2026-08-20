@@ -29,6 +29,22 @@
         (e.end_date IS NULL OR e.end_date &gt;= CURRENT_DATE())
     </sql>
 
+    <!-- 요청한 회원의 찜 여부. 비인증 요청(memberId IS NULL)은 항상 FALSE다. -->
+    <sql id="savedColumn">
+        <choose>
+            <when test="memberId != null">
+                EXISTS (
+                    SELECT 1
+                    FROM explore_item_likes saved_like
+                    WHERE saved_like.item_id = ei.item_id
+                      AND saved_like.member_id = #{memberId}
+                      AND saved_like.deleted_at IS NULL
+                ) AS saved
+            </when>
+            <otherwise>FALSE AS saved</otherwise>
+        </choose>
+    </sql>
+
     <select id="findEventDetail"
             resultMap="eventDetailResultMap">
         SELECT
@@ -67,7 +83,8 @@
             e.has_benefit,
             e.reservable,
             e.contact,
-            e.organizer
+            e.organizer,
+            <include refid="savedColumn"/>
         FROM explore_items ei
                  JOIN event e
                       ON e.event_id = ei.item_id
@@ -112,11 +129,16 @@
                  a.activity_id
     </select>
 
-    <!-- region2Other는 선택한 region1에서 세부지역이 분류되지 않은 데이터를 의미한다. -->
+    <!-- region2Other는 선택한 region1의 공식 세부지역 목록 밖 데이터를 의미한다. -->
     <sql id="region2OtherCondition">
         (
             e.region2 IS NULL
             OR TRIM(e.region2) = ''
+            <if test="request.knownRegion2Values != null and request.knownRegion2Values.size() > 0">
+                OR e.region2 NOT IN
+                <foreach collection="request.knownRegion2Values" item="knownRegion2"
+                         open="(" separator="," close=")">#{knownRegion2}</foreach>
+            </if>
         )
     </sql>
 
@@ -200,31 +222,9 @@
             )
         </if>
 
-        <choose>
-            <when test="request.datePreset == 'ONGOING'">
-                AND e.start_date &lt;= CURRENT_DATE()
-            </when>
-            <when test="request.datePreset == 'OPENING_SOON'">
-                AND e.start_date &gt; CURRENT_DATE()
-            </when>
-            <when test="request.datePreset == 'THIS_WEEKEND'">
-                AND e.start_date &lt;= DATE_ADD(
-                    CURRENT_DATE(),
-                    INTERVAL (8 - DAYOFWEEK(CURRENT_DATE())) DAY
-                )
-                AND (e.end_date IS NULL OR e.end_date &gt;= DATE_ADD(
-                    CURRENT_DATE(),
-                    INTERVAL (7 - DAYOFWEEK(CURRENT_DATE())) DAY
-                ))
-            </when>
-            <when test="request.datePreset == 'THIS_MONTH'">
-                AND e.start_date &lt;= LAST_DAY(CURRENT_DATE())
-                AND (e.end_date IS NULL OR e.end_date &gt;= DATE_FORMAT(
-                    CURRENT_DATE(),
-                    '%Y-%m-01'
-                ))
-            </when>
-        </choose>
+        <!-- 날짜 프리셋은 프론트가 사용자 시간대 기준 startDate/endDate로
+             환원해 보낸다. 서버 시간대(CURRENT_DATE) 기반 프리셋 분기는
+             #275에서 제거했다. -->
 
         <if test="request.startDate != null">
             AND (e.end_date IS NULL OR e.end_date &gt;= #{request.startDate})
@@ -314,7 +314,8 @@
         e.latitude,
         e.longitude,
         e.start_date,
-        e.end_date
+        e.end_date,
+        <include refid="savedColumn"/>
         FROM explore_items ei
         JOIN event e
         ON e.event_id = ei.item_id

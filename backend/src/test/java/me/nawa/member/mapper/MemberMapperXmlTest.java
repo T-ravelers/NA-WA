@@ -43,6 +43,13 @@ class MemberMapperXmlTest {
     }
 
     @Test
+    void mapperXml_parsesMarkAsMerchantStatement() throws Exception {
+        assertTrue(parsedConfiguration().hasStatement(
+                "me.nawa.member.mapper.MemberMapper.markAsMerchant"
+        ));
+    }
+
+    @Test
     void mapperXml_parsesExistsActiveCurrencyStatement() throws Exception {
         assertTrue(parsedConfiguration().hasStatement(
                 "me.nawa.member.mapper.MemberMapper.existsActiveCurrency"
@@ -53,6 +60,13 @@ class MemberMapperXmlTest {
     void mapperXml_parsesUpdateProfileStatement() throws Exception {
         assertTrue(parsedConfiguration().hasStatement(
                 "me.nawa.member.mapper.MemberMapper.updateProfile"
+        ));
+    }
+
+    @Test
+    void mapperXml_parsesCompleteOnboardingStatement() throws Exception {
+        assertTrue(parsedConfiguration().hasStatement(
+                "me.nawa.member.mapper.MemberMapper.completeOnboarding"
         ));
     }
 }

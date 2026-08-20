@@ -3,14 +3,16 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconHeart } from '@tabler/icons-vue'
 
+import { formatCalendarDateString } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import type { Category } from '@/shared/ui/category'
 
+import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMutation'
 import type { EventSummary } from '../model/eventExplore'
-import { useSavedEventsStore } from '../model/savedEvents'
+import { findExploreRegionLabelKey } from '../model/exploreRegions'
 
 interface Props {
   event: EventSummary
@@ -19,8 +21,8 @@ interface Props {
 const { event } = defineProps<Props>()
 const emit = defineEmits<{ open: [eventId: number] }>()
 const { t } = useI18n()
-const savedEvents = useSavedEventsStore()
-const saved = computed(() => savedEvents.isSaved(event.itemId))
+const likeMutation = useExploreItemLikeMutation()
+const saved = computed(() => event.saved)
 
 const statusTone = computed(() => {
   if (event.status === 'ONGOING') return 'ongoing'
@@ -46,16 +48,20 @@ const categoryKey = computed<Category>(() => {
 })
 
 const regionLabel = computed(() =>
-  [event.region1, event.region2, event.region3].filter(Boolean).join(' · '),
+  [event.region1, event.region2, event.region3]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      const labelKey = findExploreRegionLabelKey(value)
+      return labelKey ? t(labelKey) : value
+    })
+    .join(' · '),
 )
-
-function formatDate(value: string | null): string {
-  return value ? value.replace(/-/g, '.') : ''
-}
 
 // 한쪽 날짜만 있으면 구분자 없이 그 날짜만 보인다. `EventDetailView`와 같은 방식이다.
 const periodLabel = computed(() =>
-  [formatDate(event.startDate), formatDate(event.endDate)].filter(Boolean).join(' ~ '),
+  [formatCalendarDateString(event.startDate), formatCalendarDateString(event.endDate)]
+    .filter(Boolean)
+    .join(' ~ '),
 )
 
 function openEvent(): void {
@@ -63,7 +69,8 @@ function openEvent(): void {
 }
 
 function toggleSaved(): void {
-  savedEvents.toggle(event.itemId)
+  if (likeMutation.isPending.value) return
+  likeMutation.mutate({ itemId: event.itemId, saved: !event.saved })
 }
 
 function handleKeydown(event: KeyboardEvent): void {
@@ -112,7 +119,7 @@ function handleKeydown(event: KeyboardEvent): void {
           <button
             type="button"
             class="flex size-11 shrink-0 items-center justify-center text-ink-3"
-            :aria-label="saved ? 'Remove event from saved' : 'Save event'"
+            :aria-label="saved ? t('explore.unsaveEvent') : t('explore.saveEvent')"
             :aria-pressed="saved"
             @click.stop="toggleSaved"
           >

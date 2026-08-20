@@ -78,6 +78,8 @@ export interface JourneyTimelineExploreItem {
 }
 
 export interface JourneyTimelineAppointment {
+  /** 약속이 아직 잡히지 않은 항목에는 `appointment` 자체가 없다. */
+  appointmentId: number
   activityStartAt: string
   activityEndAt: string
   appointmentStatus: string
@@ -169,6 +171,19 @@ export async function fetchJourneys(): Promise<JourneySummary[]> {
   const response = await httpClient.get<JourneySummary[]>('/api/v1/journeys')
 
   return response.data
+}
+
+export async function checkJourneyItemExists(
+  tripId: number,
+  itemId: number,
+  visitDate: string,
+): Promise<boolean> {
+  const response = await httpClient.get<{ exists: boolean }>(
+    `/api/v1/journeys/${tripId}/items/exists`,
+    { params: { itemId, visitDate } },
+  )
+
+  return response.data.exists
 }
 
 export async function addJourneyItem(

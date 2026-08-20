@@ -9,6 +9,7 @@ import me.nawa.appointment.dto.response.AppointmentDetailResponse;
 import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.dto.response.AppointmentSummaryResponse;
+import me.nawa.appointment.dto.response.MyOngoingAppointmentResponse;
 import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.appointment.service.AppointmentService;
 import me.nawa.auth.security.AuthenticatedMember;
@@ -37,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -106,6 +108,35 @@ class AppointmentControllerTest {
     }
 
     @Test
+    void getMyOngoingAppointments_returnsResponseList() throws Exception {
+        when(appointmentService.getMyOngoingAppointments(1L, "ONGOING"))
+                .thenReturn(List.of(myOngoingAppointmentResponse()));
+
+        JsonNode body = performGet("/api/v1/appointments/me");
+
+        assertTrue(body.path("success").asBoolean());
+        assertEquals(10L,
+                body.path("data").get(0).path("appointmentId").asLong());
+        assertEquals("Seoul Night Tour",
+                body.path("data").get(0).path("appointmentName").asText());
+        assertEquals(100L, body.path("data").get(0).path("itemId").asLong());
+        assertEquals("EVENT", body.path("data").get(0).path("itemType").asText());
+        assertEquals("IN_PROGRESS",
+                body.path("data").get(0).path("appointmentStatus").asText());
+    }
+
+    @Test
+    void getMyOngoingAppointments_passesAllScopeThrough() throws Exception {
+        when(appointmentService.getMyOngoingAppointments(1L, "ALL"))
+                .thenReturn(List.of());
+
+        JsonNode body = performGet("/api/v1/appointments/me?scope=ALL");
+
+        assertTrue(body.path("success").asBoolean());
+        verify(appointmentService).getMyOngoingAppointments(1L, "ALL");
+    }
+
+    @Test
     void createAppointment_requiresPaymentIntegration() throws Exception {
         when(appointmentService.createAppointment(
                 eq(1L),
@@ -172,6 +203,20 @@ class AppointmentControllerTest {
                 .andReturn().getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readTree(responseBody);
+    }
+
+    private static MyOngoingAppointmentResponse myOngoingAppointmentResponse() {
+        return new MyOngoingAppointmentResponse(
+                10L,
+                "Seoul Night Tour",
+                5L,
+                "Gwanghwamun Square",
+                LocalDateTime.of(2026, 8, 21, 18, 30),
+                LocalDateTime.of(2026, 8, 21, 22, 0),
+                100L,
+                "EVENT",
+                "IN_PROGRESS"
+        );
     }
 
     private static AppointmentSummaryResponse summaryResponse() {

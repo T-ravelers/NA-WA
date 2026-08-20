@@ -43,11 +43,20 @@ class OAuthStateServiceTest {
         assertUrlSafeRandomValue(stored.getCodeVerifier());
         assertEquals("S256", issued.getCodeChallengeMethod());
         assertEquals(
-                createCodeChallenge(stored.getCodeVerifier()),
+                sha256Base64Url(stored.getCodeVerifier()),
                 issued.getCodeChallenge()
         );
         assertEquals(issued.getState(), stored.getState());
         assertEquals(issued.getNonce(), stored.getNonce());
+        assertUrlSafeRandomValue(issued.getBrowserBinding());
+        assertEquals(
+                sha256Base64Url(issued.getBrowserBinding()),
+                stored.getBrowserBindingHash()
+        );
+        assertNotEquals(
+                issued.getBrowserBinding(),
+                stored.getBrowserBindingHash()
+        );
         assertEquals(OAuthProvider.LINE, stored.getProvider());
         assertEquals("/", stored.getReturnPath());
         assertEquals(NOW, stored.getIssuedAt());
@@ -71,7 +80,7 @@ class OAuthStateServiceTest {
         assertUrlSafeRandomValue(stored.getCodeVerifier());
         assertEquals("S256", issued.getCodeChallengeMethod());
         assertEquals(
-                createCodeChallenge(stored.getCodeVerifier()),
+                sha256Base64Url(stored.getCodeVerifier()),
                 issued.getCodeChallenge()
         );
         assertEquals(OAuthProvider.GOOGLE, stored.getProvider());
@@ -126,7 +135,7 @@ class OAuthStateServiceTest {
     }
 
     @Test
-    void consume_validState_delegatesToStore() {
+    void consume_matchingBrowserBinding_delegatesToStore() {
         FakeOAuthStateStore store = new FakeOAuthStateStore();
         OAuthStateServiceImpl service = createService(store);
         OAuthAuthorizationRequestState issued = service.issue(
@@ -136,7 +145,8 @@ class OAuthStateServiceTest {
         store.consumedSession = Optional.of(store.savedSessions.get(0));
 
         Optional<OAuthStateSession> consumed = service.consume(
-                issued.getState()
+                issued.getState(),
+                issued.getBrowserBinding()
         );
 
         assertTrue(consumed.isPresent());
@@ -144,11 +154,45 @@ class OAuthStateServiceTest {
     }
 
     @Test
+    void consume_otherBrowserBinding_returnsEmpty() {
+        FakeOAuthStateStore store = new FakeOAuthStateStore();
+        OAuthStateServiceImpl service = createService(store);
+        OAuthAuthorizationRequestState issued = service.issue(
+                OAuthProvider.GOOGLE,
+                "/"
+        );
+        store.consumedSession = Optional.of(store.savedSessions.get(0));
+
+        Optional<OAuthStateSession> consumed = service.consume(
+                issued.getState(),
+                "other-browser-binding"
+        );
+
+        assertFalse(consumed.isPresent());
+    }
+
+    @Test
+    void consume_missingBrowserBinding_returnsEmpty() {
+        FakeOAuthStateStore store = new FakeOAuthStateStore();
+        OAuthStateServiceImpl service = createService(store);
+        OAuthAuthorizationRequestState issued = service.issue(
+                OAuthProvider.GOOGLE,
+                "/"
+        );
+        store.consumedSession = Optional.of(store.savedSessions.get(0));
+
+        assertFalse(service.consume(issued.getState(), null).isPresent());
+        assertFalse(service.consume(issued.getState(), "").isPresent());
+    }
+
+    @Test
     void consume_malformedState_doesNotQueryStore() {
         FakeOAuthStateStore store = new FakeOAuthStateStore();
         OAuthStateServiceImpl service = createService(store);
 
-        assertFalse(service.consume("invalid state").isPresent());
+        assertFalse(
+                service.consume("invalid state", "binding").isPresent()
+        );
         assertNull(store.consumedState);
     }
 
@@ -177,7 +221,7 @@ class OAuthStateServiceTest {
         );
     }
 
-    private String createCodeChallenge(String verifier) throws Exception {
+    private String sha256Base64Url(String verifier) throws Exception {
         byte[] digest = MessageDigest.getInstance("SHA-256")
                 .digest(verifier.getBytes(StandardCharsets.US_ASCII));
         return Base64.getUrlEncoder()

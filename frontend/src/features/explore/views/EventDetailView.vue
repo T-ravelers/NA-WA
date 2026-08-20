@@ -12,6 +12,8 @@ import {
   IconShare2,
 } from '@tabler/icons-vue'
 
+import { formatCalendarDateString } from '@/shared/lib/datetime'
+import { buildGoogleMapsDirectionsUrl, buildGoogleMapsSearchUrl } from '@/shared/lib/mapLink'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -33,9 +35,10 @@ import {
   toStringList,
   type DetailEntry,
 } from '../model/eventDetail'
+import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMutation'
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
-import { useSavedEventsStore } from '../model/savedEvents'
+import { findExploreRegionLabelKey } from '../model/exploreRegions'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,11 +50,8 @@ const returnContext = useExploreReturnContextStore()
 const eventId = computed(() => String(route.params.eventId ?? ''))
 const eventQuery = useEventDetailQuery(eventId, locale)
 const event = computed(() => eventQuery.data.value)
-const savedEvents = useSavedEventsStore()
-const saved = computed(() => {
-  const current = event.value
-  return current ? savedEvents.isSaved(current.eventId) : false
-})
+const likeMutation = useExploreItemLikeMutation()
+const saved = computed(() => event.value?.saved ?? false)
 
 const selectedImage = ref(0)
 const journeyAdded = ref(false)
@@ -77,7 +77,13 @@ const category = computed<Category>(() => {
 })
 
 const regionLabel = computed(() =>
-  [event.value?.region1, event.value?.region2, event.value?.region3].filter(Boolean).join(' · '),
+  [event.value?.region1, event.value?.region2, event.value?.region3]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      const labelKey = findExploreRegionLabelKey(value)
+      return labelKey ? t(labelKey) : value
+    })
+    .join(' · '),
 )
 
 const locationLabel = computed(() =>
@@ -91,6 +97,13 @@ const activeJourneyId = computed(
 const journeyListQuery = useJourneyListQuery(journeySelectSheetOpen)
 const journeys = computed(() => journeyListQuery.data.value ?? [])
 
+const mapSearchUrl = computed(() =>
+  buildGoogleMapsSearchUrl(event.value?.latitude, event.value?.longitude),
+)
+const mapDirectionsUrl = computed(() =>
+  buildGoogleMapsDirectionsUrl(event.value?.latitude, event.value?.longitude),
+)
+
 const hours = computed(() => (event.value ? toDetailEntries(event.value.operatingHours) : []))
 const openDays = computed(() => (event.value ? toStringList(event.value.openDays).join(', ') : ''))
 
@@ -101,7 +114,9 @@ const detailRows = computed(() => {
   const rows: DetailEntry[] = []
   const period = current.isPermanent
     ? t('explore.detail.permanent')
-    : [formatDate(current.startDate), formatDate(current.endDate)].filter(Boolean).join(' – ')
+    : [formatCalendarDateString(current.startDate), formatCalendarDateString(current.endDate)]
+        .filter(Boolean)
+        .join(' – ')
   if (period) rows.push({ label: t('explore.detail.period'), value: period })
   if (current.venueName || current.addressRoad) {
     rows.push({ label: t('explore.detail.venue'), value: locationLabel.value })
@@ -109,7 +124,11 @@ const detailRows = computed(() => {
   if (hours.value.length > 0) {
     rows.push({
       label: t('explore.detail.hours'),
-      value: hours.value.map((entry) => `${entry.label}: ${entry.value}`).join('\n'),
+      value: hours.value
+        .map((entry) =>
+          entry.label.toLowerCase() === 'raw' ? entry.value : `${entry.label}: ${entry.value}`,
+        )
+        .join('\n'),
     })
   } else if (openDays.value) {
     rows.push({ label: t('explore.detail.hours'), value: openDays.value })
@@ -139,10 +158,6 @@ const kindLabel = computed(() =>
 watch(imageUrls, () => {
   selectedImage.value = 0
 })
-
-function formatDate(value: string | null): string {
-  return value ? value.replace(/-/g, '.') : ''
-}
 
 function showPreviousImage(): void {
   if (imageUrls.value.length === 0) return
@@ -186,6 +201,10 @@ function openReservation(): void {
   if (reservationUrl.value) window.open(reservationUrl.value, '_blank', 'noopener,noreferrer')
 }
 
+function openMapUrl(url: string | null): void {
+  if (url) window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 function openAppointmentList(): void {
   const current = event.value
   if (!current) return
@@ -201,7 +220,8 @@ function openAppointmentList(): void {
 
 function toggleSaved(): void {
   const current = event.value
-  if (current) savedEvents.toggle(current.eventId)
+  if (!current || likeMutation.isPending.value) return
+  likeMutation.mutate({ itemId: current.eventId, saved: !current.saved })
 }
 
 function openJourneyDateSheet(): void {
@@ -495,14 +515,30 @@ function retry(): void {
               class="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-pill bg-show ring-4 ring-show/20"
               aria-hidden="true"
             />
-            <div class="absolute inset-x-3 bottom-3 flex justify-end">
-              <button
-                type="button"
-                class="rounded-pill bg-canvas/85 px-3 py-2 text-caption text-ink shadow-raised disabled:pointer-events-none disabled:opacity-40"
-                disabled
+          </div>
+          <div
+            v-if="mapSearchUrl"
+            class="flex min-w-0 gap-2"
+          >
+            <div class="min-w-0 flex-1">
+              <AppButton
+                block
+                compact
+                variant="secondary"
+                @click="openMapUrl(mapSearchUrl)"
+              >
+                {{ t('explore.detail.openInGoogleMaps') }}
+              </AppButton>
+            </div>
+            <div class="min-w-0 flex-1">
+              <AppButton
+                block
+                compact
+                variant="secondary"
+                @click="openMapUrl(mapDirectionsUrl)"
               >
                 {{ t('explore.detail.directions') }}
-              </button>
+              </AppButton>
             </div>
           </div>
         </section>

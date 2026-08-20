@@ -3,12 +3,25 @@ services:
     image: nginx:1.27-alpine
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_conf:/etc/letsencrypt:ro
     depends_on:
       - backend
     networks:
       - nawa-network
+
+  # 상시 기동하지 않음. 최초 발급/갱신은 `docker compose run --rm certbot ...`으로
+  # 필요할 때만 실행하고(갱신은 .github/workflows/renew-cert.yml이 매일 트리거),
+  # 이미지 기본 entrypoint(`certbot`)를 그대로 써야 하므로 여기서 재정의하지 않습니다.
+  certbot:
+    image: certbot/certbot
+    profiles: ["ops"]
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
 
   backend:
     image: ${DOCKERHUB_USERNAME}/nawa-backend:latest
@@ -37,6 +50,7 @@ services:
       AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
       AUTH_ACCESS_COOKIE_NAME: ${AUTH_ACCESS_COOKIE_NAME:-access_token}
       AUTH_REFRESH_COOKIE_NAME: ${AUTH_REFRESH_COOKIE_NAME:-refresh_token}
+      AUTH_OAUTH_STATE_COOKIE_NAME: ${AUTH_OAUTH_STATE_COOKIE_NAME:-oauth_state}
       AUTH_FRONTEND_SUCCESS_URL: ${AUTH_FRONTEND_SUCCESS_URL}
       AUTH_FRONTEND_FAILURE_URL: ${AUTH_FRONTEND_FAILURE_URL}
       AUTH_FRONTEND_ALLOWED_RETURN_PATHS: ${AUTH_FRONTEND_ALLOWED_RETURN_PATHS:-/}
@@ -53,6 +67,15 @@ services:
       OAUTH_HTTP_READ_TIMEOUT_MILLIS: ${OAUTH_HTTP_READ_TIMEOUT_MILLIS:-5000}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      CLOVA_OCR_INVOKE_URL: ${CLOVA_OCR_INVOKE_URL:-}
+      CLOVA_OCR_SECRET_KEY: ${CLOVA_OCR_SECRET_KEY:-}
+      CLOVA_OCR_CONNECT_TIMEOUT_MILLIS: ${CLOVA_OCR_CONNECT_TIMEOUT_MILLIS:-3000}
+      CLOVA_OCR_READ_TIMEOUT_MILLIS: ${CLOVA_OCR_READ_TIMEOUT_MILLIS:-10000}
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_S3_RECEIPT_BUCKET: ${AWS_S3_RECEIPT_BUCKET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      RECEIPT_MAX_UPLOAD_BYTES: ${RECEIPT_MAX_UPLOAD_BYTES:-}
     depends_on:
       mysql:
         condition: service_healthy
@@ -63,6 +86,12 @@ services:
 
   mysql:
     image: mysql:8.4
+    # 이미지 기본값은 UTC입니다. 백엔드 컨테이너는 TZ=Asia/Seoul이라 그대로 두면 DB가
+    # 평가하는 CURRENT_TIMESTAMP·NOW()가 앱보다 9시간 뒤처집니다. JDBC URL의
+    # serverTimezone은 드라이버의 값 변환 설정일 뿐이라 이 차이를 메우지 못합니다.
+    # 이름 있는 시간대(Asia/Seoul)는 시간대 테이블을 미리 적재해야 해서 숫자 오프셋을
+    # 씁니다. 한국은 서머타임이 없어 +09:00이 항상 유효합니다.
+    command: --default-time-zone=+09:00
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -89,6 +118,8 @@ services:
 volumes:
   mysql_data:
   redis_data:
+  certbot_www:
+  certbot_conf:
 
 networks:
   nawa-network:

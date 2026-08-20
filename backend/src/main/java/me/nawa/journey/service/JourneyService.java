@@ -2,6 +2,7 @@ package me.nawa.journey.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -11,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import me.nawa.appointment.service.AppointmentService;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.journey.domain.Journey;
@@ -21,6 +23,7 @@ import me.nawa.journey.domain.TripRegion;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
+import me.nawa.journey.dto.request.JourneyUpdateRequest;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyRegionResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
@@ -51,6 +54,7 @@ public class JourneyService {
     private static final int MAX_BUDGET_SCALE = 4;
 
     private final JourneyMapper journeyMapper;
+    private final AppointmentService appointmentService;
 
     @Transactional
     public JourneyResponse createJourney(
@@ -85,12 +89,53 @@ public class JourneyService {
     }
 
     @Transactional
+    public JourneyResponse updateJourney(
+        Long memberId,
+        Long tripId,
+        JourneyUpdateRequest request
+    ) {
+        validateMemberId(memberId);
+        validateUpdateRequest(request);
+
+        Journey journey = findOwnedJourneyForUpdate(memberId, tripId);
+        if (journeyMapper.hasJourneyItemsOutsideRange(
+            tripId,
+            request.getStartDate(),
+            request.getEndDate()
+        )) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_DATE_RANGE_CONFLICT
+            );
+        }
+
+        journey.setTitle(request.getTitle().trim());
+        journey.setStartDate(request.getStartDate());
+        journey.setEndDate(request.getEndDate());
+        journey.setBudgetAmount(request.getBudgetAmount());
+        journey.setCompanionPreference(normalizeOptional(
+            request.getCompanionPreference()
+        ));
+
+        if (journeyMapper.updateJourney(journey) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        journeyMapper.softDeleteRegionsByTripId(tripId);
+        List<TripRegion> regions = createRegions(tripId, request.getRegions());
+        if (!regions.isEmpty()) {
+            journeyMapper.insertRegions(regions);
+        }
+
+        return toResponse(journey, regions);
+    }
+
+    @Transactional
     public JourneyItemResponse addJourneyItem(
         Long memberId,
         Long tripId,
         JourneyItemCreateRequest request
     ) {
-        Journey journey = findOwnedJourney(memberId, tripId);
+        Journey journey = findOwnedJourneyForUpdate(memberId, tripId);
         validateJourneyItemRequest(request);
 
         JourneyExploreItem exploreItem = journeyMapper
@@ -155,6 +200,81 @@ public class JourneyService {
         return toJourneyItemResponse(createdItem);
     }
 
+    @Transactional
+    public void deleteJourneyItem(
+        Long memberId,
+        Long tripId,
+        Long tripItemId
+    ) {
+        validateTripItemId(tripItemId);
+        findOwnedJourneyForUpdate(memberId, tripId);
+
+        JourneyItem journeyItem = journeyMapper.findJourneyItemForUpdate(
+            tripId,
+            tripItemId,
+            memberId
+        );
+        if (journeyItem == null) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_SCHEDULE_NOT_FOUND
+            );
+        }
+
+        leaveConfirmedAppointment(memberId, journeyItem);
+        if (journeyMapper.softDeleteJourneyItem(tripId, tripItemId) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Transactional
+    public void deleteJourney(Long memberId, Long tripId) {
+        findOwnedJourneyForUpdate(memberId, tripId);
+
+        List<JourneyItem> confirmedItems = journeyMapper
+            .findConfirmedJourneyItemsForUpdate(tripId, memberId);
+        List<JourneyItem> items = confirmedItems == null
+            ? List.of()
+            : confirmedItems;
+
+        if (items.stream().anyMatch(item -> isAppointmentHost(
+            memberId,
+            item
+        ))) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_APPOINTMENT_HOST_DELETE_CONFLICT
+            );
+        }
+
+        for (JourneyItem item : items) {
+            leaveConfirmedAppointment(memberId, item);
+        }
+
+        journeyMapper.softDeleteJourneyItemsByTripId(tripId);
+        journeyMapper.softDeleteRegionsByTripId(tripId);
+        journeyMapper.softDeleteReportsByTripId(tripId);
+        journeyMapper.softDeleteExpenseLinksByTripId(tripId);
+        if (journeyMapper.softDeleteJourney(tripId) != 1) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // 약속 생성 시 여정 항목 날짜를 고르는 시점에, 그 조합이 이미 있는지 미리
+    // 확인하기 위한 조회다. 존재하면 그 날짜는 고를 수 없다는 뜻이지, 실제 저장은
+    // 하지 않는다 — 최종 확정은 AppointmentService.createAppointment가 한다.
+    @Transactional(readOnly = true)
+    public boolean existsJourneyItem(
+        Long memberId,
+        Long tripId,
+        Long itemId,
+        LocalDate visitDate
+    ) {
+        findOwnedJourney(memberId, tripId);
+        if (itemId == null || itemId <= 0 || visitDate == null) {
+            throw new BusinessException(JourneyErrorCode.INVALID_JOURNEY_INPUT);
+        }
+        return journeyMapper.existsJourneyItem(tripId, itemId, visitDate);
+    }
+
     @Transactional(readOnly = true)
     public JourneyResponse getJourney(Long memberId, Long tripId) {
         Journey journey = findOwnedJourney(memberId, tripId);
@@ -186,7 +306,7 @@ public class JourneyService {
                 .thenComparing(JourneyTimelineItem::getTripItemId)
         );
 
-        Map<java.time.LocalDate, List<JourneyTimelineItemResponse>> grouped =
+        Map<LocalDate, List<JourneyTimelineItemResponse>> grouped =
             new LinkedHashMap<>();
         for (JourneyTimelineItem item : sortedItems) {
             grouped.computeIfAbsent(
@@ -223,6 +343,15 @@ public class JourneyService {
         if (!memberId.equals(journey.getMemberId())) {
             throw new BusinessException(JourneyErrorCode.JOURNEY_FORBIDDEN);
         }
+        return journey;
+    }
+
+    private Journey findOwnedJourneyForUpdate(Long memberId, Long tripId) {
+        validateMemberId(memberId);
+        validateTripId(tripId);
+
+        Journey journey = journeyMapper.findJourneyByIdForUpdate(tripId);
+        validateJourneyOwner(journey, memberId);
         return journey;
     }
 
@@ -333,27 +462,57 @@ public class JourneyService {
     }
 
     private void validateRequest(JourneyCreateRequest request) {
-        if (request == null
-            || isBlank(request.getTitle())
-            || request.getTitle().trim().length() > MAX_TITLE_LENGTH
-            || request.getStartDate() == null
-            || request.getEndDate() == null
-            || request.getStartDate().isAfter(request.getEndDate())
-            || isInvalidBudget(request.getBudgetAmount())) {
-            throw new BusinessException(
-                JourneyErrorCode.INVALID_JOURNEY_INPUT
-            );
+        if (request == null) {
+            throw invalidJourneyInput();
+        }
+        validateJourneyFields(
+            request.getTitle(),
+            request.getStartDate(),
+            request.getEndDate(),
+            request.getBudgetAmount(),
+            request.getCompanionPreference(),
+            request.getRegions()
+        );
+    }
+
+    private void validateUpdateRequest(JourneyUpdateRequest request) {
+        if (request == null || request.getRegions() == null) {
+            throw invalidJourneyInput();
+        }
+        validateJourneyFields(
+            request.getTitle(),
+            request.getStartDate(),
+            request.getEndDate(),
+            request.getBudgetAmount(),
+            request.getCompanionPreference(),
+            request.getRegions()
+        );
+    }
+
+    private void validateJourneyFields(
+        String title,
+        LocalDate startDate,
+        LocalDate endDate,
+        BigDecimal budgetAmount,
+        String companionPreference,
+        List<JourneyRegionRequest> regions
+    ) {
+        if (isBlank(title)
+            || title.trim().length() > MAX_TITLE_LENGTH
+            || startDate == null
+            || endDate == null
+            || startDate.isAfter(endDate)
+            || isInvalidBudget(budgetAmount)) {
+            throw invalidJourneyInput();
         }
 
-        String preference = normalizeOptional(request.getCompanionPreference());
+        String preference = normalizeOptional(companionPreference);
         if (preference != null
             && preference.length() > MAX_COMPANION_PREFERENCE_LENGTH) {
-            throw new BusinessException(
-                JourneyErrorCode.INVALID_JOURNEY_INPUT
-            );
+            throw invalidJourneyInput();
         }
 
-        validateRegions(request.getRegions());
+        validateRegions(regions);
     }
 
     private void validateRegions(List<JourneyRegionRequest> regions) {
@@ -488,6 +647,65 @@ public class JourneyService {
                 JourneyErrorCode.INVALID_JOURNEY_INPUT
             );
         }
+    }
+
+    private void validateTripId(Long tripId) {
+        if (tripId == null || tripId <= 0) {
+            throw invalidJourneyInput();
+        }
+    }
+
+    private void validateTripItemId(Long tripItemId) {
+        if (tripItemId == null || tripItemId <= 0) {
+            throw invalidJourneyInput();
+        }
+    }
+
+    private void leaveConfirmedAppointment(
+        Long memberId,
+        JourneyItem journeyItem
+    ) {
+        if (!"CONFIRMED".equals(journeyItem.getTripItemStatus())) {
+            return;
+        }
+        // V5 requires CONFIRMED rows to reference an Appointment. Fail closed
+        // if the joined Appointment was removed or its required host is missing.
+        if (journeyItem.getAppointmentId() == null
+            || journeyItem.getAppointmentHostMemberId() == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        if (isAppointmentHost(memberId, journeyItem)) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_APPOINTMENT_HOST_DELETE_CONFLICT
+            );
+        }
+        if ("LEFT".equals(journeyItem.getAppointmentMembershipStatus())) {
+            return;
+        }
+        appointmentService.leaveAppointment(
+            memberId,
+            journeyItem.getAppointmentId()
+        );
+    }
+
+    private boolean isAppointmentHost(
+        Long memberId,
+        JourneyItem journeyItem
+    ) {
+        return memberId.equals(journeyItem.getAppointmentHostMemberId());
+    }
+
+    private void validateJourneyOwner(Journey journey, Long memberId) {
+        if (journey == null) {
+            throw new BusinessException(JourneyErrorCode.JOURNEY_NOT_FOUND);
+        }
+        if (!memberId.equals(journey.getMemberId())) {
+            throw new BusinessException(JourneyErrorCode.JOURNEY_FORBIDDEN);
+        }
+    }
+
+    private BusinessException invalidJourneyInput() {
+        return new BusinessException(JourneyErrorCode.INVALID_JOURNEY_INPUT);
     }
 
     private boolean isInvalidBudget(BigDecimal value) {

@@ -31,7 +31,7 @@ public class PlaceService {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
-    private static final Set<String> SORTS = Set.of("LATEST", "POPULAR");
+    private static final Set<String> SORTS = Set.of("NEWEST", "POPULAR");
     private static final Set<String> PLACE_KINDS = Set.of(
         "RESTAURANT", "CAFE", "MARKET", "BEAUTY", "ETC"
     );
@@ -56,13 +56,22 @@ public class PlaceService {
 
     @Transactional(readOnly = true)
     public PlaceDetailResponse getPlaceDetail(Long placeId, String language) {
+        return getPlaceDetail(placeId, language, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PlaceDetailResponse getPlaceDetail(
+        Long placeId,
+        String language,
+        Long memberId
+    ) {
         if (placeId == null || placeId <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         String normalizedLanguage = StringUtils.hasText(language)
             ? language.toLowerCase(Locale.ROOT)
             : "en";
-        PlaceDetailResponse place = placeMapper.findPlaceDetail(placeId);
+        PlaceDetailResponse place = placeMapper.findPlaceDetail(placeId, memberId);
         if (place == null) {
             throw new BusinessException(ExploreErrorCode.PLACE_NOT_FOUND);
         }
@@ -95,15 +104,23 @@ public class PlaceService {
         request.setRegion1(normalizeTextValues(request.getRegion1()));
         request.setRegion2(normalizeTextValues(request.getRegion2()));
         request.setRegion3(normalizeTextValues(request.getRegion3()));
+        request.setKnownRegion2Values(
+            ExploreRegionPolicy.knownRegion2Values(request.getRegion1())
+        );
         request.setKeyword(StringUtils.hasText(request.getKeyword())
             ? request.getKeyword().trim() : null);
         String sort = StringUtils.hasText(request.getSort())
-            ? request.getSort().trim().toUpperCase(Locale.ROOT) : "LATEST";
+            ? request.getSort().trim().toUpperCase(Locale.ROOT) : "POPULAR";
+        // 개명 전 프론트 번들(PWA 캐시)이 보낼 수 있는 레거시 값을 수용한다.
+        if ("LATEST".equals(sort)) {
+            sort = "NEWEST";
+        }
         if (!SORTS.contains(sort)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         request.setSort(sort);
-        if (!StringUtils.hasText(request.getLanguage())) request.setLanguage("en");
+        request.setLanguage(StringUtils.hasText(request.getLanguage())
+            ? request.getLanguage().trim().toLowerCase(Locale.ROOT) : "en");
     }
 
     private void validateSavedOnly(PlaceSearchRequest request, Long memberId) {

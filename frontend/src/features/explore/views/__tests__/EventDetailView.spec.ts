@@ -62,6 +62,7 @@ const event: EventDetail = {
   reservable: true,
   contact: null,
   organizer: 'NA-WA',
+  saved: false,
   activities: [],
 }
 
@@ -192,6 +193,37 @@ describe('EventDetailView', () => {
 
     expect(wrapper.text()).toContain('Seoul concert')
     expect(wrapper.text()).toContain('Seoul · Seocho-gu')
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Google Maps')
+        ?.attributes('disabled'),
+    ).toBeUndefined()
+  })
+
+  it('hides map buttons when the Event has no coordinates', async () => {
+    fetchEventDetail.mockResolvedValue({ ...event, latitude: null, longitude: null })
+
+    const { wrapper } = await mountView()
+
+    const buttonLabels = wrapper.findAll('button').map((button) => button.text())
+    expect(buttonLabels).not.toContain('Google Maps')
+    expect(buttonLabels).not.toContain('Directions')
+  })
+
+  it('translates operational region values and hides the raw hours key', async () => {
+    fetchEventDetail.mockResolvedValue({
+      ...event,
+      region1: '서울',
+      region2: '성수',
+      operatingHours: { raw: 'Every day 10:00 – 20:00' },
+    })
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Seoul · Seongsu')
+    expect(wrapper.text()).toContain('Every day 10:00 – 20:00')
+    expect(wrapper.text()).not.toContain('raw:')
   })
 
   it('returns to the Event list from the detail screen', async () => {

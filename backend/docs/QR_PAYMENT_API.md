@@ -14,6 +14,23 @@ QR 결제는 수취인이 QR을 생성하면 결제자가 스캔해 지갑 간 �
 | `POST /api/v1/wallet/qr/payment/execute` | 결제를 실행한다. `Idempotency-Key` 헤더가 필요하다. |
 | `GET /api/v1/wallet/qr/payment/{transferId}` | 완료된 QR 결제 거래 상태를 조회한다. |
 
+## 계정 유형 제약
+
+결제자는 `TRAVELER` 계정만 가능하다. `MERCHANT` 계정은 QR 생성과 매출 조회만 할 수
+있으므로 `resolve`·`payment/preview`·`payment/execute` 세 경로가 모두 `WALLET-030`으로
+거절한다. 세 경로 다 직접 호출할 수 있으므로 한 곳만 막지 않는다. QR
+생성(`POST /api/v1/wallet/qr/create`)은 두 계정 유형 모두 쓸 수 있다.
+
+가맹점 매출은 별도 API가 아니라 기존 거래 내역 조회로 본다. 가맹점은 결제·충전·정산을
+하지 않아 그 지갑 원장에는 QR 수입만 쌓인다.
+
+```text
+GET /api/v1/me/transactions?type=QR_PAYMENT&status=COMPLETED&from=2026-08-18&to=2026-08-18
+```
+
+계정 유형은 `GET /api/v1/members/me`의 `accountType`으로 확인하고, 가맹점 등록은
+`POST /api/v1/members/me/merchant`로 한다.
+
 ## QR 생성
 
 `POST /api/v1/wallet/qr/create`
@@ -75,10 +92,28 @@ QR의 존재, 만료, 완료 여부, 자기 자신 결제, 수취인 지갑 상�
 
 `POST /api/v1/wallet/qr/payment/execute`
 
-`Idempotency-Key` 헤더(1~100자)가 필요하다. 요청 본문은 미리보기와 동일한 형태다.
+`Idempotency-Key` 헤더(1~100자)가 필요하다. 요청 본문은 미리보기에 `spendingCategory`
+하나를 더한 형태다.
+
+```json
+{
+  "qrToken": "...",
+  "amount": 10000,
+  "spendingScope": "PERSONAL",
+  "appointmentId": null,
+  "spendingCategory": "FOOD"
+}
+```
+
+- `spendingCategory`는 결제자가 고르는 소비 카테고리다. 값 집합과 화면별 쓰임은
+  [소비 카테고리](./SPENDING_CATEGORY.md)가 정본이다.
+- 값을 빼거나 `null`을 보내면 서버가 `OTHER`로 저장한다. 목록 밖의 값은 `WALLET-031`로
+  거절한다.
+- 미리보기에는 이 필드가 없다. 카테고리는 결제 금액과 잔액을 바꾸지 않는다.
+
 같은 키로 같은 요청을 재시도하면 새 결제를 만들지 않고 기존 결제 결과를 그대로
-반환한다. 같은 키로 다른 요청(다른 QR, 다른 금액, 다른 소비 범위)을 보내면 아래
-표의 오류로 거절한다.
+반환한다. 같은 키로 다른 요청(다른 QR, 다른 금액, 다른 소비 범위, 다른 소비 카테고리)을
+보내면 아래 표의 오류로 거절한다.
 
 ## 결제 상태 조회
 
@@ -103,3 +138,5 @@ QR 결제로 생성된 거래만 조회할 수 있다. 결제자 본인만 조�
 | `WALLET-027` | 409 | 약속에 연결된 여행이 없음 |
 | `WALLET-028` | 400 | 공동 소비에 약속 정보 누락 |
 | `WALLET-029` | 409 | 결제 가능한 잔액 부족 |
+| `WALLET-030` | 403 | 가맹점 계정은 결제할 수 없음 |
+| `WALLET-031` | 400 | 지원하지 않는 소비 카테고리 |

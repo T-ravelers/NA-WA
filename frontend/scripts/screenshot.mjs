@@ -308,6 +308,70 @@ function stubReportApis(page) {
 }
 
 /**
+ * QR 결제 미리보기 응답을 세운다.
+ *
+ * 카테고리는 결제 금액과 잔액을 바꾸지 않으므로 요청 본문과 무관하게 같은 값을 준다.
+ */
+function stubQrPaymentPreview(page) {
+  return page.route('**/api/v1/wallet/qr/payment/preview', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          qrPaymentId: 10,
+          payeeName: 'Jieun Coffee',
+          amount: 18500,
+          currentBalance: 128500,
+          balanceAfter: 110000,
+          currencyCode: 'KRW',
+          spendingScope: 'PERSONAL',
+          trip: null,
+          appointment: null,
+          canPay: true,
+          expiresAt: '2026-08-20T18:00:00',
+        },
+      }),
+    }),
+  )
+}
+
+/**
+ * 스캔이 끝난 QR 결제 세션을 심는다.
+ *
+ * 이 세션은 카메라로 QR을 읽어야만 채워지는데 스크린샷은 카메라를 쓸 수 없다. 디코더가
+ * WASM이라 `BarcodeDetector`를 흉내내도 통하지 않는다. 그래서 화면이 마운트돼 스토어가
+ * 등록된 뒤 Pinia 인스턴스에 직접 값을 넣는다.
+ *
+ * **프로덕션 소스에는 이 경로를 위한 분기를 만들지 않는다.** 화면은 평소와 똑같이
+ * 스토어만 읽고, 값을 넣는 쪽이 여기 하나다.
+ */
+async function seedQrPaymentSession(page) {
+  await page.waitForSelector('main')
+  await page.evaluate(() => {
+    const provides = document.querySelector('#app').__vue_app__._context.provides
+    const piniaSymbol = Object.getOwnPropertySymbols(provides).find(
+      (symbol) => symbol.toString() === 'Symbol(pinia)',
+    )
+
+    provides[piniaSymbol]._s.get('wallet-qr-payment-session').setSession({
+      qrToken: 'screenshot-qr-token',
+      resolved: {
+        qrPaymentId: 10,
+        payeeName: 'Jieun Coffee',
+        amount: 18500,
+        amountInputRequired: false,
+        memo: 'Night market coffee',
+        status: 'ACTIVE',
+        currencyCode: 'KRW',
+        expiresAt: '2026-08-20T18:00:00',
+      },
+    })
+  })
+}
+
+/**
  * 지갑 홈 응답을 세운다.
  *
  * 금액은 `BigDecimal`이 JSON number로 내려오고, `createdAt`은 `LocalDateTime`이 오프셋 없이
@@ -369,16 +433,52 @@ const WALLET_TRANSACTIONS = [
   },
 ]
 
+/** 성공 봉투로 감싸 응답한다. 스텁마다 봉투 모양을 다시 적지 않도록 한 곳에 모은다. */
+function fulfillJson(route, data) {
+  return route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ success: true, data }),
+  })
+}
+
+/**
+ * 경로가 정확히 같을 때만 응답한다.
+ *
+ * 글롭으로 `/api/v1/settlements`를 걸면 `/api/v1/settlements/candidates`와
+ * `/api/v1/settlements/42`까지 함께 걸려 목록 응답이 상세 자리에 들어간다.
+ */
 function stubJson(page, pathname, data) {
   return page.route(
     (url) => url.pathname === pathname,
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, data }),
-      }),
+    (route) => fulfillJson(route, data),
   )
+}
+
+/**
+ * 응답을 붙잡아 두는 문.
+ *
+ * "보내는 중" 화면은 응답이 도착하는 순간 사라진다. 그 상태를 찍으려면 응답을 잡아둬야 하는데,
+ * 몇 초처럼 시간으로 잡으면 실행 속도에 따라 결과가 달라진다. 느리면 이미 넘어간 화면을 찍고,
+ * 빠르면 남은 시간만큼 그냥 기다린다. 그래서 시간이 아니라 신호로 잡는다. 흐름이 그 화면을
+ * 찍은 다음 `open()`을 부르면 그때 응답이 나간다.
+ */
+function createGate() {
+  const { promise, resolve } = Promise.withResolvers()
+  return { promise, open: resolve }
+}
+
+/**
+ * CSRF 토큰 조회.
+ *
+ * `shared/api/csrf.ts`가 모든 POST 앞에 이 요청을 먼저 보낸다. 세워 두지 않으면 매번
+ * 실제 백엔드로 새어 나가고, 응답이 없으면 그만큼 느려진다.
+ */
+function stubCsrf(page) {
+  return stubJson(page, '/api/v1/auth/csrf', {
+    token: 'screenshot-csrf-token',
+    headerName: 'X-CSRF-TOKEN',
+  })
 }
 
 function stubWalletApis(page) {
@@ -466,6 +566,408 @@ function stubWalletApis(page) {
     transactionNumber: 'ST-20260807-0009',
     fx: null,
   })
+}
+
+const SETTLEMENT_PARTICIPANTS = [
+  { id: 12, name: 'Alex', initials: 'AL' },
+  { id: 19, name: 'Mina', initials: 'MI' },
+  { id: 27, name: 'Leo', initials: 'LE' },
+]
+
+/**
+ * 낼 쪽(참여자) 목록 항목.
+ *
+ * `paid`는 `status`와 다른 축이다. 정산 자체는 아직 `REQUESTED`인데 나만 이미 낸 상태가
+ * 있고, 목록 카드는 그때만 `Paid` 표시를 낸다. 결제 직후 목록을 찍으려면 이 둘을 따로
+ * 줘야 한다.
+ */
+function settlementSummary({ id, title, status = 'REQUESTED', paid = status === 'COMPLETED' }) {
+  return {
+    id,
+    title,
+    totalAmount: '60300',
+    receivableAmount: '40200',
+    type: 'EQUAL',
+    status,
+    viewer: {
+      role: 'PARTICIPANT',
+      shareAmount: '20100',
+      payableAmount: paid ? '0' : '20100',
+      requestStatus: paid ? 'PAID' : 'PENDING',
+      allowedActions: paid ? [] : ['PAY'],
+    },
+  }
+}
+
+/** 받을 쪽(요청자) 목록 항목. 요청자에게는 낼 몫이 없어 허용 동작도 비어 있다. */
+function collectSummary({ id, title, status = 'REQUESTED' }) {
+  return {
+    id,
+    title,
+    totalAmount: '48000',
+    receivableAmount: '32000',
+    type: 'EQUAL',
+    status,
+    viewer: {
+      role: 'CREATOR',
+      shareAmount: '16000',
+      payableAmount: '0',
+      requestStatus: 'NOT_REQUESTED',
+      allowedActions: [],
+    },
+  }
+}
+
+/** `paidId`를 주면 그 정산만 이미 낸 상태로 바꾼다. 나머지는 그대로 둔다. */
+function receivedSettlements(paidId = null) {
+  return [
+    settlementSummary({ id: 42, title: 'Late-night Burger Club', paid: paidId === 42 }),
+    settlementSummary({ id: 41, title: 'Hongdae Karaoke', status: 'COMPLETED' }),
+    settlementSummary({ id: 40, title: 'Seongsu Coffee', status: 'COMPLETED' }),
+    settlementSummary({ id: 39, title: 'Namsan Cable Car', status: 'COMPLETED' }),
+    settlementSummary({ id: 38, title: 'Gwangjang Market', status: 'COMPLETED' }),
+  ]
+}
+
+/** 완료 건이 하나는 있어야 수금 쪽에도 "View all"이 나와 전체 내역으로 들어갈 수 있다. */
+function sentSettlements() {
+  return [
+    collectSummary({ id: 50, title: 'Han River Picnic' }),
+    collectSummary({ id: 49, title: 'Ikseon-dong Tea House', status: 'COMPLETED' }),
+  ]
+}
+
+const SETTLEMENT_CANDIDATES = [
+  {
+    transferId: 7,
+    appointmentId: 9,
+    payerAppointmentMemberId: 12,
+    journeyName: 'Seoul Summer',
+    gatheringName: 'Late-night Burger Club',
+    merchantName: 'Late-night Burger Club',
+    amount: '60300',
+    paidAt: '2026-07-26T20:42:00',
+    payerName: 'Alex',
+    participants: SETTLEMENT_PARTICIPANTS,
+  },
+  {
+    transferId: 8,
+    appointmentId: 9,
+    payerAppointmentMemberId: 12,
+    journeyName: 'Seoul Summer',
+    gatheringName: 'Late-night Burger Club',
+    merchantName: 'Late-night Burger Club',
+    amount: '18500',
+    paidAt: '2026-07-26T22:10:00',
+    payerName: 'Alex',
+    participants: SETTLEMENT_PARTICIPANTS,
+  },
+  {
+    transferId: 9,
+    appointmentId: 10,
+    payerAppointmentMemberId: 12,
+    journeyName: 'Seoul Summer',
+    gatheringName: 'Seongsu Coffee Walk',
+    merchantName: 'Seongsu Coffee Walk',
+    amount: '24000',
+    paidAt: '2026-07-27T11:05:00',
+    payerName: 'Alex',
+    participants: SETTLEMENT_PARTICIPANTS,
+  },
+  {
+    transferId: 10,
+    appointmentId: 11,
+    payerAppointmentMemberId: 12,
+    journeyName: 'Busan Weekend',
+    gatheringName: 'Haeundae Brunch',
+    merchantName: 'Haeundae Brunch',
+    amount: '32400',
+    paidAt: '2026-08-02T10:20:00',
+    payerName: 'Alex',
+    participants: SETTLEMENT_PARTICIPANTS,
+  },
+]
+
+/** 아직 내지 않은 상세. 하단에 결제 버튼이 나오는 유일한 상태다. */
+const PAYABLE_SETTLEMENT_DETAIL = {
+  id: 42,
+  type: 'ITEMIZED',
+  totalAmount: '60300',
+  status: 'REQUESTED',
+  requestedBy: 'Alex',
+  gatheringName: 'Late-night Burger Club',
+  merchantName: "McDonald's Hongdae",
+  viewerItems: [
+    {
+      settlementItemId: 1,
+      name: 'Burger set',
+      allocatedQuantity: '1',
+      allocatedAmount: '20100',
+    },
+  ],
+  transactionId: null,
+  paidBy: 'Alex',
+  viewer: {
+    role: 'PARTICIPANT',
+    shareAmount: '20100',
+    payableAmount: '20100',
+    requestStatus: 'PENDING',
+    allowedActions: ['PAY'],
+  },
+}
+
+/** 결제를 마친 뒤의 같은 상세. 결제 완료 화면이 머물려면 이 모양이어야 한다. */
+const PAID_SETTLEMENT_DETAIL = {
+  ...PAYABLE_SETTLEMENT_DETAIL,
+  transactionId: 'TR-20260807-0042',
+  viewer: {
+    role: 'PARTICIPANT',
+    shareAmount: '20100',
+    payableAmount: '0',
+    requestStatus: 'PAID',
+    allowedActions: [],
+  },
+}
+
+/** 요청자 시점 상세. 낼 몫이 아니라 "누가 냈는지"를 보여주는 분기다. */
+const COLLECT_SETTLEMENT_DETAIL = {
+  id: 50,
+  type: 'EQUAL',
+  totalAmount: '48000',
+  status: 'REQUESTED',
+  requestedBy: 'Mina Park',
+  gatheringName: 'Han River Picnic',
+  merchantName: 'Han River Picnic',
+  viewerItems: [],
+  transactionId: null,
+  paidBy: 'Mina Park',
+  viewer: {
+    role: 'CREATOR',
+    shareAmount: '16000',
+    payableAmount: '0',
+    requestStatus: 'NOT_REQUESTED',
+    allowedActions: [],
+  },
+}
+
+/** 이미 끝난 정산 상세. 완료 배지와 거래번호 행은 여기서만 나온다. */
+const COMPLETED_SETTLEMENT_DETAIL = {
+  id: 41,
+  type: 'EQUAL',
+  totalAmount: '36000',
+  status: 'COMPLETED',
+  requestedBy: 'Alex',
+  gatheringName: 'Hongdae Karaoke',
+  merchantName: 'Hongdae Karaoke',
+  viewerItems: [],
+  transactionId: 'TR-20260726-0031',
+  paidBy: 'Alex',
+  viewer: {
+    role: 'PARTICIPANT',
+    shareAmount: '12000',
+    payableAmount: '0',
+    requestStatus: 'PAID',
+    allowedActions: [],
+  },
+}
+
+function stubSettlementApis(page) {
+  return Promise.all([
+    stubJson(page, '/api/v1/settlements', {
+      received: receivedSettlements(),
+      sent: sentSettlements(),
+    }),
+    stubJson(page, '/api/v1/settlements/candidates', SETTLEMENT_CANDIDATES),
+    stubJson(page, '/api/v1/settlements/42', PAYABLE_SETTLEMENT_DETAIL),
+  ])
+}
+
+/**
+ * 결제 전과 후를 모두 서빙하는 정산 스텁.
+ *
+ * 결제 완료 화면은 상세의 `requestStatus`가 `PAID`가 아니면 즉시 상세로 되돌아간다. 결제가
+ * 성공하면 목록·상세 조회가 다시 나가므로, 고정 응답으로는 결제 이후 화면을 한 장도 찍을
+ * 수 없다. POST가 뒤집는 플래그를 조회 핸들러가 함께 읽게 해서 서버가 상태를 바꾼 것처럼
+ * 보이게 한다.
+ */
+async function stubPayableSettlement(page, { gate }) {
+  let paid = false
+
+  await page.route(
+    (url) => url.pathname === '/api/v1/settlements/42/members/me/pay',
+    async (route) => {
+      await gate.promise
+      // 순서를 지킨다. 결제 직후 다시 나가는 상세·목록 조회가 이 플래그를 읽으므로,
+      // 응답보다 먼저 세워 두지 않으면 결제 전 데이터가 돌아간다.
+      paid = true
+      await fulfillJson(route, {
+        settlementId: 42,
+        settlementStatus: 'REQUESTED',
+        transferId: 771,
+        viewer: PAID_SETTLEMENT_DETAIL.viewer,
+      })
+    },
+  )
+  await page.route(
+    (url) => url.pathname === '/api/v1/settlements/42',
+    (route) => fulfillJson(route, paid ? PAID_SETTLEMENT_DETAIL : PAYABLE_SETTLEMENT_DETAIL),
+  )
+  await page.route(
+    (url) => url.pathname === '/api/v1/settlements',
+    (route) =>
+      fulfillJson(route, {
+        received: receivedSettlements(paid ? 42 : null),
+        sent: sentSettlements(),
+      }),
+  )
+}
+
+/**
+ * 요청 생성. 흐름이 문을 열 때까지 응답을 잡아둬 "Sending your request" 화면을 찍게 한다.
+ *
+ * 요청 완료 화면은 서버가 나를 이 정산의 요청자로 인정해야 완료를 표시한다. 만든 정산의
+ * 상세를 함께 서빙하지 않으면 완료 화면이 영원히 처리 중에 머문다.
+ *
+ * 생성까지 가지 않는 흐름은 문을 열지 않아도 된다. 열리지 않은 문은 아무 일도 하지 않는다.
+ */
+function stubSettlementCreate(page, { id = 77, gate }) {
+  return Promise.all([
+    page.route(
+      (url) => url.pathname === '/api/v1/appointments/9/settlements',
+      async (route) => {
+        await gate.promise
+        await fulfillJson(route, { id })
+      },
+    ),
+    stubJson(page, `/api/v1/settlements/${id}`, {
+      ...COLLECT_SETTLEMENT_DETAIL,
+      id,
+    }),
+  ])
+}
+
+function stubEmptySettlementCandidates(page) {
+  return stubJson(page, '/api/v1/settlements/candidates', [])
+}
+
+function stubSettlementCandidatesError(page) {
+  return page.route(
+    (url) => url.pathname === '/api/v1/settlements/candidates',
+    (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error: { code: 'SETTLEMENT-001', message: 'Settlement candidates are unavailable' },
+        }),
+      }),
+  )
+}
+
+/** Place 상세 응답을 세운다. 좌표가 있어 지도 버튼 두 개가 함께 찍힌다(#221). */
+function stubPlaceDetail(page) {
+  // 상세 API는 `?language=` 쿼리를 붙이므로 패턴이 쿼리까지 매칭해야 한다.
+  return page.route('**/api/v1/explore/places/501?*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          placeId: 501,
+          itemId: 501,
+          name: 'Onion Anguk',
+          brand: 'Onion',
+          branch: 'Anguk',
+          placeKind: 'CAFE',
+          thumbnailUrl: null,
+          imageUrls: [],
+          region1: 'Seoul',
+          region2: 'Jongno-gu',
+          region3: null,
+          addressRoad: '5 Gyedong-gil, Jongno-gu',
+          addressDetail: null,
+          latitude: 37.5768,
+          longitude: 126.9857,
+          hasForeignLang: true,
+          hasParking: false,
+          reservable: null,
+          takeoutAvailable: true,
+          cardPaymentAvailable: true,
+          smokeFree: true,
+          kidFacility: null,
+          hasRestroom: true,
+          isActive: true,
+          viewCount: 1024,
+          favoriteCount: 87,
+          sourceUrl: null,
+          postalCode: null,
+          openingHours: { 'Mon–Sun': '10:00–21:00' },
+          closedDays: [],
+          menuSummary: 'Pandoro · Espresso · Ssuk latte',
+          tel: '02-0000-0000',
+          activities: [],
+        },
+      }),
+    }),
+  )
+}
+
+/**
+ * Event 상세 응답을 세운다. 좌표가 있는 상세와, 좌표가 NULL이라 지도 버튼이 숨는
+ * 상세(#221 완료 기준)를 id로 나눠 찍는다.
+ */
+function stubEventDetail(page, { withCoordinates }) {
+  const eventId = withCoordinates ? 301 : 302
+  return page.route(`**/api/v1/explore/events/${eventId}?*`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          eventId,
+          eventType: null,
+          eventKind: 'FESTIVAL',
+          title: withCoordinates ? 'Seoul Lantern Festival' : 'Hidden Alley Pop-up',
+          subtitle: null,
+          description: 'Evening lantern walk along the stream with local food stalls.',
+          programText: null,
+          thumbnailUrl: null,
+          imageUrls: [],
+          links: null,
+          reservationUrl: null,
+          preReservation: null,
+          status: 'ONGOING',
+          isPermanent: false,
+          startDate: '2026-08-10',
+          endDate: '2026-08-31',
+          operatingHours: { 'Mon–Sun': '18:00–22:00' },
+          openDays: null,
+          openWeekend: true,
+          opensLate: true,
+          venueName: 'Cheonggyecheon Plaza',
+          region1: 'Seoul',
+          region2: 'Jung-gu',
+          region3: null,
+          addressRoad: '1 Cheonggyecheon-ro, Jung-gu',
+          latitude: withCoordinates ? 37.5696 : null,
+          longitude: withCoordinates ? 126.9784 : null,
+          hasPhotoZone: true,
+          isExperience: false,
+          ageLimit: null,
+          isFree: true,
+          priceText: null,
+          hasBenefit: null,
+          reservable: null,
+          contact: null,
+          organizer: 'Seoul Metropolitan Government',
+          activities: [],
+        },
+      }),
+    }),
+  )
 }
 
 /**
@@ -623,10 +1125,85 @@ const SCREENS = [
     },
   },
   {
+    name: '15b-wallet-qr-payment-preview-ready',
+    path: '/wallet/qr/payment/preview',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubQrPaymentPreview(page)
+    },
+    prepare: async (page) => {
+      await seedQrPaymentSession(page)
+      // 소비 카테고리 칩이 그려질 때까지 기다린다. 세션이 없으면 빈 상태만 찍힌다.
+      await page.getByRole('radio', { name: 'Food' }).waitFor()
+    },
+  },
+  {
     name: '16-wallet-qr-payment-complete',
     path: '/wallet/qr/payment/complete?scope=shared&appointment=seoul-night-tour',
     setup: async (page) => {
       await stubMemberProfile(page)
+    },
+  },
+  // 정산 화면은 낱장으로 두지 않고 `FLOWS`에서 클릭으로 이어 찍는다. 여기 남은 둘은
+  // 후보가 없거나 조회가 실패한 상태라 지갑에서 눌러서는 도달할 수 없다.
+  {
+    name: '23-settlement-create-empty',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEmptySettlementCandidates(page)
+    },
+    prepare: (page) => page.getByText('No payments available', { exact: true }).waitFor(),
+  },
+  {
+    name: '24-settlement-create-error',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubSettlementCandidatesError(page)
+    },
+    prepare: (page) => page.getByRole('alert').waitFor({ timeout: 10_000 }),
+  },
+  {
+    name: '25-explore-place-detail',
+    path: '/explore/places/501',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubPlaceDetail(page)
+    },
+    // 지도 버튼은 접힌 아래쪽에 있어 스크롤해야 뷰포트에 들어온다.
+    prepare: async (page) => {
+      const mapButton = page.getByRole('button', { name: 'Google Maps' })
+      await mapButton.waitFor()
+      await mapButton.scrollIntoViewIfNeeded()
+    },
+  },
+  {
+    name: '26-explore-event-detail',
+    path: '/explore/events/301',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEventDetail(page, { withCoordinates: true })
+    },
+    prepare: async (page) => {
+      const mapButton = page.getByRole('button', { name: 'Google Maps' })
+      await mapButton.waitFor()
+      await mapButton.scrollIntoViewIfNeeded()
+    },
+  },
+  {
+    // 좌표가 NULL인 Event 상세. 지도 버튼이 숨는 것을 이미지로 증명한다(#221).
+    name: '27-explore-event-detail-no-coords',
+    path: '/explore/events/302',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEventDetail(page, { withCoordinates: false })
+    },
+    // 버튼이 없는 것을 보여줘야 하므로 위치 섹션 자체로 스크롤한다.
+    prepare: async (page) => {
+      const locationHeading = page.getByRole('heading', { name: 'Location' })
+      await locationHeading.waitFor()
+      await locationHeading.scrollIntoViewIfNeeded()
     },
   },
 
@@ -641,6 +1218,355 @@ const SCREENS = [
   //   },
   // },
 ]
+
+/** 요청서 1단계를 여정 → 약속 → 거래 순으로 좁힌 뒤 2단계로 넘어간다. */
+async function drillIntoRequestDetails(page) {
+  await page.locator('[data-journey-key]').first().click()
+  await page.locator('[data-appointment-id]').first().click()
+  await page.locator('[data-payment-id]').first().click()
+  await page.locator('[data-action="next"]').click()
+  await page.locator('[data-type="EQUAL"]').waitFor()
+}
+
+/**
+ * 클릭으로 이어 찍는 흐름.
+ *
+ * `SCREENS`가 낱장이라면 이쪽은 과정이다. 페이지를 한 번만 열어 두고 단계마다 조작한 뒤 한
+ * 장씩 찍는다. 그래서 화면이 시안대로인지뿐 아니라 버튼이 실제로 다음 화면에 이어져
+ * 있는지도 함께 드러난다. 중간에서 어긋나면 뒤 단계는 엉뚱한 화면을 찍게 되므로 남은
+ * 단계는 버리고 실패로 센다.
+ *
+ * `act`가 도착 화면을 직접 기다린다. 러너가 `networkidle`을 걸지 않는 것은, "보내는 중"
+ * 화면이 응답을 기다리는 그 사이에만 존재하기 때문이다. 러너가 응답을 끝까지 기다리면
+ * 찍으려던 화면은 이미 지나가 있다.
+ *
+ * 그 사이를 만드는 것이 `createGate`다. 스텁이 문 앞에서 응답을 잡고 있다가, 그 화면을 찍은
+ * 뒤 다음 단계의 `act` 첫 줄에서 `open()`을 부르면 그때 응답이 나간다. 캡처는 앞 단계 `act`가
+ * 끝난 직후에 일어나므로 다음 `act`의 첫 줄이 곧 "찍은 직후"다.
+ *
+ * `focus`는 찍기 직전의 화면 위치다. 뷰포트만 찍히므로 접힌 아래쪽을 보여줘야 하면 선택자를
+ * 준다. 기본값은 맨 위이며, 하단 버튼을 누른 뒤 스크롤이 남아 머리말이 잘리는 것도 막는다.
+ *
+ * @typedef {{ name: string, act?: Hook, focus?: string }} Step
+ * @type {{ name: string, path: string, setup?: Hook, steps: Step[] }[]}
+ */
+/**
+ * 흐름이 직접 여는 응답의 문. 흐름 하나가 문 하나를 갖는다. 나눠 쓰면 앞 흐름이 연 문이
+ * 뒤 흐름에서 이미 열려 있어, 찍으려던 "보내는 중" 화면을 그냥 지나친다.
+ */
+const payResponseGate = createGate()
+const createResponseGate = createGate()
+/** 32번은 생성까지 가지 않아 이 문을 열 일이 없다. 스텁의 짝을 맞추려고 둔다. */
+const itemizedCreateGate = createGate()
+
+const FLOWS = [
+  {
+    // 지갑에서 시작해 내 몫을 결제하기까지. 도중에 서버 상태가 바뀌는 유일한 흐름이다.
+    name: '30-pay',
+    path: '/wallet',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubWalletHome(page, WALLET_TRANSACTIONS)
+      await stubCsrf(page)
+      await stubPayableSettlement(page, { gate: payResponseGate })
+    },
+    steps: [
+      { name: '01-wallet' },
+      {
+        name: '02-splits-to-pay',
+        act: async (page) => {
+          await page.getByRole('button', { name: 'Splits' }).click()
+          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+        },
+      },
+      {
+        name: '03-detail',
+        act: async (page) => {
+          await page.locator('[data-settlement-id="42"]').click()
+          await page.locator('[data-action="pay"]').waitFor()
+        },
+      },
+      {
+        name: '04-paying',
+        act: async (page) => {
+          await page.locator('[data-action="pay"]').click()
+          await page.getByText('Sending your payment').waitFor()
+        },
+      },
+      {
+        // 앞 단계를 찍은 뒤다. 여기서 결제 응답을 내보내면 화면이 스스로 완료로 넘어간다.
+        name: '05-paid',
+        act: async (page) => {
+          payResponseGate.open()
+          await page.getByText('Payment sent').waitFor({ timeout: 10_000 })
+        },
+      },
+      {
+        name: '06-detail-paid',
+        act: async (page) => {
+          await page.locator('[data-action="status-action"]').click()
+          await page.locator('[data-action="pay-completed"]').waitFor()
+        },
+      },
+      {
+        name: '07-list-paid',
+        act: async (page) => {
+          await page.getByRole('button', { name: 'Back', exact: true }).click()
+          await page
+            .locator('[data-settlement-id="42"]')
+            .getByText('Paid', { exact: true })
+            .waitFor()
+        },
+      },
+    ],
+  },
+  {
+    // 요청을 만드는 쪽. 후보를 여정 → 약속 → 거래로 좁혀 균등 분할로 보낸다.
+    name: '31-request-equal',
+    path: '/wallet',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubWalletHome(page, WALLET_TRANSACTIONS)
+      await stubCsrf(page)
+      await stubSettlementApis(page)
+      await stubSettlementCreate(page, { gate: createResponseGate })
+    },
+    steps: [
+      { name: '01-wallet' },
+      {
+        name: '02-splits',
+        act: async (page) => {
+          await page.getByRole('button', { name: 'Splits' }).click()
+          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+        },
+      },
+      {
+        name: '03-journeys',
+        act: async (page) => {
+          await page.getByRole('button', { name: 'Start Split' }).click()
+          await page.locator('[data-journey-key]').first().waitFor()
+        },
+      },
+      {
+        name: '04-appointments',
+        act: async (page) => {
+          await page.locator('[data-journey-key]').first().click()
+          await page.locator('[data-appointment-id]').first().waitFor()
+        },
+      },
+      {
+        name: '05-payments',
+        act: async (page) => {
+          await page.locator('[data-appointment-id]').first().click()
+          await page.locator('[data-payment-id]').first().waitFor()
+        },
+      },
+      {
+        name: '06-payment-selected',
+        act: async (page) => {
+          await page.locator('[data-payment-id]').first().click()
+          await page.locator('[data-payment-id][aria-pressed="true"]').waitFor()
+        },
+      },
+      {
+        name: '07-method-equal',
+        act: async (page) => {
+          await page.locator('[data-action="next"]').click()
+          await page.locator('[data-type="EQUAL"]').waitFor()
+        },
+      },
+      {
+        // 결제자는 이미 고정돼 있다. 균등 분할은 두 명 이상이어야 다음으로 넘어간다.
+        name: '08-participants',
+        focus: '[data-participant-id="27"]',
+        act: async (page) => {
+          await page.locator('[data-participant-id="19"]').click()
+          await page.locator('[data-participant-id="27"]').click()
+          await page.locator('[data-participant-id="27"][aria-pressed="true"]').waitFor()
+        },
+      },
+      {
+        name: '09-review',
+        act: async (page) => {
+          await page.locator('[data-action="next"]').click()
+          await page.locator('[data-action="create"]').waitFor()
+        },
+      },
+      {
+        name: '10-requesting',
+        act: async (page) => {
+          await page.locator('[data-action="create"]').click()
+          await page.getByText('Sending your request').waitFor()
+        },
+      },
+      {
+        // 앞 단계를 찍은 뒤다. 여기서 생성 응답을 내보내면 화면이 스스로 완료로 넘어간다.
+        name: '11-requested',
+        act: async (page) => {
+          createResponseGate.open()
+          await page.getByText('Request sent').waitFor({ timeout: 10_000 })
+        },
+      },
+      {
+        name: '12-collect-list',
+        act: async (page) => {
+          await page.locator('[data-action="status-action"]').click()
+          await page.locator('[data-settlement-id="50"]').waitFor()
+        },
+      },
+    ],
+  },
+  {
+    // 항목별 분할은 요청서 2단계에서만 갈라진다. 앞 여섯 장은 위 흐름과 같아 다시 찍지 않고
+    // 갈라지는 지점부터 시작한다.
+    name: '32-request-itemized',
+    path: '/settlements/new',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubCsrf(page)
+      await stubSettlementApis(page)
+      await stubSettlementCreate(page, { gate: itemizedCreateGate })
+    },
+    steps: [
+      {
+        name: '01-method',
+        act: async (page) => {
+          await drillIntoRequestDetails(page)
+          await page.locator('[data-type="ITEMIZED"]').click()
+          await page.locator('[data-action="add-item"]').waitFor()
+        },
+      },
+      {
+        name: '02-participants',
+        focus: '[data-participant-id="27"]',
+        act: async (page) => {
+          await page.locator('[data-participant-id="19"]').click()
+          await page.locator('[data-participant-id="27"]').click()
+          await page.locator('[data-participant-id="27"][aria-pressed="true"]').waitFor()
+        },
+      },
+      {
+        name: '03-items-added',
+        focus: '[data-item-name="0"]',
+        act: async (page) => {
+          await page.locator('[data-action="add-item"]').click()
+          await page.locator('[data-item-name="0"]').waitFor()
+        },
+      },
+      {
+        // 항목 수량과 배분 합계가 같아야 다음으로 넘어간다.
+        name: '04-items-filled',
+        focus: '[data-allocation-quantity="0:27"]',
+        act: async (page) => {
+          await page.locator('[data-item-name="0"]').fill('Burger set')
+          await page.locator('[data-item-unit-price="0"]').fill('20100')
+          await page.locator('[data-item-quantity="0"]').fill('3')
+          await page.locator('[data-allocation-quantity="0:12"]').fill('1')
+          await page.locator('[data-allocation-quantity="0:19"]').fill('1')
+          await page.locator('[data-allocation-quantity="0:27"]').fill('1')
+        },
+      },
+      {
+        name: '05-review',
+        act: async (page) => {
+          await page.locator('[data-action="next"]').click()
+          await page.locator('[data-action="create"]').waitFor()
+        },
+      },
+    ],
+  },
+  {
+    // 받을 쪽. 같은 목록이라도 요청자에게는 낼 버튼이 없고 누가 냈는지가 대신 온다.
+    name: '33-collect',
+    path: '/wallet',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubWalletHome(page, WALLET_TRANSACTIONS)
+      await stubSettlementApis(page)
+      await stubJson(page, '/api/v1/settlements/50', COLLECT_SETTLEMENT_DETAIL)
+    },
+    steps: [
+      { name: '01-wallet' },
+      {
+        name: '02-splits-to-pay',
+        act: async (page) => {
+          await page.getByRole('button', { name: 'Splits' }).click()
+          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+        },
+      },
+      {
+        name: '03-splits-to-collect',
+        act: async (page) => {
+          await page.getByRole('radio', { name: 'To Collect', exact: true }).click()
+          await page.locator('[data-settlement-id="50"]').waitFor()
+        },
+      },
+      {
+        name: '04-detail-creator',
+        act: async (page) => {
+          await page.locator('[data-settlement-id="50"]').click()
+          await page.getByText('Who has paid').waitFor()
+        },
+      },
+      {
+        name: '05-back-to-collect',
+        act: async (page) => {
+          await page.getByRole('button', { name: 'Back to your requests' }).click()
+          await page.locator('[data-settlement-id="50"]').waitFor()
+        },
+      },
+    ],
+  },
+  {
+    // 완료된 정산은 목록에서 세 건만 미리 보여준다. 나머지는 전체 내역에서 본다.
+    name: '34-history',
+    path: '/wallet',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubWalletHome(page, WALLET_TRANSACTIONS)
+      await stubSettlementApis(page)
+      await stubJson(page, '/api/v1/settlements/41', COMPLETED_SETTLEMENT_DETAIL)
+    },
+    steps: [
+      { name: '01-wallet' },
+      {
+        name: '02-splits',
+        act: async (page) => {
+          await page.getByRole('button', { name: 'Splits' }).click()
+          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+        },
+      },
+      {
+        name: '03-history-paid',
+        act: async (page) => {
+          await page.locator('[data-action="view-all"]').click()
+          await page.getByRole('heading', { level: 1, name: 'Paid splits' }).waitFor()
+        },
+      },
+      {
+        name: '04-detail-completed',
+        act: async (page) => {
+          // 출발 화면의 카드에도 'Completed' 배지가 있어 문구로는 도착을 알 수 없다.
+          // 주소와 상세에만 있는 버튼으로 판정한다.
+          await page.locator('[data-settlement-id="41"]').click()
+          await page.waitForURL(/\/settlements\/41(\?|$)/)
+          await page.locator('[data-action="pay-completed"]').waitFor()
+        },
+      },
+      {
+        name: '05-history-collected',
+        act: async (page) => {
+          await page.getByRole('button', { name: 'Back', exact: true }).click()
+          await page.getByRole('radio', { name: 'To Collect', exact: true }).click()
+          await page.locator('[data-action="view-all"]').click()
+          await page.getByRole('heading', { level: 1, name: 'Collected splits' }).waitFor()
+        },
+      },
+    ],
+  },
+]
+
+const TOTAL = SCREENS.length + FLOWS.reduce((count, flow) => count + flow.steps.length, 0)
 
 async function assertServerIsUp() {
   try {
@@ -706,12 +1632,49 @@ for (const screen of SCREENS) {
   }
 }
 
+for (const flow of FLOWS) {
+  const page = await context.newPage()
+
+  try {
+    await flow.setup?.(page)
+    await page.goto(`${BASE}/${flow.path.replace(/^\/+/, '')}`, { waitUntil: 'networkidle' })
+
+    for (const [index, step] of flow.steps.entries()) {
+      const name = `${flow.name}-${step.name}`
+
+      try {
+        await step.act?.(page)
+
+        if (step.focus === undefined) await page.evaluate(() => window.scrollTo(0, 0))
+        else await page.locator(step.focus).scrollIntoViewIfNeeded()
+
+        // 웹폰트와 전환이 자리를 잡을 시간을 준다. 없으면 폴백 폰트가 찍히는 경우가 있다.
+        await page.waitForTimeout(400)
+        await page.screenshot({ path: `${OUT}/${name}.png` })
+
+        console.log(`  ✓ ${name}.png`)
+      } catch (error) {
+        // 한 단계가 어긋나면 그 뒤는 엉뚱한 화면에서 찍힌다. 남은 단계는 버리고 실패로 센다.
+        const remaining = flow.steps.length - index
+        failed += remaining
+        console.error(`  ✗ ${name}  (남은 ${remaining - 1}단계 건너뜀)\n    ${error.message}`)
+        break
+      }
+    }
+  } catch (error) {
+    failed += flow.steps.length
+    console.error(`  ✗ ${flow.name}  ← ${flow.path}\n    ${error.message}`)
+  } finally {
+    await page.close()
+  }
+}
+
 await browser.close()
 
 // 찍히지 않은 화면을 못 보고 넘어가지 않도록 실패를 종료 코드로 알린다. 이때는 산출물이
 // 온전하지 않으므로 PR에 붙이라는 안내도 하지 않는다.
 if (failed > 0) {
-  console.error(`\n${failed}/${SCREENS.length}개 화면을 찍지 못했다. 위 오류를 확인한다.`)
+  console.error(`\n${failed}/${TOTAL}개 화면을 찍지 못했다. 위 오류를 확인한다.`)
   process.exit(1)
 }
 

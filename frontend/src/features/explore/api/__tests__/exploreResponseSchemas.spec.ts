@@ -21,6 +21,7 @@ const eventSummary = {
   longitude: 127,
   startDate: '2026-08-01',
   endDate: null,
+  saved: false,
 }
 
 const eventDetail = {
@@ -60,6 +61,7 @@ const eventDetail = {
   reservable: false,
   contact: null,
   organizer: null,
+  saved: false,
   activities: [],
 }
 
@@ -81,6 +83,7 @@ const placeSummary = {
   isActive: true,
   viewCount: 0,
   favoriteCount: 0,
+  saved: false,
 }
 
 describe('explore response schemas', () => {

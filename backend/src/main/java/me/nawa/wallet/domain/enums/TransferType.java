@@ -6,6 +6,6 @@ public enum TransferType {
     SETTLEMENT,                    // 정산
     DEPOSIT_HOLD,                  // 보증금 홀드
     DEPOSIT_REFUND,                // 보증금 환불
-    DEPOSIT_FORFEIT_DISTRIBUTION,  // 보증금 몰수 분배
+    DEPOSIT_NO_SHOW_DISTRIBUTION,  // 노쇼 보증금 분배
     REVERSAL                       // 거래 취소/역거래
 }

@@ -1,8 +1,11 @@
 /**
  * 회원 문구.
  *
- * `errorCode`는 백엔드 MemberErrorCode(MEMBER-001~MEMBER-004)와 1:1로 맞춘다.
- * 서버가 내려준 message를 화면에 그대로 노출하지 않고 여기의 문구를 사용한다.
+ * `errorCode`는 백엔드 MemberErrorCode와 1:1로 맞춘다. 서버가 내려준 message를
+ * 화면에 그대로 노출하지 않고 여기의 문구를 사용한다.
+ *
+ * MEMBER-005~008(국적·이름·이미지·온보딩)의 문구는 그 오류에 도달하는 화면이
+ * 아직 없어 비어 있다 — 프로필 편집·온보딩 폼(#232)에서 함께 채운다.
  */
 export default {
   member: {

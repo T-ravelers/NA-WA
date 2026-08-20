@@ -19,6 +19,12 @@ public enum ExploreErrorCode implements ErrorCode {
         HttpStatus.NOT_FOUND,
         "EXPLORE-002",
         "Place를 찾을 수 없습니다."
+    ),
+
+    ITEM_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "EXPLORE-003",
+        "탐색 항목을 찾을 수 없습니다."
     );
 
     private final HttpStatus status;

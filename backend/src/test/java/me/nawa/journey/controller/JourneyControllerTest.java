@@ -6,8 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,11 +20,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
+import me.nawa.journey.dto.request.JourneyUpdateRequest;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineAppointmentResponse;
@@ -116,6 +121,85 @@ class JourneyControllerTest {
     }
 
     @Test
+    void updateJourney_returns200WithUpdatedSettings() throws Exception {
+        JourneyResponse response = JourneyResponse.builder()
+            .tripId(20L)
+            .title("Updated Seoul Journey")
+            .startDate(LocalDate.of(2026, 4, 1))
+            .endDate(LocalDate.of(2026, 4, 5))
+            .regions(List.of())
+            .build();
+        when(journeyService.updateJourney(
+            eq(1L),
+            eq(20L),
+            any(JourneyUpdateRequest.class)
+        )).thenReturn(response);
+
+        String responseBody = mockMvc.perform(
+                put("/api/v1/journeys/20")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Updated Seoul Journey",
+                          "startDate": "2026-04-01",
+                          "endDate": "2026-04-05",
+                          "budgetAmount": null,
+                          "companionPreference": null,
+                          "regions": []
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertTrue(body.path("success").asBoolean());
+        assertEquals(20L, body.path("data").path("tripId").asLong());
+        assertEquals(
+            "Updated Seoul Journey",
+            body.path("data").path("title").asText()
+        );
+        assertEquals(0, body.path("data").path("regions").size());
+    }
+
+    @Test
+    void updateJourney_returns409WhenDateRangeConflicts() throws Exception {
+        when(journeyService.updateJourney(
+            eq(1L),
+            eq(20L),
+            any(JourneyUpdateRequest.class)
+        )).thenThrow(new BusinessException(
+            JourneyErrorCode.JOURNEY_DATE_RANGE_CONFLICT
+        ));
+
+        String responseBody = mockMvc.perform(
+                put("/api/v1/journeys/20")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Short Journey",
+                          "startDate": "2026-04-02",
+                          "endDate": "2026-04-03",
+                          "regions": []
+                        }
+                        """)
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals(
+            "JOURNEY-009",
+            body.path("error").path("code").asText()
+        );
+    }
+
+    @Test
     void addJourneyItem_returns201WithApiResponse() throws Exception {
         JourneyItemResponse response = JourneyItemResponse.builder()
             .tripItemId(7L)
@@ -182,6 +266,77 @@ class JourneyControllerTest {
             "JOURNEY-004",
             body.path("error").path("code").asText()
         );
+    }
+
+    @Test
+    void existsJourneyItem_returns200WithExistsFlag() throws Exception {
+        when(journeyService.existsJourneyItem(
+            1L, 12L, 990001L, LocalDate.of(2026, 8, 8)
+        )).thenReturn(true);
+
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/12/items/exists")
+                    .param("itemId", "990001")
+                    .param("visitDate", "2026-08-08")
+            )
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertTrue(body.path("success").asBoolean());
+        assertTrue(body.path("data").path("exists").asBoolean());
+    }
+
+    @Test
+    void existsJourneyItem_returns400ForMalformedVisitDate() throws Exception {
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/12/items/exists")
+                    .param("itemId", "990001")
+                    .param("visitDate", "not-a-date")
+            )
+            .andExpect(status().isBadRequest())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals("COMMON-001", body.path("error").path("code").asText());
+    }
+
+    @Test
+    void existsJourneyItem_returns400ForMissingVisitDate() throws Exception {
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/12/items/exists")
+                    .param("itemId", "990001")
+            )
+            .andExpect(status().isBadRequest())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals("COMMON-001", body.path("error").path("code").asText());
+    }
+
+    @Test
+    void existsJourneyItem_returns400ForMalformedItemId() throws Exception {
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/12/items/exists")
+                    .param("itemId", "abc")
+                    .param("visitDate", "2026-08-08")
+            )
+            .andExpect(status().isBadRequest())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals("COMMON-001", body.path("error").path("code").asText());
     }
 
     @Test
@@ -353,5 +508,109 @@ class JourneyControllerTest {
             .get(0).path("items").get(0);
         assertEquals(900L, responseItem.path("appointment")
             .path("appointmentId").asLong());
+    }
+
+    @Test
+    void deleteJourneyItem_returns204() throws Exception {
+        mockMvc.perform(delete("/api/v1/journeys/12/items/7"))
+            .andExpect(status().isNoContent());
+
+        verify(journeyService).deleteJourneyItem(1L, 12L, 7L);
+    }
+
+    @Test
+    void deleteJourneyItem_returns404WhenScheduleDoesNotExist()
+        throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+            JourneyErrorCode.JOURNEY_SCHEDULE_NOT_FOUND
+        )).when(journeyService).deleteJourneyItem(1L, 12L, 7L);
+
+        String responseBody = mockMvc.perform(
+                delete("/api/v1/journeys/12/items/7")
+            )
+            .andExpect(status().isNotFound())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertEquals(
+            "JOURNEY-010",
+            body.path("error").path("code").asText()
+        );
+    }
+
+    @Test
+    void deleteJourneyItem_returnsAppointmentCancellationError()
+        throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+            AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
+        )).when(journeyService).deleteJourneyItem(1L, 12L, 7L);
+
+        String responseBody = mockMvc.perform(
+                delete("/api/v1/journeys/12/items/7")
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertEquals(
+            "APPOINTMENT-007",
+            body.path("error").path("code").asText()
+        );
+    }
+
+    @Test
+    void deleteJourney_returns204() throws Exception {
+        mockMvc.perform(delete("/api/v1/journeys/12"))
+            .andExpect(status().isNoContent());
+
+        verify(journeyService).deleteJourney(1L, 12L);
+    }
+
+    @Test
+    void deleteJourney_returns409ForHostedAppointment() throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+            JourneyErrorCode.JOURNEY_APPOINTMENT_HOST_DELETE_CONFLICT
+        )).when(journeyService).deleteJourney(1L, 12L);
+
+        String responseBody = mockMvc.perform(
+                delete("/api/v1/journeys/12")
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertFalse(body.path("success").asBoolean());
+        assertEquals(
+            "JOURNEY-011",
+            body.path("error").path("code").asText()
+        );
+    }
+
+    @Test
+    void deleteJourney_returnsAppointmentCancellationError()
+        throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+            AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
+        )).when(journeyService).deleteJourney(1L, 12L);
+
+        String responseBody = mockMvc.perform(
+                delete("/api/v1/journeys/12")
+            )
+            .andExpect(status().isConflict())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertEquals(
+            "APPOINTMENT-007",
+            body.path("error").path("code").asText()
+        );
     }
 }

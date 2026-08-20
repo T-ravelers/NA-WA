@@ -44,7 +44,13 @@ public enum DepositStatus {
             case HELD ->
                 nextStatus == REFUNDED || nextStatus == DISTRIBUTED;
 
-            case REFUNDED, DISTRIBUTED, CANCELLED ->
+            // 참여 취소로 환급된 회원이 마감 시각 전에 재참여하면, 같은
+            // 보증금 행을 재활용해 PENDING으로 되돌린다(appointment_member_id
+            // UNIQUE 제약 때문에 새 보증금 행을 만들 수 없음).
+            case REFUNDED ->
+                nextStatus == PENDING;
+
+            case DISTRIBUTED, CANCELLED ->
                 false;
         };
     }

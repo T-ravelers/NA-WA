@@ -4,30 +4,48 @@ import me.nawa.appointment.domain.Appointment;
 import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.domain.AppointmentStatus;
 import me.nawa.appointment.domain.MembershipStatus;
+import me.nawa.appointment.domain.MyOngoingAppointment;
 import me.nawa.appointment.dto.request.AppointmentCreateRequest;
 import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import me.nawa.appointment.dto.response.AppointmentDetailResponse;
 import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
+import me.nawa.appointment.dto.response.MyOngoingAppointmentResponse;
 import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.common.exception.CommonErrorCode;
+import me.nawa.deposit.domain.AttendanceStatus;
 import me.nawa.deposit.domain.Deposit;
+import me.nawa.deposit.domain.DepositPayoutBatch;
+import me.nawa.deposit.domain.ResolutionReason;
 import me.nawa.deposit.mapper.DepositMapper;
+import me.nawa.deposit.mapper.DepositPayoutBatchMapper;
+import me.nawa.journey.domain.Journey;
+import me.nawa.journey.exception.JourneyErrorCode;
+import me.nawa.journey.mapper.JourneyMapper;
+import me.nawa.wallet.domain.SystemWalletCode;
+import me.nawa.wallet.domain.enums.TransferType;
+import me.nawa.wallet.service.WalletTransferService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
@@ -36,25 +54,217 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AppointmentServiceTest {
+    // 절대 날짜로 고정하면 그 시점이 지나는 순간 activityStartAt이 과거가 되어
+    // validRequest()를 쓰는 테스트가 전부 깨진다. 실행 시점 기준 상대 날짜로 둔다.
+    private static final LocalDate VISIT_DATE = LocalDate.now().plusDays(7);
+    private static final LocalDate JOURNEY_START_DATE = LocalDate.now();
+    private static final LocalDate JOURNEY_END_DATE = VISIT_DATE.plusDays(30);
+
     @Mock
     private AppointmentMapper appointmentMapper;
     @Mock
     private DepositMapper depositMapper;
+    @Mock
+    private DepositPayoutBatchMapper depositPayoutBatchMapper;
+    @Mock
+    private WalletTransferService walletTransferService;
+    @Mock
+    private JourneyMapper journeyMapper;
     @InjectMocks
     private AppointmentService appointmentService;
 
     @Test
-    void createAppointment_requiresPaymentIntegrationWithoutPersistingState() {
+    void createAppointment_success_holdsHostDepositAndBecomesRecruiting() {
         AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
+        stubInsertAppointment(10L);
+        stubInsertAppointmentMember(20L);
+        when(depositMapper.insert(any())).thenReturn(1);
+        when(walletTransferService.transferToSystemWallet(
+                eq(1L), eq(1L), eq(SystemWalletCode.DEPOSIT_POOL),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_HOLD.name()), anyString()
+        )).thenReturn(500L);
+        when(depositMapper.markHeld(any(), eq(500L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberActive(20L)).thenReturn(1);
+        when(appointmentMapper.updateAppointmentStatus(
+                10L, AppointmentStatus.PAYMENT_PENDING, AppointmentStatus.RECRUITING
+        )).thenReturn(1);
+
+        Appointment result = appointmentService.createAppointment(1L, request);
+
+        assertEquals(10L, result.getAppointmentId());
+        assertEquals(AppointmentStatus.RECRUITING, result.getAppointmentStatus());
+        assertEquals(1, result.getCurrentMemberCount());
+        verify(depositMapper).markHeld(any(), eq(500L), any());
+        verify(appointmentMapper).markMemberActive(20L);
+    }
+
+    @Test
+    void toCreatedResponse_includesActiveMembers() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        AppointmentMember host = AppointmentMember.builder()
+                .appointmentMemberId(20L)
+                .memberId(1L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .host(true)
+                .build();
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of(host));
+
+        AppointmentDetailResponse result =
+                appointmentService.toCreatedResponse(appointment);
+
+        assertEquals(1, result.getMembers().size());
+        assertEquals(true, result.getMembers().get(0).isHost());
+    }
+
+    @Test
+    void createAppointment_itemNotAvailable_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn(null);
+
         BusinessException exception = assertThrows(
                 BusinessException.class,
                 () -> appointmentService.createAppointment(1L, request)
         );
 
-        assertEquals(AppointmentErrorCode.PAYMENT_INTEGRATION_REQUIRED,
-                exception.getErrorCode());
+        assertEquals(CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
         verify(appointmentMapper, never()).insertAppointment(any());
-        verify(depositMapper, never()).insert(any());
+    }
+
+    @Test
+    void createAppointment_journeyNotFound_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_NOT_FOUND, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyNotOwned_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(2L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_FORBIDDEN, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_visitDateOutsideJourneyRange_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(VISIT_DATE.plusDays(60))
+                        .endDate(VISIT_DATE.plusDays(90))
+                        .build()
+        );
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(
+                JourneyErrorCode.JOURNEY_ITEM_DATE_OUT_OF_RANGE,
+                exception.getErrorCode()
+        );
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyItemAlreadyExists_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
+        when(journeyMapper.existsJourneyItem(1L, 100L, VISIT_DATE))
+                .thenReturn(true);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_journeyItemRaceCondition_rejectsRequestAfterInsert() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
+        stubInsertAppointment(10L);
+        org.mockito.Mockito.doThrow(new DuplicateKeyException("duplicate"))
+                .when(journeyMapper).insertConfirmedJourneyItem(any());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointmentMember(any());
+    }
+
+    @Test
+    void createAppointment_activityStartInPast_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        request.setVisitDate(LocalDate.now());
+        request.setActivityStartTime(LocalTime.now().minusMinutes(1));
+        request.setActivityEndTime(LocalTime.now().plusHours(1));
+        request.setJoinDeadline(LocalDateTime.now().minusMinutes(2));
+
+        assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+        verify(appointmentMapper, never()).findAvailableItemType(any());
     }
 
     @Test
@@ -79,6 +289,22 @@ class AppointmentServiceTest {
                 () -> appointmentService.createAppointment(1L, request)
         );
         verify(appointmentMapper, never()).findAvailableItemType(any());
+    }
+
+    private void stubInsertAppointment(long appointmentId) {
+        when(appointmentMapper.insertAppointment(any())).thenAnswer(invocation -> {
+            Appointment appointment = invocation.getArgument(0);
+            appointment.setAppointmentId(appointmentId);
+            return 1;
+        });
+    }
+
+    private void stubInsertAppointmentMember(long appointmentMemberId) {
+        when(appointmentMapper.insertAppointmentMember(any())).thenAnswer(invocation -> {
+            AppointmentMember member = invocation.getArgument(0);
+            member.setAppointmentMemberId(appointmentMemberId);
+            return 1;
+        });
     }
 
     @Test
@@ -125,6 +351,36 @@ class AppointmentServiceTest {
     }
 
     @Test
+    void getAppointment_afterJoinDeadline_showsClosedBeforeSchedulerCatchesUp() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        appointment.setJoinDeadline(LocalDateTime.now().minusMinutes(1));
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of());
+
+        AppointmentDetailResponse result =
+                appointmentService.getAppointment(2L, 10L);
+
+        assertEquals(AppointmentStatus.CLOSED, result.getAppointmentStatus());
+    }
+
+    @Test
+    void getAppointment_afterActivityStart_showsInProgressBeforeSchedulerCatchesUp() {
+        Appointment appointment = appointment(10L, AppointmentStatus.CLOSED);
+        appointment.setActivityStartAt(LocalDateTime.now().minusMinutes(1));
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of());
+
+        AppointmentDetailResponse result =
+                appointmentService.getAppointment(2L, 10L);
+
+        assertEquals(AppointmentStatus.IN_PROGRESS, result.getAppointmentStatus());
+    }
+
+    @Test
     void getAppointment_paymentPendingForNonHost_returnsNotFound() {
         Appointment appointment = appointment(
                 10L,
@@ -145,14 +401,184 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void joinAppointment_requiresPaymentIntegrationWithoutPersistingState() {
+    void joinAppointment_success_holdsDepositAndActivatesMember() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(10L, 2L))
+                .thenReturn(null);
+        stubInsertAppointmentMember(30L);
+        when(depositMapper.insert(any())).thenReturn(1);
+        when(walletTransferService.transferToSystemWallet(
+                eq(2L), eq(2L), eq(SystemWalletCode.DEPOSIT_POOL),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_HOLD.name()), anyString()
+        )).thenReturn(501L);
+        when(depositMapper.markHeld(any(), eq(501L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberActive(30L)).thenReturn(1);
+        AppointmentMember active = AppointmentMember.builder()
+                .appointmentMemberId(30L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .build();
+        when(appointmentMapper.findMemberByIdForUpdate(10L, 30L))
+                .thenReturn(active);
+
+        AppointmentMemberResponse result =
+                appointmentService.joinAppointment(2L, 10L);
+
+        assertEquals(MembershipStatus.ACTIVE, result.getMembershipStatus());
+        verify(appointmentMapper).markMemberActive(30L);
+    }
+
+    @Test
+    void joinAppointment_fillsLastSlot_closesRecruitingSynchronously() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        appointment.setCurrentMemberCount(appointment.getMaxMembers() - 1);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(10L, 2L))
+                .thenReturn(null);
+        stubInsertAppointmentMember(30L);
+        when(depositMapper.insert(any())).thenReturn(1);
+        when(walletTransferService.transferToSystemWallet(
+                eq(2L), eq(2L), eq(SystemWalletCode.DEPOSIT_POOL),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_HOLD.name()), anyString()
+        )).thenReturn(501L);
+        when(depositMapper.markHeld(any(), eq(501L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberActive(30L)).thenReturn(1);
+        when(appointmentMapper.updateAppointmentStatus(
+                10L, AppointmentStatus.RECRUITING, AppointmentStatus.CLOSED
+        )).thenReturn(1);
+        when(appointmentMapper.findMemberByIdForUpdate(10L, 30L))
+                .thenReturn(AppointmentMember.builder()
+                        .appointmentMemberId(30L)
+                        .appointmentId(10L)
+                        .memberId(2L)
+                        .membershipStatus(MembershipStatus.ACTIVE)
+                        .build());
+
+        appointmentService.joinAppointment(2L, 10L);
+
+        verify(appointmentMapper).updateAppointmentStatus(
+                10L, AppointmentStatus.RECRUITING, AppointmentStatus.CLOSED
+        );
+    }
+
+    @Test
+    void joinAppointment_notRecruiting_rejectsJoin() {
+        Appointment appointment = appointment(10L, AppointmentStatus.CLOSED);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+
         BusinessException exception = assertThrows(
                 BusinessException.class,
                 () -> appointmentService.joinAppointment(2L, 10L)
         );
 
-        assertEquals(AppointmentErrorCode.PAYMENT_INTEGRATION_REQUIRED,
+        assertEquals(AppointmentErrorCode.JOIN_NOT_AVAILABLE,
                 exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointmentMember(any());
+    }
+
+    @Test
+    void joinAppointment_afterDeadline_rejectsJoin() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        appointment.setJoinDeadline(LocalDateTime.now().minusDays(1));
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.joinAppointment(2L, 10L)
+        );
+
+        assertEquals(AppointmentErrorCode.JOIN_NOT_AVAILABLE,
+                exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointmentMember(any());
+    }
+
+    @Test
+    void joinAppointment_atCapacity_rejectsJoin() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        appointment.setCurrentMemberCount(appointment.getMaxMembers());
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.joinAppointment(2L, 10L)
+        );
+
+        assertEquals(AppointmentErrorCode.JOIN_NOT_AVAILABLE,
+                exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointmentMember(any());
+    }
+
+    @Test
+    void joinAppointment_alreadyJoined_rejectsJoin() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(10L, 2L))
+                .thenReturn(AppointmentMember.builder()
+                        .appointmentMemberId(30L)
+                        .membershipStatus(MembershipStatus.ACTIVE)
+                        .build());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.joinAppointment(2L, 10L)
+        );
+
+        assertEquals(AppointmentErrorCode.ALREADY_JOINED,
+                exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointmentMember(any());
+    }
+
+    @Test
+    void joinAppointment_rejoinsAfterLeaving_revivesExistingMemberAndDeposit() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        AppointmentMember left = AppointmentMember.builder()
+                .appointmentMemberId(30L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .membershipStatus(MembershipStatus.LEFT)
+                .build();
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(10L, 2L))
+                .thenReturn(left);
+        when(appointmentMapper.reviveLeftMember(30L)).thenReturn(1);
+        Deposit refundedDeposit = Deposit.pending(30L, BigDecimal.valueOf(10_000));
+        refundedDeposit.hold(400L, LocalDateTime.now());
+        refundedDeposit.refund(LocalDateTime.now());
+        when(depositMapper.findByAppointmentMemberId(30L))
+                .thenReturn(refundedDeposit);
+        when(depositMapper.revive(any())).thenReturn(1);
+        when(walletTransferService.transferToSystemWallet(
+                eq(2L), eq(2L), eq(SystemWalletCode.DEPOSIT_POOL),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_HOLD.name()), anyString()
+        )).thenReturn(501L);
+        when(depositMapper.markHeld(any(), eq(501L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberActive(30L)).thenReturn(1);
+        when(appointmentMapper.findMemberByIdForUpdate(10L, 30L))
+                .thenReturn(AppointmentMember.builder()
+                        .appointmentMemberId(30L)
+                        .appointmentId(10L)
+                        .memberId(2L)
+                        .membershipStatus(MembershipStatus.ACTIVE)
+                        .build());
+
+        AppointmentMemberResponse result =
+                appointmentService.joinAppointment(2L, 10L);
+
+        assertEquals(MembershipStatus.ACTIVE, result.getMembershipStatus());
+        verify(appointmentMapper).reviveLeftMember(30L);
+        verify(depositMapper).revive(refundedDeposit.getDepositId());
         verify(appointmentMapper, never()).insertAppointmentMember(any());
         verify(depositMapper, never()).insert(any());
     }
@@ -191,48 +617,7 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void leaveAppointment_pendingHost_transfersHostAndLeaves() {
-        Appointment appointment = appointment(
-                10L,
-                AppointmentStatus.PAYMENT_PENDING
-        );
-        AppointmentMember host = AppointmentMember.builder()
-                .appointmentMemberId(20L)
-                .appointmentId(10L)
-                .memberId(1L)
-                .membershipStatus(MembershipStatus.PENDING)
-                .build();
-        AppointmentMember successor = AppointmentMember.builder()
-                .appointmentMemberId(30L)
-                .appointmentId(10L)
-                .memberId(2L)
-                .membershipStatus(MembershipStatus.PENDING)
-                .build();
-        Deposit deposit = mock(Deposit.class);
-        when(deposit.getDepositId()).thenReturn(40L);
-        when(deposit.isPending()).thenReturn(true);
-        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
-                .thenReturn(appointment);
-        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
-                10L, 1L
-        )).thenReturn(host);
-        when(appointmentMapper.findHostSuccessorForUpdate(10L, 1L))
-                .thenReturn(successor);
-        when(appointmentMapper.updateHostMember(10L, 1L, 2L))
-                .thenReturn(1);
-        when(depositMapper.findByAppointmentMemberId(20L))
-                .thenReturn(deposit);
-        when(depositMapper.markCancelled(eq(40L), any())).thenReturn(1);
-        when(appointmentMapper.markMemberLeft(20L)).thenReturn(1);
-
-        appointmentService.leaveAppointment(1L, 10L);
-
-        verify(appointmentMapper).updateHostMember(10L, 1L, 2L);
-        verify(appointmentMapper).markMemberLeft(20L);
-    }
-
-    @Test
-    void leaveAppointment_hostOnly_rejectsCancellation() {
+    void leaveAppointment_pendingHost_rejectsCancellation() {
         Appointment appointment = appointment(
                 10L,
                 AppointmentStatus.PAYMENT_PENDING
@@ -248,23 +633,138 @@ class AppointmentServiceTest {
         when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
                 10L, 1L
         )).thenReturn(host);
-        when(appointmentMapper.findHostSuccessorForUpdate(10L, 1L))
-                .thenReturn(null);
 
-        assertThrows(
+        BusinessException exception = assertThrows(
                 BusinessException.class,
                 () -> appointmentService.leaveAppointment(1L, 10L)
         );
 
+        assertEquals(AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
+                exception.getErrorCode());
+        verify(depositMapper, never()).findByAppointmentMemberId(any());
         verify(appointmentMapper, never()).markMemberLeft(any());
     }
 
     @Test
-    void leaveAppointment_activeMember_requiresRefundIntegration() {
+    void leaveAppointment_activeMember_refundsDepositAndLeaves() {
         Appointment appointment = appointment(
                 10L,
                 AppointmentStatus.RECRUITING
         );
+        AppointmentMember member = AppointmentMember.builder()
+                .appointmentMemberId(30L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .build();
+        Deposit deposit = mock(Deposit.class);
+        when(deposit.getDepositId()).thenReturn(40L);
+        when(deposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        when(deposit.isPending()).thenReturn(false);
+        when(deposit.isHeld()).thenReturn(true);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
+                10L, 2L
+        )).thenReturn(member);
+        when(depositMapper.findByAppointmentMemberId(30L))
+                .thenReturn(deposit);
+        when(walletTransferService.transferFromSystemWallet(
+                eq(2L), eq(SystemWalletCode.DEPOSIT_POOL), eq(2L),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_REFUND.name()), anyString()
+        )).thenReturn(600L);
+        when(depositMapper.markRefunded(eq(40L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberLeft(30L)).thenReturn(1);
+
+        appointmentService.leaveAppointment(2L, 10L);
+
+        verify(walletTransferService).transferFromSystemWallet(
+                eq(2L), eq(SystemWalletCode.DEPOSIT_POOL), eq(2L),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_REFUND.name()), anyString()
+        );
+        verify(deposit).refund(any());
+        verify(depositMapper).markRefunded(eq(40L), any());
+        verify(appointmentMapper).markMemberLeft(30L);
+    }
+
+    @Test
+    void leaveAppointment_closedByCapacity_reopensRecruiting() {
+        Appointment appointment = appointment(
+                10L,
+                AppointmentStatus.CLOSED
+        );
+        AppointmentMember member = AppointmentMember.builder()
+                .appointmentMemberId(30L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .build();
+        Deposit deposit = mock(Deposit.class);
+        when(deposit.getDepositId()).thenReturn(40L);
+        when(deposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        when(deposit.isPending()).thenReturn(false);
+        when(deposit.isHeld()).thenReturn(true);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
+                10L, 2L
+        )).thenReturn(member);
+        when(depositMapper.findByAppointmentMemberId(30L))
+                .thenReturn(deposit);
+        when(walletTransferService.transferFromSystemWallet(
+                eq(2L), eq(SystemWalletCode.DEPOSIT_POOL), eq(2L),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_REFUND.name()), anyString()
+        )).thenReturn(600L);
+        when(depositMapper.markRefunded(eq(40L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberLeft(30L)).thenReturn(1);
+        when(appointmentMapper.updateAppointmentStatus(
+                10L, AppointmentStatus.CLOSED, AppointmentStatus.RECRUITING
+        )).thenReturn(1);
+
+        appointmentService.leaveAppointment(2L, 10L);
+
+        verify(appointmentMapper).updateAppointmentStatus(
+                10L, AppointmentStatus.CLOSED, AppointmentStatus.RECRUITING
+        );
+    }
+
+    @Test
+    void leaveAppointment_activeHost_rejectsCancellation() {
+        Appointment appointment = appointment(
+                10L,
+                AppointmentStatus.RECRUITING
+        );
+        AppointmentMember host = AppointmentMember.builder()
+                .appointmentMemberId(20L)
+                .appointmentId(10L)
+                .memberId(1L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .build();
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
+                10L, 1L
+        )).thenReturn(host);
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.leaveAppointment(1L, 10L)
+        );
+
+        assertEquals(AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
+                exception.getErrorCode());
+        verify(appointmentMapper, never()).markMemberLeft(any());
+    }
+
+    @Test
+    void leaveAppointment_afterJoinDeadline_rejectsCancellation() {
+        Appointment appointment = appointment(
+                10L,
+                AppointmentStatus.RECRUITING
+        );
+        appointment.setJoinDeadline(LocalDateTime.now().minusDays(1));
         AppointmentMember member = AppointmentMember.builder()
                 .appointmentMemberId(30L)
                 .appointmentId(10L)
@@ -289,33 +789,6 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void leaveAppointment_activeHost_requiresRefundIntegration() {
-        Appointment appointment = appointment(
-                10L,
-                AppointmentStatus.RECRUITING
-        );
-        AppointmentMember host = AppointmentMember.builder()
-                .appointmentMemberId(20L)
-                .appointmentId(10L)
-                .memberId(1L)
-                .membershipStatus(MembershipStatus.ACTIVE)
-                .build();
-        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
-                .thenReturn(appointment);
-        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
-                10L, 1L
-        )).thenReturn(host);
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> appointmentService.leaveAppointment(1L, 10L)
-        );
-
-        assertEquals(AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
-                exception.getErrorCode());
-        verify(appointmentMapper, never()).updateHostMember(any(), any(), any());
-    }
-
-    @Test
     void getMyParticipation_withoutHistory_returnsNotJoined() {
         when(appointmentMapper.findAppointmentById(10L))
                 .thenReturn(appointment(10L, AppointmentStatus.RECRUITING));
@@ -328,7 +801,145 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void confirmAttendance_requiresPaymentIntegration() {
+    void getMyOngoingAppointments_returnsTripLinkedAppointments() {
+        MyOngoingAppointment appointment = new MyOngoingAppointment(
+                10L,
+                "Seoul Night Tour",
+                5L,
+                "Gwanghwamun Square",
+                LocalDateTime.of(2026, 8, 21, 18, 30),
+                LocalDateTime.of(2026, 8, 21, 22, 0),
+                100L,
+                "EVENT",
+                "IN_PROGRESS"
+        );
+        when(appointmentMapper.findMyOngoingAppointments(eq(1L), eq(false), any()))
+                .thenReturn(List.of(appointment));
+
+        List<MyOngoingAppointmentResponse> result =
+                appointmentService.getMyOngoingAppointments(1L, "ONGOING");
+
+        assertEquals(1, result.size());
+        assertEquals(10L, result.get(0).appointmentId());
+        assertEquals(5L, result.get(0).tripId());
+        assertEquals(100L, result.get(0).itemId());
+        assertEquals("EVENT", result.get(0).itemType());
+        assertEquals("IN_PROGRESS", result.get(0).appointmentStatus());
+    }
+
+    @Test
+    void getMyOngoingAppointments_allScope_includesFinishedAppointments() {
+        when(appointmentMapper.findMyOngoingAppointments(eq(1L), eq(true), any()))
+                .thenReturn(List.of());
+
+        appointmentService.getMyOngoingAppointments(1L, "ALL");
+
+        verify(appointmentMapper)
+                .findMyOngoingAppointments(eq(1L), eq(true), any());
+    }
+
+    @Test
+    void getMyOngoingAppointments_invalidMemberId_rejectsRequest() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.getMyOngoingAppointments(0L, "ONGOING")
+        );
+
+        assertEquals(CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
+    }
+
+    @Test
+    void getMyOngoingAppointments_unknownScope_rejectsRequest() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.getMyOngoingAppointments(1L, "PAST")
+        );
+
+        assertEquals(CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
+    }
+
+    @Test
+    void confirmAttendance_success_completesAppointmentAndCreatesPendingBatch() {
+        Appointment appointment = appointment(10L, AppointmentStatus.IN_PROGRESS);
+        AppointmentMember host = AppointmentMember.builder()
+                .appointmentMemberId(20L)
+                .appointmentId(10L)
+                .memberId(1L)
+                .build();
+        AppointmentMember guest = AppointmentMember.builder()
+                .appointmentMemberId(21L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .build();
+        Deposit hostDeposit = mock(Deposit.class);
+        when(hostDeposit.isHeld()).thenReturn(true);
+        when(hostDeposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        Deposit guestDeposit = mock(Deposit.class);
+        when(guestDeposit.isHeld()).thenReturn(true);
+        when(guestDeposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of(host, guest));
+        when(appointmentMapper.updateAttendance(
+                eq(20L), eq(AttendanceStatus.ATTENDED), any()
+        )).thenReturn(1);
+        when(appointmentMapper.updateAttendance(
+                eq(21L), eq(AttendanceStatus.NO_SHOW), any()
+        )).thenReturn(1);
+        when(depositMapper.findByAppointmentMemberId(20L))
+                .thenReturn(hostDeposit);
+        when(depositMapper.findByAppointmentMemberId(21L))
+                .thenReturn(guestDeposit);
+        when(appointmentMapper.updateAppointmentStatus(
+                10L,
+                AppointmentStatus.IN_PROGRESS,
+                AppointmentStatus.COMPLETED
+        )).thenReturn(1);
+        when(depositPayoutBatchMapper.insert(any())).thenReturn(1);
+
+        appointmentService.confirmAttendance(1L, 10L, attendanceRequest());
+
+        verify(appointmentMapper).updateAppointmentStatus(
+                10L,
+                AppointmentStatus.IN_PROGRESS,
+                AppointmentStatus.COMPLETED
+        );
+        ArgumentCaptor<DepositPayoutBatch> batchCaptor =
+                ArgumentCaptor.forClass(DepositPayoutBatch.class);
+        verify(depositPayoutBatchMapper).insert(batchCaptor.capture());
+        DepositPayoutBatch batch = batchCaptor.getValue();
+        assertEquals(10L, batch.getAppointmentId());
+        assertEquals(ResolutionReason.APPOINTMENT_COMPLETED,
+                batch.getResolutionReason());
+        assertEquals(0, BigDecimal.valueOf(20_000)
+                .compareTo(batch.getTotalHeldAmount()));
+    }
+
+    @Test
+    void confirmAttendance_notHost_rejects() {
+        Appointment appointment = appointment(10L, AppointmentStatus.IN_PROGRESS);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.confirmAttendance(
+                        2L, 10L, attendanceRequest()
+                )
+        );
+
+        assertEquals(AppointmentErrorCode.APPOINTMENT_FORBIDDEN,
+                exception.getErrorCode());
+        verify(appointmentMapper, never()).updateAttendance(any(), any(), any());
+    }
+
+    @Test
+    void confirmAttendance_notInProgress_rejects() {
+        Appointment appointment = appointment(10L, AppointmentStatus.CLOSED);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+
         BusinessException exception = assertThrows(
                 BusinessException.class,
                 () -> appointmentService.confirmAttendance(
@@ -336,11 +947,73 @@ class AppointmentServiceTest {
                 )
         );
 
-        assertEquals(AppointmentErrorCode.PAYMENT_INTEGRATION_REQUIRED,
+        assertEquals(AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION,
                 exception.getErrorCode());
     }
 
     @Test
+    void confirmAttendance_missingActiveMember_rejects() {
+        Appointment appointment = appointment(10L, AppointmentStatus.IN_PROGRESS);
+        AppointmentMember host = AppointmentMember.builder()
+                .appointmentMemberId(20L)
+                .appointmentId(10L)
+                .memberId(1L)
+                .build();
+        AppointmentMember guest = AppointmentMember.builder()
+                .appointmentMemberId(21L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .build();
+        AppointmentMember thirdMember = AppointmentMember.builder()
+                .appointmentMemberId(22L)
+                .appointmentId(10L)
+                .memberId(3L)
+                .build();
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of(host, guest, thirdMember));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.confirmAttendance(
+                        1L, 10L, attendanceRequest()
+                )
+        );
+
+        assertEquals(AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION,
+                exception.getErrorCode());
+        verify(appointmentMapper, never()).updateAttendance(any(), any(), any());
+    }
+
+    @Test
+    void confirmAttendance_noAttendedMember_rejects() {
+        Appointment appointment = appointment(10L, AppointmentStatus.IN_PROGRESS);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+
+        AppointmentAttendanceRequest.MemberAttendance host =
+                new AppointmentAttendanceRequest.MemberAttendance();
+        host.setMemberId(1L);
+        host.setAttendanceStatus(AttendanceStatus.NO_SHOW);
+        AppointmentAttendanceRequest.MemberAttendance guest =
+                new AppointmentAttendanceRequest.MemberAttendance();
+        guest.setMemberId(2L);
+        guest.setAttendanceStatus(AttendanceStatus.NO_SHOW);
+        AppointmentAttendanceRequest allNoShowRequest = new AppointmentAttendanceRequest();
+        allNoShowRequest.setMembers(List.of(host, guest));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.confirmAttendance(1L, 10L, allNoShowRequest)
+        );
+
+        assertEquals(AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION,
+                exception.getErrorCode());
+        verify(appointmentMapper, never()).findActiveMembersByAppointmentId(any());
+        verify(appointmentMapper, never()).updateAttendance(any(), any(), any());
+    }
+
     private static AppointmentCreateRequest validRequest() {
         AppointmentCreateRequest request = new AppointmentCreateRequest();
         request.setItemId(100L);
@@ -351,9 +1024,11 @@ class AppointmentServiceTest {
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Olive Young N Seongsu");
         request.setMeetingAddress("Seongdong-gu, Seoul");
-        request.setJoinDeadline(LocalDateTime.of(2026, 8, 20, 18, 0));
-        request.setActivityStartAt(LocalDateTime.of(2026, 8, 21, 18, 30));
-        request.setActivityEndAt(LocalDateTime.of(2026, 8, 21, 22, 0));
+        request.setJoinDeadline(LocalDateTime.of(VISIT_DATE, LocalTime.of(17, 30)));
+        request.setTripId(1L);
+        request.setVisitDate(VISIT_DATE);
+        request.setActivityStartTime(LocalTime.of(18, 30));
+        request.setActivityEndTime(LocalTime.of(22, 0));
         return request;
     }
 
@@ -373,9 +1048,9 @@ class AppointmentServiceTest {
                 .depositAmount(BigDecimal.valueOf(10_000))
                 .appointmentStatus(status)
                 .meetingPlace("Olive Young N Seongsu")
-                .activityStartAt(LocalDateTime.of(2026, 8, 21, 18, 30))
-                .activityEndAt(LocalDateTime.of(2026, 8, 21, 22, 0))
-                .joinDeadline(LocalDateTime.of(2026, 8, 20, 18, 0))
+                .activityStartAt(LocalDateTime.of(VISIT_DATE, LocalTime.of(18, 30)))
+                .activityEndAt(LocalDateTime.of(VISIT_DATE, LocalTime.of(22, 0)))
+                .joinDeadline(LocalDateTime.of(VISIT_DATE.minusDays(1), LocalTime.of(18, 0)))
                 .build();
     }
 
@@ -383,15 +1058,11 @@ class AppointmentServiceTest {
         AppointmentAttendanceRequest.MemberAttendance host =
                 new AppointmentAttendanceRequest.MemberAttendance();
         host.setMemberId(1L);
-        host.setAttendanceStatus(
-                me.nawa.deposit.domain.AttendanceStatus.ATTENDED
-        );
+        host.setAttendanceStatus(AttendanceStatus.ATTENDED);
         AppointmentAttendanceRequest.MemberAttendance guest =
                 new AppointmentAttendanceRequest.MemberAttendance();
         guest.setMemberId(2L);
-        guest.setAttendanceStatus(
-                me.nawa.deposit.domain.AttendanceStatus.NO_SHOW
-        );
+        guest.setAttendanceStatus(AttendanceStatus.NO_SHOW);
         AppointmentAttendanceRequest request =
                 new AppointmentAttendanceRequest();
         request.setMembers(List.of(host, guest));

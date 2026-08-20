@@ -22,6 +22,16 @@ class AppointmentStatusTest {
     }
 
     @Test
+    void canTransitionTo_activityStarted_allowsInProgressWithoutConfirmed() {
+        assertTrue(AppointmentStatus.CLOSED.canTransitionTo(
+                AppointmentStatus.IN_PROGRESS
+        ));
+        assertFalse(AppointmentStatus.CLOSED.canTransitionTo(
+                AppointmentStatus.CONFIRMED
+        ));
+    }
+
+    @Test
     void canTransitionTo_terminalStatus_rejectsTransition() {
         assertFalse(AppointmentStatus.COMPLETED.canTransitionTo(
                 AppointmentStatus.RECRUITING

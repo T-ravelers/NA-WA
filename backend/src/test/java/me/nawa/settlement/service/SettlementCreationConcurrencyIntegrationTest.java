@@ -23,6 +23,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.settlement.dto.request.CreateSettlementRequest;
 import me.nawa.settlement.dto.response.SettlementCreateResponse;
 import me.nawa.settlement.exception.SettlementErrorCode;
@@ -35,6 +36,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.aop.support.AopUtils;
@@ -47,6 +49,7 @@ import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
     named = "RUN_MYSQL_INTEGRATION_TESTS",
     matches = "(?i)true"
@@ -249,11 +252,13 @@ class SettlementCreationConcurrencyIntegrationTest {
         long payerAppointmentMemberId = insert("appointment_members", "appointment_member_id", Map.of(
             "appointment_id", appointmentId,
             "member_id", payerMemberId,
-            "trip_id", tripId
+            "trip_id", tripId,
+            "membership_status", "ACTIVE"
         ));
         long payeeAppointmentMemberId = insert("appointment_members", "appointment_member_id", Map.of(
             "appointment_id", appointmentId,
-            "member_id", payeeMemberId
+            "member_id", payeeMemberId,
+            "membership_status", "ACTIVE"
         ));
         long walletOwnerId = insert("wallet_owners", "wallet_owner_id", Map.of(
             "member_id", payerMemberId,
@@ -386,7 +391,35 @@ class SettlementCreationConcurrencyIntegrationTest {
             SettlementMapper settlementMapper,
             List<SettlementCreationHandler> handlers
         ) {
-            return new SettlementCreationAttemptService(settlementMapper, handlers);
+            return new SettlementCreationAttemptService(
+                settlementMapper, handlers, noOpReceiptService()
+            );
+        }
+
+        /*
+         * 이 테스트는 원거래 하나를 두고 두 스레드가 경쟁할 때 한쪽만 성공하는지를 본다.
+         * 영수증은 이 경쟁과 무관하고 요청에도 담기지 않으므로 아무 일도 하지 않는 대역을 쓴다.
+         */
+        private SettlementReceiptService noOpReceiptService() {
+            return new SettlementReceiptService() {
+                @Override
+                public me.nawa.settlement.dto.response.SettlementReceiptUploadResponse upload(
+                    Long memberId, String declaredContentType, byte[] content
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public void linkToSettlement(Long memberId, Long settlementId, Long receiptId) {
+                }
+
+                @Override
+                public me.nawa.common.storage.StoredReceipt getReceipt(
+                    Long memberId, Long settlementId
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+            };
         }
 
         @Bean

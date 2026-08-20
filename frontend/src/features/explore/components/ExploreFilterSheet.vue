@@ -9,10 +9,13 @@ import {
   IconCheck,
 } from '@tabler/icons-vue'
 
+import { parseCalendarDate, serializeCalendarDate } from '@/shared/lib/datetime'
 import AppButton from '@/shared/ui/AppButton.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 
+import { presetDateRange, todayDate, type PresetDateRange } from '../model/datePresets'
 import type { EventSearchFilters } from '../model/eventExplore'
+import { SEOUL_REGION1, SEOUL_REGION2_OPTIONS } from '../model/exploreRegions'
 import { EVENT_SECTOR_OPTIONS } from '../model/exploreTaxonomy'
 import type { ExploreSheetKind } from './ExploreFilterBar.vue'
 
@@ -45,16 +48,10 @@ const SHEET_TITLES: Record<ExploreSheetKind, string> = {
 const REGION_OPTIONS = [
   {
     labelKey: 'explore.regions.seoul',
-    value: 'Seoul',
+    value: SEOUL_REGION1,
     areas: [
-      { labelKey: 'explore.areas.allSeoul', value: 'All of Seoul' },
-      { labelKey: 'explore.areas.seongsu', value: 'Seongsu' },
-      { labelKey: 'explore.areas.hongdae', value: 'Hongdae' },
-      { labelKey: 'explore.areas.jamsil', value: 'Jamsil' },
-      { labelKey: 'explore.areas.yeouido', value: 'Yeouido' },
-      { labelKey: 'explore.areas.yongsan', value: 'Yongsan' },
-      { labelKey: 'explore.areas.myeongdong', value: 'Myeongdong' },
-      { labelKey: 'explore.areas.dongdaemun', value: 'Dongdaemun·DDP' },
+      { labelKey: 'explore.areas.allSeoul', value: '__ALL_SEOUL__' },
+      ...SEOUL_REGION2_OPTIONS.map(({ labelKey, apiValue }) => ({ labelKey, value: apiValue })),
       { labelKey: 'explore.areas.other', value: REGION2_OTHER },
     ],
   },
@@ -163,15 +160,16 @@ const DATE_PRESETS = [
 ] as const
 
 const draft = reactive<EventSearchFilters>(cloneFilters(props.filters))
-const selectedRegion = ref(props.filters.region1?.[0] ?? 'Seoul')
-const expandedCategories = ref<string[]>(['explore.categories.food'])
+const selectedRegion = ref(SEOUL_REGION1)
+const expandedCategories = ref<string[]>(['explore.categories.beauty'])
 const monthCursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
 watch(
   () => props.filters,
   (filters) => {
     Object.assign(draft, cloneFilters(filters))
-    selectedRegion.value = filters.region1?.[0] ?? 'Seoul'
+    selectedRegion.value = SEOUL_REGION1
+    calendarTouched.value = false
   },
   { deep: true },
 )
@@ -210,7 +208,7 @@ const calendarDays = computed(() => {
     const inMonth = rawDay >= 1 && rawDay <= daysInMonth
     const date = new Date(year, month, rawDay)
     const day = inMonth ? rawDay : rawDay < 1 ? previousMonthDays + rawDay : rawDay - daysInMonth
-    cells.push({ date: formatDate(date), day, inMonth })
+    cells.push({ date: serializeCalendarDate(date), day, inMonth })
   }
 
   return cells
@@ -222,29 +220,61 @@ function cloneFilters(filters: EventSearchFilters): EventSearchFilters {
     sectorIds: filters.sectorIds ? [...filters.sectorIds] : undefined,
     activityIds: filters.activityIds ? [...filters.activityIds] : undefined,
     eventKinds: filters.eventKinds ? [...filters.eventKinds] : undefined,
-    region1: filters.region1 ? [...filters.region1] : undefined,
+    region1: filters.region1 ? [...filters.region1] : [SEOUL_REGION1],
     region2: filters.region2 ? [...filters.region2] : undefined,
     region3: filters.region3 ? [...filters.region3] : undefined,
   }
 }
 
-function formatDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+const selectableRange = computed<PresetDateRange>(() => {
+  const preset = draft.datePreset ? presetDateRange(draft.datePreset) : null
+  // 프리셋이 없으면 오늘부터 고를 수 있다. 지난 날짜의 이벤트를 찾을 일은 없다.
+  return preset ?? { min: serializeCalendarDate(todayDate()) }
+})
+
+function isDateAllowed(value: string): boolean {
+  const range = selectableRange.value
+  if (value < range.min) return false
+  return range.max === undefined || value <= range.max
 }
 
+// 사용자가 달력을 직접 만졌는지 여부. 프리셋 기본 상태(범위 전체 선택)와
+// "프리셋 시작일과 같은 날을 직접 고른 경우"를 값만으로는 구분할 수 없어서
+// 플래그로 기억한다.
+const calendarTouched = ref(false)
+
 function setDatePreset(value: string): void {
-  draft.datePreset = draft.datePreset === value ? undefined : value
-  draft.startDate = undefined
-  draft.endDate = undefined
+  calendarTouched.value = false
+  if (draft.datePreset === value) {
+    draft.datePreset = undefined
+    draft.startDate = undefined
+    draft.endDate = undefined
+    return
+  }
+
+  // 프리셋만 골라도 그 범위 전체가 필터로 적용된다. 이후 달력에서 범위 안의
+  // 날짜로 더 좁힐 수 있다.
+  const range = presetDateRange(value)
+  draft.datePreset = value
+  draft.startDate = range?.min
+  draft.endDate = range?.max
+  const firstDay = parseCalendarDate(range?.min)
+  if (firstDay) {
+    monthCursor.value = new Date(firstDay.getFullYear(), firstDay.getMonth(), 1)
+  }
 }
 
 function setCalendarDate(value: string): void {
-  draft.datePreset = undefined
+  if (!isDateAllowed(value)) return
+  calendarTouched.value = true
 
-  if (draft.startDate === undefined || draft.endDate !== undefined) {
+  // 프리셋 범위 전체가 그대로 선택돼 있는 상태라면, 첫 탭은 범위를 닫는 게
+  // 아니라 그 안에서 새로 고르기 시작하는 것으로 본다.
+  const presetRange = draft.datePreset ? presetDateRange(draft.datePreset) : null
+  const presetPristine =
+    presetRange !== null && draft.startDate === presetRange.min && draft.endDate === presetRange.max
+
+  if (presetPristine || draft.startDate === undefined || draft.endDate !== undefined) {
     draft.startDate = value
     draft.endDate = undefined
     return
@@ -294,7 +324,7 @@ function toggleArea(value: string): void {
   }
 
   const current = new Set(draft.region2 ?? [])
-  if (value === 'All of Seoul' || value.startsWith('All of ')) {
+  if (value === '__ALL_SEOUL__' || value.startsWith('All of ')) {
     draft.region2 = undefined
     draft.region2Other = undefined
     return
@@ -340,6 +370,12 @@ function toggleActivity(sectorId: number, activityId: number): void {
   else activityIds.add(activityId)
   sectorIds.delete(sectorId)
 
+  const sector = EVENT_SECTOR_OPTIONS.find((option) => option.id === sectorId)
+  if (sector?.activities.every((activity) => activityIds.has(activity.id))) {
+    sector.activities.forEach((activity) => activityIds.delete(activity.id))
+    sectorIds.add(sectorId)
+  }
+
   draft.sectorIds = sectorIds.size > 0 ? [...sectorIds] : undefined
   draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
 }
@@ -359,8 +395,9 @@ function resetSheet(): void {
     draft.datePreset = undefined
     draft.startDate = undefined
     draft.endDate = undefined
+    calendarTouched.value = false
   } else if (props.kind === 'region') {
-    draft.region1 = undefined
+    draft.region1 = [SEOUL_REGION1]
     draft.region2 = undefined
     draft.region2Other = undefined
     draft.region3 = undefined
@@ -371,12 +408,23 @@ function resetSheet(): void {
   } else if (props.kind === 'options') {
     EVENT_OPTIONS.forEach(({ key }) => (draft[key] = undefined))
   } else {
-    draft.sort = 'LATEST'
+    draft.sort = 'NEWEST'
+    draft.savedOnly = undefined
   }
 }
 
 function apply(): void {
-  emit('apply', cloneFilters(draft))
+  const filters = cloneFilters(draft)
+  // 하루만 고른 선택은 여기서 시작=종료의 하루짜리 기간으로 확정한다.
+  // 달력을 만지지 않은 Opening soon 기본 상태만 상한 없이 시작일을 열어 둔다.
+  if (
+    filters.startDate !== undefined &&
+    filters.endDate === undefined &&
+    (calendarTouched.value || draft.datePreset !== 'OPENING_SOON')
+  ) {
+    filters.endDate = filters.startDate
+  }
+  emit('apply', filters)
 }
 </script>
 
@@ -474,14 +522,20 @@ function apply(): void {
               type="button"
               class="mx-auto flex size-9 items-center justify-center rounded-pill text-caption"
               :class="[
-                !cell.inMonth && 'text-ink-3/40',
+                (!cell.inMonth || !isDateAllowed(cell.date)) && 'text-ink-3/40',
                 cell.inMonth &&
+                  isDateAllowed(cell.date) &&
                   !isDateSelected(cell.date) &&
                   !isDateInRange(cell.date) &&
                   'text-ink-2',
-                isDateInRange(cell.date) && 'rounded-none bg-surface-2',
-                isDateSelected(cell.date) && 'bg-paper-fill text-on-paper',
+                // 선택 칩과 범위 배경이 같은 셀에 겹치면 CSS 순서에 따라 칩이
+                // 묻힌다 — 양 끝 날짜는 범위 배경을 받지 않게 상호 배타로 가른다.
+                // 범위도 칩과 같은 흰 배경을 써서 선택 구간 전체가 밝게 보인다.
+                isDateSelected(cell.date)
+                  ? 'bg-paper-fill text-on-paper'
+                  : isDateInRange(cell.date) && 'rounded-none bg-paper-fill text-on-paper',
               ]"
+              :disabled="!cell.inMonth || !isDateAllowed(cell.date)"
               @click="cell.inMonth && setCalendarDate(cell.date)"
             >
               {{ cell.day }}
@@ -497,7 +551,7 @@ function apply(): void {
           <div class="grid min-h-80 grid-cols-[112px_1fr] border-y border-hairline">
             <div class="border-r border-hairline">
               <button
-                v-for="region in REGION_OPTIONS"
+                v-for="region in REGION_OPTIONS.slice(0, 1)"
                 :key="region.value"
                 type="button"
                 class="flex w-full items-center justify-between px-1 py-3 text-left text-body-sm"
@@ -515,7 +569,7 @@ function apply(): void {
                 type="button"
                 class="flex min-h-11 items-center justify-between rounded-sm px-3 text-left text-body-sm"
                 :class="
-                  (area.value.startsWith('All of ') &&
+                  (area.value === '__ALL_SEOUL__' &&
                     selectedAreas.size === 0 &&
                     !draft.region2Other) ||
                   selectedAreas.has(area.value) ||
@@ -529,7 +583,7 @@ function apply(): void {
                 <span
                   class="flex size-6 items-center justify-center rounded-xs"
                   :class="
-                    (area.value.startsWith('All of ') &&
+                    (area.value === '__ALL_SEOUL__' &&
                       selectedAreas.size === 0 &&
                       !draft.region2Other) ||
                     selectedAreas.has(area.value) ||
@@ -540,7 +594,7 @@ function apply(): void {
                 >
                   <IconCheck
                     v-if="
-                      (area.value.startsWith('All of ') &&
+                      (area.value === '__ALL_SEOUL__' &&
                         selectedAreas.size === 0 &&
                         !draft.region2Other) ||
                       selectedAreas.has(area.value) ||
@@ -665,7 +719,7 @@ function apply(): void {
           <div class="divide-y divide-hairline">
             <button
               v-for="sortOption in [
-                { value: 'LATEST', labelKey: 'explore.sort.latest', hint: 'default' },
+                { value: 'NEWEST', labelKey: 'explore.sort.newest', hint: 'default' },
                 { value: 'POPULAR', labelKey: 'explore.sort.popular', hint: '' },
                 { value: 'ENDING_SOON', labelKey: 'explore.sort.ending_soon', hint: '' },
               ]"
@@ -696,6 +750,31 @@ function apply(): void {
               >
                 <IconCheck
                   v-if="draft.sort === sortOption.value"
+                  :size="15"
+                  :stroke-width="2.5"
+                  aria-hidden="true"
+                />
+              </span>
+            </button>
+            <button
+              type="button"
+              class="flex min-h-16 w-full items-center justify-between text-left"
+              @click="draft.savedOnly = draft.savedOnly === true ? undefined : true"
+            >
+              <span
+                class="text-body"
+                :class="draft.savedOnly ? 'text-ink' : 'text-ink-2'"
+              >
+                {{ t('explore.sort.saved') }}
+              </span>
+              <span
+                class="flex size-6 items-center justify-center rounded-pill"
+                :class="
+                  draft.savedOnly ? 'bg-paper-fill text-on-paper' : 'border border-hairline-2'
+                "
+              >
+                <IconCheck
+                  v-if="draft.savedOnly"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"

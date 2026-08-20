@@ -54,6 +54,38 @@ export default {
       legacyTitle: 'Spending analysis unavailable',
       legacyDescription:
         'This report was created before spending analytics were available. Its journey snapshot is still readable.',
+      persona: {
+        heading: 'Spending style',
+        FOOD: {
+          title: 'Flavor Seeker',
+          description: 'You followed your appetite — {share} of this journey went to food.',
+        },
+        SHOPPING: {
+          title: 'Souvenir Hunter',
+          description: 'You brought the journey home — {share} of it went to shopping.',
+        },
+        BEAUTY: {
+          title: 'Glow Getter',
+          description: 'You left looking your best — {share} of this journey went to beauty.',
+        },
+        SHOW: {
+          title: 'Front Row Traveler',
+          description: 'You went for the moment — {share} of this journey went to shows.',
+        },
+        TRANSPORT: {
+          title: 'Ground Coverer',
+          description: 'You kept moving — {share} of this journey went to getting around.',
+        },
+        STAY: {
+          title: 'Slow Traveler',
+          description: 'You settled in — {share} of this journey went to your stay.',
+        },
+        OTHER: {
+          title: 'Free Spender',
+          description:
+            'Your spending did not fit one box — {share} of it landed outside the usual categories.',
+        },
+      },
       categoryTitle: 'By category',
       categoryEmpty: 'No category spending was recorded.',
       categoryDescription: 'Spending grouped by category with amount and share.',

@@ -8,6 +8,7 @@ import {
   fetchAppointments,
   fetchAppointmentMembers,
   fetchMyAppointmentParticipation,
+  fetchMyOngoingAppointments,
   joinAppointment,
   type AppointmentListResponse,
 } from '../appointmentApi'
@@ -88,5 +89,24 @@ describe('appointmentApi', () => {
     })
     deleteRequest.mockRestore()
     patch.mockRestore()
+  })
+
+  it('requests my ongoing appointments and defaults a missing list to empty', async () => {
+    const appointment = {
+      appointmentId: 42,
+      appointmentName: 'Seoul Night Tour',
+      tripId: 9,
+      meetingPlace: 'Gwanghwamun Square',
+      activityStartAt: '2026-08-10T18:00:00',
+      activityEndAt: '2026-08-12T22:00:00',
+    }
+    const get = vi.spyOn(httpClient, 'get').mockResolvedValue({ data: [appointment] })
+
+    await expect(fetchMyOngoingAppointments()).resolves.toEqual([appointment])
+    expect(get).toHaveBeenCalledWith('/api/v1/appointments/me')
+
+    get.mockResolvedValue({ data: undefined })
+    await expect(fetchMyOngoingAppointments()).resolves.toEqual([])
+    get.mockRestore()
   })
 })

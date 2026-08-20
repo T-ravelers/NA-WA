@@ -14,6 +14,7 @@ import me.nawa.wallet.domain.Wallet;
 import me.nawa.wallet.domain.WalletLedgerEntry;
 import me.nawa.wallet.domain.WalletTransfer;
 import me.nawa.wallet.domain.enums.QrPaymentStatus;
+import me.nawa.wallet.domain.enums.SpendingCategory;
 import me.nawa.wallet.domain.enums.SpendingScope;
 import me.nawa.wallet.dto.request.QrPaymentCreateRequest;
 import me.nawa.wallet.dto.request.QrPaymentExecuteRequest;
@@ -138,6 +139,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
     @Transactional
     public QrPaymentResolveResponse resolvePaymentQr(Long memberId, QrPaymentResolveRequest request) {
         validateQrToken(request);
+        assertCanPay(memberId);
 
         //결제하려는 사람의 지갑: 자기 자신 결제를 막는데 사용
         Wallet payerWallet = walletMapper.findByMemberId(memberId);
@@ -166,6 +168,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
     public QrPaymentPreviewResponse previewPayment(Long memberId, QrPaymentPreviewRequest request) {
         // 1. QR 토큰, 소비 범위, 약속 id의 형태를 먼저 검증
         validatePreviewRequest(request);
+        assertCanPay(memberId);
 
         // 2. 결제자(로그인 사용자)의 지갑 조회
         Wallet payerWallet = walletMapper.findByMemberId(memberId);
@@ -270,6 +273,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         QrPaymentExecuteRequest request
     ) {
         validateExecuteRequest(idempotencyKey, request);
+        assertCanPay(memberId);
 
         // 1. 이미 완료된 동일 요청이면 기존 결과 반환 (빠른 경로, 잠금 없음).
         // 최종 판단은 아래 insert 시도 결과로 내린다.
@@ -404,7 +408,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             "COMPLETED",
             paymentAmount,
             qrPayment.getMemo(),
-            null,
+            SpendingCategory.from(request.spendingCategory()).name(),
             request.spendingScope().name(),
             now,
             now,
@@ -563,6 +567,13 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         }
     }
 
+    // 가맹점은 QR 생성과 매출 조회만 한다. 결제자는 방한 외국인(TRAVELER)뿐이다.
+    private void assertCanPay(Long memberId) {
+        if ("MERCHANT".equals(qrPaymentCodeMapper.findAccountTypeByMemberId(memberId))) {
+            throw new BusinessException(WalletErrorCode.MERCHANT_CANNOT_PAY);
+        }
+    }
+
     private String normalizeMemo(String memo){
         if(memo == null){
             return null;
@@ -697,6 +708,9 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             );
         }
 
+        // 목록 밖의 소비 카테고리는 잠금을 잡기 전에 거절한다.
+        SpendingCategory.from(request.spendingCategory());
+
         // preview와 같은 소비 범위/약속 검증
         validatePreviewRequest(
             new QrPaymentPreviewRequest(
@@ -783,6 +797,15 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         // 6. 소비 범위와 약속도 최초 요청과 같아야 한다.
         // scope는 transfer에 저장하고, 공동 소비의 appointmentId는 비용 연결에서 확인한다.
         if (!request.spendingScope().name().equals(transfer.getSpendingType())) {
+            throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
+        }
+
+        // 소비 카테고리도 같아야 한다. 들어온 값은 from으로 거부까지 하지만, 저장된 값은
+        // fromStored로 관대하게 읽는다 — 지나간 결제의 사실이라 되돌릴 수 없고, 여기서
+        // 거부하면 이미 성공한 결제의 재시도가 멱등 응답 대신 400을 받는다. 이 기능 이전에
+        // 만들어진 거래(컬럼이 NULL)도 같은 경로로 OTHER가 된다.
+        if (SpendingCategory.from(request.spendingCategory())
+            != SpendingCategory.fromStored(transfer.getSpendingCategory())) {
             throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
         }
 

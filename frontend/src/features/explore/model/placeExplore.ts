@@ -1,4 +1,4 @@
-export type PlaceSort = 'LATEST' | 'POPULAR'
+export type PlaceSort = 'NEWEST' | 'POPULAR'
 
 export const PLACE_KINDS = ['RESTAURANT', 'CAFE', 'MARKET', 'BEAUTY', 'ETC'] as const
 
@@ -75,6 +75,7 @@ export interface PlaceSummaryResponse {
   isActive: boolean | null
   viewCount: number
   favoriteCount: number
+  saved: boolean
 }
 
 export interface PlaceSummary extends Omit<PlaceSummaryResponse, 'imageUrls' | 'isActive'> {
@@ -106,6 +107,7 @@ export interface PlaceSearchFilters {
   placeKinds?: PlaceKind[]
   region1?: string[]
   region2?: string[]
+  region2Other?: boolean
   region3?: string[]
   keyword?: string
   hasForeignLang?: boolean

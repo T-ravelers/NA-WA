@@ -13,6 +13,7 @@ public class OAuthStateSession {
     private final OAuthProvider provider;
     private final String nonce;
     private final String codeVerifier;
+    private final String browserBindingHash;
     private final String returnPath;
     private final Instant issuedAt;
     private final Instant expiresAt;
@@ -22,6 +23,7 @@ public class OAuthStateSession {
             OAuthProvider provider,
             String nonce,
             String codeVerifier,
+            String browserBindingHash,
             String returnPath,
             Instant issuedAt,
             Instant expiresAt) {
@@ -30,6 +32,11 @@ public class OAuthStateSession {
         }
         if (!StringUtils.hasText(nonce)) {
             throw new IllegalArgumentException("OAuth nonce must not be blank");
+        }
+        if (!StringUtils.hasText(browserBindingHash)) {
+            throw new IllegalArgumentException(
+                    "OAuth browser binding hash must not be blank"
+            );
         }
         if (!StringUtils.hasText(returnPath)) {
             throw new IllegalArgumentException(
@@ -73,6 +80,7 @@ public class OAuthStateSession {
         this.codeVerifier = StringUtils.hasText(codeVerifier)
                 ? codeVerifier
                 : null;
+        this.browserBindingHash = browserBindingHash;
         this.returnPath = returnPath;
     }
 }
