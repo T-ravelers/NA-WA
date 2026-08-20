@@ -3,12 +3,19 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 
+import { i18n } from '@/app/i18n'
+
 const likeExploreItem = vi.fn()
 const unlikeExploreItem = vi.fn()
+const showToast = vi.fn()
 
 vi.mock('../../api/exploreApi', () => ({
   likeExploreItem: (itemId: number) => likeExploreItem(itemId),
   unlikeExploreItem: (itemId: number) => unlikeExploreItem(itemId),
+}))
+
+vi.mock('@/shared/ui/toast', () => ({
+  showToast: (message: string) => showToast(message),
 }))
 
 const { useExploreItemLikeMutation } = await import('../useExploreItemLikeMutation')
@@ -26,7 +33,7 @@ function setup() {
         return () => null
       },
     }),
-    { global: { plugins: [[VueQueryPlugin, { queryClient }]] } },
+    { global: { plugins: [i18n, [VueQueryPlugin, { queryClient }]] } },
   )
 
   return { queryClient, mutation }
@@ -36,6 +43,7 @@ describe('useExploreItemLikeMutation', () => {
   beforeEach(() => {
     likeExploreItem.mockReset()
     unlikeExploreItem.mockReset()
+    showToast.mockReset()
   })
 
   it('applies the server-confirmed saved state to list and detail caches', async () => {
@@ -85,7 +93,7 @@ describe('useExploreItemLikeMutation', () => {
     expect(queryClient.getQueryState(normalKey)?.isInvalidated).toBe(false)
   })
 
-  it('leaves caches untouched when the request fails', async () => {
+  it('leaves caches untouched and shows a toast when the request fails', async () => {
     likeExploreItem.mockRejectedValue(new Error('network'))
     const { queryClient, mutation } = setup()
     const eventListKey = ['explore', 'events', 'list', { page: 0 }]
@@ -97,5 +105,16 @@ describe('useExploreItemLikeMutation', () => {
     expect(queryClient.getQueryData(eventListKey)).toEqual({
       content: [{ itemId: 42, saved: false }],
     })
+    expect(showToast).toHaveBeenCalledWith('Could not update your saved list. Please try again.')
+  })
+
+  it('does not show a toast when the request succeeds', async () => {
+    likeExploreItem.mockResolvedValue({ saved: true })
+    const { mutation } = setup()
+
+    mutation.mutate({ itemId: 42, saved: true })
+    await flushPromises()
+
+    expect(showToast).not.toHaveBeenCalled()
   })
 })

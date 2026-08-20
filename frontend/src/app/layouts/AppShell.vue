@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 
+import AppToastHost from '@/shared/ui/AppToastHost.vue'
 import BottomNav from '@/shared/ui/BottomNav.vue'
 
 const route = useRoute()
@@ -23,5 +24,6 @@ const showBottomNav = computed(
   >
     <RouterView />
     <BottomNav v-if="showBottomNav" />
+    <AppToastHost />
   </div>
 </template>

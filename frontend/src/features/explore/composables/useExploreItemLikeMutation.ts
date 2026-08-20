@@ -1,4 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useI18n } from 'vue-i18n'
+
+import { showToast } from '@/shared/ui/toast'
 
 import { likeExploreItem, unlikeExploreItem } from '../api/exploreApi'
 import { exploreKeys } from '../model/exploreKeys'
@@ -13,14 +16,19 @@ interface ExploreItemLikeInput {
  *
  * 화면은 목록·상세 응답의 `saved`를 그대로 그리므로, 성공 시 서버가 확정한
  * 값을 캐시에 반영해 같은 항목을 보여주는 모든 화면(목록 카드·상세)이 함께
- * 갱신됩니다. 낙관적 갱신은 하지 않아 실패하면 하트가 그대로 남습니다.
+ * 갱신됩니다. 낙관적 갱신은 하지 않아 실패하면 하트가 그대로 남고, 실패
+ * 사실은 토스트로 알립니다.
  */
 export function useExploreItemLikeMutation() {
   const queryClient = useQueryClient()
+  const { t } = useI18n()
 
   return useMutation({
     mutationFn: ({ itemId, saved }: ExploreItemLikeInput) =>
       saved ? likeExploreItem(itemId) : unlikeExploreItem(itemId),
+    onError: () => {
+      showToast(t('explore.saveFailed'))
+    },
     onSuccess: (result, { itemId }) => {
       queryClient.setQueriesData({ queryKey: exploreKeys.all }, (data: unknown) =>
         applySavedToCache(data, itemId, result.saved),

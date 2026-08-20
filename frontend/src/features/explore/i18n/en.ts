@@ -252,6 +252,7 @@ export default {
     openPlace: 'Open {name}',
     savePlace: 'Save place',
     unsavePlace: 'Remove place from saved',
+    saveFailed: 'Could not update your saved list. Please try again.',
     placeResultCount: '{count} places',
     pagination: {
       label: 'Explore result pages',
