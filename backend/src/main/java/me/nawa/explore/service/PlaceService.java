@@ -31,7 +31,7 @@ public class PlaceService {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
-    private static final Set<String> SORTS = Set.of("LATEST", "POPULAR");
+    private static final Set<String> SORTS = Set.of("NEWEST", "POPULAR");
     private static final Set<String> PLACE_KINDS = Set.of(
         "RESTAURANT", "CAFE", "MARKET", "BEAUTY", "ETC"
     );
@@ -110,7 +110,11 @@ public class PlaceService {
         request.setKeyword(StringUtils.hasText(request.getKeyword())
             ? request.getKeyword().trim() : null);
         String sort = StringUtils.hasText(request.getSort())
-            ? request.getSort().trim().toUpperCase(Locale.ROOT) : "LATEST";
+            ? request.getSort().trim().toUpperCase(Locale.ROOT) : "POPULAR";
+        // 개명 전 프론트 번들(PWA 캐시)이 보낼 수 있는 레거시 값을 수용한다.
+        if ("LATEST".equals(sort)) {
+            sort = "NEWEST";
+        }
         if (!SORTS.contains(sort)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }

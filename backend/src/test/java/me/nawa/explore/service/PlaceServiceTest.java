@@ -72,6 +72,32 @@ class PlaceServiceTest {
     }
 
     @Test
+    void searchPlaces_defaultsToPopularSort() {
+        PlaceSearchRequest request = new PlaceSearchRequest();
+        request.setSort(" ");
+        when(placeMapper.searchPlaces(any(), eq(0), eq(20), isNull()))
+            .thenReturn(List.of());
+        when(placeMapper.countPlaces(any(), isNull())).thenReturn(0L);
+
+        placeService.searchPlaces(request, null);
+
+        assertEquals("POPULAR", request.getSort());
+    }
+
+    @Test
+    void searchPlaces_acceptsLegacyLatestSortAsNewest() {
+        PlaceSearchRequest request = new PlaceSearchRequest();
+        request.setSort("LATEST");
+        when(placeMapper.searchPlaces(any(), eq(0), eq(20), isNull()))
+            .thenReturn(List.of());
+        when(placeMapper.countPlaces(any(), isNull())).thenReturn(0L);
+
+        placeService.searchPlaces(request, null);
+
+        assertEquals("NEWEST", request.getSort());
+    }
+
+    @Test
     void searchPlaces_rejectsUnsupportedKind() {
         PlaceSearchRequest request = new PlaceSearchRequest();
         request.setPlaceKinds(List.of("HOTEL"));

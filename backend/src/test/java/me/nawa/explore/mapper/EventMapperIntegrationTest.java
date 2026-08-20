@@ -148,7 +148,7 @@ class EventMapperIntegrationTest {
     }
 
     @Test
-    void searchAndDetail_useCurrentDatesForVisibilityAndPresets() {
+    void searchAndDetail_useCurrentDatesForVisibilityAndDateRanges() {
         LocalDate today = currentDatabaseDate();
         long endedYesterday = insertEvent(
             "ended-yesterday",
@@ -180,23 +180,31 @@ class EventMapperIntegrationTest {
             "ENDED"
         );
 
-        Set<Long> visibleIds = searchIds(null);
+        Set<Long> visibleIds = searchIds(null, null);
         assertFalse(visibleIds.contains(endedYesterday));
         assertTrue(visibleIds.contains(endsToday));
         assertTrue(visibleIds.contains(startsTomorrow));
         assertTrue(visibleIds.contains(startedWithScheduledStatus));
         assertTrue(visibleIds.contains(permanentWithEndedStatus));
-        assertEquals(4L, countEvents(null));
+        assertEquals(4L, countEvents(null, null));
 
-        Set<Long> ongoingIds = searchIds("ONGOING");
+        // 날짜 프리셋은 프론트가 날짜 범위로 환원해 보낸다(#275). "오늘 진행 중"은
+        // 오늘 하루짜리 기간(시작=종료)으로 온다.
+        Set<Long> overlappingToday = searchIds(today, today);
         assertEquals(Set.of(
             endsToday,
             startedWithScheduledStatus,
             permanentWithEndedStatus
-        ), ongoingIds);
+        ), overlappingToday);
 
-        Set<Long> openingSoonIds = searchIds("OPENING_SOON");
-        assertEquals(Set.of(startsTomorrow), openingSoonIds);
+        // "곧 시작"은 내일부터 상한 없는 기간이다 — 내일 이후에도 진행 중인
+        // 이벤트를 모두 포함하는 겹침 기준이다.
+        Set<Long> visibleFromTomorrow = searchIds(today.plusDays(1), null);
+        assertEquals(Set.of(
+            startsTomorrow,
+            startedWithScheduledStatus,
+            permanentWithEndedStatus
+        ), visibleFromTomorrow);
 
         assertNull(mapper.findEventDetail(endedYesterday, "en", null));
         assertNotNull(mapper.findEventDetail(endsToday, "en", null));
@@ -243,7 +251,7 @@ class EventMapperIntegrationTest {
 
         Map<Long, Boolean> savedById = new HashMap<>();
         for (EventSummaryResponse result
-            : mapper.searchEvents(request(null), 0, memberId)) {
+            : mapper.searchEvents(request(null, null), 0, memberId)) {
             savedById.put(result.getItemId(), result.isSaved());
         }
         assertEquals(Boolean.TRUE, savedById.get(likedId));
@@ -251,7 +259,7 @@ class EventMapperIntegrationTest {
         assertEquals(Boolean.FALSE, savedById.get(canceledId));
 
         for (EventSummaryResponse result
-            : mapper.searchEvents(request(null), 0, null)) {
+            : mapper.searchEvents(request(null, null), 0, null)) {
             assertFalse(result.isSaved());
         }
 
@@ -259,8 +267,8 @@ class EventMapperIntegrationTest {
         assertFalse(mapper.findEventDetail(likedId, "en", null).isSaved());
     }
 
-    private Set<Long> searchIds(String datePreset) {
-        EventSearchRequest request = request(datePreset);
+    private Set<Long> searchIds(LocalDate startDate, LocalDate endDate) {
+        EventSearchRequest request = request(startDate, endDate);
         List<EventSummaryResponse> results = mapper.searchEvents(
             request,
             0,
@@ -273,14 +281,15 @@ class EventMapperIntegrationTest {
         return ids;
     }
 
-    private long countEvents(String datePreset) {
-        return mapper.countEvents(request(datePreset), null);
+    private long countEvents(LocalDate startDate, LocalDate endDate) {
+        return mapper.countEvents(request(startDate, endDate), null);
     }
 
-    private EventSearchRequest request(String datePreset) {
+    private EventSearchRequest request(LocalDate startDate, LocalDate endDate) {
         EventSearchRequest request = new EventSearchRequest();
         request.setKeyword(marker);
-        request.setDatePreset(datePreset);
+        request.setStartDate(startDate);
+        request.setEndDate(endDate);
         request.setSize(20);
         return request;
     }
