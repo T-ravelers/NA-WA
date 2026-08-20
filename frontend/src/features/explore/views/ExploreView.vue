@@ -19,6 +19,7 @@ import PlaceCard from '../components/PlaceCard.vue'
 import ExplorePagination from '../components/ExplorePagination.vue'
 import { useEventListQuery } from '../composables/useEventListQuery'
 import { usePlaceListQuery } from '../composables/usePlaceListQuery'
+import { presetDateRange } from '../model/datePresets'
 import {
   EVENT_KINDS,
   type EventKind,
@@ -64,9 +65,10 @@ const selectedRegion1 = ref(readRegion1List('eventRegion1', 'region1'))
 const selectedRegion2 = ref(readRegion2List('eventRegion2', selectedRegion1.value))
 const selectedRegion2Other = ref(readQueryBoolean('region2Other'))
 const selectedRegion3 = ref(readQueryList('region3'))
-const datePreset = ref(readQueryString('datePreset'))
-const startDate = ref(readQueryString('startDate'))
-const endDate = ref(readQueryString('endDate'))
+const initialDateFilters = readDateFilters()
+const datePreset = ref(initialDateFilters.preset)
+const startDate = ref(initialDateFilters.startDate)
+const endDate = ref(initialDateFilters.endDate)
 const selectedEventPage = ref(readQueryPage('eventPage'))
 const eventKeywordInput = ref(readQueryString('eventKeyword') ?? '')
 const eventKeyword = ref(eventKeywordInput.value.trim())
@@ -76,6 +78,7 @@ const openWeekendOnly = ref(readQueryBoolean('openWeekendOnly'))
 const opensLateOnly = ref(readQueryBoolean('opensLateOnly'))
 const preReservationOnly = ref(readQueryBoolean('preReservationOnly'))
 const experienceOnly = ref(readQueryBoolean('experienceOnly'))
+const eventSavedOnly = ref(readQueryBoolean('eventSavedOnly'))
 const selectedPlaceKinds = ref<PlaceKind[]>(readQueryList('placeKinds').filter(isPlaceKind))
 const selectedPlaceSectorIds = ref(readValidTaxonomyIds('placeSectorIds', VALID_EXPLORE_SECTOR_IDS))
 const selectedPlaceActivityIds = ref(
@@ -125,15 +128,26 @@ const filters = computed<EventSearchFilters>(() => ({
   region3: selectedRegion3.value.length > 0 ? selectedRegion3.value : undefined,
   datePreset: datePreset.value,
   startDate: startDate.value,
-  endDate: endDate.value,
+  // 단일 날짜 선택은 시작=종료의 하루짜리 기간으로 보낸다. 시작일만 보내면
+  // 백엔드 겹침 조건에 상한이 없어 "그 날짜 이후 유효한 이벤트 전부"가 나온다.
+  // 상한이 없는 Opening soon 프리셋만 시작일 그대로 열어 둔다.
+  endDate: resolveEndDate(datePreset.value, startDate.value, endDate.value),
   freeOnly: freeOnly.value || undefined,
   openWeekendOnly: openWeekendOnly.value || undefined,
   opensLateOnly: opensLateOnly.value || undefined,
   preReservationOnly: preReservationOnly.value || undefined,
   experienceOnly: experienceOnly.value || undefined,
+  savedOnly: eventSavedOnly.value || undefined,
 }))
 
-const eventQuery = useEventListQuery(filters)
+// datePreset은 화면 전용이라 요청 내용이 같아도 캐시가 갈라진다 — 키에서 뺀다.
+function toEventQueryFilters(value: EventSearchFilters): EventSearchFilters {
+  const queryFilters = { ...value }
+  delete queryFilters.datePreset
+  return queryFilters
+}
+
+const eventQuery = useEventListQuery(computed(() => toEventQueryFilters(filters.value)))
 const placeFilters = computed<PlaceSearchFilters>(() => ({
   language: locale.value,
   page: selectedPlacePage.value,
@@ -161,7 +175,7 @@ const placeQuery = usePlaceListQuery(placeFilters, {
   enabled: () => selectedTab.value === 'places',
 })
 const sheetPreviewQuery = useEventListQuery(
-  computed(() => sheetPreviewFilters.value ?? filters.value),
+  computed(() => toEventQueryFilters(sheetPreviewFilters.value ?? filters.value)),
   { enabled: () => selectedTab.value === 'events' && selectedSheet.value !== null },
 )
 const placeSheetPreviewQuery = usePlaceListQuery(
@@ -252,6 +266,7 @@ const activeFilters = computed(() => {
     ['opensLateOnly', opensLateOnly.value, t('explore.options.openLate')],
     ['preReservationOnly', preReservationOnly.value, t('explore.options.preReservation')],
     ['experienceOnly', experienceOnly.value, t('explore.options.experience')],
+    ['savedOnly', eventSavedOnly.value, t('explore.sort.saved')],
   ]
   options.forEach(([key, selected, label]) => {
     if (selected) values.push({ key: `option:${key}`, label })
@@ -319,12 +334,13 @@ function buildEventQuery(next: EventSearchFilters): LocationQueryRaw {
   addQueryValue(query, 'endDate', next.endDate)
   addQueryValue(query, 'eventKeyword', next.keyword)
   addQueryValue(query, 'eventPage', next.page && next.page > 0 ? String(next.page) : undefined)
-  addQueryValue(query, 'sort', next.sort === 'LATEST' ? undefined : next.sort)
+  addQueryValue(query, 'sort', next.sort === 'NEWEST' ? undefined : next.sort)
   addQueryValue(query, 'freeOnly', next.freeOnly)
   addQueryValue(query, 'openWeekendOnly', next.openWeekendOnly)
   addQueryValue(query, 'opensLateOnly', next.opensLateOnly)
   addQueryValue(query, 'preReservationOnly', next.preReservationOnly)
   addQueryValue(query, 'experienceOnly', next.experienceOnly)
+  addQueryValue(query, 'eventSavedOnly', next.savedOnly)
   return query
 }
 
@@ -337,7 +353,7 @@ function buildPlaceQuery(next: PlaceSearchFilters): LocationQueryRaw {
   addQueryList(query, 'placeRegion2', next.region2)
   addQueryValue(query, 'placeRegion2Other', next.region2Other)
   addQueryValue(query, 'placeKeyword', next.keyword)
-  addQueryValue(query, 'placeSort', next.sort === 'LATEST' ? undefined : next.sort)
+  addQueryValue(query, 'placeSort', next.sort === 'POPULAR' ? undefined : next.sort)
   addQueryValue(query, 'hasForeignLang', next.hasForeignLang)
   addQueryValue(query, 'hasParking', next.hasParking)
   addQueryValue(query, 'reservable', next.reservable)
@@ -399,9 +415,10 @@ watch(
       selectedRegion2.value = readRegion2List('eventRegion2', selectedRegion1.value)
       selectedRegion2Other.value = readQueryBoolean('region2Other')
       selectedRegion3.value = readQueryList('region3')
-      datePreset.value = readQueryString('datePreset')
-      startDate.value = readQueryString('startDate')
-      endDate.value = readQueryString('endDate')
+      const dateFilters = readDateFilters()
+      datePreset.value = dateFilters.preset
+      startDate.value = dateFilters.startDate
+      endDate.value = dateFilters.endDate
       selectedEventPage.value = readQueryPage('eventPage')
       eventKeywordInput.value = readQueryString('eventKeyword') ?? ''
       eventKeyword.value = eventKeywordInput.value.trim()
@@ -411,6 +428,7 @@ watch(
       opensLateOnly.value = readQueryBoolean('opensLateOnly')
       preReservationOnly.value = readQueryBoolean('preReservationOnly')
       experienceOnly.value = readQueryBoolean('experienceOnly')
+      eventSavedOnly.value = readQueryBoolean('eventSavedOnly')
       await nextTick()
       hydratingEventQuery.value = false
       sanitizeExploreQuery('events')
@@ -474,12 +492,13 @@ function applySheet(next: EventSearchFilters): void {
   datePreset.value = next.datePreset
   startDate.value = next.startDate
   endDate.value = next.endDate
-  sort.value = next.sort ?? 'LATEST'
+  sort.value = next.sort ?? 'NEWEST'
   freeOnly.value = next.freeOnly ?? false
   openWeekendOnly.value = next.openWeekendOnly ?? false
   opensLateOnly.value = next.opensLateOnly ?? false
   preReservationOnly.value = next.preReservationOnly ?? false
   experienceOnly.value = next.experienceOnly ?? false
+  eventSavedOnly.value = next.savedOnly ?? false
   selectedSheet.value = null
   sheetPreviewFilters.value = null
 }
@@ -496,7 +515,7 @@ function applyPlaceSheet(next: PlaceSearchFilters): void {
       ? (next.region2 ?? []).filter((value) => VALID_SEOUL_REGION2_VALUES.has(value))
       : (next.region2 ?? [])
   selectedPlaceRegion2Other.value = next.region2Other ?? false
-  placeSort.value = next.sort ?? 'LATEST'
+  placeSort.value = next.sort ?? 'POPULAR'
   selectedPlaceHasForeignLang.value = next.hasForeignLang ?? false
   selectedPlaceHasParking.value = next.hasParking ?? false
   selectedPlaceReservable.value = next.reservable ?? false
@@ -518,7 +537,13 @@ let placePreviewTimer: ReturnType<typeof setTimeout> | undefined
 function previewSheet(next: EventSearchFilters): void {
   clearTimeout(eventPreviewTimer)
   eventPreviewTimer = setTimeout(() => {
-    sheetPreviewFilters.value = { ...next, page: 0, size: 20, language: locale.value }
+    sheetPreviewFilters.value = {
+      ...next,
+      endDate: resolveEndDate(next.datePreset, next.startDate, next.endDate),
+      page: 0,
+      size: 20,
+      language: locale.value,
+    }
   }, 250)
 }
 
@@ -603,12 +628,13 @@ function removeFilter(key: string): void {
     endDate.value = undefined
     eventKeywordInput.value = ''
     eventKeyword.value = ''
-    sort.value = 'LATEST'
+    sort.value = 'NEWEST'
     freeOnly.value = false
     openWeekendOnly.value = false
     opensLateOnly.value = false
     preReservationOnly.value = false
     experienceOnly.value = false
+    eventSavedOnly.value = false
     return
   }
 
@@ -647,6 +673,7 @@ function removeFilter(key: string): void {
     if (option === 'opensLateOnly') opensLateOnly.value = false
     if (option === 'preReservationOnly') preReservationOnly.value = false
     if (option === 'experienceOnly') experienceOnly.value = false
+    if (option === 'savedOnly') eventSavedOnly.value = false
   }
 }
 
@@ -659,7 +686,7 @@ function removePlaceFilter(key: string): void {
     selectedPlaceRegion1.value = [SEOUL_REGION1]
     selectedPlaceRegion2.value = []
     selectedPlaceRegion2Other.value = false
-    placeSort.value = 'LATEST'
+    placeSort.value = 'POPULAR'
     selectedPlaceHasForeignLang.value = false
     selectedPlaceHasParking.value = false
     selectedPlaceReservable.value = false
@@ -818,12 +845,45 @@ function readQueryPage(key: string): number {
   return Number.isInteger(value) && value >= 0 ? value : 0
 }
 
+// 개명 전 프론트는 프리셋 선택 시 날짜 없이 `?datePreset=…`만 URL에 남겼다.
+// 그런 링크에서 날짜를 역산해 채우지 않으면 칩만 켜지고 필터는 걸리지 않는다.
+// 알 수 없는 프리셋 값은 버린다.
+function readDateFilters(): {
+  preset: string | undefined
+  startDate: string | undefined
+  endDate: string | undefined
+} {
+  const preset = readQueryString('datePreset')
+  const startDate = readQueryString('startDate')
+  const endDate = readQueryString('endDate')
+  if (preset === undefined) return { preset, startDate, endDate }
+
+  const range = presetDateRange(preset)
+  if (range === null) return { preset: undefined, startDate, endDate }
+  if (startDate === undefined) {
+    return { preset, startDate: range.min, endDate: range.max }
+  }
+  return { preset, startDate, endDate }
+}
+
+function resolveEndDate(
+  preset: string | undefined,
+  start: string | undefined,
+  end: string | undefined,
+): string | undefined {
+  if (end !== undefined) return end
+  return preset === 'OPENING_SOON' ? undefined : start
+}
+
+// 개명 전에 만들어진 URL이 남아 있을 수 있어 레거시 'LATEST'는 'NEWEST'로
+// 해석한다. 기본값 처리에 맡기면 기본 정렬이 다른 탭에서 의도가 뒤집힌다.
 function readSort(value: string | undefined): EventSort {
-  return value === 'POPULAR' || value === 'ENDING_SOON' ? value : 'LATEST'
+  return value === 'POPULAR' || value === 'ENDING_SOON' ? value : 'NEWEST'
 }
 
 function readPlaceSort(value: string | undefined): PlaceSort {
-  return value === 'POPULAR' ? value : 'LATEST'
+  if (value === 'NEWEST' || value === 'LATEST') return 'NEWEST'
+  return 'POPULAR'
 }
 
 function isEventKind(value: string): value is EventKind {

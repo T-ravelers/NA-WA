@@ -47,6 +47,7 @@ export interface EventDetail {
   reservable: boolean | null
   contact: string | null
   organizer: string | null
+  saved: boolean
   activities: EventActivity[]
 }
 

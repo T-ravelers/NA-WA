@@ -37,6 +37,7 @@ export const eventSummaryResponseSchema = z
     longitude: finiteNumberSchema.nullable(),
     startDate: nullableDateSchema,
     endDate: nullableDateSchema,
+    saved: z.boolean(),
   })
   .passthrough()
 
@@ -89,6 +90,7 @@ export const eventDetailResponseSchema = z
     reservable: z.boolean().nullable(),
     contact: nullableStringSchema,
     organizer: nullableStringSchema,
+    saved: z.boolean(),
     activities: z.array(eventActivityResponseSchema),
   })
   .passthrough()
@@ -120,6 +122,7 @@ const placeSummaryShape = {
   isActive: z.boolean().nullable(),
   viewCount: z.number().int().nonnegative(),
   favoriteCount: z.number().int().nonnegative(),
+  saved: z.boolean(),
 }
 
 export const placeSummaryResponseSchema = z.object(placeSummaryShape).passthrough()
@@ -161,6 +164,13 @@ export const placeDetailResponseSchema = z
     menuSummary: nullableStringSchema,
     tel: nullableStringSchema,
     activities: z.array(placeActivityResponseSchema).nullable(),
+  })
+  .passthrough()
+
+// 찜 등록·취소 응답. 멱등 재호출도 같은 최종 상태를 돌려준다.
+export const exploreItemLikeResponseSchema = z
+  .object({
+    saved: z.boolean(),
   })
   .passthrough()
 

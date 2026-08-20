@@ -15,6 +15,7 @@ vi.mock('../../api/exploreApi', () => ({
 }))
 
 const ExploreView = (await import('../ExploreView.vue')).default
+const { presetDateRange } = await import('../../model/datePresets')
 
 const place = {
   itemId: 42,
@@ -34,6 +35,7 @@ const place = {
   isActive: true,
   viewCount: 10,
   favoriteCount: 2,
+  saved: false,
   hasParking: true,
   reservable: true,
   takeoutAvailable: false,
@@ -128,6 +130,88 @@ describe('ExploreView Place branch', () => {
 
     expect(router.currentRoute.value.query.tab).toBeUndefined()
     expect(wrapper.get('[role="radio"][aria-checked="true"]').text()).toBe('Events')
+  })
+
+  it('requests the Event list with the NEWEST sort by default', async () => {
+    await mountView()
+
+    expect(fetchEventList).toHaveBeenCalledWith(expect.objectContaining({ sort: 'NEWEST' }))
+  })
+
+  it('sends a single selected date as a one-day range', async () => {
+    await mountView('/explore?startDate=2026-08-21')
+
+    expect(fetchEventList).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: '2026-08-21', endDate: '2026-08-21' }),
+    )
+  })
+
+  it('requests only saved events when the URL asks for them', async () => {
+    await mountView('/explore?eventSavedOnly=true')
+
+    expect(fetchEventList).toHaveBeenCalledWith(expect.objectContaining({ savedOnly: true }))
+  })
+
+  it('keeps the UI-only datePreset out of list query filters', async () => {
+    await mountView('/explore?datePreset=THIS_WEEKEND')
+
+    expect(fetchEventList.mock.calls[fetchEventList.mock.calls.length - 1]?.[0]).not.toHaveProperty(
+      'datePreset',
+    )
+  })
+
+  it('derives dates from a legacy preset-only URL', async () => {
+    const range = presetDateRange('THIS_WEEKEND')
+
+    await mountView('/explore?datePreset=THIS_WEEKEND')
+
+    expect(fetchEventList).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: range?.min, endDate: range?.max }),
+    )
+  })
+
+  it('drops an unknown preset from an old URL', async () => {
+    await mountView('/explore?datePreset=GARBAGE')
+
+    const lastFilters = fetchEventList.mock.calls[fetchEventList.mock.calls.length - 1]?.[0]
+    expect(lastFilters).not.toHaveProperty('datePreset')
+    expect(lastFilters).toMatchObject({ startDate: undefined })
+  })
+
+  it('keeps an Opening soon filter open ended and off the API params', async () => {
+    await mountView('/explore?datePreset=OPENING_SOON&startDate=2026-08-21')
+
+    expect(fetchEventList).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: '2026-08-21', endDate: undefined }),
+    )
+  })
+
+  it('sends a completed range with its own end date', async () => {
+    await mountView('/explore?startDate=2026-08-21&endDate=2026-08-23')
+
+    expect(fetchEventList).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: '2026-08-21', endDate: '2026-08-23' }),
+    )
+  })
+
+  it('reads a legacy LATEST event sort from an old URL as NEWEST', async () => {
+    await mountView('/explore?sort=LATEST')
+
+    expect(fetchEventList).toHaveBeenCalledWith(expect.objectContaining({ sort: 'NEWEST' }))
+  })
+
+  it('requests the Place list with the POPULAR sort by default', async () => {
+    await mountView('/explore?tab=places')
+    await flushPromises()
+
+    expect(fetchPlaceList).toHaveBeenCalledWith(expect.objectContaining({ sort: 'POPULAR' }))
+  })
+
+  it('reads a legacy LATEST place sort from an old URL as NEWEST', async () => {
+    await mountView('/explore?tab=places&placeSort=LATEST')
+    await flushPromises()
+
+    expect(fetchPlaceList).toHaveBeenCalledWith(expect.objectContaining({ sort: 'NEWEST' }))
   })
 
   it('applies a translated Seoul region2 using the operational_v9 API value', async () => {

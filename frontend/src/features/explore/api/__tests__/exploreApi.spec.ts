@@ -50,6 +50,18 @@ describe('exploreApi', () => {
     expect(params.toString()).toBe('')
   })
 
+  it('keeps the UI-only datePreset out of the query string', () => {
+    const params = toSearchParams({
+      datePreset: 'THIS_WEEKEND',
+      startDate: '2026-08-22',
+      endDate: '2026-08-23',
+    })
+
+    expect(params.get('datePreset')).toBeNull()
+    expect(params.get('startDate')).toBe('2026-08-22')
+    expect(params.get('endDate')).toBe('2026-08-23')
+  })
+
   it('returns the unwrapped event list from the shared client', async () => {
     const data = {
       content: [],
@@ -61,7 +73,7 @@ describe('exploreApi', () => {
     }
     get.mockResolvedValueOnce({ data })
 
-    await expect(fetchEventList({ sort: 'LATEST' })).resolves.toEqual(data)
+    await expect(fetchEventList({ sort: 'NEWEST' })).resolves.toEqual(data)
     expect(get).toHaveBeenCalledWith('/api/v1/explore/events', {
       params: expect.any(URLSearchParams),
       responseSchema: eventListResponseSchema,
@@ -103,7 +115,7 @@ describe('exploreApi', () => {
     }
     get.mockResolvedValueOnce({ data })
 
-    await expect(fetchPlaceList({ sort: 'LATEST' })).resolves.toEqual({ ...data, content: [] })
+    await expect(fetchPlaceList({ sort: 'NEWEST' })).resolves.toEqual({ ...data, content: [] })
     expect(get).toHaveBeenCalledWith('/api/v1/explore/places', {
       params: expect.any(URLSearchParams),
       responseSchema: placeListResponseSchema,

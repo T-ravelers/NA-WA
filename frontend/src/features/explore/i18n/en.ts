@@ -1,6 +1,6 @@
 export default {
   explore: {
-    title: 'Discover',
+    title: 'Explore',
     tabs: {
       events: 'Events',
       places: 'Places',
@@ -221,7 +221,7 @@ export default {
     },
     sort: {
       defaultHint: 'Default',
-      latest: 'Newest',
+      newest: 'Newest',
       popular: 'Popular',
       ending_soon: 'Ending soon',
       saved: 'Saved',
@@ -250,7 +250,12 @@ export default {
     imageUnavailable: 'Event image unavailable',
     placePhoto: 'Place photo',
     openPlace: 'Open {name}',
-    savePlaceUnavailable: 'Save place is not available yet',
+    saveEvent: 'Save event',
+    unsaveEvent: 'Remove event from saved',
+    savePlace: 'Save place',
+    unsavePlace: 'Remove place from saved',
+    saveFailed: 'Could not update your saved list. Please try again.',
+    saveRequiresLogin: 'Sign in to save items.',
     placeResultCount: '{count} places',
     pagination: {
       label: 'Explore result pages',
@@ -301,7 +306,8 @@ export default {
         kids: 'Kids facility',
         restroom: 'Restroom',
       },
-      saveUnavailable: 'Save place is not available yet',
+      save: 'Save place',
+      unsave: 'Remove place from saved',
       addToJourney: 'Add to journey',
       addedToJourney: 'Added to journey',
       findCompanions: 'Find companions',

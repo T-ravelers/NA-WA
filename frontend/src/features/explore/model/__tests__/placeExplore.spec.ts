@@ -53,6 +53,7 @@ describe('placeExplore model helpers', () => {
             isActive: null,
             viewCount: 0,
             favoriteCount: 0,
+            saved: false,
           },
         ],
         page: 0,
