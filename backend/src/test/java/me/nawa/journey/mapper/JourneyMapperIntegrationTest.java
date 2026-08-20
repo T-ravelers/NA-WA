@@ -11,6 +11,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -372,6 +373,78 @@ class JourneyMapperIntegrationTest {
     }
 
     @Test
+    void insertJourneyItem_softDeletedSameItemAndDateCanBeReadded() {
+        JourneyItemFixture fixture = createFixture();
+        try {
+            JourneyItem deleted = journeyItem(fixture);
+            mapper.insertJourneyItem(deleted);
+            softDeleteTripItem(deleted.getTripItemId());
+
+            JourneyItem readded = journeyItem(fixture);
+            mapper.insertJourneyItem(readded);
+
+            assertNotNull(deleted.getTripItemId());
+            assertNotNull(readded.getTripItemId());
+            assertTrue(!deleted.getTripItemId().equals(readded.getTripItemId()));
+            assertEquals(2L, countTripItems(fixture.tripId(), false));
+            assertEquals(1L, countTripItems(fixture.tripId(), true));
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    @Test
+    void insertConfirmedJourneyItem_activeAppointmentDuplicateIsBlockedAndDeletedCanBeReadded() {
+        JourneyItemFixture fixture = createEventFixture();
+        long appointmentId = insertAppointment(fixture.itemId(), fixture.memberId());
+        try {
+            JourneyItem first = confirmedJourneyItem(
+                fixture,
+                appointmentId,
+                LocalDate.of(2026, 8, 8)
+            );
+            mapper.insertConfirmedJourneyItem(first);
+
+            JourneyItem activeDuplicate = confirmedJourneyItem(
+                fixture,
+                appointmentId,
+                LocalDate.of(2026, 8, 9)
+            );
+            assertThrows(
+                DuplicateKeyException.class,
+                () -> mapper.insertConfirmedJourneyItem(activeDuplicate)
+            );
+
+            softDeleteTripItem(first.getTripItemId());
+            JourneyItem readded = confirmedJourneyItem(
+                fixture,
+                appointmentId,
+                LocalDate.of(2026, 8, 9)
+            );
+            mapper.insertConfirmedJourneyItem(readded);
+
+            assertNotNull(readded.getTripItemId());
+            assertTrue(!first.getTripItemId().equals(readded.getTripItemId()));
+            assertEquals(2L, countTripItems(fixture.tripId(), false));
+            assertEquals(1L, countTripItems(fixture.tripId(), true));
+        } finally {
+            jdbcTemplate.update(
+                "DELETE FROM trip_items WHERE trip_id = ?",
+                fixture.tripId()
+            );
+            jdbcTemplate.update(
+                "DELETE FROM appointments WHERE appointment_id = ?",
+                appointmentId
+            );
+            jdbcTemplate.update(
+                "DELETE FROM event WHERE event_id = ?",
+                fixture.itemId()
+            );
+            deleteFixture(fixture);
+        }
+    }
+
+    @Test
     void updateJourney_replacesRegionsAndDetectsDateConflict() {
         JourneyItemFixture fixture = createFixture();
         try {
@@ -585,6 +658,15 @@ class JourneyMapperIntegrationTest {
         return new JourneyItemFixture(memberId, tripId, itemId);
     }
 
+    private static JourneyItemFixture createEventFixture() {
+        String marker = "journey-appointment-" + UUID.randomUUID();
+        long memberId = insertMember(marker);
+        long tripId = insertTrip(memberId, marker);
+        long itemId = insertExploreItem(memberId, "EVENT");
+        insertEvent(itemId, marker);
+        return new JourneyItemFixture(memberId, tripId, itemId);
+    }
+
     private static long insertMember(String displayName) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
@@ -703,6 +785,35 @@ class JourneyMapperIntegrationTest {
         );
     }
 
+    private static long insertAppointment(long itemId, long hostMemberId) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        LocalDateTime activityStartAt = LocalDateTime.of(2026, 8, 8, 10, 0);
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO appointments "
+                    + "(item_id, host_member_id, language_code, appointment_name, "
+                    + "max_members, join_deadline, deposit_amount, "
+                    + "appointment_status, activity_start_at, activity_end_at) "
+                    + "VALUES (?, ?, 'en', 'journey re-add integration', "
+                    + "5, ?, 10000, 'RECRUITING', ?, ?)",
+                Statement.RETURN_GENERATED_KEYS
+            );
+            statement.setLong(1, itemId);
+            statement.setLong(2, hostMemberId);
+            statement.setObject(3, activityStartAt.minusDays(1));
+            statement.setObject(4, activityStartAt);
+            statement.setObject(5, activityStartAt.plusHours(2));
+            return statement;
+        }, keyHolder);
+        return keyHolder.getKey().longValue();
+    }
+
+    private static long countTripItems(long tripId, boolean activeOnly) {
+        String sql = "SELECT COUNT(*) FROM trip_items WHERE trip_id = ?"
+            + (activeOnly ? " AND deleted_at IS NULL" : "");
+        return jdbcTemplate.queryForObject(sql, Long.class, tripId);
+    }
+
     private static void softDeleteEvent(long itemId) {
         jdbcTemplate.update(
             "UPDATE event SET deleted_at = CURRENT_TIMESTAMP WHERE event_id = ?",
@@ -732,6 +843,21 @@ class JourneyMapperIntegrationTest {
             .visitDate(java.time.LocalDate.of(2026, 8, 8))
             .displayOrder(0)
             .note("integration")
+            .build();
+    }
+
+    private static JourneyItem confirmedJourneyItem(
+        JourneyItemFixture fixture,
+        long appointmentId,
+        LocalDate visitDate
+    ) {
+        return JourneyItem.builder()
+            .tripId(fixture.tripId())
+            .itemId(fixture.itemId())
+            .appointmentId(appointmentId)
+            .visitDate(visitDate)
+            .displayOrder(0)
+            .note("appointment integration")
             .build();
     }
 

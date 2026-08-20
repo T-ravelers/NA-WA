@@ -170,13 +170,12 @@ DELETE /api/v1/journeys/{tripId}/items/{tripItemId}
 
 성공하면 응답 본문 없이 `204 No Content`를 반환합니다.
 
-### soft-delete 일정 재추가 제한
+### soft-delete 일정 재추가
 
-V5의 `trip_items` 유니크 키는 `deleted_at`을 포함하지 않습니다. 따라서 soft delete한
-일정과 같은 `itemId`·`visitDate` 조합을 같은 Journey에 다시 추가하면
-`JOURNEY-004`(409)를 반환합니다. 같은 Journey와 Appointment 조합도 다시 연결할 수
-없습니다. 이 제한을 제거하려면 별도 Flyway 스키마 변경이 필요하며, Issue #205/#206의
-범위에는 포함되지 않습니다.
+V17부터 `trip_items` 유니크 키는 `deleted_at IS NULL`인 활성 일정에만 적용됩니다.
+따라서 soft delete한 일정과 같은 `itemId`·`visitDate` 조합 또는 같은 Appointment
+연결을 새 일정으로 다시 추가할 수 있습니다. 활성 일정의 중복은 계속
+`JOURNEY-004`(409)를 반환합니다. 삭제 이력은 복구하거나 hard delete하지 않습니다.
 
 ### 오류 코드
 
