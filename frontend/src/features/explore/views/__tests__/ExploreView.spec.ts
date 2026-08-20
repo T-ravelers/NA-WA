@@ -6,6 +6,8 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
+import { useExploreFilterMemoryStore } from '../../model/exploreFilterMemory'
+
 const fetchEventList = vi.fn()
 const fetchPlaceList = vi.fn()
 
@@ -147,6 +149,33 @@ describe('ExploreView Place branch', () => {
     expect(router.currentRoute.value.query.placeRegion2).toEqual(['Suwon'])
     expect(fetchPlaceList).toHaveBeenLastCalledWith(
       expect.objectContaining({ region1: ['Gyeonggi'], region2: ['Suwon'], page: 0 }),
+    )
+  })
+
+  it('remembers the Place filters it writes to the URL', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Places')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('Region'))
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Gyeonggi'))
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(useExploreFilterMemoryStore().lastQuery.places).toEqual(
+      expect.objectContaining({ tab: 'places', placeRegion1: ['Gyeonggi'] }),
     )
   })
 

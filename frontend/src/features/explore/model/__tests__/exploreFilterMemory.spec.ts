@@ -56,6 +56,14 @@ describe('useExploreFilterMemoryStore', () => {
     expect(store.resolveEntry({ tab: 'places' })).toEqual({ tab: 'places', placeKinds: 'CAFE' })
   })
 
+  it('does not keep the entry context among the filters', () => {
+    const store = useExploreFilterMemoryStore()
+    store.remember({ journeyId: '7', startDate: '2026-09-03', endDate: '2026-09-03' })
+
+    /* 날짜는 필터라 되돌리지만 journeyId는 일회성 맥락이라 되살리지 않는다. */
+    expect(store.resolveEntry({})).toEqual({ startDate: '2026-09-03', endDate: '2026-09-03' })
+  })
+
   it('does not ask for a navigation that changes nothing', () => {
     const store = useExploreFilterMemoryStore()
     store.remember({ tab: 'places' })

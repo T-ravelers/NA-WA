@@ -13,16 +13,23 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
     beforeEnter: [
       /*
-       * 필터가 빠진 주소로 들어오면 그 탭에서 마지막으로 보던 필터를 되돌린다.
+       * 필터가 빠진 주소로 들어오면 그 탭에서 마지막으로 보던 필터를 되돌리고, 필터를 싣고
+       * 들어오면 그 주소를 기억한다.
        *
        * 화면이 만들어지기 전에 주소를 고쳐야 `ExploreView`가 평소처럼 URL만 읽고도 필터를
        * 살릴 수 있다. 그래서 기존 필터 동기화 코드는 그대로 두고 여기서 처리한다.
+       *
+       * 기억을 여기서도 하는 이유는 `ExploreView`의 필터 watcher가 `immediate`가 아니라서다.
+       * 진입 주소의 필터는 화면이 다시 쓰지 않으므로, Journey의 날짜 지정 링크·공유 주소·
+       * 새로고침으로 들어와 필터를 만지지 않고 상세로 갔다 오면 되돌릴 것이 없어진다.
        */
       (to) => {
-        const restored = useExploreFilterMemoryStore().resolveEntry(to.query)
-        if (restored === null) return true
+        const filterMemory = useExploreFilterMemoryStore()
+        const restored = filterMemory.resolveEntry(to.query)
+        if (restored !== null) return { name: 'explore', query: restored, replace: true }
 
-        return { name: 'explore', query: restored, replace: true }
+        filterMemory.remember(to.query)
+        return true
       },
       /*
        * Journey 화면에서 날짜를 지정해 넘어온 맥락을 여기서 받는다.

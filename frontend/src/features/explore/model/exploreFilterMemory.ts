@@ -4,6 +4,20 @@ import type { LocationQuery, LocationQueryRaw } from 'vue-router'
 
 const TAB_KEY = 'tab'
 
+/**
+ * 목록을 거르지 않는 키. 진입 맥락일 뿐이라 기억해서 되돌리면 안 된다.
+ *
+ * `journeyId`는 "어느 여정에 담는가"이고 그 처리는 복귀 맥락 store(#192)가 맡는다.
+ * `ExploreView`도 필터를 한 번 바꾸면 URL에서 이 키를 지우므로, 기억이 화면보다 오래
+ * 들고 있으면 일회성이어야 할 맥락이 되살아난다.
+ */
+const CONTEXT_KEYS = new Set(['journeyId'])
+
+/** 기억할 필터만 남긴다. */
+function filtersOf(query: LocationQuery | LocationQueryRaw): LocationQueryRaw {
+  return Object.fromEntries(Object.entries(query).filter(([key]) => !CONTEXT_KEYS.has(key)))
+}
+
 type ExploreTab = 'events' | 'places'
 
 /** Events가 기본 탭이라 URL에 `tab`이 없으면 Events다. */
@@ -42,9 +56,14 @@ export const useExploreFilterMemoryStore = defineStore('explore-filter-memory', 
     places: null,
   })
 
-  /** URL에 필터를 쓸 때마다 같은 값을 기억한다. 필터를 모두 지운 상태도 그대로 기억한다. */
-  function remember(query: LocationQueryRaw): void {
-    lastQuery.value = { ...lastQuery.value, [tabOf(query)]: { ...query } }
+  /**
+   * URL에 필터를 쓸 때마다 같은 값을 기억한다. 필터를 모두 지운 상태도 그대로 기억한다.
+   *
+   * 화면이 필터를 바꿀 때만이 아니라 진입 주소도 이리로 들어온다. 그래야 Journey에서
+   * 날짜를 지정해 들어온 뒤 필터를 만지지 않고 바로 상세로 갔다 돌아와도 그 날짜가 남는다.
+   */
+  function remember(query: LocationQuery | LocationQueryRaw): void {
+    lastQuery.value = { ...lastQuery.value, [tabOf(query)]: filtersOf(query) }
   }
 
   /**

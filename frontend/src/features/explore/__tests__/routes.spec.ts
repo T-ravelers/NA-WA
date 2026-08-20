@@ -8,6 +8,7 @@ import routes from '../routes'
 
 const Stub = { template: '<div />' }
 const CONTEXT_ENTRY = '/explore?journeyId=7&startDate=2026-09-03&endDate=2026-09-03'
+const CONTEXT_DATES = { startDate: '2026-09-03', endDate: '2026-09-03' }
 
 /** 실제 route 정의를 그대로 쓰되 화면만 stub으로 바꾼다. beforeEnter는 진짜가 돈다. */
 function createTestRouter() {
@@ -92,9 +93,9 @@ describe('explore routes', () => {
 
   it('restores the last filters when Discover is entered without any', async () => {
     const router = createTestRouter()
-    await router.push('/')
-    useExploreFilterMemoryStore().remember({ keyword: 'hongdae' })
+    await router.push('/explore?keyword=hongdae')
 
+    await router.push('/')
     await router.push('/explore')
 
     expect(router.currentRoute.value.query).toEqual({ keyword: 'hongdae' })
@@ -103,7 +104,6 @@ describe('explore routes', () => {
   it('brings the filters back when returning from an item detail', async () => {
     const router = createTestRouter()
     await router.push('/explore?keyword=hongdae')
-    useExploreFilterMemoryStore().remember({ keyword: 'hongdae' })
 
     await router.push('/explore/events/42')
     /* 상세의 뒤로가기는 필터가 빠진 주소로 되돌아온다. */
@@ -112,11 +112,53 @@ describe('explore routes', () => {
     expect(router.currentRoute.value.query).toEqual({ keyword: 'hongdae' })
   })
 
+  it('brings back a filter URL that was never touched after a refresh', async () => {
+    /* 새로고침하면 이 주소가 첫 진입이 된다. 화면의 필터 watcher는 아직 한 번도 돌지 않았다. */
+    const router = createTestRouter()
+    await router.push('/explore?keyword=hongdae&freeOnly=true')
+
+    await router.push('/explore/events/42')
+    await router.push('/explore?tab=events')
+
+    expect(router.currentRoute.value.query).toEqual({ keyword: 'hongdae', freeOnly: 'true' })
+  })
+
+  it('brings back the Journey date after visiting an item detail', async () => {
+    const router = createTestRouter()
+    await router.push('/journeys/7')
+    await router.push(CONTEXT_ENTRY)
+
+    /* 필터를 만지지 않고 바로 상세로 들어갔다 나온다. */
+    await router.push('/explore/events/42')
+    await router.push('/explore?tab=events')
+
+    expect(router.currentRoute.value.query).toEqual(CONTEXT_DATES)
+    const context = useExploreReturnContextStore()
+    expect(context.visitDate).toBe('2026-09-03')
+    expect(context.returnTo).toEqual({ name: 'journey-detail', params: { tripId: '7' } })
+  })
+
+  it('restores the date filter without reviving the one-shot context', async () => {
+    const router = createTestRouter()
+    await router.push('/journeys/7')
+    await router.push(CONTEXT_ENTRY)
+
+    /* Discover 바깥으로 나갔다가 하단 탭으로 다시 들어온 진입이다. */
+    await router.push('/')
+    await router.push('/explore')
+
+    /* 날짜는 필터라 되돌아오지만 journeyId는 맥락이라 되살아나지 않는다. */
+    expect(router.currentRoute.value.query).toEqual(CONTEXT_DATES)
+    const context = useExploreReturnContextStore()
+    expect(context.visitDate).toBeNull()
+    expect(context.returnTo).toBeNull()
+  })
+
   it('lets an explicit shared URL win over the remembered filters', async () => {
     const router = createTestRouter()
-    await router.push('/')
-    useExploreFilterMemoryStore().remember({ keyword: 'hongdae' })
+    await router.push('/explore?keyword=hongdae')
 
+    await router.push('/')
     await router.push('/explore?keyword=itaewon')
 
     expect(router.currentRoute.value.query).toEqual({ keyword: 'itaewon' })
@@ -124,8 +166,8 @@ describe('explore routes', () => {
 
   it('does not mix the Places filters into an Events entry', async () => {
     const router = createTestRouter()
+    await router.push('/explore?tab=places&placeKinds=CAFE')
     await router.push('/')
-    useExploreFilterMemoryStore().remember({ tab: 'places', placeKinds: 'CAFE' })
 
     /* Event 상세에서 뒤로 나온 진입. Events는 아직 기억한 것이 없으므로 아무것도 안 붙는다. */
     await router.push('/explore?tab=events')
@@ -139,11 +181,11 @@ describe('explore routes', () => {
 
   it('keeps a cleared filter state cleared on the next entry', async () => {
     const router = createTestRouter()
-    await router.push('/')
-    const filterMemory = useExploreFilterMemoryStore()
-    filterMemory.remember({ keyword: 'hongdae' })
-    filterMemory.remember({})
+    await router.push('/explore?keyword=hongdae')
+    /* 필터를 모두 지우는 것은 화면이 한다. 같은 라우트라 가드가 아니라 watcher가 기억한다. */
+    useExploreFilterMemoryStore().remember({})
 
+    await router.push('/')
     await router.push('/explore')
 
     expect(router.currentRoute.value.query).toEqual({})
