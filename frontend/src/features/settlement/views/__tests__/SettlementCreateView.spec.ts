@@ -859,4 +859,60 @@ describe('SettlementCreateView', () => {
 
     expect(wrapper.find('[data-testid="receipt-total"]').exists()).toBe(false)
   })
+
+  /*
+   * 쓸 만한 줄이 하나도 없으면 카드를 비우지 않는다. 품목 카드가 한 장도 없는 화면이 되면
+   * 사용자는 무엇이 잘못됐는지 알 길이 없다.
+   */
+  it('keeps the cards and explains when nothing readable came back', async () => {
+    recognizeReceipt.mockResolvedValue({ items: [], recognizedTotal: null })
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await pickReceipt(wrapper)
+
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="ocr-error"]').text()).toContain('could not find any items')
+    expect(wrapper.find('[data-item-name="0"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="receipt-total"]').exists()).toBe(false)
+  })
+
+  /** 품목 칸은 비었는데 배분만 적어 둔 경우도 말 없이 지우면 안 된다. */
+  it('asks before replacing an item that only has shared quantities', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await allocate(wrapper, 0, '12', '1')
+    await pickReceipt(wrapper)
+
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+
+    expect(wrapper.find('[data-action="overwrite-items-confirm"]').exists()).toBe(true)
+    expect(recognizeReceipt).not.toHaveBeenCalled()
+  })
+
+  /*
+   * 할인이 붙은 영수증은 품목을 다 더한 값이 결제 금액보다 크게 나온다. 두 숫자만 나란히
+   * 두면 사용자가 차액을 암산해야 하고, 얼마를 줄여야 하는지 알 수 없다.
+   */
+  it('says how far the items are from the payment, and which way', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    // 결제는 25.00인데 품목은 28.00이다. 영수증에 3.00 할인이 붙은 모양이다.
+    await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '28.00', quantity: '1' })
+    expect(wrapper.get('[data-testid="items-gap"]').text()).toContain('3.00 P more')
+
+    await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '22.00', quantity: '1' })
+    expect(wrapper.get('[data-testid="items-gap"]').text()).toContain('3.00 P less')
+
+    await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '25.00', quantity: '1' })
+    expect(wrapper.find('[data-testid="items-gap"]').exists()).toBe(false)
+  })
 })

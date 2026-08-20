@@ -149,6 +149,18 @@ export function useSettlementReceiptOcr(): SettlementReceiptOcr {
 
       if (attempt !== generation) return null
 
+      /*
+       * 쓸 만한 줄이 하나도 없으면 못 읽은 것으로 본다.
+       *
+       * 서버도 같은 판단을 하지만 계약상으로는 빈 목록이 올 수 있다. 그대로 받으면 품목
+       * 카드가 한 장도 없는 화면이 되어, 사용자는 무엇이 잘못됐는지 알 길이 없다.
+       */
+      if (draft.items.length === 0) {
+        recognizedTotal.value = null
+        errorKey.value = 'settlement.receipt.error.ocrUnreadable'
+        return null
+      }
+
       recognizedTotal.value = draft.recognizedTotal
       return draft.items
     } catch (error) {

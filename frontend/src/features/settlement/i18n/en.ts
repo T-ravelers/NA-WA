@@ -67,10 +67,10 @@ export default {
       addItem: 'Add item',
       loadItems: 'Read receipt',
       allocateAfterLoad: 'Now share each quantity across the participants.',
-      overwriteItemsTitle: 'Replace the items you entered?',
+      overwriteItemsTitle: 'Replace the current items?',
       overwriteItemsDescription:
         'Reading the receipt replaces every item below, including the quantities you shared out.',
-      overwriteItemsCancel: 'Keep what I entered',
+      overwriteItemsCancel: 'Keep the current items',
       overwriteItemsConfirm: 'Read the receipt',
       itemNumber: 'Item {number}',
       removeItem: 'Remove item {number}',
@@ -85,6 +85,10 @@ export default {
       receiptTotalMismatch:
         'The receipt total differs from what was paid. Discounts, service charges, or a split bill can explain this — check the photo if it looks wrong.',
       totalMismatch: 'Item totals must match the payment exactly before continuing',
+      itemsOverPayment:
+        'Items add up to {amount} more than the payment. A discount on the receipt is not an item, so lower a price to close the gap.',
+      itemsUnderPayment:
+        'Items add up to {amount} less than the payment. A service charge or tax can cause this, so raise a price to close the gap.',
       itemsHint: 'Enter what was ordered, then share each quantity across the participants.',
       overview: 'Request overview',
       overviewHint: 'Check the amounts before sending. Go back to change anything.',

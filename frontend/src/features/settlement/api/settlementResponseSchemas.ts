@@ -10,12 +10,16 @@ const apiAmountSchema = z.union([z.string(), z.number().finite()])
  * 영수증에서 읽어낸 품목 한 줄.
  *
  * 못 읽은 자리는 null로 온다. 그 줄을 버리지 않아야 사용자가 빈 칸만 채워 넣을 수 있다.
+ *
+ * 자리가 아예 빠져 있는 것도 받아 준다. 서버가 빈 값을 내려주는 방식을 null에서 생략으로
+ * 바꾸는 일은 흔한데, 둘은 "못 읽었다"는 같은 뜻이다. 이것 때문에 인식 기능 전체가 멈추면
+ * 안 된다.
  */
 const receiptOcrItemSchema = z
   .object({
-    name: z.string().nullable(),
-    unitPrice: apiAmountSchema.nullable(),
-    quantity: apiAmountSchema.nullable(),
+    name: z.string().nullish(),
+    unitPrice: apiAmountSchema.nullish(),
+    quantity: apiAmountSchema.nullish(),
   })
   .passthrough()
 
@@ -31,6 +35,6 @@ const receiptOcrItemSchema = z
 export const settlementReceiptOcrResponseSchema = z
   .object({
     items: z.array(receiptOcrItemSchema),
-    recognizedTotal: apiAmountSchema.nullable(),
+    recognizedTotal: apiAmountSchema.nullish(),
   })
   .passthrough()

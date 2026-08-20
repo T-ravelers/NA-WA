@@ -57,6 +57,8 @@ describe('compareItemizedTotal', () => {
     expect(compareItemizedTotal([item('10.00', '2'), item('5.00', '1')], '25.00')).toEqual({
       matches: true,
       total: '25',
+      difference: '0',
+      exceedsPayment: false,
     })
   })
 
@@ -66,6 +68,17 @@ describe('compareItemizedTotal', () => {
 
     expect(result?.matches).toBe(false)
     expect(result?.total).toBe('30')
+    // 두 값을 나란히 보여주는 것만으로는 사용자가 차액을 암산해야 한다.
+    expect(result?.difference).toBe('5')
+    expect(result?.exceedsPayment).toBe(true)
+  })
+
+  /** 모자란 쪽도 얼마나 모자란지 알아야 어느 단가를 올릴지 정할 수 있다. */
+  it('reports how far the items fall short', () => {
+    const result = compareItemizedTotal([item('20.00', '1')], '25.00')
+
+    expect(result?.difference).toBe('5')
+    expect(result?.exceedsPayment).toBe(false)
   })
 
   it('counts fractional quantities without floating point drift', () => {

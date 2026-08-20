@@ -28,6 +28,16 @@ describe('settlement response schemas', () => {
     ).toBe(true)
   })
 
+  /**
+   * 빈 값을 null로 보내던 서버가 자리를 아예 빼고 보내도 뜻은 같다. 그것 때문에 인식
+   * 기능 전체가 멈추면 안 된다.
+   */
+  it('treats an omitted field the same as an unread one', () => {
+    expect(
+      settlementReceiptOcrResponseSchema.safeParse({ items: [{ name: 'Pasta' }] }).success,
+    ).toBe(true)
+  })
+
   /** 서버가 필드를 더 붙여도 화면이 통째로 실패하면 안 된다. */
   it('keeps passing when the server adds fields', () => {
     expect(
@@ -53,6 +63,8 @@ describe('settlement response schemas', () => {
         recognizedTotal: null,
       }).success,
     ).toBe(false)
-    expect(settlementReceiptOcrResponseSchema.safeParse({ items: [] }).success).toBe(false)
+    expect(settlementReceiptOcrResponseSchema.safeParse({ recognizedTotal: null }).success).toBe(
+      false,
+    )
   })
 })

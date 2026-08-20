@@ -142,11 +142,19 @@ function shareAmountOf(appointmentMemberId: string): string {
   )
 }
 
-/** 사용자가 손으로 채워 둔 품목이 있는지 본다. 덮어쓰기 전에 물어볼지 정하는 기준이다. */
+/**
+ * 지워질 내용이 있는지 본다. 덮어쓰기 전에 물어볼지 정하는 기준이다.
+ *
+ * 배분도 함께 센다. 품목 칸은 비었는데 누가 얼마를 먹었는지만 적어 둔 경우가 있고, 그것도
+ * 사용자가 손으로 넣은 값이라 말 없이 지우면 안 된다.
+ */
 const hasEnteredItems = computed(() =>
   items.value.some(
     (item) =>
-      item.name.trim() !== '' || item.unitPrice.trim() !== '' || item.quantity.trim() !== '',
+      item.name.trim() !== '' ||
+      item.unitPrice.trim() !== '' ||
+      item.quantity.trim() !== '' ||
+      item.allocations.length > 0,
   ),
 )
 
@@ -761,6 +769,7 @@ defineExpose({ back })
         <p
           v-else-if="showAllocateHint"
           data-testid="allocate-hint"
+          role="status"
           class="mt-2 text-caption text-ink-3"
         >
           {{ t('settlement.create.allocateAfterLoad') }}
@@ -785,6 +794,20 @@ defineExpose({ back })
             {{ points(selectedCandidate?.amount ?? '0') }}</span
           >
         </div>
+        <p
+          v-if="itemsTotal !== null && !itemsTotal.matches"
+          data-testid="items-gap"
+          class="mt-2 text-caption text-danger"
+        >
+          {{
+            t(
+              itemsTotal.exceedsPayment
+                ? 'settlement.create.itemsOverPayment'
+                : 'settlement.create.itemsUnderPayment',
+              { amount: points(itemsTotal.difference, amountFractionDigits) },
+            )
+          }}
+        </p>
         <p
           v-if="receiptTotalComparison?.matches === false"
           data-testid="receipt-total-mismatch"
