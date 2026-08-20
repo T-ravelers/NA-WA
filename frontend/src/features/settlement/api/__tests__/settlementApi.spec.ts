@@ -6,7 +6,9 @@ import {
   fetchSettlementDetail,
   fetchSettlements,
   paySettlement,
+  recognizeSettlementReceipt,
 } from '../settlementApi'
+import { settlementReceiptOcrResponseSchema } from '../settlementResponseSchemas'
 
 const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 vi.mock('@/shared/api/httpClient', () => ({
@@ -79,6 +81,20 @@ describe('settlement API contract', () => {
 
     expect(post).toHaveBeenCalledWith('/api/v1/settlements/42/members/me/pay', undefined, {
       headers: { 'Idempotency-Key': 'pay-key' },
+    })
+  })
+
+  /*
+   * 읽기만 하는데 POST인 이유는 부를 때마다 요금이 나가서다. GET으로 바꾸면 브라우저나 중간
+   * 서버가 임의로 다시 부르거나 응답을 캐시에 담는다.
+   */
+  it('reads a receipt through POST and checks the response shape', async () => {
+    post.mockResolvedValue({ data: { items: [], recognizedTotal: null } })
+
+    await recognizeSettlementReceipt('31')
+
+    expect(post).toHaveBeenCalledWith('/api/v1/settlement-receipts/31/ocr', undefined, {
+      responseSchema: settlementReceiptOcrResponseSchema,
     })
   })
 })

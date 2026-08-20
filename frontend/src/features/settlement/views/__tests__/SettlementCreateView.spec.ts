@@ -7,8 +7,14 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import type { SettlementCandidate } from '../../model/settlement'
 import SettlementCreateView from '../SettlementCreateView.vue'
 
-const { create, uploadReceipt } = vi.hoisted(() => ({ create: vi.fn(), uploadReceipt: vi.fn() }))
-vi.mock('../../api/settlementGateway', () => ({ settlementGateway: { create, uploadReceipt } }))
+const { create, uploadReceipt, recognizeReceipt } = vi.hoisted(() => ({
+  create: vi.fn(),
+  uploadReceipt: vi.fn(),
+  recognizeReceipt: vi.fn(),
+}))
+vi.mock('../../api/settlementGateway', () => ({
+  settlementGateway: { create, uploadReceipt, recognizeReceipt },
+}))
 
 /** jsdom에는 미리보기 주소를 만드는 기능이 없어 대역을 둔다. */
 const revokeObjectURL = vi.fn()
@@ -47,6 +53,10 @@ async function fillItem(
   await wrapper.get(`[data-item-name="${index}"]`).setValue(values.name)
   await wrapper.get(`[data-item-unit-price="${index}"]`).setValue(values.unitPrice)
   await wrapper.get(`[data-item-quantity="${index}"]`).setValue(values.quantity)
+}
+
+function itemValue(wrapper: ReturnType<typeof mountCreate>, selector: string): string {
+  return (wrapper.get(selector).element as HTMLInputElement).value
 }
 
 async function allocate(
@@ -115,6 +125,10 @@ describe('SettlementCreateView', () => {
   beforeEach(() => {
     create.mockReset().mockResolvedValue({ id: '42' })
     uploadReceipt.mockReset().mockResolvedValue({ receiptId: '31' })
+    recognizeReceipt.mockReset().mockResolvedValue({
+      items: [{ name: 'Wine', unitPrice: '25.00', quantity: '1' }],
+      recognizedTotal: '25.00',
+    })
   })
 
   it('narrows a journey to an appointment before offering its payments', async () => {
@@ -696,5 +710,153 @@ describe('SettlementCreateView', () => {
 
     await wrapper.get('[data-remove-item="1"]').trigger('click')
     expect(wrapper.find('[data-remove-item]').exists()).toBe(false)
+  })
+
+  /** 사진이 없으면 읽을 것이 없다. 눌러도 아무 일이 없는 버튼을 두면 고장으로 보인다. */
+  it('offers the receipt reader only once a photo is attached', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    expect(wrapper.find('[data-action="load-items"]').exists()).toBe(false)
+
+    await pickReceipt(wrapper)
+
+    expect(wrapper.find('[data-action="load-items"]').exists()).toBe(true)
+  })
+
+  it('fills the item cards from the receipt and leaves the sharing to the user', async () => {
+    recognizeReceipt.mockResolvedValue({
+      items: [
+        { name: 'Pasta', unitPrice: '10.00', quantity: '1' },
+        { name: 'Wine', unitPrice: '15.00', quantity: '1' },
+      ],
+      recognizedTotal: '25.00',
+    })
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await pickReceipt(wrapper)
+
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+    await flushPromises()
+
+    expect(itemValue(wrapper, '[data-item-name="0"]')).toBe('Pasta')
+    expect(itemValue(wrapper, '[data-item-unit-price="1"]')).toBe('15.00')
+    // 누가 무엇을 먹었는지는 인식이 알려주지 않는다. 비어 있어야 사용자가 정한다.
+    expect(itemValue(wrapper, '[data-allocation-quantity="0:12"]')).toBe('')
+    // 배분이 비었다고 방금 채운 값까지 틀린 것처럼 보이면 안 된다.
+    expect(wrapper.find('[data-item-invalid="true"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="allocate-hint"]').text()).toContain('share each quantity')
+  })
+
+  /*
+   * 인식은 부를 때마다 요금이 나간다. 덮어쓰지 않기로 할 요청을 미리 보낼 이유가 없어서
+   * 읽기 전에 묻는다.
+   */
+  it('asks before replacing entered items and does not call the reader when refused', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '25.00', quantity: '1' })
+    await pickReceipt(wrapper)
+
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+    await wrapper.get('[data-action="overwrite-items-cancel"]').trigger('click')
+    await flushPromises()
+
+    expect(recognizeReceipt).not.toHaveBeenCalled()
+    expect(itemValue(wrapper, '[data-item-name="0"]')).toBe('Pasta')
+
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+    await wrapper.get('[data-action="overwrite-items-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(recognizeReceipt).toHaveBeenCalledWith('31')
+    expect(itemValue(wrapper, '[data-item-name="0"]')).toBe('Wine')
+  })
+
+  /*
+   * 영수증은 정산 방식과 무관하게 붙어 있다. 1/N으로 두고 사진만 올린 뒤 품목별로 마음을
+   * 바꿔도 그 사진을 그대로 읽을 수 있어야 한다.
+   */
+  it('reads a receipt that was attached while the split was still even', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await pickReceipt(wrapper)
+
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+    await flushPromises()
+
+    expect(recognizeReceipt).toHaveBeenCalledWith('31')
+    expect(itemValue(wrapper, '[data-item-name="0"]')).toBe('Wine')
+  })
+
+  /** 넷 다 "다시 시도"라고 말하면 사용자는 다시 찍을지 직접 적을지 알 수 없다. */
+  it.each([
+    ['SETTLEMENT-022', 'WebP'],
+    ['SETTLEMENT-023', 'could not find any items'],
+    ['SETTLEMENT-024', 'took too long'],
+    ['SETTLEMENT-025', 'unavailable right now'],
+  ])('explains %s in its own words', async (code, phrase) => {
+    recognizeReceipt.mockRejectedValue(new NormalizedApiError(code, 422, 'server message'))
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await pickReceipt(wrapper)
+
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="ocr-error"]').text()).toContain(phrase)
+  })
+
+  /*
+   * 할인이나 봉사료가 붙거나 여러 명이 나눠 결제하면 영수증 합계와 결제 금액은 정상적으로도
+   * 달라진다. 인식 값 자체가 틀렸을 수도 있어서, 알리기만 하고 막지 않는다.
+   */
+  it('warns about a receipt total that differs from the payment without blocking', async () => {
+    recognizeReceipt.mockResolvedValue({
+      items: [{ name: 'Dinner', unitPrice: '25.00', quantity: '1' }],
+      recognizedTotal: '30.00',
+    })
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await pickReceipt(wrapper)
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+    await flushPromises()
+    await allocate(wrapper, 0, '12', '1')
+
+    expect(wrapper.get('[data-testid="receipt-total"]').text()).toContain('30.00 P')
+    expect(wrapper.find('[data-testid="receipt-total-mismatch"]').exists()).toBe(true)
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(true)
+  })
+
+  /** 사진을 바꿨는데 앞 영수증의 합계가 남아 있으면 무엇을 견주는 중인지 알 수 없다. */
+  it('drops the previous reading when another photo is chosen', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await pickReceipt(wrapper)
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="receipt-total"]').exists()).toBe(true)
+
+    await pickReceipt(wrapper, pngFile('another.png'))
+
+    expect(wrapper.find('[data-testid="receipt-total"]').exists()).toBe(false)
   })
 })

@@ -1,6 +1,7 @@
 import { formatServerDateTime } from '@/shared/lib/datetime'
 
 import type {
+  RecognizedReceiptDraft,
   SettlementCandidate,
   SettlementDetail,
   SettlementPaymentResult,
@@ -12,12 +13,23 @@ import type {
   SettlementCandidateDto,
   SettlementDetailDto,
   SettlementMutationDto,
+  SettlementReceiptOcrDto,
   SettlementSummaryDto,
   SettlementViewerDto,
 } from './settlementApi.types'
 
 function amount(value: ApiAmount): string {
   return String(value)
+}
+
+/**
+ * 못 읽은 자리를 빈 문자열로 바꾼다.
+ *
+ * 이 값은 곧바로 품목 입력란에 들어가는데, 입력란은 문자열만 다룬다. null을 그대로 넘기면
+ * 화면에 "null"이라고 찍힌다.
+ */
+function optionalAmount(value: ApiAmount | null): string {
+  return value === null ? '' : amount(value)
 }
 
 function viewer(dto: SettlementViewerDto): SettlementViewer {
@@ -100,5 +112,16 @@ export function mapSettlementPayment(dto: SettlementMutationDto): SettlementPaym
     settlementStatus: dto.settlementStatus,
     transferId: String(dto.transferId),
     viewer: viewer(dto.viewer),
+  }
+}
+
+export function mapRecognizedReceipt(dto: SettlementReceiptOcrDto): RecognizedReceiptDraft {
+  return {
+    items: dto.items.map((item) => ({
+      name: item.name ?? '',
+      unitPrice: optionalAmount(item.unitPrice),
+      quantity: optionalAmount(item.quantity),
+    })),
+    recognizedTotal: dto.recognizedTotal === null ? null : amount(dto.recognizedTotal),
   }
 }
