@@ -239,17 +239,28 @@ function retry(): void {
   void participationQuery.refetch()
 }
 
+/**
+ * 참여·탈퇴는 이 약속만 바꾸지 않는다. 목록 카드의 "{current}/{max} members"와
+ * 내 약속 목록(지갑 QR 결제가 공동 지출 약속을 고를 때 쓴다)도 함께 어긋나므로
+ * 다섯 갈래를 같이 무효화한다.
+ */
+async function invalidateParticipationScopes(): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.detail(appointmentId.value) }),
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.members(appointmentId.value) }),
+    queryClient.invalidateQueries({
+      queryKey: appointmentKeys.participation(appointmentId.value),
+    }),
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() }),
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.mine() }),
+  ])
+}
+
 const joinMutation = useMutation({
   mutationFn: () => joinAppointment(appointmentId.value as number),
   onSuccess: async () => {
     depositSheetOpen.value = false
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.detail(appointmentId.value) }),
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.members(appointmentId.value) }),
-      queryClient.invalidateQueries({
-        queryKey: appointmentKeys.participation(appointmentId.value),
-      }),
-    ])
+    await invalidateParticipationScopes()
   },
 })
 
@@ -257,13 +268,7 @@ const leaveMutation = useMutation({
   mutationFn: () => cancelAppointmentParticipation(appointmentId.value as number),
   onSuccess: async () => {
     leaveConfirmOpen.value = false
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.detail(appointmentId.value) }),
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.members(appointmentId.value) }),
-      queryClient.invalidateQueries({
-        queryKey: appointmentKeys.participation(appointmentId.value),
-      }),
-    ])
+    await invalidateParticipationScopes()
   },
 })
 

@@ -127,7 +127,7 @@ async function mountView() {
     },
   })
   await flushPromises()
-  return { wrapper, router }
+  return { wrapper, router, queryClient }
 }
 
 const notJoinedParticipation = {
@@ -401,6 +401,30 @@ describe('AppointmentDetailView', () => {
 
     expect(leave?.attributes('disabled')).toBeDefined()
     expect(leave?.text()).toContain('The join deadline has passed')
+  })
+
+  it('refreshes the list and my-appointments caches after leaving', async () => {
+    fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
+    cancelAppointmentParticipation.mockResolvedValue(undefined)
+    const { wrapper, queryClient } = await mountView()
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    await menuItem(wrapper)('Leave group')?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('[role="dialog"] button')
+      .find((button) => button.text() === 'Leave group')
+      ?.trigger('click')
+    await flushPromises()
+
+    // 상세만 고치면 목록 카드의 인원 수와 지갑 QR 결제의 약속 선택이 어긋난 채 남는다.
+    const invalidated = invalidate.mock.calls.map((call) => {
+      const filters = typeof call[0] === 'function' ? call[0]() : call[0]
+      return JSON.stringify(filters?.queryKey)
+    })
+    expect(invalidated).toContain(JSON.stringify(['appointments', 'list']))
+    expect(invalidated).toContain(JSON.stringify(['appointments', 'mine']))
   })
 
   it('closes the menu sheet on Escape', async () => {

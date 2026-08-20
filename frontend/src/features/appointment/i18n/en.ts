@@ -140,7 +140,6 @@ export default {
       joinDeadline: 'Join deadline',
       notProvided: 'Not provided',
       join: 'Join appointment',
-      cancelParticipation: 'Cancel participation',
       joinUnavailable: 'This appointment is not open for joining.',
       alreadyJoined: 'You have already joined this appointment.',
       participationCheckFailed: 'We could not check your participation status. Please try again.',
@@ -213,7 +212,6 @@ export default {
         'Your deposit of \u20a9{amount} will be refunded to your wallet. To join again you will need to pay it once more.',
       confirm: 'Leave group',
       cancel: 'Stay',
-      failed: 'You could not be removed from this appointment. Please try again.',
     },
     deposit: {
       title: 'Confirm participation',
