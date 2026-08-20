@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { spendingCategoryLabelKey, toSpendingCategory } from '@/shared/lib/spendingCategory'
 import AppCard from '@/shared/ui/AppCard.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateError from '@/shared/ui/StateError.vue'
@@ -11,6 +12,7 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import ReportCategoryBreakdown from '../components/presentation/ReportCategoryBreakdown.vue'
 import ReportDailyTrend from '../components/presentation/ReportDailyTrend.vue'
+import { formatPercent } from '../components/presentation/format'
 import ReportKpiCard from '../components/presentation/ReportKpiCard.vue'
 import type {
   ReportCategoryBreakdownItem,
@@ -54,11 +56,39 @@ const reportKpi = computed<ReportKpiData | null>(() => {
 const reportCategories = computed<ReportCategoryBreakdownItem[]>(() =>
   (report.value?.analytics?.categoryBreakdown ?? []).map((row) => ({
     category: row.category,
-    label: row.category,
+    label: t(spendingCategoryLabelKey(row.category)),
     amount: Number(row.amount),
     percentage: Number(row.percentage),
   })),
 )
+
+/**
+ * 소비 성향 칭호.
+ *
+ * 가장 많이 쓴 카테고리 하나로 정한다. 백엔드가 금액 내림차순으로 정렬해 내려주므로
+ * 첫 항목이 1위이고, 같은 리포트에서는 항상 같은 칭호가 나온다.
+ *
+ * 문구는 백엔드가 만들지 않는다. 그래서 리포트 스냅샷에 `locale`을 실을 필요가 없고,
+ * 이미 만들어진 리포트도 사용자가 언어를 바꾸면 그 언어로 보인다.
+ *
+ * 지출이 없으면 칭호를 주지 않는다 — 근거 없는 성향이 된다.
+ */
+const reportPersona = computed<{ title: string; description: string } | null>(() => {
+  const top = reportCategories.value[0]
+
+  if (top === undefined || isZeroSpending.value) {
+    return null
+  }
+
+  const category = toSpendingCategory(top.category)
+
+  return {
+    title: t(`report.detail.persona.${category}.title`),
+    description: t(`report.detail.persona.${category}.description`, {
+      share: formatPercent(top.percentage, i18n.locale.value),
+    }),
+  }
+})
 const reportTrend = computed<ReportDailyTrendPoint[]>(() =>
   (report.value?.analytics?.dailyTrend ?? []).map((row) => ({
     date: row.date,
@@ -166,6 +196,14 @@ function retry(): void {
           <p class="mt-2 text-body-sm text-ink-3">
             {{ t('report.detail.zeroDescription') }}
           </p>
+        </AppCard>
+
+        <AppCard v-if="reportPersona !== null">
+          <p class="text-caption uppercase text-ink-3">
+            {{ t('report.detail.persona.heading') }}
+          </p>
+          <h2 class="mt-1 font-display text-title text-ink">{{ reportPersona.title }}</h2>
+          <p class="mt-2 text-body-sm text-ink-3">{{ reportPersona.description }}</p>
         </AppCard>
 
         <ReportCategoryBreakdown

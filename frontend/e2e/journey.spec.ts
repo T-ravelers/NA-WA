@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test('lists ongoing and past journeys and navigates to journey actions', async ({ page }) => {
   await page.route('**/api/v1/members/me', async (route) => {
@@ -159,7 +159,7 @@ test('creates a journey and opens its empty itinerary', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/journeys\/42$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Seoul Foodie Week' })).toBeVisible()
-  await expect(page.getByText('No itinerary yet')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Itinerary' })).toBeVisible()
   expect(createRequest).toEqual({
     title: 'Seoul Foodie Week',
     startDate: '2026-08-10',

@@ -7,12 +7,16 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import { settlementGateway } from '../api/settlementGateway'
+import SettlementBottomSheet from '../components/SettlementBottomSheet.vue'
 import SettlementEmptyState from '../components/SettlementEmptyState.vue'
 import SettlementReceiptSheet from '../components/SettlementReceiptSheet.vue'
 import SettlementStatusScreen from '../components/SettlementStatusScreen.vue'
 import SettlementTransactionCard from '../components/SettlementTransactionCard.vue'
 import { useSettlementPoints } from '../composables/useSettlementPoints'
-import { useSettlementReceiptUpload } from '../composables/useSettlementReceipt'
+import {
+  useSettlementReceiptOcr,
+  useSettlementReceiptUpload,
+} from '../composables/useSettlementReceipt'
 import type {
   ItemizedSettlementItem,
   SettlementCandidate,
@@ -26,6 +30,7 @@ import {
 } from '../model/settlementIdempotency'
 import {
   compareItemizedTotal,
+  compareRecognizedTotal,
   summarizeItemizedShares,
   validateItemizedItems,
 } from '../model/settlementRules'
@@ -64,6 +69,15 @@ const validationMessage = ref<string | null>(null)
 const candidateNotice = ref<string | null>(null)
 const receipt = useSettlementReceiptUpload()
 const receiptSheetOpen = ref(false)
+const ocr = useSettlementReceiptOcr()
+const overwriteSheetOpen = ref(false)
+/*
+ * 방금 인식으로 채웠는지 기억한다.
+ *
+ * 인식은 누가 무엇을 먹었는지 알려주지 않아 배분이 비어 있는 채로 채워진다. 그 상태가
+ * 고장이 아니라 다음에 할 일이 남은 것임을 알려 주는 데만 쓴다.
+ */
+const loadedFromReceipt = ref(false)
 
 const journeys = computed(() => groupCandidates(props.candidates))
 const selectedJourney = computed(
@@ -127,6 +141,50 @@ function shareAmountOf(appointmentMemberId: string): string {
       ?.amount ?? '0'
   )
 }
+
+/**
+ * 지워질 내용이 있는지 본다. 덮어쓰기 전에 물어볼지 정하는 기준이다.
+ *
+ * 배분도 함께 센다. 품목 칸은 비었는데 누가 얼마를 먹었는지만 적어 둔 경우가 있고, 그것도
+ * 사용자가 손으로 넣은 값이라 말 없이 지우면 안 된다.
+ */
+const hasEnteredItems = computed(() =>
+  items.value.some(
+    (item) =>
+      item.name.trim() !== '' ||
+      item.unitPrice.trim() !== '' ||
+      item.quantity.trim() !== '' ||
+      item.allocations.length > 0,
+  ),
+)
+
+/*
+ * 품목별로 나누기로 했고 사진이 다 올라갔을 때만 읽을 수 있다.
+ *
+ * 균등 분할에는 품목 자리가 없어 읽어 봐야 넣을 곳이 없고, 인식은 부를 때마다 요금이 나간다.
+ */
+const canLoadItems = computed(
+  () =>
+    type.value === 'ITEMIZED' &&
+    receipt.receiptId.value !== null &&
+    !receipt.pending.value &&
+    !ocr.pending.value,
+)
+
+/*
+ * 영수증에 찍힌 합계와 실제 결제 금액을 견준다.
+ *
+ * 달라도 막지 않는다. 여러 명이 나눠 결제했거나 할인·봉사료가 붙으면 정상적으로도 달라지고,
+ * 인식 값 자체가 틀렸을 수도 있다. 사진을 다시 볼지 사용자가 판단할 근거로만 보여준다.
+ */
+const receiptTotalComparison = computed(() =>
+  selectedCandidate.value === null
+    ? null
+    : compareRecognizedTotal(ocr.recognizedTotal.value, selectedCandidate.value.amount),
+)
+
+/** 배분을 다 채우고 나면 안내를 거둔다. 다 한 일을 계속 시키면 안 된다. */
+const showAllocateHint = computed(() => loadedFromReceipt.value && !itemValidation.value.valid)
 
 const canContinueDetails = computed(
   () =>
@@ -216,6 +274,8 @@ function selectTransaction(candidate: SettlementCandidate): void {
    * 바꿀 수 없어 되돌릴 방법이 없다.
    */
   receipt.reset()
+  ocr.reset()
+  loadedFromReceipt.value = false
   error.value = null
   candidateNotice.value = null
 }
@@ -253,6 +313,58 @@ function toggleParticipant(participantId: string): void {
     }))
   }
 
+  validationMessage.value = null
+}
+
+/**
+ * 사진을 바꾸면 앞서 읽어낸 결과를 버린다.
+ *
+ * 그대로 두면 지금 붙어 있는 사진과 다른 영수증의 합계가 화면에 남아, 어떤 사진을 견주는
+ * 중인지 알 수 없게 된다.
+ */
+function selectReceipt(file: File): void {
+  ocr.reset()
+  loadedFromReceipt.value = false
+  void receipt.select(file)
+}
+
+/**
+ * 영수증에서 품목을 읽어 카드에 채운다.
+ *
+ * 이미 적어 둔 것이 있으면 **읽기 전에** 묻는다. 인식은 부를 때마다 요금이 나가므로, 사용자가
+ * 덮어쓰지 않기로 할 요청을 미리 보낼 이유가 없다.
+ */
+function loadItems(): void {
+  if (!canLoadItems.value) return
+
+  if (hasEnteredItems.value) {
+    overwriteSheetOpen.value = true
+    return
+  }
+  void recognizeIntoItems()
+}
+
+function confirmOverwrite(): void {
+  overwriteSheetOpen.value = false
+  void recognizeIntoItems()
+}
+
+async function recognizeIntoItems(): Promise<void> {
+  const receiptId = receipt.receiptId.value
+  if (receiptId === null) return
+
+  const recognized = await ocr.recognize(receiptId)
+  if (recognized === null) return
+
+  items.value = recognized.map((item) => ({ ...item, allocations: [] }))
+  loadedFromReceipt.value = true
+  /*
+   * 빨간 표시를 켜지 않는다.
+   *
+   * 배분이 비어 있어 검증은 아직 통과하지 못하지만 그것은 인식이 실패해서가 아니다. 채우자마자
+   * 카드가 전부 빨개지면 방금 읽어 온 값이 잘못된 것처럼 보인다.
+   */
+  showItemErrors.value = false
   validationMessage.value = null
 }
 
@@ -583,7 +695,7 @@ defineExpose({ back })
         :payer-name="selectedCandidate.payerName"
         :receipt-url="receipt.previewUrl.value"
         :receipt-pending="receipt.pending.value"
-        @receipt-select="receipt.select"
+        @receipt-select="selectReceipt"
       />
       <p
         v-if="receipt.errorKey.value !== null"
@@ -625,15 +737,51 @@ defineExpose({ back })
       <template v-if="type === 'ITEMIZED'">
         <div class="mt-8 flex items-center justify-between gap-3">
           <h3 class="text-title">{{ t('settlement.create.items') }}</h3>
-          <AppButton
-            data-action="add-item"
-            dense
-            variant="secondary"
-            @click="addItem"
-            >{{ t('settlement.create.addItem') }}</AppButton
-          >
+          <div class="flex items-center gap-2">
+            <AppButton
+              v-if="receipt.receiptId.value !== null"
+              data-action="load-items"
+              dense
+              variant="secondary"
+              :disabled="!canLoadItems"
+              :loading="ocr.pending.value"
+              @click="loadItems"
+              >{{ t('settlement.create.loadItems') }}</AppButton
+            >
+            <AppButton
+              data-action="add-item"
+              dense
+              variant="secondary"
+              @click="addItem"
+              >{{ t('settlement.create.addItem') }}</AppButton
+            >
+          </div>
         </div>
         <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.itemsHint') }}</p>
+        <p
+          v-if="ocr.errorKey.value !== null"
+          data-testid="ocr-error"
+          class="mt-2 text-caption text-danger"
+          role="alert"
+        >
+          {{ t(ocr.errorKey.value) }}
+        </p>
+        <p
+          v-else-if="showAllocateHint"
+          data-testid="allocate-hint"
+          role="status"
+          class="mt-2 text-caption text-ink-3"
+        >
+          {{ t('settlement.create.allocateAfterLoad') }}
+        </p>
+        <div
+          v-if="ocr.recognizedTotal.value !== null"
+          data-testid="receipt-total"
+          class="mt-3 flex items-baseline justify-between gap-3 text-body-sm text-ink-2"
+        >
+          <span>{{ t('settlement.create.receiptTotal') }}</span>
+          <span>{{ points(ocr.recognizedTotal.value, amountFractionDigits) }}</span>
+        </div>
         <div
           v-if="itemsTotal !== null"
           data-testid="items-total"
@@ -646,6 +794,27 @@ defineExpose({ back })
             {{ points(selectedCandidate?.amount ?? '0') }}</span
           >
         </div>
+        <p
+          v-if="itemsTotal !== null && !itemsTotal.matches"
+          data-testid="items-gap"
+          class="mt-2 text-caption text-danger"
+        >
+          {{
+            t(
+              itemsTotal.exceedsPayment
+                ? 'settlement.create.itemsOverPayment'
+                : 'settlement.create.itemsUnderPayment',
+              { amount: points(itemsTotal.difference, amountFractionDigits) },
+            )
+          }}
+        </p>
+        <p
+          v-if="receiptTotalComparison?.matches === false"
+          data-testid="receipt-total-mismatch"
+          class="mt-2 text-caption text-ink-3"
+        >
+          {{ t('settlement.create.receiptTotalMismatch') }}
+        </p>
         <div
           v-for="(item, index) in items"
           :key="index"
@@ -869,6 +1038,36 @@ defineExpose({ back })
         >
       </div>
     </div>
+
+    <SettlementBottomSheet
+      v-if="overwriteSheetOpen"
+      :label="t('settlement.create.overwriteItemsTitle')"
+      @close="overwriteSheetOpen = false"
+    >
+      <h2 class="font-display text-section-header text-ink-display uppercase">
+        {{ t('settlement.create.overwriteItemsTitle') }}
+      </h2>
+      <p class="mt-2 text-body-sm text-ink-2">
+        {{ t('settlement.create.overwriteItemsDescription') }}
+      </p>
+
+      <div class="mt-6 flex flex-col gap-2">
+        <AppButton
+          data-action="overwrite-items-confirm"
+          block
+          variant="settle"
+          @click="confirmOverwrite"
+          >{{ t('settlement.create.overwriteItemsConfirm') }}</AppButton
+        >
+        <AppButton
+          data-action="overwrite-items-cancel"
+          block
+          variant="secondary"
+          @click="overwriteSheetOpen = false"
+          >{{ t('settlement.create.overwriteItemsCancel') }}</AppButton
+        >
+      </div>
+    </SettlementBottomSheet>
 
     <SettlementReceiptSheet
       v-if="receiptSheetOpen && receipt.previewUrl.value !== null"

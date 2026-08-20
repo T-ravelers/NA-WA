@@ -64,7 +64,6 @@ export interface AppointmentCreateRequest {
   joinDeadline: string
   depositAmount: string
   meetingPlace: string
-  meetingAddress?: string
   /** `visitDate` 위에서의 시각만(`HH:mm:ss`). 날짜는 서버가 `visitDate`와 합친다. */
   activityStartTime: string
   activityEndTime: string
@@ -84,7 +83,6 @@ export interface AppointmentMember {
 export type AppointmentAttendanceStatus = AppointmentMember['attendanceStatus']
 
 export interface AppointmentDetail extends AppointmentSummary {
-  meetingAddress: string | null
   description: string | null
   members: AppointmentMember[]
 }

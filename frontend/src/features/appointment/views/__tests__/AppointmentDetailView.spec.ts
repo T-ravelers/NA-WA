@@ -36,7 +36,6 @@ const appointment = {
   depositAmount: '10000',
   appointmentStatus: 'RECRUITING' as const,
   meetingPlace: 'Seongsu Beauty Lab',
-  meetingAddress: 'Seongsu-ro 12',
   activityStartAt: '2099-08-08T18:30:00',
   activityEndAt: '2099-08-08T22:00:00',
   joinDeadline: '2099-08-08T17:30:00',

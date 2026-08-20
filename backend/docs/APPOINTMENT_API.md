@@ -137,7 +137,6 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
   "joinDeadline": "2026-08-20T18:00:00",
   "depositAmount": 10000,
   "meetingPlace": "Olive Young N Seongsu",
-  "meetingAddress": "Seongdong-gu, Seoul",
   "activityStartTime": "18:30:00",
   "activityEndTime": "22:00:00"
 }

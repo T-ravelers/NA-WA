@@ -1023,7 +1023,6 @@ class AppointmentServiceTest {
         request.setMaxMembers(5);
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Olive Young N Seongsu");
-        request.setMeetingAddress("Seongdong-gu, Seoul");
         request.setJoinDeadline(LocalDateTime.of(VISIT_DATE, LocalTime.of(17, 30)));
         request.setTripId(1L);
         request.setVisitDate(VISIT_DATE);

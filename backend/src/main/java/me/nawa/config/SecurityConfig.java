@@ -94,7 +94,9 @@ public class SecurityConfig {
                             antMatcher("/api/v1/internal/ingest/events"),
                             antMatcher("/api/v1/internal/ingest/places"),
                             antMatcher("/api/v1/internal/ingest/event-translations"),
-                            antMatcher("/api/v1/internal/ingest/place-translations")))
+                            antMatcher("/api/v1/internal/ingest/place-translations"),
+                            antMatcher("/api/v1/internal/ingest/event-activities"),
+                            antMatcher("/api/v1/internal/ingest/place-activities")))
                 .cors(cors -> cors
                         .configurationSource(corsConfigurationSource))
                 .formLogin(formLogin -> formLogin.disable())

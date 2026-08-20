@@ -1,5 +1,6 @@
 package me.nawa.ingest.service;
 
+import me.nawa.ingest.dto.request.ActivityIngestItem;
 import me.nawa.ingest.dto.request.EventIngestItem;
 import me.nawa.ingest.dto.request.EventTranslationIngestItem;
 import me.nawa.ingest.dto.request.PlaceIngestItem;
@@ -130,7 +131,7 @@ public class IngestServiceImpl implements IngestService {
 
         // 같은 (pipeline_id, language_code) 가 배치에 두 번 오면 ON DUPLICATE KEY 로
         // 마지막 값만 남는데 건수는 두 번 세어진다. 미리 하나로 줄인다.
-        items = dedupeByLanguage(items,
+        items = dedupeBy(items,
                 it -> it.getPipelineId() + ':' + it.getLanguageCode());
 
         Set<String> existing = new HashSet<>(ingestMapper.findExistingEventPipelineIds(
@@ -154,7 +155,7 @@ public class IngestServiceImpl implements IngestService {
             requireLanguage(it.getLanguageCode());
         });
 
-        items = dedupeByLanguage(items,
+        items = dedupeBy(items,
                 it -> it.getPipelineId() + ':' + it.getLanguageCode());
 
         Set<String> existing = new HashSet<>(ingestMapper.findExistingPlacePipelineIds(
@@ -170,13 +171,130 @@ public class IngestServiceImpl implements IngestService {
 
 
 
+
+    @Override
+    @Transactional
+    public IngestResultResponse ingestEventActivities(List<ActivityIngestItem> items) {
+        if (items.isEmpty()) {
+            return new IngestResultResponse(0, 0, 0, 0);
+        }
+        // 같은 항목이 두 번 오면 대표 유일성이 배치 단위로 깨진다. 각 항목은
+        // 그 시점의 분류 전체라 나중 것이 최신이므로 마지막만 남긴다.
+        items = dedupeBy(items, ActivityIngestItem::getPipelineId);
+        items.forEach(IngestServiceImpl::validateActivities);
+
+        Set<String> existing = new HashSet<>(ingestMapper.findExistingEventPipelineIds(
+                items.stream().map(ActivityIngestItem::getPipelineId).distinct().toList()));
+        List<ActivityIngestItem> known = items.stream()
+                .filter(it -> existing.contains(it.getPipelineId())).toList();
+
+        if (known.isEmpty()) {
+            return new IngestResultResponse(items.size(), 0, 0, items.size());
+        }
+
+        // 분류가 없는 항목과 있는 항목을 갈라서 보낸다. 없는 쪽은 남길 짝이
+        // 하나도 없어 파생 테이블이 비고, 그러면 SQL 이 성립하지 않는다.
+        List<ActivityIngestItem> withLinks = known.stream()
+                .filter(it -> !it.getActivities().isEmpty()).toList();
+        List<String> cleared = known.stream()
+                .filter(it -> it.getActivities().isEmpty())
+                .map(ActivityIngestItem::getPipelineId).toList();
+
+        if (!cleared.isEmpty()) {
+            ingestMapper.deleteAllEventActivities(cleared);
+        }
+        if (!withLinks.isEmpty()) {
+            ingestMapper.deleteMissingEventActivities(withLinks);
+            ingestMapper.upsertEventActivities(withLinks);
+        }
+
+        // updated 는 분류를 손댄 항목 수다. delete 와 upsert 두 문장이 나가서
+        // 영향 행수를 더하면 "관계 몇 개를 건드렸나"가 되어 다른 경로와 뜻이
+        // 달라진다. 여기서는 항목 수로 통일한다.
+        return new IngestResultResponse(
+                items.size(), 0, known.size(), items.size() - known.size());
+    }
+
+    @Override
+    @Transactional
+    public IngestResultResponse ingestPlaceActivities(List<ActivityIngestItem> items) {
+        if (items.isEmpty()) {
+            return new IngestResultResponse(0, 0, 0, 0);
+        }
+        // 같은 항목이 두 번 오면 대표 유일성이 배치 단위로 깨진다. 각 항목은
+        // 그 시점의 분류 전체라 나중 것이 최신이므로 마지막만 남긴다.
+        items = dedupeBy(items, ActivityIngestItem::getPipelineId);
+        items.forEach(IngestServiceImpl::validateActivities);
+
+        Set<String> existing = new HashSet<>(ingestMapper.findExistingPlacePipelineIds(
+                items.stream().map(ActivityIngestItem::getPipelineId).distinct().toList()));
+        List<ActivityIngestItem> known = items.stream()
+                .filter(it -> existing.contains(it.getPipelineId())).toList();
+
+        if (known.isEmpty()) {
+            return new IngestResultResponse(items.size(), 0, 0, items.size());
+        }
+
+        // 분류가 없는 항목과 있는 항목을 갈라서 보낸다. 없는 쪽은 남길 짝이
+        // 하나도 없어 파생 테이블이 비고, 그러면 SQL 이 성립하지 않는다.
+        List<ActivityIngestItem> withLinks = known.stream()
+                .filter(it -> !it.getActivities().isEmpty()).toList();
+        List<String> cleared = known.stream()
+                .filter(it -> it.getActivities().isEmpty())
+                .map(ActivityIngestItem::getPipelineId).toList();
+
+        if (!cleared.isEmpty()) {
+            ingestMapper.deleteAllPlaceActivities(cleared);
+        }
+        if (!withLinks.isEmpty()) {
+            ingestMapper.deleteMissingPlaceActivities(withLinks);
+            ingestMapper.upsertPlaceActivities(withLinks);
+        }
+
+        // updated 는 분류를 손댄 항목 수다. delete 와 upsert 두 문장이 나가서
+        // 영향 행수를 더하면 "관계 몇 개를 건드렸나"가 되어 다른 경로와 뜻이
+        // 달라진다. 여기서는 항목 수로 통일한다.
+        return new IngestResultResponse(
+                items.size(), 0, known.size(), items.size() - known.size());
+    }
+
     /**
-     * 같은 (pipeline_id, language_code) 가 배치에 두 번 오면 ON DUPLICATE KEY 로
-     * 마지막 값만 남는데 건수는 두 번 세어집니다. 미리 하나로 줄입니다.
+     * 분류 목록을 확인합니다.
+     *
+     * <p>대표 분류는 최대 하나입니다. 노출 기준이 대표 분류 하나라는 정책을
+     * 그대로 지킵니다. 둘이 들어오면 화면이 무엇을 보여줄지 정할 수 없습니다.
+     *
+     * <p>빈 목록은 받습니다. 분류를 통째로 지우는 요청이기 때문입니다.
+     * 다만 파이프라인은 분류 없는 항목을 보내지 않습니다 — 노출되려면 대표
+     * 분류가 있어야 하므로 분류 없는 상태는 정상이 아니고, 수집이 잠깐 분류를
+     * 못 붙인 항목의 기존 분류까지 지워지면 안 됩니다.
+     */
+    private static void validateActivities(ActivityIngestItem item) {
+        requireValid(hasText(item.getPipelineId()));
+        requireValid(item.getActivities() != null);
+
+        long primaries = item.getActivities().stream()
+                .filter(link -> Boolean.TRUE.equals(link.getIsPrimary()))
+                .count();
+        requireValid(primaries <= 1);
+
+        item.getActivities().forEach(link -> {
+            requireValid(link.getActivityId() != null);
+            // is_primary 는 NOT NULL 이다. 빠진 채로 넣으면 배치 전체가 롤백되고
+            // 500 이 나가, 파이프라인이 같은 배치를 계속 재시도한다.
+            // 노출 기준이 대표 분류라는 정책상 빠뜨릴 값이 아니므로 거절한다.
+            requireValid(link.getIsPrimary() != null);
+        });
+    }
+
+    /**
+     * 같은 키가 배치에 두 번 오면 마지막 값만 남는데 건수는 두 번 세어집니다.
+     * 미리 하나로 줄입니다. 마지막 것을 남기는 이유는, 한 항목이 그 시점의
+     * 전체 상태를 담고 있어 나중 것이 최신이기 때문입니다.
      *
      * <p>구분자는 콜론입니다. pipeline_id 는 UUID 라 콜론이 들어가지 않습니다.
      */
-    private static <T> List<T> dedupeByLanguage(List<T> items, Function<T, String> key) {
+    private static <T> List<T> dedupeBy(List<T> items, Function<T, String> key) {
         return List.copyOf(items.stream()
                 .collect(Collectors.toMap(key, it -> it, (first, last) -> last,
                         LinkedHashMap::new))

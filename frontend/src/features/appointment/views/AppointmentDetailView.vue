@@ -441,12 +441,6 @@ function confirmJoin(): void {
               <dt class="text-caption text-ink-3">{{ t('appointment.detail.meetingPlace') }}</dt>
               <dd class="text-body-sm text-ink">
                 {{ appointment.meetingPlace ?? t('appointment.detail.notProvided') }}
-                <span
-                  v-if="appointment.meetingAddress"
-                  class="mt-1 block text-caption text-ink-3"
-                >
-                  {{ appointment.meetingAddress }}
-                </span>
               </dd>
             </div>
             <div class="grid grid-cols-[7rem_1fr] gap-3 py-3">

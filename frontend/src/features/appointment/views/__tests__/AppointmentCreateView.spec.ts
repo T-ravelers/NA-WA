@@ -7,6 +7,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
+import { appointmentExploreIntegrationKey } from '@/features/appointment/model/exploreIntegration'
 import { appointmentJourneyIntegrationKey } from '../../model/journeyIntegration'
 
 const createAppointment = vi.fn()
@@ -29,7 +30,7 @@ function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
   return button
 }
 
-async function mountView() {
+async function mountView(query = '?itemId=42&itemType=EVENT') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -56,7 +57,7 @@ async function mountView() {
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  await router.push('/appointments/new?itemId=42&itemType=EVENT')
+  await router.push(`/appointments/new${query}`)
   await router.isReady()
 
   const wrapper = mount(AppointmentCreateView, {
@@ -70,6 +71,13 @@ async function mountView() {
             isError: ref(false),
           }),
           checkJourneyItemExists,
+        },
+        [appointmentExploreIntegrationKey as symbol]: {
+          useItemLocation: () => ({
+            data: ref({ placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' }),
+            isLoading: ref(false),
+            isError: ref(false),
+          }),
         },
       },
     },
@@ -94,13 +102,10 @@ async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> 
     .setValue('Seongsu K-Beauty Tour')
   await wrapper.get('form').trigger('submit')
 
-  await wrapper.find('input[inputmode="numeric"]').setValue('10000')
-  await wrapper.find('input[placeholder="e.g. Seongsu Beauty Lab"]').setValue('Seongsu Beauty Lab')
-  await wrapper.get('form').trigger('submit')
-
   await wrapper.find('input[type="time"]').setValue('18:30')
   await wrapper.findAll('input[type="time"]')[1]?.setValue('22:00')
   await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T17:30')
+  await wrapper.find('input[inputmode="numeric"]').setValue('10000')
   await wrapper.get('form').trigger('submit')
   await buttonByText(wrapper, 'Confirm').trigger('click')
 }
@@ -146,6 +151,20 @@ describe('AppointmentCreateView', () => {
     )
     expect(wrapper.text()).toContain('Which day?')
     expect(wrapper.find('form').exists()).toBe(false)
+  })
+
+  it('names the broken entry instead of blaming the date check when the item type is missing', async () => {
+    // itemType이 없으면 폼에 들어가도 항목 위치를 읽을 수 없다. 여기서 막지 않으면
+    // 사용자는 원인을 알 수 없는 화면에 갇힌다.
+    const { wrapper } = await mountView('?itemId=42')
+
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    await buttonByText(wrapper, 'Continue with').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Open this form from an Event or Place.')
+    expect(wrapper.find('form').exists()).toBe(false)
+    expect(checkJourneyItemExists).not.toHaveBeenCalled()
   })
 
   it('returns to the journey select sheet when the date sheet is closed', async () => {
@@ -195,6 +214,13 @@ describe('AppointmentCreateView', () => {
             }),
             checkJourneyItemExists,
           },
+          [appointmentExploreIntegrationKey as symbol]: {
+            useItemLocation: () => ({
+              data: ref(undefined),
+              isLoading: ref(false),
+              isError: ref(false),
+            }),
+          },
         },
       },
     })
@@ -220,20 +246,11 @@ describe('AppointmentCreateView', () => {
       .setValue('Seongsu K-Beauty Tour')
     await wrapper.get('form').trigger('submit')
 
-    await wrapper.find('input[inputmode="numeric"]').setValue('10000')
-    await wrapper
-      .find('input[placeholder="e.g. Seongsu Beauty Lab"]')
-      .setValue('Seongsu Beauty Lab')
-    await wrapper.get('form').trigger('submit')
-
-    expect(wrapper.text()).toContain('Set the appointment schedule')
-
-    await wrapper.find('header button').trigger('click')
     expect(wrapper.text()).toContain('Set your appointment details')
-    expect(router.currentRoute.value.name).toBe('appointment-create')
 
     await wrapper.find('header button').trigger('click')
     expect(wrapper.text()).toContain('Start with your appointment details')
+    expect(router.currentRoute.value.name).toBe('appointment-create')
 
     await wrapper.find('header button').trigger('click')
     expect(wrapper.text()).toContain('Leave without creating?')
@@ -250,12 +267,11 @@ describe('AppointmentCreateView', () => {
       currentMemberCount: 1,
       depositAmount: '10000',
       appointmentStatus: 'RECRUITING',
-      meetingPlace: 'Seongsu Beauty Lab',
+      meetingPlace: 'DDP Design Plaza',
       activityStartAt: '2026-08-08T18:30:00',
       activityEndAt: '2026-08-08T22:00:00',
       joinDeadline: '2026-08-08T17:30:00',
       hostDisplayName: 'Mina Park',
-      meetingAddress: null,
       description: null,
       members: [],
     })
@@ -311,9 +327,9 @@ describe('AppointmentCreateView', () => {
     await fillAndConfirm(wrapper)
     await flushPromises()
 
-    // 날짜 시트가 폼 위에 다시 뜨고, 폼은 여전히(같은 3단계에) 입력값을 유지한 채 있다.
+    // 날짜 시트가 폼 위에 다시 뜨고, 폼은 여전히(같은 2단계에) 입력값을 유지한 채 있다.
     expect(wrapper.text()).toContain('Which day?')
-    expect(wrapper.text()).toContain('Set the appointment schedule')
+    expect(wrapper.text()).toContain('Set your appointment details')
     expect(wrapper.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
 
     checkJourneyItemExists.mockResolvedValueOnce(false)
@@ -322,7 +338,7 @@ describe('AppointmentCreateView', () => {
     await flushPromises()
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Set the appointment schedule')
+    expect(wrapper.text()).toContain('Set your appointment details')
     expect(wrapper.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
   })
 })

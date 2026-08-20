@@ -4,6 +4,8 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { spendingCategoryLabelKey } from '@/shared/lib/spendingCategory'
+
 import { getTransactionDetail } from '../api/walletApi'
 import {
   formatPointAmount,
@@ -40,6 +42,12 @@ const formatValue = (value: string | number | null | undefined): string =>
   value === null || value === undefined || value === ''
     ? t('wallet.transactionDetail.notAvailable')
     : String(value)
+
+// 서버가 저장한 값은 `FOOD` 같은 코드다. 그대로 찍으면 화면에 코드가 날것으로 보인다.
+const formatSpendingCategory = (value: string | null | undefined): string =>
+  value === null || value === undefined || value === ''
+    ? t('wallet.transactionDetail.notAvailable')
+    : t(spendingCategoryLabelKey(value))
 </script>
 
 <template>
@@ -153,7 +161,7 @@ const formatValue = (value: string | number | null | undefined): string =>
                 {{ t('wallet.transactionDetail.spendingCategory') }}
               </dt>
               <dd class="text-right">
-                {{ formatValue(transactionQuery.data.value.receipt.spendingCategory) }}
+                {{ formatSpendingCategory(transactionQuery.data.value.receipt.spendingCategory) }}
               </dd>
             </div>
           </dl>

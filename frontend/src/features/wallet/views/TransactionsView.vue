@@ -10,7 +10,7 @@ import {
   formatTransactionAmount,
   formatTransactionDateTime,
   getTransactionStatusLabel,
-  getTransactionTypeLabel,
+  toActivityKind,
   walletKeys,
   type TransactionSearchParams,
   type TransactionStatus,
@@ -39,7 +39,7 @@ const typeOptions: Array<{ value: TransactionType; labelKey: string }> = [
   { value: 'SETTLEMENT', labelKey: 'settlement' },
   { value: 'DEPOSIT_HOLD', labelKey: 'depositHold' },
   { value: 'DEPOSIT_REFUND', labelKey: 'depositRefund' },
-  { value: 'DEPOSIT_FORFEIT_DISTRIBUTION', labelKey: 'depositForfeiture' },
+  { value: 'DEPOSIT_NO_SHOW_DISTRIBUTION', labelKey: 'depositNoShowShare' },
   { value: 'REVERSAL', labelKey: 'reversal' },
 ]
 
@@ -289,7 +289,7 @@ const openTransactionDetail = (transactionId: number): void => {
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="truncate text-sm font-semibold">
-                  {{ getTransactionTypeLabel(transaction.transferType) }}
+                  {{ t(`wallet.home.activity.${toActivityKind(transaction.transferType)}`) }}
                 </p>
                 <p class="mt-1 text-xs text-[#989898]">
                   {{ formatTransactionDateTime(transaction.createdAt) }}

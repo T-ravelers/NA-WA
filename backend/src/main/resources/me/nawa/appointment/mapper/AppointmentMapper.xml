@@ -38,13 +38,13 @@
             (item_id, host_member_id, language_code, appointment_name,
              appointment_description, max_members, join_deadline,
              deposit_amount, appointment_status, meeting_place,
-             meeting_address, meeting_latitude, meeting_longitude,
+             meeting_latitude, meeting_longitude,
              activity_start_at, activity_end_at)
         VALUES
             (#{itemId}, #{hostMemberId}, #{languageCode}, #{appointmentName},
              #{appointmentDescription}, #{maxMembers}, #{joinDeadline},
              #{depositAmount}, #{appointmentStatus}, #{meetingPlace},
-             #{meetingAddress}, #{meetingLatitude}, #{meetingLongitude},
+             #{meetingLatitude}, #{meetingLongitude},
              #{activityStartAt}, #{activityEndAt})
     </insert>
 
@@ -128,7 +128,6 @@
         a.deposit_amount,
         a.appointment_status,
         a.meeting_place,
-        a.meeting_address,
         a.meeting_latitude,
         a.meeting_longitude,
         a.activity_start_at,

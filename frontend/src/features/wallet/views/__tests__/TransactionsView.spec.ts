@@ -6,6 +6,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { i18n } from '@/app/i18n'
 
 import { getTransactions } from '../../api/walletApi'
+import { TRANSFER_TYPES } from '../../model/walletHome'
 import TransactionsView from '../TransactionsView.vue'
 
 vi.mock('../../api/walletApi', () => ({
@@ -96,6 +97,51 @@ describe('TransactionsView', () => {
       cursor: undefined,
       size: 20,
     })
+  })
+
+  it('offers every transfer type in TRANSFER_TYPES as a labeled filter option', async () => {
+    const { wrapper } = await mountTransactions()
+
+    await flushPromises()
+
+    const options = wrapper
+      .get('select[aria-label="Transaction type"]')
+      .findAll('option')
+      .filter((option) => option.attributes('value') !== '')
+
+    expect(options.map((option) => option.attributes('value')).sort()).toEqual(
+      [...TRANSFER_TYPES].sort(),
+    )
+
+    for (const option of options) {
+      expect(option.text(), `${option.attributes('value')}의 필터 문구가 없다`).not.toContain(
+        'wallet.transactions.',
+      )
+    }
+  })
+
+  it('labels each row from the shared activity copy instead of the unknown fallback', async () => {
+    const row = (transferId: number, transferType: string) => ({
+      transferId,
+      transferType,
+      entryType: 'CREDIT',
+      amount: '25000',
+      balanceAfter: '109500',
+      createdAt: '2026-07-26T10:30:00',
+    })
+
+    vi.mocked(getTransactions).mockResolvedValue({
+      ...transactionsResponse,
+      transactions: [row(201, 'DEPOSIT_NO_SHOW_DISTRIBUTION'), row(202, 'REVERSAL')],
+    })
+
+    const { wrapper } = await mountTransactions()
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No-show deposit shared out')
+    expect(wrapper.text()).toContain('Transaction reversed')
+    expect(wrapper.text()).not.toContain('Wallet transaction')
   })
 
   it('requests transactions with the selected filters', async () => {

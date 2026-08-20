@@ -26,6 +26,7 @@ import {
   type EventSearchFilters,
   type EventSort,
 } from '../model/eventExplore'
+import { useExploreFilterMemoryStore } from '../model/exploreFilterMemory'
 import {
   SEOUL_REGION1,
   SEOUL_REGION2_OPTIONS,
@@ -51,6 +52,7 @@ type ExploreTab = 'events' | 'places'
 const { locale, t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const filterMemory = useExploreFilterMemoryStore()
 
 const selectedTab = ref<ExploreTab>(readExploreTab(readQueryString('tab')))
 const selectedSheet = ref<ExploreSheetKind | null>(null)
@@ -371,7 +373,10 @@ watch(
   filters,
   (next) => {
     if (selectedTab.value !== 'events' || hydratingEventQuery.value) return
-    router.replace({ query: buildEventQuery(next) }).catch(() => undefined)
+
+    const query = buildEventQuery(next)
+    filterMemory.remember(query)
+    router.replace({ query }).catch(() => undefined)
   },
   { deep: true },
 )
@@ -380,7 +385,10 @@ watch(
   placeFilters,
   (next) => {
     if (selectedTab.value !== 'places' || hydratingPlaceQuery.value) return
-    router.replace({ query: buildPlaceQuery(next) }).catch(() => undefined)
+
+    const query = buildPlaceQuery(next)
+    filterMemory.remember(query)
+    router.replace({ query }).catch(() => undefined)
   },
   { deep: true },
 )

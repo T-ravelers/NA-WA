@@ -14,11 +14,13 @@ import {
 } from '@/app/session/sessionHandlers'
 import { useMyOngoingAppointmentsQuery } from '@/features/appointment/composables/useMyOngoingAppointmentsQuery'
 import { appointmentJourneyIntegrationKey } from '@/features/appointment/model/journeyIntegration'
+import { appointmentExploreIntegrationKey } from '@/features/appointment/model/exploreIntegration'
 import { appointmentMemberIntegrationKey } from '@/features/appointment/model/memberIntegration'
 import { addJourneyItem, checkJourneyItemExists } from '@/features/journey/api/journeyApi'
 import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
 import { parseJourneyRouteQuery } from '@/features/journey/model/journeyRouteQuery'
 import { useMemberAppointmentProfile } from '@/features/member/model/memberQueries'
+import { useExploreItemLocationQuery } from '@/features/explore/model/appointmentIntegration'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
 import { journeyReportIntegrationKey } from '@/features/journey/model/reportIntegration'
 import { useReportSummariesQuery } from '@/features/report/composables/useReportQueries'
@@ -67,5 +69,6 @@ app.provide(appointmentJourneyIntegrationKey, {
 })
 app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
 app.provide(walletAppointmentIntegrationKey, { useMyOngoingAppointmentsQuery })
+app.provide(appointmentExploreIntegrationKey, { useItemLocation: useExploreItemLocationQuery })
 
 app.mount('#app')

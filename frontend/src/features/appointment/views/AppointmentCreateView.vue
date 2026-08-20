@@ -144,9 +144,16 @@ function closeJourneyDate(): void {
   phase.value = 'journeySelect'
 }
 
+// itemType이 없으면 폼에 들어가도 항목 위치 조회가 켜지지 않아 만남 장소를 영영 읽지
+// 못한다. 날짜 확인이 실패한 것처럼 말하지 말고, 진입 자체가 잘못됐다고 알리고 폼
+// 단계로 넘기지 않는다.
 async function confirmDate(date: string): Promise<void> {
   if (dateCheckPending.value) return
-  if (selectedTripId.value === null || itemId.value === undefined) {
+  if (itemId.value === undefined || itemType.value === undefined) {
+    dateCheckError.value = t('appointment.create.validation.itemContext')
+    return
+  }
+  if (selectedTripId.value === null) {
     dateCheckError.value = t('appointment.journeyDate.checkFailed')
     return
   }
@@ -176,7 +183,11 @@ async function confirmDate(date: string): Promise<void> {
 
 async function retryDate(date: string): Promise<void> {
   if (dateCheckPending.value) return
-  if (selectedTripId.value === null || itemId.value === undefined) {
+  if (itemId.value === undefined || itemType.value === undefined) {
+    dateCheckError.value = t('appointment.create.validation.itemContext')
+    return
+  }
+  if (selectedTripId.value === null) {
     dateCheckError.value = t('appointment.journeyDate.checkFailed')
     return
   }

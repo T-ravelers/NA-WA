@@ -164,3 +164,53 @@ jobs:
 
       - name: 프로덕션 빌드
         run: pnpm build
+
+  # 실제 브라우저를 띄워 사람이 조작하듯 확인한다. 탭 두 개에 걸친 로그아웃 장벽처럼
+  # 유닛 테스트로는 잡히지 않는 흐름이 여기에 있다. frontend-test와 나눠 둔 이유는
+  # 린트 하나를 고칠 때마다 브라우저 세 종을 기다리지 않기 위해서다.
+  e2e-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: pnpm 설정
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      # 브라우저 세 종이 200MB를 넘는다. 잠금 파일이 그대로면 다시 받지 않는다.
+      - name: Playwright 브라우저 캐시
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      # 캐시가 맞아도 시스템 라이브러리는 매번 필요해 --with-deps를 유지한다.
+      - name: Playwright 브라우저 설치
+        run: pnpm --filter @na-wa/frontend exec playwright install --with-deps chromium firefox webkit
+
+      # 빌드와 preview 서버 기동은 playwright.config.ts의 webServer가 맡는다.
+      # CI 환경 변수는 GitHub Actions가 넣어 주며, 그 값으로 preview 모드로 전환된다.
+      - name: E2E 테스트
+        run: pnpm test:e2e
+
+      # CI 리포터는 line이라 HTML 리포트가 없다. 실패 시에는 trace와 스냅샷이 남는
+      # test-results가 원인 파악에 필요하다.
+      - name: 실패 시 실행 기록 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: frontend/test-results
+          retention-days: 7

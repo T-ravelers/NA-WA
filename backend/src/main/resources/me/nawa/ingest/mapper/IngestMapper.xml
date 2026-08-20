@@ -337,4 +337,122 @@
             deleted_at         = NULL
     </insert>
 
+    <!--
+      활동 분류는 "지금 이 항목이 속한 분류" 전체로 다룹니다.
+      보낸 목록에 없는 관계를 먼저 지우고, 남은 것을 넣습니다.
+
+      지우는 범위는 이번 배치의 pipeline_id 로 한정합니다. 그러지 않으면
+      배치에 없는 항목의 분류까지 사라집니다.
+
+      남길 짝은 UNION ALL 파생 테이블로 만들고 NOT EXISTS 로 거릅니다.
+      행 생성자 NOT IN 은 항목마다 괄호를 정확히 맞춰야 하는데, 중첩
+      foreach 로는 첫 행과 끝 행의 괄호가 빠져 문법 오류가 납니다.
+
+      분류가 하나도 없는 항목은 이 문장으로 오지 않습니다. 서비스가 미리
+      갈라서 deleteAllEventActivities 로 보냅니다. 그래야 파생 테이블이
+      비는 경우가 없습니다.
+
+      물리 삭제를 씁니다. 조회 쪽은 soft delete 를 전제하지만(EventMapper 가
+      ea.deleted_at IS NULL 로 거릅니다), 이 관계는 파이프라인이 유일한
+      기록자라 "지워진 관계"를 남겨 둘 이유가 없습니다.
+
+      사람이 관리자 화면 등에서 관계를 숨기게 되면 이 판단을 다시 봐야
+      합니다. 그때는 파이프라인 배치가 upsert 의 deleted_at = NULL 로
+      숨김을 매번 되돌립니다.
+    -->
+    <delete id="deleteMissingEventActivities">
+        DELETE ea FROM event_activity ea
+        JOIN event e ON e.event_id = ea.event_id
+        WHERE e.pipeline_id IN
+        <foreach collection="items" item="it" open="(" separator="," close=")">
+            #{it.pipelineId}
+        </foreach>
+        AND NOT EXISTS (
+            SELECT 1 FROM (
+            <foreach collection="items" item="it" separator=" UNION ALL ">
+                <foreach collection="it.activities" item="link" separator=" UNION ALL ">
+                    SELECT #{it.pipelineId} AS pipeline_id, #{link.activityId} AS activity_id
+                </foreach>
+            </foreach>
+            ) keep
+            WHERE keep.pipeline_id = e.pipeline_id
+              AND keep.activity_id = ea.activity_id
+        )
+    </delete>
+
+    <delete id="deleteMissingPlaceActivities">
+        DELETE pa FROM place_activity pa
+        JOIN place p ON p.place_id = pa.place_id
+        WHERE p.pipeline_id IN
+        <foreach collection="items" item="it" open="(" separator="," close=")">
+            #{it.pipelineId}
+        </foreach>
+        AND NOT EXISTS (
+            SELECT 1 FROM (
+            <foreach collection="items" item="it" separator=" UNION ALL ">
+                <foreach collection="it.activities" item="link" separator=" UNION ALL ">
+                    SELECT #{it.pipelineId} AS pipeline_id, #{link.activityId} AS activity_id
+                </foreach>
+            </foreach>
+            ) keep
+            WHERE keep.pipeline_id = p.pipeline_id
+              AND keep.activity_id = pa.activity_id
+        )
+    </delete>
+
+    <!-- 분류를 통째로 지우는 요청입니다. 남길 짝이 없으니 파생 테이블도 없습니다. -->
+    <delete id="deleteAllEventActivities">
+        DELETE ea FROM event_activity ea
+        JOIN event e ON e.event_id = ea.event_id
+        WHERE e.pipeline_id IN
+        <foreach collection="pipelineIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteAllPlaceActivities">
+        DELETE pa FROM place_activity pa
+        JOIN place p ON p.place_id = pa.place_id
+        WHERE p.pipeline_id IN
+        <foreach collection="pipelineIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <insert id="upsertEventActivities">
+        INSERT INTO event_activity (event_id, activity_id, is_primary)
+        SELECT e.event_id, s.activity_id, s.is_primary
+        FROM (
+        <foreach collection="items" item="it" separator=" UNION ALL ">
+            <foreach collection="it.activities" item="link" separator=" UNION ALL ">
+                SELECT #{it.pipelineId} AS pipeline_id,
+                       #{link.activityId} AS activity_id,
+                       #{link.isPrimary} AS is_primary
+            </foreach>
+        </foreach>
+        ) s
+        JOIN event e ON e.pipeline_id = s.pipeline_id
+        ON DUPLICATE KEY UPDATE
+            is_primary = VALUES(is_primary),
+            deleted_at = NULL
+    </insert>
+
+    <insert id="upsertPlaceActivities">
+        INSERT INTO place_activity (place_id, activity_id, is_primary)
+        SELECT p.place_id, s.activity_id, s.is_primary
+        FROM (
+        <foreach collection="items" item="it" separator=" UNION ALL ">
+            <foreach collection="it.activities" item="link" separator=" UNION ALL ">
+                SELECT #{it.pipelineId} AS pipeline_id,
+                       #{link.activityId} AS activity_id,
+                       #{link.isPrimary} AS is_primary
+            </foreach>
+        </foreach>
+        ) s
+        JOIN place p ON p.pipeline_id = s.pipeline_id
+        ON DUPLICATE KEY UPDATE
+            is_primary = VALUES(is_primary),
+            deleted_at = NULL
+    </insert>
+
 </mapper>

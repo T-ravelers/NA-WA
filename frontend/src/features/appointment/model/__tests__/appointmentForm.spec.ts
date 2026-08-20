@@ -16,8 +16,8 @@ function baseDraft(overrides: Partial<AppointmentFormDraft> = {}): AppointmentFo
     maxMembers: 4,
     languageCode: 'en',
     depositAmount: 10_000,
+    meetingPlaceMode: 'ITEM' as const,
     meetingPlace: 'Seongsu Beauty Lab',
-    meetingAddress: '',
     activityStartTime: '18:30',
     activityEndTime: '22:00',
     joinDeadline: '2026-08-19T17:30',
@@ -107,7 +107,6 @@ describe('toAppointmentCreateRequest', () => {
       joinDeadline: '2026-08-19T17:30:00',
       depositAmount: '10000',
       meetingPlace: 'Seongsu Beauty Lab',
-      meetingAddress: undefined,
       activityStartTime: '18:30:00',
       activityEndTime: '22:00:00',
     })

@@ -99,7 +99,6 @@ public class AppointmentService {
                 .depositAmount(request.getDepositAmount())
                 .appointmentStatus(AppointmentStatus.PAYMENT_PENDING)
                 .meetingPlace(request.getMeetingPlace().trim())
-                .meetingAddress(request.getMeetingAddress())
                 .activityStartAt(activityStartAt)
                 .activityEndAt(activityEndAt)
                 .build();
@@ -689,7 +688,6 @@ public class AppointmentService {
                 .depositAmount(appointment.getDepositAmount())
                 .appointmentStatus(resolveDisplayStatus(appointment))
                 .meetingPlace(appointment.getMeetingPlace())
-                .meetingAddress(appointment.getMeetingAddress())
                 .description(appointment.getAppointmentDescription())
                 .activityStartAt(appointment.getActivityStartAt())
                 .activityEndAt(appointment.getActivityEndAt())
@@ -774,7 +772,6 @@ public class AppointmentService {
                 || request.getDepositAmount().compareTo(MAX_DEPOSIT) > 0
                 || isBlank(request.getMeetingPlace())
                 || request.getMeetingPlace().trim().length() > 200
-                || lengthExceeds(request.getMeetingAddress(), 500)
                 || request.getJoinDeadline() == null
                 || request.getActivityStartTime() == null
                 || request.getActivityEndTime() == null
@@ -854,10 +851,6 @@ public class AppointmentService {
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
-    }
-
-    private static boolean lengthExceeds(String value, int maxLength) {
-        return value != null && value.trim().length() > maxLength;
     }
 
     private static String normalizeOptional(String value) {
