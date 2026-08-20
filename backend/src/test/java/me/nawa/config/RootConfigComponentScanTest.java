@@ -2,6 +2,9 @@ package me.nawa.config;
 
 import me.nawa.common.ocr.ReceiptOcrClient;
 import me.nawa.common.storage.ReceiptStorageService;
+import me.nawa.ingest.controller.IngestController;
+import me.nawa.ingest.mapper.IngestMapper;
+import me.nawa.ingest.service.IngestService;
 import me.nawa.member.service.MemberProfileServiceImpl;
 import me.nawa.report.mapper.ReportMapper;
 import me.nawa.report.service.ReportService;
@@ -60,6 +63,40 @@ class RootConfigComponentScanTest {
 
         assertTrue(Arrays.asList(componentScan.basePackages()).contains(
                 ReceiptOcrClient.class.getPackageName()
+        ));
+    }
+
+    @Test
+    void ingestPackages_areRegisteredInRootConfig() {
+        // 등록을 빠뜨리면 컨트롤러가 스캔되지 않아 매핑 자체가 생기지 않는다.
+        // 실제로 #284 가 이 상태로 배포돼 적재 경로가 404 였다. 클래스는 WAR
+        // 안에 있는데 Spring 이 "No mapping for POST" 를 남긴다.
+        //
+        // 이 프로젝트는 Spring Boot 가 아니라 패키지를 명시 등록해야 한다.
+        ComponentScan componentScan = RootConfig.class.getAnnotation(
+                ComponentScan.class
+        );
+        MapperScan mapperScan = RootConfig.class.getAnnotation(
+                MapperScan.class
+        );
+
+        assertTrue(Arrays.asList(componentScan.basePackages()).contains(
+                IngestService.class.getPackageName()
+        ));
+        assertTrue(Arrays.asList(mapperScan.basePackages()).contains(
+                IngestMapper.class.getPackageName()
+        ));
+    }
+
+    @Test
+    void ingestController_isRegisteredInServletConfig() {
+        // 컨트롤러는 서블릿 컨텍스트에서 스캔한다. RootConfig 와 별개다.
+        ComponentScan componentScan = ServletConfig.class.getAnnotation(
+                ComponentScan.class
+        );
+
+        assertTrue(Arrays.asList(componentScan.basePackages()).contains(
+                IngestController.class.getPackageName()
         ));
     }
 
