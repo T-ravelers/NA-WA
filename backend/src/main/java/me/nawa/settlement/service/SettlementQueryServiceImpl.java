@@ -116,8 +116,16 @@ public class SettlementQueryServiceImpl implements SettlementQueryService {
             .name(participant.getDisplayName()).initials(initialsOf(participant.getDisplayName())).build()).toList();
     }
 
-    /** 사진이 없는 자리에 대신 넣을 이름 첫 글자다. 이름을 알 수 없으면 물음표로 둔다. */
+    /**
+     * 사진이 없는 자리에 대신 넣을 이름 첫 글자다. 이름을 알 수 없으면 물음표로 둔다.
+     *
+     * 앞뒤 공백을 먼저 털어낸다. 그러지 않으면 " Alex"에서 공백 한 칸을 잘라 와 빈 동그라미가 된다.
+     * 그리고 한 글자는 자리 하나가 아닐 수 있다. 이모지처럼 두 자리를 차지하는 글자를 한 자리만
+     * 잘라내면 글자의 반쪽만 남아 깨져 보인다.
+     */
     private String initialsOf(String displayName) {
-        return displayName == null || displayName.isBlank() ? "?" : displayName.substring(0, 1).toUpperCase();
+        if (displayName == null || displayName.isBlank()) return "?";
+        String trimmed = displayName.strip();
+        return new String(Character.toChars(trimmed.codePointAt(0))).toUpperCase();
     }
 }

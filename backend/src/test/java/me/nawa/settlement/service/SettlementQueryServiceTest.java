@@ -19,6 +19,7 @@ import me.nawa.settlement.dto.response.SettlementCandidateResponse;
 import me.nawa.settlement.domain.SettlementViewerItem;
 import me.nawa.settlement.dto.response.SettlementDetailResponse;
 import me.nawa.settlement.dto.response.SettlementListResponse;
+import me.nawa.settlement.dto.response.SettlementParticipantResponse;
 import me.nawa.settlement.mapper.SettlementMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -200,6 +201,32 @@ class SettlementQueryServiceTest {
         // 낼 사람에게는 다른 사람이 냈는지가 보이지 않는다. 빈 목록조차 만들지 않는다.
         assertNull(response.getCollection());
         verify(settlementMapper, never()).findCollectionMembers(90L);
+    }
+
+    /**
+     * 사진 대신 세우는 이름 첫 글자를 만든다.
+     *
+     * 앞의 공백을 그대로 잘라 오면 빈 동그라미가 되고, 이모지처럼 두 자리를 차지하는 글자를
+     * 한 자리만 잘라 오면 반쪽만 남아 깨진다.
+     */
+    @Test
+    void getCandidates_awkwardDisplayNames_stillProduceOneReadableInitial() {
+        SettlementSource source = new SettlementSource();
+        source.setTransferId(20L);
+        source.setAppointmentId(7L);
+        when(settlementMapper.findCandidateSources(1L)).thenReturn(List.of(source));
+        when(settlementMapper.findParticipants(7L)).thenReturn(List.of(
+            new SettlementParticipant(71L, 1L, " alex"),
+            new SettlementParticipant(72L, 2L, "\uD83D\uDE42Bora"),
+            new SettlementParticipant(73L, 3L, "   ")
+        ));
+
+        List<SettlementParticipantResponse> participants =
+            service().getCandidates(1L).get(0).getParticipants();
+
+        assertEquals("A", participants.get(0).getInitials());
+        assertEquals("\uD83D\uDE42", participants.get(1).getInitials());
+        assertEquals("?", participants.get(2).getInitials());
     }
 
     private SettlementQueryService service() {
