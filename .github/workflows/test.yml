@@ -82,13 +82,21 @@ jobs:
 
       - name: 병합된 마이그레이션 파일 불변성 확인
         if: github.event_name == 'pull_request'
+        # base_ref를 스크립트에 직접 보간하지 않고 환경 변수로 받는다. 이 워크플로는
+        # main 대상 PR에서만 도는 데다 값이 고정이지만, 보간 패턴 자체를 두지 않는다.
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          modified=$(git diff --diff-filter=M --name-only FETCH_HEAD...HEAD \
+          git fetch --no-tags origin "$BASE_REF"
+          # 수정(M)만으로는 부족하다. 삭제와 이름 변경도 적용 이력만 남고 파일이
+          # 사라져 같은 방식으로 배포 시점 Flyway validate에서 터진다. 게다가 git은
+          # rename 감지가 기본이라 이름만 바꾸면 M도 D도 아닌 R로 분류돼 그냥 통과한다.
+          # --no-renames로 이름 변경을 D+A로 분해해 D에 걸리게 한다.
+          changed=$(git diff --no-renames --diff-filter=MD --name-only FETCH_HEAD...HEAD \
             -- 'src/main/resources/db/migration/V*.sql')
-          if [ -n "$modified" ]; then
-            echo "::error::이미 병합된 마이그레이션은 수정할 수 없습니다. Flyway 체크섬이 어긋나 배포가 실패합니다. 새 버전 파일을 추가하세요."
-            echo "$modified"
+          if [ -n "$changed" ]; then
+            echo "::error::이미 병합된 마이그레이션은 수정·삭제·이름 변경할 수 없습니다. Flyway 체크섬이 어긋나 배포가 실패합니다. 새 버전 파일을 추가하세요."
+            echo "$changed"
             exit 1
           fi
           echo "마이그레이션 파일 불변성 확인 완료"
