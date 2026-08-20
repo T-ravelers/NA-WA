@@ -120,7 +120,8 @@ GET /api/v1/journeys/{tripId}/items/exists?itemId={itemId}&visitDate={visitDate}
 ```
 
 - 약속 생성 폼의 날짜 선택 단계에서, 선택하려는 `(tripId, itemId, visitDate)`
-  조합이 이미 `trip_items`에 있는지 미리 확인하기 위한 조회 전용 API입니다.
+  조합이 활성 일정으로 이미 `trip_items`에 있는지 미리 확인하기 위한 조회 전용
+  API입니다.
 - 인증 회원이 소유한 Journey만 조회할 수 있습니다.
 - `visitDate`는 `yyyy-MM-dd` 형식입니다.
 - 이 API는 조회만 하며 아무것도 저장하지 않습니다. 실제 확정은
