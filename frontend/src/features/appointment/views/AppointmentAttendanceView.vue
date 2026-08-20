@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { parseServerDateTime } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -65,8 +66,14 @@ const members = computed(() => membersQuery.data.value ?? [])
 // 내 memberId를 찾아 추리면 목록 조회나 프로필 연동이 실패했을 때 방장 권한까지
 // 함께 사라져, 정작 출석을 확정해야 할 사람이 막힌다.
 const isHost = computed(() => participationQuery.data.value?.host === true)
-const appointmentInProgress = computed(
-  () => detailQuery.data.value?.appointmentStatus === 'IN_PROGRESS',
+// 상세 화면의 시트와 같은 조건이다. 활동이 끝나기 전에 확정하면 늦게 온 사람이
+// 노쇼로 굳어 보증금을 잃는다.
+const isActivityOver = computed(() => {
+  const endAt = parseServerDateTime(detailQuery.data.value?.activityEndAt ?? null)
+  return endAt !== null && Date.now() >= endAt.getTime()
+})
+const attendanceOpen = computed(
+  () => detailQuery.data.value?.appointmentStatus === 'IN_PROGRESS' && isActivityOver.value,
 )
 function initials(displayName: string): string {
   return displayName.trim().charAt(0).toUpperCase() || '?'
@@ -198,7 +205,7 @@ function retry(): void {
       @retry="retry"
     />
     <StateEmpty
-      v-else-if="!appointmentInProgress"
+      v-else-if="!attendanceOpen"
       :title="t('appointment.attendance.notCompletedTitle')"
       :description="t('appointment.attendance.notCompletedDescription')"
     />
