@@ -34,6 +34,8 @@ route는 `features/<domain>/routes.ts`, 문구는 `features/<domain>/i18n/<local
 - `NormalizedApiError`(`code` / `status` / `messageKey`) 정규화
 - CSRF 헤더 부착
 - 401을 받으면 갱신 1회 후 원 요청 재시도
+- `responseType: 'blob'` 요청의 오류 본문(Blob)을 글자로 풀어 오류 코드를 살림. 이 해제는
+  CSRF·401 판정보다 먼저 일어나므로 바이너리 요청도 두 재시도를 그대로 탐
 
 **feature에서 재시도 로직을 다시 만들지 마세요.** 백엔드의 refresh 재사용 감지에
 걸립니다. 오류 분기는 메시지가 아니라 `error.code`로 합니다.
