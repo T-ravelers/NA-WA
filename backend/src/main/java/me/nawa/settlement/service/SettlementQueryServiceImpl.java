@@ -84,7 +84,9 @@ public class SettlementQueryServiceImpl implements SettlementQueryService {
                 .shareAmount(summary.getViewerShareAmount())
                 .requestStatus(summary.getViewerRequestStatus())
                 .settlementStatus(summary.getSettlementStatus())
-                .build())).build()).toList();
+                .build()))
+            .createdAt(summary.getCreatedAt())
+            .completedAt(summary.getCompletedAt()).build()).toList();
     }
 
     private List<SettlementParticipantResponse> toParticipantResponses(List<SettlementParticipant> participants) {

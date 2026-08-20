@@ -18,6 +18,18 @@
 
 생성 요청과 지급 요청에는 각각 `Idempotency-Key` 헤더가 필요하며, 값은 1~100자다.
 
+## 정산 목록 응답의 시각
+
+`GET /api/v1/settlements`의 각 요약은 `createdAt`과 `completedAt`을 함께 반환한다. 형식은
+`yyyy-MM-dd'T'HH:mm:ss`이고 기준 시간대는 서버와 같은 `Asia/Seoul`이다.
+
+`completedAt`은 settlement가 `COMPLETED`로 전이한 시각이며, `REQUESTED`인 동안에는 `null`이다.
+이 필드를 남기기 시작한 시점보다 먼저 완료된 정산도 `null`이다. `updated_at`이 갱신되지 않는
+스키마라 되살릴 근거 값이 없어 데이터를 보정하지 않았다. 완료 시각으로 목록을 거르거나
+표시하는 클라이언트는 `completedAt`이 없으면 `createdAt`으로 대신한다.
+
+목록 정렬은 지금도 `created_at` 내림차순이며 이 응답 필드가 정렬을 바꾸지 않는다.
+
 ## 정산 후보 생성 문맥
 
 `GET /api/v1/settlements/candidates`의 각 후보는 `transferId`, `appointmentId`,

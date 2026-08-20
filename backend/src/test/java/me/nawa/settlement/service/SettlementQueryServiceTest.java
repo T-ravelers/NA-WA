@@ -1,9 +1,11 @@
 package me.nawa.settlement.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import me.nawa.settlement.domain.SettlementAllowedAction;
 import me.nawa.settlement.domain.SettlementDetail;
@@ -72,6 +74,46 @@ class SettlementQueryServiceTest {
             List.of(SettlementAllowedAction.PAY),
             response.getReceived().get(0).getViewer().getAllowedActions()
         );
+    }
+
+    @Test
+    void getSettlements_returnsCreatedAndCompletedTimes() {
+        SettlementSummary done = new SettlementSummary();
+        done.setSettlementId(11L);
+        done.setTitle("Lunch");
+        done.setTotalAmount(new BigDecimal("100"));
+        done.setReceivableAmount(new BigDecimal("50"));
+        done.setSplitMethod("EQUAL");
+        done.setSettlementStatus("COMPLETED");
+        done.setCreatedByMemberId(2L);
+        done.setViewerShareAmount(new BigDecimal("50"));
+        done.setViewerRequestStatus("NOT_REQUESTED");
+        done.setCreatedAt(LocalDateTime.of(2026, 8, 18, 12, 30, 0));
+        done.setCompletedAt(LocalDateTime.of(2026, 8, 19, 9, 0, 0));
+
+        // 이 필드를 남기기 전에 끝난 정산은 완료 시각이 비어 있다. 화면이 생성 시각으로
+        // 대신 보여줄 수 있도록 두 값을 모두 내려준다.
+        SettlementSummary legacy = new SettlementSummary();
+        legacy.setSettlementId(12L);
+        legacy.setTitle("Coffee");
+        legacy.setTotalAmount(new BigDecimal("30"));
+        legacy.setReceivableAmount(new BigDecimal("15"));
+        legacy.setSplitMethod("EQUAL");
+        legacy.setSettlementStatus("COMPLETED");
+        legacy.setCreatedByMemberId(2L);
+        legacy.setViewerShareAmount(new BigDecimal("15"));
+        legacy.setViewerRequestStatus("NOT_REQUESTED");
+        legacy.setCreatedAt(LocalDateTime.of(2026, 7, 1, 8, 0, 0));
+
+        when(settlementMapper.findReceivedSummaries(2L)).thenReturn(List.of());
+        when(settlementMapper.findSentSummaries(2L)).thenReturn(List.of(done, legacy));
+
+        SettlementListResponse response = service().getSettlements(2L);
+
+        assertEquals(LocalDateTime.of(2026, 8, 18, 12, 30, 0), response.getSent().get(0).getCreatedAt());
+        assertEquals(LocalDateTime.of(2026, 8, 19, 9, 0, 0), response.getSent().get(0).getCompletedAt());
+        assertEquals(LocalDateTime.of(2026, 7, 1, 8, 0, 0), response.getSent().get(1).getCreatedAt());
+        assertNull(response.getSent().get(1).getCompletedAt());
     }
 
     @Test

@@ -93,7 +93,8 @@
     <select id="findReceivedSummaries" resultType="me.nawa.settlement.domain.SettlementSummary">
         SELECT s.settlement_id, a.appointment_name AS title,
                s.total_amount, s.receivable_amount, s.split_method, s.settlement_status,
-               s.created_by_member_id, sm.share_amount AS viewer_share_amount,
+               s.created_by_member_id, s.created_at, s.completed_at,
+               sm.share_amount AS viewer_share_amount,
                sm.request_status AS viewer_request_status,
                EXISTS (
                    SELECT 1 FROM settlement_members paid_sm
@@ -114,7 +115,8 @@
     <select id="findSentSummaries" resultType="me.nawa.settlement.domain.SettlementSummary">
         SELECT s.settlement_id, a.appointment_name AS title,
                s.total_amount, s.receivable_amount, s.split_method, s.settlement_status,
-               s.created_by_member_id, sm.share_amount AS viewer_share_amount,
+               s.created_by_member_id, s.created_at, s.completed_at,
+               sm.share_amount AS viewer_share_amount,
                sm.request_status AS viewer_request_status,
                EXISTS (
                    SELECT 1 FROM settlement_members paid_sm
@@ -300,7 +302,7 @@
 
     <update id="completeSettlementIfNoPendingPayments">
         UPDATE settlements s
-        SET settlement_status = 'COMPLETED', version = version + 1
+        SET settlement_status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP, version = version + 1
         WHERE s.settlement_id = #{settlementId}
           AND s.settlement_status = 'REQUESTED'
           AND s.deleted_at IS NULL

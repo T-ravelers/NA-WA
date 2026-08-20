@@ -1,6 +1,7 @@
 package me.nawa.settlement.domain;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -19,6 +20,9 @@ public class SettlementSummary {
     private Long createdByMemberId;
     private BigDecimal viewerShareAmount;
     private String viewerRequestStatus;
+    private LocalDateTime createdAt;
+    /** 정산이 끝난 시각. 아직 진행 중이면 비어 있다. */
+    private LocalDateTime completedAt;
 
     public SettlementSummary(
         Long settlementId,
