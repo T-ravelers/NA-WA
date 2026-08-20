@@ -197,7 +197,6 @@ describe('SettlementCreateView', () => {
     await drillDownToTransaction(wrapper)
     await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
     await wrapper.get('[data-participant-id="19"]').trigger('click')
-    await wrapper.get('[data-action="add-item"]').trigger('click')
 
     await wrapper.get('[data-item-name="0"]').setValue('Pasta')
     await wrapper.get('[data-item-unit-price="0"]').setValue('12.50')
@@ -254,7 +253,6 @@ describe('SettlementCreateView', () => {
     await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
     await wrapper.get('[data-participant-id="19"]').trigger('click')
     await wrapper.get('[data-participant-id="27"]').trigger('click')
-    await wrapper.get('[data-action="add-item"]').trigger('click')
 
     await wrapper.get('[data-item-name="0"]').setValue('Pasta')
     await wrapper.get('[data-item-unit-price="0"]').setValue('12.50')
@@ -431,7 +429,6 @@ describe('SettlementCreateView', () => {
     await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
 
     await wrapper.get('[data-action="add-item"]').trigger('click')
-    await wrapper.get('[data-action="add-item"]').trigger('click')
     await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '10', quantity: '1' })
     await allocate(wrapper, 0, '12', '1')
     // 두 번째 품목은 배분 합이 수량과 어긋난다.
@@ -454,7 +451,6 @@ describe('SettlementCreateView', () => {
     await drillDownToTransaction(wrapper)
     await wrapper.get('[data-participant-id="19"]').trigger('click')
     await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
-    await wrapper.get('[data-action="add-item"]').trigger('click')
     await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '25', quantity: '2' })
     await allocate(wrapper, 0, '12', '1')
 
@@ -472,7 +468,6 @@ describe('SettlementCreateView', () => {
     await drillDownToTransaction(wrapper)
     await wrapper.get('[data-participant-id="19"]').trigger('click')
     await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
-    await wrapper.get('[data-action="add-item"]').trigger('click')
 
     // 원거래는 25.00인데 품목 합계가 30.00이다. 서버가 거절할 요청이라 여기서 막는다.
     await fillItem(wrapper, 0, { name: 'Wine', unitPrice: '30.00', quantity: '1' })
@@ -492,7 +487,6 @@ describe('SettlementCreateView', () => {
     await drillDownToTransaction(wrapper)
     await wrapper.get('[data-participant-id="19"]').trigger('click')
     await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
-    await wrapper.get('[data-action="add-item"]').trigger('click')
     await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '12.50', quantity: '2' })
     await allocate(wrapper, 0, '12', '1')
     await allocate(wrapper, 0, '19', '1')
@@ -507,7 +501,6 @@ describe('SettlementCreateView', () => {
     await drillDownToTransaction(wrapper)
     await wrapper.get('[data-participant-id="19"]').trigger('click')
     await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
-    await wrapper.get('[data-action="add-item"]').trigger('click')
     await fillItem(wrapper, 0, { name: 'Dinner', unitPrice: '12.50', quantity: '2' })
     await allocate(wrapper, 0, '12', '1')
     await allocate(wrapper, 0, '19', '1')
@@ -530,5 +523,63 @@ describe('SettlementCreateView', () => {
     // 나머지를 누가 더 낼지는 통화 단위에 달려 있어 화면이 알 수 없다. 규칙만 알린다.
     expect(wrapper.find('[data-testid="request-total"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Split evenly across 2 people')
+  })
+
+  it('lays out the first item as soon as the itemized split is chosen', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    // 균등 분할에는 품목이 없다.
+    expect(wrapper.find('[data-item-name="0"]').exists()).toBe(false)
+
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    // 품목이 0개인 품목별 정산은 어차피 통과하지 못한다. 빈 자리부터 보여줄 이유가 없다.
+    expect(wrapper.find('[data-item-name="0"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-item-invalid]')).toHaveLength(0)
+  })
+
+  it('keeps what was typed when the split method is toggled back', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '25', quantity: '1' })
+
+    await wrapper.get('[data-type="EQUAL"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    // 자동으로 까는 것은 비어 있을 때뿐이다. 적어 둔 것을 밀어내면 안 된다.
+    expect((wrapper.get('[data-item-name="0"]').element as HTMLInputElement).value).toBe('Pasta')
+    expect(wrapper.findAll('[data-item-name]')).toHaveLength(1)
+  })
+
+  it('removes the item card that the x button belongs to', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+    await fillItem(wrapper, 0, { name: 'Pasta', unitPrice: '10', quantity: '1' })
+    await fillItem(wrapper, 1, { name: 'Wine', unitPrice: '15', quantity: '1' })
+
+    await wrapper.get('[data-remove-item="0"]').trigger('click')
+
+    // 지운 자리로 뒷 품목이 당겨진다. 잘못 눌러 남은 쪽이 사라지면 알아채기 어렵다.
+    expect(wrapper.findAll('[data-item-name]')).toHaveLength(1)
+    expect((wrapper.get('[data-item-name="0"]').element as HTMLInputElement).value).toBe('Wine')
+  })
+
+  it('hides the remove button on the last item card', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+
+    // 마지막 한 장까지 지우면 어떤 편집으로도 빠져나올 수 없는 자리가 남는다.
+    expect(wrapper.find('[data-remove-item]').exists()).toBe(false)
+
+    await wrapper.get('[data-action="add-item"]').trigger('click')
+    expect(wrapper.findAll('[data-remove-item]')).toHaveLength(2)
+
+    await wrapper.get('[data-remove-item="1"]').trigger('click')
+    expect(wrapper.find('[data-remove-item]').exists()).toBe(false)
   })
 })

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { IconX } from '@tabler/icons-vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -195,12 +196,14 @@ function selectTransaction(candidate: SettlementCandidate): void {
 
 function goToDetails(): void {
   if (selectedCandidate.value === null) return
+  ensureFirstItem()
   step.value = 2
   emit('update:step', step.value)
 }
 
 function setType(nextType: SettlementType): void {
   type.value = nextType
+  ensureFirstItem()
   validationMessage.value = null
 }
 
@@ -229,6 +232,29 @@ function toggleParticipant(participantId: string): void {
 
 function addItem(): void {
   items.value.push({ name: '', unitPrice: '', quantity: '', allocations: [] })
+}
+
+/*
+ * 품목별 정산으로 들어오면 빈 품목 한 장을 미리 깔아 둔다.
+ *
+ * 품목이 하나도 없는 품목별 정산은 어차피 다음 단계로 넘어가지 못한다. 빈 자리를 두고
+ * "추가"부터 누르게 하면 무엇을 적는 화면인지 보여주지도 못한 채 한 번 더 두드리게 만든다.
+ * 이미 적어 둔 품목이 있으면 건드리지 않아서, 방식을 오갔다 돌아와도 값이 그대로 남는다.
+ */
+function ensureFirstItem(): void {
+  if (type.value === 'ITEMIZED' && items.value.length === 0) addItem()
+}
+
+/*
+ * 마지막 한 장은 지우지 않는다.
+ *
+ * 품목이 0개면 진행할 수 없는데, 그 상태에서는 왜 막혔는지 짚어 줄 카드조차 화면에 남지
+ * 않는다. 그래서 마지막 한 장에서는 버튼 자체를 감춘다. 내용을 비우려면 칸을 지우면 된다.
+ */
+function removeItem(index: number): void {
+  if (items.value.length <= 1) return
+  items.value.splice(index, 1)
+  validationMessage.value = null
 }
 
 function updateItem(index: number, field: 'name' | 'unitPrice' | 'quantity', value: string): void {
@@ -599,6 +625,25 @@ defineExpose({ back })
           class="mt-4 rounded-sm bg-surface-1 p-4"
           :class="{ 'ring-1 ring-danger': invalidItemIndexes.has(index) }"
         >
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <p class="text-caption text-ink-3">
+              {{ t('settlement.create.itemNumber', { number: index + 1 }) }}
+            </p>
+            <button
+              v-if="items.length > 1"
+              type="button"
+              :data-remove-item="index"
+              class="-my-2 -mr-2 grid size-11 shrink-0 place-items-center rounded-sm text-ink-3"
+              :aria-label="t('settlement.create.removeItem', { number: index + 1 })"
+              @click="removeItem(index)"
+            >
+              <IconX
+                :size="18"
+                :stroke-width="1.8"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
           <p
             v-if="invalidItemIndexes.has(index)"
             :id="`item-error-${index}`"

@@ -65,6 +65,8 @@ export default {
       payerRequired: 'The original payer is included and cannot be removed.',
       items: 'Items',
       addItem: 'Add item',
+      itemNumber: 'Item {number}',
+      removeItem: 'Remove item {number}',
       itemName: 'Item name',
       unitPrice: 'Unit price',
       quantity: 'Quantity',
