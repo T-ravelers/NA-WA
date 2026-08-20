@@ -773,7 +773,7 @@ class QrPaymentServiceImplTest {
     // ===== executePayment =====
 
     private QrPaymentExecuteRequest executeRequest(String qrToken, SpendingScope scope, Long appointmentId) {
-        return new QrPaymentExecuteRequest(qrToken, null, scope, appointmentId);
+        return new QrPaymentExecuteRequest(qrToken, null, scope, appointmentId, null);
     }
 
     private void stubLockableWallets(String payerStatus, String payeeStatus) {
@@ -823,6 +823,71 @@ class QrPaymentServiceImplTest {
         verify(walletMapper).updateBalance(PAYER_WALLET_ID, new BigDecimal("31500.0000"));
         verify(walletMapper).updateBalance(PAYEE_WALLET_ID, new BigDecimal("21000.0000"));
         verifyNoInteractions(tripExpenseLinkMapper);
+    }
+
+    @Test
+    void executePayment_storesSpendingCategory_whenPayerChoseOne() {
+        stubLockableWallets("ACTIVE", "ACTIVE");
+        stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
+        when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
+
+        doAnswer(invocation -> {
+            WalletTransfer transfer = invocation.getArgument(0);
+            transfer.setTransferId(999L);
+            return null;
+        }).when(walletTransferMapper).insert(any());
+
+        when(qrPaymentCodeMapper.markCompleted(eq(10L), eq(999L), any(), any())).thenReturn(1);
+
+        qrPaymentService.executePayment(
+            MEMBER_ID,
+            "idem-1",
+            new QrPaymentExecuteRequest("token-abc", null, SpendingScope.PERSONAL, null, "food")
+        );
+
+        ArgumentCaptor<WalletTransfer> captor = ArgumentCaptor.forClass(WalletTransfer.class);
+        verify(walletTransferMapper).insert(captor.capture());
+        assertEquals("FOOD", captor.getValue().getSpendingCategory());
+    }
+
+    // 카테고리를 고르지 않은 결제도 받아야 한다. 리포트 집계 쿼리가 NULL을 OTHER로 접으므로
+    // 저장 시점에도 같은 값으로 접어 두 곳이 어긋나지 않게 한다.
+    @Test
+    void executePayment_storesOtherCategory_whenPayerChoseNone() {
+        stubLockableWallets("ACTIVE", "ACTIVE");
+        stubLockableQr(QrPaymentStatus.ACTIVE, LocalDateTime.now().plusMinutes(5), BigDecimal.valueOf(18500));
+        when(transactionNumberGenerator.generate()).thenReturn("TXN-20260812-ABCDEFGH");
+
+        doAnswer(invocation -> {
+            WalletTransfer transfer = invocation.getArgument(0);
+            transfer.setTransferId(999L);
+            return null;
+        }).when(walletTransferMapper).insert(any());
+
+        when(qrPaymentCodeMapper.markCompleted(eq(10L), eq(999L), any(), any())).thenReturn(1);
+
+        qrPaymentService.executePayment(
+            MEMBER_ID, "idem-1", executeRequest("token-abc", SpendingScope.PERSONAL, null)
+        );
+
+        ArgumentCaptor<WalletTransfer> captor = ArgumentCaptor.forClass(WalletTransfer.class);
+        verify(walletTransferMapper).insert(captor.capture());
+        assertEquals("OTHER", captor.getValue().getSpendingCategory());
+    }
+
+    @Test
+    void executePayment_throwsSpendingCategoryNotAllowed_whenCategoryIsUnknown() {
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> qrPaymentService.executePayment(
+                MEMBER_ID,
+                "idem-1",
+                new QrPaymentExecuteRequest("token-abc", null, SpendingScope.PERSONAL, null, "CAFE")
+            )
+        );
+
+        assertEquals(WalletErrorCode.SPENDING_CATEGORY_NOT_ALLOWED, exception.getErrorCode());
+        verifyNoInteractions(walletTransferMapper);
     }
 
     @Test
@@ -1191,7 +1256,9 @@ class QrPaymentServiceImplTest {
         when(qrPaymentCodeMapper.findByCompletedTransferId(999L)).thenReturn(qr);
 
         QrPaymentExecuteRequest differentAmountRequest =
-            new QrPaymentExecuteRequest("token-abc", BigDecimal.valueOf(9999), SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(
+                "token-abc", BigDecimal.valueOf(9999), SpendingScope.PERSONAL, null, null
+            );
 
         BusinessException exception = assertThrows(
             BusinessException.class,
