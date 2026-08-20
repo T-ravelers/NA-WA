@@ -160,6 +160,28 @@ describe('AppointmentAttendanceView', () => {
     expect(toggleFor(wrapper, 'Alex Kim').attributes('aria-pressed')).toBe('false')
   })
 
+  it('marks the host themselves with a badge, not by replacing their name', async () => {
+    // 이름을 통째로 "You"로 바꾸면 토글의 aria-label이 쓰는 실명과 어긋나, 눈으로
+    // 보는 이름과 스크린 리더가 읽는 이름이 달라진다. 회원 목록과 같은 방식이다.
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Mina Park')
+    expect(wrapper.text()).toContain('You')
+    expect(toggleFor(wrapper, 'Mina Park').exists()).toBe(true)
+  })
+
+  it('says each status once per row, not twice', async () => {
+    // 상태는 오른쪽 토글 버튼이 말한다. 카드가 같은 값을 한 번 더 적으면 한 줄에
+    // 같은 말이 두 번 남는다.
+    const { wrapper } = await mountView()
+
+    const rows = wrapper.findAll('li')
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      expect(row.text().split('No-show').length - 1).toBe(1)
+    }
+  })
+
   it('toggles a member between not attended and attended', async () => {
     const { wrapper } = await mountView()
 

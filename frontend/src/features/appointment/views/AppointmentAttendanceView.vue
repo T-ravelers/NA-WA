@@ -284,13 +284,16 @@ function retry(): void {
 
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center gap-2">
-                    <h3 class="truncate text-title-sm text-ink">
-                      {{
-                        member.appointmentMemberId === myAppointmentMemberId
-                          ? t('appointment.attendance.you')
-                          : member.displayName
-                      }}
-                    </h3>
+                    <!-- 본인도 이름을 그대로 적고 배지로 가른다. 회원 목록이 쓰는
+                         방식이고, 이름을 통째로 "You"로 바꾸면 토글의 aria-label이
+                         쓰는 실명과 어긋나 보이는 이름과 읽히는 이름이 달라진다. -->
+                    <h3 class="truncate text-title-sm text-ink">{{ member.displayName }}</h3>
+                    <AppBadge
+                      v-if="member.appointmentMemberId === myAppointmentMemberId"
+                      tone="neutral"
+                    >
+                      {{ t('appointment.attendance.you') }}
+                    </AppBadge>
                     <AppBadge :tone="member.isHost ? 'settlement' : 'neutral'">
                       {{
                         member.isHost
@@ -299,11 +302,6 @@ function retry(): void {
                       }}
                     </AppBadge>
                   </div>
-                  <!-- 상태는 오른쪽 토글 버튼이 이미 말한다. 여기서는 아직 손대지
-                       않은 사람을 눈에 띄게만 한다. -->
-                  <p class="mt-1 text-caption text-ink-3">
-                    {{ statusLabel(attendanceStatus(member)) }}
-                  </p>
                 </div>
 
                 <div class="w-28 shrink-0">
