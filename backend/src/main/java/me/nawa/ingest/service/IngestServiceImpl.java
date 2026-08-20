@@ -229,9 +229,13 @@ public class IngestServiceImpl implements IngestService {
     /**
      * 분류 목록을 확인합니다.
      *
-     * <p>대표 분류는 최대 하나입니다. 둘 이상이면 어느 것을 대표로 보여줄지
-     * 화면이 정할 수 없습니다. 하나도 없는 것은 허용합니다 — 분류를 통째로
-     * 지우는 요청일 수 있습니다.
+     * <p>대표 분류는 최대 하나입니다. 노출 기준이 대표 분류 하나라는 정책을
+     * 그대로 지킵니다. 둘이 들어오면 화면이 무엇을 보여줄지 정할 수 없습니다.
+     *
+     * <p>빈 목록은 받습니다. 분류를 통째로 지우는 요청이기 때문입니다.
+     * 다만 파이프라인은 분류 없는 항목을 보내지 않습니다 — 노출되려면 대표
+     * 분류가 있어야 하므로 분류 없는 상태는 정상이 아니고, 수집이 잠깐 분류를
+     * 못 붙인 항목의 기존 분류까지 지워지면 안 됩니다.
      */
     private static void validateActivities(ActivityIngestItem item) {
         requireValid(hasText(item.getPipelineId()));
