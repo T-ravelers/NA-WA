@@ -1,6 +1,8 @@
 package me.nawa.wallet.domain.enums;
 
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.Optional;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.wallet.exception.WalletErrorCode;
 
@@ -37,17 +39,41 @@ public enum SpendingCategory {
      * 삼키면 리포트 칭호가 틀린 근거로 만들어진다.
      */
     public static SpendingCategory from(String value) {
+        return resolve(value).orElseThrow(() -> new BusinessException(
+            WalletErrorCode.SPENDING_CATEGORY_NOT_ALLOWED
+        ));
+    }
+
+    /**
+     * 이미 저장된 값을 읽는다.
+     *
+     * {@link #from}과 달리 목록 밖의 값을 거부하지 않고 {@link #OTHER}로 접는다. 저장된
+     * 값은 지나간 결제의 사실이라 되돌릴 수 없는데, 여기서 거부하면 이미 성공한 결제의
+     * 멱등 재시도가 멱등 응답 대신 400을 받는다. 값 집합을 줄이거나 백필이 한 번이라도
+     * 들어오면 실제로 일어난다.
+     *
+     * 들어오는 값은 계속 거부한다. 두 방향을 다르게 다루는 것이 의도다.
+     */
+    public static SpendingCategory fromStored(String value) {
+        return resolve(value).orElse(OTHER);
+    }
+
+    /**
+     * 앞뒤 공백을 자르고 대문자로 맞춘 뒤 목록에서 찾는다.
+     *
+     * `toUpperCase`에 {@link Locale#ROOT}를 넘긴다. 인자가 없으면 JVM 기본 로케일을 따르는데,
+     * 터키어 로케일에서는 `i`가 `İ`(U+0130)로 올라가 `shopping`이 `SHOPPİNG`이 된다. 일곱 값
+     * 중 `SHOPPING` 하나가 `i`를 가지고 있어, 그 로케일에서 소문자 요청이 거부된다.
+     */
+    private static Optional<SpendingCategory> resolve(String value) {
         if (value == null || value.isBlank()) {
-            return OTHER;
+            return Optional.of(OTHER);
         }
 
-        String normalized = value.trim().toUpperCase();
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
 
         return Arrays.stream(values())
             .filter(category -> category.name().equals(normalized))
-            .findFirst()
-            .orElseThrow(() -> new BusinessException(
-                WalletErrorCode.SPENDING_CATEGORY_NOT_ALLOWED
-            ));
+            .findFirst();
     }
 }

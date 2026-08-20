@@ -800,11 +800,12 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
         }
 
-        // 소비 카테고리도 같아야 한다. 저장된 값도 from으로 접어서 비교한다 —
-        // 이 기능 이전에 만들어진 거래는 컬럼이 NULL이라 그대로 비교하면 OTHER를 보낸
-        // 재요청이 충돌로 잘못 거절된다.
+        // 소비 카테고리도 같아야 한다. 들어온 값은 from으로 거부까지 하지만, 저장된 값은
+        // fromStored로 관대하게 읽는다 — 지나간 결제의 사실이라 되돌릴 수 없고, 여기서
+        // 거부하면 이미 성공한 결제의 재시도가 멱등 응답 대신 400을 받는다. 이 기능 이전에
+        // 만들어진 거래(컬럼이 NULL)도 같은 경로로 OTHER가 된다.
         if (SpendingCategory.from(request.spendingCategory())
-            != SpendingCategory.from(transfer.getSpendingCategory())) {
+            != SpendingCategory.fromStored(transfer.getSpendingCategory())) {
             throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
         }
 
