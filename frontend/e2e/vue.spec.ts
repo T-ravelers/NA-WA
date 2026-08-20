@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test('renders the NA-WA app shell', async ({ page }) => {
   await page.goto('/')

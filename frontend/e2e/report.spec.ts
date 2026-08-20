@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 const memberEnvelope = {
   success: true,
@@ -169,10 +169,13 @@ test('selects expenses, prevents duplicate generation, and opens the final repor
   await expect(generate).toBeDisabled()
 
   await expect(page).toHaveURL(/\/reports\/101$/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Final report' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Report' })).toBeVisible()
   await expect(page.getByText('₩23,000')).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: 'By category' })).toBeVisible()
-  await expect(page.getByText('FOOD 78%', { exact: true })).toBeVisible()
+  // 범례는 분류명과 비율을 각각 다른 요소로 그린다. 한 문자열로 묶어 찾으면
+  // 마크업이 조금만 바뀌어도 깨지므로 행 단위로 확인한다.
+  const foodRow = page.getByRole('listitem').filter({ hasText: 'FOOD' })
+  await expect(foodRow).toContainText('78%')
   await expect(page.getByRole('heading', { level: 2, name: 'Spending trend' })).toBeVisible()
   await expect(page.getByRole('listitem').filter({ hasText: '2021.07.20' })).toBeVisible()
   expect(createRequest).toEqual({ locale: 'en', transferIds: [10, 30] })
