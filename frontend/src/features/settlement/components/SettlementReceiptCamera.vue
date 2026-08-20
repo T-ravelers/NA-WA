@@ -18,6 +18,14 @@ const video = useTemplateRef('video')
 const errorKey = ref<string | null>(null)
 const busy = ref(false)
 let stream: MediaStream | null = null
+/*
+ * 이 화면이 이미 닫혔는지 표시해 둔다.
+ *
+ * 카메라를 켜도 되는지 묻는 창이 떠 있는 동안 사용자가 닫으면, 정리가 먼저 끝나고 카메라는
+ * 그 뒤에야 열린다. 표시를 남기지 않으면 아무도 끄지 않는 카메라가 그대로 남아, 페이지를
+ * 떠날 때까지 촬영 표시등이 켜진 채로 있다.
+ */
+let disposed = false
 
 function stop(): void {
   stream?.getTracks().forEach((track) => track.stop())
@@ -32,10 +40,18 @@ async function start(): Promise<void> {
 
   try {
     // 휴대폰에서는 뒷면 카메라를 쓴다. 영수증은 자기 얼굴 쪽으로 찍지 않는다.
-    stream = await navigator.mediaDevices.getUserMedia({
+    const acquired = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment' },
       audio: false,
     })
+
+    // 기다리는 사이에 화면이 닫혔다면, 열린 카메라를 여기서 직접 끄고 물러난다.
+    if (disposed) {
+      acquired.getTracks().forEach((track) => track.stop())
+      return
+    }
+
+    stream = acquired
 
     if (video.value !== null) {
       video.value.srcObject = stream
@@ -79,7 +95,10 @@ async function shoot(): Promise<void> {
 }
 
 onMounted(start)
-onBeforeUnmount(stop)
+onBeforeUnmount(() => {
+  disposed = true
+  stop()
+})
 </script>
 
 <template>
