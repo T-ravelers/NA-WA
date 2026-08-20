@@ -247,6 +247,49 @@ export function formatCalendarDateString(
   return serializeCalendarDate(date).replace(/-/g, separator)
 }
 
+/** 달력 한 칸. `date`는 날짜 전용 API 값(YYYY-MM-DD)이다. */
+export interface CalendarCell {
+  date: string
+  day: number
+  /** 이번 달 날짜인지. 앞뒤 달에서 채워 넣은 칸은 `false`다. */
+  inMonth: boolean
+}
+
+/** 달력 한 판의 줄 수. 6주 × 7일로 고정해 달마다 높이가 흔들리지 않게 한다. */
+const CALENDAR_CELL_COUNT = 42
+
+/**
+ * 한 달을 6주짜리 달력 판으로 만든다.
+ *
+ * 첫 주의 빈 앞자리와 마지막 주의 빈 뒷자리는 앞뒤 달 날짜로 채우고 `inMonth: false`로
+ * 표시한다. 호출부는 그 칸을 흐리게 그리거나 누르지 못하게 한다.
+ *
+ * 주는 일요일에 시작한다.
+ */
+export function buildCalendarMonth(monthCursor: Date): CalendarCell[] {
+  const year = monthCursor.getFullYear()
+  const month = monthCursor.getMonth()
+  const startOffset = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const previousMonthDays = new Date(year, month, 0).getDate()
+  const cells: CalendarCell[] = []
+
+  for (let index = 0; index < CALENDAR_CELL_COUNT; index += 1) {
+    const rawDay = index - startOffset + 1
+    const inMonth = rawDay >= 1 && rawDay <= daysInMonth
+    const day = inMonth ? rawDay : rawDay < 1 ? previousMonthDays + rawDay : rawDay - daysInMonth
+
+    cells.push({ date: serializeCalendarDate(new Date(year, month, rawDay)), day, inMonth })
+  }
+
+  return cells
+}
+
+/** 달력에서 달을 옮긴다. 항상 1일을 가리켜 말일이 있는 달에서 날짜가 튀지 않는다. */
+export function shiftCalendarMonth(monthCursor: Date, offset: number): Date {
+  return new Date(monthCursor.getFullYear(), monthCursor.getMonth() + offset, 1)
+}
+
 // 의미를 드러내는 별칭을 제공해 날짜 전용 값이 서버 시각 파서로 흘러가지 않게 한다.
 export const formatDateOnly = formatCalendarDate
 export const formatDateOnlyString = formatCalendarDateString
