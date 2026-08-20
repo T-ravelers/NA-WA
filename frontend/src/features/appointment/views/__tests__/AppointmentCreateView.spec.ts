@@ -30,7 +30,7 @@ function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
   return button
 }
 
-async function mountView() {
+async function mountView(query = '?itemId=42&itemType=EVENT') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -57,7 +57,7 @@ async function mountView() {
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  await router.push('/appointments/new?itemId=42&itemType=EVENT')
+  await router.push(`/appointments/new${query}`)
   await router.isReady()
 
   const wrapper = mount(AppointmentCreateView, {
@@ -75,7 +75,7 @@ async function mountView() {
         [appointmentExploreIntegrationKey as symbol]: {
           useItemLocation: () => ({
             data: ref({ placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' }),
-            isPending: ref(false),
+            isLoading: ref(false),
             isError: ref(false),
           }),
         },
@@ -153,6 +153,20 @@ describe('AppointmentCreateView', () => {
     expect(wrapper.find('form').exists()).toBe(false)
   })
 
+  it('names the broken entry instead of blaming the date check when the item type is missing', async () => {
+    // itemType이 없으면 폼에 들어가도 항목 위치를 읽을 수 없다. 여기서 막지 않으면
+    // 사용자는 원인을 알 수 없는 화면에 갇힌다.
+    const { wrapper } = await mountView('?itemId=42')
+
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    await buttonByText(wrapper, 'Continue with').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Open this form from an Event or Place.')
+    expect(wrapper.find('form').exists()).toBe(false)
+    expect(checkJourneyItemExists).not.toHaveBeenCalled()
+  })
+
   it('returns to the journey select sheet when the date sheet is closed', async () => {
     const { wrapper } = await mountView()
 
@@ -203,7 +217,7 @@ describe('AppointmentCreateView', () => {
           [appointmentExploreIntegrationKey as symbol]: {
             useItemLocation: () => ({
               data: ref(undefined),
-              isPending: ref(false),
+              isLoading: ref(false),
               isError: ref(false),
             }),
           },

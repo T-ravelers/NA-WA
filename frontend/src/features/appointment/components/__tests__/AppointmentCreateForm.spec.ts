@@ -7,33 +7,19 @@ import { i18n } from '@/app/i18n'
 import { appointmentExploreIntegrationKey } from '../../model/exploreIntegration'
 import AppointmentCreateForm from '../AppointmentCreateForm.vue'
 
-/** 항목 위치 조회는 explore feature가 제공한다. 폼은 연동으로만 받는다. */
-const itemLocation = ref<{ placeName: string | null; addressRoad: string | null } | undefined>({
-  placeName: 'DDP Design Plaza',
-  addressRoad: '281 Eulji-ro, Jung-gu',
-})
-
-const mountOptions = {
-  global: {
-    plugins: [i18n],
-    provide: {
-      [appointmentExploreIntegrationKey as symbol]: {
-        useItemLocation: () => ({
-          data: itemLocation,
-          isPending: ref(false),
-          isError: ref(false),
-        }),
-      },
-    },
-  },
-}
-
-/** 조회 중·조회 실패처럼 위치 상태에 따라 화면이 갈리는 경우만 따로 세운다. */
-function locationMountOptions(state: {
-  data?: { placeName: string | null; addressRoad: string | null }
-  isPending?: boolean
-  isError?: boolean
-}) {
+/**
+ * 항목 위치 조회는 explore feature가 제공한다. 폼은 연동으로만 받는다.
+ *
+ * 마운트마다 새 ref를 세워 테스트끼리 상태를 나눠 갖지 않게 한다 — 공유 ref를
+ * 바꿨다 되돌리면 되돌린 값이 원본과 어긋나 뒤 테스트가 엉뚱한 이유로 깨진다.
+ */
+function locationMountOptions(
+  state: {
+    data?: { placeName: string | null; addressRoad: string | null }
+    isLoading?: boolean
+    isError?: boolean
+  } = {},
+) {
   return {
     global: {
       plugins: [i18n],
@@ -41,7 +27,7 @@ function locationMountOptions(state: {
         [appointmentExploreIntegrationKey as symbol]: {
           useItemLocation: () => ({
             data: ref(state.data),
-            isPending: ref(state.isPending ?? false),
+            isLoading: ref(state.isLoading ?? false),
             isError: ref(state.isError ?? false),
           }),
         },
@@ -49,6 +35,10 @@ function locationMountOptions(state: {
     },
   }
 }
+
+const mountOptions = locationMountOptions({
+  data: { placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' },
+})
 
 function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
   const button = wrapper.findAll('button').find((candidate) => candidate.text().includes(text))
@@ -129,28 +119,42 @@ describe('AppointmentCreateForm', () => {
   })
 
   it('blocks submission when the activity location could not be read', async () => {
-    itemLocation.value = undefined
     const wrapper = mount(AppointmentCreateForm, {
       props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
-      ...mountOptions,
+      ...locationMountOptions({ isError: true }),
     })
 
     await fillBasics(wrapper)
 
     expect(wrapper.text()).toContain('We could not read this activity location.')
-    itemLocation.value = { placeName: 'DDP Design Plaza', addressRoad: null }
   })
 
   it('says the activity location is still loading instead of blaming a failure', () => {
     const wrapper = mount(AppointmentCreateForm, {
       props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
-      ...locationMountOptions({ isPending: true }),
+      ...locationMountOptions({ isLoading: true }),
     })
 
     // 아직 읽는 중일 뿐인데 "못 읽었다"고 말하면 사용자는 고칠 수 없는 문제로 받아들인다.
     expect(wrapper.text()).toContain('Reading the activity location')
     expect(wrapper.text()).not.toContain('We could not read this activity location.')
     expect(buttonByText(wrapper, 'Continue').attributes('disabled')).toBeDefined()
+  })
+
+  it('does not lock Continue when the item query never starts', async () => {
+    // 항목 정보가 없으면 위치 조회가 꺼진 채로 있다. 이때를 "읽는 중"으로 보면 다음이
+    // 영영 잠겨, 진짜 원인인 잘못된 진입 안내를 볼 방법조차 없어진다.
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, tripId: 7, visitDate: '2026-08-08' },
+      ...locationMountOptions(),
+    })
+
+    expect(wrapper.text()).not.toContain('Reading the activity location')
+    expect(buttonByText(wrapper, 'Continue').attributes('disabled')).toBeUndefined()
+
+    await fillBasics(wrapper)
+
+    expect(wrapper.text()).toContain('Open this form from an Event or Place.')
   })
 
   it('warns about a failed location before the host presses Continue', () => {

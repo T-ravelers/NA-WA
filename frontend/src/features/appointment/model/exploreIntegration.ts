@@ -17,7 +17,14 @@ export interface AppointmentItemLocation {
 
 export interface AppointmentItemLocationQuery {
   data: Ref<AppointmentItemLocation | undefined>
-  isPending: Ref<boolean>
+  /**
+   * **실제로 읽고 있는 중일 때만 참이다.**
+   *
+   * `isPending`은 `enabled: false`로 꺼져 있는 쿼리에서도 참이라 "읽는 중"을
+   * 판단하는 데 쓸 수 없다 — 항목 정보가 없어 쿼리가 꺼진 상태를 영영 읽는 중으로
+   * 보게 된다. 그래서 이 연동은 `isPending`을 노출하지 않는다.
+   */
+  isLoading: Ref<boolean>
   isError: Ref<boolean>
 }
 

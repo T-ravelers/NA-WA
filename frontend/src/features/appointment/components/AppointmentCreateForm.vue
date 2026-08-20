@@ -76,7 +76,7 @@ const itemPlaceName = computed(() => itemLocationQuery.data.value?.placeName ?? 
 // 조회 중과 조회 실패는 둘 다 meetingPlace가 비어 있어 같은 오류로 보인다. 아직
 // 읽는 중일 뿐인데 "못 읽었다"고 말하지 않도록 상태를 갈라 안내한다.
 const waitingForItemPlace = computed(
-  () => draft.meetingPlaceMode === 'ITEM' && itemLocationQuery.isPending.value,
+  () => draft.meetingPlaceMode === 'ITEM' && itemLocationQuery.isLoading.value,
 )
 const itemPlaceFailed = computed(
   () => draft.meetingPlaceMode === 'ITEM' && itemLocationQuery.isError.value,
