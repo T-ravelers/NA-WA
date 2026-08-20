@@ -475,6 +475,15 @@ class SwaggerConfigTest {
         }
 
         @Bean
+        me.nawa.settlement.service.SettlementReceiptOcrService settlementReceiptOcrService() {
+            return new me.nawa.settlement.service.SettlementReceiptOcrService() {
+                @Override public me.nawa.settlement.dto.response.SettlementReceiptOcrResponse recognize(
+                    Long memberId, Long receiptId
+                ) { throw new UnsupportedOperationException(); }
+            };
+        }
+
+        @Bean
         SettlementCreationService settlementCreationService() {
             return new SettlementCreationService() {
                 @Override public me.nawa.settlement.dto.response.SettlementCreateResponse createSettlement(
