@@ -3,7 +3,10 @@ export default {
     errorCode: {
       'APPOINTMENT-002': 'This appointment is not open for joining.',
       'APPOINTMENT-003': 'You have already joined this appointment.',
+      'APPOINTMENT-004': 'Only the appointment host can do this.',
       'APPOINTMENT-005': 'You are not a member of this appointment.',
+      'APPOINTMENT-006':
+        'Attendance could not be confirmed. Mark at least one member as attended and try again.',
       'APPOINTMENT-007': 'You can no longer leave this appointment.',
     },
     list: {
@@ -233,14 +236,16 @@ export default {
         NO_SHOW: 'No-show',
       },
       toggle: 'Toggle attendance for {name}',
-      save: 'Attendance checked',
-      saveUnavailable: 'Attendance saving will be available when the API is connected.',
+      save: 'Confirm attendance',
+      hint: 'Tap a member to switch between attended and no-show. Everyone starts as attended.',
+      requireAttended: 'Mark at least one member as attended.',
       invalidTitle: 'Attendance could not be loaded',
       invalidDescription: 'The appointment link is invalid.',
       accessDeniedTitle: 'Host access required',
       accessDeniedDescription: 'Only the appointment host can confirm attendance.',
-      notCompletedTitle: 'Attendance is not available yet',
-      notCompletedDescription: 'Attendance opens after the appointment is completed.',
+      notCompletedTitle: 'Attendance is not open',
+      notCompletedDescription:
+        'Attendance opens once the activity starts, and closes once you confirm it.',
       loadFailed: 'Attendance could not be loaded',
       loadFailedDescription: 'Please try again in a moment.',
     },
