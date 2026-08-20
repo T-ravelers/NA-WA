@@ -56,14 +56,6 @@ const membersQuery = useQuery({
   retry: false,
 })
 
-// 이미 후기를 쓴 대상은 서버에서 받아온다. 화면 메모리에만 두면 새로고침하거나
-// 나갔다 오는 순간 전원이 미작성으로 되돌아가고, 다시 제출하면 REVIEW-002가 난다.
-const reviewStatusQuery = useQuery({
-  ...appointmentReviewStatusQueryOptions(appointmentId),
-  enabled: computed(() => appointmentId.value !== null),
-  retry: false,
-})
-
 const myAppointmentMemberId = computed(
   () => participationQuery.data.value?.appointmentMemberId ?? null,
 )
@@ -88,6 +80,20 @@ const isActiveParticipant = computed(() => {
   )
 })
 const canReview = computed(() => appointmentCompleted.value && isActiveParticipant.value)
+
+// 이미 후기를 쓴 대상은 서버에서 받아온다. 화면 메모리에만 두면 새로고침하거나
+// 나갔다 오는 순간 전원이 미작성으로 되돌아가고, 다시 제출하면 REVIEW-002가 난다.
+//
+// 자격이 확인된 뒤에만 조회한다. 서버는 약속이 COMPLETED가 아니거나 요청자가
+// ACTIVE+ATTENDED가 아니면 이 조회를 REVIEW-001로 막는데(ReviewService), 자격과
+// 무관하게 먼저 부르면 그 거절이 "불러오지 못했습니다"로 보인다. 재시도해도
+// 달라질 게 없는 상태라 아래 전용 안내로 보내야 한다.
+const reviewStatusQuery = useQuery({
+  ...appointmentReviewStatusQueryOptions(appointmentId),
+  enabled: computed(() => appointmentId.value !== null && canReview.value),
+  retry: false,
+})
+
 const completedMemberIds = reactive(new Set<number>())
 
 // 서버가 준 목록을 화면 상태에 합친다. 지우지 않고 더하기만 한다 — 방금 이 화면에서
@@ -210,23 +216,24 @@ function finishReviews(): void {
       v-else-if="
         detailQuery.isPending.value ||
         membersQuery.isPending.value ||
-        participationQuery.isPending.value ||
-        reviewStatusQuery.isPending.value
+        participationQuery.isPending.value
       "
       :label="t('state.loading')"
     />
     <StateError
       v-else-if="
-        detailQuery.isError.value ||
-        membersQuery.isError.value ||
-        participationQuery.isError.value ||
-        reviewStatusQuery.isError.value
+        detailQuery.isError.value || membersQuery.isError.value || participationQuery.isError.value
       "
       :title="t('appointment.review.loadFailed')"
       :description="t('appointment.review.loadFailedDescription')"
       :action-label="t('action.retry')"
       @retry="retry"
     />
+    <!--
+      쓸 자격이 없는 상태는 실패가 아니라 정상 결과다. 재시도로 달라지지 않으므로
+      오류 화면보다 먼저 갈라 전용 안내를 보여준다. 후기 목록 조회는 자격이
+      확인된 뒤에만 시작한다.
+    -->
     <StateEmpty
       v-else-if="!appointmentCompleted"
       :title="t('appointment.review.notCompletedTitle')"
@@ -236,6 +243,17 @@ function finishReviews(): void {
       v-else-if="!isActiveParticipant"
       :title="t('appointment.review.accessDeniedTitle')"
       :description="t('appointment.review.accessDeniedDescription')"
+    />
+    <StateLoading
+      v-else-if="reviewStatusQuery.isLoading.value"
+      :label="t('state.loading')"
+    />
+    <StateError
+      v-else-if="reviewStatusQuery.isError.value"
+      :title="t('appointment.review.loadFailed')"
+      :description="t('appointment.review.loadFailedDescription')"
+      :action-label="t('action.retry')"
+      @retry="retry"
     />
     <template v-else-if="detailQuery.data.value !== undefined">
       <section class="flex flex-col gap-2">

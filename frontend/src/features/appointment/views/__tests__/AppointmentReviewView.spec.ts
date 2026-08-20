@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
+import { NormalizedApiError } from '@/shared/api/apiError'
 import { i18n } from '@/app/i18n'
 
 const fetchAppointment = vi.fn()
@@ -137,6 +138,10 @@ describe('AppointmentReviewView', () => {
     expect(wrapper.text()).toContain('Alex Kim')
   })
 
+  // 서버는 자격이 없는 요청자에게 후기 목록 조회를 REVIEW-001로 막는다
+  // (ReviewService.getMyReviewStatus). 그 거절을 "불러오지 못했습니다"로 보여 주면
+  // 재시도해도 달라질 게 없는 상태에 재시도를 권하게 되므로, 두 경우 모두 전용
+  // 안내가 나와야 한다.
   it('blocks reviews for members who are not active participants', async () => {
     fetchMyAppointmentParticipation.mockResolvedValue({
       joined: false,
@@ -145,18 +150,29 @@ describe('AppointmentReviewView', () => {
       attendanceStatus: null,
       host: false,
     })
+    fetchMyAppointmentReviewStatus.mockRejectedValue(
+      new NormalizedApiError('REVIEW-001', 403, 'not allowed'),
+    )
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Participant access required')
     expect(wrapper.text()).not.toContain('Save review')
+    expect(wrapper.text()).not.toContain('Reviews could not be loaded')
+    // 자격이 없으면 실패할 조회를 보내지 않는다.
+    expect(fetchMyAppointmentReviewStatus).not.toHaveBeenCalled()
   })
 
   it('blocks reviews until the appointment is completed', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'RECRUITING' })
+    fetchMyAppointmentReviewStatus.mockRejectedValue(
+      new NormalizedApiError('REVIEW-001', 403, 'not allowed'),
+    )
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Reviews are not available yet')
     expect(wrapper.text()).not.toContain('Save review')
+    expect(wrapper.text()).not.toContain('Reviews could not be loaded')
+    expect(fetchMyAppointmentReviewStatus).not.toHaveBeenCalled()
   })
 
   it('restores what was already written from the server', async () => {
@@ -175,7 +191,6 @@ describe('AppointmentReviewView', () => {
   })
 
   it('tells the user a duplicate review apart from a generic failure', async () => {
-    const { NormalizedApiError } = await import('@/shared/api/apiError')
     submitAppointmentReview.mockRejectedValue(
       new NormalizedApiError('REVIEW-002', 409, 'duplicate'),
     )
