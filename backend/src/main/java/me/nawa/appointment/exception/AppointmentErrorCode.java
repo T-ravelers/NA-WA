@@ -47,6 +47,11 @@ public enum AppointmentErrorCode implements ErrorCode {
             HttpStatus.CONFLICT,
             "APPOINTMENT-008",
             "보증금 결제 연동 후 이용할 수 있습니다."
+    ),
+    ATTENDANCE_NOT_ENDED(
+            HttpStatus.CONFLICT,
+            "APPOINTMENT-009",
+            "활동이 끝난 뒤에 출석을 확정할 수 있습니다."
     );
 
     private final HttpStatus status;

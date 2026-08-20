@@ -72,7 +72,7 @@ DB 컬럼: `appointments.appointment_status`
 | `RECRUITING → CLOSED` | 정원 도달은 `joinAppointment`가 참여 성공 트랜잭션 안에서 즉시 동기로 전환. 참여 마감 시각 도달은 시간 기반이라 스케줄러가 60초 주기로 전환(15절). |
 | `CLOSED → RECRUITING` | 정원 도달로 `CLOSED`된 약속에서, 마감 시각(`joinDeadline`) 전에 참여 취소가 발생해 빈자리가 생기면 `leaveAppointment`가 같은 트랜잭션에서 즉시 되돌립니다. 마감 시각이 지나 `CLOSED`된 경우는 참여 취소 자체가 마감 시각 전까지만 허용되므로 이 경로에 들어오지 않습니다. |
 | `CLOSED → IN_PROGRESS` | `activityStartAt` 도달. 방장의 별도 확정 액션 없이 스케줄러가 시간만 보고 전환(15절). |
-| `IN_PROGRESS → COMPLETED` | 방장이 모든 `ACTIVE` 회원의 출석을 확정 |
+| `IN_PROGRESS → COMPLETED` | 방장이 모든 `ACTIVE` 회원의 출석을 확정. `activityEndAt`이 지난 뒤에만 받습니다(4절). |
 | `* → CANCELLED` | 코드에는 정의돼 있으나 17절 정책에 따라 트리거하는 API·스케줄러를 만들지 않습니다. |
 
 ## 3. 약속 회원 상태 `MembershipStatus`
@@ -142,6 +142,10 @@ Java 패키지: `me.nawa.deposit.domain`(보증금 정산이 출석 결과를 �
 출석 확정 조건:
 
 - 약속 상태가 `IN_PROGRESS`
+- **활동 종료 시각(`activityEndAt`)이 지났음** — `IN_PROGRESS`는 활동 *시작*
+  시각에 스케줄러가 붙이므로 상태만으로는 활동 도중 확정을 막지 못합니다. 늦게
+  도착한 참여자가 노쇼로 굳으면 보증금을 잃는데 되돌리는 전이가 없습니다.
+  지나지 않았거나 값을 읽지 못하면 `APPOINTMENT-009`
 - 요청자는 해당 약속의 방장
 - 대상은 약속의 모든 `ACTIVE` 회원
 - 각 회원을 요청에 정확히 한 번씩 포함

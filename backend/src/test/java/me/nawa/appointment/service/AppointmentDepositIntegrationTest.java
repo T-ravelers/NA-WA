@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -374,9 +375,20 @@ class AppointmentDepositIntegrationTest {
 
         // 스케줄러가 실제로 IN_PROGRESS로 넘길 때까지 기다리지 않고, 출석
         // 확정 자체의 동작만 검증하기 위해 상태를 직접 IN_PROGRESS로 맞춘다.
+        // 활동 종료도 지나 있어야 한다(APPOINTMENT-009). 시각은 DB의 NOW()가
+        // 아니라 앱이 만든 값을 넘긴다 — CI는 MySQL을 UTC로 두기 때문에 DB 시계에
+        // 기대면 서비스가 보는 시각과 갈린다. join_deadline까지 함께 당기는 것은
+        // chk_appointments_schedule이 join_deadline <= activity_start_at
+        // < activity_end_at을 요구하기 때문이다.
+        LocalDateTime endedAt = LocalDateTime.now().minusHours(1);
         jdbcTemplate.update(
-                "UPDATE appointments SET appointment_status = 'IN_PROGRESS'"
+                "UPDATE appointments SET appointment_status = 'IN_PROGRESS',"
+                        + " join_deadline = ?,"
+                        + " activity_start_at = ?, activity_end_at = ?"
                         + " WHERE appointment_id = ?",
+                Timestamp.valueOf(endedAt.minusHours(4)),
+                Timestamp.valueOf(endedAt.minusHours(3)),
+                Timestamp.valueOf(endedAt),
                 created.getAppointmentId()
         );
 

@@ -377,6 +377,18 @@ public class AppointmentService {
                     AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
             );
         }
+        // IN_PROGRESS는 활동 '시작' 시각에 스케줄러가 바꾼다. 상태만 보면 활동이
+        // 진행되는 도중에도 확정이 통과해, 아직 오는 중인 참여자가 노쇼로 굳는다.
+        // 확정에는 되돌리는 상태 전이가 없고 노쇼는 보증금 몰수로 이어지므로
+        // 활동이 끝났는지 함께 본다. 화면에도 같은 조건이 있지만(#285) 화면에만
+        // 있는 조건은 화면을 거치지 않는 요청을 막지 못한다.
+        LocalDateTime activityEndAt = appointment.getActivityEndAt();
+        if (activityEndAt == null
+                || LocalDateTime.now().isBefore(activityEndAt)) {
+            throw new BusinessException(
+                    AppointmentErrorCode.ATTENDANCE_NOT_ENDED
+            );
+        }
 
         Map<Long, AttendanceStatus> requestedByMemberId =
                 toRequestedAttendanceMap(request);
