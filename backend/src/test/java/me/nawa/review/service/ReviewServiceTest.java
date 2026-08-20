@@ -11,6 +11,7 @@ import me.nawa.review.domain.MemberReview;
 import me.nawa.review.domain.ReviewCategory;
 import me.nawa.review.domain.ReviewKeywordCode;
 import me.nawa.review.dto.request.MemberReviewCreateRequest;
+import me.nawa.review.dto.response.MyReviewStatusResponse;
 import me.nawa.review.mapper.ReviewMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -122,6 +124,101 @@ class ReviewServiceTest {
 
         verify(appointmentMapper, never())
                 .findAppointmentByIdForUpdate(anyLong());
+    }
+
+    @Test
+    void getMyReviewStatus_returnsAlreadyReviewedTargets() {
+        prepareCompletedAppointmentForRead();
+        when(appointmentMapper.findMemberByAppointmentAndMember(10L, 1L))
+                .thenReturn(attendedMember(20L, 1L));
+        when(reviewMapper.findReviewedAppointmentMemberIds(10L, 20L))
+                .thenReturn(List.of(30L, 31L));
+
+        MyReviewStatusResponse response =
+                reviewService.getMyReviewStatus(1L, 10L);
+
+        assertEquals(
+                List.of(30L, 31L),
+                response.getReviewedAppointmentMemberIds()
+        );
+    }
+
+    @Test
+    void getMyReviewStatus_nonMember_rejectsRequest() {
+        prepareCompletedAppointmentForRead();
+        when(appointmentMapper.findMemberByAppointmentAndMember(10L, 1L))
+                .thenReturn(null);
+
+        assertThrows(
+                BusinessException.class,
+                () -> reviewService.getMyReviewStatus(1L, 10L)
+        );
+
+        verify(reviewMapper, never())
+                .findReviewedAppointmentMemberIds(anyLong(), anyLong());
+    }
+
+    @Test
+    void getMyReviewStatus_noShowMember_rejectsRequest() {
+        prepareCompletedAppointmentForRead();
+        when(appointmentMapper.findMemberByAppointmentAndMember(10L, 1L))
+                .thenReturn(AppointmentMember.builder()
+                        .appointmentMemberId(20L)
+                        .memberId(1L)
+                        .membershipStatus(MembershipStatus.ACTIVE)
+                        .attendanceStatus(AttendanceStatus.NO_SHOW)
+                        .build());
+
+        assertThrows(
+                BusinessException.class,
+                () -> reviewService.getMyReviewStatus(1L, 10L)
+        );
+
+        verify(reviewMapper, never())
+                .findReviewedAppointmentMemberIds(anyLong(), anyLong());
+    }
+
+    @Test
+    void getMyReviewStatus_notCompletedAppointment_rejectsRequest() {
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(Appointment.builder()
+                        .appointmentStatus(AppointmentStatus.IN_PROGRESS)
+                        .build());
+
+        assertThrows(
+                BusinessException.class,
+                () -> reviewService.getMyReviewStatus(1L, 10L)
+        );
+
+        verify(appointmentMapper, never())
+                .findMemberByAppointmentAndMember(anyLong(), anyLong());
+    }
+
+    @Test
+    void getMyReviewStatus_unknownAppointment_rejectsRequest() {
+        when(appointmentMapper.findAppointmentById(10L)).thenReturn(null);
+
+        assertThrows(
+                BusinessException.class,
+                () -> reviewService.getMyReviewStatus(1L, 10L)
+        );
+    }
+
+    @Test
+    void getMyReviewStatus_invalidIdentifiers_rejectsRequest() {
+        assertThrows(
+                BusinessException.class,
+                () -> reviewService.getMyReviewStatus(1L, 0L)
+        );
+
+        verify(appointmentMapper, never()).findAppointmentById(anyLong());
+    }
+
+    private void prepareCompletedAppointmentForRead() {
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(Appointment.builder()
+                        .appointmentStatus(AppointmentStatus.COMPLETED)
+                        .build());
     }
 
     private void prepareCompletedAppointment() {
