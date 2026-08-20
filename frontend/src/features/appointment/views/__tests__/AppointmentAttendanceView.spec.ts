@@ -2,14 +2,13 @@ import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { computed, ref } from 'vue'
 
 import { i18n } from '@/app/i18n'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
 const confirmAppointmentAttendance = vi.fn()
-const useAppointmentMemberProfileMock = vi.hoisted(() => vi.fn())
+const fetchMyAppointmentParticipation = vi.fn()
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
@@ -17,10 +16,8 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   fetchAppointmentMembers: (appointmentId: number) => fetchAppointmentMembers(appointmentId),
   confirmAppointmentAttendance: (appointmentId: number, request: unknown) =>
     confirmAppointmentAttendance(appointmentId, request),
-}))
-
-vi.mock('../../model/memberIntegration', () => ({
-  useAppointmentMemberProfile: () => useAppointmentMemberProfileMock(),
+  fetchMyAppointmentParticipation: (appointmentId: number) =>
+    fetchMyAppointmentParticipation(appointmentId),
 }))
 
 const AppointmentAttendanceView = (await import('../AppointmentAttendanceView.vue')).default
@@ -68,12 +65,12 @@ const members = [
   },
 ]
 
-const profileMemberId = ref(11)
-const profileQuery = {
-  data: computed(() => ({ memberId: profileMemberId.value })),
-  isPending: ref(false),
-  isError: ref(false),
-  refetch: vi.fn().mockResolvedValue(undefined),
+const hostParticipation = {
+  joined: true,
+  appointmentMemberId: 1,
+  membershipStatus: 'ACTIVE' as const,
+  attendanceStatus: 'PENDING' as const,
+  host: true,
 }
 
 async function mountView() {
@@ -118,9 +115,8 @@ describe('AppointmentAttendanceView', () => {
     confirmAppointmentAttendance.mockResolvedValue(undefined)
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue(members)
-    profileMemberId.value = 11
-    useAppointmentMemberProfileMock.mockReset()
-    useAppointmentMemberProfileMock.mockReturnValue(profileQuery)
+    fetchMyAppointmentParticipation.mockReset()
+    fetchMyAppointmentParticipation.mockResolvedValue(hostParticipation)
   })
 
   function toggleFor(wrapper: Awaited<ReturnType<typeof mountView>>['wrapper'], name: string) {
@@ -197,7 +193,7 @@ describe('AppointmentAttendanceView', () => {
   })
 
   it('hides attendance controls from non-host members', async () => {
-    profileMemberId.value = 12
+    fetchMyAppointmentParticipation.mockResolvedValue({ ...hostParticipation, host: false })
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Host access required')
