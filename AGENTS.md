@@ -71,6 +71,13 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   먼저 확정하고 사진을 나중에 붙이면 그 사진이 품목의 근거라는 보장이 사라집니다.
   `POST /api/v1/settlement-receipts`로 받은 `receiptId`를 정산 생성 요청에 실어 연결하고,
   **연결된 뒤에는 교체하지 않습니다.** 이 순서를 뒤집으면 영수증 OCR을 얹을 자리가 없어집니다.
+- 영수증 글자 인식(CLOVA OCR)은 **정산에 붙지 않은 자기 초안 사진**에만 씁니다. 결과는
+  저장하지 않고 사용자가 확인·수정한 값만 정산 생성 요청으로 저장됩니다. 인식 결과를
+  저장하면 사용자가 고친 값과 원래 읽은 값 중 무엇이 그 정산의 근거인지 알 수 없게 됩니다.
+  업로드가 받아주는 형식 중 **webp만 CLOVA가 읽지 못합니다** — 서버에서 형식을 바꿔 보내면
+  사용자가 확인한 사진과 인식에 쓰인 사진이 달라지므로 바꾸지 않고 거절합니다.
+  `CLOVA_OCR_INVOKE_URL`과 `CLOVA_OCR_SECRET_KEY`는 도메인 하나에서 함께 나오는 한 쌍이라
+  하나만 채우면 서버가 시작할 때 멈추고, 둘 다 비우면 인식 기능만 꺼집니다.
 - 이 백엔드는 Spring Boot가 아니라서 `spring.servlet.multipart.*`가 동작하지 않습니다.
   업로드 크기는 `WebConfig`의 `MultipartConfigElement`가 `RECEIPT_MAX_UPLOAD_BYTES`
   환경변수로 정하고, `ServletConfig`의 `multipartResolver` 빈이 요청을 해석합니다.

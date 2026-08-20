@@ -13,6 +13,7 @@
 | `GET /api/v1/settlements/{settlementId}` | 참여한 정산의 상태, 개인 부담금과 ITEMIZED 품목 배분을 조회한다. |
 | `POST /api/v1/settlements/{settlementId}/members/me/pay` | 현재 사용자의 미지급 부담금을 지급한다. |
 | `POST /api/v1/settlement-receipts` | 영수증 사진을 올리고 `receiptId`를 받는다. |
+| `POST /api/v1/settlement-receipts/{receiptId}/ocr` | 올려 둔 사진에서 품목 초안을 읽는다. |
 | `GET /api/v1/settlements/{settlementId}/receipt` | 정산에 붙은 영수증 사진을 조회한다. |
 
 생성 요청과 지급 요청에는 각각 `Idempotency-Key` 헤더가 필요하며, 값은 1~100자다.
@@ -91,6 +92,10 @@ URL의 경로 변수이고, `transferId`는 생성 요청의 `sourceTransferId`�
 | `SETTLEMENT-019` | 503 | 영수증 저장소를 사용할 수 없음 |
 | `SETTLEMENT-020` | 410 | 영수증 보관 기한이 지나 저장소에서 사라짐 |
 | `SETTLEMENT-021` | 500 | 올라온 영수증 파일을 서버가 읽지 못함 |
+| `SETTLEMENT-022` | 400 | 글자 인식이 다루지 못하는 이미지 형식(webp) |
+| `SETTLEMENT-023` | 422 | 사진에서 품목을 하나도 읽지 못함 |
+| `SETTLEMENT-024` | 504 | 글자 인식이 정해진 시간 안에 끝나지 않음 |
+| `SETTLEMENT-025` | 503 | 글자 인식 서비스에 닿지 못했거나, 설정되지 않았거나, 알 수 없는 응답을 보냄 |
 
 업로드 크기 초과는 정산 코드가 아니라 공통 코드 `COMMON-004`(413)로 응답한다. multipart
 해석 단계에서 실패해 정산 컨트롤러에 닿지 못하기 때문이다.
@@ -101,9 +106,10 @@ URL의 경로 변수이고, `transferId`는 생성 요청의 `sourceTransferId`�
 확정하고 사진을 나중에 붙이면 그 사진이 그 품목의 근거라는 보장이 사라지기 때문이다.
 
 ```
-POST /api/v1/settlement-receipts        → { "receiptId": 12 }
-POST /api/v1/appointments/{id}/settlements  (본문에 receiptId: 12)
-GET  /api/v1/settlements/{id}/receipt   → 이미지 바이트
+POST /api/v1/settlement-receipts             → { "receiptId": 12 }
+POST /api/v1/settlement-receipts/12/ocr      → 품목 초안 (저장 안 함)
+POST /api/v1/appointments/{id}/settlements   (본문에 receiptId: 12)
+GET  /api/v1/settlements/{id}/receipt        → 이미지 바이트
 ```
 
 `receiptId`는 정산 생성 요청의 선택 필드다. 넣지 않으면 사진 없는 정산이 만들어진다.
@@ -175,3 +181,72 @@ GET  /api/v1/settlements/{id}/receipt   → 이미지 바이트
 
 인증은 쿠키 기반이므로 프론트엔드와 API의 오리진이 다르면 `<img src>`로는 쿠키가 실리지
 않는다. 이 경우 클라이언트가 인증을 실어 직접 받아 표시해야 한다.
+
+### 글자 인식
+
+`POST /api/v1/settlement-receipts/{receiptId}/ocr`는 올려 둔 사진을 네이버 CLOVA OCR에
+보내 ITEMIZED 품목의 **초안**을 돌려준다.
+
+```json
+{
+  "items": [{ "name": "아메리카노", "unitPrice": 4500, "quantity": 2 }],
+  "recognizedTotal": 9000
+}
+```
+
+**결과는 저장하지 않는다.** DB에 남는 것은 사용자가 확인·수정해 정산 생성 요청으로 다시
+올린 값뿐이다. 인식 결과를 저장해 두면 사용자가 고친 값과 원래 읽은 값 중 어느 쪽이 그
+정산의 근거인지 알 수 없게 된다. 그래서 인식 결과용 테이블도 두지 않는다.
+
+**아직 정산에 붙지 않은 자기 초안만 인식할 수 있다.** 남의 사진이거나 이미 정산에 붙은
+사진이면 `SETTLEMENT-018`(404)로 답해 존재 여부까지 감춘다. 이미 붙은 사진을 다시 읽어 봐야
+품목은 확정된 뒤라 쓸 데가 없고, 인식은 부를 때마다 요금이 나간다.
+
+읽기만 하는데 `POST`인 이유도 요금이다. 브라우저나 중간 서버가 임의로 다시 부르면 안 되고,
+사진 크기에 따라 수 초씩 걸리는 응답이 캐시에 남아서도 안 된다.
+
+#### 읽은 값을 다듬는 규칙
+
+| 상황 | 결과 |
+| --- | --- |
+| 줄 합계와 수량이 나누어떨어짐 | `unitPrice = 합계 ÷ 수량`, 수량 그대로 |
+| 나누어떨어지지 않음 | `unitPrice = 줄 합계`, **수량 1** |
+| 수량을 못 읽음 | 수량 1 |
+| 이름과 금액을 모두 못 읽음 | 그 줄을 버림 |
+| 쓸 만한 줄이 하나도 없음 | `SETTLEMENT-023`(422) |
+
+수량보다 줄 합계를 먼저 믿는 이유는, ITEMIZED 정산이 **품목 합계와 원결제 금액이 정확히
+같을 때만** 만들어지기 때문이다. 낱개 값 쪽을 믿으면 나누어떨어지지 않는 영수증에서 몇
+원씩 어긋나 정산 생성이 통째로 거절된다. 수량은 사용자가 다시 넣을 수 있지만 금액은 그렇지
+않다.
+
+`recognizedTotal`은 영수증에 찍힌 합계다. 할인이나 봉사료가 품목 줄 밖에 붙기 때문에 품목을
+다 더한 값과 다를 수 있어서, 계산해 채우지 않고 읽은 그대로 둔다. 사용자가 견주어 볼
+기준으로만 쓴다.
+
+#### webp는 인식하지 못한다
+
+업로드가 받아주는 세 형식 중 **webp만 CLOVA가 다루지 못한다**. 서버에서 png로 바꿔 보내면
+사용자가 확인한 사진과 인식에 쓰인 사진이 달라져 "사진 한 장이 품목의 근거"라는 전제가
+깨지므로, 바꾸지 않고 `SETTLEMENT-022`(400)로 거절한다. 사용자는 다시 찍거나 직접 입력한다.
+
+#### 설정
+
+| 환경 변수 | 뜻 |
+| --- | --- |
+| `CLOVA_OCR_INVOKE_URL` | 콘솔에서 영수증 도메인을 만들면 나오는 호출 주소 |
+| `CLOVA_OCR_SECRET_KEY` | 같은 도메인의 Secret Key. 응답과 로그에 남기지 않는다 |
+| `CLOVA_OCR_CONNECT_TIMEOUT_MILLIS` | 접속 대기(기본 3000) |
+| `CLOVA_OCR_READ_TIMEOUT_MILLIS` | 응답 대기(기본 10000) |
+
+주소와 비밀키는 도메인 하나에서 함께 나오므로 **항상 한 쌍**이다. 하나만 채우면 서버가
+시작할 때 멈춘다. 사용자가 영수증을 찍는 순간에야 실패하면 원인을 찾기 어렵기 때문이다.
+둘 다 비우면 글자 인식만 꺼지고 나머지 기능은 그대로 뜬다. 이 상태에서 인식을 부르면
+`SETTLEMENT-025`(503)로 답한다.
+
+읽기 대기가 OAuth(5초)보다 긴 것은 사진을 실제로 분석하는 시간이 들어가기 때문이다. 짧게
+잡으면 정상 요청도 `SETTLEMENT-024`(504)로 끊긴다.
+
+호출 주소가 영수증 도메인이 아니면 인식 자체는 성공했다는 응답이 오지만 영수증 결과가 없다.
+이때도 `SETTLEMENT-025`(503)로 답한다. 사진 문제(`SETTLEMENT-023`)로 안내하면 사용자는
+멀쩡한 영수증을 계속 다시 찍게 되고, 주소가 잘못됐다는 사실은 끝내 드러나지 않는다.

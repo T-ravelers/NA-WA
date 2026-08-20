@@ -1,5 +1,6 @@
 package me.nawa.config;
 
+import me.nawa.common.ocr.ReceiptOcrClient;
 import me.nawa.common.storage.ReceiptStorageService;
 import me.nawa.member.service.MemberProfileServiceImpl;
 import me.nawa.report.mapper.ReportMapper;
@@ -44,6 +45,21 @@ class RootConfigComponentScanTest {
 
         assertTrue(Arrays.asList(componentScan.basePackages()).contains(
                 ReceiptStorageService.class.getPackageName()
+        ));
+    }
+
+    /**
+     * 이 패키지가 빠지면 글자 인식 빈이 만들어지지 않아 영수증 인식 요청이 통째로 실패한다.
+     * 컴파일로는 드러나지 않고 실행해 봐야 알 수 있는 종류의 누락이라 여기서 붙잡는다.
+     */
+    @Test
+    void componentScan_includesReceiptOcrPackage() {
+        ComponentScan componentScan = RootConfig.class.getAnnotation(
+                ComponentScan.class
+        );
+
+        assertTrue(Arrays.asList(componentScan.basePackages()).contains(
+                ReceiptOcrClient.class.getPackageName()
         ));
     }
 
