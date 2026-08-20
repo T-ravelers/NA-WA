@@ -21,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.journey.domain.Journey;
 import me.nawa.journey.domain.JourneyExploreItem;
 import me.nawa.journey.domain.JourneyItem;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
@@ -42,6 +44,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
     named = "RUN_MYSQL_INTEGRATION_TESTS",
     matches = "(?i)true"

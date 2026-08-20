@@ -4,12 +4,14 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import me.nawa.auth.mapper.OAuthAccountMapper;
 import me.nawa.auth.oauth.account.OAuthMemberInsert;
+import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.member.domain.MemberProfile;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.ClassPathResource;
@@ -31,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 조건은 여기서만 검증된다. 모든 테스트는 rollback-only 트랜잭션 안에서 돌므로
  * 데이터가 남지 않는다.
  */
+@ExtendWith(MySqlSchemaExtension.class)
 @EnabledIfEnvironmentVariable(
         named = "RUN_MYSQL_INTEGRATION_TESTS",
         matches = "(?i)true"
