@@ -5,6 +5,7 @@ import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { useToasts } from '@/shared/ui/toast'
 import { appointmentMemberIntegrationKey } from '../../model/memberIntegration'
 
 const fetchAppointment = vi.fn()
@@ -167,6 +168,8 @@ function menuItem(wrapper: MountedWrapper) {
     wrapper.findAll('[role="dialog"] button').find((button) => button.text().startsWith(label))
 }
 
+const toasts = useToasts()
+
 describe('AppointmentDetailView', () => {
   beforeEach(() => {
     fetchAppointment.mockReset()
@@ -205,27 +208,39 @@ describe('AppointmentDetailView', () => {
     expect(router.currentRoute.value.query).toEqual({ itemId: '42', itemType: 'EVENT' })
   })
 
-  it('disables Join appointment and shows an already-joined notice for the host', async () => {
+  it('tells an existing member they are already in, instead of opening the deposit sheet', async () => {
     const { wrapper } = await mountView()
+    const joinButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
 
+    // 비활성 버튼은 왜 안 되는지 말해 줄 방법이 없다(모바일이라 hover도 없다).
+    // 눌리게 두고 눌렀을 때 알려 준다.
+    expect(joinButton?.attributes('disabled')).toBeUndefined()
+
+    await joinButton?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(toasts.value[toasts.value.length - 1]?.message).toBe(
+      'You have already joined this appointment.',
+    )
+  })
+
+  it('keeps Join appointment disabled once recruiting is over', async () => {
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'CLOSED' })
+    const { wrapper } = await mountView()
     const joinButton = wrapper
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
     const notice = wrapper
       .findAll('p')
-      .find((p) => p.text() === 'You have already joined this appointment.')
+      .find((p) => p.text() === 'This appointment is not open for joining.')
 
-    // 버튼 title 툴팁은 비활성 버튼·모바일에서 뜨지 않으므로, 이유는 상시
-    // 텍스트로 보여준다. 완료된 약속에서도 보일 수 있어 경고색(text-danger)이
-    // 아니라 중립색(text-ink-3)이어야 한다.
-    expect(notice).toBeDefined()
+    // 모집 종료는 사용자 잘못이 아닌 정상 상태라 경고색이 아니라 중립색이어야 한다.
+    expect(joinButton?.attributes('disabled')).toBeDefined()
     expect(notice?.classes()).toContain('text-ink-3')
     expect(notice?.classes()).not.toContain('text-danger')
-    expect(joinButton?.attributes('disabled')).toBeDefined()
-
-    await joinButton?.trigger('click')
-
-    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
   it('disables Join appointment when the participation check fails', async () => {

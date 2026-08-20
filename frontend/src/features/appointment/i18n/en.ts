@@ -174,6 +174,7 @@ export default {
       viewAll: 'View all',
       loading: 'Loading members',
       host: 'Host',
+      you: 'You',
       status: {
         ACTIVE: 'Active',
         LEFT: 'Left',

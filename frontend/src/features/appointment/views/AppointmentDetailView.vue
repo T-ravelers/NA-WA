@@ -12,6 +12,7 @@ import AppCard from '@/shared/ui/AppCard.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import { showToast } from '@/shared/ui/toast'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
@@ -88,17 +89,16 @@ const isJoinAvailable = computed(() => {
   const deadline = parseServerDateTime(appointment.value.joinDeadline)
   return deadline !== null && Date.now() < deadline.getTime()
 })
-const isJoinButtonEnabled = computed(
-  () => isJoinAvailable.value && !hasJoined.value && !participationCheckFailed.value,
-)
-// 버튼 title 툴팁은 비활성 버튼에 pointer-events-none이 걸려 뜨지 않고,
-// 390px 모바일 PWA라 애초에 hover도 없다. 그래서 비활성 이유는 버튼 아래에
-// 상시 텍스트로 보여준다. 모집 종료(CLOSED/COMPLETED/CANCELLED)는 사용자
-// 잘못이 아닌 정상 상태라 text-danger(빨강)로 알릴 일이 아니어서, 세 경우
-// 모두 중립색(text-ink-3)으로 통일한다.
+// 이미 참여한 사람에게도 버튼을 눌리게 둔다. 비활성 버튼은 왜 안 되는지 말해 줄
+// 방법이 마땅치 않고(모바일이라 hover도 없다), 누르면 그때 참여 중이라고 알려
+// 주는 편이 분명하다. 모집이 끝났거나 참여 여부를 확인하지 못한 경우는 눌러도
+// 할 수 있는 일이 없어 그대로 비활성으로 둔다.
+const isJoinButtonEnabled = computed(() => isJoinAvailable.value && !participationCheckFailed.value)
+// 비활성 이유는 버튼 아래에 상시 텍스트로 보여준다. 모집 종료
+// (CLOSED/COMPLETED/CANCELLED)는 사용자 잘못이 아닌 정상 상태라 text-danger로
+// 알릴 일이 아니어서 중립색(text-ink-3)으로 둔다.
 const joinDisabledReason = computed(() => {
   if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
-  if (hasJoined.value) return t('appointment.detail.alreadyJoined')
   if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
   return undefined
 })
@@ -304,6 +304,13 @@ const joinErrorMessage = computed(() =>
 function openDepositSheet(): void {
   if (!isJoinButtonEnabled.value) return
 
+  // 이미 참여한 사람은 결제 시트까지 갈 이유가 없다. 서버도 APPOINTMENT-003으로
+  // 막으므로 여기서 먼저 알려 준다.
+  if (hasJoined.value) {
+    showToast(t('appointment.detail.alreadyJoined'))
+    return
+  }
+
   joinMutation.reset()
   depositSheetOpen.value = true
 }
@@ -463,6 +470,7 @@ function confirmJoin(): void {
         <AppointmentMemberList
           v-else
           :members="members"
+          :current-appointment-member-id="participation?.appointmentMemberId ?? null"
           @select="openMemberProfile"
         />
       </section>
