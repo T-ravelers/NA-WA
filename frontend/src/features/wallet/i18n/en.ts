@@ -32,16 +32,27 @@ export default {
       activity: {
         TOPUP: 'Point top-up',
         QR_PAYMENT: 'QR payment',
-        SETTLEMENT: 'Settlement',
+        SETTLEMENT: 'Split',
         DEPOSIT_HOLD: 'Deposit held',
         DEPOSIT_REFUND: 'Deposit refunded',
         DEPOSIT_NO_SHOW_DISTRIBUTION: 'No-show deposit shared out',
         REVERSAL: 'Transaction reversed',
         UNKNOWN: 'Wallet transaction',
       },
+      /**
+       * 정산 거래를 낸 쪽과 받은 쪽으로 갈라 부르는 이름.
+       *
+       * `activity`의 key는 백엔드가 보내는 거래 종류와 1:1이라 방향을 끼워 넣을 자리가
+       * 없다. 서버는 정산을 한 종류로만 보내고 방향은 입출금 구분에만 있어서, 화면이
+       * 그 값을 보고 이 둘 중 하나를 고른다.
+       */
+      settlementDirection: {
+        paid: 'Split paid',
+        collected: 'Split collected',
+      },
       activityStatus: {
-        available: 'Available to settle',
-        settled: 'Settled',
+        available: 'Can be split',
+        settled: 'Already split',
       },
       status: {
         ACTIVE: 'Active',
@@ -83,7 +94,7 @@ export default {
       allStatuses: 'All statuses',
       topUp: 'Top-up',
       qrPayment: 'QR payment',
-      settlement: 'Settlement',
+      settlement: 'Split',
       depositHold: 'Deposit hold',
       depositRefund: 'Deposit refund',
       depositNoShowShare: 'No-show deposit share',
@@ -229,7 +240,7 @@ export default {
       loadingPreview: 'Loading payment preview...',
       previewError: 'We could not load this payment preview. Please try again.',
       expenseType: 'Expense type',
-      expenseTypeHint: 'Choose how this payment should be included in settlement.',
+      expenseTypeHint: 'Choose how this payment should be included when you split it.',
       personal: 'Personal',
       shared: 'Shared',
       activeAppointments: 'Current appointments',

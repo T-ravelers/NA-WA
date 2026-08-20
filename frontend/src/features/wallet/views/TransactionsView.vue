@@ -14,6 +14,7 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { getTransactions } from '../api/walletApi'
 import {
+  activityLabelKey,
   formatPointAmount,
   formatTransactionAmount,
   formatTransactionDateTime,
@@ -158,6 +159,15 @@ const loadMore = (): void => {
 
   cursor.value = nextCursor.value
 }
+
+/** 정산은 낸 쪽과 받은 쪽을 갈라 부른다. 방향은 입출금 구분에만 있다. */
+const transactionLabel = (transaction: WalletTransactionResponse): string =>
+  t(
+    activityLabelKey(
+      toActivityKind(transaction.transferType),
+      transaction.entryType.toUpperCase() === 'DEBIT',
+    ),
+  )
 
 const openTransactionDetail = (transactionId: number): void => {
   void router.push({ name: 'wallet-transaction-detail', params: { transactionId } })
@@ -328,7 +338,7 @@ const openTransactionDetail = (transactionId: number): void => {
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="truncate text-body-sm font-semibold text-ink">
-                  {{ t(`wallet.home.activity.${toActivityKind(transaction.transferType)}`) }}
+                  {{ transactionLabel(transaction) }}
                 </p>
                 <p class="mt-1 text-caption text-ink-3">
                   {{ formatTransactionDateTime(transaction.createdAt) }}

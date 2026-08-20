@@ -55,6 +55,8 @@ export interface WalletActivity {
   signedAmount: number
   /** 서버 시각을 해석한 결과. 해석할 수 없으면 `null`이고 화면이 시각을 생략한다. */
   occurredAt: Date | null
+  /** 이 지갑에서 돈이 나간 거래인지. 정산의 낸 쪽·받은 쪽을 가르는 데 쓴다. */
+  outgoing: boolean
   settled: boolean
 }
 
@@ -147,6 +149,26 @@ export function toActivityKind(transferType: string): ActivityKind {
   return TRANSFER_TYPES.find((type) => type === normalized) ?? 'UNKNOWN'
 }
 
+/**
+ * 이 거래를 화면에서 뭐라고 부를지 정한다.
+ *
+ * 정산만 낸 쪽과 받은 쪽을 갈라 부른다. 남에게 돈을 낸 것과 남에게서 받은 것은 사용자에게
+ * 전혀 다른 일인데, 서버는 둘을 같은 거래 종류 하나로 보내기 때문이다. 방향은 돈이 나갔는지
+ * 들어왔는지에만 남아 있으므로 그 값으로 고른다.
+ *
+ * 나머지 종류는 이름 자체에 이미 방향이 들어 있어(예: 보증금 잡힘 / 보증금 돌려받음) 그대로
+ * 쓴다.
+ */
+export function activityLabelKey(kind: ActivityKind, isOutgoing: boolean): string {
+  if (kind === 'SETTLEMENT') {
+    return isOutgoing
+      ? 'wallet.home.settlementDirection.paid'
+      : 'wallet.home.settlementDirection.collected'
+  }
+
+  return `wallet.home.activity.${kind}`
+}
+
 function toWalletStatus(status: string): WalletStatusKind {
   const normalized = status.toUpperCase()
 
@@ -187,6 +209,7 @@ export function toWalletHomeData(response: WalletHome): WalletHomeData {
         kind,
         signedAmount: toSignedAmount(transaction),
         occurredAt: parseServerDateTime(transaction.createdAt),
+        outgoing: transaction.entryType.toUpperCase() === 'DEBIT',
         settled: kind === 'SETTLEMENT',
       }
     }),
