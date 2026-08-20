@@ -217,6 +217,8 @@ export default {
         'Your deposit of \u20a9{amount} will be refunded to your wallet. To join again you will need to pay it once more.',
       confirm: 'Leave group',
       cancel: 'Stay',
+      done: 'You left this appointment.',
+      doneRefunded: 'You left this appointment. \u20a9{amount} has been refunded to your wallet.',
     },
     deposit: {
       title: 'Confirm participation',

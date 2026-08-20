@@ -284,8 +284,17 @@ const joinMutation = useMutation({
 const leaveMutation = useMutation({
   mutationFn: () => cancelAppointmentParticipation(appointmentId.value as number),
   onSuccess: async () => {
+    // 서버가 같은 트랜잭션에서 보증금을 지갑으로 돌려준다(HELD → REFUNDED).
+    // 확인 모달에서 환급을 예고했으니 실제로 됐다는 것도 알려 준다. 모달만 조용히
+    // 닫히면 나간 것인지 확신할 수 없다.
+    const refunded = appointment.value?.depositAmount
     leaveConfirmOpen.value = false
     await invalidateParticipationScopes()
+    showToast(
+      refunded === undefined
+        ? t('appointment.leave.done')
+        : t('appointment.leave.doneRefunded', { amount: formatDeposit(refunded) }),
+    )
   },
 })
 

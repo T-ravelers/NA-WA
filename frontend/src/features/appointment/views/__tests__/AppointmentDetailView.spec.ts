@@ -458,6 +458,10 @@ describe('AppointmentDetailView', () => {
     await flushPromises()
 
     expect(cancelAppointmentParticipation).toHaveBeenCalledWith(7)
+    // 모달만 조용히 닫히면 나간 것인지, 보증금이 돌아왔는지 알 수 없다.
+    expect(toasts.value[toasts.value.length - 1]?.message).toBe(
+      'You left this appointment. ₩10,000 has been refunded to your wallet.',
+    )
   })
 
   it('disables Leave group once the join deadline has passed', async () => {
