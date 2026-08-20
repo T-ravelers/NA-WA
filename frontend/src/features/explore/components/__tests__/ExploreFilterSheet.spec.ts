@@ -30,6 +30,12 @@ describe('ExploreFilterSheet date presets', () => {
       ?.trigger('click')
   }
 
+  // 같은 숫자가 이웃 달 셀에도 있을 때는 그리드에서 나중에 오는(이번 달) 쪽.
+  function lastButton(wrapper: VueWrapper, text: string) {
+    const matches = wrapper.findAll('button').filter((button) => button.text() === text)
+    return matches[matches.length - 1]
+  }
+
   function pressApply(wrapper: VueWrapper) {
     return wrapper
       .findAll('button')
@@ -121,22 +127,100 @@ describe('ExploreFilterSheet date presets', () => {
     expect(day22?.attributes('disabled')).toBeUndefined()
   })
 
-  it('paints the whole selected range white and keeps the endpoints as pills', async () => {
+  it('paints the selected range as one continuous band', async () => {
+    const wrapper = mountDateSheet()
+
+    // 21(금)~25(화)는 주말을 사이에 두고 두 줄에 걸친다. 기간 양 끝, 줄 넘김
+    // 경계, 줄 한가운데가 모두 이 범위 안에 있다.
+    await pressButton(wrapper, '21')
+    await pressButton(wrapper, '25')
+
+    const days = ['21', '22', '23', '24', '25'].map((text) =>
+      wrapper.findAll('button').find((button) => button.text() === text),
+    )
+    const [day21, day22, day23, day24, day25] = days
+
+    // 칸 전체를 채워야 날짜끼리 이어져 하나의 기간으로 읽힌다. 칸보다 좁은 칩을
+    // 가운데 두면 흰색이어도 끊겨 보인다.
+    for (const day of days) {
+      expect(day?.classes()).toContain('bg-paper-fill')
+      expect(day?.classes()).toContain('w-full')
+      expect(day?.classes()).not.toContain('mx-auto')
+    }
+
+    // 띠가 시작·끝나는 자리만 둥글고 사이는 각지다. 21은 기간 시작, 22(토)는
+    // 줄의 끝, 23(일)은 새 줄의 시작, 25는 기간 끝이라 깎이고, 한가운데의
+    // 24는 각지다.
+    expect(day21?.classes()).toContain('rounded-l-pill')
+    expect(day21?.classes()).not.toContain('rounded-r-pill')
+    expect(day22?.classes()).not.toContain('rounded-l-pill')
+    expect(day22?.classes()).toContain('rounded-r-pill')
+    expect(day23?.classes()).toContain('rounded-l-pill')
+    expect(day23?.classes()).not.toContain('rounded-r-pill')
+    expect(day24?.classes()).not.toContain('rounded-l-pill')
+    expect(day24?.classes()).not.toContain('rounded-r-pill')
+    expect(day25?.classes()).toContain('rounded-r-pill')
+    expect(day25?.classes()).not.toContain('rounded-l-pill')
+    expect(wrapper.html()).not.toContain('bg-surface-2')
+  })
+
+  it('keeps a lone start date as a single dot, not a band', async () => {
     const wrapper = mountDateSheet()
 
     await pressButton(wrapper, '21')
-    await pressButton(wrapper, '23')
 
     const day21 = wrapper.findAll('button').find((button) => button.text() === '21')
     const day22 = wrapper.findAll('button').find((button) => button.text() === '22')
-    const day23 = wrapper.findAll('button').find((button) => button.text() === '23')
+    // 시작일만 고른 상태에서도 달력에 선택이 보여야 한다. 배경 없이 모서리만
+    // 깎으면 화면에는 아무것도 그려지지 않아, 미선택 셀과 구분해 단언한다.
     expect(day21?.classes()).toContain('bg-paper-fill')
-    expect(day21?.classes()).not.toContain('rounded-none')
-    expect(day22?.classes()).toContain('bg-paper-fill')
-    expect(day22?.classes()).toContain('rounded-none')
-    expect(day23?.classes()).toContain('bg-paper-fill')
-    expect(day23?.classes()).not.toContain('rounded-none')
-    expect(wrapper.html()).not.toContain('bg-surface-2')
+    expect(day21?.classes()).toContain('rounded-pill')
+    expect(day21?.classes()).not.toContain('rounded-l-pill')
+    expect(day22?.classes()).not.toContain('bg-paper-fill')
+
+    // 하루는 칸을 채우지 않는다. 칸을 채우면 하루가 기간처럼 읽힌다.
+    expect(day21?.classes()).toContain('mx-auto')
+    expect(day21?.classes()).toContain('w-9')
+    expect(day21?.classes()).not.toContain('w-full')
+  })
+
+  it('keeps a closed single-day range as the same dot', async () => {
+    const wrapper = mountDateSheet()
+
+    // 같은 날을 두 번 탭하면 시작·종료가 같은 하루짜리 기간이 된다. 시작일만
+    // 고른 상태와 같은 하루이므로 같은 모양이어야 한다.
+    await pressButton(wrapper, '25')
+    await pressButton(wrapper, '25')
+
+    const day25 = wrapper.findAll('button').find((button) => button.text() === '25')
+    expect(day25?.classes()).toContain('bg-paper-fill')
+    expect(day25?.classes()).toContain('rounded-pill')
+    expect(day25?.classes()).toContain('mx-auto')
+    expect(day25?.classes()).toContain('w-9')
+    expect(day25?.classes()).not.toContain('w-full')
+    expect(day25?.classes()).not.toContain('rounded-l-pill')
+    expect(day25?.classes()).not.toContain('rounded-r-pill')
+  })
+
+  it('keeps adjacent-month cells out of the band even when their date is in range', async () => {
+    const wrapper = mountDateSheet()
+
+    // 30은 이웃 달 셀(7월 30일)이 먼저 걸리므로 마지막 일치(8월 30일)를 누른다.
+    await lastButton(wrapper, '30')?.trigger('click')
+    await wrapper.get('button[aria-label="Next month"]').trigger('click')
+    await pressButton(wrapper, '2')
+    await wrapper.get('button[aria-label="Previous month"]').trigger('click')
+
+    // 기간은 8/30~9/2. 8월 그리드 마지막 줄의 9월 1일은 날짜로는 기간에 들지만
+    // 이웃 달 셀이라 띠를 그리지 않는다 — 흐린 글자 위에 흰 배경이 얹히면
+    // 선택할 수 없는 날짜가 오히려 도드라진다.
+    const day31 = lastButton(wrapper, '31')
+    const trailing1 = lastButton(wrapper, '1')
+    expect(day31?.classes()).toContain('bg-paper-fill')
+    // 띠가 이웃 달 경계에서 잘리므로 8월 마지막 날이 오른쪽 끝으로 깎인다.
+    expect(day31?.classes()).toContain('rounded-r-pill')
+    expect(trailing1?.classes()).not.toContain('bg-paper-fill')
+    expect(trailing1?.classes()).toContain('text-ink-3/40')
   })
 
   it('disables past days when no preset is chosen', () => {
