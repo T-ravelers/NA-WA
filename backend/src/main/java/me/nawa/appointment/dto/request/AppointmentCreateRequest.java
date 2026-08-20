@@ -38,7 +38,6 @@ public class AppointmentCreateRequest {
 
     private BigDecimal depositAmount;
     private String meetingPlace;
-    private String meetingAddress;
 
     @ApiModelProperty(value = "visitDate 안에서의 활동 시작 시각")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm:ss")
