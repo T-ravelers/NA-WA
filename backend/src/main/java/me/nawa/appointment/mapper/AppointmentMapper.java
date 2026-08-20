@@ -93,9 +93,15 @@ public interface AppointmentMapper {
             @Param("appointmentId") Long appointmentId
     );
 
+    // includeAll=true의 예정/지난 분류 기준도 DB의 NOW()가 아니라 애플리케이션이 넘긴
+    // now를 쓴다. 이유는 closeExpiredRecruitingAppointments와 같다 — activity_start_at은
+    // 애플리케이션의 LocalDateTime.now() 기준으로 저장되는데, DB 서버 컨테이너의 시간대가
+    // 애플리케이션(TZ=Asia/Seoul)과 다르면 그 시차만큼 경계가 어긋나 지금 시각 근처의
+    // 약속이 예정/지난 반대쪽으로 정렬된다.
     List<MyOngoingAppointment> findMyOngoingAppointments(
         @Param("memberId") Long memberId,
-        @Param("includeAll") boolean includeAll
+        @Param("includeAll") boolean includeAll,
+        @Param("now") LocalDateTime now
     );
 
     // ACTIVE·PENDING(출석 미확정) 회원만 대상으로 한다 — 출석 확정은 한 번만
