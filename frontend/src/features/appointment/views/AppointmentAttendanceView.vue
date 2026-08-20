@@ -62,6 +62,9 @@ const participationQuery = useQuery({
 })
 
 const members = computed(() => membersQuery.data.value ?? [])
+const myAppointmentMemberId = computed(
+  () => participationQuery.data.value?.appointmentMemberId ?? null,
+)
 // 방장 여부는 상세 화면과 같은 근거(participation 응답)를 쓴다. 회원 목록에서
 // 내 memberId를 찾아 추리면 목록 조회나 프로필 연동이 실패했을 때 방장 권한까지
 // 함께 사라져, 정작 출석을 확정해야 할 사람이 막힌다.
@@ -82,15 +85,14 @@ function initials(displayName: string): string {
 // 방장이 화면에서 고른 값. 저장 전까지 서버에 반영되지 않는다.
 const draft = reactive<Record<number, ConfirmedAttendance>>({})
 
-// 아직 확정 전(PENDING)인 회원은 ATTENDED에서 출발한다. NO_SHOW는 보증금을
-// 몰수해 참석자에게 나누는 처리라(16절), 방장이 명시적으로 고르지 않은 회원에게
-// 기본값으로 적용할 값이 아니다.
+// 아직 확정 전(PENDING)인 회원은 NO_SHOW에서 출발한다. 방장이 온 사람을 하나씩
+// 눌러 ATTENDED로 바꾼다. 이미 확정된 값이 있으면 그 값을 그대로 이어받는다.
 watch(
   members,
   (list) => {
     for (const member of list) {
       if (draft[member.memberId] === undefined) {
-        draft[member.memberId] = member.attendanceStatus === 'NO_SHOW' ? 'NO_SHOW' : 'ATTENDED'
+        draft[member.memberId] = member.attendanceStatus === 'ATTENDED' ? 'ATTENDED' : 'NO_SHOW'
       }
     }
   },
@@ -255,24 +257,30 @@ function retry(): void {
                 </div>
 
                 <div class="min-w-0 flex-1">
-                  <h3 class="truncate text-title-sm text-ink">{{ member.displayName }}</h3>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="truncate text-title-sm text-ink">
+                      {{
+                        member.appointmentMemberId === myAppointmentMemberId
+                          ? t('appointment.attendance.you')
+                          : member.displayName
+                      }}
+                    </h3>
+                    <AppBadge :tone="member.isHost ? 'settlement' : 'neutral'">
+                      {{
+                        member.isHost
+                          ? t('appointment.members.host')
+                          : t('appointment.attendance.member')
+                      }}
+                    </AppBadge>
+                  </div>
+                  <!-- 상태는 오른쪽 토글 버튼이 이미 말한다. 여기서는 아직 손대지
+                       않은 사람을 눈에 띄게만 한다. -->
                   <p class="mt-1 text-caption text-ink-3">
                     {{ statusLabel(attendanceStatus(member)) }}
                   </p>
                 </div>
 
-                <AppBadge
-                  :tone="
-                    attendanceStatus(member) === 'ATTENDED'
-                      ? 'settlement'
-                      : attendanceStatus(member) === 'PENDING'
-                        ? 'pending'
-                        : 'onPaper'
-                  "
-                >
-                  {{ statusLabel(attendanceStatus(member)) }}
-                </AppBadge>
-                <div class="w-24 shrink-0">
+                <div class="w-28 shrink-0">
                   <AppButton
                     block
                     compact

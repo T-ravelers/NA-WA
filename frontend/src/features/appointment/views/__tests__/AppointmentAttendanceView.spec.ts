@@ -50,7 +50,7 @@ const members = [
     profileImageUrl: null,
     preferredLanguage: 'en' as const,
     membershipStatus: 'ACTIVE' as const,
-    attendanceStatus: 'ATTENDED' as const,
+    attendanceStatus: 'PENDING' as const,
     isHost: true,
   },
   {
@@ -127,30 +127,41 @@ describe('AppointmentAttendanceView', () => {
     return wrapper.findAll('button').find((button) => button.text() === 'Confirm attendance')
   }
 
-  it('starts everyone as attended so a no-show is always a deliberate choice', async () => {
-    // NO_SHOW는 보증금을 몰수해 참석자에게 나누는 처리라 기본값이 되면 안 된다.
+  it('starts everyone as not attended and blocks saving until someone is marked', async () => {
+    // 방장이 온 사람만 하나씩 눌러 올린다. 아무도 안 누르면 저장할 수 없다.
+    const { wrapper } = await mountView()
+
+    expect(toggleFor(wrapper, 'Mina Park').attributes('aria-pressed')).toBe('false')
+    expect(toggleFor(wrapper, 'Alex Kim').attributes('aria-pressed')).toBe('false')
+    expect(saveButton(wrapper)?.attributes('disabled')).toBeDefined()
+  })
+
+  it('keeps an already confirmed attendance as attended', async () => {
+    fetchAppointmentMembers.mockResolvedValueOnce([
+      { ...members[0], attendanceStatus: 'ATTENDED' as const },
+      members[1],
+    ])
     const { wrapper } = await mountView()
 
     expect(toggleFor(wrapper, 'Mina Park').attributes('aria-pressed')).toBe('true')
-    expect(toggleFor(wrapper, 'Alex Kim').attributes('aria-pressed')).toBe('true')
-    expect(saveButton(wrapper)?.attributes('disabled')).toBeUndefined()
+    expect(toggleFor(wrapper, 'Alex Kim').attributes('aria-pressed')).toBe('false')
   })
 
-  it('toggles a member between attended and no-show', async () => {
+  it('toggles a member between not attended and attended', async () => {
     const { wrapper } = await mountView()
-    const toggle = toggleFor(wrapper, 'Alex Kim')
-
-    await toggle.trigger('click')
-    expect(toggleFor(wrapper, 'Alex Kim').attributes('aria-pressed')).toBe('false')
 
     await toggleFor(wrapper, 'Alex Kim').trigger('click')
     expect(toggleFor(wrapper, 'Alex Kim').attributes('aria-pressed')).toBe('true')
+
+    await toggleFor(wrapper, 'Alex Kim').trigger('click')
+    expect(toggleFor(wrapper, 'Alex Kim').attributes('aria-pressed')).toBe('false')
   })
 
   it('sends every active member and returns to the detail screen', async () => {
     const { wrapper, router } = await mountView()
 
-    await toggleFor(wrapper, 'Alex Kim').trigger('click')
+    // 온 사람만 눌러 올린다. 나머지는 기본값 그대로 NO_SHOW로 나간다.
+    await toggleFor(wrapper, 'Mina Park').trigger('click')
     await saveButton(wrapper)?.trigger('click')
     await flushPromises()
 
@@ -167,9 +178,6 @@ describe('AppointmentAttendanceView', () => {
     // 서버가 APPOINTMENT-006으로 거부한다. 나눠 줄 상대가 없어 정산이 성립하지 않는다.
     const { wrapper } = await mountView()
 
-    await toggleFor(wrapper, 'Mina Park').trigger('click')
-    await toggleFor(wrapper, 'Alex Kim').trigger('click')
-
     expect(saveButton(wrapper)?.attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('Mark at least one member as attended.')
 
@@ -185,6 +193,7 @@ describe('AppointmentAttendanceView', () => {
     )
     const { wrapper, router } = await mountView()
 
+    await toggleFor(wrapper, 'Mina Park').trigger('click')
     await saveButton(wrapper)?.trigger('click')
     await flushPromises()
 
