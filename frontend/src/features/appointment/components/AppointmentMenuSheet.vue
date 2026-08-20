@@ -18,7 +18,6 @@ import { useOverlayDismiss } from '../composables/useOverlayDismiss'
  */
 interface Props {
   appointmentName: string
-  /** 비어 있으면 활성. 값이 있으면 비활성이며 그 문구가 이유로 보인다. */
   /** 방장에게만 넣는다. */
   showAttendance: boolean
   attendanceDisabledReason?: string

@@ -215,35 +215,45 @@ describe('AppointmentDetailView', () => {
       .find((button) => button.text() === 'Join appointment')
 
     // 비활성 버튼은 왜 안 되는지 말해 줄 방법이 없다(모바일이라 hover도 없다).
-    // 눌리게 두고 눌렀을 때 알려 준다.
+    // 눌리게 두고, 누르면 그 이유를 버튼 위에 한 줄로 남긴다.
     expect(joinButton?.attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).not.toContain('You have already joined this appointment.')
 
     await joinButton?.trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(toasts.value[toasts.value.length - 1]?.message).toBe(
-      'You have already joined this appointment.',
-    )
+    expect(
+      wrapper.findAll('p').find((p) => p.text() === 'You have already joined this appointment.'),
+    ).toBeDefined()
   })
 
-  it('keeps Join appointment disabled once recruiting is over', async () => {
+  it('explains once pressed that recruiting is over', async () => {
+    // 아직 참여하지 않은 사람이어야 모집 종료가 이유로 잡힌다. 이미 참여한
+    // 사람에게는 "이미 참여 중"이 먼저 걸린다.
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'CLOSED' })
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
     const { wrapper } = await mountView()
     const joinButton = wrapper
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
+
+    expect(joinButton?.attributes('disabled')).toBeUndefined()
+
+    await joinButton?.trigger('click')
+    await flushPromises()
+
     const notice = wrapper
       .findAll('p')
       .find((p) => p.text() === 'This appointment is not open for joining.')
 
     // 모집 종료는 사용자 잘못이 아닌 정상 상태라 경고색이 아니라 중립색이어야 한다.
-    expect(joinButton?.attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(notice?.classes()).toContain('text-ink-3')
     expect(notice?.classes()).not.toContain('text-danger')
   })
 
-  it('disables Join appointment when the participation check fails', async () => {
+  it('explains once pressed that the participation check failed', async () => {
     fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
     const { wrapper } = await mountView()
 
@@ -251,24 +261,30 @@ describe('AppointmentDetailView', () => {
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
 
+    await joinButton?.trigger('click')
+    await flushPromises()
+
     expect(wrapper.text()).toContain(
       'We could not check your participation status. Please try again.',
     )
-    expect(joinButton?.attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
   it('shows a neutral (not red) notice on a normally closed appointment', async () => {
     // 모집 종료(COMPLETED 등)는 정상 상태지 오류가 아니다. 버튼 title
-    // 툴팁은 비활성 버튼·모바일에서 뜨지 않으므로 이유는 상시 텍스트로
+    // 툴팁은 모바일에서 뜨지 않으므로 이유는 눌렀을 때 버튼 위 텍스트로
     // 보여주되, 경고색이 아니라 중립색으로 보여준다.
     fetchAppointment.mockResolvedValue({ ...appointment, appointmentStatus: 'COMPLETED' })
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
     profileQuery.data.value = { memberId: 99 }
     const { wrapper } = await mountView()
 
-    const joinButton = wrapper
+    await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+
     const notice = wrapper
       .findAll('p')
       .find((p) => p.text() === 'This appointment is not open for joining.')
@@ -276,7 +292,6 @@ describe('AppointmentDetailView', () => {
     expect(notice).toBeDefined()
     expect(notice?.classes()).toContain('text-ink-3')
     expect(notice?.classes()).not.toContain('text-danger')
-    expect(joinButton?.attributes('disabled')).toBeDefined()
   })
 
   it('opens the deposit sheet with an enabled confirm button for a member who has not joined', async () => {

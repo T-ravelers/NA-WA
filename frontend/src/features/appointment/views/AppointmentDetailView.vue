@@ -89,19 +89,19 @@ const isJoinAvailable = computed(() => {
   const deadline = parseServerDateTime(appointment.value.joinDeadline)
   return deadline !== null && Date.now() < deadline.getTime()
 })
-// 이미 참여한 사람에게도 버튼을 눌리게 둔다. 비활성 버튼은 왜 안 되는지 말해 줄
-// 방법이 마땅치 않고(모바일이라 hover도 없다), 누르면 그때 참여 중이라고 알려
-// 주는 편이 분명하다. 모집이 끝났거나 참여 여부를 확인하지 못한 경우는 눌러도
-// 할 수 있는 일이 없어 그대로 비활성으로 둔다.
-const isJoinButtonEnabled = computed(() => isJoinAvailable.value && !participationCheckFailed.value)
-// 비활성 이유는 버튼 아래에 상시 텍스트로 보여준다. 모집 종료
-// (CLOSED/COMPLETED/CANCELLED)는 사용자 잘못이 아닌 정상 상태라 text-danger로
-// 알릴 일이 아니어서 중립색(text-ink-3)으로 둔다.
-const joinDisabledReason = computed(() => {
+// 참여 버튼은 어떤 경우에도 눌린다. 비활성 버튼은 왜 안 되는지 말해 줄 방법이
+// 마땅치 않고(모바일이라 hover도 없다), 눌렀을 때 이유를 그 자리에서 보여 주는
+// 편이 분명하다. 세 가지 사유(모집 종료·참여 확인 실패·이미 참여)를 모두 같은
+// 방식으로 다뤄, 어떤 사유든 버튼 위에 한 줄로 남는다.
+const joinBlockedReason = ref<string | undefined>(undefined)
+
+// 지금 누르면 막히는 이유. 없으면 결제 시트로 넘어간다.
+function currentJoinBlockedReason(): string | undefined {
   if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
+  if (hasJoined.value) return t('appointment.detail.alreadyJoined')
   if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
   return undefined
-})
+}
 // 방장 여부·참여 상태는 members 목록에서 추리지 않고 participation 응답을 쓴다.
 // 목록은 ACTIVE만 담고 있어 LEFT가 된 내 참여를 구분하지 못하고, 목록 조회가
 // 실패하면 내 권한까지 함께 사라진다.
@@ -277,6 +277,9 @@ const joinMutation = useMutation({
   mutationFn: () => joinAppointment(appointmentId.value as number),
   onSuccess: async () => {
     depositSheetOpen.value = false
+    // 참여에 성공했으니 직전에 남겨 둔 안내는 지운다. 그대로 두면 이미 해결된
+    // 이유가 버튼 위에 남는다.
+    joinBlockedReason.value = undefined
     await invalidateParticipationScopes()
   },
 })
@@ -311,14 +314,10 @@ const joinErrorMessage = computed(() =>
 )
 
 function openDepositSheet(): void {
-  if (!isJoinButtonEnabled.value) return
-
-  // 이미 참여한 사람은 결제 시트까지 갈 이유가 없다. 서버도 APPOINTMENT-003으로
-  // 막으므로 여기서 먼저 알려 준다.
-  if (hasJoined.value) {
-    showToast(t('appointment.detail.alreadyJoined'))
-    return
-  }
+  // 막히는 이유가 있으면 시트를 열지 않고 그 이유만 버튼 위에 남긴다. 이미 참여한
+  // 사람은 서버도 APPOINTMENT-003으로 막으므로 여기서 먼저 알려 주는 셈이다.
+  joinBlockedReason.value = currentJoinBlockedReason()
+  if (joinBlockedReason.value !== undefined) return
 
   joinMutation.reset()
   depositSheetOpen.value = true
@@ -488,14 +487,14 @@ function confirmJoin(): void {
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
         <p
-          v-if="joinDisabledReason !== undefined"
+          v-if="joinBlockedReason !== undefined"
+          role="status"
           class="mb-2 text-center text-body-sm text-ink-3"
         >
-          {{ joinDisabledReason }}
+          {{ joinBlockedReason }}
         </p>
         <AppButton
           block
-          :disabled="!isJoinButtonEnabled"
           @click="openDepositSheet"
         >
           {{ t('appointment.detail.join') }}
