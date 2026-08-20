@@ -427,6 +427,54 @@ describe('AppointmentDetailView', () => {
     expect(invalidated).toContain(JSON.stringify(['appointments', 'mine']))
   })
 
+  // 버거 버튼은 "이 약속의 활성 회원인가"만 본다. 약속 상태나 출석 여부로
+  // 갈리지 않는다 — 갈리는 것은 시트 안 항목의 활성 여부다.
+  it.each([
+    ['COMPLETED', true, 'ATTENDED'],
+    ['COMPLETED', false, 'ATTENDED'],
+    ['IN_PROGRESS', true, 'PENDING'],
+    ['CLOSED', true, 'PENDING'],
+    ['RECRUITING', false, 'PENDING'],
+    ['CANCELLED', false, 'PENDING'],
+  ] as const)(
+    'shows the menu button on a %s appointment (host=%s, attendance=%s)',
+    async (appointmentStatus, host, attendanceStatus) => {
+      fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus })
+      fetchMyAppointmentParticipation.mockResolvedValue({
+        joined: true,
+        appointmentMemberId: 1,
+        membershipStatus: 'ACTIVE' as const,
+        attendanceStatus,
+        host,
+      })
+      const { wrapper } = await mountView()
+
+      expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
+
+      await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    },
+  )
+
+  it('does not show the menu button while the detail is still loading', async () => {
+    // 버튼만 먼저 뜨면 눌러도 시트가 열리지 않는다. 시트는 약속 이름과 보증금이
+    // 필요해 상세를 받은 뒤에만 렌더된다.
+    let resolveDetail: (value: unknown) => void = () => {}
+    fetchAppointment.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveDetail = resolve
+      }),
+    )
+    const { wrapper } = await mountView()
+
+    expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(false)
+
+    resolveDetail(appointment)
+    await flushPromises()
+
+    expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
+  })
+
   it('closes the menu sheet on Escape', async () => {
     const { wrapper } = await mountView()
 

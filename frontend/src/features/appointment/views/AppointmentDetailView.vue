@@ -154,7 +154,11 @@ const leaveDisabledReason = computed(() =>
 // 나가기는 방장에게 보여줄 이유가 없다. 방장은 어떤 상태에서도 자기 참여를
 // 취소할 수 없어 비활성 항목이 영영 활성화되지 않는다.
 const showLeaveItem = computed(() => isActiveMember.value && !isHost.value)
-const canOpenMenu = computed(() => isHost.value || isActiveMember.value)
+// 시트는 상세를 다 받은 뒤에만 렌더되므로(약속 이름과 보증금이 필요하다) 버튼도
+// 같은 조건을 쓴다. 버튼만 헤더에서 먼저 뜨면 눌러도 아무것도 열리지 않는다.
+const canOpenMenu = computed(
+  () => appointment.value !== undefined && (isHost.value || isActiveMember.value),
+)
 
 function formatDateTime(value: AppointmentDateTimeValue): string {
   if (!value) return t('appointment.detail.notProvided')
