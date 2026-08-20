@@ -46,6 +46,13 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   이 헤더는 아는 값(`http`, `https`)만 통과시키고 나머지는 실제 수신 프로토콜로
   되돌립니다 — 그렇지 않으면 클라이언트가 헤더 한 줄로 프로토콜을 위조할 수 있습니다.
   ALB 전환이 끝나면 이 분기와 certbot 관련 설정을 함께 걷어냅니다.
+- **시간대는 세 곳에서 따로 정해집니다.** 백엔드 컨테이너의 `TZ=Asia/Seoul`,
+  `docker-compose.yml` `mysql`의 `--default-time-zone=+09:00`, `DATABASE_URL`의
+  `serverTimezone`입니다. 마지막 것은 **드라이버 설정일 뿐이라 DB가 평가하는
+  `CURRENT_TIMESTAMP`를 바꾸지 못합니다** — "URL에 Asia/Seoul이 있으니 맞춰져 있다"는
+  판단이 실제로 약속 전환을 9시간 밀리게 했습니다. 그리고 셋을 맞추더라도 `WHERE`·
+  `ORDER BY`에서 `NOW()`로 분기하지 말고 앱이 넘긴 시각을 쓰세요. CI는 MySQL을 일부러
+  UTC로 둬서 이 의존을 잡습니다. 자세한 것은 [docs/TECH_STACK.md](./docs/TECH_STACK.md).
 - 리다이렉트 응답에는 CORS 헤더가 없습니다. 프론트의 `VITE_API_BASE_URL`이 `http://`로
   남아 있으면 브라우저가 preflight 단계에서 차단해 **모든 API 호출이 실패합니다.**
   백엔드 도메인·프로토콜을 바꿀 때는 Vercel 환경 변수와 EC2 `.env`의
