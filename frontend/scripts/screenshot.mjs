@@ -324,7 +324,7 @@ function stubWalletHome(page, transactions) {
       body: JSON.stringify({
         success: true,
         data: {
-          balance: 84500,
+          balance: 109500,
           availabilityStatus: 'ACTIVE',
           recentTransactions: transactions,
         },
