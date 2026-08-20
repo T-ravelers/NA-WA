@@ -6,6 +6,7 @@ import type {
 
 export const MIN_APPOINTMENT_DEPOSIT = 5_000
 export const MAX_APPOINTMENT_DEPOSIT = 50_000
+export const MAX_MEETING_PLACE_LENGTH = 200
 export const MIN_APPOINTMENT_MEMBERS = 2
 export const MAX_APPOINTMENT_MEMBERS = 10
 
@@ -113,11 +114,15 @@ export function validateAppointmentBasics(draft: AppointmentFormDraft): Appointm
 
   // 항목 위치로 만나기를 골랐다면 그 위치를 아직 못 읽은 것이다(조회 중이거나 실패).
   // 어느 쪽이든 빈 장소로 약속을 만들 수는 없다.
-  if (draft.meetingPlace.trim() === '') {
+  const meetingPlace = draft.meetingPlace.trim()
+  if (meetingPlace === '') {
     errors.meetingPlace =
       draft.meetingPlaceMode === 'ITEM'
         ? 'appointment.create.validation.itemPlaceUnavailable'
         : 'appointment.create.validation.meetingPlaceRequired'
+  } else if (meetingPlace.length > MAX_MEETING_PLACE_LENGTH) {
+    // 서버도 200자에서 거절한다. 여기서 막지 않으면 필드 안내 없는 통짜 오류만 돌아온다.
+    errors.meetingPlace = 'appointment.create.validation.meetingPlaceTooLong'
   }
 
   return errors

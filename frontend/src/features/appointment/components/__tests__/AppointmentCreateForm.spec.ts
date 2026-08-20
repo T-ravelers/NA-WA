@@ -28,6 +28,28 @@ const mountOptions = {
   },
 }
 
+/** 조회 중·조회 실패처럼 위치 상태에 따라 화면이 갈리는 경우만 따로 세운다. */
+function locationMountOptions(state: {
+  data?: { placeName: string | null; addressRoad: string | null }
+  isPending?: boolean
+  isError?: boolean
+}) {
+  return {
+    global: {
+      plugins: [i18n],
+      provide: {
+        [appointmentExploreIntegrationKey as symbol]: {
+          useItemLocation: () => ({
+            data: ref(state.data),
+            isPending: ref(state.isPending ?? false),
+            isError: ref(state.isError ?? false),
+          }),
+        },
+      },
+    },
+  }
+}
+
 function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
   const button = wrapper.findAll('button').find((candidate) => candidate.text().includes(text))
   if (button === undefined) throw new Error(`Button not found: ${text}`)
@@ -117,6 +139,41 @@ describe('AppointmentCreateForm', () => {
 
     expect(wrapper.text()).toContain('We could not read this activity location.')
     itemLocation.value = { placeName: 'DDP Design Plaza', addressRoad: null }
+  })
+
+  it('says the activity location is still loading instead of blaming a failure', () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
+      ...locationMountOptions({ isPending: true }),
+    })
+
+    // 아직 읽는 중일 뿐인데 "못 읽었다"고 말하면 사용자는 고칠 수 없는 문제로 받아들인다.
+    expect(wrapper.text()).toContain('Reading the activity location')
+    expect(wrapper.text()).not.toContain('We could not read this activity location.')
+    expect(buttonByText(wrapper, 'Continue').attributes('disabled')).toBeDefined()
+  })
+
+  it('warns about a failed location before the host presses Continue', () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
+      ...locationMountOptions({ isError: true }),
+    })
+
+    expect(wrapper.text()).toContain('We could not read this activity location.')
+    expect(buttonByText(wrapper, 'Continue').attributes('disabled')).toBeUndefined()
+  })
+
+  it('rejects a meeting place longer than the server accepts', async () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
+      ...mountOptions,
+    })
+
+    await wrapper.get('#appointment-meeting-mode').setValue('CUSTOM')
+    await wrapper.find('input[placeholder="Please enter the location."]').setValue('a'.repeat(201))
+    await fillBasics(wrapper)
+
+    expect(wrapper.text()).toContain('Use 200 characters or fewer.')
   })
 
   it('moves between the basics and settings steps', async () => {

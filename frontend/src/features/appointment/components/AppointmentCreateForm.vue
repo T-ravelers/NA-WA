@@ -73,6 +73,15 @@ const itemLocationQuery = useAppointmentItemLocation(
 )
 const itemPlaceName = computed(() => itemLocationQuery.data.value?.placeName ?? null)
 
+// 조회 중과 조회 실패는 둘 다 meetingPlace가 비어 있어 같은 오류로 보인다. 아직
+// 읽는 중일 뿐인데 "못 읽었다"고 말하지 않도록 상태를 갈라 안내한다.
+const waitingForItemPlace = computed(
+  () => draft.meetingPlaceMode === 'ITEM' && itemLocationQuery.isPending.value,
+)
+const itemPlaceFailed = computed(
+  () => draft.meetingPlaceMode === 'ITEM' && itemLocationQuery.isError.value,
+)
+
 // 직접 적은 장소는 모드를 오갔다 돌아와도 남는다 — 잘못 눌러 지워지면 다시 적어야 한다.
 const customMeetingPlace = ref('')
 
@@ -329,6 +338,19 @@ defineExpose({ goToPreviousStep })
             {{ translatedError(errors.meetingPlace) }}
           </p>
           <p
+            v-else-if="waitingForItemPlace"
+            class="text-caption text-ink-3"
+          >
+            {{ t('appointment.create.meetingPlaceLoading') }}
+          </p>
+          <p
+            v-else-if="itemPlaceFailed"
+            class="text-caption text-danger"
+            role="alert"
+          >
+            {{ t('appointment.create.validation.itemPlaceUnavailable') }}
+          </p>
+          <p
             v-else-if="itemLocationQuery.data.value?.addressRoad"
             class="text-caption text-ink-3"
           >
@@ -417,6 +439,7 @@ defineExpose({ goToPreviousStep })
           block
           type="submit"
           :loading="pending"
+          :disabled="step === 1 && waitingForItemPlace"
           :class="step === 1 ? 'col-span-2' : ''"
         >
           {{ step === 2 ? t('appointment.create.submit') : t('appointment.create.continue') }}

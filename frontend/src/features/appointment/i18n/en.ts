@@ -64,6 +64,7 @@ export default {
       meetingElsewhere: 'Meet elsewhere and go together.',
       meetingPlaceLabel: 'Where should members meet?',
       meetingPlacePlaceholder: 'Please enter the location.',
+      meetingPlaceLoading: 'Reading the activity location…',
       visitDateNote: 'This activity happens on {date}, based on the journey day you chose.',
       startAt: 'Activity starts',
       endAt: 'Activity ends',
@@ -88,6 +89,7 @@ export default {
         languageRequired: 'Choose a preferred language.',
         depositInvalid: 'Choose a deposit between ₩5,000 and ₩50,000.',
         meetingPlaceRequired: 'Enter a meeting place.',
+        meetingPlaceTooLong: 'Use 200 characters or fewer.',
         itemPlaceUnavailable:
           'We could not read this activity location. Choose to meet elsewhere and enter a place.',
         startRequired: 'Choose a start time.',
