@@ -265,6 +265,26 @@ describe('AppointmentAttendanceView', () => {
     expect(router.currentRoute.value.name).toBe('appointment-attendance')
   })
 
+  it('says the failure once, not in two live regions at the same time', async () => {
+    // 시트는 오류 뒤에도 닫히지 않아 그 자리에서 다시 시도할 수 있다. 하단 바까지
+    // 같은 말을 하면 라이브 리전이 둘이 된다.
+    const { NormalizedApiError } = await import('@/shared/api/apiError')
+    confirmAppointmentAttendance.mockRejectedValue(
+      new NormalizedApiError('APPOINTMENT-004', 403, 'forbidden'),
+    )
+    const { wrapper } = await mountView()
+
+    await toggleFor(wrapper, 'Mina Park').trigger('click')
+    await saveThroughSheet(wrapper)
+
+    const alerts = wrapper
+      .findAll('[role="alert"]')
+      .filter((node) => node.text().includes('Only the appointment host can do this.'))
+
+    expect(alerts).toHaveLength(1)
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+  })
+
   it('hides attendance controls from non-host members', async () => {
     fetchMyAppointmentParticipation.mockResolvedValue({ ...hostParticipation, host: false })
     const { wrapper } = await mountView()

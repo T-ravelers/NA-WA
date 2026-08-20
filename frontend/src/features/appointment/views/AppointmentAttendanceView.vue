@@ -329,8 +329,11 @@ function retry(): void {
       <div
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
+        <!-- 시트가 열려 있으면 같은 오류를 시트가 이미 말하고 있다. 여기까지
+             띄우면 라이브 리전이 둘이라 스크린 리더가 두 번 읽고, 그중 하나는
+             scrim 뒤라 눈으로는 보이지도 않는다. -->
         <p
-          v-if="saveErrorMessage !== undefined"
+          v-if="saveErrorMessage !== undefined && !saveConfirmOpen"
           class="mb-2 text-center text-body-sm text-danger"
           role="alert"
         >
