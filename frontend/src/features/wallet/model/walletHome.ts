@@ -11,8 +11,8 @@ import { formatGroupedDecimal } from '@/shared/lib/money'
  * 이 계층은 문구를 만들지 않는다. i18n key로 쓸 값과 숫자·시각만 정하고, 번역과 색·아이콘은
  * 화면이 고른다. 표시 문자열이 여기 굳어 있으면 로케일을 바꿔도 화면이 따라오지 못한다.
  *
- * 거래 내역·거래 상세(#99)는 별도 화면이라 문구를 영어로 직접 고정해 둔다. 이 화면들이
- * i18n으로 옮겨가면 `getTransactionTypeLabel`·`getTransactionStatusLabel`도 함께 정리한다.
+ * 거래 상태 문구는 거래 내역·거래 상세(#99)가 아직 영어로 고정해 두고 있다. 그 화면들이
+ * i18n으로 옮겨갈 때 `getTransactionStatusLabel`도 함께 정리한다.
  */
 
 /** 백엔드 `me.nawa.wallet.domain.enums.TransferType`과 1:1이다. */
@@ -22,7 +22,7 @@ export const TRANSFER_TYPES = [
   'SETTLEMENT',
   'DEPOSIT_HOLD',
   'DEPOSIT_REFUND',
-  'DEPOSIT_FORFEIT_DISTRIBUTION',
+  'DEPOSIT_NO_SHOW_DISTRIBUTION',
   'REVERSAL',
 ] as const
 
@@ -140,7 +140,8 @@ export const walletKeys = {
 // 기존 wallet model을 직접 참조하던 호출부를 위해 공용 파서를 재노출한다.
 export const parseServerDateTime = parseSharedServerDateTime
 
-function toActivityKind(transferType: string): ActivityKind {
+/** 서버가 내려준 거래 종류를 화면이 아는 값으로 좁힌다. 모르는 값은 `UNKNOWN`이다. */
+export function toActivityKind(transferType: string): ActivityKind {
   const normalized = transferType.toUpperCase()
 
   return TRANSFER_TYPES.find((type) => type === normalized) ?? 'UNKNOWN'
@@ -199,22 +200,6 @@ const getAbsoluteAmount = (amount: string): string => amount.replace(/^-/, '')
 
 export const formatPointAmount = (amount: string): string =>
   formatGroupedDecimal(amount, 'en-US') || amount
-
-/** 거래 내역·거래 상세 화면에서 쓰는 영문 표시명. 백엔드 `TransferType`과 1:1이다. */
-export const getTransactionTypeLabel = (transferType: string): string => {
-  switch (transferType.toUpperCase()) {
-    case 'TOPUP':
-      return 'Point top-up'
-    case 'QR_PAYMENT':
-      return 'QR payment'
-    case 'TRANSFER':
-      return 'Point transfer'
-    case 'SETTLEMENT':
-      return 'Settlement'
-    default:
-      return 'Wallet transaction'
-  }
-}
 
 export const getTransactionStatusLabel = (status: string): string => {
   switch (status.toUpperCase()) {

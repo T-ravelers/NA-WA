@@ -388,7 +388,7 @@ function stubWalletHome(page, transactions) {
       body: JSON.stringify({
         success: true,
         data: {
-          balance: 84500,
+          balance: 109500,
           availabilityStatus: 'ACTIVE',
           recentTransactions: transactions,
         },
@@ -399,6 +399,14 @@ function stubWalletHome(page, transactions) {
 
 /** 거래 종류마다 아이콘과 문구가 다르므로, 한 장에 여러 종류를 섞어 찍는다. */
 const WALLET_TRANSACTIONS = [
+  {
+    transferId: 5,
+    transferType: 'DEPOSIT_NO_SHOW_DISTRIBUTION',
+    entryType: 'CREDIT',
+    amount: 25000,
+    balanceAfter: 109500,
+    createdAt: [2026, 7, 26, 10, 30],
+  },
   {
     transferId: 1,
     transferType: 'QR_PAYMENT',
