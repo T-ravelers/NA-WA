@@ -362,6 +362,16 @@ class SettlementMapperIntegrationTest {
 
             assertEquals(1, paid.size());
             assertEquals("PAID", paid.get(0).getRequestStatus());
+
+            // 약속에서 나가도 이미 진 빚은 남는다. 목록에서 빼면 정산은 끝나지 않았는데
+            // 화면만 다 냈다고 말하게 된다.
+            jdbcTemplate.update(
+                "UPDATE appointment_members SET membership_status = 'LEFT', "
+                    + "left_at = CURRENT_TIMESTAMP WHERE appointment_member_id = ?",
+                guestAppointmentMemberId
+            );
+
+            assertEquals(1, mapper.findCollectionMembers(settlement.getSettlementId()).size());
         } finally {
             // 참가 행과 회원을 지우려면 그것을 가리키는 정산 구성원 행이 먼저 없어져야 한다.
             jdbcTemplate.update(

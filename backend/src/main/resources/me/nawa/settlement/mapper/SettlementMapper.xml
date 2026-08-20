@@ -99,6 +99,10 @@
         넘어가므로, 같은 기준으로 세야 화면의 "몇 명 중 몇 명"과 정산 상태가 어긋나지 않는다.
 
         지운 행은 정산 쪽과 약속 참가 쪽 양쪽에서 걸러야 한 곳만 지워진 사람이 되살아나지 않는다.
+
+        membership_status는 일부러 보지 않는다. 약속에서 나간 사람도 이미 진 빚은 그대로라
+        정산은 그 사람이 낼 때까지 끝나지 않는다. 여기서 그를 빼면 화면은 다 냈다고 말하는데
+        정산은 요청 중으로 남는다. findParticipants처럼 ACTIVE만 고르면 이 어긋남이 생긴다.
     -->
     <select id="findCollectionMembers" resultType="me.nawa.settlement.domain.SettlementCollectionMember">
         SELECT sm.appointment_member_id, m.display_name, sm.share_amount, sm.request_status
