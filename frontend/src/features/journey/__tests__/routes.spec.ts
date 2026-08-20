@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import routes from '../routes'
 
 describe('journey routes', () => {
-  it('registers authenticated list, create, and detail screens', () => {
+  it('registers authenticated list, create, detail, and settings screens', () => {
     expect(routes.map(({ path, name, meta }) => ({ path, name, meta }))).toEqual([
       {
         path: '/journeys',
@@ -18,6 +18,11 @@ describe('journey routes', () => {
       {
         path: '/journeys/:tripId',
         name: 'journey-detail',
+        meta: { requiresAuth: true },
+      },
+      {
+        path: '/journeys/:tripId/settings',
+        name: 'journey-settings',
         meta: { requiresAuth: true },
       },
     ])

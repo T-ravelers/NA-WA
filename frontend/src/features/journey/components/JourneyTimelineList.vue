@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
-import { IconPlus } from '@tabler/icons-vue'
+import { IconPlus, IconX } from '@tabler/icons-vue'
 
 import {
   formatCalendarDate,
@@ -19,9 +19,11 @@ interface Props {
   tripId: number
   startDate: string
   endDate: string
+  removingTripItemId?: number | null
 }
 
 const props = defineProps<Props>()
+const emit = defineEmits<{ remove: [item: JourneyTimelineItem] }>()
 
 const { locale, t } = useI18n()
 
@@ -171,6 +173,7 @@ const displayDays = computed(() => {
         const companionsTo = companionsLink(item)
 
         return {
+          source: item,
           tripItemId: item.tripItemId,
           timeLabel: formatTime(item),
           confirmed,
@@ -196,6 +199,7 @@ const displayDays = computed(() => {
           companionsName: confirmed
             ? t('journey.detail.viewCompanionsFor', { title })
             : t('journey.detail.findCompanionsFor', { title }),
+          removeName: t('journey.remove.actionFor', { title }),
         }
       }),
     }
@@ -248,8 +252,21 @@ const displayDays = computed(() => {
           </div>
 
           <article class="min-w-0 flex-1 pb-4">
-            <div class="flex flex-col gap-2 rounded-md bg-surface-1 px-4 py-3.5">
-              <div class="flex flex-wrap items-center gap-2">
+            <div class="relative flex flex-col gap-2 rounded-md bg-surface-1 px-4 py-3.5">
+              <button
+                type="button"
+                :aria-label="item.removeName"
+                :disabled="props.removingTripItemId === item.tripItemId"
+                class="absolute right-0.5 top-0.5 flex size-11 items-center justify-center rounded-pill text-ink-3 disabled:opacity-40"
+                @click="emit('remove', item.source)"
+              >
+                <IconX
+                  :size="19"
+                  :stroke-width="1.75"
+                  aria-hidden="true"
+                />
+              </button>
+              <div class="flex flex-wrap items-center gap-2 pr-8">
                 <h4 class="min-w-0 text-title-sm text-ink">{{ item.title }}</h4>
                 <AppBadge
                   :tone="item.confirmed ? 'ongoing' : 'neutral'"
