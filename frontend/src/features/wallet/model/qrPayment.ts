@@ -1,3 +1,5 @@
+import type { SpendingCategory } from '@/shared/lib/spendingCategory'
+
 export { formatKrw } from '@/shared/lib/money'
 
 export type SpendingScope = 'personal' | 'shared'
@@ -73,6 +75,13 @@ export interface QrPaymentExecuteRequest {
   amount: number
   spendingScope: QrPaymentSpendingScope
   appointmentId: number | null
+  /**
+   * 결제자가 고른 소비 카테고리.
+   *
+   * 백엔드는 `null`도 받아 `OTHER`로 접지만, 화면은 기본 선택을 두고 항상 값을 보낸다.
+   * 미리보기 요청에는 없다 — 카테고리는 결제 금액과 잔액을 바꾸지 않는다.
+   */
+  spendingCategory: SpendingCategory
 }
 
 /** `POST /api/v1/wallet/qr/payment/execute` 응답. 백엔드 `QrPaymentExecuteResponse`와 1:1. */

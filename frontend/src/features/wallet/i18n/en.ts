@@ -233,6 +233,8 @@ export default {
       shared: 'Shared',
       activeAppointments: 'Current appointments',
       activeAppointmentsHint: 'Choose the appointment this expense belongs to.',
+      spendingCategory: 'Spending category',
+      spendingCategoryHint: 'This shapes the spending style shown in your journey report.',
       selectAppointment: 'Select an appointment to continue.',
       appointmentsLoading: 'Loading your appointments...',
       appointmentsError: 'We could not load your appointments. Please try again.',

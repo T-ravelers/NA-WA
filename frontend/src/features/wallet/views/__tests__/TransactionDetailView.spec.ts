@@ -85,4 +85,31 @@ describe('TransactionDetailView', () => {
     expect(wrapper.text()).toContain('ST-0727-0001')
     expect(vi.mocked(getTransactionDetail)).toHaveBeenCalledWith(101)
   })
+
+  // 서버가 저장한 값은 `FOOD` 같은 코드다. 그대로 찍으면 화면에 코드가 날것으로 보인다.
+  it('translates the stored spending category', async () => {
+    vi.mocked(getTransactionDetail).mockResolvedValue({
+      ...transactionDetail,
+      receipt: { ...transactionDetail.receipt, spendingCategory: 'FOOD' },
+    })
+
+    const { wrapper } = await mountTransactionDetail()
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Food')
+    expect(wrapper.text()).not.toContain('FOOD')
+  })
+
+  it('falls back to the not-available label when no category was picked', async () => {
+    const { wrapper } = await mountTransactionDetail()
+
+    await flushPromises()
+
+    const categoryRow = wrapper
+      .findAll('div')
+      .find((row) => row.find('dt')?.text() === 'Spending category')
+
+    expect(categoryRow?.get('dd').text()).toBe('Not available')
+  })
 })

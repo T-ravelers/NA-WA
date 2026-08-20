@@ -114,6 +114,7 @@ describe('ReportDetailView', () => {
     expect(wrapper.text()).not.toContain('similar travelers')
     expect(wrapper.findAll('h2').map((heading) => heading.text())).toEqual([
       'Analysis',
+      'Flavor Seeker',
       'By category',
       'Spending trend',
       'Journey snapshot',
@@ -150,6 +151,42 @@ describe('ReportDetailView', () => {
 
     expect(wrapper.text()).toContain('No spending selected')
     expect(wrapper.text()).toContain('No category spending was recorded.')
+    expect(wrapper.text()).not.toContain('Free Spender')
+  })
+
+  it('names a spending persona from the top category and fills in its share', async () => {
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Flavor Seeker')
+    expect(wrapper.text()).toContain(
+      'You followed your appetite — 78% of this journey went to food.',
+    )
+  })
+
+  // 백엔드가 금액 내림차순으로 정렬해 주므로 첫 항목이 1위다.
+  it('follows the breakdown order when another category leads', async () => {
+    fetchReport.mockResolvedValueOnce({
+      ...detail,
+      analytics: {
+        ...detail.analytics,
+        categoryBreakdown: [
+          { category: 'STAY', amount: '900000.0000', percentage: '70.07' },
+          { category: 'FOOD', amount: '384500.0000', percentage: '29.93' },
+        ],
+      },
+    })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Slow Traveler')
+    expect(wrapper.text()).not.toContain('Flavor Seeker')
+  })
+
+  it('translates category codes instead of printing them raw', async () => {
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Food')
+    expect(wrapper.text()).toContain('Other')
+    expect(wrapper.text()).not.toContain('FOOD')
   })
 
   it('does not request an invalid route id and navigates back', async () => {
