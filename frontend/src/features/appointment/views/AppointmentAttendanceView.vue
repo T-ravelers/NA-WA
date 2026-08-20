@@ -21,8 +21,8 @@ import { appointmentKeys } from '../model/appointmentKeys'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
+  appointmentParticipationQueryOptions,
 } from '../model/appointmentQueries'
-import { useAppointmentMemberProfile } from '../model/memberIntegration'
 
 /** 서버가 받는 값. `PENDING`은 확정 요청에 실을 수 없다. */
 type ConfirmedAttendance = 'ATTENDED' | 'NO_SHOW'
@@ -54,15 +54,17 @@ const membersQuery = useQuery({
   retry: false,
 })
 
-const profileQuery = useAppointmentMemberProfile()
-const members = computed(() => membersQuery.data.value ?? [])
-const isHost = computed(() => {
-  const currentMemberId = profileQuery.data.value?.memberId
-  return (
-    currentMemberId !== undefined &&
-    members.value.some((member) => member.memberId === currentMemberId && member.isHost)
-  )
+const participationQuery = useQuery({
+  ...appointmentParticipationQueryOptions(appointmentId),
+  enabled: computed(() => appointmentId.value !== null),
+  retry: false,
 })
+
+const members = computed(() => membersQuery.data.value ?? [])
+// 방장 여부는 상세 화면과 같은 근거(participation 응답)를 쓴다. 회원 목록에서
+// 내 memberId를 찾아 추리면 목록 조회나 프로필 연동이 실패했을 때 방장 권한까지
+// 함께 사라져, 정작 출석을 확정해야 할 사람이 막힌다.
+const isHost = computed(() => participationQuery.data.value?.host === true)
 const appointmentInProgress = computed(
   () => detailQuery.data.value?.appointmentStatus === 'IN_PROGRESS',
 )
@@ -153,7 +155,7 @@ function goBack(): void {
 function retry(): void {
   void detailQuery.refetch()
   void membersQuery.refetch()
-  void profileQuery.refetch()
+  void participationQuery.refetch()
 }
 </script>
 
@@ -180,13 +182,15 @@ function retry(): void {
     />
     <StateLoading
       v-else-if="
-        detailQuery.isPending.value || membersQuery.isPending.value || profileQuery.isPending.value
+        detailQuery.isPending.value ||
+        membersQuery.isPending.value ||
+        participationQuery.isPending.value
       "
       :label="t('state.loading')"
     />
     <StateError
       v-else-if="
-        detailQuery.isError.value || membersQuery.isError.value || profileQuery.isError.value
+        detailQuery.isError.value || membersQuery.isError.value || participationQuery.isError.value
       "
       :title="t('appointment.attendance.loadFailed')"
       :description="t('appointment.attendance.loadFailedDescription')"
