@@ -409,6 +409,7 @@ function resetSheet(): void {
     EVENT_OPTIONS.forEach(({ key }) => (draft[key] = undefined))
   } else {
     draft.sort = 'NEWEST'
+    draft.savedOnly = undefined
   }
 }
 

@@ -168,6 +168,25 @@ describe('ExploreFilterSheet', () => {
     expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({ savedOnly: true })
   })
 
+  it('clears the Saved toggle when the sort sheet is reset', async () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'sort', filters: { sort: 'NEWEST', savedOnly: true }, resultCount: 3 },
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Reset')
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+
+    const applied = wrapper.emitted('apply')?.[0]?.[0] as { savedOnly?: boolean }
+    expect(applied.savedOnly).toBeUndefined()
+  })
+
   it('emits close when the scrim is pressed', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
