@@ -11,6 +11,7 @@ const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
 const fetchMyAppointmentParticipation = vi.fn()
 const joinAppointment = vi.fn()
+const cancelAppointmentParticipation = vi.fn()
 const profileQuery = {
   data: ref({ memberId: 11 }),
   isPending: ref(false),
@@ -25,6 +26,8 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   fetchMyAppointmentParticipation: (appointmentId: number) =>
     fetchMyAppointmentParticipation(appointmentId),
   joinAppointment: (appointmentId: number) => joinAppointment(appointmentId),
+  cancelAppointmentParticipation: (appointmentId: number) =>
+    cancelAppointmentParticipation(appointmentId),
 }))
 
 const AppointmentDetailView = (await import('../AppointmentDetailView.vue')).default
@@ -143,12 +146,29 @@ const hostParticipation = {
   host: true,
 }
 
+const memberParticipation = {
+  joined: true,
+  appointmentMemberId: 2,
+  membershipStatus: 'ACTIVE' as const,
+  attendanceStatus: 'ATTENDED' as const,
+  host: false,
+}
+
+type MountedWrapper = Awaited<ReturnType<typeof mountView>>['wrapper']
+
+/** 시트 안에서 라벨로 항목 버튼을 찾는다. 라벨 아래에 설명·비활성 사유가 붙는다. */
+function menuItem(wrapper: MountedWrapper) {
+  return (label: string) =>
+    wrapper.findAll('[role="dialog"] button').find((button) => button.text().startsWith(label))
+}
+
 describe('AppointmentDetailView', () => {
   beforeEach(() => {
     fetchAppointment.mockReset()
     fetchAppointmentMembers.mockReset()
     fetchMyAppointmentParticipation.mockReset()
     joinAppointment.mockReset()
+    cancelAppointmentParticipation.mockReset()
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue([...members, leftMember])
     fetchMyAppointmentParticipation.mockResolvedValue(hostParticipation)
@@ -165,8 +185,9 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).not.toContain('Not attended')
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).not.toContain('Jamie Lee')
-    expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Confirm attendance')
+    // 방장이라 모집 중에도 버거 버튼은 뜬다. 다만 시트 안의 항목은 아직 전부
+    // 비활성이다.
+    expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
   })
 
   it('disables Join appointment and shows an already-joined notice for the host', async () => {
@@ -293,39 +314,104 @@ describe('AppointmentDetailView', () => {
     expect(router.currentRoute.value.name).toBe('appointment-member-profile')
   })
 
-  it('opens the attendance screen from the appointment detail', async () => {
+  it('opens the attendance screen from the detail sheet', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'IN_PROGRESS' })
     const { wrapper, router } = await mountView()
 
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Confirm attendance')
-      ?.trigger('click')
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    const attendance = menuItem(wrapper)('Attendance')
+    expect(attendance?.attributes('disabled')).toBeUndefined()
+
+    await attendance?.trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('appointment-attendance')
   })
 
-  it('opens reviews from the detail menu after completion', async () => {
+  it('opens reviews from the detail sheet after completion', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
     const { wrapper, router } = await mountView()
 
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    expect(wrapper.get('[role="menu"]').text()).toContain('Reviews')
-    expect(wrapper.get('[role="menu"]').text()).not.toContain('Attendance')
+    const item = menuItem(wrapper)
+    expect(item('Reviews')?.attributes('disabled')).toBeUndefined()
 
-    await wrapper.get('[role="menuitem"]').trigger('click')
+    await item('Reviews')?.trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.name).toBe('appointment-reviews')
   })
 
-  it('does not expose attendance from a completed appointment', async () => {
+  it('keeps attendance visible but disabled once the appointment is completed', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
     const { wrapper } = await mountView()
 
-    expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    expect(wrapper.get('[role="menu"]').text()).not.toContain('Attendance')
-    expect(wrapper.text()).not.toContain('Confirm attendance')
+    const attendance = menuItem(wrapper)('Attendance')
+
+    expect(attendance?.attributes('disabled')).toBeDefined()
+    expect(attendance?.text()).toContain('Attendance has already been confirmed.')
+  })
+
+  it('hides the menu button from someone who never joined', async () => {
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    const { wrapper } = await mountView()
+
+    expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(false)
+  })
+
+  it('hides Leave group from the host', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    expect(menuItem(wrapper)('Leave group')).toBeUndefined()
+  })
+
+  it('leaves the appointment after confirming, and refunds are spelled out', async () => {
+    fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
+    cancelAppointmentParticipation.mockResolvedValue(undefined)
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    await menuItem(wrapper)('Leave group')?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Leave this appointment?')
+    expect(wrapper.text()).toContain('will be refunded to your wallet')
+
+    await wrapper
+      .findAll('[role="dialog"] button')
+      .find((button) => button.text() === 'Leave group')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(cancelAppointmentParticipation).toHaveBeenCalledWith(7)
+  })
+
+  it('disables Leave group once the join deadline has passed', async () => {
+    fetchAppointment.mockResolvedValueOnce({
+      ...appointment,
+      appointmentStatus: 'IN_PROGRESS',
+      joinDeadline: '2020-01-01T00:00:00',
+    })
+    fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    const leave = menuItem(wrapper)('Leave group')
+
+    expect(leave?.attributes('disabled')).toBeDefined()
+    expect(leave?.text()).toContain('The join deadline has passed')
+  })
+
+  it('closes the menu sheet on Escape', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 })

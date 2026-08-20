@@ -3,6 +3,8 @@ export default {
     errorCode: {
       'APPOINTMENT-002': 'This appointment is not open for joining.',
       'APPOINTMENT-003': 'You have already joined this appointment.',
+      'APPOINTMENT-005': 'You are not a member of this appointment.',
+      'APPOINTMENT-007': 'You can no longer leave this appointment.',
     },
     list: {
       title: 'Appointments',
@@ -142,11 +144,21 @@ export default {
       joinUnavailable: 'This appointment is not open for joining.',
       alreadyJoined: 'You have already joined this appointment.',
       participationCheckFailed: 'We could not check your participation status. Please try again.',
-      attendance: 'Confirm attendance',
       openMenu: 'Open appointment menu',
       menu: {
+        title: 'Group tools',
         attendance: 'Attendance',
+        attendanceDescription: 'Confirm who attended · Host only',
+        attendanceNotStarted: 'Opens once the activity starts.',
+        attendanceDone: 'Attendance has already been confirmed.',
+        attendanceCancelled: 'This appointment was canceled.',
         reviews: 'Reviews',
+        reviewsDescription: 'Rate members you met',
+        reviewsNotCompleted: 'Opens once the host confirms attendance.',
+        reviewsNotAttended: 'Only members confirmed as attended can write reviews.',
+        leave: 'Leave group',
+        leaveDescription: 'You will no longer be a member',
+        leaveDeadlinePassed: 'The join deadline has passed, so you can no longer leave.',
       },
       invalidTitle: 'Appointment not found',
       invalidDescription: 'The appointment link is invalid.',
@@ -192,6 +204,16 @@ export default {
       actionsUnavailable: 'This action will be connected later.',
       loadFailed: 'Participant profile could not be loaded',
       loadFailedDescription: 'Please try again in a moment.',
+    },
+    leave: {
+      title: 'Leave this appointment?',
+      close: 'Close leave confirmation',
+      description: 'You will no longer be a member of {name}.',
+      refund:
+        'Your deposit of \u20a9{amount} will be refunded to your wallet. To join again you will need to pay it once more.',
+      confirm: 'Leave group',
+      cancel: 'Stay',
+      failed: 'You could not be removed from this appointment. Please try again.',
     },
     deposit: {
       title: 'Confirm participation',
