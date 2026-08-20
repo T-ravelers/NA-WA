@@ -65,6 +65,13 @@ export default {
       payerRequired: 'The original payer is included and cannot be removed.',
       items: 'Items',
       addItem: 'Add item',
+      loadItems: 'Read receipt',
+      allocateAfterLoad: 'Now share each quantity across the participants.',
+      overwriteItemsTitle: 'Replace the current items?',
+      overwriteItemsDescription:
+        'Reading the receipt replaces every item below, including the quantities you shared out.',
+      overwriteItemsCancel: 'Keep the current items',
+      overwriteItemsConfirm: 'Read the receipt',
       itemNumber: 'Item {number}',
       removeItem: 'Remove item {number}',
       itemName: 'Item name',
@@ -74,7 +81,14 @@ export default {
       allocationIncomplete: 'Allocate every item quantity before continuing',
       itemInvalid: 'Check this item. Its allocated quantities must add up to the quantity above.',
       itemsTotal: 'Items total',
+      receiptTotal: 'Receipt total',
+      receiptTotalMismatch:
+        'The receipt total differs from what was paid. Discounts, service charges, or a split bill can explain this — check the photo if it looks wrong.',
       totalMismatch: 'Item totals must match the payment exactly before continuing',
+      itemsOverPayment:
+        'Items add up to {amount} more than the payment. Check the quantities, or lower a price — a discount on the receipt is not an item.',
+      itemsUnderPayment:
+        'Items add up to {amount} less than the payment. Check the quantities, or raise a price — a service charge or tax is not an item.',
       itemsHint: 'Enter what was ordered, then share each quantity across the participants.',
       overview: 'Request overview',
       overviewHint: 'Check the amounts before sending. Go back to change anything.',
@@ -123,6 +137,17 @@ export default {
         storage: 'Receipt storage is unavailable right now. Try again in a moment.',
         missing: 'No receipt was attached to this split.',
         expired: 'Receipts are kept for one year. This one is no longer available.',
+        /*
+         * 아래 인식 실패 네 문구는 errorCode의 SETTLEMENT-022~025와 자구가 같다. 두 경로를
+         * 나눈 것은 의도한 것이지만(인식 실패는 여기, 정산 생성·조회 실패는 errorCode),
+         * 문구를 고칠 때는 반드시 양쪽을 함께 고친다.
+         */
+        ocrFormat:
+          'We cannot read text from this photo. WebP is not supported — take the photo again as JPEG or PNG.',
+        ocrUnreadable:
+          'We could not find any items on that photo. Check it, or enter the items yourself.',
+        ocrTimeout: 'Reading the receipt took too long. Try once more.',
+        ocrUnavailable: 'Receipt reading is unavailable right now. Enter the items yourself.',
         unknown: 'We could not handle that receipt. Try again.',
       },
     },
@@ -165,6 +190,22 @@ export default {
       'SETTLEMENT-014':
         'This payment was already processed with another attempt. Refresh the split.',
       'SETTLEMENT-015': 'The payment attempt key is invalid. Try again.',
+      /*
+       * 아래 영수증 코드 가운데 022~025는 receipt.error.ocr* 네 문구와 자구가 같다. 한쪽만
+       * 고치면 같은 실패가 자리에 따라 다르게 말하게 되므로 함께 고친다.
+       */
+      'SETTLEMENT-016': 'That file is not a JPEG, PNG, or WebP photo. Take the photo again.',
+      'SETTLEMENT-017': 'That receipt is already attached to another split. Add a different photo.',
+      'SETTLEMENT-018': 'That receipt is no longer available. Add the photo again.',
+      'SETTLEMENT-019': 'Receipt storage is unavailable right now. Try again in a moment.',
+      'SETTLEMENT-020': 'Receipts are kept for one year. Add a newer photo.',
+      'SETTLEMENT-021': 'We could not read that photo file. Take the photo again.',
+      'SETTLEMENT-022':
+        'We cannot read text from this photo. WebP is not supported — take the photo again as JPEG or PNG.',
+      'SETTLEMENT-023':
+        'We could not find any items on that photo. Check it, or enter the items yourself.',
+      'SETTLEMENT-024': 'Reading the receipt took too long. Try once more.',
+      'SETTLEMENT-025': 'Receipt reading is unavailable right now. Enter the items yourself.',
       default: 'We could not complete this split action. Try again.',
     },
   },

@@ -27,10 +27,15 @@ function parseQuantity(value: string): bigint | null {
   return parseScaled(value, QUANTITY_DECIMALS)
 }
 
+/**
+ * 단가가 0인 품목도 받는다.
+ *
+ * 사은품이나 리뷰 증정 음료는 영수증에 0원으로 찍히고, 그것이 맞는 값이다. 서버도 음수만
+ * 거절한다. 화면에서만 0을 막으면 사용자는 제대로 읽어 온 증정 품목을 지우거나 영수증에
+ * 없는 금액을 지어내야 다음 단계로 갈 수 있다.
+ */
 function hasValidPrice(value: string): boolean {
-  return (
-    /^(?:0|[1-9]\d{0,14})(?:\.\d{1,4})?$/.test(value.trim()) && !/^0(?:\.0+)?$/.test(value.trim())
-  )
+  return /^(?:0|[1-9]\d{0,14})(?:\.\d{1,4})?$/.test(value.trim())
 }
 
 /** Validates only client-entered ITEMIZED data; it never calculates money shares. */
@@ -76,7 +81,7 @@ export function validateItemizedItems(
 export function compareItemizedTotal(
   items: ItemizedSettlementItem[],
   sourceAmount: string,
-): { matches: boolean; total: string } | null {
+): { matches: boolean; total: string; difference: string; exceedsPayment: boolean } | null {
   const source = parseScaled(sourceAmount, TOTAL_DECIMALS)
   if (source === null || items.length === 0) return null
 
@@ -89,7 +94,46 @@ export function compareItemizedTotal(
     total += price * quantity
   }
 
-  return { matches: total === source, total: formatScaled(total, TOTAL_DECIMALS) }
+  const gap = total - source
+
+  return {
+    matches: gap === 0n,
+    total: formatScaled(total, TOTAL_DECIMALS),
+    /*
+     * 얼마나 어긋났는지를 크기로 넘기고 방향은 따로 알린다.
+     *
+     * 두 값을 나란히 보여주는 것만으로는 사용자가 차액을 암산해야 한다. 특히 할인이 붙은
+     * 영수증은 품목을 다 더한 값이 결제 금액보다 크게 나오는데, 얼마나 큰지 모르면 어느
+     * 단가를 얼마나 줄여야 할지 알 수 없다.
+     *
+     * 부호를 붙인 문자열을 그대로 내보내지 않는 것은, 금액 표기에서 기호가 앞에 오는지
+     * 뒤에 오는지가 로케일마다 달라 화면이 정할 몫이기 때문이다.
+     */
+    difference: formatScaled(gap < 0n ? -gap : gap, TOTAL_DECIMALS),
+    exceedsPayment: gap > 0n,
+  }
+}
+
+/**
+ * 영수증에 찍힌 합계가 실제 결제 금액과 맞는지 본다.
+ *
+ * 어긋나도 **막지 않는다.** 여러 명이 나눠 결제했거나 할인·봉사료가 붙으면 정상적으로도
+ * 달라지고, 인식 값 자체가 틀렸을 수도 있다. 잘못 읽은 값 때문에 멀쩡한 영수증이 거절되면
+ * 사용자는 손쓸 방법이 없다. 그래서 알리기만 한다.
+ *
+ * 품목 합계와 결제 금액이 정확히 같아야 한다는 규칙은 `compareItemizedTotal`이 그대로 맡는다.
+ */
+export function compareRecognizedTotal(
+  recognizedTotal: string | null,
+  sourceAmount: string,
+): { matches: boolean } | null {
+  if (recognizedTotal === null) return null
+
+  const recognized = parseScaled(recognizedTotal, TOTAL_DECIMALS)
+  const source = parseScaled(sourceAmount, TOTAL_DECIMALS)
+  if (recognized === null || source === null) return null
+
+  return { matches: recognized === source }
 }
 
 /** 정수로 세던 값을 다시 소수 문자열로 돌린다. 뒤에 남는 0은 떼어 읽기 쉽게 둔다. */

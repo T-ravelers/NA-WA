@@ -5,16 +5,19 @@ import {
   fetchSettlementReceipt,
   fetchSettlements,
   paySettlement,
+  recognizeSettlementReceipt,
   uploadSettlementReceipt,
 } from './settlementApi'
 import type {
   CreateSettlementRequest,
+  RecognizedReceiptDraft,
   SettlementCandidate,
   SettlementDetail,
   SettlementPaymentResult,
   SettlementSummary,
 } from '../model/settlement'
 import {
+  mapRecognizedReceipt,
   mapSettlementCandidate,
   mapSettlementDetail,
   mapSettlementPayment,
@@ -32,6 +35,7 @@ export interface SettlementGateway {
   ): Promise<{ id: string }>
   pay(settlementId: string, idempotencyKey: string): Promise<SettlementPaymentResult>
   uploadReceipt(file: File): Promise<{ receiptId: string }>
+  recognizeReceipt(receiptId: string): Promise<RecognizedReceiptDraft>
   getReceipt(settlementId: string): Promise<Blob>
 }
 
@@ -49,6 +53,8 @@ export const apiSettlementGateway: SettlementGateway = {
   pay: async (settlementId, idempotencyKey) =>
     mapSettlementPayment(await paySettlement(settlementId, idempotencyKey)),
   uploadReceipt: uploadSettlementReceipt,
+  recognizeReceipt: async (receiptId) =>
+    mapRecognizedReceipt(await recognizeSettlementReceipt(receiptId)),
   getReceipt: fetchSettlementReceipt,
 }
 

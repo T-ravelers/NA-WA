@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { ItemizedSettlementItem } from '../settlement'
 import {
   compareItemizedTotal,
+  compareRecognizedTotal,
   summarizeItemizedShares,
   validateItemizedItems,
 } from '../settlementRules'
@@ -49,6 +50,42 @@ describe('ITEMIZED request rules', () => {
       ),
     ).toEqual({ valid: false, invalidItemIndexes: [0, 1] })
   })
+
+  it('accepts a giveaway item priced at zero but still refuses a blank price', () => {
+    expect(
+      validateItemizedItems(
+        [
+          {
+            name: 'Zero cola (review event)',
+            unitPrice: '0',
+            quantity: '1',
+            allocations: [{ appointmentMemberId: '12', quantity: '1' }],
+          },
+          {
+            name: 'Dinner',
+            unitPrice: '0.0000',
+            quantity: '2',
+            allocations: [{ appointmentMemberId: '19', quantity: '2' }],
+          },
+        ],
+        new Set(['12', '19']),
+      ),
+    ).toEqual({ valid: true, invalidItemIndexes: [] })
+
+    expect(
+      validateItemizedItems(
+        [
+          {
+            name: 'Zero cola (review event)',
+            unitPrice: '',
+            quantity: '1',
+            allocations: [{ appointmentMemberId: '12', quantity: '1' }],
+          },
+        ],
+        new Set(['12']),
+      ),
+    ).toEqual({ valid: false, invalidItemIndexes: [0] })
+  })
 })
 
 describe('compareItemizedTotal', () => {
@@ -56,6 +93,8 @@ describe('compareItemizedTotal', () => {
     expect(compareItemizedTotal([item('10.00', '2'), item('5.00', '1')], '25.00')).toEqual({
       matches: true,
       total: '25',
+      difference: '0',
+      exceedsPayment: false,
     })
   })
 
@@ -65,6 +104,17 @@ describe('compareItemizedTotal', () => {
 
     expect(result?.matches).toBe(false)
     expect(result?.total).toBe('30')
+    // 두 값을 나란히 보여주는 것만으로는 사용자가 차액을 암산해야 한다.
+    expect(result?.difference).toBe('5')
+    expect(result?.exceedsPayment).toBe(true)
+  })
+
+  /** 모자란 쪽도 얼마나 모자란지 알아야 어느 단가를 올릴지 정할 수 있다. */
+  it('reports how far the items fall short', () => {
+    const result = compareItemizedTotal([item('20.00', '1')], '25.00')
+
+    expect(result?.difference).toBe('5')
+    expect(result?.exceedsPayment).toBe(false)
   })
 
   it('counts fractional quantities without floating point drift', () => {
@@ -136,5 +186,28 @@ describe('summarizeItemizedShares', () => {
         '12',
       ),
     ).toBeNull()
+  })
+})
+
+describe('receipt total comparison', () => {
+  it('reports a match without minding how the decimals are written', () => {
+    expect(compareRecognizedTotal('25', '25.00')).toEqual({ matches: true })
+    expect(compareRecognizedTotal('25.0000', '25')).toEqual({ matches: true })
+  })
+
+  /*
+   * 어긋나도 결과만 알릴 뿐 막지 않는다. 여러 명이 나눠 결제했거나 할인·봉사료가 붙으면
+   * 정상적으로도 달라지고, 인식 값 자체가 틀렸을 수도 있다.
+   */
+  it('reports a difference so the screen can warn without blocking', () => {
+    expect(compareRecognizedTotal('30.00', '25.00')).toEqual({ matches: false })
+  })
+
+  /** 읽지 못했거나 읽을 수 없는 값이면 견줄 것이 없다. 견주지 못한 것을 어긋난 것으로 보면 안 된다. */
+  it('stays silent when there is nothing to compare', () => {
+    expect(compareRecognizedTotal(null, '25.00')).toBeNull()
+    expect(compareRecognizedTotal('', '25.00')).toBeNull()
+    expect(compareRecognizedTotal('twenty', '25.00')).toBeNull()
+    expect(compareRecognizedTotal('25.00', '')).toBeNull()
   })
 })

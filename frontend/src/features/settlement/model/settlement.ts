@@ -35,6 +35,29 @@ export interface ItemizedSettlementItem {
   allocations: ItemizedAllocation[]
 }
 
+/**
+ * 영수증에서 읽어낸 품목 초안 한 줄.
+ *
+ * 아직 정산 품목이 아니다. 누가 무엇을 먹었는지는 인식이 알려주지 않으므로, 사용자가
+ * 배분을 정해야 비로소 정산 품목이 된다. 못 읽은 자리는 빈 문자열로 온다.
+ */
+export interface RecognizedReceiptItem {
+  name: string
+  unitPrice: string
+  quantity: string
+}
+
+/**
+ * 영수증 한 장에서 읽어낸 결과.
+ *
+ * `recognizedTotal`은 영수증에 찍힌 합계다. 할인이나 봉사료가 품목 줄 밖에 붙어서 품목을
+ * 다 더한 값과 다를 수 있다. 그래서 정산 금액으로 쓰지 않고 견주어 볼 기준으로만 쓴다.
+ */
+export interface RecognizedReceiptDraft {
+  items: RecognizedReceiptItem[]
+  recognizedTotal: string | null
+}
+
 export interface CreateSettlementRequest {
   sourceTransferId: string
   type: SettlementType

@@ -1,6 +1,7 @@
 import { formatServerDateTime } from '@/shared/lib/datetime'
 
 import type {
+  RecognizedReceiptDraft,
   SettlementCandidate,
   SettlementDetail,
   SettlementPaymentResult,
@@ -12,12 +13,33 @@ import type {
   SettlementCandidateDto,
   SettlementDetailDto,
   SettlementMutationDto,
+  SettlementReceiptOcrDto,
   SettlementSummaryDto,
   SettlementViewerDto,
 } from './settlementApi.types'
 
 function amount(value: ApiAmount): string {
   return String(value)
+}
+
+/**
+ * 못 읽은 자리인지 본다.
+ *
+ * 서버는 지금 빈 값을 null로 보내지만 자리를 아예 빼고 보내도 뜻은 같다. 둘을 같게 다뤄야
+ * 서버가 표현 방식을 바꿔도 인식 기능이 통째로 멈추지 않는다.
+ */
+function unread(value: ApiAmount | null | undefined): value is null | undefined {
+  return value === null || value === undefined
+}
+
+/**
+ * 못 읽은 자리를 빈 문자열로 바꾼다.
+ *
+ * 이 값은 곧바로 품목 입력란에 들어가는데, 입력란은 문자열만 다룬다. 그대로 넘기면 화면에
+ * "null"이라고 찍힌다.
+ */
+function optionalAmount(value: ApiAmount | null | undefined): string {
+  return unread(value) ? '' : amount(value)
 }
 
 function viewer(dto: SettlementViewerDto): SettlementViewer {
@@ -100,5 +122,16 @@ export function mapSettlementPayment(dto: SettlementMutationDto): SettlementPaym
     settlementStatus: dto.settlementStatus,
     transferId: String(dto.transferId),
     viewer: viewer(dto.viewer),
+  }
+}
+
+export function mapRecognizedReceipt(dto: SettlementReceiptOcrDto): RecognizedReceiptDraft {
+  return {
+    items: dto.items.map((item) => ({
+      name: item.name ?? '',
+      unitPrice: optionalAmount(item.unitPrice),
+      quantity: optionalAmount(item.quantity),
+    })),
+    recognizedTotal: unread(dto.recognizedTotal) ? null : amount(dto.recognizedTotal),
   }
 }

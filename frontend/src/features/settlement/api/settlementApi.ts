@@ -15,8 +15,10 @@ import type {
   SettlementCandidateDto,
   SettlementDetailDto,
   SettlementMutationDto,
+  SettlementReceiptOcrDto,
   SettlementSummaryDto,
 } from './settlementApi.types'
+import { settlementReceiptOcrResponseSchema } from './settlementResponseSchemas'
 
 /**
  * 정산 후보 조회
@@ -113,6 +115,26 @@ export async function uploadSettlementReceipt(file: File): Promise<{ receiptId: 
     form,
   )
   return { receiptId: String(data.receiptId) }
+}
+
+/**
+ * 영수증 글자 인식
+ *
+ * 올려 둔 사진에서 품목 초안을 읽어 온다. 결과는 서버에 저장되지 않으며, 사용자가 확인하고
+ * 고친 값만 정산 생성 요청으로 올라간다.
+ *
+ * 읽기만 하는데 POST인 이유는 부를 때마다 바깥 서비스에 요금이 나가기 때문이다. 브라우저나
+ * 중간 서버가 임의로 다시 부르거나 응답을 캐시에 담아 두면 안 된다.
+ */
+export async function recognizeSettlementReceipt(
+  receiptId: string,
+): Promise<SettlementReceiptOcrDto> {
+  const { data } = await httpClient.post<SettlementReceiptOcrDto>(
+    `/api/v1/settlement-receipts/${receiptId}/ocr`,
+    undefined,
+    { responseSchema: settlementReceiptOcrResponseSchema },
+  )
+  return data
 }
 
 /**

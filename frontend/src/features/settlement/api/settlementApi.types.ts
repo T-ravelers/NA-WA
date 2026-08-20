@@ -71,6 +71,29 @@ export interface SettlementViewerItemDto {
 }
 
 /**
+ * 영수증에서 읽어낸 품목 한 줄
+ *
+ * 값이 전부 null일 수 있다. 영수증이 접혔거나 흐리면 이름만 읽히고 금액은 안 읽히기도
+ * 한다. 그런 줄을 버리지 않고 그대로 받아야 사용자가 빈 칸만 채울 수 있다.
+ */
+export interface SettlementReceiptOcrItemDto {
+  name: string | null
+  unitPrice: ApiAmount | null
+  quantity: ApiAmount | null
+}
+
+/**
+ * 영수증 글자 인식 결과
+ *
+ * 'recognizedTotal'은 영수증에 찍힌 합계다. 할인이나 봉사료가 품목 줄 밖에 붙기 때문에
+ * 품목을 다 더한 값과 다를 수 있다
+ */
+export interface SettlementReceiptOcrDto {
+  items: SettlementReceiptOcrItemDto[]
+  recognizedTotal: ApiAmount | null
+}
+
+/**
  * 정산 상세
  */
 export interface SettlementDetailDto {

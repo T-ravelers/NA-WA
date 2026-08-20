@@ -4,6 +4,7 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 
 import { settlementGateway } from '../api/settlementGateway'
 import { rejectReceiptFile } from '../model/receiptFile'
+import type { RecognizedReceiptItem } from '../model/settlement'
 
 /**
  * 미리보기 주소를 만들고 되돌려주는 도우미.
@@ -101,6 +102,82 @@ export function useSettlementReceiptUpload(): SettlementReceiptUpload {
   return { receiptId, previewUrl, pending, errorKey, select, reset }
 }
 
+export interface SettlementReceiptOcr {
+  pending: Ref<boolean>
+  errorKey: Ref<string | null>
+  /** 마지막으로 읽어낸 영수증 합계. 읽지 못했으면 비어 있다. */
+  recognizedTotal: Ref<string | null>
+  recognize: (receiptId: string) => Promise<RecognizedReceiptItem[] | null>
+  reset: () => void
+}
+
+/**
+ * 올려 둔 영수증에서 품목 초안을 읽어 온다.
+ *
+ * 업로드가 끝나자마자 부르지 않는다. 사진을 저장소에서 내려받아 바깥 서비스를 부르는 일이라
+ * 수 초가 걸리고 부를 때마다 요금이 나간다. 사용자가 품목별로 나누기로 하고 직접 눌렀을
+ * 때만 부른다.
+ *
+ * 읽어낸 값은 어디에도 저장하지 않는다. 사용자가 확인하고 고친 값만 정산 생성 요청으로
+ * 올라간다.
+ */
+export function useSettlementReceiptOcr(): SettlementReceiptOcr {
+  const pending = ref(false)
+  const errorKey = ref<string | null>(null)
+  const recognizedTotal = ref<string | null>(null)
+  /*
+   * 읽는 사이 사용자는 다른 사진을 고르거나 다른 결제로 옮겨 갈 수 있다. 뒤늦게 도착한
+   * 결과를 그대로 받으면 지금 화면과 무관한 품목이 카드에 채워진다.
+   */
+  let generation = 0
+
+  function reset(): void {
+    generation += 1
+    errorKey.value = null
+    recognizedTotal.value = null
+    // 읽던 것을 버렸으니 기다림도 함께 끝난다. 두지 않으면 버튼이 영영 잠긴다.
+    pending.value = false
+  }
+
+  async function recognize(receiptId: string): Promise<RecognizedReceiptItem[] | null> {
+    const attempt = (generation += 1)
+    pending.value = true
+    errorKey.value = null
+
+    try {
+      const draft = await settlementGateway.recognizeReceipt(receiptId)
+
+      if (attempt !== generation) return null
+
+      /*
+       * 쓸 만한 줄이 하나도 없으면 못 읽은 것으로 본다.
+       *
+       * 서버도 같은 판단을 하지만 계약상으로는 빈 목록이 올 수 있다. 그대로 받으면 품목
+       * 카드가 한 장도 없는 화면이 되어, 사용자는 무엇이 잘못됐는지 알 길이 없다.
+       */
+      if (draft.items.length === 0) {
+        recognizedTotal.value = null
+        errorKey.value = 'settlement.receipt.error.ocrUnreadable'
+        return null
+      }
+
+      recognizedTotal.value = draft.recognizedTotal
+      return draft.items
+    } catch (error) {
+      if (attempt !== generation) return null
+
+      recognizedTotal.value = null
+      errorKey.value = resolveOcrErrorKey(error)
+      return null
+    } finally {
+      // 나보다 나중 것이 기다리는 중이면 그쪽이 끝낼 몫이다. 여기서 끄면 거짓으로 끝난다.
+      if (attempt === generation) pending.value = false
+    }
+  }
+
+  return { pending, errorKey, recognizedTotal, recognize, reset }
+}
+
 export interface SettlementReceiptViewer {
   url: Ref<string | null>
   pending: Ref<boolean>
@@ -175,6 +252,44 @@ function resolveUploadErrorKey(error: unknown): string {
     case 'SETTLEMENT-019':
     case 'SETTLEMENT-021':
       return 'settlement.receipt.error.storage'
+    default:
+      return 'settlement.receipt.error.unknown'
+  }
+}
+
+/**
+ * 인식 실패를 원인별로 가른다.
+ *
+ * 넷의 성격이 완전히 다르다. 형식은 사진을 바꿔야 하고, 글자를 못 읽은 것은 직접 입력이
+ * 빠르며, 시간 초과는 그대로 다시 눌러 볼 만하고, 서비스가 꺼져 있으면 사용자가 할 수 있는
+ * 일이 없다. 한 문장으로 묶으면 화면이 넷 다 "다시 시도"라고만 말하게 된다.
+ */
+function resolveOcrErrorKey(error: unknown): string {
+  if (!(error instanceof NormalizedApiError)) {
+    return 'settlement.receipt.error.unknown'
+  }
+
+  switch (error.code) {
+    case 'SETTLEMENT-018':
+      return 'settlement.receipt.error.missing'
+    case 'SETTLEMENT-019':
+      return 'settlement.receipt.error.storage'
+    case 'SETTLEMENT-020':
+      return 'settlement.receipt.error.expired'
+    /*
+     * 016은 DB에 담긴 형식을 서버가 알아보지 못한 경우다. 업로드가 형식을 먼저 확인하므로
+     * 사실상 닿지 않는 방어 경로지만, 닿으면 022와 마찬가지로 다시 눌러도 소용이 없다.
+     * 빠뜨리면 "다시 시도"로 떨어져 이 기능이 고치려던 문제가 그대로 남는다.
+     */
+    case 'SETTLEMENT-016':
+    case 'SETTLEMENT-022':
+      return 'settlement.receipt.error.ocrFormat'
+    case 'SETTLEMENT-023':
+      return 'settlement.receipt.error.ocrUnreadable'
+    case 'SETTLEMENT-024':
+      return 'settlement.receipt.error.ocrTimeout'
+    case 'SETTLEMENT-025':
+      return 'settlement.receipt.error.ocrUnavailable'
     default:
       return 'settlement.receipt.error.unknown'
   }

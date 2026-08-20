@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  mapRecognizedReceipt,
   mapSettlementCandidate,
   mapSettlementDetail,
   mapSettlementSummary,
@@ -112,5 +113,37 @@ describe('settlement response mappers', () => {
         },
       }),
     ).toMatchObject({ totalAmount: '25.00', viewer: { allowedActions: ['PAY'] } })
+  })
+
+  /*
+   * 읽지 못한 자리는 빈 칸이 돼야 한다. null이나 undefined가 그대로 흘러가면 입력란에
+   * "null"이라고 찍히고, 사용자는 그것을 지우고 다시 적어야 한다.
+   */
+  it('turns unread receipt values into empty inputs', () => {
+    expect(
+      mapRecognizedReceipt({
+        items: [{ name: null, unitPrice: 4500, quantity: null }, { name: 'Wine' } as never],
+        recognizedTotal: null,
+      }),
+    ).toEqual({
+      items: [
+        { name: '', unitPrice: '4500', quantity: '' },
+        { name: 'Wine', unitPrice: '', quantity: '' },
+      ],
+      recognizedTotal: null,
+    })
+  })
+
+  /** 서버가 금액을 숫자로 보내도 품목 입력란은 문자열만 다룬다. */
+  it('normalizes recognized amounts to strings', () => {
+    expect(
+      mapRecognizedReceipt({
+        items: [{ name: 'Pasta', unitPrice: 10500, quantity: 2 }],
+        recognizedTotal: 21000,
+      }),
+    ).toEqual({
+      items: [{ name: 'Pasta', unitPrice: '10500', quantity: '2' }],
+      recognizedTotal: '21000',
+    })
   })
 })
