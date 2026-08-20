@@ -183,6 +183,20 @@ class AppointmentMapperXmlTest {
         assertTrue(sql.contains("a.appointment_status = 'IN_PROGRESS'"));
     }
 
+    @Test
+    void myOngoingAppointmentList_classifiesByBoundParameterNotDatabaseClock()
+            throws Exception {
+        String sql = boundSql(
+                "findMyOngoingAppointments",
+                Map.of("memberId", 1L, "includeAll", true, "now", LocalDateTime.now())
+        );
+
+        // 예정/지난 경계는 애플리케이션이 넘긴 값으로 갈려야 한다. DB 시계로 돌아가면
+        // DB 컨테이너 시간대가 어긋난 만큼 목록 순서가 뒤집힌다.
+        assertFalse(sql.contains("NOW()"));
+        assertTrue(sql.contains("ORDER BY (a.activity_start_at < ?)"));
+    }
+
     private static Configuration configuration() throws Exception {
         Configuration configuration = new Configuration();
         try (InputStream input = Resources.getResourceAsStream(MAPPER_RESOURCE)) {

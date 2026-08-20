@@ -259,6 +259,56 @@ class SettlementMapperIntegrationTest {
         }
     }
 
+    /**
+     * 글자 인식은 이 조회 하나로 권한을 가른다. 남의 초안을 넘겨 대신 인식시키는 것을 여기서
+     * 막지 못하면 다른 곳에 걸러 낼 자리가 없다.
+     */
+    @Test
+    void findDraftForUploader_ownDraft_returnsRowAndHidesItFromOthers() {
+        Fixture fixture = createFixture();
+        try {
+            SettlementReceipt draft = draft(fixture);
+            receiptMapper.insertReceipt(draft);
+
+            SettlementReceipt found = receiptMapper.findDraftForUploader(
+                draft.getSettlementReceiptId(), fixture.memberId()
+            );
+
+            assertNotNull(found);
+            assertEquals(draft.getObjectKey(), found.getObjectKey());
+            assertEquals("image/png", found.getContentType());
+            assertNull(receiptMapper.findDraftForUploader(
+                draft.getSettlementReceiptId(), fixture.memberId() + 1
+            ));
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    /**
+     * 정산에 붙은 뒤에는 품목이 확정된 뒤라 다시 읽을 이유가 없고, 인식은 부를 때마다 요금이
+     * 나간다. 그래서 연결되는 순간 이 조회에서 빠져야 한다.
+     */
+    @Test
+    void findDraftForUploader_linkedToSettlement_returnsNull() {
+        Fixture fixture = createFixture();
+        try {
+            Settlement settlement = settlement(fixture);
+            mapper.insertSettlement(settlement);
+            SettlementReceipt draft = draft(fixture);
+            receiptMapper.insertReceipt(draft);
+            receiptMapper.linkToSettlement(
+                draft.getSettlementReceiptId(), settlement.getSettlementId(), fixture.memberId()
+            );
+
+            assertNull(receiptMapper.findDraftForUploader(
+                draft.getSettlementReceiptId(), fixture.memberId()
+            ));
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
     private static SettlementReceipt draft(Fixture fixture) {
         return new SettlementReceipt(
             fixture.memberId(),

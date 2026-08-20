@@ -46,6 +46,13 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   이 헤더는 아는 값(`http`, `https`)만 통과시키고 나머지는 실제 수신 프로토콜로
   되돌립니다 — 그렇지 않으면 클라이언트가 헤더 한 줄로 프로토콜을 위조할 수 있습니다.
   ALB 전환이 끝나면 이 분기와 certbot 관련 설정을 함께 걷어냅니다.
+- **시간대는 세 곳에서 따로 정해집니다.** 백엔드 컨테이너의 `TZ=Asia/Seoul`,
+  `docker-compose.yml` `mysql`의 `--default-time-zone=+09:00`, `DATABASE_URL`의
+  `serverTimezone`입니다. 마지막 것은 **드라이버 설정일 뿐이라 DB가 평가하는
+  `CURRENT_TIMESTAMP`를 바꾸지 못합니다** — "URL에 Asia/Seoul이 있으니 맞춰져 있다"는
+  판단이 실제로 약속 전환을 9시간 밀리게 했습니다. 그리고 셋을 맞추더라도 `WHERE`·
+  `ORDER BY`에서 `NOW()`로 분기하지 말고 앱이 넘긴 시각을 쓰세요. CI는 MySQL을 일부러
+  UTC로 둬서 이 의존을 잡습니다. 자세한 것은 [docs/TECH_STACK.md](./docs/TECH_STACK.md).
 - 리다이렉트 응답에는 CORS 헤더가 없습니다. 프론트의 `VITE_API_BASE_URL`이 `http://`로
   남아 있으면 브라우저가 preflight 단계에서 차단해 **모든 API 호출이 실패합니다.**
   백엔드 도메인·프로토콜을 바꿀 때는 Vercel 환경 변수와 EC2 `.env`의
@@ -71,6 +78,13 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   먼저 확정하고 사진을 나중에 붙이면 그 사진이 품목의 근거라는 보장이 사라집니다.
   `POST /api/v1/settlement-receipts`로 받은 `receiptId`를 정산 생성 요청에 실어 연결하고,
   **연결된 뒤에는 교체하지 않습니다.** 이 순서를 뒤집으면 영수증 OCR을 얹을 자리가 없어집니다.
+- 영수증 글자 인식(CLOVA OCR)은 **정산에 붙지 않은 자기 초안 사진**에만 씁니다. 결과는
+  저장하지 않고 사용자가 확인·수정한 값만 정산 생성 요청으로 저장됩니다. 인식 결과를
+  저장하면 사용자가 고친 값과 원래 읽은 값 중 무엇이 그 정산의 근거인지 알 수 없게 됩니다.
+  업로드가 받아주는 형식 중 **webp만 CLOVA가 읽지 못합니다** — 서버에서 형식을 바꿔 보내면
+  사용자가 확인한 사진과 인식에 쓰인 사진이 달라지므로 바꾸지 않고 거절합니다.
+  `CLOVA_OCR_INVOKE_URL`과 `CLOVA_OCR_SECRET_KEY`는 도메인 하나에서 함께 나오는 한 쌍이라
+  하나만 채우면 서버가 시작할 때 멈추고, 둘 다 비우면 인식 기능만 꺼집니다.
 - 이 백엔드는 Spring Boot가 아니라서 `spring.servlet.multipart.*`가 동작하지 않습니다.
   업로드 크기는 `WebConfig`의 `MultipartConfigElement`가 `RECEIPT_MAX_UPLOAD_BYTES`
   환경변수로 정하고, `ServletConfig`의 `multipartResolver` 빈이 요청을 해석합니다.

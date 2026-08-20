@@ -34,7 +34,8 @@ import javax.sql.DataSource;
     "me.nawa.member.mapper",
     "me.nawa.wallet.mapper",
     "me.nawa.settlement.mapper",
-    "me.nawa.deposit.mapper"})
+    "me.nawa.deposit.mapper",
+    "me.nawa.ingest.mapper"})
 @ComponentScan(basePackages = {"me.nawa.auth.service",
     "me.nawa.auth.jwt",
     "me.nawa.auth.oauth",
@@ -54,7 +55,9 @@ import javax.sql.DataSource;
     "me.nawa.wallet.util",
     "me.nawa.settlement.service",
     "me.nawa.common.storage",
-    "me.nawa.deposit.service"})
+    "me.nawa.common.ocr",
+    "me.nawa.deposit.service",
+    "me.nawa.ingest.service"})
 @EnableTransactionManagement
 @EnableScheduling
 public class RootConfig {

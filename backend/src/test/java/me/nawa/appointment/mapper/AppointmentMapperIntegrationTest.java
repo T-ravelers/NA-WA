@@ -78,8 +78,11 @@ class AppointmentMapperIntegrationTest {
             long itemId = insertVisibleEventItem(memberId);
             long tripId = insertTrip(memberId);
 
-            // 분류가 MySQL NOW() 기준이라 시각 차가 하루 미만이어도 안전하게
-            // 미래·과거 여백을 하루 이상 둔다.
+            // 분류 기준이 애플리케이션이 넘긴 시각이므로 DB 서버 시간대와 무관하다.
+            // 예전에는 MySQL NOW() 기준이라 여백을 하루 이상 둬야 안전했는데, 그
+            // 여백이 정확히 시간대 시차를 가려 버그를 통과시키고 있었다. 아래
+            // findMyOngoingAppointments_classifiesAroundApplicationClock이 분 단위
+            // 경계를 직접 확인한다.
             LocalDateTime now = LocalDateTime.now();
             long paymentPendingId = insertAppointment(
                     itemId, memberId, "PAYMENT_PENDING", now.plusDays(1));
@@ -101,7 +104,7 @@ class AppointmentMapperIntegrationTest {
 
             // 기존 계약: 진행 중만, 다가오는 순.
             List<MyOngoingAppointment> ongoing =
-                    appointmentMapper.findMyOngoingAppointments(memberId, false);
+                    appointmentMapper.findMyOngoingAppointments(memberId, false, now);
             assertEquals(1, ongoing.size());
             assertEquals(ongoingId, ongoing.get(0).getAppointmentId());
             assertEquals(itemId, ongoing.get(0).getItemId());
@@ -111,13 +114,54 @@ class AppointmentMapperIntegrationTest {
             // 전체: 취소 제외. 예정은 임박한 순으로 위, 지난 것은 최근 순으로 아래.
             // PAYMENT_PENDING은 포함된다 — 근거는 APPOINTMENT_API.md.
             List<MyOngoingAppointment> all =
-                    appointmentMapper.findMyOngoingAppointments(memberId, true);
+                    appointmentMapper.findMyOngoingAppointments(memberId, true, now);
             assertEquals(
                     List.of(paymentPendingId, ongoingId, farFutureId,
                             finishedId, olderFinishedId),
                     all.stream().map(MyOngoingAppointment::getAppointmentId).toList());
             assertEquals("PAYMENT_PENDING", all.get(0).getAppointmentStatus());
             assertEquals("COMPLETED", all.get(3).getAppointmentStatus());
+        });
+    }
+
+    /**
+     * 예정/지난 경계가 DB 서버 시계가 아니라 애플리케이션이 넘긴 시각으로 갈리는지
+     * 분 단위로 확인한다.
+     *
+     * DB가 UTC이고 애플리케이션이 Asia/Seoul이면 두 시계는 9시간 어긋난다. 경계에서
+     * 몇 분 떨어진 약속들은 그 시차 안에 들어가므로, 분류가 DB 시계를 따르면 예정과
+     * 지난 것이 통째로 뒤집힌다. 하루 이상 여백을 두면 이 차이가 가려지기 때문에
+     * 반드시 분 단위로 확인해야 한다.
+     */
+    @Test
+    void findMyOngoingAppointments_classifiesAroundApplicationClock() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long memberId = insertMember();
+            long itemId = insertVisibleEventItem(memberId);
+            long tripId = insertTrip(memberId);
+
+            LocalDateTime now = LocalDateTime.now();
+            long justAheadId = insertAppointment(
+                    itemId, memberId, "CONFIRMED", now.plusMinutes(5));
+            long laterAheadId = insertAppointment(
+                    itemId, memberId, "CONFIRMED", now.plusMinutes(30));
+            long justPastId = insertAppointment(
+                    itemId, memberId, "COMPLETED", now.minusMinutes(5));
+            long olderPastId = insertAppointment(
+                    itemId, memberId, "COMPLETED", now.minusMinutes(30));
+            for (long appointmentId : new long[] {
+                    justAheadId, laterAheadId, justPastId, olderPastId}) {
+                insertActiveMembership(appointmentId, memberId, tripId);
+            }
+
+            List<MyOngoingAppointment> all =
+                    appointmentMapper.findMyOngoingAppointments(memberId, true, now);
+
+            // 예정은 임박한 순으로 위, 지난 것은 최근 순으로 아래.
+            assertEquals(
+                    List.of(justAheadId, laterAheadId, justPastId, olderPastId),
+                    all.stream().map(MyOngoingAppointment::getAppointmentId).toList());
         });
     }
 

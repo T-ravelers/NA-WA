@@ -14,6 +14,7 @@ import me.nawa.review.domain.MemberReview;
 import me.nawa.review.domain.ReviewCategory;
 import me.nawa.review.domain.ReviewKeywordCode;
 import me.nawa.review.dto.request.MemberReviewCreateRequest;
+import me.nawa.review.dto.response.MyReviewStatusResponse;
 import me.nawa.review.exception.ReviewErrorCode;
 import me.nawa.review.mapper.ReviewMapper;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,51 @@ public class ReviewService {
 
     private final AppointmentMapper appointmentMapper;
     private final ReviewMapper reviewMapper;
+
+    /**
+     * 로그인한 회원이 이 약속에서 이미 후기를 작성한 대상을 조회합니다.
+     *
+     * 작성 화면은 이 목록으로 "이미 씀" 상태를 복원합니다. 목록이 없으면
+     * 화면이 전원을 미작성으로 보고 재제출을 허용해 REVIEW-002가 납니다.
+     *
+     * 진입 조건은 작성과 같습니다 — 약속이 COMPLETED이고, 방장이 출석을
+     * 확인한(ACTIVE + ATTENDED) 참여자만입니다. 후기를 쓸 자격이 없는 회원은
+     * 이 화면에 들어오지 못하므로 조회도 REVIEW-001로 막습니다.
+     */
+    @Transactional(readOnly = true)
+    public MyReviewStatusResponse getMyReviewStatus(
+            Long memberId,
+            Long appointmentId) {
+        if (memberId == null || memberId <= 0
+                || appointmentId == null || appointmentId <= 0) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        Appointment appointment = appointmentMapper
+                .findAppointmentById(appointmentId);
+        if (appointment == null) {
+            throw new BusinessException(
+                    AppointmentErrorCode.APPOINTMENT_NOT_FOUND
+            );
+        }
+        if (appointment.getAppointmentStatus()
+                != AppointmentStatus.COMPLETED) {
+            throw new BusinessException(ReviewErrorCode.REVIEW_NOT_ALLOWED);
+        }
+
+        AppointmentMember reviewer = appointmentMapper
+                .findMemberByAppointmentAndMember(appointmentId, memberId);
+        if (!isReviewableMember(reviewer)) {
+            throw new BusinessException(ReviewErrorCode.REVIEW_NOT_ALLOWED);
+        }
+        return MyReviewStatusResponse.builder()
+                .reviewedAppointmentMemberIds(
+                        reviewMapper.findReviewedAppointmentMemberIds(
+                                appointmentId,
+                                reviewer.getAppointmentMemberId()
+                        )
+                )
+                .build();
+    }
 
     @Transactional
     public void createReview(

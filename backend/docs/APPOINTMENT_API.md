@@ -232,3 +232,24 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 - 키워드는 0~5개이며 중복 없이 `FRIENDLY`, `ON_TIME`, `CONSIDERATE`,
   `GOOD_COMMUNICATOR`, `WOULD_JOIN_AGAIN` 중에서 선택합니다.
 - 성공하면 `201 Created`를 반환합니다.
+
+## 내가 작성한 후기 대상 조회
+
+`GET /api/v1/appointments/{appointmentId}/reviews/me`
+
+```json
+{
+  "reviewedAppointmentMemberIds": [30, 31]
+}
+```
+
+- 로그인 회원이 이 약속에서 이미 후기를 쓴 대상의 `appointmentMemberId` 목록만
+  반환합니다. 점수·키워드는 포함하지 않습니다.
+- 후기 작성 화면이 "이미 씀" 상태를 복원하는 데 씁니다. 이 목록 없이는 재진입 시
+  전원이 미작성으로 보여 재제출 → `REVIEW-002`가 납니다.
+- 진입 조건은 후기 등록과 같습니다 — 약속이 `COMPLETED`이고, 방장이 출석을
+  확인한(`ACTIVE` + `ATTENDED`) 참여자만 조회할 수 있습니다. 그 밖에는
+  `REVIEW-001`을 반환합니다. 후기를 쓸 자격이 없는 회원은 작성 화면에 진입하지
+  못하므로 조회도 같은 잣대로 막습니다.
+- 없는 약속이면 `APPOINTMENT-001`을 반환합니다.
+- 소프트 삭제된 후기는 목록에서 제외합니다.

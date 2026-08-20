@@ -139,6 +139,55 @@ public enum SettlementErrorCode implements ErrorCode {
         HttpStatus.INTERNAL_SERVER_ERROR,
         "SETTLEMENT-021",
         "영수증 파일을 읽지 못했습니다."
+    ),
+
+    /**
+     * 글자 인식이 지원하지 않는 이미지 형식
+     *
+     * 올릴 때는 통과했지만 글자 인식이 다루지 못하는 형식(webp)일 때 사용합니다. 사진을
+     * 다시 찍으면 해결되므로 저장소 오류(019)와 구분합니다.
+     */
+    SETTLEMENT_RECEIPT_OCR_FORMAT_UNSUPPORTED(
+        HttpStatus.BAD_REQUEST,
+        "SETTLEMENT-022",
+        "이 형식의 사진은 글자를 읽을 수 없습니다."
+    ),
+
+    /**
+     * 영수증에서 품목을 읽지 못함
+     *
+     * 사진은 인식했지만 품목 줄을 하나도 찾지 못한 경우입니다. 사용자가 다시 찍거나 직접
+     * 입력하면 되는 상황이라, 서버 쪽 문제인 024·025와 구분합니다.
+     */
+    SETTLEMENT_RECEIPT_OCR_UNREADABLE(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        "SETTLEMENT-023",
+        "영수증에서 품목을 읽지 못했습니다."
+    ),
+
+    /**
+     * 글자 인식 시간 초과
+     *
+     * 정해진 시간 안에 인식 결과가 오지 않았습니다. 그대로 다시 시도할 만한 상황이라
+     * 아예 부르지 못한 경우(025)와 나눕니다.
+     */
+    SETTLEMENT_RECEIPT_OCR_TIMEOUT(
+        HttpStatus.GATEWAY_TIMEOUT,
+        "SETTLEMENT-024",
+        "영수증 글자 인식이 시간 안에 끝나지 않았습니다."
+    ),
+
+    /**
+     * 글자 인식 서비스 사용 불가
+     *
+     * 인식 서버에 닿지 못했거나 오류를 응답했습니다. 접속 정보가 설정되지 않은 경우와
+     * 응답이 우리가 아는 모양이 아닌 경우도 여기에 들어갑니다. 사용자가 할 수 있는 일이
+     * 없으므로 직접 입력으로 안내합니다.
+     */
+    SETTLEMENT_RECEIPT_OCR_UNAVAILABLE(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "SETTLEMENT-025",
+        "영수증 글자 인식을 사용할 수 없습니다."
     );
 
     private final HttpStatus status;
