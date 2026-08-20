@@ -150,13 +150,22 @@ describe('ExploreFilterSheet date presets', () => {
 })
 
 describe('ExploreFilterSheet', () => {
-  it('does not expose saved sorting before the saved API is connected', () => {
+  it('applies the Saved toggle now that the like API is wired', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
       props: { kind: 'sort', filters: { sort: 'NEWEST' }, resultCount: 3 },
     })
 
-    expect(wrapper.findAll('button').some((button) => button.text() === 'Saved')).toBe(false)
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Saved')
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+
+    expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({ savedOnly: true })
   })
 
   it('emits close when the scrim is pressed', async () => {

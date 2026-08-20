@@ -755,6 +755,31 @@ function apply(): void {
                 />
               </span>
             </button>
+            <button
+              type="button"
+              class="flex min-h-16 w-full items-center justify-between text-left"
+              @click="draft.savedOnly = draft.savedOnly === true ? undefined : true"
+            >
+              <span
+                class="text-body"
+                :class="draft.savedOnly ? 'text-ink' : 'text-ink-2'"
+              >
+                {{ t('explore.sort.saved') }}
+              </span>
+              <span
+                class="flex size-6 items-center justify-center rounded-pill"
+                :class="
+                  draft.savedOnly ? 'bg-paper-fill text-on-paper' : 'border border-hairline-2'
+                "
+              >
+                <IconCheck
+                  v-if="draft.savedOnly"
+                  :size="15"
+                  :stroke-width="2.5"
+                  aria-hidden="true"
+                />
+              </span>
+            </button>
           </div>
         </template>
       </div>

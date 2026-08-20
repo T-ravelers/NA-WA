@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 
+import { NormalizedApiError } from '@/shared/api/apiError'
 import { showToast } from '@/shared/ui/toast'
 
 import { likeExploreItem, unlikeExploreItem } from '../api/exploreApi'
@@ -26,8 +27,10 @@ export function useExploreItemLikeMutation() {
   return useMutation({
     mutationFn: ({ itemId, saved }: ExploreItemLikeInput) =>
       saved ? likeExploreItem(itemId) : unlikeExploreItem(itemId),
-    onError: () => {
-      showToast(t('explore.saveFailed'))
+    onError: (error) => {
+      // 비로그인(401)에는 "다시 시도"가 거짓 안내가 된다 — 로그인 안내로 가른다.
+      const requiresLogin = error instanceof NormalizedApiError && error.status === 401
+      showToast(t(requiresLogin ? 'explore.saveRequiresLogin' : 'explore.saveFailed'))
     },
     onSuccess: (result, { itemId }) => {
       queryClient.setQueriesData({ queryKey: exploreKeys.all }, (data: unknown) =>

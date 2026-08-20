@@ -146,6 +146,20 @@ describe('ExploreView Place branch', () => {
     )
   })
 
+  it('requests only saved events when the URL asks for them', async () => {
+    await mountView('/explore?eventSavedOnly=true')
+
+    expect(fetchEventList).toHaveBeenCalledWith(expect.objectContaining({ savedOnly: true }))
+  })
+
+  it('keeps the UI-only datePreset out of list query filters', async () => {
+    await mountView('/explore?datePreset=THIS_WEEKEND')
+
+    expect(fetchEventList.mock.calls[fetchEventList.mock.calls.length - 1]?.[0]).not.toHaveProperty(
+      'datePreset',
+    )
+  })
+
   it('derives dates from a legacy preset-only URL', async () => {
     const range = presetDateRange('THIS_WEEKEND')
 
@@ -159,9 +173,9 @@ describe('ExploreView Place branch', () => {
   it('drops an unknown preset from an old URL', async () => {
     await mountView('/explore?datePreset=GARBAGE')
 
-    expect(fetchEventList).toHaveBeenCalledWith(
-      expect.objectContaining({ datePreset: undefined, startDate: undefined }),
-    )
+    const lastFilters = fetchEventList.mock.calls[fetchEventList.mock.calls.length - 1]?.[0]
+    expect(lastFilters).not.toHaveProperty('datePreset')
+    expect(lastFilters).toMatchObject({ startDate: undefined })
   })
 
   it('keeps an Opening soon filter open ended and off the API params', async () => {

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 const likeExploreItem = vi.fn()
 const unlikeExploreItem = vi.fn()
@@ -106,6 +107,16 @@ describe('useExploreItemLikeMutation', () => {
       content: [{ itemId: 42, saved: false }],
     })
     expect(showToast).toHaveBeenCalledWith('Could not update your saved list. Please try again.')
+  })
+
+  it('asks the user to sign in when the request is unauthorized', async () => {
+    likeExploreItem.mockRejectedValue(new NormalizedApiError('AUTH-001', 401, 'unauthorized'))
+    const { mutation } = setup()
+
+    mutation.mutate({ itemId: 42, saved: true })
+    await flushPromises()
+
+    expect(showToast).toHaveBeenCalledWith('Sign in to save items.')
   })
 
   it('does not show a toast when the request succeeds', async () => {

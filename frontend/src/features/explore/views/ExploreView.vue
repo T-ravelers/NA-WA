@@ -78,6 +78,7 @@ const openWeekendOnly = ref(readQueryBoolean('openWeekendOnly'))
 const opensLateOnly = ref(readQueryBoolean('opensLateOnly'))
 const preReservationOnly = ref(readQueryBoolean('preReservationOnly'))
 const experienceOnly = ref(readQueryBoolean('experienceOnly'))
+const eventSavedOnly = ref(readQueryBoolean('eventSavedOnly'))
 const selectedPlaceKinds = ref<PlaceKind[]>(readQueryList('placeKinds').filter(isPlaceKind))
 const selectedPlaceSectorIds = ref(readValidTaxonomyIds('placeSectorIds', VALID_EXPLORE_SECTOR_IDS))
 const selectedPlaceActivityIds = ref(
@@ -136,9 +137,17 @@ const filters = computed<EventSearchFilters>(() => ({
   opensLateOnly: opensLateOnly.value || undefined,
   preReservationOnly: preReservationOnly.value || undefined,
   experienceOnly: experienceOnly.value || undefined,
+  savedOnly: eventSavedOnly.value || undefined,
 }))
 
-const eventQuery = useEventListQuery(filters)
+// datePreset은 화면 전용이라 요청 내용이 같아도 캐시가 갈라진다 — 키에서 뺀다.
+function toEventQueryFilters(value: EventSearchFilters): EventSearchFilters {
+  const queryFilters = { ...value }
+  delete queryFilters.datePreset
+  return queryFilters
+}
+
+const eventQuery = useEventListQuery(computed(() => toEventQueryFilters(filters.value)))
 const placeFilters = computed<PlaceSearchFilters>(() => ({
   language: locale.value,
   page: selectedPlacePage.value,
@@ -166,7 +175,7 @@ const placeQuery = usePlaceListQuery(placeFilters, {
   enabled: () => selectedTab.value === 'places',
 })
 const sheetPreviewQuery = useEventListQuery(
-  computed(() => sheetPreviewFilters.value ?? filters.value),
+  computed(() => toEventQueryFilters(sheetPreviewFilters.value ?? filters.value)),
   { enabled: () => selectedTab.value === 'events' && selectedSheet.value !== null },
 )
 const placeSheetPreviewQuery = usePlaceListQuery(
@@ -257,6 +266,7 @@ const activeFilters = computed(() => {
     ['opensLateOnly', opensLateOnly.value, t('explore.options.openLate')],
     ['preReservationOnly', preReservationOnly.value, t('explore.options.preReservation')],
     ['experienceOnly', experienceOnly.value, t('explore.options.experience')],
+    ['savedOnly', eventSavedOnly.value, t('explore.sort.saved')],
   ]
   options.forEach(([key, selected, label]) => {
     if (selected) values.push({ key: `option:${key}`, label })
@@ -330,6 +340,7 @@ function buildEventQuery(next: EventSearchFilters): LocationQueryRaw {
   addQueryValue(query, 'opensLateOnly', next.opensLateOnly)
   addQueryValue(query, 'preReservationOnly', next.preReservationOnly)
   addQueryValue(query, 'experienceOnly', next.experienceOnly)
+  addQueryValue(query, 'eventSavedOnly', next.savedOnly)
   return query
 }
 
@@ -417,6 +428,7 @@ watch(
       opensLateOnly.value = readQueryBoolean('opensLateOnly')
       preReservationOnly.value = readQueryBoolean('preReservationOnly')
       experienceOnly.value = readQueryBoolean('experienceOnly')
+      eventSavedOnly.value = readQueryBoolean('eventSavedOnly')
       await nextTick()
       hydratingEventQuery.value = false
       sanitizeExploreQuery('events')
@@ -486,6 +498,7 @@ function applySheet(next: EventSearchFilters): void {
   opensLateOnly.value = next.opensLateOnly ?? false
   preReservationOnly.value = next.preReservationOnly ?? false
   experienceOnly.value = next.experienceOnly ?? false
+  eventSavedOnly.value = next.savedOnly ?? false
   selectedSheet.value = null
   sheetPreviewFilters.value = null
 }
@@ -621,6 +634,7 @@ function removeFilter(key: string): void {
     opensLateOnly.value = false
     preReservationOnly.value = false
     experienceOnly.value = false
+    eventSavedOnly.value = false
     return
   }
 
@@ -659,6 +673,7 @@ function removeFilter(key: string): void {
     if (option === 'opensLateOnly') opensLateOnly.value = false
     if (option === 'preReservationOnly') preReservationOnly.value = false
     if (option === 'experienceOnly') experienceOnly.value = false
+    if (option === 'savedOnly') eventSavedOnly.value = false
   }
 }
 

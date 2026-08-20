@@ -119,7 +119,7 @@ function handleKeydown(event: KeyboardEvent): void {
           <button
             type="button"
             class="flex size-11 shrink-0 items-center justify-center text-ink-3"
-            :aria-label="saved ? 'Remove event from saved' : 'Save event'"
+            :aria-label="saved ? t('explore.unsaveEvent') : t('explore.saveEvent')"
             :aria-pressed="saved"
             @click.stop="toggleSaved"
           >

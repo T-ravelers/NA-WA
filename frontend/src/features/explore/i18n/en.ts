@@ -250,9 +250,12 @@ export default {
     imageUnavailable: 'Event image unavailable',
     placePhoto: 'Place photo',
     openPlace: 'Open {name}',
+    saveEvent: 'Save event',
+    unsaveEvent: 'Remove event from saved',
     savePlace: 'Save place',
     unsavePlace: 'Remove place from saved',
     saveFailed: 'Could not update your saved list. Please try again.',
+    saveRequiresLogin: 'Sign in to save items.',
     placeResultCount: '{count} places',
     pagination: {
       label: 'Explore result pages',
