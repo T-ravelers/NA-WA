@@ -1,4 +1,5 @@
-export const EVENT_KINDS = ['POPUP', 'CONCERT', 'ETC', 'FESTIVAL', 'EXHIBITION'] as const
+// 종류 칩이 이 순서 그대로 그려진다. PLACE_KINDS처럼 Other(ETC)를 마지막에 둔다.
+export const EVENT_KINDS = ['POPUP', 'CONCERT', 'FESTIVAL', 'EXHIBITION', 'ETC'] as const
 export const EVENT_STATUSES = ['SCHEDULED', 'ONGOING', 'ENDED'] as const
 
 export type EventKind = (typeof EVENT_KINDS)[number]
