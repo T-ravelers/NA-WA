@@ -426,6 +426,51 @@ describe('AppointmentDetailView', () => {
     expect(item('Leave group')?.text()).toContain('You are not a member of this appointment.')
   })
 
+  it('does not claim you are not a member when the participation check failed', async () => {
+    // isActiveMember는 조회 실패와 "회원이 아님"을 구분하지 못한다. 못 읽었을
+    // 뿐인데 단정하면 사용자는 자기가 회원이 아니라고 믿는다.
+    fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    const leave = menuItem(wrapper)('Leave group')
+
+    expect(leave?.text()).toContain('We could not check your participation status.')
+    expect(leave?.text()).not.toContain('You are not a member of this appointment.')
+  })
+
+  it('does not claim you were absent when the participation check failed', async () => {
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'COMPLETED' })
+    fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    const reviews = menuItem(wrapper)('Reviews')
+
+    expect(reviews?.text()).toContain('We could not check your participation status.')
+    expect(reviews?.text()).not.toContain('Only members confirmed as attended can write reviews.')
+  })
+
+  it('keeps Attendance in the sheet when the host check could not be read', async () => {
+    // 조회가 실패하면 isHost가 false에 머문다. 그걸로 항목을 감추면 정작
+    // 방장에게서 출석 확정이 통째로 사라진다.
+    fetchAppointment.mockResolvedValueOnce({
+      ...appointment,
+      appointmentStatus: 'IN_PROGRESS',
+      activityStartAt: '2020-01-01T10:00:00',
+      activityEndAt: '2020-01-01T12:00:00',
+    })
+    fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    const attendance = menuItem(wrapper)('Attendance')
+
+    expect(attendance).toBeDefined()
+    expect(attendance?.attributes('disabled')).toBeDefined()
+    expect(attendance?.text()).toContain('We could not check your participation status.')
+  })
+
   it('hides Leave group from the host', async () => {
     // 방장은 어떤 상태에서도 자기 참여를 취소할 수 없어(APPOINTMENT-007) 비활성으로
     // 둬도 영영 켜지지 않는다.
@@ -477,6 +522,32 @@ describe('AppointmentDetailView', () => {
     expect(toasts.value[toasts.value.length - 1]?.message).toBe(
       'You left this appointment. ₩10,000 has been refunded to your wallet.',
     )
+  })
+
+  it('clears the already-joined notice after leaving', async () => {
+    // 나갔는데 안내가 남으면 같은 화면에서 "이미 참여했다"와 환급 토스트가
+    // 서로 반대되는 말을 한다.
+    fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
+    cancelAppointmentParticipation.mockResolvedValue(undefined)
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('You have already joined this appointment.')
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    await menuItem(wrapper)('Leave group')?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('[role="dialog"] button')
+      .find((button) => button.text() === 'Leave group')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('You have already joined this appointment.')
   })
 
   it('disables Leave group once the join deadline has passed', async () => {

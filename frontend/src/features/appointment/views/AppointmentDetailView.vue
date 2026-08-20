@@ -145,6 +145,11 @@ const attendanceDisabledReason = computed(() => {
   const status = appointment.value?.appointmentStatus
   if (status === 'CANCELLED') return t('appointment.detail.menu.attendanceCancelled')
   if (status === 'COMPLETED') return t('appointment.detail.menu.attendanceDone')
+  // 활동이 이미 끝났는데도 열리지 않았다면 남은 조건은 방장 여부뿐이다. 그것을
+  // 확인하지 못한 채 "활동이 끝나면 열린다"고 하면 틀린 안내가 된다.
+  if (participationCheckFailed.value && isActivityOver.value) {
+    return t('appointment.detail.participationCheckFailed')
+  }
   return t('appointment.detail.menu.attendanceNotEnded')
 })
 const reviewsDisabledReason = computed(() => {
@@ -152,10 +157,16 @@ const reviewsDisabledReason = computed(() => {
   if (appointment.value?.appointmentStatus !== 'COMPLETED') {
     return t('appointment.detail.menu.reviewsNotCompleted')
   }
+  // 여기서부터는 participation 응답에 기대는 판정이다. 조회가 실패한 것은
+  // 참여 여부를 모르는 것이지 아닌 것이 아니다.
+  if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
   return t('appointment.detail.menu.reviewsNotAttended')
 })
 const leaveDisabledReason = computed(() => {
   if (canLeave.value) return undefined
+  // isActiveMember는 조회 실패와 "회원이 아님"을 구분하지 못한다. 실패를 먼저
+  // 가르지 않으면 못 읽었을 뿐인데 회원이 아니라고 단정한다.
+  if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
   if (!isActiveMember.value) return t('appointment.detail.menu.leaveNotMember')
   return t('appointment.detail.menu.leaveDeadlinePassed')
 })
@@ -163,7 +174,11 @@ const leaveDisabledReason = computed(() => {
 // 영영 켜질 수 없는 항목은 아예 넣지 않는다. 출석 확정은 방장만 할 수 있고
 // (APPOINTMENT-004), 방장은 어떤 상태에서도 자기 참여를 취소할 수 없다
 // (APPOINTMENT-007). 비활성으로 둬 봐야 이유만 차지한다.
-const showAttendanceItem = computed(() => isHost.value)
+//
+// 단 이 판단은 방장 여부를 알 때만 쓸 수 있다. participation 조회가 실패하면
+// isHost가 false로 남아 정작 방장에게서 출석 확정이 통째로 사라진다. 모를 때는
+// 감추지 말고 이유로 "확인하지 못했다"를 적는다.
+const showAttendanceItem = computed(() => isHost.value || participationCheckFailed.value)
 const showLeaveItem = computed(() => !isHost.value)
 
 // 시트는 상세를 다 받은 뒤에만 렌더되므로(약속 이름과 보증금이 필요하다) 버튼도
@@ -292,6 +307,9 @@ const leaveMutation = useMutation({
     // 닫히면 나간 것인지 확신할 수 없다.
     const refunded = appointment.value?.depositAmount
     leaveConfirmOpen.value = false
+    // 나갔으니 버튼 위의 안내도 지운다. 그대로 두면 방금 나간 사람에게 "이미
+    // 참여했다"가 남아, 같은 화면에서 환급 토스트와 반대되는 말을 한다.
+    joinBlockedReason.value = undefined
     await invalidateParticipationScopes()
     showToast(
       refunded === undefined
