@@ -15,6 +15,18 @@ export type SettlementRecovery =
   | 'RETAKE_PHOTO'
   | 'ENTER_MANUALLY'
 
+/*
+ * RETAKE_PHOTO와 ENTER_MANUALLY를 보고 동작을 바꾸는 화면은 아직 없다.
+ *
+ * recovery를 읽는 곳은 SettlementCreateView와 SettlementPayView 둘뿐이고, 둘 다
+ * BACK_TO_LIST·REFETCH_DETAIL·REFETCH_CANDIDATES만 본다. 지금 사용자 안내를 실제로
+ * 갈라 주는 것은 이 값이 아니라 코드마다 다른 문구다.
+ *
+ * 그래도 값을 두는 이유는 아래 전수 매핑이 "이 코드는 어느 쪽으로 이끄는가"를 한곳에
+ * 적어 두기 때문이다. 화면이 사진 다시 찍기나 직접 입력으로 데려가는 버튼을 붙일 때
+ * 판단 기준이 이미 서 있게 된다.
+ */
+
 /**
  * 영수증 관련 서버 코드 전부.
  *

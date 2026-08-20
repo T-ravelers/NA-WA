@@ -276,6 +276,12 @@ function resolveOcrErrorKey(error: unknown): string {
       return 'settlement.receipt.error.storage'
     case 'SETTLEMENT-020':
       return 'settlement.receipt.error.expired'
+    /*
+     * 016은 DB에 담긴 형식을 서버가 알아보지 못한 경우다. 업로드가 형식을 먼저 확인하므로
+     * 사실상 닿지 않는 방어 경로지만, 닿으면 022와 마찬가지로 다시 눌러도 소용이 없다.
+     * 빠뜨리면 "다시 시도"로 떨어져 이 기능이 고치려던 문제가 그대로 남는다.
+     */
+    case 'SETTLEMENT-016':
     case 'SETTLEMENT-022':
       return 'settlement.receipt.error.ocrFormat'
     case 'SETTLEMENT-023':

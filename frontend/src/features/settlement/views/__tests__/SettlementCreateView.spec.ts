@@ -797,6 +797,29 @@ describe('SettlementCreateView', () => {
     expect(itemValue(wrapper, '[data-item-name="0"]')).toBe('Wine')
   })
 
+  /*
+   * 016은 서버가 사진 형식을 알아보지 못했을 때 인식 경로에서도 나온다. 업로드가 형식을
+   * 먼저 확인하므로 사실상 닿지 않지만, 닿으면 다시 눌러도 소용이 없다. 여기서 빠지면
+   * "다시 시도"로 떨어져 이 기능이 고치려던 문제가 그대로 남는다.
+   */
+  it('does not fall back to a retry prompt when the format cannot be read', async () => {
+    recognizeReceipt.mockRejectedValue(
+      new NormalizedApiError('SETTLEMENT-016', 400, 'server message'),
+    )
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await pickReceipt(wrapper)
+
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+    await flushPromises()
+
+    const message = wrapper.get('[data-testid="ocr-error"]').text()
+    expect(message).toContain('WebP is not supported')
+    expect(message).not.toContain('Try again')
+  })
+
   /** 넷 다 "다시 시도"라고 말하면 사용자는 다시 찍을지 직접 적을지 알 수 없다. */
   it.each([
     ['SETTLEMENT-022', 'WebP'],
