@@ -7,6 +7,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
+import { appointmentExploreIntegrationKey } from '@/features/appointment/model/exploreIntegration'
 import { appointmentJourneyIntegrationKey } from '../../model/journeyIntegration'
 
 const createAppointment = vi.fn()
@@ -71,6 +72,13 @@ async function mountView() {
           }),
           checkJourneyItemExists,
         },
+        [appointmentExploreIntegrationKey as symbol]: {
+          useItemLocation: () => ({
+            data: ref({ placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' }),
+            isPending: ref(false),
+            isError: ref(false),
+          }),
+        },
       },
     },
   })
@@ -94,13 +102,10 @@ async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> 
     .setValue('Seongsu K-Beauty Tour')
   await wrapper.get('form').trigger('submit')
 
-  await wrapper.find('input[inputmode="numeric"]').setValue('10000')
-  await wrapper.find('input[placeholder="e.g. Seongsu Beauty Lab"]').setValue('Seongsu Beauty Lab')
-  await wrapper.get('form').trigger('submit')
-
   await wrapper.find('input[type="time"]').setValue('18:30')
   await wrapper.findAll('input[type="time"]')[1]?.setValue('22:00')
   await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T17:30')
+  await wrapper.find('input[inputmode="numeric"]').setValue('10000')
   await wrapper.get('form').trigger('submit')
   await buttonByText(wrapper, 'Confirm').trigger('click')
 }
@@ -195,6 +200,13 @@ describe('AppointmentCreateView', () => {
             }),
             checkJourneyItemExists,
           },
+          [appointmentExploreIntegrationKey as symbol]: {
+            useItemLocation: () => ({
+              data: ref(undefined),
+              isPending: ref(false),
+              isError: ref(false),
+            }),
+          },
         },
       },
     })
@@ -220,20 +232,11 @@ describe('AppointmentCreateView', () => {
       .setValue('Seongsu K-Beauty Tour')
     await wrapper.get('form').trigger('submit')
 
-    await wrapper.find('input[inputmode="numeric"]').setValue('10000')
-    await wrapper
-      .find('input[placeholder="e.g. Seongsu Beauty Lab"]')
-      .setValue('Seongsu Beauty Lab')
-    await wrapper.get('form').trigger('submit')
-
-    expect(wrapper.text()).toContain('Set the appointment schedule')
-
-    await wrapper.find('header button').trigger('click')
     expect(wrapper.text()).toContain('Set your appointment details')
-    expect(router.currentRoute.value.name).toBe('appointment-create')
 
     await wrapper.find('header button').trigger('click')
     expect(wrapper.text()).toContain('Start with your appointment details')
+    expect(router.currentRoute.value.name).toBe('appointment-create')
 
     await wrapper.find('header button').trigger('click')
     expect(wrapper.text()).toContain('Leave without creating?')
@@ -250,7 +253,7 @@ describe('AppointmentCreateView', () => {
       currentMemberCount: 1,
       depositAmount: '10000',
       appointmentStatus: 'RECRUITING',
-      meetingPlace: 'Seongsu Beauty Lab',
+      meetingPlace: 'DDP Design Plaza',
       activityStartAt: '2026-08-08T18:30:00',
       activityEndAt: '2026-08-08T22:00:00',
       joinDeadline: '2026-08-08T17:30:00',
@@ -306,9 +309,9 @@ describe('AppointmentCreateView', () => {
     await fillAndConfirm(wrapper)
     await flushPromises()
 
-    // 날짜 시트가 폼 위에 다시 뜨고, 폼은 여전히(같은 3단계에) 입력값을 유지한 채 있다.
+    // 날짜 시트가 폼 위에 다시 뜨고, 폼은 여전히(같은 2단계에) 입력값을 유지한 채 있다.
     expect(wrapper.text()).toContain('Which day?')
-    expect(wrapper.text()).toContain('Set the appointment schedule')
+    expect(wrapper.text()).toContain('Set your appointment details')
     expect(wrapper.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
 
     checkJourneyItemExists.mockResolvedValueOnce(false)
@@ -317,7 +320,7 @@ describe('AppointmentCreateView', () => {
     await flushPromises()
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Set the appointment schedule')
+    expect(wrapper.text()).toContain('Set your appointment details')
     expect(wrapper.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
   })
 })

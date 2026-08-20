@@ -20,13 +20,20 @@ export interface AppointmentFormDraft {
   maxMembers: number
   languageCode: AppointmentLanguage
   depositAmount: number | null
+  /**
+   * `ITEM`이면 이 Event·Place가 열리는 자리에서 그대로 만난다. 그때 `meetingPlace`는
+   * 항목 위치로 채워지고 사용자는 직접 적지 않는다. `CUSTOM`이면 아래 입력칸에 적은
+   * 값이 그대로 `meetingPlace`가 된다.
+   */
+  meetingPlaceMode: MeetingPlaceMode
   meetingPlace: string
-  meetingAddress: string
   /** `visitDate` 하루 안에서의 시각만(`HH:mm`). 날짜 입력은 없다. */
   activityStartTime: string
   activityEndTime: string
   joinDeadline: string
 }
+
+export type MeetingPlaceMode = 'ITEM' | 'CUSTOM'
 
 export interface AppointmentFormErrors {
   itemContext?: string
@@ -104,11 +111,23 @@ export function validateAppointmentBasics(draft: AppointmentFormDraft): Appointm
     errors.languageCode = 'appointment.create.validation.languageRequired'
   }
 
+  // 항목 위치로 만나기를 골랐다면 그 위치를 아직 못 읽은 것이다(조회 중이거나 실패).
+  // 어느 쪽이든 빈 장소로 약속을 만들 수는 없다.
+  if (draft.meetingPlace.trim() === '') {
+    errors.meetingPlace =
+      draft.meetingPlaceMode === 'ITEM'
+        ? 'appointment.create.validation.itemPlaceUnavailable'
+        : 'appointment.create.validation.meetingPlaceRequired'
+  }
+
   return errors
 }
 
+/** 보증금과 시각은 2단계에서 함께 받는다. */
 export function validateAppointmentSettings(draft: AppointmentFormDraft): AppointmentFormErrors {
-  const errors: AppointmentFormErrors = {}
+  const errors: AppointmentFormErrors = {
+    ...validateAppointmentSchedule(draft),
+  }
 
   if (
     draft.depositAmount === null ||
@@ -117,10 +136,6 @@ export function validateAppointmentSettings(draft: AppointmentFormDraft): Appoin
     draft.depositAmount > MAX_APPOINTMENT_DEPOSIT
   ) {
     errors.depositAmount = 'appointment.create.validation.depositInvalid'
-  }
-
-  if (draft.meetingPlace.trim() === '') {
-    errors.meetingPlace = 'appointment.create.validation.meetingPlaceRequired'
   }
 
   return errors
@@ -158,7 +173,6 @@ export function validateAppointmentForm(draft: AppointmentFormDraft): Appointmen
   return {
     ...validateAppointmentBasics(draft),
     ...validateAppointmentSettings(draft),
-    ...validateAppointmentSchedule(draft),
   }
 }
 
@@ -183,7 +197,6 @@ export function toAppointmentCreateRequest(draft: AppointmentFormDraft): Appoint
     joinDeadline: toDateTimeRequest(draft.joinDeadline),
     depositAmount: String(draft.depositAmount),
     meetingPlace: draft.meetingPlace.trim(),
-    meetingAddress: draft.meetingAddress.trim() || undefined,
     activityStartTime: toTimeRequest(draft.activityStartTime),
     activityEndTime: toTimeRequest(draft.activityEndTime),
   }
