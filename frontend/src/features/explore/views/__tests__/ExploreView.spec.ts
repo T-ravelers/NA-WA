@@ -1,9 +1,12 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+
+import { useExploreFilterMemoryStore } from '../../model/exploreFilterMemory'
 
 const fetchEventList = vi.fn()
 const fetchPlaceList = vi.fn()
@@ -61,7 +64,7 @@ async function mountView(path = '/explore') {
 
   const wrapper = mount(ExploreView, {
     global: {
-      plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+      plugins: [i18n, router, createPinia(), [VueQueryPlugin, { queryClient }]],
     },
   })
 
@@ -71,6 +74,7 @@ async function mountView(path = '/explore') {
 
 describe('ExploreView Place branch', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     scrollToMock.mockReset()
     vi.stubGlobal('scrollTo', scrollToMock)
     vi.stubGlobal(
@@ -267,6 +271,30 @@ describe('ExploreView Place branch', () => {
     expect(router.currentRoute.value.query.placeRegion2Other).toBe('true')
     expect(fetchPlaceList).toHaveBeenLastCalledWith(
       expect.objectContaining({ region1: ['서울'], region2Other: true }),
+    )
+  })
+
+  it('remembers the Place filters it writes to the URL', async () => {
+    const { wrapper } = await mountView('/explore?tab=places')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('Options'))
+      ?.trigger('click')
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text() === 'Parking')
+      ?.trigger('click')
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(useExploreFilterMemoryStore().lastQuery.places).toEqual(
+      expect.objectContaining({ tab: 'places', hasParking: 'true' }),
     )
   })
 
