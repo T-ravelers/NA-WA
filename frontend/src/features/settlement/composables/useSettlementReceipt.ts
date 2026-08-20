@@ -1,4 +1,4 @@
-import { onBeforeUnmount, ref, type Ref } from 'vue'
+import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
 
@@ -101,19 +101,36 @@ export function useSettlementReceiptViewer(settlementId: () => string): Settleme
   const errorKey = ref<string | null>(null)
   const { url, set } = useObjectUrl()
 
+  /*
+   * 보고 있는 정산이 바뀌면 받아 둔 사진을 버린다.
+   *
+   * 한 번 받으면 다시 받지 않는 구조라, 그대로 두면 다음 정산에서 앞 정산의 영수증이
+   * 그대로 보인다.
+   */
+  watch(settlementId, () => {
+    set(null)
+    errorKey.value = null
+  })
+
   async function load(): Promise<void> {
     if (pending.value || url.value !== null) {
       return
     }
 
+    const requested = settlementId()
     pending.value = true
     errorKey.value = null
 
     try {
-      set(await settlementGateway.getReceipt(settlementId()))
+      const received = await settlementGateway.getReceipt(requested)
+
+      // 받는 사이에 다른 정산으로 옮겨 갔다면 이 사진은 이제 남의 것이다.
+      if (requested === settlementId()) set(received)
     } catch (error) {
-      set(null)
-      errorKey.value = resolveViewErrorKey(error)
+      if (requested === settlementId()) {
+        set(null)
+        errorKey.value = resolveViewErrorKey(error)
+      }
     } finally {
       pending.value = false
     }

@@ -208,4 +208,23 @@ describe('SettlementDetailView', () => {
 
     expect(wrapper.text()).toContain('No receipt was attached')
   })
+
+  it('does not carry a receipt over to the next settlement', async () => {
+    getReceipt.mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
+    const { wrapper, router } = await mountDetail()
+
+    await wrapper.get('[data-action="add-receipt"]').trigger('click')
+    await flushPromises()
+    expect(getReceipt).toHaveBeenCalledTimes(1)
+
+    // 화면이 그대로 붙어 있어도 다른 정산을 보는 중이면 앞 사진은 남의 것이다.
+    await router.push('/settlements/43')
+    await flushPromises()
+
+    await wrapper.get('[data-action="add-receipt"]').trigger('click')
+    await flushPromises()
+
+    expect(getReceipt).toHaveBeenCalledTimes(2)
+    expect(getReceipt).toHaveBeenLastCalledWith('43')
+  })
 })
