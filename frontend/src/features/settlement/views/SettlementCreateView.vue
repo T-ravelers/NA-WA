@@ -131,6 +131,13 @@ function shareAmountOf(appointmentMemberId: string): string {
 const canContinueDetails = computed(
   () =>
     hasEnoughParticipants.value &&
+    /*
+     * 사진이 다 올라가기 전에는 넘기지 않는다.
+     *
+     * 아직 영수증 번호가 없는 상태로 요청이 나가면 정산은 영수증 없이 만들어지고, 나중에
+     * 붙일 수도 없다. 오류도 안내도 없이 방금 찍은 사진만 사라진다.
+     */
+    !receipt.pending.value &&
     (type.value === 'EQUAL' || (itemValidation.value.valid && totalMatchesSource.value)),
 )
 
@@ -309,6 +316,10 @@ function updateAllocation(index: number, participantId: string, quantity: string
 function goToReview(): void {
   if (!hasEnoughParticipants.value) {
     validationMessage.value = t('settlement.create.participantsTooFew')
+    return
+  }
+  if (receipt.pending.value) {
+    validationMessage.value = t('settlement.receipt.uploading')
     return
   }
   if (!canContinueDetails.value) {

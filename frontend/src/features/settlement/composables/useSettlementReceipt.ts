@@ -49,10 +49,21 @@ export function useSettlementReceiptUpload(): SettlementReceiptUpload {
   const pending = ref(false)
   const errorKey = ref<string | null>(null)
   const { url: previewUrl, set: setPreview } = useObjectUrl()
+  /*
+   * 지금 화면이 기다리는 사진이 몇 번째인지 센다.
+   *
+   * 사진을 올리는 데는 시간이 걸리고, 그 사이 사용자는 다른 결제로 옮겨 가거나 다른 사진을
+   * 고를 수 있다. 뒤늦게 도착한 응답을 그대로 받아 두면 이미 버린 영수증이 되살아나
+   * 엉뚱한 정산에 붙는다. 한 번 붙은 영수증은 바꿀 수 없어 되돌릴 방법이 없다.
+   */
+  let generation = 0
 
   function reset(): void {
+    generation += 1
     receiptId.value = null
     errorKey.value = null
+    // 올리던 것을 버렸으니 기다림도 함께 끝난다. 두지 않으면 버튼이 영영 잠긴다.
+    pending.value = false
     setPreview(null)
   }
 
@@ -64,19 +75,26 @@ export function useSettlementReceiptUpload(): SettlementReceiptUpload {
       return
     }
 
+    const attempt = (generation += 1)
     pending.value = true
     errorKey.value = null
 
     try {
       const { receiptId: uploaded } = await settlementGateway.uploadReceipt(file)
+
+      if (attempt !== generation) return
+
       receiptId.value = uploaded
       setPreview(file)
     } catch (error) {
+      if (attempt !== generation) return
+
       receiptId.value = null
       setPreview(null)
       errorKey.value = resolveUploadErrorKey(error)
     } finally {
-      pending.value = false
+      // 나보다 나중 것이 기다리는 중이면 그쪽이 끝낼 몫이다. 여기서 끄면 거짓으로 끝난다.
+      if (attempt === generation) pending.value = false
     }
   }
 

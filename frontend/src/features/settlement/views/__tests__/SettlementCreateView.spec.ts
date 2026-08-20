@@ -525,6 +525,67 @@ describe('SettlementCreateView', () => {
     expect(wrapper.text()).toContain('Split evenly across 2 people')
   })
 
+  it('drops an upload that lands after the payment was changed', async () => {
+    let finishUpload: (value: { receiptId: string }) => void = () => {}
+    uploadReceipt.mockReturnValueOnce(
+      new Promise<{ receiptId: string }>((resolve) => {
+        finishUpload = resolve
+      }),
+    )
+    const wrapper = mountCreate([
+      candidate(),
+      candidate({ transferId: '8', gatheringName: 'Cafe', amount: '10.00' }),
+    ])
+    await drillDownToTransaction(wrapper)
+    await pickReceipt(wrapper)
+
+    // 아직 올라가는 중에 다른 결제로 옮긴다.
+    ;(wrapper.vm as unknown as { back: () => void }).back()
+    await flushPromises()
+    await wrapper.get('[data-payment-id="8"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 버린 사진의 응답이 뒤늦게 도착한다.
+    finishUpload({ receiptId: '31' })
+    await flushPromises()
+
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    // 되살아나면 앞 결제의 영수증이 남의 정산에 붙고, 붙은 뒤에는 바꿀 수 없다.
+    expect(create.mock.calls[0]?.[2]).not.toHaveProperty('receiptId')
+  })
+
+  it('waits for the upload before letting the request through', async () => {
+    let finishUpload: (value: { receiptId: string }) => void = () => {}
+    uploadReceipt.mockReturnValueOnce(
+      new Promise<{ receiptId: string }>((resolve) => {
+        finishUpload = resolve
+      }),
+    )
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await pickReceipt(wrapper)
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 그냥 넘기면 영수증 번호가 아직 없어, 오류도 없이 사진만 빠진 정산이 만들어진다.
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Wait for the receipt')
+
+    finishUpload({ receiptId: '31' })
+    await flushPromises()
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+    await wrapper.get('[data-action="create"]').trigger('click')
+    await flushPromises()
+
+    expect(create.mock.calls[0]?.[2]).toMatchObject({ receiptId: '31' })
+  })
+
   it('drops the receipt when another payment is chosen', async () => {
     const wrapper = mountCreate([
       candidate(),
