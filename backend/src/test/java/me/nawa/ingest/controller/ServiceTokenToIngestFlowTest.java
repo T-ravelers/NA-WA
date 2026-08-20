@@ -165,7 +165,7 @@ class ServiceTokenToIngestFlowTest {
     private static String eventBatchJson() {
         return "[{\"pipelineId\":\"11111111-1111-1111-1111-111111111111\","
                 + "\"title\":\"제목\",\"startDate\":\"2026-08-20\","
-                + "\"endDate\":\"2026-08-21\"}]";
+                + "\"endDate\":\"2026-08-21\",\"isPermanent\":false}]";
     }
 
     /** 호출 여부만 기록합니다. 이 저장소는 목 프레임워크 대신 이 방식을 씁니다. */

@@ -9,6 +9,7 @@ import me.nawa.ingest.mapper.IngestMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -145,6 +146,49 @@ class IngestServiceImplTest {
         assertEquals(1, result.getUpdated());
     }
 
+
+    @Test
+    void ingestEvents_rejectsAnEventWithoutThePermanentFlag() {
+        // 리뷰에서 나온 재현 경로다. isPermanent 가 없으면 검증은 비상시로 보아
+        // 통과시키는데 UPDATE 는 기존 상시를 유지해서, is_permanent=TRUE 인데
+        // end_date 가 있는 행이 되어 chk_event_period 를 위반했다.
+        // 셋을 한 덩어리로 받으면 이 경로가 생기지 않는다.
+        EventIngestItem missingFlag = event("a");
+        missingFlag.setIsPermanent(null);
+
+        assertThrows(BusinessException.class, () -> service.ingestEvents(List.of(missingFlag)));
+        assertTrue(mapper.callOrder.isEmpty(), "거절해야 할 배치가 DB 에 닿았습니다");
+    }
+
+    @Test
+    void ingestEvents_rejectsAHalfCoordinate() {
+        // chk_event_coordinates 는 위도·경도가 둘 다 없거나 둘 다 있어야 한다.
+        EventIngestItem halfCoordinate = event("a");
+        halfCoordinate.setLatitude(new BigDecimal("37.5"));
+
+        assertThrows(BusinessException.class,
+                () -> service.ingestEvents(List.of(halfCoordinate)));
+    }
+
+    @Test
+    void ingestEvents_acceptsAnEventWithNoCoordinatesAtAll() {
+        // 주소가 없어 지오코딩하지 못한 항목이다. 실제로 8건 있다.
+        service.ingestEvents(List.of(event("a")));
+
+        assertEquals(List.of("insertExploreItems", "insertEvents"), mapper.callOrder);
+    }
+
+    @Test
+    void ingestPlaces_rejectsAHalfCoordinate() {
+        PlaceIngestItem halfCoordinate = new PlaceIngestItem();
+        halfCoordinate.setPipelineId("a");
+        halfCoordinate.setName("이름");
+        halfCoordinate.setLongitude(new BigDecimal("127.0"));
+
+        assertThrows(BusinessException.class,
+                () -> service.ingestPlaces(List.of(halfCoordinate)));
+    }
+
     private static List<String> pipelineIdsOf(List<EventIngestItem> items) {
         return items.stream().map(EventIngestItem::getPipelineId).toList();
     }
@@ -157,6 +201,7 @@ class IngestServiceImplTest {
         // 종료일을 요구한다. 서비스가 이것을 미리 본다.
         item.setStartDate(LocalDate.of(2026, 8, 20));
         item.setEndDate(LocalDate.of(2026, 8, 21));
+        item.setIsPermanent(false);
         return item;
     }
 

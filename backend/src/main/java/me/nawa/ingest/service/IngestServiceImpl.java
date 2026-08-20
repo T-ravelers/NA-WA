@@ -5,14 +5,13 @@ import me.nawa.ingest.dto.request.EventTranslationIngestItem;
 import me.nawa.ingest.dto.request.PlaceIngestItem;
 import me.nawa.ingest.dto.request.PlaceTranslationIngestItem;
 import me.nawa.ingest.dto.response.IngestResultResponse;
-import me.nawa.common.exception.BusinessException;
-import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.ingest.exception.IngestInvalidItemException;
 import me.nawa.ingest.mapper.IngestMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -89,7 +88,8 @@ public class IngestServiceImpl implements IngestService {
         }
 
         items.forEach(it -> {
-            require(hasText(it.getPipelineId()) && hasText(it.getName()));
+            requireValid(hasText(it.getPipelineId()) && hasText(it.getName()));
+            requireCoordinatePair(it.getLatitude(), it.getLongitude());
         });
 
         Set<String> existing = new HashSet<>(ingestMapper.findExistingPlacePipelineIds(
@@ -124,7 +124,7 @@ public class IngestServiceImpl implements IngestService {
             return new IngestResultResponse(0, 0, 0, 0);
         }
         items.forEach(it -> {
-            require(hasText(it.getPipelineId()));
+            requireValid(hasText(it.getPipelineId()));
             requireLanguage(it.getLanguageCode());
         });
 
@@ -150,7 +150,7 @@ public class IngestServiceImpl implements IngestService {
             return new IngestResultResponse(0, 0, 0, 0);
         }
         items.forEach(it -> {
-            require(hasText(it.getPipelineId()));
+            requireValid(hasText(it.getPipelineId()));
             requireLanguage(it.getLanguageCode());
         });
 
@@ -196,16 +196,38 @@ public class IngestServiceImpl implements IngestService {
      * </ul>
      */
     private static void validateEvent(EventIngestItem item) {
-        require(hasText(item.getPipelineId()) && hasText(item.getTitle()));
+        requireValid(hasText(item.getPipelineId()) && hasText(item.getTitle()));
         requireValid(item.getStartDate() != null);
 
-        boolean permanent = Boolean.TRUE.equals(item.getIsPermanent());
-        if (permanent) {
+        // isPermanent 는 필수입니다. start_date · end_date · is_permanent 는 한 덩어리
+        // 사실이라, 일부만 "null 이면 기존값 유지"로 두면 셋이 찢어집니다.
+        //
+        // 찢어지면 이렇게 됩니다: 상시 이벤트에 isPermanent=null, endDate=2026-12-31 이
+        // 오면 검증은 비상시로 보아 통과시키는데 UPDATE 는 상시를 유지해서,
+        // is_permanent=TRUE 인데 end_date 가 있는 행이 되어 chk_event_period 를
+        // 위반합니다. 크롤러가 이미 이 값을 정규화하므로 받아서 그대로 씁니다.
+        requireValid(item.getIsPermanent() != null);
+
+        if (item.getIsPermanent()) {
             requireValid(item.getEndDate() == null);
         } else {
             requireValid(item.getEndDate() != null
                     && !item.getStartDate().isAfter(item.getEndDate()));
         }
+
+        requireCoordinatePair(item.getLatitude(), item.getLongitude());
+    }
+
+    /**
+     * chk_event_coordinates · chk_place_coordinates 는 위도·경도가 둘 다 없거나
+     * 둘 다 있어야 합니다. 한쪽만 오면 SQLException 이 500 으로 터지고 배치가
+     * 재시도 불능이 됩니다.
+     *
+     * <p>범위 검사는 DB 에 맡깁니다. 쌍이 깨지는 것과 달리 파이프라인이 만들 수
+     * 있는 값이 아닙니다.
+     */
+    private static void requireCoordinatePair(BigDecimal latitude, BigDecimal longitude) {
+        requireValid((latitude == null) == (longitude == null));
     }
 
     /**
@@ -216,23 +238,19 @@ public class IngestServiceImpl implements IngestService {
         requireValid(languageCode != null && LANGUAGES.contains(languageCode));
     }
 
+    /**
+     * 배치에 하나라도 어긋난 항목이 있으면 통째로 거절합니다.
+     *
+     * <p>일부만 넣고 성공으로 알리면 파이프라인이 넘어가 격차가 쌓입니다.
+     * 필수값 누락과 제약 위반을 같은 코드로 냅니다. 파이프라인 입장에서는
+     * 둘 다 "고쳐서 보내야 하는 것"이라 구분할 이유가 없습니다.
+     */
     private static void requireValid(boolean condition) {
         if (!condition) {
             throw new IngestInvalidItemException();
         }
     }
 
-    /**
-     * 적재 키와 표시명이 없는 항목은 받지 않습니다.
-     *
-     * <p>한 건이라도 비어 있으면 배치 전체를 거절합니다. 일부만 넣고 나머지를
-     * 조용히 버리면 파이프라인이 성공으로 알고 넘어가 격차가 누적됩니다.
-     */
-    private static void require(boolean condition) {
-        if (!condition) {
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-        }
-    }
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();

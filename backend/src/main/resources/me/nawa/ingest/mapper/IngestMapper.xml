@@ -11,11 +11,23 @@
 
   적재 키는 pipeline_id 입니다. 파이프라인 쪽 숫자 PK 는 쓰지 않습니다.
 
-  UPDATE 의 null 계약: null 은 "데이터 없음"이므로 기존값을 유지합니다.
-  "값이 FALSE 로 바뀌었다"가 아닙니다. 컬럼마다 방향이 다르면, 상시 이벤트에
-  is_permanent=null 이 오는 순간 FALSE 로 리셋돼 chk_event_period 를 위반하고
-  배치 전체가 실패합니다. INSERT 는 다릅니다 — 새 행에는 기존값이 없으므로
-  NOT NULL 컬럼에 기본값을 채웁니다.
+  UPDATE 에서 null 을 어떻게 다루는가:
+
+    파이프라인이 소유하는 값(제목·설명·주소·좌표 등)은 보낸 값을 그대로 씁니다.
+    null 이 오면 기존값을 지웁니다. 파이프라인이 "이제 이 값이 없다"고 말한
+    것이므로 그대로 반영하는 것이 맞습니다.
+
+    기간 세 값(start_date · end_date · is_permanent)은 한 덩어리 사실이라
+    셋 다 직접 대입합니다. 일부만 기존값을 유지하면 셋이 찢어져
+    chk_event_period 를 위반합니다. 그래서 is_permanent 는 서비스에서
+    필수값으로 받습니다.
+
+    나머지 플래그(has_photo_zone · is_experience · is_active)와 분류 값
+    (event_kind · status)만 COALESCE 로 기존값을 유지합니다. 소스가 판단하지
+    못한 항목이라 null 이 "없음"이 아니라 "모름"이기 때문입니다.
+
+  INSERT 는 다릅니다. 새 행에는 유지할 기존값이 없으므로 NOT NULL 컬럼에
+  기본값을 채웁니다.
 
   앱이 소유하는 값은 갱신하지 않습니다:
     view_count, favorite_count, created_at,
@@ -80,7 +92,7 @@
              #{it.startDate},
              #{it.endDate},
              COALESCE(UPPER(#{it.status}), 'SCHEDULED'),
-             COALESCE(#{it.isPermanent}, FALSE),
+             #{it.isPermanent},
              #{it.operatingHours},
              #{it.openDays},
              #{it.openWeekend},
@@ -148,7 +160,7 @@
             e.start_date      = s.start_date,
             e.end_date        = s.end_date,
             e.status          = COALESCE(UPPER(s.status), e.status),
-            e.is_permanent    = COALESCE(s.is_permanent, e.is_permanent),
+            e.is_permanent    = s.is_permanent,
             e.operating_hours = s.operating_hours,
             e.open_days       = s.open_days,
             e.open_weekend    = s.open_weekend,
