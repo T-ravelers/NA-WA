@@ -289,16 +289,7 @@ function setCalendarDate(value: string): void {
   draft.endDate = value
 }
 
-/** 기간의 양 끝. 여기만 둥글게 깎아 하나의 띠로 보이게 한다. */
-function isRangeStart(value: string): boolean {
-  return draft.endDate !== undefined && value === draft.startDate
-}
-
-function isRangeEnd(value: string): boolean {
-  return draft.startDate !== undefined && value === draft.endDate
-}
-
-/** 아직 시작일만 고른 상태. 띠가 아니라 점 하나로 보여야 한다. */
+/** 아직 시작일만 고른 상태. 띠가 아니라 칸 폭 알약 하나로 보여야 한다. */
 function isLoneDate(value: string): boolean {
   return draft.endDate === undefined && value === draft.startDate
 }
@@ -310,6 +301,29 @@ function isDateInRange(value: string): boolean {
     value >= draft.startDate &&
     value <= draft.endDate
   )
+}
+
+/**
+ * 셀이 기간 띠를 그리는지. 이웃 달 셀은 날짜가 기간에 들어도 띠를 그리지
+ * 않는다 — 흐린 글자(text-ink-3/40) 위에 흰 배경이 얹혀, 선택할 수 없는
+ * 날짜가 오히려 도드라진다.
+ */
+function showsBand(index: number): boolean {
+  const cell = calendarDays.value[index]
+  return cell !== undefined && cell.inMonth && isDateInRange(cell.date)
+}
+
+/**
+ * 띠가 시각적으로 시작하거나 끝나는 자리만 둥글게 깎는다. 기간의 양 끝만이
+ * 아니라, 주가 바뀌어 줄이 끊기는 자리와 이웃 달 셀에 잘리는 자리도 띠가
+ * 새로 시작·끝나는 것으로 본다.
+ */
+function isBandLeftEdge(index: number): boolean {
+  return showsBand(index) && (index % 7 === 0 || !showsBand(index - 1))
+}
+
+function isBandRightEdge(index: number): boolean {
+  return showsBand(index) && (index % 7 === 6 || !showsBand(index + 1))
 }
 
 function shiftMonth(offset: number): void {
@@ -527,7 +541,7 @@ function apply(): void {
           </div>
           <div class="mt-2 grid grid-cols-7 gap-y-1 text-center">
             <button
-              v-for="cell in calendarDays"
+              v-for="(cell, index) in calendarDays"
               :key="cell.date"
               type="button"
               class="flex h-9 w-full items-center justify-center text-caption"
@@ -536,14 +550,18 @@ function apply(): void {
                 cell.inMonth &&
                   isDateAllowed(cell.date) &&
                   !isDateInRange(cell.date) &&
+                  !isLoneDate(cell.date) &&
                   'rounded-pill text-ink-2',
                 // 기간은 칸 전체를 채워 하나의 띠로 이어진다. 칸보다 좁은 칩을
                 // 가운데 두면 흰색이어도 날짜마다 끊겨 보여 기간으로 읽히지
-                // 않는다. 양 끝만 둥글게 깎고 사이는 각지게 둔다.
-                isDateInRange(cell.date) && 'bg-paper-fill text-on-paper',
-                isLoneDate(cell.date) && 'rounded-pill',
-                isRangeStart(cell.date) && 'rounded-l-pill',
-                isRangeEnd(cell.date) && 'rounded-r-pill',
+                // 않는다. 띠가 시작·끝나는 자리(기간 양 끝, 줄 넘김, 이웃 달
+                // 경계)만 둥글게 깎고 사이는 각지게 둔다.
+                showsBand(index) && 'bg-paper-fill text-on-paper',
+                // 시작일만 고른 상태도 배경이 있어야 화면에 보인다. 모서리만
+                // 깎으면 아무것도 그려지지 않는다.
+                cell.inMonth && isLoneDate(cell.date) && 'rounded-pill bg-paper-fill text-on-paper',
+                isBandLeftEdge(index) && 'rounded-l-pill',
+                isBandRightEdge(index) && 'rounded-r-pill',
               ]"
               :disabled="!cell.inMonth || !isDateAllowed(cell.date)"
               @click="cell.inMonth && setCalendarDate(cell.date)"
