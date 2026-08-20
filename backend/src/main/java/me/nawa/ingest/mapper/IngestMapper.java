@@ -1,5 +1,6 @@
 package me.nawa.ingest.mapper;
 
+import me.nawa.ingest.dto.request.ActivityIngestItem;
 import me.nawa.ingest.dto.request.EventIngestItem;
 import me.nawa.ingest.dto.request.EventTranslationIngestItem;
 import me.nawa.ingest.dto.request.PlaceIngestItem;
@@ -60,4 +61,21 @@ public interface IngestMapper {
     int upsertEventTranslations(@Param("items") List<EventTranslationIngestItem> items);
 
     int upsertPlaceTranslations(@Param("items") List<PlaceTranslationIngestItem> items);
+
+    /**
+     * 보낸 목록에 없는 분류를 지웁니다.
+     *
+     * <p>대상은 이번 배치에 들어온 pipeline_id 로 한정합니다. 그러지 않으면
+     * 배치에 없는 항목의 분류까지 지워집니다.
+     */
+    int deleteMissingEventActivities(@Param("items") List<ActivityIngestItem> items);
+
+    int deleteMissingPlaceActivities(@Param("items") List<ActivityIngestItem> items);
+
+    /**
+     * 본체가 있는 항목의 분류만 넣습니다. 없는 항목은 JOIN 이 걸러 냅니다.
+     */
+    int upsertEventActivities(@Param("items") List<ActivityIngestItem> items);
+
+    int upsertPlaceActivities(@Param("items") List<ActivityIngestItem> items);
 }

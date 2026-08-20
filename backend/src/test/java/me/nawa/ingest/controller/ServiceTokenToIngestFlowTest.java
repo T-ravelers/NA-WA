@@ -194,5 +194,17 @@ class ServiceTokenToIngestFlowTest {
                 List<me.nawa.ingest.dto.request.PlaceTranslationIngestItem> items) {
             return new IngestResultResponse(0, 0, 0, 0);
         }
+
+        @Override
+        public IngestResultResponse ingestEventActivities(
+                List<me.nawa.ingest.dto.request.ActivityIngestItem> items) {
+            return new IngestResultResponse(0, 0, 0, 0);
+        }
+
+        @Override
+        public IngestResultResponse ingestPlaceActivities(
+                List<me.nawa.ingest.dto.request.ActivityIngestItem> items) {
+            return new IngestResultResponse(0, 0, 0, 0);
+        }
     }
 }

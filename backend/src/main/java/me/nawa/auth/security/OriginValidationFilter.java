@@ -37,7 +37,9 @@ public class OriginValidationFilter extends OncePerRequestFilter {
             "/api/v1/internal/ingest/events",
             "/api/v1/internal/ingest/places",
             "/api/v1/internal/ingest/event-translations",
-            "/api/v1/internal/ingest/place-translations"
+            "/api/v1/internal/ingest/place-translations",
+            "/api/v1/internal/ingest/event-activities",
+            "/api/v1/internal/ingest/place-activities"
     );
 
     @Override

@@ -1,5 +1,6 @@
 package me.nawa.ingest.service;
 
+import me.nawa.ingest.dto.request.ActivityIngestItem;
 import me.nawa.ingest.dto.request.EventIngestItem;
 import me.nawa.ingest.dto.request.EventTranslationIngestItem;
 import me.nawa.ingest.dto.request.PlaceIngestItem;
@@ -169,6 +170,80 @@ public class IngestServiceImpl implements IngestService {
 
 
 
+
+
+    @Override
+    @Transactional
+    public IngestResultResponse ingestEventActivities(List<ActivityIngestItem> items) {
+        if (items.isEmpty()) {
+            return new IngestResultResponse(0, 0, 0, 0);
+        }
+        items.forEach(IngestServiceImpl::validateActivities);
+
+        Set<String> existing = new HashSet<>(ingestMapper.findExistingEventPipelineIds(
+                items.stream().map(ActivityIngestItem::getPipelineId).distinct().toList()));
+        List<ActivityIngestItem> known = items.stream()
+                .filter(it -> existing.contains(it.getPipelineId())).toList();
+
+        if (known.isEmpty()) {
+            return new IngestResultResponse(items.size(), 0, 0, items.size());
+        }
+
+        ingestMapper.deleteMissingEventActivities(known);
+        if (known.stream().anyMatch(it -> !it.getActivities().isEmpty())) {
+            ingestMapper.upsertEventActivities(
+                    known.stream().filter(it -> !it.getActivities().isEmpty()).toList());
+        }
+
+        return new IngestResultResponse(
+                items.size(), 0, known.size(), items.size() - known.size());
+    }
+
+    @Override
+    @Transactional
+    public IngestResultResponse ingestPlaceActivities(List<ActivityIngestItem> items) {
+        if (items.isEmpty()) {
+            return new IngestResultResponse(0, 0, 0, 0);
+        }
+        items.forEach(IngestServiceImpl::validateActivities);
+
+        Set<String> existing = new HashSet<>(ingestMapper.findExistingPlacePipelineIds(
+                items.stream().map(ActivityIngestItem::getPipelineId).distinct().toList()));
+        List<ActivityIngestItem> known = items.stream()
+                .filter(it -> existing.contains(it.getPipelineId())).toList();
+
+        if (known.isEmpty()) {
+            return new IngestResultResponse(items.size(), 0, 0, items.size());
+        }
+
+        ingestMapper.deleteMissingPlaceActivities(known);
+        if (known.stream().anyMatch(it -> !it.getActivities().isEmpty())) {
+            ingestMapper.upsertPlaceActivities(
+                    known.stream().filter(it -> !it.getActivities().isEmpty()).toList());
+        }
+
+        return new IngestResultResponse(
+                items.size(), 0, known.size(), items.size() - known.size());
+    }
+
+    /**
+     * 분류 목록을 확인합니다.
+     *
+     * <p>대표 분류는 최대 하나입니다. 둘 이상이면 어느 것을 대표로 보여줄지
+     * 화면이 정할 수 없습니다. 하나도 없는 것은 허용합니다 — 분류를 통째로
+     * 지우는 요청일 수 있습니다.
+     */
+    private static void validateActivities(ActivityIngestItem item) {
+        requireValid(hasText(item.getPipelineId()));
+        requireValid(item.getActivities() != null);
+
+        long primaries = item.getActivities().stream()
+                .filter(link -> Boolean.TRUE.equals(link.getIsPrimary()))
+                .count();
+        requireValid(primaries <= 1);
+
+        item.getActivities().forEach(link -> requireValid(link.getActivityId() != null));
+    }
 
     /**
      * 같은 (pipeline_id, language_code) 가 배치에 두 번 오면 ON DUPLICATE KEY 로

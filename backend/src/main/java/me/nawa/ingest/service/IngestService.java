@@ -1,5 +1,6 @@
 package me.nawa.ingest.service;
 
+import me.nawa.ingest.dto.request.ActivityIngestItem;
 import me.nawa.ingest.dto.request.EventIngestItem;
 import me.nawa.ingest.dto.request.EventTranslationIngestItem;
 import me.nawa.ingest.dto.request.PlaceIngestItem;
@@ -17,4 +18,8 @@ public interface IngestService {
     IngestResultResponse ingestEventTranslations(List<EventTranslationIngestItem> items);
 
     IngestResultResponse ingestPlaceTranslations(List<PlaceTranslationIngestItem> items);
+
+    IngestResultResponse ingestEventActivities(List<ActivityIngestItem> items);
+
+    IngestResultResponse ingestPlaceActivities(List<ActivityIngestItem> items);
 }
