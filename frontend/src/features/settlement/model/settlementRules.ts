@@ -27,10 +27,15 @@ function parseQuantity(value: string): bigint | null {
   return parseScaled(value, QUANTITY_DECIMALS)
 }
 
+/**
+ * 단가가 0인 품목도 받는다.
+ *
+ * 사은품이나 리뷰 증정 음료는 영수증에 0원으로 찍히고, 그것이 맞는 값이다. 서버도 음수만
+ * 거절한다. 화면에서만 0을 막으면 사용자는 제대로 읽어 온 증정 품목을 지우거나 영수증에
+ * 없는 금액을 지어내야 다음 단계로 갈 수 있다.
+ */
 function hasValidPrice(value: string): boolean {
-  return (
-    /^(?:0|[1-9]\d{0,14})(?:\.\d{1,4})?$/.test(value.trim()) && !/^0(?:\.0+)?$/.test(value.trim())
-  )
+  return /^(?:0|[1-9]\d{0,14})(?:\.\d{1,4})?$/.test(value.trim())
 }
 
 /** Validates only client-entered ITEMIZED data; it never calculates money shares. */

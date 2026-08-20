@@ -50,6 +50,42 @@ describe('ITEMIZED request rules', () => {
       ),
     ).toEqual({ valid: false, invalidItemIndexes: [0, 1] })
   })
+
+  it('accepts a giveaway item priced at zero but still refuses a blank price', () => {
+    expect(
+      validateItemizedItems(
+        [
+          {
+            name: 'Zero cola (review event)',
+            unitPrice: '0',
+            quantity: '1',
+            allocations: [{ appointmentMemberId: '12', quantity: '1' }],
+          },
+          {
+            name: 'Dinner',
+            unitPrice: '0.0000',
+            quantity: '2',
+            allocations: [{ appointmentMemberId: '19', quantity: '2' }],
+          },
+        ],
+        new Set(['12', '19']),
+      ),
+    ).toEqual({ valid: true, invalidItemIndexes: [] })
+
+    expect(
+      validateItemizedItems(
+        [
+          {
+            name: 'Zero cola (review event)',
+            unitPrice: '',
+            quantity: '1',
+            allocations: [{ appointmentMemberId: '12', quantity: '1' }],
+          },
+        ],
+        new Set(['12']),
+      ),
+    ).toEqual({ valid: false, invalidItemIndexes: [0] })
+  })
 })
 
 describe('compareItemizedTotal', () => {
