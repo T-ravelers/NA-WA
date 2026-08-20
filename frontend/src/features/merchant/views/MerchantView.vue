@@ -423,7 +423,7 @@ const createError = computed(() =>
                       :for="`merchant-name-${item.id}`"
                       class="sr-only"
                     >
-                      {{ t('merchant.qr.itemName') }}
+                      {{ t('merchant.qr.itemName', { index: index + 1 }) }}
                     </label>
                     <input
                       :id="`merchant-name-${item.id}`"
@@ -437,7 +437,7 @@ const createError = computed(() =>
                       :for="`merchant-price-${item.id}`"
                       class="sr-only"
                     >
-                      {{ t('merchant.qr.unitPrice') }}
+                      {{ t('merchant.qr.unitPrice', { index: index + 1 }) }}
                     </label>
                     <div
                       class="flex h-11 w-24 shrink-0 items-center gap-1 rounded-sm bg-surface-2 px-2 focus-within:outline-2 focus-within:outline-ink"
@@ -462,7 +462,7 @@ const createError = computed(() =>
                     <div class="flex h-11 shrink-0 items-center rounded-sm bg-surface-2">
                       <button
                         type="button"
-                        class="grid size-7 place-items-center rounded-sm text-ink transition-colors disabled:text-ink-3/40 focus-visible:outline-2 focus-visible:outline-ink"
+                        class="grid h-11 w-9 place-items-center rounded-sm text-ink transition-colors disabled:text-ink-3/40 focus-visible:outline-2 focus-visible:outline-ink"
                         :aria-label="t('merchant.qr.decreaseQuantity', { index: index + 1 })"
                         :disabled="(item.quantity ?? 0) <= 0"
                         @click="item.quantity = decreaseQuantity(item.quantity)"
@@ -477,7 +477,7 @@ const createError = computed(() =>
                         :for="`merchant-qty-${item.id}`"
                         class="sr-only"
                       >
-                        {{ t('merchant.qr.quantity') }}
+                        {{ t('merchant.qr.quantity', { index: index + 1 }) }}
                       </label>
                       <input
                         :id="`merchant-qty-${item.id}`"
@@ -489,7 +489,7 @@ const createError = computed(() =>
                       />
                       <button
                         type="button"
-                        class="grid size-7 place-items-center rounded-sm text-ink transition-colors focus-visible:outline-2 focus-visible:outline-ink"
+                        class="grid h-11 w-9 place-items-center rounded-sm text-ink transition-colors focus-visible:outline-2 focus-visible:outline-ink"
                         :aria-label="t('merchant.qr.increaseQuantity', { index: index + 1 })"
                         @click="item.quantity = increaseQuantity(item.quantity)"
                       >
@@ -503,10 +503,10 @@ const createError = computed(() =>
                   </div>
 
                   <!-- 소계와 삭제는 아래 줄로 내린다. 입력 세 칸이 한 행을 차지한다. -->
-                  <div class="mt-1.5 flex items-center justify-between gap-2">
+                  <div class="flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      class="text-caption text-ink-3 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                      class="-ml-2 min-h-11 px-2 text-caption text-ink-3 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                       :aria-label="t('merchant.qr.removeItem', { index: index + 1 })"
                       @click="removeItem(item.id)"
                     >
@@ -534,10 +534,11 @@ const createError = computed(() =>
               />
 
               <!-- 합계는 QR에 실제로 실리는 값이라 맨 아래에서 크게 보여준다. -->
-              <div
-                class="flex items-baseline justify-between border-t border-hairline pt-4"
-                role="status"
-              >
+              <!--
+                합계는 보이는 자리에 있고 값이 키 입력마다 바뀐다. `role="status"`를 두면
+                한 글자마다 합계를 다시 읽는다.
+              -->
+              <div class="flex items-baseline justify-between border-t border-hairline pt-4">
                 <span class="text-body">{{ t('merchant.qr.total') }}</span>
                 <span class="text-title font-bold tabular-nums">
                   {{ t('merchant.qr.totalAmount', { amount: formatAmount(totalAmount) }) }}

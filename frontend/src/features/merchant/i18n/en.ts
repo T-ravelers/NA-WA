@@ -34,11 +34,14 @@ export default {
       /**
        * 품목·수량·단가는 서버에 저장되지 않는다. 합계를 손으로 더하지 않게 돕는 입력
        * 보조이며, QR에는 합계 금액만 실린다.
+       *
+       * 세 입력의 라벨은 sr-only다. 줄마다 같은 문구면 스크린 리더에서 어느 줄의 칸인지
+       * 알 수 없어 `{index}`로 구분한다 — Remove·+/-와 같은 방식이다.
        */
-      itemName: 'Item',
+      itemName: 'Name of item {index}',
       itemNamePlaceholder: 'e.g. Iced americano',
-      quantity: 'Qty',
-      unitPrice: 'Price',
+      quantity: 'Quantity of item {index}',
+      unitPrice: 'Price of item {index}',
       unitPricePlaceholder: '0',
       addItem: 'Add item',
       remove: 'Remove',
