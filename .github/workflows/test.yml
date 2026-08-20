@@ -16,8 +16,53 @@ jobs:
       run:
         working-directory: backend
 
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: nawa
+          MYSQL_USER: nawa
+          MYSQL_PASSWORD: ci-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      # 러너 안에서만 유효한 CI 전용 더미 값입니다. 운영 비밀값이 아닙니다.
+      RUN_MYSQL_INTEGRATION_TESTS: "true"
+      RUN_REDIS_INTEGRATION_TESTS: "true"
+      DATABASE_DRIVER: com.mysql.cj.jdbc.Driver
+      DATABASE_URL: "jdbc:mysql://127.0.0.1:3306/nawa?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul"
+      DATABASE_USERNAME: nawa
+      DATABASE_PASSWORD: ci-password
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: "6379"
+      # JVM만 앱 컨테이너(backend/Dockerfile ENV TZ)와 같게 두고, MySQL은 이미지 기본값인
+      # UTC로 남깁니다. 운영과 같은 9시간 불일치를 일부러 재현해, DB 시계에 의존하는
+      # 코드가 CI에서 구조적으로 걸리게 하려는 것입니다. 양쪽을 맞추면 약속 마감·시작
+      # 전환이 밀리던 유형의 버그가 다시 들어와도 CI가 통과합니다.
+      TZ: Asia/Seoul
+
     steps:
       - uses: actions/checkout@v7
+        with:
+          # 아래 마이그레이션 불변성 확인이 base 브랜치와 비교해야 해서 전체 이력이 필요합니다.
+          fetch-depth: 0
 
       - name: JDK 17 설정
         uses: actions/setup-java@v5
@@ -35,8 +80,46 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: 병합된 마이그레이션 파일 불변성 확인
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          modified=$(git diff --diff-filter=M --name-only FETCH_HEAD...HEAD \
+            -- 'src/main/resources/db/migration/V*.sql')
+          if [ -n "$modified" ]; then
+            echo "::error::이미 병합된 마이그레이션은 수정할 수 없습니다. Flyway 체크섬이 어긋나 배포가 실패합니다. 새 버전 파일을 추가하세요."
+            echo "$modified"
+            exit 1
+          fi
+          echo "마이그레이션 파일 불변성 확인 완료"
+
+      - name: MySQL 준비 대기
+        run: |
+          # 서비스 컨테이너의 health check(mysqladmin ping)는 MySQL 엔트리포인트가
+          # 초기화용 임시 서버를 띄운 동안에도 통과합니다. 실제 질의가 되는지까지
+          # 확인해야 첫 테스트가 접속 실패로 깨지지 않습니다.
+          for i in $(seq 1 60); do
+            if docker run --rm --network host mysql:8.4 \
+                 mysql -h 127.0.0.1 -P 3306 -unawa -p"$DATABASE_PASSWORD" \
+                 -e "SELECT 1" nawa >/dev/null 2>&1; then
+              echo "MySQL 준비 완료 (${i}회 시도)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::MySQL이 120초 안에 준비되지 않았습니다"
+          exit 1
+
       - name: 빌드 + 테스트
         run: ./gradlew build --no-daemon
+
+      - name: 테스트 리포트 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: backend/build/reports/tests/test
+          retention-days: 7
 
   frontend-test:
     runs-on: ubuntu-latest

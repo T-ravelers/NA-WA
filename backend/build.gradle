@@ -128,4 +128,61 @@ dependencies {
 
 test {
     useJUnitPlatform()
+
+    // 통합 테스트가 조용히 skip되면 초록불이 거짓말을 한다. 실제로 약속 스케줄러의
+    // 시간대 버그와 Flyway 기대 버전 단정문이 깨진 채로 이 경로를 통해 main까지 갔다.
+    //
+    // 판정 기준은 "실제로 한 건이라도 실행된 클래스"다. 클래스 단위
+    // @EnabledIfEnvironmentVariable로 꺼져도 Gradle은 메서드별 skip 이벤트를 내보내므로,
+    // 이벤트가 왔다는 사실만으로 실행됐다고 볼 수 없다. 반대로 skip 건수만 세면
+    // Assumptions.assumeTrue로 정상적으로 건너뛴 메서드까지 실패로 잡는다.
+    def gateEnabled = ["RUN_MYSQL_INTEGRATION_TESTS", "RUN_REDIS_INTEGRATION_TESTS"]
+            .any { "true".equalsIgnoreCase(System.getenv(it) ?: "") }
+
+    def testSourceRoot = file("src/test/java")
+    def expectedIntegrationClasses = fileTree(testSourceRoot) {
+        include "**/*IntegrationTest.java"
+    }.files.collect { source ->
+        testSourceRoot.toPath().relativize(source.toPath()).toString()
+                .replaceFirst(/\.java$/, "")
+                .replace(File.separator, ".")
+    }.toSet()
+
+    def executedClasses = Collections.synchronizedSet([] as Set)
+    def skippedTests = Collections.synchronizedList([])
+
+    afterTest { descriptor, result ->
+        if (result.resultType.name() == "SKIPPED") {
+            skippedTests << "${descriptor.className}.${descriptor.name}"
+        } else {
+            executedClasses << descriptor.className
+        }
+    }
+
+    doLast {
+        // 메서드 단위 skip(Assumptions.assumeTrue 등)은 실패로 다루지 않고 알리기만 한다.
+        // 예: PlaceMapperIntegrationTest.findPlaceDetail_mapsJsonValues는 시드 데이터가
+        // 없으면 정상적으로 건너뛴다.
+        if (!skippedTests.isEmpty()) {
+            logger.lifecycle("건너뛴 테스트 ${skippedTests.size()}건:")
+            skippedTests.sort().each { logger.lifecycle("  - ${it}") }
+        }
+
+        if (!gateEnabled) {
+            return
+        }
+        // --tests로 범위를 좁혀 돌린 경우에는 대조하지 않는다.
+        if (!filter.commandLineIncludePatterns.isEmpty()
+                || !filter.includePatterns.isEmpty()) {
+            return
+        }
+
+        def missing = (expectedIntegrationClasses - executedClasses).sort()
+        if (!missing.isEmpty()) {
+            throw new GradleException(
+                    "통합 테스트 게이트가 켜져 있는데 아래 ${missing.size()}개 클래스가 실행되지 "
+                            + "않았습니다. DB·Redis 접속 환경 변수를 확인하세요:\n  "
+                            + missing.join("\n  "))
+        }
+    }
 }
