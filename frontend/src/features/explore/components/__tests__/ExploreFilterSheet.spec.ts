@@ -164,7 +164,7 @@ describe('ExploreFilterSheet date presets', () => {
     expect(wrapper.html()).not.toContain('bg-surface-2')
   })
 
-  it('keeps a lone start date visible as a single full-width pill', async () => {
+  it('keeps a lone start date as a single dot, not a band', async () => {
     const wrapper = mountDateSheet()
 
     await pressButton(wrapper, '21')
@@ -177,6 +177,29 @@ describe('ExploreFilterSheet date presets', () => {
     expect(day21?.classes()).toContain('rounded-pill')
     expect(day21?.classes()).not.toContain('rounded-l-pill')
     expect(day22?.classes()).not.toContain('bg-paper-fill')
+
+    // 하루는 칸을 채우지 않는다. 칸을 채우면 하루가 기간처럼 읽힌다.
+    expect(day21?.classes()).toContain('mx-auto')
+    expect(day21?.classes()).toContain('w-9')
+    expect(day21?.classes()).not.toContain('w-full')
+  })
+
+  it('keeps a closed single-day range as the same dot', async () => {
+    const wrapper = mountDateSheet()
+
+    // 같은 날을 두 번 탭하면 시작·종료가 같은 하루짜리 기간이 된다. 시작일만
+    // 고른 상태와 같은 하루이므로 같은 모양이어야 한다.
+    await pressButton(wrapper, '25')
+    await pressButton(wrapper, '25')
+
+    const day25 = wrapper.findAll('button').find((button) => button.text() === '25')
+    expect(day25?.classes()).toContain('bg-paper-fill')
+    expect(day25?.classes()).toContain('rounded-pill')
+    expect(day25?.classes()).toContain('mx-auto')
+    expect(day25?.classes()).toContain('w-9')
+    expect(day25?.classes()).not.toContain('w-full')
+    expect(day25?.classes()).not.toContain('rounded-l-pill')
+    expect(day25?.classes()).not.toContain('rounded-r-pill')
   })
 
   it('keeps adjacent-month cells out of the band even when their date is in range', async () => {

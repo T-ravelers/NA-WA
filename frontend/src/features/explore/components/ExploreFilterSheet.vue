@@ -289,11 +289,6 @@ function setCalendarDate(value: string): void {
   draft.endDate = value
 }
 
-/** 아직 시작일만 고른 상태. 띠가 아니라 칸 폭 알약 하나로 보여야 한다. */
-function isLoneDate(value: string): boolean {
-  return draft.endDate === undefined && value === draft.startDate
-}
-
 function isDateInRange(value: string): boolean {
   return (
     draft.startDate !== undefined &&
@@ -304,13 +299,36 @@ function isDateInRange(value: string): boolean {
 }
 
 /**
+ * 하루만 고른 상태. 시작일만 고른 경우와 시작·종료가 같은 날인 경우를 함께
+ * 본다. 같은 날을 두 번 탭하면 후자가 되는데, 둘을 다르게 그리면 같은 하루가
+ * 탭 횟수에 따라 점과 띠로 갈린다.
+ */
+function isSingleDaySelection(): boolean {
+  return (
+    draft.startDate !== undefined &&
+    (draft.endDate === undefined || draft.endDate === draft.startDate)
+  )
+}
+
+/**
+ * 셀이 하루짜리 선택 점을 그리는지. 기간과 달리 칸을 채우지 않고 가운데
+ * 알약으로 남는다 — 칸을 채우면 하루가 기간처럼 읽힌다.
+ */
+function showsDot(index: number): boolean {
+  const cell = calendarDays.value[index]
+  return (
+    cell !== undefined && cell.inMonth && isSingleDaySelection() && cell.date === draft.startDate
+  )
+}
+
+/**
  * 셀이 기간 띠를 그리는지. 이웃 달 셀은 날짜가 기간에 들어도 띠를 그리지
  * 않는다 — 흐린 글자(text-ink-3/40) 위에 흰 배경이 얹혀, 선택할 수 없는
- * 날짜가 오히려 도드라진다.
+ * 날짜가 오히려 도드라진다. 하루짜리 선택도 띠가 아니라 점으로 그린다.
  */
 function showsBand(index: number): boolean {
   const cell = calendarDays.value[index]
-  return cell !== undefined && cell.inMonth && isDateInRange(cell.date)
+  return cell !== undefined && cell.inMonth && !isSingleDaySelection() && isDateInRange(cell.date)
 }
 
 /**
@@ -544,22 +562,25 @@ function apply(): void {
               v-for="(cell, index) in calendarDays"
               :key="cell.date"
               type="button"
-              class="flex h-9 w-full items-center justify-center text-caption"
+              class="flex h-9 items-center justify-center text-caption"
               :class="[
+                // 폭은 둘 중 하나만 붙는다. w-full과 w-9를 함께 두면 어느 쪽이
+                // 이기는지가 CSS 정의 순서에 좌우된다.
+                showsDot(index) ? 'mx-auto w-9' : 'w-full',
                 (!cell.inMonth || !isDateAllowed(cell.date)) && 'text-ink-3/40',
                 cell.inMonth &&
                   isDateAllowed(cell.date) &&
-                  !isDateInRange(cell.date) &&
-                  !isLoneDate(cell.date) &&
+                  !showsBand(index) &&
+                  !showsDot(index) &&
                   'rounded-pill text-ink-2',
                 // 기간은 칸 전체를 채워 하나의 띠로 이어진다. 칸보다 좁은 칩을
                 // 가운데 두면 흰색이어도 날짜마다 끊겨 보여 기간으로 읽히지
                 // 않는다. 띠가 시작·끝나는 자리(기간 양 끝, 줄 넘김, 이웃 달
                 // 경계)만 둥글게 깎고 사이는 각지게 둔다.
                 showsBand(index) && 'bg-paper-fill text-on-paper',
-                // 시작일만 고른 상태도 배경이 있어야 화면에 보인다. 모서리만
-                // 깎으면 아무것도 그려지지 않는다.
-                cell.inMonth && isLoneDate(cell.date) && 'rounded-pill bg-paper-fill text-on-paper',
+                // 하루짜리 선택은 칸을 채우지 않고 점으로 남는다. 배경이 있어야
+                // 화면에 보인다 — 모서리만 깎으면 아무것도 그려지지 않는다.
+                showsDot(index) && 'rounded-pill bg-paper-fill text-on-paper',
                 isBandLeftEdge(index) && 'rounded-l-pill',
                 isBandRightEdge(index) && 'rounded-r-pill',
               ]"
