@@ -12,6 +12,7 @@ import AppCard from '@/shared/ui/AppCard.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import { showToast } from '@/shared/ui/toast'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
@@ -88,15 +89,14 @@ const isJoinAvailable = computed(() => {
   const deadline = parseServerDateTime(appointment.value.joinDeadline)
   return deadline !== null && Date.now() < deadline.getTime()
 })
-const isJoinButtonEnabled = computed(
-  () => isJoinAvailable.value && !hasJoined.value && !participationCheckFailed.value,
-)
-// 버튼 title 툴팁은 비활성 버튼에 pointer-events-none이 걸려 뜨지 않고,
-// 390px 모바일 PWA라 애초에 hover도 없다. 그래서 비활성 이유는 버튼 아래에
-// 상시 텍스트로 보여준다. 모집 종료(CLOSED/COMPLETED/CANCELLED)는 사용자
-// 잘못이 아닌 정상 상태라 text-danger(빨강)로 알릴 일이 아니어서, 세 경우
-// 모두 중립색(text-ink-3)으로 통일한다.
-const joinDisabledReason = computed(() => {
+// 참여 버튼은 어떤 경우에도 눌린다. 비활성 버튼은 왜 안 되는지 말해 줄 방법이
+// 마땅치 않아서다(모바일이라 hover도 없다). 대신 막히는 이유는 누르기 전부터
+// 버튼 위에 한 줄로 떠 있는다. 눌러 봐야 아는 화면은 제일 큰 CTA를 "눌리기는
+// 하는데 아무 일도 없는 버튼"으로 만든다.
+//
+// 상태에서 그대로 끌어내므로 따로 지워 줄 자리가 없다. 누를 때 ref에 담아 두면
+// 이유가 해소된 뒤에도 남는다 — 나간 사람에게 "이미 참여했다"가 남던 식이다.
+const joinBlockedReason = computed<string | undefined>(() => {
   if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
   if (hasJoined.value) return t('appointment.detail.alreadyJoined')
   if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
@@ -118,13 +118,20 @@ const isJoinDeadlinePassed = computed(() => {
   const deadline = parseServerDateTime(appointment.value?.joinDeadline ?? null)
   return deadline === null || Date.now() >= deadline.getTime()
 })
+// 출석 확정은 활동이 끝난 뒤에 연다. 백엔드는 IN_PROGRESS이기만 하면 받아주지만
+// (활동 시작 시각에 스케줄러가 바꾼다), 진행 중에 미리 확정하면 늦게 온 사람이
+// 노쇼로 굳어 보증금을 잃는다.
+const isActivityOver = computed(() => {
+  const endAt = parseServerDateTime(appointment.value?.activityEndAt ?? null)
+  return endAt !== null && Date.now() >= endAt.getTime()
+})
 
-// 세 항목은 서로 다른 시점에만 열린다. joinDeadline은 활동 시작보다 늦을 수
-// 없으므로(생성 시 검증) IN_PROGRESS·COMPLETED는 이미 마감이 지난 상태고,
-// 그때는 나가기가 서버에서 막힌다(APPOINTMENT-007). 조건에 맞는 항목만 넣으면
-// 시트가 매번 달라지므로, 볼 자격이 있는 항목은 두고 이유만 붙인다.
+// 세 항목은 언제나 시트에 있고, 조건을 만족하지 않으면 이유와 함께 비활성이다.
+// 조건에 맞는 것만 넣으면 시트가 열 때마다 다른 모양이 되고 나머지 기능이
+// 있다는 것조차 알 수 없다.
 const canOpenAttendance = computed(
-  () => appointment.value?.appointmentStatus === 'IN_PROGRESS' && isHost.value,
+  () =>
+    isHost.value && isActivityOver.value && appointment.value?.appointmentStatus === 'IN_PROGRESS',
 )
 const canOpenReviews = computed(
   () => appointment.value?.appointmentStatus === 'COMPLETED' && isAttendedMember.value,
@@ -138,27 +145,45 @@ const attendanceDisabledReason = computed(() => {
   const status = appointment.value?.appointmentStatus
   if (status === 'CANCELLED') return t('appointment.detail.menu.attendanceCancelled')
   if (status === 'COMPLETED') return t('appointment.detail.menu.attendanceDone')
-  return t('appointment.detail.menu.attendanceNotStarted')
+  // 활동이 이미 끝났는데도 열리지 않았다면 남은 조건은 방장 여부뿐이다. 그것을
+  // 확인하지 못한 채 "활동이 끝나면 열린다"고 하면 틀린 안내가 된다.
+  if (participationCheckFailed.value && isActivityOver.value) {
+    return t('appointment.detail.participationCheckFailed')
+  }
+  return t('appointment.detail.menu.attendanceNotEnded')
 })
 const reviewsDisabledReason = computed(() => {
   if (canOpenReviews.value) return undefined
   if (appointment.value?.appointmentStatus !== 'COMPLETED') {
     return t('appointment.detail.menu.reviewsNotCompleted')
   }
+  // 여기서부터는 participation 응답에 기대는 판정이다. 조회가 실패한 것은
+  // 참여 여부를 모르는 것이지 아닌 것이 아니다.
+  if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
   return t('appointment.detail.menu.reviewsNotAttended')
 })
-const leaveDisabledReason = computed(() =>
-  canLeave.value ? undefined : t('appointment.detail.menu.leaveDeadlinePassed'),
-)
+const leaveDisabledReason = computed(() => {
+  if (canLeave.value) return undefined
+  // isActiveMember는 조회 실패와 "회원이 아님"을 구분하지 못한다. 실패를 먼저
+  // 가르지 않으면 못 읽었을 뿐인데 회원이 아니라고 단정한다.
+  if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
+  if (!isActiveMember.value) return t('appointment.detail.menu.leaveNotMember')
+  return t('appointment.detail.menu.leaveDeadlinePassed')
+})
 
-// 나가기는 방장에게 보여줄 이유가 없다. 방장은 어떤 상태에서도 자기 참여를
-// 취소할 수 없어 비활성 항목이 영영 활성화되지 않는다.
-const showLeaveItem = computed(() => isActiveMember.value && !isHost.value)
+// 영영 켜질 수 없는 항목은 아예 넣지 않는다. 출석 확정은 방장만 할 수 있고
+// (APPOINTMENT-004), 방장은 어떤 상태에서도 자기 참여를 취소할 수 없다
+// (APPOINTMENT-007). 비활성으로 둬 봐야 이유만 차지한다.
+//
+// 단 이 판단은 방장 여부를 알 때만 쓸 수 있다. participation 조회가 실패하면
+// isHost가 false로 남아 정작 방장에게서 출석 확정이 통째로 사라진다. 모를 때는
+// 감추지 말고 이유로 "확인하지 못했다"를 적는다.
+const showAttendanceItem = computed(() => isHost.value || participationCheckFailed.value)
+const showLeaveItem = computed(() => !isHost.value)
+
 // 시트는 상세를 다 받은 뒤에만 렌더되므로(약속 이름과 보증금이 필요하다) 버튼도
 // 같은 조건을 쓴다. 버튼만 헤더에서 먼저 뜨면 눌러도 아무것도 열리지 않는다.
-const canOpenMenu = computed(
-  () => appointment.value !== undefined && (isHost.value || isActiveMember.value),
-)
+const canOpenMenu = computed(() => appointment.value !== undefined)
 
 function formatDateTime(value: AppointmentDateTimeValue): string {
   if (!value) return t('appointment.detail.notProvided')
@@ -179,17 +204,31 @@ function statusLabel(status: AppointmentStatus): string {
   return t(`appointment.status.${status}`)
 }
 
+/**
+ * 뒤로 가면 왔던 길을 되감는다. 출석·후기 화면과 같은 규칙이다.
+ *
+ * 히스토리가 없을 때(딥링크·PWA 재진입)만 목적지를 정해 보낸다. 이 약속이 속한
+ * 약속 목록이고, 목록은 `itemId`·`itemType` 쿼리로 대상 Event·Place를 좁히므로
+ * 상세가 가진 값을 그대로 넘긴다. 상세를 아직 못 받았으면 좁히지 않은 전체 목록이다.
+ *
+ * 한때는 히스토리와 무관하게 목록으로 push했다. 생성 직후 뒤로 가기가 방금 제출한
+ * 폼으로 돌아가는 것을 막으려던 것인데, 그 대가로 여정 타임라인에서 들어온 사람이
+ * 타임라인으로 못 돌아갔다. 생성 쪽을 replace로 바꿔 폼을 히스토리에서 뺐으니
+ * 목적지를 고정할 이유가 없어졌다.
+ */
 function goBack(): void {
-  const current = appointment.value
-  if (current?.itemType === 'EVENT' || current?.itemType === 'PLACE') {
-    void router.push({
-      name: 'explore',
-      query: { tab: current.itemType === 'PLACE' ? 'places' : 'events' },
-    })
+  if (window.history.length > 1) {
+    void router.back()
     return
   }
 
-  void router.push({ name: 'explore' })
+  const current = appointment.value
+  const scoped = current?.itemType === 'EVENT' || current?.itemType === 'PLACE'
+
+  void router.push({
+    name: 'appointment-list',
+    query: scoped ? { itemId: String(current.itemId), itemType: current.itemType } : {},
+  })
 }
 
 function openMemberProfile(member: { memberId: number }): void {
@@ -271,8 +310,17 @@ const joinMutation = useMutation({
 const leaveMutation = useMutation({
   mutationFn: () => cancelAppointmentParticipation(appointmentId.value as number),
   onSuccess: async () => {
+    // 서버가 같은 트랜잭션에서 보증금을 지갑으로 돌려준다(HELD → REFUNDED).
+    // 확인 모달에서 환급을 예고했으니 실제로 됐다는 것도 알려 준다. 모달만 조용히
+    // 닫히면 나간 것인지 확신할 수 없다.
+    const refunded = appointment.value?.depositAmount
     leaveConfirmOpen.value = false
     await invalidateParticipationScopes()
+    showToast(
+      refunded === undefined
+        ? t('appointment.leave.done')
+        : t('appointment.leave.doneRefunded', { amount: formatDeposit(refunded) }),
+    )
   },
 })
 
@@ -289,7 +337,9 @@ const joinErrorMessage = computed(() =>
 )
 
 function openDepositSheet(): void {
-  if (!isJoinButtonEnabled.value) return
+  // 이유는 이미 버튼 위에 떠 있다. 여기서는 시트를 열지 않는 것으로 끝낸다. 이미
+  // 참여한 사람은 서버도 APPOINTMENT-003으로 막으므로 미리 알려 주는 셈이다.
+  if (joinBlockedReason.value !== undefined) return
 
   joinMutation.reset()
   depositSheetOpen.value = true
@@ -444,6 +494,7 @@ function confirmJoin(): void {
         <AppointmentMemberList
           v-else
           :members="members"
+          :current-appointment-member-id="participation?.appointmentMemberId ?? null"
           @select="openMemberProfile"
         />
       </section>
@@ -452,14 +503,14 @@ function confirmJoin(): void {
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
         <p
-          v-if="joinDisabledReason !== undefined"
+          v-if="joinBlockedReason !== undefined"
+          role="status"
           class="mb-2 text-center text-body-sm text-ink-3"
         >
-          {{ joinDisabledReason }}
+          {{ joinBlockedReason }}
         </p>
         <AppButton
           block
-          :disabled="!isJoinButtonEnabled"
           @click="openDepositSheet"
         >
           {{ t('appointment.detail.join') }}
@@ -479,9 +530,8 @@ function confirmJoin(): void {
       <AppointmentMenuSheet
         v-if="menuOpen"
         :appointment-name="appointment.appointmentName"
-        :show-attendance="isHost"
+        :show-attendance="showAttendanceItem"
         :attendance-disabled-reason="attendanceDisabledReason"
-        :show-reviews="isActiveMember"
         :reviews-disabled-reason="reviewsDisabledReason"
         :show-leave="showLeaveItem"
         :leave-disabled-reason="leaveDisabledReason"

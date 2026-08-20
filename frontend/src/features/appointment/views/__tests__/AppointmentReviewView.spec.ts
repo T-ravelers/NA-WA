@@ -1,15 +1,16 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { computed, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
+import { NormalizedApiError } from '@/shared/api/apiError'
 import { i18n } from '@/app/i18n'
 
 const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
 const submitAppointmentReview = vi.fn()
-const useAppointmentMemberProfileMock = vi.hoisted(() => vi.fn())
+const fetchMyAppointmentReviewStatus = vi.fn()
+const fetchMyAppointmentParticipation = vi.fn()
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
@@ -17,10 +18,10 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   fetchAppointmentMembers: (appointmentId: number) => fetchAppointmentMembers(appointmentId),
   submitAppointmentReview: (appointmentId: number, request: unknown) =>
     submitAppointmentReview(appointmentId, request),
-}))
-
-vi.mock('../../model/memberIntegration', () => ({
-  useAppointmentMemberProfile: () => useAppointmentMemberProfileMock(),
+  fetchMyAppointmentReviewStatus: (appointmentId: number) =>
+    fetchMyAppointmentReviewStatus(appointmentId),
+  fetchMyAppointmentParticipation: (appointmentId: number) =>
+    fetchMyAppointmentParticipation(appointmentId),
 }))
 
 const AppointmentReviewView = (await import('../AppointmentReviewView.vue')).default
@@ -67,13 +68,14 @@ const members = [
   },
 ]
 
-const profileQuery = {
-  data: computed(() => ({ memberId: profileMemberId.value })),
-  isPending: ref(false),
-  isError: ref(false),
-  refetch: vi.fn().mockResolvedValue(undefined),
+/** 방장(Mina Park, appointmentMemberId 1)으로 로그인한 상태. */
+const attendedParticipation = {
+  joined: true,
+  appointmentMemberId: 1,
+  membershipStatus: 'ACTIVE' as const,
+  attendanceStatus: 'ATTENDED' as const,
+  host: true,
 }
-const profileMemberId = ref(11)
 
 async function mountView() {
   const router = createRouter({
@@ -109,12 +111,13 @@ describe('AppointmentReviewView', () => {
     fetchAppointment.mockReset()
     fetchAppointmentMembers.mockReset()
     submitAppointmentReview.mockReset()
+    fetchMyAppointmentReviewStatus.mockReset()
+    fetchMyAppointmentReviewStatus.mockResolvedValue({ reviewedAppointmentMemberIds: [] })
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue(members)
     submitAppointmentReview.mockRejectedValue(new Error('save failed'))
-    profileMemberId.value = 11
-    useAppointmentMemberProfileMock.mockReset()
-    useAppointmentMemberProfileMock.mockReturnValue(profileQuery)
+    fetchMyAppointmentParticipation.mockReset()
+    fetchMyAppointmentParticipation.mockResolvedValue(attendedParticipation)
   })
 
   it('shows a save error for the member whose review failed', async () => {
@@ -130,24 +133,79 @@ describe('AppointmentReviewView', () => {
       ?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('Review could not be saved')
+    expect(wrapper.get('[role="alert"]').text()).toContain('Something went wrong')
     expect(wrapper.text()).toContain('Alex Kim')
   })
 
+  // 서버는 자격이 없는 요청자에게 후기 목록 조회를 REVIEW-001로 막는다
+  // (ReviewService.getMyReviewStatus). 그 거절을 "불러오지 못했습니다"로 보여 주면
+  // 재시도해도 달라질 게 없는 상태에 재시도를 권하게 되므로, 두 경우 모두 전용
+  // 안내가 나와야 한다.
   it('blocks reviews for members who are not active participants', async () => {
-    profileMemberId.value = 99
+    fetchMyAppointmentParticipation.mockResolvedValue({
+      joined: false,
+      appointmentMemberId: null,
+      membershipStatus: null,
+      attendanceStatus: null,
+      host: false,
+    })
+    fetchMyAppointmentReviewStatus.mockRejectedValue(
+      new NormalizedApiError('REVIEW-001', 403, 'not allowed'),
+    )
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Participant access required')
     expect(wrapper.text()).not.toContain('Save review')
+    expect(wrapper.text()).not.toContain('Reviews could not be loaded')
+    // 자격이 없으면 실패할 조회를 보내지 않는다.
+    expect(fetchMyAppointmentReviewStatus).not.toHaveBeenCalled()
   })
 
   it('blocks reviews until the appointment is completed', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'RECRUITING' })
+    fetchMyAppointmentReviewStatus.mockRejectedValue(
+      new NormalizedApiError('REVIEW-001', 403, 'not allowed'),
+    )
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Reviews are not available yet')
     expect(wrapper.text()).not.toContain('Save review')
+    expect(wrapper.text()).not.toContain('Reviews could not be loaded')
+    expect(fetchMyAppointmentReviewStatus).not.toHaveBeenCalled()
+  })
+
+  it('restores what was already written from the server', async () => {
+    // 이게 없으면 재진입할 때마다 전원이 미작성으로 보이고, 다시 내면 REVIEW-002가 난다.
+    fetchMyAppointmentReviewStatus.mockResolvedValue({ reviewedAppointmentMemberIds: [2] })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Completed')
+    expect(wrapper.text()).not.toContain('Pending')
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Finish reviews')
+        ?.attributes('disabled'),
+    ).toBeUndefined()
+  })
+
+  it('tells the user a duplicate review apart from a generic failure', async () => {
+    submitAppointmentReview.mockRejectedValue(
+      new NormalizedApiError('REVIEW-002', 409, 'duplicate'),
+    )
+    const { wrapper } = await mountView()
+    const scoreButtons = wrapper.findAll('button').filter((button) => button.text() === '★')
+
+    await scoreButtons[4]?.trigger('click')
+    await scoreButtons[9]?.trigger('click')
+    await scoreButtons[14]?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Save review')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('already reviewed this member')
   })
 
   it('does not offer reviews for members marked as no-show', async () => {

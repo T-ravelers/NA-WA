@@ -277,6 +277,7 @@ describe('AppointmentCreateView', () => {
     })
     const { wrapper, router } = await mountView()
     await completeJourneySelection(wrapper)
+    const replace = vi.spyOn(router, 'replace')
 
     await fillAndConfirm(wrapper)
     await flushPromises()
@@ -284,6 +285,10 @@ describe('AppointmentCreateView', () => {
     expect(createAppointment).toHaveBeenCalledOnce()
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('42')
+    // 상세의 뒤로 가기가 왔던 길을 되감으므로 폼은 히스토리에 남으면 안 된다.
+    expect(replace).toHaveBeenCalledOnce()
+
+    replace.mockRestore()
   })
 
   it('shows a generic error message and stays on the form when creation fails', async () => {

@@ -4,6 +4,7 @@ import {
   fetchAppointment,
   fetchAppointmentMembers,
   fetchMyAppointmentParticipation,
+  fetchMyAppointmentReviewStatus,
 } from '../api/appointmentApi'
 import { appointmentKeys } from './appointmentKeys'
 
@@ -33,5 +34,12 @@ export function appointmentParticipationQueryOptions(appointmentId: Readonly<Ref
   return {
     queryKey: computed(() => appointmentKeys.participation(appointmentId.value)),
     queryFn: () => fetchMyAppointmentParticipation(requireAppointmentId(appointmentId.value)),
+  }
+}
+
+export function appointmentReviewStatusQueryOptions(appointmentId: Readonly<Ref<number | null>>) {
+  return {
+    queryKey: computed(() => appointmentKeys.reviewStatus(appointmentId.value)),
+    queryFn: () => fetchMyAppointmentReviewStatus(requireAppointmentId(appointmentId.value)),
   }
 }

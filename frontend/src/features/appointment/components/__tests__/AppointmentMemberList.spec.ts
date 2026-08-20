@@ -32,6 +32,41 @@ describe('AppointmentMemberList', () => {
     expect(wrapper.text()).toContain('Visit')
   })
 
+  it('marks only the logged-in member with a You badge', () => {
+    const wrapper = mount(AppointmentMemberList, {
+      props: {
+        members: [
+          {
+            appointmentMemberId: 1,
+            memberId: 11,
+            displayName: 'Mina Park',
+            profileImageUrl: null,
+            preferredLanguage: 'en',
+            membershipStatus: 'ACTIVE',
+            attendanceStatus: 'PENDING',
+            isHost: true,
+          },
+          {
+            appointmentMemberId: 2,
+            memberId: 12,
+            displayName: 'Alex Kim',
+            profileImageUrl: null,
+            preferredLanguage: 'ja',
+            membershipStatus: 'ACTIVE',
+            attendanceStatus: 'PENDING',
+            isHost: false,
+          },
+        ],
+        currentAppointmentMemberId: 2,
+      },
+      global: { plugins: [i18n] },
+    })
+
+    const cards = wrapper.findAll('li')
+    expect(cards[0]?.text()).not.toContain('You')
+    expect(cards[1]?.text()).toContain('You')
+  })
+
   it('emits the selected member when a member card is pressed', async () => {
     const member = {
       appointmentMemberId: 1,
