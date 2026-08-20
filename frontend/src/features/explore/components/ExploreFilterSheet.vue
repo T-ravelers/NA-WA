@@ -1,15 +1,10 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronUp,
-  IconChevronDown,
-  IconCheck,
-} from '@tabler/icons-vue'
+import { IconChevronUp, IconChevronDown, IconCheck } from '@tabler/icons-vue'
 
-import { parseCalendarDate, serializeCalendarDate } from '@/shared/lib/datetime'
+import { serializeCalendarDate } from '@/shared/lib/datetime'
+import CalendarGrid from '@/shared/ui/CalendarGrid.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 
@@ -35,7 +30,7 @@ const emit = defineEmits<{
 
 const REGION2_OTHER = '__OTHER_REGION2__'
 
-const { locale, t } = useI18n()
+const { t } = useI18n()
 
 const SHEET_TITLES: Record<ExploreSheetKind, string> = {
   date: 'explore.sheets.date',
@@ -162,7 +157,6 @@ const DATE_PRESETS = [
 const draft = reactive<EventSearchFilters>(cloneFilters(props.filters))
 const selectedRegion = ref(SEOUL_REGION1)
 const expandedCategories = ref<string[]>(['explore.categories.beauty'])
-const monthCursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
 watch(
   () => props.filters,
@@ -188,32 +182,6 @@ const currentRegion = computed(
   () => REGION_OPTIONS.find((region) => region.value === selectedRegion.value) ?? REGION_OPTIONS[0],
 )
 const selectedAreas = computed(() => new Set(draft.region2 ?? []))
-const monthLabel = computed(() =>
-  new Intl.DateTimeFormat(locale.value, { month: 'long', year: 'numeric' }).format(
-    monthCursor.value,
-  ),
-)
-
-const calendarDays = computed(() => {
-  const year = monthCursor.value.getFullYear()
-  const month = monthCursor.value.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const startOffset = firstDay.getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const previousMonthDays = new Date(year, month, 0).getDate()
-  const cells: Array<{ date: string; day: number; inMonth: boolean }> = []
-
-  for (let index = 0; index < 42; index += 1) {
-    const rawDay = index - startOffset + 1
-    const inMonth = rawDay >= 1 && rawDay <= daysInMonth
-    const date = new Date(year, month, rawDay)
-    const day = inMonth ? rawDay : rawDay < 1 ? previousMonthDays + rawDay : rawDay - daysInMonth
-    cells.push({ date: serializeCalendarDate(date), day, inMonth })
-  }
-
-  return cells
-})
-
 function cloneFilters(filters: EventSearchFilters): EventSearchFilters {
   return {
     ...filters,
@@ -258,10 +226,6 @@ function setDatePreset(value: string): void {
   draft.datePreset = value
   draft.startDate = range?.min
   draft.endDate = range?.max
-  const firstDay = parseCalendarDate(range?.min)
-  if (firstDay) {
-    monthCursor.value = new Date(firstDay.getFullYear(), firstDay.getMonth(), 1)
-  }
 }
 
 function setCalendarDate(value: string): void {
@@ -287,27 +251,6 @@ function setCalendarDate(value: string): void {
   }
 
   draft.endDate = value
-}
-
-function isDateSelected(value: string): boolean {
-  return value === draft.startDate || value === draft.endDate
-}
-
-function isDateInRange(value: string): boolean {
-  return (
-    draft.startDate !== undefined &&
-    draft.endDate !== undefined &&
-    value >= draft.startDate &&
-    value <= draft.endDate
-  )
-}
-
-function shiftMonth(offset: number): void {
-  monthCursor.value = new Date(
-    monthCursor.value.getFullYear(),
-    monthCursor.value.getMonth() + offset,
-    1,
-  )
 }
 
 function selectRegion(value: string): void {
@@ -482,65 +425,14 @@ function apply(): void {
 
           <div class="my-5 border-t border-hairline" />
 
-          <div class="flex items-center justify-between">
-            <button
-              type="button"
-              class="flex size-8 items-center justify-center text-ink-2"
-              :aria-label="t('explore.calendar.previousMonth')"
-              @click="shiftMonth(-1)"
-            >
-              <IconChevronLeft
-                :size="18"
-                aria-hidden="true"
-              />
-            </button>
-            <strong class="text-title-sm text-ink">{{ monthLabel }}</strong>
-            <button
-              type="button"
-              class="flex size-8 items-center justify-center text-ink-2"
-              :aria-label="t('explore.calendar.nextMonth')"
-              @click="shiftMonth(1)"
-            >
-              <IconChevronRight
-                :size="18"
-                aria-hidden="true"
-              />
-            </button>
-          </div>
+          <CalendarGrid
+            :range-start="draft.startDate ?? null"
+            :range-end="draft.endDate ?? null"
+            :is-date-allowed="isDateAllowed"
+            :label-dates="false"
+            @select="setCalendarDate"
+          />
 
-          <div class="mt-3 grid grid-cols-7 text-center text-micro text-ink-3">
-            <span
-              v-for="day in ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']"
-              :key="day"
-              >{{ t(`explore.calendar.weekdays.${day}`) }}</span
-            >
-          </div>
-          <div class="mt-2 grid grid-cols-7 gap-y-1 text-center">
-            <button
-              v-for="cell in calendarDays"
-              :key="cell.date"
-              type="button"
-              class="mx-auto flex size-9 items-center justify-center rounded-pill text-caption"
-              :class="[
-                (!cell.inMonth || !isDateAllowed(cell.date)) && 'text-ink-3/40',
-                cell.inMonth &&
-                  isDateAllowed(cell.date) &&
-                  !isDateSelected(cell.date) &&
-                  !isDateInRange(cell.date) &&
-                  'text-ink-2',
-                // 선택 칩과 범위 배경이 같은 셀에 겹치면 CSS 순서에 따라 칩이
-                // 묻힌다 — 양 끝 날짜는 범위 배경을 받지 않게 상호 배타로 가른다.
-                // 범위도 칩과 같은 흰 배경을 써서 선택 구간 전체가 밝게 보인다.
-                isDateSelected(cell.date)
-                  ? 'bg-paper-fill text-on-paper'
-                  : isDateInRange(cell.date) && 'rounded-none bg-paper-fill text-on-paper',
-              ]"
-              :disabled="!cell.inMonth || !isDateAllowed(cell.date)"
-              @click="cell.inMonth && setCalendarDate(cell.date)"
-            >
-              {{ cell.day }}
-            </button>
-          </div>
           <p class="mt-3 text-caption text-ink-3">
             {{ draft.startDate ?? t('explore.calendar.startDate')
             }}<span v-if="draft.endDate"> – {{ draft.endDate }}</span>
