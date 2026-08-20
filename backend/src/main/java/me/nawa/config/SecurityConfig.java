@@ -84,7 +84,17 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf
                     .csrfTokenRepository(csrfTokenRepository)
-                    .ignoringRequestMatchers(antMatcher("/api/v1/stripe/webhook")))
+                    .ignoringRequestMatchers(
+                            antMatcher("/api/v1/stripe/webhook"),
+                            // 기계가 부르는 경로다. 브라우저 세션이 없어
+                            // CSRF 토큰을 받아 올 방법도, 받을 이유도 없다.
+                            antMatcher("/api/v1/auth/service-token"),
+                            // 경로를 하나씩 적는다. /api/v1/internal/** 로 열면
+                            // 앞으로 생길 internal 엔드포인트가 면제를 물려받는다.
+                            antMatcher("/api/v1/internal/ingest/events"),
+                            antMatcher("/api/v1/internal/ingest/places"),
+                            antMatcher("/api/v1/internal/ingest/event-translations"),
+                            antMatcher("/api/v1/internal/ingest/place-translations")))
                 .cors(cors -> cors
                         .configurationSource(corsConfigurationSource))
                 .formLogin(formLogin -> formLogin.disable())
@@ -115,7 +125,10 @@ public class SecurityConfig {
                                 antMatcher("/v2/api-docs"),
                                 antMatcher("/v2/api-docs/**"),
                                 antMatcher("/webjars/**"),
-                                antMatcher("/api/v1/stripe/webhook")
+                                antMatcher("/api/v1/stripe/webhook"),
+                                // 공유 비밀을 본문으로 확인하고 토큰을 내준다.
+                                // 인증 전에 닿아야 하므로 여기서 열어 둔다.
+                                antMatcher("/api/v1/auth/service-token")
                         ).permitAll()
                         .requestMatchers(antMatcher("/api/**")).authenticated()
                         .anyRequest().permitAll())

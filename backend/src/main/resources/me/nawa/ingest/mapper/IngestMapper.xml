@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  크롤러 파이프라인 적재.
+
+  보낸 목록을 UNION ALL 파생 테이블로 만들어 한 문장으로 처리합니다.
+  건마다 문장을 날리면 수백 번 왕복하고, 임시 테이블을 쓰면 커넥션 풀에서
+  세션이 재사용될 때 남은 임시 테이블이 다음 요청을 방해합니다.
+
+  적재 키는 pipeline_id 입니다. 파이프라인 쪽 숫자 PK 는 쓰지 않습니다.
+
+  UPDATE 에서 null 을 어떻게 다루는가:
+
+    파이프라인이 소유하는 값(제목·설명·주소·좌표 등)은 보낸 값을 그대로 씁니다.
+    null 이 오면 기존값을 지웁니다. 파이프라인이 "이제 이 값이 없다"고 말한
+    것이므로 그대로 반영하는 것이 맞습니다.
+
+    기간 세 값(start_date · end_date · is_permanent)은 한 덩어리 사실이라
+    셋 다 직접 대입합니다. 일부만 기존값을 유지하면 셋이 찢어져
+    chk_event_period 를 위반합니다. 그래서 is_permanent 는 서비스에서
+    필수값으로 받습니다.
+
+    나머지 플래그(has_photo_zone · is_experience · is_active)와 분류 값
+    (event_kind · status)만 COALESCE 로 기존값을 유지합니다. 소스가 판단하지
+    못한 항목이라 null 이 "없음"이 아니라 "모름"이기 때문입니다.
+
+  INSERT 는 다릅니다. 새 행에는 유지할 기존값이 없으므로 NOT NULL 컬럼에
+  기본값을 채웁니다.
+
+  앱이 소유하는 값은 갱신하지 않습니다:
+    view_count, favorite_count, created_at,
+    explore_items 의 appointment_count / participant_count / popularity_score
+-->
+<mapper namespace="me.nawa.ingest.mapper.IngestMapper">
+
+    <select id="findExistingEventPipelineIds" resultType="string">
+        SELECT pipeline_id FROM event
+        WHERE pipeline_id IN
+        <foreach collection="pipelineIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="findExistingPlacePipelineIds" resultType="string">
+        SELECT pipeline_id FROM place
+        WHERE pipeline_id IN
+        <foreach collection="pipelineIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="findMaxExploreItemId" resultType="long">
+        SELECT COALESCE(MAX(item_id), 0) FROM explore_items
+    </select>
+
+    <insert id="insertExploreItems">
+        INSERT INTO explore_items
+            (item_id, item_type, approval_status, visibility_status, reviewed_by, reviewed_at)
+        VALUES
+        <foreach collection="itemIds" item="itemId" separator=",">
+            (#{itemId}, #{itemType}, 'APPROVED', 'VISIBLE', #{reviewedBy}, NOW())
+        </foreach>
+    </insert>
+
+    <!--
+      itemIds 는 items 와 같은 순서로 옵니다. 서비스가 신규 건만 추려
+      두 목록을 나란히 만듭니다.
+    -->
+    <insert id="insertEvents">
+        INSERT INTO event
+            (event_id, pipeline_id, event_kind, title, description, venue_name,
+             thumbnail_url, image_urls, links, reservation_url, pre_reservation,
+             start_date, end_date, status, is_permanent, operating_hours, open_days,
+             open_weekend, opens_late, region1, region2, address_road,
+             latitude, longitude, has_photo_zone, is_experience, age_limit,
+             contact, organizer, is_free, price_text)
+        VALUES
+        <foreach collection="items" item="it" index="i" separator=",">
+            (#{itemIds[${i}]},
+             #{it.pipelineId},
+             COALESCE(#{it.eventKind}, 'ETC'),
+             #{it.title},
+             #{it.description},
+             #{it.venueName},
+             #{it.thumbnailUrl},
+             #{it.imageUrls},
+             #{it.links},
+             #{it.reservationUrl},
+             #{it.preReservation},
+             #{it.startDate},
+             #{it.endDate},
+             COALESCE(UPPER(#{it.status}), 'SCHEDULED'),
+             #{it.isPermanent},
+             #{it.operatingHours},
+             #{it.openDays},
+             #{it.openWeekend},
+             #{it.opensLate},
+             #{it.region1},
+             #{it.region2},
+             #{it.addressRoad},
+             #{it.latitude},
+             #{it.longitude},
+             COALESCE(#{it.hasPhotoZone}, FALSE),
+             COALESCE(#{it.isExperience}, FALSE),
+             #{it.ageLimit},
+             #{it.contact},
+             #{it.organizer},
+             #{it.isFree},
+             #{it.priceText})
+        </foreach>
+    </insert>
+
+    <update id="updateEvents">
+        UPDATE event e
+        JOIN (
+        <foreach collection="items" item="it" separator=" UNION ALL ">
+            SELECT #{it.pipelineId} AS pipeline_id,
+                   #{it.eventKind} AS event_kind,
+                   #{it.title} AS title,
+                   #{it.description} AS description,
+                   #{it.venueName} AS venue_name,
+                   #{it.thumbnailUrl} AS thumbnail_url,
+                   #{it.imageUrls} AS image_urls,
+                   #{it.links} AS links,
+                   #{it.reservationUrl} AS reservation_url,
+                   #{it.preReservation} AS pre_reservation,
+                   #{it.startDate} AS start_date,
+                   #{it.endDate} AS end_date,
+                   #{it.status} AS status,
+                   #{it.isPermanent} AS is_permanent,
+                   #{it.operatingHours} AS operating_hours,
+                   #{it.openDays} AS open_days,
+                   #{it.openWeekend} AS open_weekend,
+                   #{it.opensLate} AS opens_late,
+                   #{it.region1} AS region1,
+                   #{it.region2} AS region2,
+                   #{it.addressRoad} AS address_road,
+                   #{it.latitude} AS latitude,
+                   #{it.longitude} AS longitude,
+                   #{it.hasPhotoZone} AS has_photo_zone,
+                   #{it.isExperience} AS is_experience,
+                   #{it.ageLimit} AS age_limit,
+                   #{it.contact} AS contact,
+                   #{it.organizer} AS organizer,
+                   #{it.isFree} AS is_free,
+                   #{it.priceText} AS price_text
+        </foreach>
+        ) s ON s.pipeline_id = e.pipeline_id
+        SET e.event_kind      = COALESCE(s.event_kind, e.event_kind),
+            e.title           = s.title,
+            e.description     = s.description,
+            e.venue_name      = s.venue_name,
+            e.thumbnail_url   = s.thumbnail_url,
+            e.image_urls      = s.image_urls,
+            e.links           = s.links,
+            e.reservation_url = s.reservation_url,
+            e.pre_reservation = s.pre_reservation,
+            e.start_date      = s.start_date,
+            e.end_date        = s.end_date,
+            e.status          = COALESCE(UPPER(s.status), e.status),
+            e.is_permanent    = s.is_permanent,
+            e.operating_hours = s.operating_hours,
+            e.open_days       = s.open_days,
+            e.open_weekend    = s.open_weekend,
+            e.opens_late      = s.opens_late,
+            e.region1         = s.region1,
+            e.region2         = s.region2,
+            e.address_road    = s.address_road,
+            e.latitude        = s.latitude,
+            e.longitude       = s.longitude,
+            e.has_photo_zone  = COALESCE(s.has_photo_zone, e.has_photo_zone),
+            e.is_experience   = COALESCE(s.is_experience, e.is_experience),
+            e.age_limit       = s.age_limit,
+            e.contact         = s.contact,
+            e.organizer       = s.organizer,
+            e.is_free         = s.is_free,
+            e.price_text      = s.price_text
+    </update>
+
+    <insert id="insertPlaces">
+        INSERT INTO place
+            (place_id, pipeline_id, name, brand, branch, place_kind, thumbnail_url,
+             image_urls, region1, region2, address_road, address_detail, postal_code,
+             latitude, longitude, opening_hours, closed_days, tel, has_parking,
+             reservable, takeout_available, has_restroom, menu_summary, is_active)
+        VALUES
+        <foreach collection="items" item="it" index="i" separator=",">
+            (#{itemIds[${i}]},
+             #{it.pipelineId},
+             #{it.name},
+             #{it.brand},
+             #{it.branch},
+             #{it.placeKind},
+             #{it.thumbnailUrl},
+             #{it.imageUrls},
+             #{it.region1},
+             #{it.region2},
+             #{it.addressRoad},
+             #{it.addressDetail},
+             #{it.postalCode},
+             #{it.latitude},
+             #{it.longitude},
+             #{it.openingHours},
+             #{it.closedDays},
+             #{it.tel},
+             #{it.hasParking},
+             #{it.reservable},
+             #{it.takeoutAvailable},
+             #{it.hasRestroom},
+             #{it.menuSummary},
+             COALESCE(#{it.isActive}, TRUE))
+        </foreach>
+    </insert>
+
+    <update id="updatePlaces">
+        UPDATE place p
+        JOIN (
+        <foreach collection="items" item="it" separator=" UNION ALL ">
+            SELECT #{it.pipelineId} AS pipeline_id,
+                   #{it.name} AS name,
+                   #{it.brand} AS brand,
+                   #{it.branch} AS branch,
+                   #{it.placeKind} AS place_kind,
+                   #{it.thumbnailUrl} AS thumbnail_url,
+                   #{it.imageUrls} AS image_urls,
+                   #{it.region1} AS region1,
+                   #{it.region2} AS region2,
+                   #{it.addressRoad} AS address_road,
+                   #{it.addressDetail} AS address_detail,
+                   #{it.postalCode} AS postal_code,
+                   #{it.latitude} AS latitude,
+                   #{it.longitude} AS longitude,
+                   #{it.openingHours} AS opening_hours,
+                   #{it.closedDays} AS closed_days,
+                   #{it.tel} AS tel,
+                   #{it.hasParking} AS has_parking,
+                   #{it.reservable} AS reservable,
+                   #{it.takeoutAvailable} AS takeout_available,
+                   #{it.hasRestroom} AS has_restroom,
+                   #{it.menuSummary} AS menu_summary,
+                   #{it.isActive} AS is_active
+        </foreach>
+        ) s ON s.pipeline_id = p.pipeline_id
+        SET p.name              = s.name,
+            p.brand             = s.brand,
+            p.branch            = s.branch,
+            p.place_kind        = s.place_kind,
+            p.thumbnail_url     = s.thumbnail_url,
+            p.image_urls        = s.image_urls,
+            p.region1           = s.region1,
+            p.region2           = s.region2,
+            p.address_road      = s.address_road,
+            p.address_detail    = s.address_detail,
+            p.postal_code       = s.postal_code,
+            p.latitude          = s.latitude,
+            p.longitude         = s.longitude,
+            p.opening_hours     = s.opening_hours,
+            p.closed_days       = s.closed_days,
+            p.tel               = s.tel,
+            p.has_parking       = s.has_parking,
+            p.reservable        = s.reservable,
+            p.takeout_available = s.takeout_available,
+            p.has_restroom      = s.has_restroom,
+            p.menu_summary      = s.menu_summary,
+            p.is_active         = COALESCE(s.is_active, p.is_active)
+    </update>
+
+    <!--
+      본체가 있는 건만 들어갑니다. JOIN 이 걸러 주므로 고아 번역이 생기지
+      않습니다. deleted_at 은 NULL 로 되돌려 다시 노출되게 합니다.
+    -->
+    <insert id="upsertEventTranslations">
+        INSERT INTO event_translations
+            (event_id, language_code, title, description, operating_hours,
+             address_display, venue_detail, age_limit, organizer, price_text)
+        SELECT e.event_id, s.language_code, s.title, s.description, s.operating_hours,
+               s.address_display, s.venue_detail, s.age_limit, s.organizer, s.price_text
+        FROM (
+        <foreach collection="items" item="it" separator=" UNION ALL ">
+            SELECT #{it.pipelineId} AS pipeline_id,
+                   #{it.languageCode} AS language_code,
+                   #{it.title} AS title,
+                   #{it.description} AS description,
+                   #{it.operatingHours} AS operating_hours,
+                   #{it.addressDisplay} AS address_display,
+                   #{it.venueDetail} AS venue_detail,
+                   #{it.ageLimit} AS age_limit,
+                   #{it.organizer} AS organizer,
+                   #{it.priceText} AS price_text
+        </foreach>
+        ) s
+        JOIN event e ON e.pipeline_id = s.pipeline_id
+        ON DUPLICATE KEY UPDATE
+            title           = VALUES(title),
+            description     = VALUES(description),
+            operating_hours = VALUES(operating_hours),
+            address_display = VALUES(address_display),
+            venue_detail    = VALUES(venue_detail),
+            age_limit       = VALUES(age_limit),
+            organizer       = VALUES(organizer),
+            price_text      = VALUES(price_text),
+            deleted_at      = NULL
+    </insert>
+
+    <insert id="upsertPlaceTranslations">
+        INSERT INTO place_translations
+            (place_id, language_code, name, brand, branch, address_display,
+             address_detail, opening_hours_text, closed_days_text, menu_summary)
+        SELECT p.place_id, s.language_code, s.name, s.brand, s.branch, s.address_display,
+               s.address_detail, s.opening_hours_text, s.closed_days_text, s.menu_summary
+        FROM (
+        <foreach collection="items" item="it" separator=" UNION ALL ">
+            SELECT #{it.pipelineId} AS pipeline_id,
+                   #{it.languageCode} AS language_code,
+                   #{it.name} AS name,
+                   #{it.brand} AS brand,
+                   #{it.branch} AS branch,
+                   #{it.addressDisplay} AS address_display,
+                   #{it.addressDetail} AS address_detail,
+                   #{it.openingHoursText} AS opening_hours_text,
+                   #{it.closedDaysText} AS closed_days_text,
+                   #{it.menuSummary} AS menu_summary
+        </foreach>
+        ) s
+        JOIN place p ON p.pipeline_id = s.pipeline_id
+        ON DUPLICATE KEY UPDATE
+            name               = VALUES(name),
+            brand              = VALUES(brand),
+            branch             = VALUES(branch),
+            address_display    = VALUES(address_display),
+            address_detail     = VALUES(address_detail),
+            opening_hours_text = VALUES(opening_hours_text),
+            closed_days_text   = VALUES(closed_days_text),
+            menu_summary       = VALUES(menu_summary),
+            deleted_at         = NULL
+    </insert>
+
+</mapper>
