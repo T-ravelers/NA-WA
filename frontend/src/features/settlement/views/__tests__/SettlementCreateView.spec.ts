@@ -176,7 +176,7 @@ describe('SettlementCreateView', () => {
     await wrapper.get('[data-participant-id="19"]').trigger('click')
     await wrapper.get('[data-action="next"]').trigger('click')
 
-    expect(wrapper.get('[data-action="create"]').text()).toBe('Request 25.00 P')
+    expect(wrapper.get('[data-action="create"]').text()).toBe('Send request')
     await wrapper.get('[data-action="create"]').trigger('click')
     await flushPromises()
 
@@ -479,7 +479,7 @@ describe('SettlementCreateView', () => {
 
     // 품목 자체는 흠이 없으니 배분 안내가 아니라 합계 안내가 떠야 고칠 곳을 안다.
     expect(wrapper.text()).toContain('must match the payment')
-    expect(wrapper.text()).not.toContain('settlement.create.overview')
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(false)
   })
 
   it('lets the step through once the totals line up', async () => {
@@ -523,6 +523,18 @@ describe('SettlementCreateView', () => {
     // 나머지를 누가 더 낼지는 통화 단위에 달려 있어 화면이 알 수 없다. 규칙만 알린다.
     expect(wrapper.find('[data-testid="request-total"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Split evenly across 2 people')
+  })
+
+  it('does not offer a receipt to open when none was attached', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    // 눌러도 아무 일이 없는 버튼은 고장으로 보인다. 없다는 것을 아는 자리라 눌리지 않게 둔다.
+    const box = wrapper.get('[data-action="add-receipt"]')
+    expect(box.attributes('disabled')).toBeDefined()
+    expect(box.attributes('aria-label')).toBe('No receipt attached')
   })
 
   it('lays out the first item as soon as the itemized split is chosen', async () => {

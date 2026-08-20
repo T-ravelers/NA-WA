@@ -85,6 +85,7 @@ export default {
       evenSplitNote:
         'Split evenly across {count} people. If it does not divide exactly, one person covers one unit more.',
       request: 'Request {amount}',
+      send: 'Send request',
       requesting: 'Sending your request',
       requestingHint: 'Keep this screen open while we create the split.',
       requestedTitle: 'Request sent',

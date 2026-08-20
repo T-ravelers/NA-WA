@@ -737,7 +737,7 @@ defineExpose({ back })
         :amount="selectedCandidate.amount"
         :paid-at="selectedCandidate.paidAt"
         :payer-name="selectedCandidate.payerName"
-        receipt-mode="view"
+        :receipt-mode="receipt.previewUrl.value === null ? 'empty' : 'view'"
         :receipt-url="receipt.previewUrl.value"
         @receipt-open="receiptSheetOpen = true"
       />
@@ -796,7 +796,7 @@ defineExpose({ back })
       </template>
 
       <p
-        v-else
+        v-else-if="type === 'EQUAL'"
         class="mt-4 text-body-sm text-ink-2"
       >
         {{ t('settlement.create.evenSplitNote', { count: chosenParticipants.length }) }}
@@ -832,9 +832,9 @@ defineExpose({ back })
           variant="settle"
           @click="create"
           >{{
-            t('settlement.create.request', {
-              amount: points(itemizedShares?.requested ?? selectedCandidate?.amount ?? '0'),
-            })
+            itemizedShares === null
+              ? t('settlement.create.send')
+              : t('settlement.create.request', { amount: points(itemizedShares.requested) })
           }}</AppButton
         >
       </div>

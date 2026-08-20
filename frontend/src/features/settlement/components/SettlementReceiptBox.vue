@@ -11,9 +11,12 @@ import SettlementReceiptCamera from './SettlementReceiptCamera.vue'
  *
  * 생성 화면에서는 사진을 고르는 버튼이고, 상세 화면에서는 붙어 있는 사진을 여는 버튼이다.
  * 두 화면이 같은 거래 카드를 쓰기 때문에 한 컴포넌트가 두 역할을 맡는다.
+ *
+ * 'empty'는 볼 사진이 없다는 것을 화면이 이미 아는 자리다. 눌러도 아무 일이 없는 버튼을
+ * 두면 고장으로 보이므로, 눌리지 않게 하고 없다고 알린다.
  */
 interface Props {
-  mode?: 'add' | 'view'
+  mode?: 'add' | 'view' | 'empty'
   /** 썸네일 주소. 없으면 아이콘만 나온다. */
   previewUrl?: string | null
   pending?: boolean
@@ -32,16 +35,17 @@ const cameraOpen = ref(false)
  * 내려받으면 대부분 보지도 않을 사진에 데이터를 쓴다. 그래서 눌렀을 때 받는다.
  * 정산에 영수증이 붙어 있는지는 눌러 봐야 알 수 있고, 없으면 그때 안내한다.
  */
-const isDisabled = computed(() => pending)
+const isDisabled = computed(() => pending || mode === 'empty')
 
 const label = computed(() => {
   if (pending) return t('settlement.receipt.pending')
+  if (mode === 'empty') return t('settlement.receipt.none')
   if (mode === 'view') return t('settlement.receipt.view')
   return previewUrl === null ? t('settlement.receipt.label') : t('settlement.receipt.change')
 })
 
 function handleClick(): void {
-  if (mode === 'view') {
+  if (mode !== 'add') {
     emit('open')
     return
   }

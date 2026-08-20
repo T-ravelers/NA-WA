@@ -23,8 +23,8 @@ interface Props {
    */
   paidAt?: string
   payerName?: string
-  /** 생성 화면은 'add', 상세 화면은 'view'. 영수증 자리의 역할을 정한다. */
-  receiptMode?: 'add' | 'view'
+  /** 'add'는 고르는 자리, 'view'는 여는 자리, 'empty'는 볼 것이 없다고 아는 자리다. */
+  receiptMode?: 'add' | 'view' | 'empty'
   receiptUrl?: string | null
   receiptPending?: boolean
 }
