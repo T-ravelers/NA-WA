@@ -204,7 +204,7 @@ class QrPaymentConcurrencyIntegrationTest {
 
         String idempotencyKey = "concurrency-idem-" + UUID.randomUUID();
         QrPaymentExecuteRequest request =
-            new QrPaymentExecuteRequest(qrToken, null, SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(qrToken, null, SpendingScope.PERSONAL, null, null);
 
         Callable<QrPaymentExecuteResponse> attempt = () -> transactionTemplate.execute(
             status -> qrPaymentService.executePayment(payerMemberId, idempotencyKey, request)
@@ -273,9 +273,9 @@ class QrPaymentConcurrencyIntegrationTest {
 
         String idempotencyKey = "concurrency-idem-" + UUID.randomUUID();
         QrPaymentExecuteRequest requestA =
-            new QrPaymentExecuteRequest(qrTokenA, null, SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(qrTokenA, null, SpendingScope.PERSONAL, null, null);
         QrPaymentExecuteRequest requestB =
-            new QrPaymentExecuteRequest(qrTokenB, null, SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(qrTokenB, null, SpendingScope.PERSONAL, null, null);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
@@ -345,9 +345,9 @@ class QrPaymentConcurrencyIntegrationTest {
         createActiveQr(qrTokenB, payeeWalletId2, new BigDecimal("15000.0000"));
 
         QrPaymentExecuteRequest requestA =
-            new QrPaymentExecuteRequest(qrTokenA, null, SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(qrTokenA, null, SpendingScope.PERSONAL, null, null);
         QrPaymentExecuteRequest requestB =
-            new QrPaymentExecuteRequest(qrTokenB, null, SpendingScope.PERSONAL, null);
+            new QrPaymentExecuteRequest(qrTokenB, null, SpendingScope.PERSONAL, null, null);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         QrPaymentExecuteResponse responseA;

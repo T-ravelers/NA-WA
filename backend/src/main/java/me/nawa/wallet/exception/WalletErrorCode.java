@@ -187,6 +187,12 @@ public enum WalletErrorCode implements ErrorCode {
         HttpStatus.FORBIDDEN,
         "WALLET-030",
         "가맹점 계정은 결제할 수 없습니다."
+    ),
+
+    SPENDING_CATEGORY_NOT_ALLOWED(
+        HttpStatus.BAD_REQUEST,
+        "WALLET-031",
+        "지원하지 않는 소비 카테고리입니다."
     );
 
     private final HttpStatus status;

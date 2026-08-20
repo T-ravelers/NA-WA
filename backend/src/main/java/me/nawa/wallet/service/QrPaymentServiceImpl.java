@@ -14,6 +14,7 @@ import me.nawa.wallet.domain.Wallet;
 import me.nawa.wallet.domain.WalletLedgerEntry;
 import me.nawa.wallet.domain.WalletTransfer;
 import me.nawa.wallet.domain.enums.QrPaymentStatus;
+import me.nawa.wallet.domain.enums.SpendingCategory;
 import me.nawa.wallet.domain.enums.SpendingScope;
 import me.nawa.wallet.dto.request.QrPaymentCreateRequest;
 import me.nawa.wallet.dto.request.QrPaymentExecuteRequest;
@@ -407,7 +408,7 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             "COMPLETED",
             paymentAmount,
             qrPayment.getMemo(),
-            null,
+            SpendingCategory.from(request.spendingCategory()).name(),
             request.spendingScope().name(),
             now,
             now,
@@ -707,6 +708,9 @@ public class QrPaymentServiceImpl implements QrPaymentService {
             );
         }
 
+        // 목록 밖의 소비 카테고리는 잠금을 잡기 전에 거절한다.
+        SpendingCategory.from(request.spendingCategory());
+
         // preview와 같은 소비 범위/약속 검증
         validatePreviewRequest(
             new QrPaymentPreviewRequest(
@@ -793,6 +797,15 @@ public class QrPaymentServiceImpl implements QrPaymentService {
         // 6. 소비 범위와 약속도 최초 요청과 같아야 한다.
         // scope는 transfer에 저장하고, 공동 소비의 appointmentId는 비용 연결에서 확인한다.
         if (!request.spendingScope().name().equals(transfer.getSpendingType())) {
+            throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
+        }
+
+        // 소비 카테고리도 같아야 한다. 들어온 값은 from으로 거부까지 하지만, 저장된 값은
+        // fromStored로 관대하게 읽는다 — 지나간 결제의 사실이라 되돌릴 수 없고, 여기서
+        // 거부하면 이미 성공한 결제의 재시도가 멱등 응답 대신 400을 받는다. 이 기능 이전에
+        // 만들어진 거래(컬럼이 NULL)도 같은 경로로 OTHER가 된다.
+        if (SpendingCategory.from(request.spendingCategory())
+            != SpendingCategory.fromStored(transfer.getSpendingCategory())) {
             throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_CONFLICT);
         }
 

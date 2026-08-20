@@ -331,6 +331,7 @@ describe('WalletQrPaymentPreviewView', () => {
       amount: 18_500,
       spendingScope: 'PERSONAL',
       appointmentId: null,
+      spendingCategory: 'OTHER',
     })
   })
 
@@ -351,6 +352,7 @@ describe('WalletQrPaymentPreviewView', () => {
       amount: 18_500,
       spendingScope: 'PERSONAL',
       appointmentId: null,
+      spendingCategory: 'OTHER',
     })
     expect(vi.mocked(executeQrPayment).mock.calls[0]?.[1]).toEqual(expect.any(String))
     expect(pushSpy).toHaveBeenCalledWith({
@@ -358,6 +360,50 @@ describe('WalletQrPaymentPreviewView', () => {
       params: { transferId: '77' },
     })
     expect(useQrPaymentSessionStore().session).toBeNull()
+  })
+
+  it('sends the spending category the payer picked', async () => {
+    const { wrapper } = await mountView()
+    setFixedAmountSession()
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Food')
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Pay')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(executeQrPayment).mock.calls[0]?.[0]).toEqual({
+      qrToken: 'tok-abc',
+      amount: 18_500,
+      spendingScope: 'PERSONAL',
+      appointmentId: null,
+      spendingCategory: 'FOOD',
+    })
+  })
+
+  // 카테고리는 결제 금액과 잔액을 바꾸지 않는다. 미리보기를 다시 부르면 화면이 깜빡이고
+  // 서버 호출만 늘어난다.
+  it('does not re-run the preview when the payer changes the category', async () => {
+    const { wrapper } = await mountView()
+    setFixedAmountSession()
+    await flushPromises()
+
+    const callsBefore = vi.mocked(previewQrPayment).mock.calls.length
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Shopping')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(previewQrPayment).mock.calls).toHaveLength(callsBefore)
   })
 
   it('executes a shared-expense payment with the selected appointment id', async () => {
@@ -380,6 +426,7 @@ describe('WalletQrPaymentPreviewView', () => {
       amount: 18_500,
       spendingScope: 'SHARED',
       appointmentId: 42,
+      spendingCategory: 'OTHER',
     })
   })
 

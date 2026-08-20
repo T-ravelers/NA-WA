@@ -308,6 +308,70 @@ function stubReportApis(page) {
 }
 
 /**
+ * QR 결제 미리보기 응답을 세운다.
+ *
+ * 카테고리는 결제 금액과 잔액을 바꾸지 않으므로 요청 본문과 무관하게 같은 값을 준다.
+ */
+function stubQrPaymentPreview(page) {
+  return page.route('**/api/v1/wallet/qr/payment/preview', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          qrPaymentId: 10,
+          payeeName: 'Jieun Coffee',
+          amount: 18500,
+          currentBalance: 128500,
+          balanceAfter: 110000,
+          currencyCode: 'KRW',
+          spendingScope: 'PERSONAL',
+          trip: null,
+          appointment: null,
+          canPay: true,
+          expiresAt: '2026-08-20T18:00:00',
+        },
+      }),
+    }),
+  )
+}
+
+/**
+ * 스캔이 끝난 QR 결제 세션을 심는다.
+ *
+ * 이 세션은 카메라로 QR을 읽어야만 채워지는데 스크린샷은 카메라를 쓸 수 없다. 디코더가
+ * WASM이라 `BarcodeDetector`를 흉내내도 통하지 않는다. 그래서 화면이 마운트돼 스토어가
+ * 등록된 뒤 Pinia 인스턴스에 직접 값을 넣는다.
+ *
+ * **프로덕션 소스에는 이 경로를 위한 분기를 만들지 않는다.** 화면은 평소와 똑같이
+ * 스토어만 읽고, 값을 넣는 쪽이 여기 하나다.
+ */
+async function seedQrPaymentSession(page) {
+  await page.waitForSelector('main')
+  await page.evaluate(() => {
+    const provides = document.querySelector('#app').__vue_app__._context.provides
+    const piniaSymbol = Object.getOwnPropertySymbols(provides).find(
+      (symbol) => symbol.toString() === 'Symbol(pinia)',
+    )
+
+    provides[piniaSymbol]._s.get('wallet-qr-payment-session').setSession({
+      qrToken: 'screenshot-qr-token',
+      resolved: {
+        qrPaymentId: 10,
+        payeeName: 'Jieun Coffee',
+        amount: 18500,
+        amountInputRequired: false,
+        memo: 'Night market coffee',
+        status: 'ACTIVE',
+        currencyCode: 'KRW',
+        expiresAt: '2026-08-20T18:00:00',
+      },
+    })
+  })
+}
+
+/**
  * 지갑 홈 응답을 세운다.
  *
  * 금액은 `BigDecimal`이 JSON number로 내려오고, `createdAt`은 `LocalDateTime`이 오프셋 없이
@@ -1058,6 +1122,19 @@ const SCREENS = [
     path: '/wallet/qr/payment/preview',
     setup: async (page) => {
       await stubMemberProfile(page)
+    },
+  },
+  {
+    name: '15b-wallet-qr-payment-preview-ready',
+    path: '/wallet/qr/payment/preview',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubQrPaymentPreview(page)
+    },
+    prepare: async (page) => {
+      await seedQrPaymentSession(page)
+      // 소비 카테고리 칩이 그려질 때까지 기다린다. 세션이 없으면 빈 상태만 찍힌다.
+      await page.getByRole('radio', { name: 'Food' }).waitFor()
     },
   },
   {

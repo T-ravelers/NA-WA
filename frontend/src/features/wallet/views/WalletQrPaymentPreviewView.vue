@@ -7,6 +7,12 @@ import { useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
 import { formatServerDateTime } from '@/shared/lib/datetime'
+import {
+  DEFAULT_SPENDING_CATEGORY,
+  SPENDING_CATEGORIES,
+  spendingCategoryLabelKey,
+  type SpendingCategory,
+} from '@/shared/lib/spendingCategory'
 import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -37,6 +43,19 @@ const session = computed(() => qrPaymentSession.session)
 const spendingScope = ref<SpendingScope>('personal')
 const selectedAppointmentId = ref<number | null>(null)
 const enteredAmount = ref<number | null>(null)
+
+/**
+ * 결제자가 고르는 소비 카테고리.
+ *
+ * 오프라인 결제 순간이라 선택을 강제하지 않는다. 기본값은 서버가 값 없는 결제를 접는
+ * 값과 같은 `OTHER`다 — 고르지 않았을 때 임의의 카테고리를 넣으면 리포트가 거짓 근거로
+ * 칭호를 만든다.
+ */
+const spendingCategory = ref<SpendingCategory>(DEFAULT_SPENDING_CATEGORY)
+
+const spendingCategoryOptions = computed(() =>
+  SPENDING_CATEGORIES.map((value) => ({ value, label: t(spendingCategoryLabelKey(value)) })),
+)
 
 const isSharedExpense = computed(() => spendingScope.value === 'shared')
 const ongoingAppointmentsQuery = useMyOngoingAppointmentsQuery(isSharedExpense)
@@ -152,6 +171,7 @@ watch(
       finalAmount.value,
       spendingScope.value,
       selectedAppointmentId.value,
+      spendingCategory.value,
     ] as const,
   () => {
     idempotencyKey.value = null
@@ -171,6 +191,7 @@ const completePayment = (): void => {
         amount: finalAmount.value,
         spendingScope: toQrPaymentSpendingScope(spendingScope.value),
         appointmentId: selectedAppointment.value?.appointmentId ?? null,
+        spendingCategory: spendingCategory.value,
       },
       idempotencyKey: idempotencyKey.value,
     },
@@ -392,6 +413,36 @@ const completePayment = (): void => {
             </p>
           </template>
         </fieldset>
+      </AppCard>
+
+      <AppCard padding="lg">
+        <h3 class="text-title-sm">{{ t('wallet.qrPayment.spendingCategory') }}</h3>
+        <p class="mt-1 text-caption text-ink-3">
+          {{ t('wallet.qrPayment.spendingCategoryHint') }}
+        </p>
+
+        <div
+          role="radiogroup"
+          :aria-label="t('wallet.qrPayment.spendingCategory')"
+          class="mt-4 flex flex-wrap gap-2"
+        >
+          <button
+            v-for="option in spendingCategoryOptions"
+            :key="option.value"
+            type="button"
+            role="radio"
+            :aria-checked="option.value === spendingCategory"
+            class="h-9 rounded-pill px-3.5 text-caption transition-transform active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            :class="
+              option.value === spendingCategory
+                ? 'bg-paper-fill text-on-paper'
+                : 'border border-hairline bg-transparent text-ink-2'
+            "
+            @click="spendingCategory = option.value"
+          >
+            {{ option.label }}
+          </button>
+        </div>
       </AppCard>
 
       <p
