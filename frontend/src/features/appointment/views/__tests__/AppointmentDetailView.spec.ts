@@ -110,6 +110,11 @@ async function mountView() {
         name: 'appointment-reviews',
         component: { template: '<div>Reviews</div>' },
       },
+      {
+        path: '/appointments',
+        name: 'appointment-list',
+        component: { template: '<div>List</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -188,6 +193,16 @@ describe('AppointmentDetailView', () => {
     // 방장이라 모집 중에도 버거 버튼은 뜬다. 다만 시트 안의 항목은 아직 전부
     // 비활성이다.
     expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
+  })
+
+  it('goes back to the appointment list for this item', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('button[aria-label="Go back"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-list')
+    expect(router.currentRoute.value.query).toEqual({ itemId: '42', itemType: 'EVENT' })
   })
 
   it('disables Join appointment and shows an already-joined notice for the host', async () => {

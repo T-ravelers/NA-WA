@@ -189,17 +189,20 @@ function statusLabel(status: AppointmentStatus): string {
   return t(`appointment.status.${status}`)
 }
 
+/**
+ * 뒤로 가면 이 약속이 속한 약속 목록으로 돌아간다.
+ *
+ * 목록은 `itemId`·`itemType` 쿼리로 대상 Event·Place를 좁히므로 상세가 가진 값을
+ * 그대로 넘긴다. 상세를 아직 못 받았으면 좁히지 않은 전체 목록으로 보낸다.
+ */
 function goBack(): void {
   const current = appointment.value
-  if (current?.itemType === 'EVENT' || current?.itemType === 'PLACE') {
-    void router.push({
-      name: 'explore',
-      query: { tab: current.itemType === 'PLACE' ? 'places' : 'events' },
-    })
-    return
-  }
+  const scoped = current?.itemType === 'EVENT' || current?.itemType === 'PLACE'
 
-  void router.push({ name: 'explore' })
+  void router.push({
+    name: 'appointment-list',
+    query: scoped ? { itemId: String(current.itemId), itemType: current.itemType } : {},
+  })
 }
 
 function openMemberProfile(member: { memberId: number }): void {
