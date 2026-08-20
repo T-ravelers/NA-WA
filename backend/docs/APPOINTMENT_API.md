@@ -151,7 +151,7 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 
 `tripId`는 요청 회원이 소유한 Journey여야 하고, `visitDate`는 그 Journey의
 `startDate`~`endDate` 안이어야 하며, 같은 `(tripId, itemId, visitDate)`
-조합이 이미 있으면 안 됩니다 — 위반 시 각각 `JOURNEY-002`, `JOURNEY-007`,
+조합의 활성 일정이 이미 있으면 안 됩니다 — 위반 시 각각 `JOURNEY-002`, `JOURNEY-007`,
 `JOURNEY-004`를 반환합니다([JOURNEY_API.md](./JOURNEY_API.md) 참고). 참여
 마감은 조립된 활동 시작 시각보다 늦을 수 없고, 활동 시작 시각은 종료 시각보다
 빨라야 하며 현재 시각 이후여야 합니다.

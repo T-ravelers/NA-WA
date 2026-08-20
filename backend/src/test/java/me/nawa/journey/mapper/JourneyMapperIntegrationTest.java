@@ -1,6 +1,8 @@
 package me.nawa.journey.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -378,16 +380,31 @@ class JourneyMapperIntegrationTest {
         try {
             JourneyItem deleted = journeyItem(fixture);
             mapper.insertJourneyItem(deleted);
+            assertTrue(mapper.existsJourneyItem(
+                fixture.tripId(),
+                fixture.itemId(),
+                deleted.getVisitDate()
+            ));
             softDeleteTripItem(deleted.getTripItemId());
+            assertFalse(mapper.existsJourneyItem(
+                fixture.tripId(),
+                fixture.itemId(),
+                deleted.getVisitDate()
+            ));
 
             JourneyItem readded = journeyItem(fixture);
             mapper.insertJourneyItem(readded);
 
             assertNotNull(deleted.getTripItemId());
             assertNotNull(readded.getTripItemId());
-            assertTrue(!deleted.getTripItemId().equals(readded.getTripItemId()));
-            assertEquals(2L, countTripItems(fixture.tripId(), false));
-            assertEquals(1L, countTripItems(fixture.tripId(), true));
+            assertNotEquals(deleted.getTripItemId(), readded.getTripItemId());
+            assertTrue(mapper.existsJourneyItem(
+                fixture.tripId(),
+                fixture.itemId(),
+                readded.getVisitDate()
+            ));
+            assertEquals(2L, countAllTripItems(fixture.tripId()));
+            assertEquals(1L, countActiveTripItems(fixture.tripId()));
         } finally {
             deleteFixture(fixture);
         }
@@ -424,14 +441,11 @@ class JourneyMapperIntegrationTest {
             mapper.insertConfirmedJourneyItem(readded);
 
             assertNotNull(readded.getTripItemId());
-            assertTrue(!first.getTripItemId().equals(readded.getTripItemId()));
-            assertEquals(2L, countTripItems(fixture.tripId(), false));
-            assertEquals(1L, countTripItems(fixture.tripId(), true));
+            assertNotEquals(first.getTripItemId(), readded.getTripItemId());
+            assertEquals(2L, countAllTripItems(fixture.tripId()));
+            assertEquals(1L, countActiveTripItems(fixture.tripId()));
         } finally {
-            jdbcTemplate.update(
-                "DELETE FROM trip_items WHERE trip_id = ?",
-                fixture.tripId()
-            );
+            deleteTripItems(fixture.tripId());
             jdbcTemplate.update(
                 "DELETE FROM appointments WHERE appointment_id = ?",
                 appointmentId
@@ -440,7 +454,7 @@ class JourneyMapperIntegrationTest {
                 "DELETE FROM event WHERE event_id = ?",
                 fixture.itemId()
             );
-            deleteFixture(fixture);
+            deleteFixtureRows(fixture);
         }
     }
 
@@ -808,10 +822,21 @@ class JourneyMapperIntegrationTest {
         return keyHolder.getKey().longValue();
     }
 
-    private static long countTripItems(long tripId, boolean activeOnly) {
-        String sql = "SELECT COUNT(*) FROM trip_items WHERE trip_id = ?"
-            + (activeOnly ? " AND deleted_at IS NULL" : "");
-        return jdbcTemplate.queryForObject(sql, Long.class, tripId);
+    private static long countAllTripItems(long tripId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM trip_items WHERE trip_id = ?",
+            Long.class,
+            tripId
+        );
+    }
+
+    private static long countActiveTripItems(long tripId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM trip_items "
+                + "WHERE trip_id = ? AND deleted_at IS NULL",
+            Long.class,
+            tripId
+        );
     }
 
     private static void softDeleteEvent(long itemId) {
@@ -862,10 +887,18 @@ class JourneyMapperIntegrationTest {
     }
 
     private static void deleteFixture(JourneyItemFixture fixture) {
+        deleteTripItems(fixture.tripId());
+        deleteFixtureRows(fixture);
+    }
+
+    private static void deleteTripItems(long tripId) {
         jdbcTemplate.update(
             "DELETE FROM trip_items WHERE trip_id = ?",
-            fixture.tripId()
+            tripId
         );
+    }
+
+    private static void deleteFixtureRows(JourneyItemFixture fixture) {
         jdbcTemplate.update(
             "DELETE FROM trips WHERE trip_id = ?",
             fixture.tripId()
