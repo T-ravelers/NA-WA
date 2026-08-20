@@ -7,7 +7,7 @@
 export default {
   auth: {
     welcome: {
-      merchantEntry: 'Bạn đang kinh doanh cửa hàng?',
+      merchantEntry: 'Bạn có cửa hàng không?',
     },
   },
 }
