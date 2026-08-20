@@ -1,6 +1,5 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { computed, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -10,7 +9,7 @@ const fetchAppointment = vi.fn()
 const fetchAppointmentMembers = vi.fn()
 const submitAppointmentReview = vi.fn()
 const fetchMyAppointmentReviewStatus = vi.fn()
-const useAppointmentMemberProfileMock = vi.hoisted(() => vi.fn())
+const fetchMyAppointmentParticipation = vi.fn()
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
@@ -20,10 +19,8 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
     submitAppointmentReview(appointmentId, request),
   fetchMyAppointmentReviewStatus: (appointmentId: number) =>
     fetchMyAppointmentReviewStatus(appointmentId),
-}))
-
-vi.mock('../../model/memberIntegration', () => ({
-  useAppointmentMemberProfile: () => useAppointmentMemberProfileMock(),
+  fetchMyAppointmentParticipation: (appointmentId: number) =>
+    fetchMyAppointmentParticipation(appointmentId),
 }))
 
 const AppointmentReviewView = (await import('../AppointmentReviewView.vue')).default
@@ -71,13 +68,14 @@ const members = [
   },
 ]
 
-const profileQuery = {
-  data: computed(() => ({ memberId: profileMemberId.value })),
-  isPending: ref(false),
-  isError: ref(false),
-  refetch: vi.fn().mockResolvedValue(undefined),
+/** 방장(Mina Park, appointmentMemberId 1)으로 로그인한 상태. */
+const attendedParticipation = {
+  joined: true,
+  appointmentMemberId: 1,
+  membershipStatus: 'ACTIVE' as const,
+  attendanceStatus: 'ATTENDED' as const,
+  host: true,
 }
-const profileMemberId = ref(11)
 
 async function mountView() {
   const router = createRouter({
@@ -118,9 +116,8 @@ describe('AppointmentReviewView', () => {
     fetchAppointment.mockResolvedValue(appointment)
     fetchAppointmentMembers.mockResolvedValue(members)
     submitAppointmentReview.mockRejectedValue(new Error('save failed'))
-    profileMemberId.value = 11
-    useAppointmentMemberProfileMock.mockReset()
-    useAppointmentMemberProfileMock.mockReturnValue(profileQuery)
+    fetchMyAppointmentParticipation.mockReset()
+    fetchMyAppointmentParticipation.mockResolvedValue(attendedParticipation)
   })
 
   it('shows a save error for the member whose review failed', async () => {
@@ -141,7 +138,13 @@ describe('AppointmentReviewView', () => {
   })
 
   it('blocks reviews for members who are not active participants', async () => {
-    profileMemberId.value = 99
+    fetchMyAppointmentParticipation.mockResolvedValue({
+      joined: false,
+      appointmentMemberId: null,
+      membershipStatus: null,
+      attendanceStatus: null,
+      host: false,
+    })
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Participant access required')

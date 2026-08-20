@@ -16,9 +16,9 @@ import { appointmentKeys } from '../model/appointmentKeys'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
+  appointmentParticipationQueryOptions,
   appointmentReviewStatusQueryOptions,
 } from '../model/appointmentQueries'
-import { useAppointmentMemberProfile } from '../model/memberIntegration'
 
 const route = useRoute()
 const router = useRouter()
@@ -41,7 +41,14 @@ const detailQuery = useQuery({
   retry: false,
 })
 
-const profileQuery = useAppointmentMemberProfile()
+// 내 참여 자격은 상세·출석 화면과 같은 근거(participation 응답)를 쓴다. 회원
+// 목록에서 내 memberId를 찾아 추리면 프로필 연동과 목록 조회가 둘 다 성공해야
+// 하고, 하나만 실패해도 참여자인데 화면이 막힌다.
+const participationQuery = useQuery({
+  ...appointmentParticipationQueryOptions(appointmentId),
+  enabled: computed(() => appointmentId.value !== null),
+  retry: false,
+})
 
 const membersQuery = useQuery({
   ...appointmentMembersQueryOptions(appointmentId),
@@ -57,28 +64,27 @@ const reviewStatusQuery = useQuery({
   retry: false,
 })
 
+const myAppointmentMemberId = computed(
+  () => participationQuery.data.value?.appointmentMemberId ?? null,
+)
 const reviewableMembers = computed(() =>
   (membersQuery.data.value ?? []).filter(
     (member) =>
       member.membershipStatus === 'ACTIVE' &&
       member.attendanceStatus === 'ATTENDED' &&
-      profileQuery.data.value?.memberId !== undefined &&
-      member.memberId !== profileQuery.data.value.memberId,
+      myAppointmentMemberId.value !== null &&
+      member.appointmentMemberId !== myAppointmentMemberId.value,
   ),
 )
 const appointmentCompleted = computed(
   () => detailQuery.data.value?.appointmentStatus === 'COMPLETED',
 )
 const isActiveParticipant = computed(() => {
-  const currentMemberId = profileQuery.data.value?.memberId
+  const participation = participationQuery.data.value
   return (
-    currentMemberId !== undefined &&
-    (membersQuery.data.value ?? []).some(
-      (member) =>
-        member.memberId === currentMemberId &&
-        member.membershipStatus === 'ACTIVE' &&
-        member.attendanceStatus === 'ATTENDED',
-    )
+    participation?.joined === true &&
+    participation.membershipStatus === 'ACTIVE' &&
+    participation.attendanceStatus === 'ATTENDED'
   )
 })
 const canReview = computed(() => appointmentCompleted.value && isActiveParticipant.value)
@@ -169,7 +175,7 @@ function goBack(): void {
 function retry(): void {
   void detailQuery.refetch()
   void membersQuery.refetch()
-  void profileQuery.refetch()
+  void participationQuery.refetch()
   void reviewStatusQuery.refetch()
 }
 
@@ -204,7 +210,7 @@ function finishReviews(): void {
       v-else-if="
         detailQuery.isPending.value ||
         membersQuery.isPending.value ||
-        profileQuery.isPending.value ||
+        participationQuery.isPending.value ||
         reviewStatusQuery.isPending.value
       "
       :label="t('state.loading')"
@@ -213,7 +219,7 @@ function finishReviews(): void {
       v-else-if="
         detailQuery.isError.value ||
         membersQuery.isError.value ||
-        profileQuery.isError.value ||
+        participationQuery.isError.value ||
         reviewStatusQuery.isError.value
       "
       :title="t('appointment.review.loadFailed')"
