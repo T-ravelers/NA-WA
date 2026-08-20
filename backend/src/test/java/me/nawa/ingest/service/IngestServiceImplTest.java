@@ -237,6 +237,44 @@ class IngestServiceImplTest {
         assertTrue(mapper.callOrder.isEmpty());
     }
 
+
+    @Test
+    void ingestEventActivities_rejectsALinkWithoutThePrimaryFlag() {
+        // is_primary 는 NOT NULL 이다. 빠진 채로 들어가면 배치 전체가 롤백되고
+        // 500 이 나가, 파이프라인이 같은 배치를 계속 재시도한다.
+        ActivityIngestItem item = activities("a", 10L);
+        item.getActivities().get(0).setIsPrimary(null);
+
+        assertThrows(BusinessException.class,
+                () -> service.ingestEventActivities(List.of(item)));
+        assertTrue(mapper.callOrder.isEmpty());
+    }
+
+    @Test
+    void ingestEventActivities_keepsOnlyTheLastEntryForARepeatedItem() {
+        mapper.existingEventIds = List.of("a");
+
+        // 각 항목은 대표가 하나씩이라 항목 단위 검증은 통과한다. 줄이지 않으면
+        // 같은 이벤트에 대표가 2행 남아 이 PR 이 세운 규칙이 깨진다.
+        IngestResultResponse result = service.ingestEventActivities(
+                List.of(activities("a", 10L), activities("a", 20L)));
+
+        assertEquals(1, result.getReceived());
+        assertEquals(1, result.getUpdated());
+    }
+
+    @Test
+    void ingestEventActivities_doesNotSendTheSameItemToBothDeletePaths() {
+        mapper.existingEventIds = List.of("a");
+
+        // 앞이 빈 목록, 뒤가 분류 있는 목록이면 줄이기 전에는 deleteAll 과
+        // upsert 가 같은 항목에 동시에 걸려 결과가 호출 순서에 의존한다.
+        service.ingestEventActivities(List.of(activities("a"), activities("a", 10L)));
+
+        assertEquals(List.of("deleteMissingEventActivities", "upsertEventActivities"),
+                mapper.callOrder);
+    }
+
     private static ActivityIngestItem activities(String pipelineId, Long... activityIds) {
         ActivityIngestItem item = new ActivityIngestItem();
         item.setPipelineId(pipelineId);

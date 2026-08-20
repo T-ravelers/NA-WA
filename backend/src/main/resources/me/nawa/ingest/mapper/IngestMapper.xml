@@ -351,6 +351,14 @@
       분류가 하나도 없는 항목은 이 문장으로 오지 않습니다. 서비스가 미리
       갈라서 deleteAllEventActivities 로 보냅니다. 그래야 파생 테이블이
       비는 경우가 없습니다.
+
+      물리 삭제를 씁니다. 조회 쪽은 soft delete 를 전제하지만(EventMapper 가
+      ea.deleted_at IS NULL 로 거릅니다), 이 관계는 파이프라인이 유일한
+      기록자라 "지워진 관계"를 남겨 둘 이유가 없습니다.
+
+      사람이 관리자 화면 등에서 관계를 숨기게 되면 이 판단을 다시 봐야
+      합니다. 그때는 파이프라인 배치가 upsert 의 deleted_at = NULL 로
+      숨김을 매번 되돌립니다.
     -->
     <delete id="deleteMissingEventActivities">
         DELETE ea FROM event_activity ea
