@@ -115,9 +115,30 @@ https에 넘깁니다. ALB 도입 준비로 `X-Forwarded-Proto`가 붙은 요청
 없으므로 프론트엔드의
 `VITE_API_BASE_URL`은 반드시 https 주소여야 합니다.
 
-백엔드 컨테이너는 `TZ=Asia/Seoul`로 고정되어 있습니다(`backend/Dockerfile`).
-`LocalDateTime.now()`가 컨테이너 기본값인 UTC가 아니라 서비스 기준 시간대로
-찍히도록 하기 위함이며, JDBC URL의 `serverTimezone=Asia/Seoul`과 짝을 맞춥니다.
+시간대는 **서로 다른 일을 하는 세 곳**에서 정해집니다. 하나로 뭉뚱그리면 반드시
+틀리므로 구분해서 봅니다.
+
+| 설정 | 위치 | 정하는 것 |
+| --- | --- | --- |
+| `TZ=Asia/Seoul` | `backend/Dockerfile` | JVM의 `LocalDateTime.now()`가 찍는 시각 |
+| `--default-time-zone=+09:00` | `docker-compose.yml`의 `mysql` | **DB 서버가 평가하는 `NOW()`·`CURRENT_TIMESTAMP`** |
+| `serverTimezone=Asia/Seoul` | `DATABASE_URL` | JDBC 드라이버가 값을 주고받을 때의 해석 |
+
+`serverTimezone`은 **드라이버 설정일 뿐이라 DB 서버가 평가하는 `CURRENT_TIMESTAMP`를
+바꾸지 못합니다.** 이 점을 놓치면 "URL에 이미 Asia/Seoul이 있으니 맞춰져 있다"고
+오해하기 쉽습니다. 실제로 `mysql` 서비스에 시간대 설정이 없던 동안 DB는 이미지
+기본값인 UTC로 돌았고, 약속 마감·시작 전환 스케줄러가 DB의 `CURRENT_TIMESTAMP`에
+기대고 있어 전환이 9시간씩 밀렸습니다.
+
+세 곳을 맞춰도 **시각을 근거로 판단하는 주체는 애플리케이션이어야 합니다.** DB 시계에
+기대는 쿼리는 컨테이너 설정 하나로 다시 어긋날 수 있으므로, `WHERE`·`ORDER BY`에서
+`NOW()`·`CURRENT_TIMESTAMP`로 분기하지 말고 앱이 넘긴 시각을 씁니다. `updated_at`
+같은 값에 대입하는 용도는 그대로 두어도 됩니다.
+
+CI는 이 정렬을 **일부러 깨서** 돌립니다. MySQL 서비스를 UTC로 두고 JVM만
+`TZ=Asia/Seoul`로 맞춰 운영과 같은 시차를 재현하므로, DB 시계에 의존하는 코드가
+`.github/workflows/test.yml`의 통합 테스트에서 걸립니다. 양쪽을 맞추면 이 유형의
+버그를 CI가 잡지 못합니다.
 
 ## 아직 구현하지 않았거나 정리할 항목
 

@@ -86,6 +86,12 @@ services:
 
   mysql:
     image: mysql:8.4
+    # 이미지 기본값은 UTC입니다. 백엔드 컨테이너는 TZ=Asia/Seoul이라 그대로 두면 DB가
+    # 평가하는 CURRENT_TIMESTAMP·NOW()가 앱보다 9시간 뒤처집니다. JDBC URL의
+    # serverTimezone은 드라이버의 값 변환 설정일 뿐이라 이 차이를 메우지 못합니다.
+    # 이름 있는 시간대(Asia/Seoul)는 시간대 테이블을 미리 적재해야 해서 숫자 오프셋을
+    # 씁니다. 한국은 서머타임이 없어 +09:00이 항상 유효합니다.
+    command: --default-time-zone=+09:00
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
