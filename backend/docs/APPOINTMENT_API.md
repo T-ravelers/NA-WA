@@ -157,8 +157,10 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 `tripId`는 요청 회원이 소유한 Journey여야 하고, `visitDate`는 그 Journey의
 `startDate`~`endDate` 안이어야 하며, 같은 `(tripId, itemId, visitDate)`
 조합의 활성 일정이 이미 있으면 안 됩니다 — 위반 시 각각 `JOURNEY-002`, `JOURNEY-007`,
-`JOURNEY-004`를 반환합니다([JOURNEY_API.md](./JOURNEY_API.md) 참고). 활동 시작
-시각은 종료 시각보다 빨라야 하며 현재 시각 이후여야 합니다. 참여 마감 시각은
+`JOURNEY-004`를 반환합니다([JOURNEY_API.md](./JOURNEY_API.md) 참고). 이 경로는
+Journey 일정 추가와 달리 **항목 자체의 운영 기간(`JOURNEY-012`)은 보지 않습니다** —
+`validateJourneyLink`가 `addJourneyItem`과 별개의 검사를 갖고 있기 때문입니다. 활동
+시작 시각은 종료 시각보다 빨라야 하며 현재 시각 이후여야 합니다. 참여 마감 시각은
 따로 받지 않습니다 — 참여는 활동이 시작되기 전까지 열려 있습니다.
 
 성공하면 방장의 보증금을 즉시 예치(`DEPOSIT_HOLD`)하고 약속을 `RECRUITING`

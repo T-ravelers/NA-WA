@@ -113,6 +113,95 @@ PUT /api/v1/journeys/{tripId}
 | 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
 | 409 | `JOURNEY-009` | 변경 기간 밖에 활성 일정 항목이 존재함 |
 
+## Journey 일정 항목 추가
+
+```http
+POST /api/v1/journeys/{tripId}/items
+```
+
+- 인증이 필요하며 해당 Journey의 소유자만 추가할 수 있습니다.
+- Journey 행을 `FOR UPDATE`로 잠근 뒤 처리하므로, 설정 수정과 동시에 들어오면 먼저
+  잠금을 획득한 요청이 끝난 다음 최신 기간을 기준으로 판정합니다.
+- 추가할 수 있는 Explore 항목은 `EVENT`와 `PLACE`뿐입니다. 삭제됐거나 승인·노출
+  상태가 아닌 항목, 이미 종료된 이벤트는 `JOURNEY-005`입니다.
+
+### 요청
+
+```json
+{
+  "itemId": 301,
+  "visitDate": "2026-08-21",
+  "displayOrder": 0,
+  "note": "오전 방문"
+}
+```
+
+| 필드 | 필수 | 계약 |
+| --- | ---: | --- |
+| `itemId` | O | 1 이상의 Explore 항목 id |
+| `visitDate` | O | `yyyy-MM-dd` |
+| `displayOrder` | X | `null` 허용, 0~32767 정수. 생략하면 0 |
+| `note` | X | `null`·공백 허용, 공백 제외 최대 500자 |
+
+### 방문 날짜가 지켜야 하는 두 기간
+
+`visitDate`는 **서로 다른 두 기간을 모두** 만족해야 하며, 위반한 기간에 따라 오류
+코드가 다릅니다.
+
+| 기간 | 조건 | 위반 시 |
+| --- | --- | --- |
+| Journey 기간 | `startDate ≤ visitDate ≤ endDate` | `JOURNEY-007` |
+| 항목 운영 기간 | `event.start_date ≤ visitDate ≤ event.end_date` | `JOURNEY-012` |
+
+항목 운영 기간은 **`EVENT`에만 적용됩니다.** `place` 테이블에는 운영 기간 컬럼이
+없으므로 `PLACE` 항목은 Journey 기간만 봅니다.
+
+상시 이벤트(`is_permanent = TRUE`)는 `chk_event_period` 불변식에 따라 `end_date`가
+반드시 `NULL`이므로 운영 기간이 `[start_date, ∞)`입니다. **상한만 없을 뿐 하한은
+있습니다** — 아직 시작하지 않은 상시 이벤트는 `JOURNEY-012`로 거절됩니다.
+
+두 검사는 Journey 기간이 먼저입니다. 둘 다 어긋나면 `JOURNEY-007`을 받습니다.
+
+### 성공 응답
+
+`201 Created`
+
+```json
+{
+  "success": true,
+  "data": {
+    "tripItemId": 901,
+    "journeyId": 20,
+    "itemId": 301,
+    "itemType": "EVENT",
+    "visitDate": "2026-08-21",
+    "tripItemStatus": "ADDED",
+    "displayOrder": 0,
+    "note": "오전 방문",
+    "appointmentId": null,
+    "confirmedAt": null
+  }
+}
+```
+
+이 경로로 만든 일정은 항상 `ADDED`이며 `appointmentId`와 `confirmedAt`은 비어
+있습니다. `CONFIRMED`는 약속 생성 경로에서만 만들어집니다
+([APPOINTMENT_API.md](APPOINTMENT_API.md) 참고).
+
+### 오류 코드
+
+| HTTP | 오류 코드 | 발생 조건 |
+| ---: | --- | --- |
+| 400 | `JOURNEY-003` | `tripId`·`itemId`·`visitDate`가 없거나 유효하지 않음, `note`가 500자 초과 |
+| 400 | `JOURNEY-006` | `EVENT`·`PLACE`가 아닌 Explore 항목 유형 |
+| 400 | `JOURNEY-007` | `visitDate`가 Journey 기간을 벗어남 |
+| 400 | `JOURNEY-008` | `displayOrder`가 0 미만이거나 32767 초과 |
+| 400 | `JOURNEY-012` | `visitDate`가 항목(이벤트)의 운영 기간을 벗어남 |
+| 403 | `JOURNEY-002` | 다른 회원이 소유한 Journey에 추가 요청 |
+| 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
+| 404 | `JOURNEY-005` | 삭제·미승인·비노출이거나 이미 종료된 Explore 항목 |
+| 409 | `JOURNEY-004` | 같은 `(tripId, itemId, visitDate)` 활성 일정이 이미 존재함 |
+
 ## Journey 항목·방문 날짜 조합 중복 확인
 
 ```http
