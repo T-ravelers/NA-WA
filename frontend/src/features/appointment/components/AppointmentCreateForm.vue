@@ -387,18 +387,41 @@ defineExpose({ goToPreviousStep })
           {{ t('appointment.create.visitDateNote', { date: draft.visitDate }) }}
         </p>
         <div class="grid gap-4">
-          <TextInput
-            v-model="draft.activityStartTime"
-            type="time"
-            :label="t('appointment.create.startAt')"
-            :error="translatedError(errors.activityStartTime)"
-          />
-          <TextInput
-            v-model="draft.activityEndTime"
-            type="time"
-            :label="t('appointment.create.endAt')"
-            :error="translatedError(errors.activityEndTime)"
-          />
+          <!--
+            시작·종료 시각은 위아래가 아니라 나란히 두고 사이에 "~"를 놓는다.
+            "18:30 ~ 22:00"처럼 한 줄로 읽혀야 시간 범위가 한눈에 들어온다.
+            각 입력의 라벨은 시각적으로 숨기고(sr-only) 묶음 라벨 하나만 보인다 —
+            스크린 리더에는 여전히 "Activity starts"·"Activity ends"로 읽힌다.
+            구분자는 입력 상자와 같은 높이(h-13)로 두어, 한쪽에 오류 문구가
+            붙어도 상자 가운데에 그대로 머문다.
+          -->
+          <fieldset class="min-w-0">
+            <legend class="mb-1.5 text-caption text-ink-2">
+              {{ t('appointment.create.activityTime') }}
+            </legend>
+            <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
+              <TextInput
+                v-model="draft.activityStartTime"
+                type="time"
+                label-hidden
+                :label="t('appointment.create.startAt')"
+                :error="translatedError(errors.activityStartTime)"
+              />
+              <span
+                aria-hidden="true"
+                class="flex h-13 items-center text-body text-ink-3"
+              >
+                ~
+              </span>
+              <TextInput
+                v-model="draft.activityEndTime"
+                type="time"
+                label-hidden
+                :label="t('appointment.create.endAt')"
+                :error="translatedError(errors.activityEndTime)"
+              />
+            </div>
+          </fieldset>
         </div>
         <AmountInput
           v-model="draft.depositAmount"

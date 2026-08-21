@@ -77,6 +77,7 @@ export default {
       meetingPlacePlaceholder: 'Please enter the location.',
       meetingPlaceLoading: 'Reading the activity location…',
       visitDateNote: 'This activity happens on {date}, based on the journey day you chose.',
+      activityTime: 'Activity time',
       startAt: 'Activity starts',
       endAt: 'Activity ends',
       submit: 'Create appointment',

@@ -196,6 +196,25 @@ describe('AppointmentCreateForm', () => {
     expect(wrapper.find('input[placeholder="e.g. Seongsu K-Beauty Tour"]').exists()).toBe(true)
   })
 
+  it('lays the start and end times side by side with a range separator', async () => {
+    // "18:30 ~ 22:00"처럼 한 줄로 읽혀야 한다. 개별 라벨은 눈에 보이지 않지만
+    // 접근성 이름으로는 남는다.
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT' },
+      ...mountOptions,
+    })
+    await fillBasics(wrapper)
+
+    const range = wrapper.get('fieldset')
+    expect(range.text()).toContain('Activity time')
+    expect(range.findAll('input[type="time"]')).toHaveLength(2)
+    expect(range.text()).toContain('~')
+    expect(range.findAll('label.sr-only').map((label) => label.text())).toEqual([
+      'Activity starts',
+      'Activity ends',
+    ])
+  })
+
   it('emits a normalized request after confirming valid details', async () => {
     const wrapper = mount(AppointmentCreateForm, {
       props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
