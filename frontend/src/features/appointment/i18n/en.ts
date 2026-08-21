@@ -29,7 +29,9 @@ export default {
       memberCount: '{current}/{max} members',
       scheduleUnavailable: 'Schedule unavailable',
       placePending: 'Meeting place to be confirmed',
-      deposit: 'Refundable deposit {amount} P',
+      // 목록 카드는 우측 버튼과 한 줄을 나눠 쓴다. 문구가 길면 폴더블 커버(280px)에서
+      // 금액부터 잘리므로, 환불 안내는 상세·결제 시트에 맡기고 여기서는 짧게 쓴다.
+      deposit: 'Deposit {amount} P',
       view: 'View',
       create: 'Create appointment',
       emptyTitle: 'No appointments yet',
