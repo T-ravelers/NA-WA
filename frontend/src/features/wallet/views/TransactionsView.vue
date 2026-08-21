@@ -224,9 +224,9 @@ const openTransactionDetail = (transactionId: number): void => {
           </label>
 
           <div class="col-span-2">
-            <p class="text-xs text-[#aaa8a3]">{{ t('wallet.transactions.dateRange') }}</p>
+            <p class="text-xs text-ink-3">{{ t('wallet.transactions.dateRange') }}</p>
             <p
-              class="mt-1 text-sm text-[#f5f4f0]"
+              class="mt-1 text-sm text-ink"
               aria-live="polite"
             >
               {{ dateRangeLabel }}
@@ -244,7 +244,7 @@ const openTransactionDetail = (transactionId: number): void => {
             <button
               v-if="formFrom || formTo"
               type="button"
-              class="mt-2 text-xs text-[#aaa8a3] underline underline-offset-4"
+              class="mt-2 text-xs text-ink-3 underline underline-offset-4"
               @click="clearDates"
             >
               {{ t('wallet.transactions.clearDates') }}
