@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { spendingCategoryLabelKey } from '@/shared/lib/spendingCategory'
+import { vFitText } from '@/shared/lib/fitText'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import StateError from '@/shared/ui/StateError.vue'
@@ -65,10 +66,9 @@ const formatSpendingCategory = (value: string | null | undefined): string =>
       >
         ‹
       </AppButton>
-      <!-- TRANSACTION DETAILS는 19자라 screen-title(34px·폭 200%)로는 390에서 잘린다.
-           긴 제목 화면은 section-header로 내린다 — 헤더 크기·폭 정합은 P3에서 전 화면 일괄. -->
       <h1
-        class="min-w-0 flex-1 truncate font-display text-section-header uppercase text-ink-display"
+        v-fit-text
+        class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display"
       >
         {{ t('wallet.transactionDetail.title') }}
       </h1>

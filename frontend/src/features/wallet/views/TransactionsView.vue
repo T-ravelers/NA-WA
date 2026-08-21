@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { formatCalendarDate } from '@/shared/lib/datetime'
+import { vFitText } from '@/shared/lib/fitText'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import CalendarGrid from '@/shared/ui/CalendarGrid.vue'
@@ -186,10 +187,9 @@ const openTransactionDetail = (transactionId: number): void => {
       >
         ‹
       </AppButton>
-      <!-- TRANSACTIONS는 12자라 screen-title(34px·폭 200%)로는 390에서 잘린다.
-           긴 제목 화면은 section-header로 내린다 — 헤더 크기·폭 정합은 P3에서 전 화면 일괄. -->
       <h1
-        class="min-w-0 flex-1 truncate font-display text-section-header uppercase text-ink-display"
+        v-fit-text
+        class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display"
       >
         {{ t('wallet.transactions.title') }}
       </h1>

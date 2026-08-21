@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { vFitText } from '@/shared/lib/fitText'
 import AppButton from '@/shared/ui/AppButton.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
@@ -112,7 +113,10 @@ function retry(): void {
       >
         <span aria-hidden="true">‹</span>
       </button>
-      <h1 class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display">
+      <h1
+        v-fit-text
+        class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display"
+      >
         {{ title }}
       </h1>
     </header>

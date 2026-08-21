@@ -2,6 +2,8 @@
 import { IconLoader2 } from '@tabler/icons-vue'
 import { useI18n } from 'vue-i18n'
 
+import { vFitText } from '@/shared/lib/fitText'
+
 /**
  * 공용 버튼.
  *
@@ -91,7 +93,11 @@ function handleClick(): void {
     ]"
     @click="handleClick"
   >
-    <span :class="loading ? 'sr-only' : 'truncate'">
+    <!-- 라벨은 16px에서 12px(75%)까지만 줄인다. 더 작으면 버튼인지 읽히지 않는다. 그 아래는 말줄임. -->
+    <span
+      v-fit-text="0.75"
+      :class="loading ? 'sr-only' : 'truncate'"
+    >
       <slot />
     </span>
     <IconLoader2

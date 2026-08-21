@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { IconCheck } from '@tabler/icons-vue'
 
 import AmountInput from '@/shared/ui/AmountInput.vue'
+import { vFitText } from '@/shared/lib/fitText'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
@@ -168,7 +169,10 @@ const handlePaymentError = (message: string): void => {
       >
         ‹
       </AppButton>
-      <h1 class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display">
+      <h1
+        v-fit-text
+        class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display"
+      >
         {{
           step === 'preview'
             ? t('wallet.topUp.previewTitle')

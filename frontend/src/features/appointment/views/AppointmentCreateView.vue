@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { vFitText } from '@/shared/lib/fitText'
 import AppButton from '@/shared/ui/AppButton.vue'
 
 import {
@@ -265,7 +266,10 @@ function confirmExit(): void {
       >
         ‹
       </AppButton>
-      <h1 class="min-w-0 flex-1 truncate font-display text-screen-title text-ink-display">
+      <h1
+        v-fit-text
+        class="min-w-0 flex-1 truncate font-display text-screen-title text-ink-display"
+      >
         {{ t('appointment.create.title') }}
       </h1>
     </header>
