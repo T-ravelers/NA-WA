@@ -12,7 +12,7 @@ import AppCard from '@/shared/ui/AppCard.vue'
 import { createStripeIntent, getTopupMethods, previewTopup } from '../api/topupApi'
 import {
   DEFAULT_TOPUP_METHOD,
-  formatKrw,
+  formatPoints,
   getTopupMethodLabel,
   QUICK_TOPUP_AMOUNTS,
   TOPUP_CURRENCY,
@@ -194,7 +194,10 @@ const handlePaymentError = (message: string): void => {
       <AppCard>
         <AmountInput
           v-model="amount"
+          currency-symbol="P"
+          symbol-position="suffix"
           :label="t('wallet.topUp.amountLabel')"
+          :helper="t('wallet.topUp.pointsRateNotice')"
         />
 
         <div class="mt-4 border-t border-hairline pt-4">
@@ -206,7 +209,7 @@ const handlePaymentError = (message: string): void => {
               class="h-10 rounded-pill border border-hairline-strong text-body-sm font-medium text-ink transition-colors hover:border-paper-fill focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
               @click="setAmount(quickAmount)"
             >
-              +{{ formatKrw(quickAmount) }}
+              +{{ formatPoints(quickAmount) }}
             </button>
           </div>
         </div>
@@ -326,11 +329,11 @@ const handlePaymentError = (message: string): void => {
         <dl class="mt-4 divide-y divide-hairline text-body">
           <div class="flex items-center justify-between py-3 first:pt-0">
             <dt class="text-ink-2">{{ t('wallet.topUp.amountLabel') }}</dt>
-            <dd class="font-semibold text-ink">{{ formatKrw(preview.amount) }}</dd>
+            <dd class="font-semibold text-ink">{{ formatPoints(preview.amount) }}</dd>
           </div>
           <div class="flex items-center justify-between py-3">
             <dt class="text-ink-2">{{ t('wallet.topUp.fee') }}</dt>
-            <dd class="font-semibold text-ink">{{ formatKrw(preview.fee) }}</dd>
+            <dd class="font-semibold text-ink">{{ formatPoints(preview.fee) }}</dd>
           </div>
           <div class="flex items-center justify-between py-3">
             <dt class="text-ink-2">{{ t('wallet.topUp.paymentMethod') }}</dt>
@@ -338,7 +341,9 @@ const handlePaymentError = (message: string): void => {
           </div>
           <div class="flex items-center justify-between pb-0 pt-3">
             <dt class="text-ink-2">{{ t('wallet.topUp.balanceAfter') }}</dt>
-            <dd class="font-semibold text-ink">{{ formatKrw(preview.expectedSandboxBalance) }}</dd>
+            <dd class="font-semibold text-ink">
+              {{ formatPoints(preview.expectedSandboxBalance) }}
+            </dd>
           </div>
         </dl>
       </AppCard>
@@ -428,9 +433,9 @@ const handlePaymentError = (message: string): void => {
       >
         {{ t('wallet.topUp.completeTitle') }}
       </h2>
-      <p class="mt-3 text-data-xl text-success">+{{ formatKrw(preview?.amount ?? 0) }}</p>
+      <p class="mt-3 text-data-xl text-success">+{{ formatPoints(preview?.amount ?? 0) }}</p>
       <p class="mt-2 text-body-sm text-ink-2">
-        {{ t('wallet.topUp.currentBalance', { balance: formatKrw(completedBalance) }) }}
+        {{ t('wallet.topUp.currentBalance', { balance: formatPoints(completedBalance) }) }}
       </p>
 
       <AppButton

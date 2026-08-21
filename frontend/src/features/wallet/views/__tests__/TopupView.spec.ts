@@ -114,7 +114,7 @@ describe('TopupView', () => {
 
     await flushPromises()
 
-    const quickAmount = wrapper.findAll('button').find((button) => button.text() === '+₩30,000')
+    const quickAmount = wrapper.findAll('button').find((button) => button.text() === '+30,000 P')
     expect(quickAmount).toBeDefined()
     await quickAmount?.trigger('click')
     await wrapper
@@ -129,8 +129,8 @@ describe('TopupView', () => {
       currency: 'KRW',
     })
     expect(wrapper.get('h1').text()).toBe('TOP UP PREVIEW')
-    expect(wrapper.text()).toContain('₩30,000')
-    expect(wrapper.text()).toContain('₩114,500')
+    expect(wrapper.text()).toContain('30,000 P')
+    expect(wrapper.text()).toContain('114,500 P')
   })
 
   it('creates a Stripe PaymentIntent before showing the Stripe payment step', async () => {
@@ -139,7 +139,7 @@ describe('TopupView', () => {
     await flushPromises()
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === '+₩30,000')
+      .find((button) => button.text() === '+30,000 P')
       ?.trigger('click')
     await wrapper
       .findAll('button')
@@ -160,6 +160,6 @@ describe('TopupView', () => {
     expect(vi.mocked(createStripeIntent).mock.calls[0]?.[1]).toEqual(expect.any(String))
     expect(wrapper.get('h1').text()).toBe('PAYMENT')
     expect(wrapper.text()).toContain('Stripe payment form could not be loaded')
-    expect(wrapper.text()).toContain('Pay ₩30,000')
+    expect(wrapper.text()).toContain('Pay 30,000 P')
   })
 })

@@ -1,4 +1,4 @@
-export { formatKrw } from '@/shared/lib/money'
+export { formatPoints } from '@/shared/lib/money'
 
 export const TOPUP_CURRENCY = 'KRW'
 export const DEFAULT_TOPUP_METHOD = 'STRIPE_CARD'

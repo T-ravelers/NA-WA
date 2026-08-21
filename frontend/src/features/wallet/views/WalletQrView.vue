@@ -13,7 +13,7 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { listActiveQrPayments } from '../api/qrPaymentApi'
-import { formatKrw, qrPaymentKeys, type QrPaymentCreateResponse } from '../model/qrPayment'
+import { formatPoints, qrPaymentKeys, type QrPaymentCreateResponse } from '../model/qrPayment'
 import { parseServerDateTime } from '../model/walletHome'
 import { useWalletHome } from '../model/walletQueries'
 
@@ -103,7 +103,7 @@ const displayAmount = computed(() => {
 
   return amount === undefined || amount === null
     ? t('wallet.qr.amountEnteredByPayer')
-    : formatKrw(amount)
+    : formatPoints(amount)
 })
 
 const expiresAtLabel = computed(() => {
@@ -302,7 +302,9 @@ const createNewQr = (): void => {
                 </span>
                 <span class="shrink-0 text-body-sm text-ink-2">
                   {{
-                    qr.amount === null ? t('wallet.qr.amountEnteredByPayer') : formatKrw(qr.amount)
+                    qr.amount === null
+                      ? t('wallet.qr.amountEnteredByPayer')
+                      : formatPoints(qr.amount)
                   }}
                 </span>
               </button>
