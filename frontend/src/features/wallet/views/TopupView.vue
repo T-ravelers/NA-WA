@@ -83,7 +83,7 @@ watch(enabledMethods, (methods) => {
 })
 
 const setAmount = (nextAmount: number): void => {
-  amount.value = nextAmount
+  amount.value = (amount.value ?? 0) + nextAmount
 }
 
 const submitPreview = (): void => {
