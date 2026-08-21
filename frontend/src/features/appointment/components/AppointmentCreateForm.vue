@@ -62,7 +62,6 @@ const draft = reactive<AppointmentFormDraft>({
   meetingPlace: '',
   activityStartTime: '',
   activityEndTime: '',
-  joinDeadline: '',
 })
 
 // "이 자리에서 그대로 만난다"를 고르면 항목 위치가 그대로 meetingPlace가 된다.
@@ -133,8 +132,8 @@ clearErrorsOnEdit(
   ['appointmentName', 'maxMembers', 'languageCode', 'meetingPlace'],
 )
 clearErrorsOnEdit(
-  () => [draft.activityStartTime, draft.activityEndTime, draft.joinDeadline, draft.depositAmount],
-  ['activityStartTime', 'activityEndTime', 'joinDeadline', 'depositAmount'],
+  () => [draft.activityStartTime, draft.activityEndTime, draft.depositAmount],
+  ['activityStartTime', 'activityEndTime', 'depositAmount'],
 )
 
 const languageOptions: AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
@@ -399,12 +398,6 @@ defineExpose({ goToPreviousStep })
             type="time"
             :label="t('appointment.create.endAt')"
             :error="translatedError(errors.activityEndTime)"
-          />
-          <TextInput
-            v-model="draft.joinDeadline"
-            type="datetime-local"
-            :label="t('appointment.create.joinDeadline')"
-            :error="translatedError(errors.joinDeadline)"
           />
         </div>
         <AmountInput

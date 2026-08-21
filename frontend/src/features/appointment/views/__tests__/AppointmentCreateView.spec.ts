@@ -104,7 +104,6 @@ async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> 
 
   await wrapper.find('input[type="time"]').setValue('18:30')
   await wrapper.findAll('input[type="time"]')[1]?.setValue('22:00')
-  await wrapper.find('input[type="datetime-local"]').setValue('2026-08-08T17:30')
   await wrapper.find('input[inputmode="numeric"]').setValue('10000')
   await wrapper.get('form').trigger('submit')
   await buttonByText(wrapper, 'Confirm').trigger('click')
@@ -270,7 +269,6 @@ describe('AppointmentCreateView', () => {
       meetingPlace: 'DDP Design Plaza',
       activityStartAt: '2026-08-08T18:30:00',
       activityEndAt: '2026-08-08T22:00:00',
-      joinDeadline: '2026-08-08T17:30:00',
       hostDisplayName: 'Mina Park',
       description: null,
       members: [],

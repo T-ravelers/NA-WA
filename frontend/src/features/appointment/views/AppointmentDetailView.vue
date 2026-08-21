@@ -84,11 +84,10 @@ const statusTone = computed(() =>
   appointment.value?.appointmentStatus === 'RECRUITING' ? 'ongoing' : 'neutral',
 )
 
-const isJoinAvailable = computed(() => {
-  if (appointment.value?.appointmentStatus !== 'RECRUITING') return false
-  const deadline = parseServerDateTime(appointment.value.joinDeadline)
-  return deadline !== null && Date.now() < deadline.getTime()
-})
+// 참여 가능 여부를 클라이언트 시계로 다시 재지 않는다. 서버가 정원이 찬 약속을
+// FULL로, 활동이 시작된 약속을 IN_PROGRESS로 계산해 내려주므로 RECRUITING이라는
+// 값 자체가 "지금 참여할 수 있다"를 뜻한다 — 나가기·출석 확정과 같은 근거다.
+const isJoinAvailable = computed(() => appointment.value?.appointmentStatus === 'RECRUITING')
 // 참여 버튼은 어떤 경우에도 눌린다. 비활성 버튼은 왜 안 되는지 말해 줄 방법이
 // 마땅치 않아서다(모바일이라 hover도 없다). 대신 막히는 이유는 누르기 전부터
 // 버튼 위에 한 줄로 떠 있는다. 눌러 봐야 아는 화면은 제일 큰 CTA를 "눌리기는
@@ -114,11 +113,11 @@ const isAttendedMember = computed(
   () => isActiveMember.value && participation.value?.attendanceStatus === 'ATTENDED',
 )
 
-// 나가기는 활동 종료 전까지 열린다. 시작 전(RECRUITING·CLOSED)에는 보증금을
+// 나가기는 활동 종료 전까지 열린다. 시작 전(RECRUITING·FULL)에는 보증금을
 // 환급받는 탈퇴, 활동 중(IN_PROGRESS)에는 노쇼로 굳어 보증금이 몰수되는
 // 탈퇴다. 어느 구간인지는 클라이언트 시계로 재지 않고 서버가 계산한 표시
 // 상태로 가른다 — 출석 확정 게이트와 같은 근거다.
-const LEAVE_OPEN_STATUSES: AppointmentStatus[] = ['RECRUITING', 'CLOSED', 'IN_PROGRESS']
+const LEAVE_OPEN_STATUSES: AppointmentStatus[] = ['RECRUITING', 'FULL', 'IN_PROGRESS']
 const isLeaveNoShow = computed(() => appointment.value?.appointmentStatus === 'IN_PROGRESS')
 // 세 항목은 언제나 시트에 있고, 조건을 만족하지 않으면 이유와 함께 비활성이다.
 // 조건에 맞는 것만 넣으면 시트가 열 때마다 다른 모양이 되고 나머지 기능이
@@ -457,16 +456,10 @@ function confirmJoin(): void {
                 {{ t(`appointment.languages.${appointment.languageCode}`) }}
               </dd>
             </div>
-            <div class="grid grid-cols-[7rem_1fr] gap-3 py-3">
+            <div class="grid grid-cols-[7rem_1fr] gap-3 py-3 last:pb-0">
               <dt class="text-caption text-ink-3">{{ t('appointment.detail.deposit') }}</dt>
               <dd class="text-body-sm text-ink">
                 {{ t('appointment.points', { amount: formatDeposit(appointment.depositAmount) }) }}
-              </dd>
-            </div>
-            <div class="grid grid-cols-[7rem_1fr] gap-3 py-3 last:pb-0">
-              <dt class="text-caption text-ink-3">{{ t('appointment.detail.joinDeadline') }}</dt>
-              <dd class="text-body-sm text-ink">
-                {{ formatDateTime(appointment.joinDeadline) }}
               </dd>
             </div>
           </dl>
