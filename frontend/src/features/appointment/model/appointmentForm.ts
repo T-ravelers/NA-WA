@@ -6,6 +6,8 @@ import type {
 
 export const MIN_APPOINTMENT_DEPOSIT = 5_000
 export const MAX_APPOINTMENT_DEPOSIT = 50_000
+/** 생성 폼이 처음 보여주는 보증금. 방장이 비워둔 채 넘어가지 않게 범위 안의 값으로 시작한다. */
+export const DEFAULT_APPOINTMENT_DEPOSIT = 10_000
 export const MAX_MEETING_PLACE_LENGTH = 200
 export const MIN_APPOINTMENT_MEMBERS = 2
 export const MAX_APPOINTMENT_MEMBERS = 10

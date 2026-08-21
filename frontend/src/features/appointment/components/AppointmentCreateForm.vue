@@ -12,6 +12,7 @@ import type {
   AppointmentLanguage,
 } from '../api/appointmentApi'
 import {
+  DEFAULT_APPOINTMENT_DEPOSIT,
   MAX_APPOINTMENT_DEPOSIT,
   MAX_APPOINTMENT_MEMBERS,
   MIN_APPOINTMENT_DEPOSIT,
@@ -57,7 +58,7 @@ const draft = reactive<AppointmentFormDraft>({
   appointmentName: '',
   maxMembers: 4,
   languageCode: 'en',
-  depositAmount: null,
+  depositAmount: DEFAULT_APPOINTMENT_DEPOSIT,
   meetingPlaceMode: 'ITEM',
   meetingPlace: '',
   activityStartTime: '',

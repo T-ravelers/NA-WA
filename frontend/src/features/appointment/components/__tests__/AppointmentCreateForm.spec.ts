@@ -333,6 +333,27 @@ describe('AppointmentCreateForm', () => {
     expect(wrapper.text()).not.toContain('The end time must be after the start time.')
   })
 
+  it('starts the deposit at 10,000 so the host can keep it without typing', async () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
+      ...mountOptions,
+    })
+
+    await fillBasics(wrapper)
+
+    expect(wrapper.find<HTMLInputElement>('input[inputmode="numeric"]').element.value).toBe(
+      '10,000',
+    )
+
+    await wrapper.find('input[type="time"]').setValue('18:30')
+    await wrapper.findAll('input[type="time"]')[1]?.setValue('22:00')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.text()).not.toContain('Choose a deposit between 5,000 P and 50,000 P.')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('10,000')
+  })
+
   it('rejects a deposit outside the configured range', async () => {
     const wrapper = mount(AppointmentCreateForm, {
       props: { itemId: 42, itemType: 'PLACE' },
