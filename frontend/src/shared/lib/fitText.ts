@@ -7,6 +7,9 @@ import type { Directive } from 'vue'
  * 읽을 수 없다. 하한(기본 50%)까지 줄여도 안 들어갈 때만 기존 `truncate`가 남는다.
  * 34px 화면 제목은 17px까지 내려간다 — `TRANSACTION DETAILS`가 390px에서 필요한 비율이 0.55다.
  *
+ * `.wrap` 수식어를 주면 하한에서도 안 들어갈 때 말줄임 대신 **줄을 꺾는다.** 버튼처럼 칸이 좁고
+ * 높이에 여유가 있는 곳에 쓴다(48px 버튼에 12px 두 줄이 들어간다).
+ *
  * 마운트·다시 그릴 때·칸 폭이 바뀔 때·폰트가 늦게 도착했을 때 글자 크기를 원래 값으로 되돌린 뒤
  * 다시 잰다. 원래 값은 클래스(토큰)가 정하므로 inline `font-size`만 비우면 된다.
  *
@@ -14,7 +17,7 @@ import type { Directive } from 'vue'
  *
  * ```vue
  * <h1 v-fit-text class="truncate text-screen-title">{{ title }}</h1>
- * <span v-fit-text="0.75" class="truncate">{{ label }}</span>
+ * <span v-fit-text.wrap="0.75" class="truncate">{{ label }}</span>
  * ```
  */
 const DEFAULT_MIN_RATIO = 0.5
@@ -24,6 +27,7 @@ const EXTRA_PASSES = 3
 
 interface FitState {
   minRatio: number
+  wrap: boolean
   lastWidth: number
   lastText: string
   observer: ResizeObserver | null
@@ -58,10 +62,13 @@ function contentWidth(el: HTMLElement): number {
 /**
  * 글자 크기를 원래 값으로 되돌린 뒤, 넘치는 만큼 줄인다.
  *
- * 디렉티브 밖에서도 쓸 수 있게 순수 함수로 둔다. `minRatio`는 원래 크기 대비 하한(0–1)이다.
+ * 디렉티브 밖에서도 쓸 수 있게 순수 함수로 둔다. `minRatio`는 원래 크기 대비 하한(0–1)이고,
+ * `wrap`이 참이면 하한에서도 안 들어갈 때 줄을 꺾는다.
  */
-export function fitText(el: HTMLElement, minRatio = DEFAULT_MIN_RATIO): void {
+export function fitText(el: HTMLElement, minRatio = DEFAULT_MIN_RATIO, wrap = false): void {
   el.style.fontSize = ''
+  el.style.whiteSpace = ''
+  el.style.textAlign = ''
 
   const base = Number.parseFloat(getComputedStyle(el).fontSize)
   const available = el.clientWidth
@@ -72,17 +79,29 @@ export function fitText(el: HTMLElement, minRatio = DEFAULT_MIN_RATIO): void {
   }
 
   let ratio = available / needed
+  let reachedFloor = false
 
   for (let pass = 0; pass <= EXTRA_PASSES; pass += 1) {
     const applied = Math.max(minRatio, ratio)
 
     el.style.fontSize = `${(base * applied).toFixed(2)}px`
 
-    if (applied === minRatio || contentWidth(el) <= el.clientWidth) {
+    if (contentWidth(el) <= el.clientWidth) {
       return
     }
 
+    if (applied === minRatio) {
+      reachedFloor = true
+      break
+    }
+
     ratio *= 0.98
+  }
+
+  // 하한까지 줄여도 안 들어간다. 말줄임이 기본이고, `.wrap`이면 두 줄로 꺾는다.
+  if (wrap && reachedFloor) {
+    el.style.whiteSpace = 'normal'
+    el.style.textAlign = 'center'
   }
 }
 
@@ -93,7 +112,7 @@ function refit(el: HTMLElement): void {
     return
   }
 
-  fitText(el, state.minRatio)
+  fitText(el, state.minRatio, state.wrap)
   state.lastWidth = el.clientWidth
   state.lastText = el.textContent ?? ''
 }
@@ -114,6 +133,7 @@ export const vFitText: Directive<HTMLElement, number | undefined> = {
   mounted(el, binding) {
     const state: FitState = {
       minRatio: resolveMinRatio(binding.value),
+      wrap: binding.modifiers.wrap === true,
       lastWidth: -1,
       lastText: '',
       observer: null,
@@ -146,6 +166,7 @@ export const vFitText: Directive<HTMLElement, number | undefined> = {
     }
 
     state.minRatio = resolveMinRatio(binding.value)
+    state.wrap = binding.modifiers.wrap === true
 
     if (el.textContent !== state.lastText || el.clientWidth !== state.lastWidth) {
       refit(el)

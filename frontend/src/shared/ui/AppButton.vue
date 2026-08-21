@@ -93,9 +93,10 @@ function handleClick(): void {
     ]"
     @click="handleClick"
   >
-    <!-- 라벨은 16px에서 12px(75%)까지만 줄인다. 더 작으면 버튼인지 읽히지 않는다. 그 아래는 말줄임. -->
+    <!-- 라벨은 16px에서 12px(75%)까지만 줄인다. 더 작으면 버튼인지 읽히지 않는다.
+         그래도 안 들어가면 말줄임 대신 두 줄로 꺾는다 — 48px 버튼에 12px 두 줄이 들어간다. -->
     <span
-      v-fit-text="0.75"
+      v-fit-text.wrap="0.75"
       :class="loading ? 'sr-only' : 'truncate'"
     >
       <slot />

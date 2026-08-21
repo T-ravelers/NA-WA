@@ -52,12 +52,14 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function mountTitle(text: string, minRatio?: number) {
+function mountTitle(text: string, minRatio?: number, modifiers: Record<string, boolean> = {}) {
   const title = ref(text)
   const Title = defineComponent({
     setup() {
       return () =>
-        withDirectives(h('h1', { class: 'truncate' }, title.value), [[vFitText, minRatio]])
+        withDirectives(h('h1', { class: 'truncate' }, title.value), [
+          [vFitText, minRatio, '', modifiers],
+        ])
     },
   })
   const wrapper = mount(Title)
@@ -124,6 +126,34 @@ describe('fitText', () => {
     box.available = 300
     fitText(el)
     expect(el.style.fontSize).toBe('')
+  })
+
+  it('keeps truncating at the floor without the wrap modifier', () => {
+    box.available = 100
+
+    const { el } = mountTitle('A title that is much longer than the column')
+
+    expect(el.style.whiteSpace).toBe('')
+    expect(el.style.textAlign).toBe('')
+  })
+
+  it('wraps instead of truncating when the floor is not enough and .wrap is set', () => {
+    box.available = 100
+
+    const { el } = mountTitle('A title that is much longer than the column', 0.75, { wrap: true })
+
+    expect(Number.parseFloat(el.style.fontSize)).toBeCloseTo(BASE_FONT_SIZE * 0.75, 2)
+    expect(el.style.whiteSpace).toBe('normal')
+    expect(el.style.textAlign).toBe('center')
+  })
+
+  it('does not wrap when shrinking was enough', () => {
+    const { el } = mountTitle('TRANSACTION DETAILS', 0.5, { wrap: true }) // 190px
+
+    box.available = 152 // 80%면 들어간다
+    fitText(el, 0.5, true)
+
+    expect(el.style.whiteSpace).toBe('')
   })
 
   it('does nothing when the element has no width yet', () => {
