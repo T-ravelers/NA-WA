@@ -1,0 +1,136 @@
+import { mount } from '@vue/test-utils'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, nextTick, ref, withDirectives } from 'vue'
+
+import { fitText, vFitText } from './fitText'
+
+/**
+ * jsdom은 레이아웃을 계산하지 않는다. 칸 폭과 글자 폭을 흉내 낸다.
+ *
+ * - `clientWidth`: 칸 폭. 테스트가 `box.available`로 정한다.
+ * - `scrollWidth`: 글자 폭. 글자 수 × 글자당 폭 × (현재 글자 크기 / 기본 34px).
+ */
+const BASE_FONT_SIZE = 34
+const box = { available: 300, widthPerChar: 10 }
+
+function currentFontSize(el: HTMLElement): number {
+  const inline = Number.parseFloat(el.style.fontSize)
+
+  return Number.isFinite(inline) ? inline : BASE_FONT_SIZE
+}
+
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get: () => box.available,
+  })
+  Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+    configurable: true,
+    get(this: HTMLElement) {
+      const chars = this.textContent?.length ?? 0
+
+      return Math.round((chars * box.widthPerChar * currentFontSize(this)) / BASE_FONT_SIZE)
+    },
+  })
+})
+
+afterAll(() => {
+  // jsdom 원래 getter(Element.prototype)로 돌아가게 덮어쓴 것을 지운다.
+  Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth')
+  Reflect.deleteProperty(HTMLElement.prototype, 'scrollWidth')
+})
+
+beforeEach(() => {
+  box.available = 300
+  box.widthPerChar = 10
+  vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+    fontSize: `${BASE_FONT_SIZE}px`,
+  } as CSSStyleDeclaration)
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+function mountTitle(text: string, minRatio?: number) {
+  const title = ref(text)
+  const Title = defineComponent({
+    setup() {
+      return () =>
+        withDirectives(h('h1', { class: 'truncate' }, title.value), [[vFitText, minRatio]])
+    },
+  })
+  const wrapper = mount(Title)
+
+  return { wrapper, title, el: wrapper.element as HTMLElement }
+}
+
+describe('fitText', () => {
+  it('leaves the font size alone when the text fits', () => {
+    const { el } = mountTitle('Wallet') // 6자 × 10px = 60px < 300px
+
+    expect(el.style.fontSize).toBe('')
+  })
+
+  it('shrinks the font size by the overflow ratio', () => {
+    const { el } = mountTitle('TRANSACTION DETAILS') // 19자 × 10px = 190px
+
+    box.available = 152 // 190 → 152 = 80%
+    fitText(el)
+
+    expect(Number.parseFloat(el.style.fontSize)).toBeCloseTo(27.2, 2)
+  })
+
+  it('never shrinks below the minimum ratio', () => {
+    box.available = 100
+
+    const { el } = mountTitle('A title that is much longer than the column') // 43자 = 430px
+
+    expect(Number.parseFloat(el.style.fontSize)).toBeCloseTo(BASE_FONT_SIZE * 0.5, 2)
+  })
+
+  it('accepts a custom minimum ratio through the directive value', () => {
+    box.available = 100
+
+    const { el } = mountTitle('A title that is much longer than the column', 0.8)
+
+    expect(Number.parseFloat(el.style.fontSize)).toBeCloseTo(BASE_FONT_SIZE * 0.8, 2)
+  })
+
+  it('refits when the text changes after mount', async () => {
+    const { el, title } = mountTitle('Short')
+
+    expect(el.style.fontSize).toBe('')
+
+    title.value = 'A much longer title for this screen' // 35자 = 350px > 300px
+    await nextTick()
+
+    expect(el.style.fontSize).not.toBe('')
+    expect(Number.parseFloat(el.style.fontSize)).toBeLessThan(BASE_FONT_SIZE)
+
+    title.value = 'Short'
+    await nextTick()
+
+    expect(el.style.fontSize).toBe('')
+  })
+
+  it('resets to the token size before measuring again', () => {
+    const { el } = mountTitle('TRANSACTION DETAILS')
+
+    box.available = 152 // 190 → 152 = 80%
+    fitText(el)
+    expect(Number.parseFloat(el.style.fontSize)).toBeCloseTo(27.2, 2)
+
+    box.available = 300
+    fitText(el)
+    expect(el.style.fontSize).toBe('')
+  })
+
+  it('does nothing when the element has no width yet', () => {
+    box.available = 0
+
+    const { el } = mountTitle('TRANSACTION DETAILS')
+
+    expect(el.style.fontSize).toBe('')
+  })
+})
