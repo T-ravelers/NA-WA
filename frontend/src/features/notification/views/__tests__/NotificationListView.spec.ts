@@ -62,6 +62,49 @@ beforeEach(() => {
 })
 
 describe('NotificationListView', () => {
+  /*
+   * 버튼에 aria-label을 걸면 그 말이 버튼 이름을 통째로 덮어써서, 화면을 못 보는 사람은
+   * 알림마다 똑같은 한 마디만 듣게 된다. 안의 글이 그대로 이름이 되어야 한다.
+   */
+  it('알림 문장이 버튼의 이름을 덮어쓰이지 않고 그대로 읽힌다', async () => {
+    fetchNotifications.mockResolvedValue([REQUESTED])
+
+    const wrapper = await mountView()
+    const button = wrapper.get('li button')
+
+    expect(button.attributes('aria-label')).toBeUndefined()
+    expect(button.text()).toContain('Ari asked you for')
+  })
+
+  /*
+   * 안 읽음을 점 하나로만 말하면 화면을 못 보는 사람에게는 아무 말도 하지 않은 것과 같다.
+   */
+  it('안 읽은 알림은 눈에 보이지 않는 말로도 안 읽음을 알린다', async () => {
+    fetchNotifications.mockResolvedValue([REQUESTED])
+
+    const wrapper = await mountView()
+
+    expect(wrapper.get('li button .sr-only').text()).toBe('Unread')
+  })
+
+  /*
+   * 들어오자마자 전부 읽음으로 바꾸기 때문에, 서버 응답을 그대로 따라가면 점이 찍히자마자
+   * 지워진다. 사용자가 목록을 여는 이유가 바로 무엇이 새로 왔는지 보는 것이다.
+   *
+   * 그래서 목록을 다시 받아 와 전부 읽음으로 바뀌더라도 이번 방문의 표시는 유지되어야
+   * 한다. 두 번째 응답을 읽음 상태로 두어 그 상황을 그대로 만든다.
+   */
+  it('읽음 처리 뒤 목록을 다시 받아도 이번 방문에서는 안 읽음 표시가 남는다', async () => {
+    fetchNotifications.mockResolvedValueOnce([REQUESTED])
+    fetchNotifications.mockResolvedValue([{ ...REQUESTED, readAt: '2026-08-21T12:05:00' }])
+
+    const wrapper = await mountView()
+    await queryClient.refetchQueries({ queryKey: ['notifications', 'list'] })
+    await flushPromises()
+
+    expect(wrapper.find('li button .sr-only').exists()).toBe(true)
+  })
+
   it('알림 종류에 맞는 문장으로 그린다', async () => {
     fetchNotifications.mockResolvedValue([
       REQUESTED,
@@ -109,7 +152,7 @@ describe('NotificationListView', () => {
     const router = createTestRouter()
 
     const wrapper = await mountView(router)
-    await wrapper.get('button[aria-label="Open this split"]').trigger('click')
+    await wrapper.get('li button').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('settlement-detail')
@@ -123,7 +166,7 @@ describe('NotificationListView', () => {
     const router = createTestRouter()
 
     const wrapper = await mountView(router)
-    await wrapper.get('button[aria-label="Open this split"]').trigger('click')
+    await wrapper.get('li button').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.query.side).toBe('sent')
@@ -134,7 +177,7 @@ describe('NotificationListView', () => {
     const router = createTestRouter()
 
     const wrapper = await mountView(router)
-    await wrapper.get('button[aria-label="Open this split"]').trigger('click')
+    await wrapper.get('li button').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.query.side).toBeUndefined()

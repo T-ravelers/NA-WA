@@ -78,8 +78,10 @@ export function useNotifications() {
 /**
  * 목록에 들어갈 때 전부 읽음으로 바꾼다.
  *
- * 개수와 목록 두 key만 다시 받는다. 알림 캐시 전체를 비우지 않는 이유는, 방금 그린 목록을
- * 읽음 표시만 바꾸려고 통째로 버릴 이유가 없기 때문이다.
+ * 벨 개수만 다시 받고 **목록은 건드리지 않는다.** 목록까지 무효화하면 방금 그린 화면을
+ * 곧바로 다시 받아 오는데, 그 응답은 전부 읽음 상태라 안 읽음 표시가 눈앞에서 지워진다.
+ * 사용자가 알림 목록을 여는 이유가 바로 "무엇이 새로 왔는지" 보는 것이라, 그걸 지워 버리면
+ * 요청 한 번을 더 쓰고 화면은 더 나빠진다. 목록은 다음에 들어올 때 새로 받는다.
  */
 export function useReadAllNotifications() {
   const queryClient = useQueryClient()
@@ -88,7 +90,6 @@ export function useReadAllNotifications() {
     mutationFn: readAllNotifications,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() })
-      void queryClient.invalidateQueries({ queryKey: notificationKeys.list() })
     },
   })
 }
