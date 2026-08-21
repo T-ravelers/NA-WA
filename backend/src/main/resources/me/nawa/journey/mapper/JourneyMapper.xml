@@ -238,7 +238,9 @@
             resultType="me.nawa.journey.domain.JourneyExploreItem">
         SELECT
             ei.item_id,
-            ei.item_type
+            ei.item_type,
+            e.start_date,
+            e.end_date
         FROM explore_items ei
         LEFT JOIN event e
           ON e.event_id = ei.item_id

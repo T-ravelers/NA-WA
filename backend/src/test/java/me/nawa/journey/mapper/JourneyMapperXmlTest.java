@@ -133,6 +133,9 @@ class JourneyMapperXmlTest {
             .trim();
         assertTrue(availableItemSql.contains("ei.approval_status = 'APPROVED'"));
         assertTrue(availableItemSql.contains("ei.visibility_status = 'VISIBLE'"));
+        // 항목 운영 기간 검사(JOURNEY-012)가 읽는 컬럼이다. 빠지면 검사가 조용히 통과한다.
+        assertTrue(availableItemSql.contains("e.start_date"));
+        assertTrue(availableItemSql.contains("e.end_date"));
         assertTrue(availableItemSql.contains(
             "(e.end_date IS NULL OR e.end_date >= CURRENT_DATE())"
         ));
