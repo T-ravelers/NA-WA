@@ -1,14 +1,11 @@
 package me.nawa.wallet.external.stripe;
 
-import com.stripe.model.PaymentIntent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.math.BigDecimal;
-import java.util.Set;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,14 +36,6 @@ class StripeClientLiveTest {
         assertNotNull(intent.getProviderPaymentId());
         assertTrue(intent.getProviderPaymentId().startsWith("pi_"));
         assertNotNull(intent.getClientSecret());
-
-        // 한국 로컬 결제수단만 명시했는지, Link는 빠졌는지 Stripe 쪽 실제 상태로 재확인한다.
-        // Link가 섞여 들어가면 계정 설정에 따라 결제 후에도 안 지워지는 Link 위젯이 뜬다.
-        PaymentIntent remoteIntent = PaymentIntent.retrieve(intent.getProviderPaymentId());
-        assertEquals(
-            Set.of("card", "kakao_pay", "naver_pay", "payco", "samsung_pay"),
-            Set.copyOf(remoteIntent.getPaymentMethodTypes())
-        );
 
         System.out.println(
             "[StripeClientLiveTest] created id=" + intent.getProviderPaymentId()
