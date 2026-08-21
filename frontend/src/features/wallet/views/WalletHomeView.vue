@@ -23,7 +23,7 @@ import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
-import { toWalletHomeData, type ActivityKind } from '../model/walletHome'
+import { activityLabelKey, toWalletHomeData, type ActivityKind } from '../model/walletHome'
 import { useWalletHome } from '../model/walletQueries'
 
 const i18n = useI18n()
@@ -195,7 +195,7 @@ const errorDescription = computed(() => {
 
               <div class="min-w-0 flex-1">
                 <p class="truncate text-title-sm text-ink">
-                  {{ t(`wallet.home.activity.${activity.kind}`) }}
+                  {{ t(activityLabelKey(activity.kind, activity.outgoing)) }}
                 </p>
                 <p
                   v-if="activity.occurredAt !== null"
@@ -207,16 +207,6 @@ const errorDescription = computed(() => {
 
               <div class="shrink-0 text-right">
                 <p class="text-title-sm text-ink">{{ formatPoints(activity.signedAmount) }}</p>
-                <p
-                  class="mt-0.5 text-caption"
-                  :class="activity.settled ? 'text-success' : 'text-settlement'"
-                >
-                  {{
-                    activity.settled
-                      ? t('wallet.home.activityStatus.settled')
-                      : t('wallet.home.activityStatus.available')
-                  }}
-                </p>
               </div>
             </div>
           </AppCard>

@@ -10,13 +10,43 @@
 | `GET /api/v1/settlements` | 현재 사용자가 생성했거나 지급할 정산 목록을 조회한다. |
 | `GET /api/v1/settlements/candidates` | 생성 가능한 원거래와 약속 참가자 후보를 조회한다. |
 | `POST /api/v1/appointments/{appointmentId}/settlements` | 원거래와 분담 규칙으로 정산을 생성한다. |
-| `GET /api/v1/settlements/{settlementId}` | 참여한 정산의 상태, 개인 부담금과 ITEMIZED 품목 배분을 조회한다. |
+| `GET /api/v1/settlements/{settlementId}` | 참여한 정산의 상태, 개인 부담금과 ITEMIZED 품목 배분을 조회한다. 원결제자에게는 참여자별 납부 현황도 함께 내려준다. |
 | `POST /api/v1/settlements/{settlementId}/members/me/pay` | 현재 사용자의 미지급 부담금을 지급한다. |
 | `POST /api/v1/settlement-receipts` | 영수증 사진을 올리고 `receiptId`를 받는다. |
 | `POST /api/v1/settlement-receipts/{receiptId}/ocr` | 올려 둔 사진에서 품목 초안을 읽는다. |
 | `GET /api/v1/settlements/{settlementId}/receipt` | 정산에 붙은 영수증 사진을 조회한다. |
 
 생성 요청과 지급 요청에는 각각 `Idempotency-Key` 헤더가 필요하며, 값은 1~100자다.
+
+## 정산 목록 응답의 시각
+
+`GET /api/v1/settlements`의 각 요약은 `createdAt`과 `completedAt`을 함께 반환한다. 형식은
+`yyyy-MM-dd'T'HH:mm:ss`이고 기준 시간대는 서버와 같은 `Asia/Seoul`이다.
+
+`completedAt`은 **애플리케이션이 넘긴 시각**을 기록한다. DB의 `CURRENT_TIMESTAMP`를 쓰지
+않는다. 이 값이 기간 필터의 기준이 되므로, DB 시계에 기대면 시간대 설정이 어긋나는 순간
+경계 근처의 정산이 통째로 다른 날짜로 묶인다.
+
+**두 시각은 서로 다른 시계에서 나온다.** 아래 표가 정본이다.
+
+| 필드 | 값을 적는 쪽 | 기준 시계 |
+| --- | --- | --- |
+| `createdAt` | `settlements.created_at`의 컬럼 기본값 `CURRENT_TIMESTAMP` | DB 세션 시간대 |
+| `completedAt` | 애플리케이션이 넘긴 `LocalDateTime.now()` | JVM 시간대 |
+
+`created_at`을 DB가 적는 것은 이 저장소의 모든 테이블이 그렇게 하기 때문이고, 정산만
+바꾸면 오히려 규칙이 갈린다. 대신 **두 값이 같은 기준으로 읽히려면 DB와 애플리케이션의
+시간대가 맞아 있어야 한다.** 운영은 맞춰 두었다 — `docker-compose.yml`의 `mysql`이
+`--default-time-zone=+09:00`이고 백엔드 컨테이너가 `TZ=Asia/Seoul`이다(#294). CI는 이
+맞춤을 **일부러 깨서**(MySQL만 UTC) DB 시계에 기대는 코드가 드러나게 한다. 세 곳의 설정은
+[AGENTS.md](../../AGENTS.md)와 [docs/TECH_STACK.md](../../docs/TECH_STACK.md)가 정본이다.
+
+`completedAt`은 settlement가 `COMPLETED`로 전이한 시각이며, `REQUESTED`인 동안에는 `null`이다.
+이 필드를 남기기 시작한 시점보다 먼저 완료된 정산도 `null`이다. `updated_at`이 갱신되지 않는
+스키마라 되살릴 근거 값이 없어 데이터를 보정하지 않았다. 완료 시각으로 목록을 거르거나
+표시하는 클라이언트는 `completedAt`이 없으면 `createdAt`으로 대신한다.
+
+목록 정렬은 지금도 `created_at` 내림차순이며 이 응답 필드가 정렬을 바꾸지 않는다.
 
 ## 정산 후보 생성 문맥
 
@@ -61,6 +91,38 @@ URL의 경로 변수이고, `transferId`는 생성 요청의 `sourceTransferId`�
 양수 부담금(`shareAmount > 0`)을 가진 지급 대상자가 최소 한 명 있어야 한다. 원결제자만
 선택한 요청은 `SETTLEMENT-005`(400)으로 거절한다. 원결제자 외 선택한 모든 참여자는
 양수 부담금을 가져야 한다.
+
+## 정산 상세의 납부 현황
+
+`GET /api/v1/settlements/{settlementId}`는 `collection`을 함께 반환한다. 원결제자에게만
+채워 주고 그 밖의 참여자에게는 `null`이다. 빈 배열이 아니라 `null`인 것은 "볼 수 없다"와
+"청구한 상대가 없다"를 구분하기 위해서다. 참여자가 다른 참여자의 납부 여부를 보는 경로는
+아직 없다.
+
+| 필드 | 내용 |
+| --- | --- |
+| `collection.totalCount` | 청구한 상대 수. **원결제자 본인은 세지 않는다.** |
+| `collection.paidCount` | 그중 지급을 마친 수 |
+| `collection.participants[].id` | 회원 ID가 아닌 `appointment_member_id` |
+| `collection.participants[].name` · `initials` | 표시용 이름과 이름 첫 글자 |
+| `collection.participants[].shareAmount` | 그 사람의 부담금 |
+| `collection.participants[].requestStatus` | `PENDING` 또는 `PAID` |
+
+`participants`에는 `request_status`가 `NOT_REQUESTED`가 아닌 구성원만 담는다. 이 상태는
+생성자에게만 붙고 생성자가 곧 원결제자이므로(`chk_settlements_creator_is_payer`), 결과적으로
+원결제자 본인 행이 빠진다. 본인을 세면 자기 자신에게 보낼 돈이 없어 전원이 지급해도
+`paidCount`가 `totalCount`에 닿지 못한다.
+
+**고르는 기준은 `COMPLETED` 전이 조건과 글자 그대로 같다.** 둘 다 정산 구성원 행만 보고
+약속 참가 쪽 상태(`membership_status`·`deleted_at`)는 보지 않는다. 약속에서 나가든 참가
+기록이 지워지든 이미 진 빚은 그대로라 정산은 그 사람이 낼 때까지 끝나지 않기 때문이다.
+목록만 한 사람이라도 더 걸러내면 화면은 다 냈다고 말하는데 정산은 `REQUESTED`에 멈춰 있고
+원결제자가 그 이유를 볼 방법이 없어진다. 약속 참가 행을 잇는 것은 이름을 얻기 위해서다.
+
+정렬은 **아직 내지 않은 사람이 먼저**이고, 같은 상태 안에서는 `appointment_member_id`
+오름차순이다(EQUAL 나머지 배분 순서와 같다). 이 목록을 여는 이유가 "누가 아직 안 냈나"라서,
+낸 사람 사이에 섞으면 원결제자가 배지를 하나씩 훑어야 한다. 사람이 지급할 때마다 그 행이
+아래로 내려가므로 목록의 위쪽은 항상 남은 사람이다.
 
 ## 멱등성
 
@@ -221,8 +283,13 @@ GET  /api/v1/settlements/{id}/receipt        → 이미지 바이트
 않다.
 
 `recognizedTotal`은 영수증에 찍힌 합계다. 할인이나 봉사료가 품목 줄 밖에 붙기 때문에 품목을
-다 더한 값과 다를 수 있어서, 계산해 채우지 않고 읽은 그대로 둔다. 사용자가 견주어 볼
-기준으로만 쓴다.
+다 더한 값과 다를 수 있어서, 계산해 채우지 않고 읽은 그대로 둔다.
+
+**응답에는 남아 있지만 화면은 이 값을 쓰지 않는다.** 사진을 반듯하게 찍지 않으면 합계부터
+틀리게 읽히는데, 그 값으로 결제 금액과 견주어 "다릅니다"라고 알리면 사용자가 손댈 수도 없는
+숫자를 근거로 겁을 주게 된다. 인식이 하는 일은 품목 카드를 대신 채워 주는 것 하나다.
+품목 합계가 원결제 금액과 같아야 한다는 규칙은 사용자가 카드에 확정한 값으로 판단하므로
+이것과 별개다.
 
 #### webp는 인식하지 못한다
 

@@ -81,6 +81,7 @@ describe('settlement response mappers', () => {
         requestStatus: 'PENDING',
         allowedActions: ['PAY'],
       },
+      collection: null,
     })
 
     expect(detail.viewer).toEqual({
@@ -93,6 +94,47 @@ describe('settlement response mappers', () => {
     expect(detail.viewerItems).toEqual([
       { id: '1', name: 'Dinner', allocatedQuantity: '1', allocatedAmount: '12.50' },
     ])
+    // 볼 수 없다는 뜻의 null을 빈 목록으로 바꾸면 "받을 사람이 없다"와 같아진다.
+    expect(detail.collection).toBeUndefined()
+  })
+
+  it('keeps payment status identifiers and amounts as strings', () => {
+    const detail = mapSettlementDetail({
+      id: 42,
+      type: 'EQUAL',
+      totalAmount: 150,
+      status: 'REQUESTED',
+      requestedBy: 'Alex',
+      gatheringName: 'Dinner',
+      merchantName: 'Cafe',
+      viewerItems: [],
+      transactionId: null,
+      paidBy: 'Alex',
+      viewer: {
+        role: 'CREATOR',
+        shareAmount: 50,
+        payableAmount: 0,
+        requestStatus: 'NOT_REQUESTED',
+        allowedActions: [],
+      },
+      collection: {
+        totalCount: 2,
+        paidCount: 1,
+        participants: [
+          { id: 72, name: 'Bora', initials: 'B', shareAmount: 50, requestStatus: 'PAID' },
+          { id: 73, name: 'Chan', initials: 'C', shareAmount: 50, requestStatus: 'PENDING' },
+        ],
+      },
+    })
+
+    expect(detail.collection).toEqual({
+      totalCount: 2,
+      paidCount: 1,
+      participants: [
+        { id: '72', name: 'Bora', initials: 'B', shareAmount: '50', requestStatus: 'PAID' },
+        { id: '73', name: 'Chan', initials: 'C', shareAmount: '50', requestStatus: 'PENDING' },
+      ],
+    })
   })
 
   it('maps list viewer state from the nested response', () => {
@@ -130,7 +172,6 @@ describe('settlement response mappers', () => {
         { name: '', unitPrice: '4500', quantity: '' },
         { name: 'Wine', unitPrice: '', quantity: '' },
       ],
-      recognizedTotal: null,
     })
   })
 
@@ -143,7 +184,6 @@ describe('settlement response mappers', () => {
       }),
     ).toEqual({
       items: [{ name: 'Pasta', unitPrice: '10500', quantity: '2' }],
-      recognizedTotal: '21000',
     })
   })
 })

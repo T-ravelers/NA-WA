@@ -90,10 +90,48 @@
         ORDER BY am.appointment_member_id
     </select>
 
+    <!--
+        원결제자가 볼 "누가 냈나" 목록이다.
+
+        request_status가 NOT_REQUESTED인 행을 빼는 것이 곧 원결제자 본인을 빼는 것이다.
+        이 상태는 정산을 만든 사람에게만 붙고, 만든 사람이 곧 돈을 낸 사람이다
+        (chk_settlements_creator_is_payer).
+
+        고르는 기준은 아래 completeSettlementIfNoPendingPayments와 **글자 그대로 같아야**
+        한다. 그쪽은 "안 낸 사람이 하나도 없을 때" 정산을 완료로 넘기는데, 이 목록이 한
+        사람이라도 더 걸러내면 화면은 다 냈다고 말하는데 정산은 요청 중에 멈춰 있고 왜
+        그런지 볼 방법이 없다. 그래서 여기서 보는 것은 정산 구성원 행 하나뿐이다.
+
+        "안 낸 사람이 없다"와 "다 낸 사람 수가 전체와 같다"가 같은 말이 되는 것은 요청 상태가
+        NOT_REQUESTED·PENDING·PAID 세 값뿐이기 때문이다(V9__simplify_settlement_domain.sql).
+        여기서 NOT_REQUESTED만 빼면 남는 것이 PENDING과 PAID뿐이라 두 세는 법이 맞아떨어진다.
+        값이 하나라도 늘면 그 값은 전체에는 들어가는데 낸 사람에도 안 낸 사람에도 없어서,
+        정산은 끝났는데 화면은 "2명 중 1명"에서 멈춘다. 상태 값을 늘릴 때 여기를 함께 본다.
+
+        약속 참가 쪽 상태는 일부러 보지 않는다. membership_status도, deleted_at도 마찬가지다.
+        약속에서 나가든 참가 기록이 지워지든 이미 진 빚은 그대로라 정산은 그 사람이 낼
+        때까지 끝나지 않는다. 참가 쪽을 조건에 넣으면 그 사람만 목록에서 사라지고 정산은
+        영영 안 끝난다. 참가 행을 잇는 것은 이름을 가져오기 위해서일 뿐이다.
+
+        정렬은 안 낸 사람이 위로 온다. 이 카드를 여는 이유가 "누가 아직 안 냈나"이기
+        때문이다. 같은 상태 안에서는 참가 행 번호 순서라 목록이 매번 같은 자리에 선다.
+    -->
+    <select id="findCollectionMembers" resultType="me.nawa.settlement.domain.SettlementCollectionMember">
+        SELECT sm.appointment_member_id, m.display_name, sm.share_amount, sm.request_status
+        FROM settlement_members sm
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        JOIN members m ON m.member_id = am.member_id
+        WHERE sm.settlement_id = #{settlementId}
+          AND sm.request_status &lt;&gt; 'NOT_REQUESTED'
+          AND sm.deleted_at IS NULL
+        ORDER BY sm.request_status = 'PAID', sm.appointment_member_id
+    </select>
+
     <select id="findReceivedSummaries" resultType="me.nawa.settlement.domain.SettlementSummary">
         SELECT s.settlement_id, a.appointment_name AS title,
                s.total_amount, s.receivable_amount, s.split_method, s.settlement_status,
-               s.created_by_member_id, sm.share_amount AS viewer_share_amount,
+               s.created_by_member_id, s.created_at, s.completed_at,
+               sm.share_amount AS viewer_share_amount,
                sm.request_status AS viewer_request_status,
                EXISTS (
                    SELECT 1 FROM settlement_members paid_sm
@@ -114,7 +152,8 @@
     <select id="findSentSummaries" resultType="me.nawa.settlement.domain.SettlementSummary">
         SELECT s.settlement_id, a.appointment_name AS title,
                s.total_amount, s.receivable_amount, s.split_method, s.settlement_status,
-               s.created_by_member_id, sm.share_amount AS viewer_share_amount,
+               s.created_by_member_id, s.created_at, s.completed_at,
+               sm.share_amount AS viewer_share_amount,
                sm.request_status AS viewer_request_status,
                EXISTS (
                    SELECT 1 FROM settlement_members paid_sm
@@ -298,9 +337,21 @@
           AND request_status = 'PENDING' AND deleted_at IS NULL
     </update>
 
+    <!--
+        완료 시각은 애플리케이션이 넘긴 값을 그대로 적는다. DB의 CURRENT_TIMESTAMP를 쓰지
+        않는 것은 DB 서버의 시간대 설정이 앱과 다르면 그 시차만큼 시각이 어긋나기 때문이다.
+
+        그래서 같은 정산의 시각 두 개가 서로 다른 시계에서 나온다 — created_at은 DB가 적고
+        (컬럼 기본값), completed_at은 앱이 적는다. 두 값은 한 응답에 나란히 실려 나가므로,
+        받는 쪽이 둘을 같은 기준으로 읽으려면 DB와 앱의 시간대가 맞아 있어야 한다. 운영은
+        맞춰 두었다 — docker-compose.yml의 mysql이 default-time-zone 옵션으로 +09:00을 받고
+        백엔드 컨테이너가 TZ=Asia/Seoul이다. CI는 이 맞춤을 일부러 깨서(MySQL만 UTC) DB 시계에
+        기대는 코드가 드러나게 한다. 자세한 것은 AGENTS.md의 "시간대는 세 곳에서 따로
+        정해집니다"와 docs/TECH_STACK.md.
+    -->
     <update id="completeSettlementIfNoPendingPayments">
         UPDATE settlements s
-        SET settlement_status = 'COMPLETED', version = version + 1
+        SET settlement_status = 'COMPLETED', completed_at = #{completedAt}, version = version + 1
         WHERE s.settlement_id = #{settlementId}
           AND s.settlement_status = 'REQUESTED'
           AND s.deleted_at IS NULL

@@ -14,10 +14,12 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { getTransactions } from '../api/walletApi'
 import {
+  activityLabelKey,
   formatPointAmount,
   formatTransactionAmount,
   formatTransactionDateTime,
   getTransactionStatusLabel,
+  isOutgoingEntry,
   toActivityKind,
   walletKeys,
   type TransactionSearchParams,
@@ -158,6 +160,15 @@ const loadMore = (): void => {
 
   cursor.value = nextCursor.value
 }
+
+/** 정산은 낸 쪽과 받은 쪽을 갈라 부른다. 방향은 입출금 구분에만 있다. */
+const transactionLabel = (transaction: WalletTransactionResponse): string =>
+  t(
+    activityLabelKey(
+      toActivityKind(transaction.transferType),
+      isOutgoingEntry(transaction.entryType),
+    ),
+  )
 
 const openTransactionDetail = (transactionId: number): void => {
   void router.push({ name: 'wallet-transaction-detail', params: { transactionId } })
@@ -328,7 +339,7 @@ const openTransactionDetail = (transactionId: number): void => {
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="truncate text-body-sm font-semibold text-ink">
-                  {{ t(`wallet.home.activity.${toActivityKind(transaction.transferType)}`) }}
+                  {{ transactionLabel(transaction) }}
                 </p>
                 <p class="mt-1 text-caption text-ink-3">
                   {{ formatTransactionDateTime(transaction.createdAt) }}
@@ -338,22 +349,18 @@ const openTransactionDetail = (transactionId: number): void => {
                 <!-- 들어온 돈만 민트 계열로 구분한다. V2 거래내역/01의 Credit 표기. -->
                 <p
                   class="text-title-sm font-bold"
-                  :class="
-                    transaction.entryType.toUpperCase() === 'DEBIT' ? 'text-ink' : 'text-success-2'
-                  "
+                  :class="isOutgoingEntry(transaction.entryType) ? 'text-ink' : 'text-success-2'"
                 >
                   {{ formatTransactionAmount(transaction) }}
                 </p>
                 <p
                   class="mt-1 text-caption"
                   :class="
-                    transaction.entryType.toUpperCase() === 'DEBIT'
-                      ? 'text-ink-3'
-                      : 'text-success-subtle'
+                    isOutgoingEntry(transaction.entryType) ? 'text-ink-3' : 'text-success-subtle'
                   "
                 >
                   {{
-                    transaction.entryType.toUpperCase() === 'DEBIT'
+                    isOutgoingEntry(transaction.entryType)
                       ? t('wallet.transactions.debit')
                       : t('wallet.transactions.credit')
                   }}

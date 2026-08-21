@@ -7,12 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.settlement.domain.Settlement;
+import me.nawa.settlement.domain.SettlementCollectionMember;
 import me.nawa.settlement.domain.SettlementItem;
 import me.nawa.settlement.domain.SettlementItemShare;
 import me.nawa.settlement.domain.SettlementMember;
@@ -304,6 +306,236 @@ class SettlementMapperIntegrationTest {
             assertNull(receiptMapper.findDraftForUploader(
                 draft.getSettlementReceiptId(), fixture.memberId()
             ));
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    /**
+     * 원결제자가 볼 "누가 냈나" 목록은 돈을 낼 사람만 담는다.
+     *
+     * 정산을 만든 사람도 구성원 행을 가지지만 자기 자신에게 보낼 돈은 없어서 NOT_REQUESTED로
+     * 남는다. 이 행이 목록에 섞이면 전원이 다 내도 화면의 인원수가 끝까지 차지 않는다.
+     */
+    @Test
+    void findCollectionMembers_excludesPayerRowAndReadsNameShareAndStatus() {
+        Fixture fixture = createFixture();
+        String guestName = "settlement-it-" + UUID.randomUUID();
+        long guestMemberId = 0L;
+        long guestAppointmentMemberId = 0L;
+        try {
+            Settlement settlement = settlement(fixture);
+            mapper.insertSettlement(settlement);
+            guestMemberId = insert("members", "member_id", Map.of("display_name", guestName));
+            guestAppointmentMemberId = insert("appointment_members", "appointment_member_id", Map.of(
+                "appointment_id", fixture.appointmentId(),
+                "member_id", guestMemberId
+            ));
+            mapper.insertSettlementMembers(List.of(
+                new SettlementMember(
+                    null, settlement.getSettlementId(), fixture.appointmentMemberId(),
+                    fixture.memberId(), new BigDecimal("40"), "NOT_REQUESTED", null
+                ),
+                new SettlementMember(
+                    null, settlement.getSettlementId(), guestAppointmentMemberId,
+                    guestMemberId, new BigDecimal("60"), "PENDING", null
+                )
+            ));
+
+            List<SettlementCollectionMember> pending =
+                mapper.findCollectionMembers(settlement.getSettlementId());
+
+            assertEquals(1, pending.size());
+            assertEquals(guestAppointmentMemberId, pending.get(0).getAppointmentMemberId());
+            assertEquals(guestName, pending.get(0).getDisplayName());
+            assertEquals(0, new BigDecimal("60").compareTo(pending.get(0).getShareAmount()));
+            assertEquals("PENDING", pending.get(0).getRequestStatus());
+
+            mapper.markSettlementMemberPaid(
+                mapper.findMemberBySettlementAndMember(settlement.getSettlementId(), guestMemberId)
+                    .getSettlementMemberId(),
+                fixture.transferId(),
+                "settlement-it-" + UUID.randomUUID()
+            );
+
+            List<SettlementCollectionMember> paid =
+                mapper.findCollectionMembers(settlement.getSettlementId());
+
+            assertEquals(1, paid.size());
+            assertEquals("PAID", paid.get(0).getRequestStatus());
+
+            // 약속에서 나가도 이미 진 빚은 남는다. 목록에서 빼면 정산은 끝나지 않았는데
+            // 화면만 다 냈다고 말하게 된다.
+            jdbcTemplate.update(
+                "UPDATE appointment_members SET membership_status = 'LEFT', "
+                    + "left_at = CURRENT_TIMESTAMP WHERE appointment_member_id = ?",
+                guestAppointmentMemberId
+            );
+
+            assertEquals(1, mapper.findCollectionMembers(settlement.getSettlementId()).size());
+
+            // 참가 기록이 지워져도 같다. 완료 판정은 정산 구성원 행만 보므로, 이 목록이
+            // 참가 쪽을 더 걸러내면 화면과 정산 상태가 어긋난다.
+            jdbcTemplate.update(
+                "UPDATE appointment_members SET deleted_at = CURRENT_TIMESTAMP "
+                    + "WHERE appointment_member_id = ?",
+                guestAppointmentMemberId
+            );
+
+            assertEquals(1, mapper.findCollectionMembers(settlement.getSettlementId()).size());
+        } finally {
+            // 참가 행과 회원을 지우려면 그것을 가리키는 정산 구성원 행이 먼저 없어져야 한다.
+            jdbcTemplate.update(
+                "DELETE sm FROM settlement_members sm "
+                    + "JOIN settlements s ON s.settlement_id = sm.settlement_id "
+                    + "WHERE s.source_transfer_id = ?",
+                fixture.transferId()
+            );
+            jdbcTemplate.update(
+                "DELETE FROM appointment_members WHERE appointment_member_id = ?",
+                guestAppointmentMemberId
+            );
+            jdbcTemplate.update("DELETE FROM members WHERE member_id = ?", guestMemberId);
+            deleteFixture(fixture);
+        }
+    }
+
+    /**
+     * 안 낸 사람이 목록 위로 온다.
+     *
+     * 이 카드를 여는 이유가 "누가 아직 안 냈나"라서, 낸 사람 사이에 섞어 두면 원결제자가
+     * 배지를 하나씩 훑어야 한다. 같은 상태 안에서는 참가 행 번호 순서로 두어 목록이 볼
+     * 때마다 뒤바뀌지 않게 한다.
+     */
+    @Test
+    void findCollectionMembers_unpaidComesFirstThenStableByAppointmentMember() {
+        Fixture fixture = createFixture();
+        long earlyPaidMemberId = 0L;
+        long earlyPaidAppointmentMemberId = 0L;
+        long latePendingMemberId = 0L;
+        long latePendingAppointmentMemberId = 0L;
+        try {
+            Settlement settlement = settlement(fixture);
+            mapper.insertSettlement(settlement);
+
+            // 먼저 들어와서 이미 낸 사람과, 나중에 들어와서 아직 안 낸 사람.
+            // 참가 행 번호만 보면 낸 사람이 위인데, 안 낸 사람이 위로 와야 한다.
+            earlyPaidMemberId = insert("members", "member_id",
+                Map.of("display_name", "settlement-it-" + UUID.randomUUID()));
+            earlyPaidAppointmentMemberId = insert("appointment_members", "appointment_member_id",
+                Map.of("appointment_id", fixture.appointmentId(), "member_id", earlyPaidMemberId));
+            latePendingMemberId = insert("members", "member_id",
+                Map.of("display_name", "settlement-it-" + UUID.randomUUID()));
+            latePendingAppointmentMemberId = insert("appointment_members", "appointment_member_id",
+                Map.of("appointment_id", fixture.appointmentId(), "member_id", latePendingMemberId));
+
+            mapper.insertSettlementMembers(List.of(
+                new SettlementMember(
+                    null, settlement.getSettlementId(), fixture.appointmentMemberId(),
+                    fixture.memberId(), new BigDecimal("40"), "NOT_REQUESTED", null
+                ),
+                new SettlementMember(
+                    null, settlement.getSettlementId(), earlyPaidAppointmentMemberId,
+                    earlyPaidMemberId, new BigDecimal("30"), "PENDING", null
+                ),
+                new SettlementMember(
+                    null, settlement.getSettlementId(), latePendingAppointmentMemberId,
+                    latePendingMemberId, new BigDecimal("30"), "PENDING", null
+                )
+            ));
+            mapper.markSettlementMemberPaid(
+                mapper.findMemberBySettlementAndMember(
+                    settlement.getSettlementId(), earlyPaidMemberId
+                ).getSettlementMemberId(),
+                fixture.transferId(),
+                "settlement-it-" + UUID.randomUUID()
+            );
+
+            List<SettlementCollectionMember> members =
+                mapper.findCollectionMembers(settlement.getSettlementId());
+
+            assertEquals(2, members.size());
+            assertEquals(latePendingAppointmentMemberId, members.get(0).getAppointmentMemberId());
+            assertEquals("PENDING", members.get(0).getRequestStatus());
+            assertEquals(earlyPaidAppointmentMemberId, members.get(1).getAppointmentMemberId());
+            assertEquals("PAID", members.get(1).getRequestStatus());
+        } finally {
+            jdbcTemplate.update(
+                "DELETE sm FROM settlement_members sm "
+                    + "JOIN settlements s ON s.settlement_id = sm.settlement_id "
+                    + "WHERE s.source_transfer_id = ?",
+                fixture.transferId()
+            );
+            jdbcTemplate.update(
+                "DELETE FROM appointment_members WHERE appointment_member_id IN (?, ?)",
+                earlyPaidAppointmentMemberId, latePendingAppointmentMemberId
+            );
+            jdbcTemplate.update(
+                "DELETE FROM members WHERE member_id IN (?, ?)",
+                earlyPaidMemberId, latePendingMemberId
+            );
+            deleteFixture(fixture);
+        }
+    }
+
+    /**
+     * 마지막 사람이 낼 때까지는 완료로 넘어가지 않고, 넘어가는 순간의 시각은 DB가 아니라
+     * 애플리케이션이 넘긴 값이 그대로 들어가야 한다.
+     *
+     * 운영 DB의 시계는 앱과 같게 맞춰 뒀지만 CI의 MySQL은 이 의존을 드러내려고 일부러
+     * UTC다. DB 시계로 적으면 그 차이만큼 어긋난 시각이 화면에 "언제 끝났는지"로 보이고,
+     * 기간으로 거를 때 경계 근처의 정산이 다른 날짜로 묶인다.
+     */
+    @Test
+    void completeSettlementIfNoPendingPayments_lastPaymentDone_storesTimeGivenByApplication() {
+        Fixture fixture = createFixture();
+        try {
+            Settlement settlement = settlement(fixture);
+            mapper.insertSettlement(settlement);
+            mapper.insertSettlementMembers(List.of(new SettlementMember(
+                null,
+                settlement.getSettlementId(),
+                fixture.appointmentMemberId(),
+                fixture.memberId(),
+                new BigDecimal("100"),
+                "PENDING",
+                null
+            )));
+            Long settlementMemberId = jdbcTemplate.queryForObject(
+                "SELECT settlement_member_id FROM settlement_members WHERE settlement_id = ?",
+                Long.class,
+                settlement.getSettlementId()
+            );
+            LocalDateTime completedAt = LocalDateTime.of(2026, 8, 20, 21, 5, 0);
+
+            assertEquals(0, mapper.completeSettlementIfNoPendingPayments(
+                settlement.getSettlementId(), completedAt
+            ));
+            assertNull(jdbcTemplate.queryForObject(
+                "SELECT completed_at FROM settlements WHERE settlement_id = ?",
+                Timestamp.class,
+                settlement.getSettlementId()
+            ));
+
+            mapper.markSettlementMemberPaid(
+                settlementMemberId, fixture.transferId(), "settlement-it-pay"
+            );
+
+            assertEquals(1, mapper.completeSettlementIfNoPendingPayments(
+                settlement.getSettlementId(), completedAt
+            ));
+            assertEquals("COMPLETED", jdbcTemplate.queryForObject(
+                "SELECT settlement_status FROM settlements WHERE settlement_id = ?",
+                String.class,
+                settlement.getSettlementId()
+            ));
+            Timestamp stored = jdbcTemplate.queryForObject(
+                "SELECT completed_at FROM settlements WHERE settlement_id = ?",
+                Timestamp.class,
+                settlement.getSettlementId()
+            );
+            assertNotNull(stored);
+            assertEquals(completedAt, stored.toLocalDateTime());
         } finally {
             deleteFixture(fixture);
         }

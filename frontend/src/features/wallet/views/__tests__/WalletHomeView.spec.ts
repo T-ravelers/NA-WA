@@ -121,6 +121,23 @@ describe('WalletHomeView', () => {
     expect(wrapper.text()).toContain('Deposit held')
   })
 
+  it('정산 거래를 낸 쪽과 받은 쪽으로 갈라 부른다', async () => {
+    const base = WALLET.recentTransactions![0]!
+
+    fetchWalletHome.mockResolvedValue({
+      ...WALLET,
+      recentTransactions: [
+        { ...base, transferId: 11, transferType: 'SETTLEMENT', entryType: 'DEBIT' },
+        { ...base, transferId: 12, transferType: 'SETTLEMENT', entryType: 'CREDIT' },
+      ],
+    })
+
+    const wrapper = await mountLoaded()
+
+    expect(wrapper.text()).toContain('Split paid')
+    expect(wrapper.text()).toContain('Split collected')
+  })
+
   it('QR과 정산 버튼을 사용할 수 있고 정산 화면으로 이동한다', async () => {
     const router = createTestRouter()
     const wrapper = await mountLoaded(router)

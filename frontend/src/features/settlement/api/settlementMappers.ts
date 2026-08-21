@@ -3,6 +3,7 @@ import { formatServerDateTime } from '@/shared/lib/datetime'
 import type {
   RecognizedReceiptDraft,
   SettlementCandidate,
+  SettlementCollection,
   SettlementDetail,
   SettlementPaymentResult,
   SettlementSummary,
@@ -11,6 +12,7 @@ import type {
 import type {
   ApiAmount,
   SettlementCandidateDto,
+  SettlementCollectionDto,
   SettlementDetailDto,
   SettlementMutationDto,
   SettlementReceiptOcrDto,
@@ -65,6 +67,33 @@ function formatPaidAt(value: string): string {
   return formatted === '' ? value : formatted
 }
 
+/**
+ * 누가 냈는지를 볼 수 있는 사람인지 가린다.
+ *
+ * 서버는 볼 수 없는 사람에게 null을 보내고, 자리를 아예 빼고 보내도 뜻은 같다. 이것을 빈
+ * 목록으로 바꾸면 "볼 수 없다"와 "받을 사람이 없다"가 한 모양이 되어, 화면이 아무도 없는
+ * 카드를 그리게 된다.
+ */
+function collection(
+  dto: SettlementCollectionDto | null | undefined,
+): SettlementCollection | undefined {
+  if (dto === null || dto === undefined) {
+    return undefined
+  }
+
+  return {
+    totalCount: dto.totalCount,
+    paidCount: dto.paidCount,
+    participants: dto.participants.map((participant) => ({
+      id: String(participant.id),
+      name: participant.name,
+      initials: participant.initials,
+      shareAmount: amount(participant.shareAmount),
+      requestStatus: participant.requestStatus,
+    })),
+  }
+}
+
 export function mapSettlementCandidate(dto: SettlementCandidateDto): SettlementCandidate {
   return {
     transferId: String(dto.transferId),
@@ -113,6 +142,7 @@ export function mapSettlementDetail(dto: SettlementDetailDto): SettlementDetail 
     transactionId: dto.transactionId ?? undefined,
     paidBy: dto.paidBy ?? undefined,
     viewer: viewer(dto.viewer),
+    collection: collection(dto.collection),
   }
 }
 
@@ -132,6 +162,5 @@ export function mapRecognizedReceipt(dto: SettlementReceiptOcrDto): RecognizedRe
       unitPrice: optionalAmount(item.unitPrice),
       quantity: optionalAmount(item.quantity),
     })),
-    recognizedTotal: unread(dto.recognizedTotal) ? null : amount(dto.recognizedTotal),
   }
 }

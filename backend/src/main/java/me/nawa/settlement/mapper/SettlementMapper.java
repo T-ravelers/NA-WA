@@ -1,7 +1,9 @@
 package me.nawa.settlement.mapper;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import me.nawa.settlement.domain.Settlement;
+import me.nawa.settlement.domain.SettlementCollectionMember;
 import me.nawa.settlement.domain.SettlementDetail;
 import me.nawa.settlement.domain.SettlementItem;
 import me.nawa.settlement.domain.SettlementItemShare;
@@ -29,6 +31,10 @@ public interface SettlementMapper {
     List<SettlementSource> findCandidateSources(@Param("memberId") Long memberId);
 
     List<SettlementParticipant> findParticipants(@Param("appointmentId") Long appointmentId);
+
+    List<SettlementCollectionMember> findCollectionMembers(
+        @Param("settlementId") Long settlementId
+    );
 
     List<SettlementSummary> findReceivedSummaries(@Param("memberId") Long memberId);
 
@@ -85,5 +91,17 @@ public interface SettlementMapper {
         @Param("idempotencyKey") String idempotencyKey
     );
 
-    int completeSettlementIfNoPendingPayments(@Param("settlementId") Long settlementId);
+    // 완료 시각은 DB에게 "지금 몇 시냐"고 묻지 않고 애플리케이션이 넘긴 값을 쓴다.
+    //
+    // 운영 DB의 시계는 docker-compose.yml에서 앱과 같은 +09:00으로 이미 맞춰 뒀다.
+    // 그런데도 DB 시계에 기대지 않는 이유는, 그 맞춤이 설정 한 줄에 달려 있고 CI는
+    // 이런 의존을 드러내려고 MySQL을 일부러 UTC로 띄우기 때문이다. 이 값은 화면에
+    // "언제 끝났는지"로 그대로 보이고 기간 필터가 날짜를 가르는 기준이라, 두 시계가
+    // 한 번 어긋나면 경계 근처의 정산이 통째로 다른 날짜로 묶인다.
+    //
+    // 지갑 이체·충전·QR 결제의 completed_at도 같은 이유로 애플리케이션 시각을 받는다.
+    int completeSettlementIfNoPendingPayments(
+        @Param("settlementId") Long settlementId,
+        @Param("completedAt") LocalDateTime completedAt
+    );
 }

@@ -30,7 +30,6 @@ import {
 } from '../model/settlementIdempotency'
 import {
   compareItemizedTotal,
-  compareRecognizedTotal,
   summarizeItemizedShares,
   validateItemizedItems,
 } from '../model/settlementRules'
@@ -169,18 +168,6 @@ const canLoadItems = computed(
     receipt.receiptId.value !== null &&
     !receipt.pending.value &&
     !ocr.pending.value,
-)
-
-/*
- * 영수증에 찍힌 합계와 실제 결제 금액을 견준다.
- *
- * 달라도 막지 않는다. 여러 명이 나눠 결제했거나 할인·봉사료가 붙으면 정상적으로도 달라지고,
- * 인식 값 자체가 틀렸을 수도 있다. 사진을 다시 볼지 사용자가 판단할 근거로만 보여준다.
- */
-const receiptTotalComparison = computed(() =>
-  selectedCandidate.value === null
-    ? null
-    : compareRecognizedTotal(ocr.recognizedTotal.value, selectedCandidate.value.amount),
 )
 
 /** 배분을 다 채우고 나면 안내를 거둔다. 다 한 일을 계속 시키면 안 된다. */
@@ -774,14 +761,16 @@ defineExpose({ back })
         >
           {{ t('settlement.create.allocateAfterLoad') }}
         </p>
-        <div
-          v-if="ocr.recognizedTotal.value !== null"
-          data-testid="receipt-total"
-          class="mt-3 flex items-baseline justify-between gap-3 text-body-sm text-ink-2"
-        >
-          <span>{{ t('settlement.create.receiptTotal') }}</span>
-          <span>{{ points(ocr.recognizedTotal.value, amountFractionDigits) }}</span>
-        </div>
+        <!--
+          영수증에 찍힌 합계는 보여주지 않는다.
+
+          사진을 반듯하게 찍지 않으면 합계부터 틀리게 읽힌다. 사용자가 손댈 수 없는 그 숫자를
+          결제 금액과 나란히 놓으면 멀쩡한 영수증을 두고 뭔가 잘못됐다는 인상만 남는다.
+          인식이 하는 일은 아래 품목 카드를 대신 채워 주는 것 하나다.
+
+          아래 "품목 합계"는 성격이 다르다. 사용자가 카드에 확정한 값이고, 서버가 결제 금액과
+          정확히 같을 때만 정산을 만들기 때문에 여기서 알려주지 않으면 제출에서야 거절당한다.
+        -->
         <div
           v-if="itemsTotal !== null"
           data-testid="items-total"
@@ -807,13 +796,6 @@ defineExpose({ back })
               { amount: points(itemsTotal.difference, amountFractionDigits) },
             )
           }}
-        </p>
-        <p
-          v-if="receiptTotalComparison?.matches === false"
-          data-testid="receipt-total-mismatch"
-          class="mt-2 text-caption text-ink-3"
-        >
-          {{ t('settlement.create.receiptTotalMismatch') }}
         </p>
         <div
           v-for="(item, index) in items"

@@ -55,7 +55,8 @@ export interface WalletActivity {
   signedAmount: number
   /** 서버 시각을 해석한 결과. 해석할 수 없으면 `null`이고 화면이 시각을 생략한다. */
   occurredAt: Date | null
-  settled: boolean
+  /** 이 지갑에서 돈이 나간 거래인지. 정산의 낸 쪽·받은 쪽을 가르는 데 쓴다. */
+  outgoing: boolean
 }
 
 export interface WalletHomeData {
@@ -147,6 +148,41 @@ export function toActivityKind(transferType: string): ActivityKind {
   return TRANSFER_TYPES.find((type) => type === normalized) ?? 'UNKNOWN'
 }
 
+/**
+ * 이 지갑에서 돈이 나간 거래인지 가른다.
+ *
+ * 원장에 적히는 금액은 언제나 양수라서, 나갔는지 들어왔는지는 `entryType`에만 남는다.
+ * 한 번의 이체마다 보낸 지갑에 `DEBIT`, 받은 지갑에 `CREDIT`이 한 줄씩 쓰인다
+ * (백엔드 `WalletTransferService`).
+ *
+ * 금액 앞의 부호도, 글자 색도, 정산을 "낸 것"과 "받은 것"으로 갈라 부르는 이름도 전부 이
+ * 판단 하나에서 나온다. 같은 판단을 화면마다 다시 적어 두면 한 곳만 고쳤을 때 같은 줄이
+ * 서로 다른 말을 하게 된다.
+ */
+export function isOutgoingEntry(entryType: string): boolean {
+  return entryType.toUpperCase() === 'DEBIT'
+}
+
+/**
+ * 이 거래를 화면에서 뭐라고 부를지 정한다.
+ *
+ * 정산만 낸 쪽과 받은 쪽을 갈라 부른다. 남에게 돈을 낸 것과 남에게서 받은 것은 사용자에게
+ * 전혀 다른 일인데, 서버는 둘을 같은 거래 종류 하나로 보내기 때문이다. 방향은 돈이 나갔는지
+ * 들어왔는지에만 남아 있으므로 그 값으로 고른다.
+ *
+ * 나머지 종류는 이름 자체에 이미 방향이 들어 있어(예: 보증금 잡힘 / 보증금 돌려받음) 그대로
+ * 쓴다.
+ */
+export function activityLabelKey(kind: ActivityKind, isOutgoing: boolean): string {
+  if (kind === 'SETTLEMENT') {
+    return isOutgoing
+      ? 'wallet.home.settlementDirection.paid'
+      : 'wallet.home.settlementDirection.collected'
+  }
+
+  return `wallet.home.activity.${kind}`
+}
+
 function toWalletStatus(status: string): WalletStatusKind {
   const normalized = status.toUpperCase()
 
@@ -154,16 +190,12 @@ function toWalletStatus(status: string): WalletStatusKind {
 }
 
 /**
- * 이 지갑 기준 증감 부호를 붙인다.
- *
- * 원장의 `amount`는 `CHECK (amount > 0)`이라 항상 양수이고, 방향은 `entry_type`에만 있다.
- * `DEBIT`을 차감으로 읽는다 — 사용자 화면 기준의 관례다. 백엔드에 이 방향을 못 박은
- * 코드가 아직 없으므로(원장 기록 경로 미구현), 지갑 도메인 담당과 확인이 필요하다.
+ * 이 지갑 기준 증감 부호를 붙인다. 방향 판단은 `isOutgoingEntry` 하나에 맡긴다.
  */
 function toSignedAmount(transaction: WalletTransaction): number {
   const magnitude = Math.abs(transaction.amount)
 
-  return transaction.entryType.toUpperCase() === 'DEBIT' ? -magnitude : magnitude
+  return isOutgoingEntry(transaction.entryType) ? -magnitude : magnitude
 }
 
 export function toWalletHomeData(response: WalletHome): WalletHomeData {
@@ -187,7 +219,7 @@ export function toWalletHomeData(response: WalletHome): WalletHomeData {
         kind,
         signedAmount: toSignedAmount(transaction),
         occurredAt: parseServerDateTime(transaction.createdAt),
-        settled: kind === 'SETTLEMENT',
+        outgoing: isOutgoingEntry(transaction.entryType),
       }
     }),
   }
@@ -232,7 +264,7 @@ export const formatTransactionDateTime = (createdAt: ServerDateTime): string => 
 
 export const formatTransactionAmount = (transaction: WalletTransactionResponse): string => {
   const amount = getAbsoluteAmount(toAmountString(transaction.amount))
-  const sign = transaction.entryType.toUpperCase() === 'DEBIT' ? '-' : '+'
+  const sign = isOutgoingEntry(transaction.entryType) ? '-' : '+'
 
   return `${sign}${formatPointAmount(amount)} P`
 }

@@ -164,6 +164,42 @@ describe('TransactionsView', () => {
     expect(wrapper.text()).not.toContain('Wallet transaction')
   })
 
+  it('names a settlement by direction so paying and collecting do not read the same', async () => {
+    const settlement = (transferId: number, entryType: string) => ({
+      transferId,
+      transferType: 'SETTLEMENT',
+      entryType,
+      amount: '12000',
+      balanceAfter: '98000',
+      createdAt: '2026-07-27T19:00:00',
+    })
+
+    vi.mocked(getTransactions).mockResolvedValue({
+      ...transactionsResponse,
+      transactions: [settlement(301, 'DEBIT'), settlement(302, 'CREDIT')],
+    })
+
+    const { wrapper } = await mountTransactions()
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Split paid')
+    expect(wrapper.text()).toContain('Split collected')
+  })
+
+  it('keeps one settlement option in the type filter because the server cannot filter by direction', async () => {
+    const { wrapper } = await mountTransactions()
+
+    await flushPromises()
+
+    const settlementOptions = wrapper
+      .get('select[aria-label="Transaction type"]')
+      .findAll('option')
+      .filter((option) => option.attributes('value') === 'SETTLEMENT')
+
+    expect(settlementOptions.map((option) => option.text())).toEqual(['Split'])
+  })
+
   it('requests transactions with the selected filters', async () => {
     const { wrapper } = await mountTransactions()
 
