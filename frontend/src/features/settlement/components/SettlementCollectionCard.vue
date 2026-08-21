@@ -53,9 +53,13 @@ const points = useSettlementPoints()
           면은 surface-3다. surface-2는 이름이 말하듯 입력칸·세그먼트 트랙의 면이고, 카드
           위에 얹히는 자리는 surface-3다. 값으로도 그렇다 — surface-2는 카드 면과 거의 같은
           값이라 동그라미가 배경에 묻혀 글자만 떠 있는 것처럼 보인다.
+
+          아주 좁은 화면(폴더블 커버 등)에서는 접는다. 한 줄에 이름·금액·상태가 다 들어가야
+          하는데 자리가 모자라면 이름부터 잘려서, 정작 "누가 냈나"를 읽을 수 없게 된다. 이
+          동그라미는 옆에 그대로 있는 이름의 첫 글자를 되풀이할 뿐이라 접어도 잃는 것이 없다.
         -->
         <span
-          class="flex size-9 shrink-0 items-center justify-center rounded-pill bg-surface-3 text-body-sm text-ink"
+          class="hidden size-9 shrink-0 items-center justify-center rounded-pill bg-surface-3 text-body-sm text-ink min-[330px]:flex"
           aria-hidden="true"
           >{{ participant.initials }}</span
         >
@@ -68,8 +72,11 @@ const points = useSettlementPoints()
           있는 금액이 줄마다 다른 자리에 선다. 금액은 위아래로 훑어 비교하는 값이라 몇
           픽셀만 어긋나도 눈에 걸린다. 칸을 고정하면 배지 글자가 바뀌어도 금액 자리는
           그대로다.
+
+          단 아주 좁은 화면에서는 고정을 푼다. 자리가 없을 때까지 줄맞춤을 지키면 그 대가를
+          이름이 치른다. 몇 픽셀의 줄맞춤보다 이름을 읽는 쪽이 먼저다.
         -->
-        <span class="flex w-18 shrink-0 justify-end">
+        <span class="flex shrink-0 justify-end min-[330px]:w-18">
           <AppBadge :tone="participant.requestStatus === 'PAID' ? 'completed' : 'pending'">
             {{ t(`settlement.detail.participantRequestStatus.${participant.requestStatus}`) }}
           </AppBadge>
