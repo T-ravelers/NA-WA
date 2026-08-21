@@ -15,8 +15,12 @@
  *
  * 환경변수:
  *   SCREENSHOT_BASE  대상 주소 (기본 http://localhost:5173)
- *   SCREENSHOT_OUT   출력 경로 (기본 frontend/screenshots)
+ *   SCREENSHOT_OUT   출력 경로 (기본 frontend/screenshots — 아래 두 옵션이 접미사를 붙인다)
  *   SCREENSHOT_CHANNEL Playwright 브라우저 채널 (예: 설치된 Google Chrome은 chrome)
+ *   SCREENSHOT_WIDTH  뷰포트 폭 (기본 390 — 시안 기준. 280 같은 다른 값은 반응형
+ *                     검증용이며 출력이 screenshots-<width>/로 분리된다)
+ *   SCREENSHOT_LOCALE 앱 로케일 (기본 en. ja·zh-TW·vi는 출력이 screenshots-<locale>/로
+ *                     분리된다. 번역이 없는 문구는 en 폴백으로 찍힌다)
  *
  * 출력물은 저장소에 커밋하지 않는다. `.gitignore`에 들어 있다.
  */
@@ -26,11 +30,35 @@ import { relative } from 'node:path'
 import { chromium } from '@playwright/test'
 
 /**
- * 시안 기준 폭이다. 리뷰어가 시안과 나란히 놓고 볼 수 있도록 고정한다.
+ * 시안 기준 폭 390이 기본이다. 리뷰어가 시안과 나란히 놓고 볼 수 있도록 기본 실행은
+ * 그대로 두고, SCREENSHOT_WIDTH는 반응형 검증(폴더블 커버 280 등)에만 쓴다.
  * 2배율로 찍어야 GitHub에서 축소돼도 글자가 뭉개지지 않는다.
  */
-const VIEWPORT = { width: 390, height: 844 }
+const DEFAULT_WIDTH = 390
+const WIDTH = Number(process.env.SCREENSHOT_WIDTH ?? DEFAULT_WIDTH)
+
+if (!Number.isInteger(WIDTH) || WIDTH <= 0) {
+  console.error(`SCREENSHOT_WIDTH가 올바른 폭이 아니다: ${process.env.SCREENSHOT_WIDTH}`)
+  process.exit(1)
+}
+
+const VIEWPORT = { width: WIDTH, height: 844 }
 const SCALE = 2
+
+/**
+ * 앱이 지원하는 로케일. 정본은 `src/shared/i18n/locales.ts`다 — 이 스크립트는 Vite 밖에서
+ * 도는 플레인 Node라 TS를 import하지 못해 값을 복사해 둔다. 로케일을 늘리면 여기도 맞춘다.
+ */
+const SUPPORTED_LOCALES = ['en', 'ja', 'zh-TW', 'vi']
+const DEFAULT_LOCALE = 'en'
+const LOCALE = process.env.SCREENSHOT_LOCALE ?? DEFAULT_LOCALE
+
+if (!SUPPORTED_LOCALES.includes(LOCALE)) {
+  console.error(
+    `SCREENSHOT_LOCALE이 지원 로케일이 아니다: ${LOCALE} (지원: ${SUPPORTED_LOCALES.join(', ')})`,
+  )
+  process.exit(1)
+}
 
 /**
  * 끝 슬래시를 제거한 뒤 화면 경로와 결합한다.
@@ -40,7 +68,14 @@ const SCALE = 2
  * 매칭에 실패해 모든 화면이 NotFound로 찍힌다. 실패가 성공처럼 보이는 것을 막는다.
  */
 const BASE = (process.env.SCREENSHOT_BASE ?? 'http://localhost:5173').replace(/\/+$/, '')
-const OUT = process.env.SCREENSHOT_OUT ?? 'screenshots'
+
+/**
+ * 옵션 실행 산출물은 기본 산출물(screenshots/)과 폴더를 나눈다. 같은 폴더에 덮어쓰면
+ * PR에 첨부할 기본 스냅샷이 어떤 조건에서 찍힌 것인지 알 수 없게 된다.
+ */
+const OUT_SUFFIX =
+  (WIDTH === DEFAULT_WIDTH ? '' : `-${WIDTH}`) + (LOCALE === DEFAULT_LOCALE ? '' : `-${LOCALE}`)
+const OUT = process.env.SCREENSHOT_OUT ?? `screenshots${OUT_SUFFIX}`
 const CHANNEL = process.env.SCREENSHOT_CHANNEL
 
 /** @typedef {(page: import('@playwright/test').Page) => Promise<unknown>} Hook */
@@ -57,7 +92,9 @@ function stubMemberProfile(page) {
           memberId: 1,
           displayName: 'Mina Park',
           profileImageUrl: null,
-          preferredLanguage: 'en',
+          // 저장된 명시 선택이 없으면 프로필의 preferredLanguage가 로케일을 덮는다
+          // (localeSync). 러너 로케일과 어긋나면 로그인 화면만 en으로 되돌아간다.
+          preferredLanguage: LOCALE,
           preferredCurrencyCode: 'KRW',
           onboardingRequired: false,
         },
@@ -1611,7 +1648,11 @@ const browser = await launchBrowser()
 const context = await browser.newContext({
   viewport: VIEWPORT,
   deviceScaleFactor: SCALE,
-  locale: 'en-US',
+  // 앱 로케일 코드가 그대로 BCP 47 태그라 비로그인 화면의 언어 감지(navigator.languages)에
+  // 그대로 먹는다. en만 기존 산출물과 같도록 en-US를 유지한다.
+  locale: LOCALE === DEFAULT_LOCALE ? 'en-US' : LOCALE,
+  // 화면에 모션이 들어와도 전환 중간 프레임이 찍히지 않도록 정적 상태로 고정한다.
+  reducedMotion: 'reduce',
 })
 
 let failed = 0

@@ -42,4 +42,6 @@ test-results/
 playwright-report/
 
 # 화면 스냅샷 출력물. PR에 끌어다 놓는 용도이며 저장소에 커밋하지 않는다.
+# 옵션 실행(SCREENSHOT_WIDTH·SCREENSHOT_LOCALE)은 screenshots-280 같은 분리 폴더를 만든다.
 screenshots
+screenshots-*/
