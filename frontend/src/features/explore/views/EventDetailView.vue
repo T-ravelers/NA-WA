@@ -613,7 +613,7 @@ function retry(): void {
           <AppButton
             block
             compact
-            class="h-12 whitespace-nowrap text-on-paper"
+            class="whitespace-nowrap text-on-paper"
             @click="openJourneyDateSheet"
           >
             {{
@@ -626,7 +626,7 @@ function retry(): void {
             block
             compact
             variant="secondary"
-            class="h-12 whitespace-nowrap border-success text-success"
+            class="whitespace-nowrap border-success text-success"
             @click="openAppointmentList"
           >
             {{ t('explore.detail.findCompanions') }}
