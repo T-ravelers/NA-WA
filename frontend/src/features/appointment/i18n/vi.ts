@@ -174,7 +174,7 @@ export default {
         reviewsNotAttended: 'Chỉ thành viên được xác nhận có mặt mới viết đánh giá được.',
         leave: 'Rời khỏi nhóm',
         leaveDescription: 'Bạn sẽ không còn là thành viên',
-        leaveDeadlinePassed: 'Đã qua hạn tham gia nên bạn không thể rời khỏi nữa.',
+        leaveActivityEnded: 'Hoạt động đã kết thúc nên bạn không thể rời khỏi nữa.',
         leaveNotMember: 'Bạn không phải thành viên của cuộc hẹn này.',
       },
       invalidTitle: 'Không tìm thấy cuộc hẹn',
@@ -229,10 +229,14 @@ export default {
       description: 'Bạn sẽ không còn là thành viên của {name}.',
       refund:
         'Tiền cọc {amount} P của bạn sẽ được hoàn về ví. Để tham gia lại, bạn sẽ cần đặt cọc lần nữa.',
+      noShowForfeit:
+        'Hoạt động đã bắt đầu nên rời khỏi lúc này được tính là vắng mặt. Tiền cọc {amount} P của bạn sẽ không được hoàn lại mà được chia cho các thành viên đã có mặt.',
       confirm: 'Rời khỏi nhóm',
       cancel: 'Ở lại',
       done: 'Bạn đã rời khỏi cuộc hẹn này.',
       doneRefunded: 'Bạn đã rời khỏi cuộc hẹn này. {amount} P đã được hoàn về ví của bạn.',
+      doneNoShow:
+        'Bạn đã rời khỏi cuộc hẹn này. Tiền cọc đã bị mất do vắng mặt và sẽ được chia cho các thành viên đã có mặt.',
     },
     deposit: {
       title: 'Xác nhận tham gia',

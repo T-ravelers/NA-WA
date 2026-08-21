@@ -171,7 +171,7 @@ export default {
         reviewsNotAttended: 'レビューを書けるのは出席が確定したメンバーのみです。',
         leave: 'グループを退出',
         leaveDescription: 'メンバーではなくなります',
-        leaveDeadlinePassed: '参加締切を過ぎたため、退出できません。',
+        leaveActivityEnded: '活動が終了したため、退出できません。',
         leaveNotMember: 'この同行グループのメンバーではありません。',
       },
       invalidTitle: '同行グループが見つかりません',
@@ -226,10 +226,14 @@ export default {
       description: '{name}のメンバーではなくなります。',
       refund:
         'デポジット {amount} P はウォレットに返金されます。再び参加するには、もう一度支払う必要があります。',
+      noShowForfeit:
+        '活動はすでに始まっているため、今退出すると無断欠席扱いになります。デポジット {amount} P は返金されず、出席したメンバーに分配されます。',
       confirm: 'グループを退出',
       cancel: 'とどまる',
       done: 'この同行グループから退出しました。',
       doneRefunded: 'この同行グループから退出しました。{amount} P をウォレットに返金しました。',
+      doneNoShow:
+        'この同行グループから退出しました。デポジットは無断欠席として没収され、出席したメンバーに分配されます。',
     },
     deposit: {
       title: '参加を確定',

@@ -168,7 +168,7 @@ export default {
         reviewsNotAttended: '只有確認出席的成員才能撰寫評價。',
         leave: '退出揪團',
         leaveDescription: '您將不再是成員',
-        leaveDeadlinePassed: '加入截止時間已過，無法再退出。',
+        leaveActivityEnded: '活動已結束，無法再退出。',
         leaveNotMember: '您不是這個揪團的成員。',
       },
       invalidTitle: '找不到揪團',
@@ -223,10 +223,13 @@ export default {
       close: '關閉退出確認視窗',
       description: '您將不再是 {name} 的成員。',
       refund: '您的押金 {amount} P 會退回錢包。若要再次加入，需要重新支付押金。',
+      noShowForfeit:
+        '活動已經開始，現在退出將視為缺席。您的押金 {amount} P 不會退還，將分配給出席的成員。',
       confirm: '退出揪團',
       cancel: '繼續參加',
       done: '您已退出這個揪團。',
       doneRefunded: '您已退出這個揪團。{amount} P 已退回您的錢包。',
+      doneNoShow: '您已退出這個揪團。押金已因缺席而沒收，將分配給出席的成員。',
     },
     deposit: {
       title: '確認參加',
