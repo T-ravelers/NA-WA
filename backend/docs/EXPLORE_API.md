@@ -157,8 +157,11 @@ Event·Place 공통으로 `explore_items`의 `item_id`를 사용합니다(Event�
 }
 ```
 
-- 등록은 목록·상세와 같은 노출 조건(`APPROVED`·`VISIBLE`·미삭제)을 요구합니다.
-  조건을 만족하지 않으면 HTTP 404와 `EXPLORE-003`을 반환합니다.
+- 등록은 `explore_items`의 노출 조건(`APPROVED`·`VISIBLE`·미삭제)만 확인하며,
+  Event 종료(`end_date`)와 Place 비활성(`is_active = FALSE`)은 검사하지
+  않습니다. 조건을 만족하지 않으면 HTTP 404와 `EXPLORE-003`을 반환합니다.
+- 그래서 목록·상세에서 빠진 종료 Event와 비활성 Place도 등록됩니다. 이렇게
+  등록된 찜은 목록 API의 `savedOnly=true`에 나오지 않습니다.
 - 취소는 노출이 꺼진(`HIDDEN`) 항목에도 허용합니다 — 회원이 자기 찜 목록을 정리할
   수 있어야 하므로 노출 조건 대신 삭제되지 않았는지만 확인합니다. 삭제된 항목의
   취소는 등록과 같이 HTTP 404와 `EXPLORE-003`을 반환합니다.
