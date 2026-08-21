@@ -157,6 +157,58 @@ describe('settlement response mappers', () => {
     ).toMatchObject({ totalAmount: '25.00', viewer: { allowedActions: ['PAY'] } })
   })
 
+  it('carries the list times through so the history screen can group them by day', () => {
+    const summary = mapSettlementSummary({
+      id: 42,
+      title: 'Dinner',
+      totalAmount: '25.00',
+      receivableAmount: '12.50',
+      type: 'EQUAL',
+      status: 'COMPLETED',
+      createdAt: '2026-08-12T10:00:00',
+      completedAt: '2026-08-13T21:30:00',
+      viewer: {
+        role: 'PARTICIPANT',
+        shareAmount: '12.50',
+        payableAmount: '0',
+        requestStatus: 'PAID',
+        allowedActions: [],
+      },
+    })
+
+    expect(summary).toMatchObject({
+      createdAt: '2026-08-12T10:00:00',
+      completedAt: '2026-08-13T21:30:00',
+    })
+  })
+
+  /*
+   * 완료 시각은 서버가 그 값을 남기기 전에 끝난 정산에는 없다. 없는 것을 빈 칸으로 받아야
+   * 화면이 만든 날짜로 대신할지 스스로 정할 수 있다.
+   */
+  it('reads a missing completion time as an empty one instead of dropping the settlement', () => {
+    const summary = mapSettlementSummary({
+      id: 42,
+      title: 'Dinner',
+      totalAmount: '25.00',
+      receivableAmount: '12.50',
+      type: 'EQUAL',
+      status: 'COMPLETED',
+      createdAt: '2026-08-12T10:00:00',
+      completedAt: null,
+      viewer: {
+        role: 'PARTICIPANT',
+        shareAmount: '12.50',
+        payableAmount: '0',
+        requestStatus: 'PAID',
+        allowedActions: [],
+      },
+    })
+
+    expect(summary.completedAt).toBe('')
+    expect(summary.createdAt).toBe('2026-08-12T10:00:00')
+  })
+
   /*
    * 읽지 못한 자리는 빈 칸이 돼야 한다. null이나 undefined가 그대로 흘러가면 입력란에
    * "null"이라고 찍히고, 사용자는 그것을 지우고 다시 적어야 한다.

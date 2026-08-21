@@ -83,6 +83,10 @@ export interface SettlementSummary {
   type: SettlementType
   status: SettlementStatus
   viewer: SettlementViewer
+  /** 정산을 만든 시각. 완료 시각이 없는 예전 정산은 이 값으로 대신 보여준다. */
+  createdAt: string
+  /** 정산이 끝난 시각. 진행 중이거나 서버가 이 값을 남기기 전에 끝난 정산은 비어 있다. */
+  completedAt: string
 }
 
 /**

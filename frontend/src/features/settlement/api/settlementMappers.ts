@@ -121,6 +121,10 @@ export function mapSettlementSummary(dto: SettlementSummaryDto): SettlementSumma
     type: dto.type,
     status: dto.status,
     viewer: viewer(dto.viewer),
+    // 시각은 서버 문자열 그대로 둔다. 여기서 화면 표기로 바꾸면 날짜로 거를 때 다시
+    // 되돌려야 한다. 표기는 그것이 필요한 화면에서 한 번만 한다.
+    createdAt: dto.createdAt ?? '',
+    completedAt: dto.completedAt ?? '',
   }
 }
 
