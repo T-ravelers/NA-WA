@@ -909,6 +909,9 @@ function stubPlaceDetail(page) {
           isActive: true,
           viewCount: 1024,
           favoriteCount: 87,
+          // #280 찜 서버 연동부터 필수 필드다. 빠지면 responseSchema 검증이 실패해
+          // 상세가 오류 상태로 뜨고, 지도 버튼 대기가 타임아웃으로 죽는다.
+          saved: false,
           sourceUrl: null,
           postalCode: null,
           openingHours: { 'Mon–Sun': '10:00–21:00' },
@@ -936,6 +939,8 @@ function stubEventDetail(page, { withCoordinates }) {
         success: true,
         data: {
           eventId,
+          // #280 찜 서버 연동부터 필수 필드다. 빠지면 responseSchema 검증이 실패한다.
+          saved: false,
           eventType: null,
           eventKind: 'FESTIVAL',
           title: withCoordinates ? 'Seoul Lantern Festival' : 'Hidden Alley Pop-up',
@@ -1454,10 +1459,12 @@ const FLOWS = [
         },
       },
       {
+        // #279부터 위저드가 첫 품목 카드를 미리 깔아 둔다(ensureFirstItem — OCR이 채울
+        // 자리). 여기서 add-item을 누르면 빈 둘째 카드가 생겨 배분 검증에 걸리고
+        // 5단계 전진이 막힌다. 첫 카드가 뜨기를 기다리기만 한다.
         name: '03-items-added',
         focus: '[data-item-name="0"]',
         act: async (page) => {
-          await page.locator('[data-action="add-item"]').click()
           await page.locator('[data-item-name="0"]').waitFor()
         },
       },
