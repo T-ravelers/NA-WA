@@ -106,7 +106,7 @@ function goBack(): void {
       <AppCard padding="lg">
         <section class="flex items-center gap-3">
           <div
-            class="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-2 text-section-header text-ink"
+            class="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-3 text-section-header text-ink"
             aria-hidden="true"
           >
             <img

@@ -266,7 +266,7 @@ function retry(): void {
             <AppCard padding="base">
               <div class="flex items-center gap-3">
                 <div
-                  class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-2 text-title text-ink"
+                  class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-3 text-title text-ink"
                   aria-hidden="true"
                 >
                   <img
