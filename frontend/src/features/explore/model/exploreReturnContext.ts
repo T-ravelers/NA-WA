@@ -124,6 +124,24 @@ export const useExploreReturnContextStore = defineStore('explore-return-context'
   }
 
   /**
+   * 돌아올 위치를 직접 심는다.
+   *
+   * `capture()`는 Journey에서 날짜를 지정해 넘어온 진입만 다루므로 복귀 위치가 늘
+   * `journey-detail`이다. Discover 상세에서 여정을 만들러 나갈 때는 그 상세로 돌아와야
+   * 하는데 그 자리에 심을 방법이 없었다.
+   *
+   * 대상 여정(`journeyId`)은 건드리지 않는다. 아직 고르지 않았을 수도 있고, 여기서
+   * 지우면 이미 고른 여정이 사라진다.
+   */
+  function captureReturnTo(location: unknown): void {
+    const parsed = parseReturnLocation(location)
+    if (parsed === null) return
+
+    returnTo.value = parsed
+    persist()
+  }
+
+  /**
    * 담기 시트에서 고른 대상 여정을 기억한다.
    *
    * 맥락에 담긴 여정과 다른 여정을 고르면 날짜와 복귀 위치는 그 여정의 것이 아니므로 버린다.
@@ -181,6 +199,7 @@ export const useExploreReturnContextStore = defineStore('explore-return-context'
     visitDate,
     returnTo,
     capture,
+    captureReturnTo,
     setJourneyId,
     consumeReturn,
     discardReturn,

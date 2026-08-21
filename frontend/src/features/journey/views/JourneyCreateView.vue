@@ -7,6 +7,7 @@ import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 
 import JourneyCreateForm from '../components/JourneyCreateForm.vue'
 import { createJourney, type JourneyCreateInput } from '../api/journeyApi'
+import { useJourneyExploreIntegration } from '../model/exploreIntegration'
 import { journeyErrorMessageKey } from '../model/journeyErrors'
 import { journeyKeys } from '../model/journeyQueries'
 
@@ -15,6 +16,7 @@ const { t } = i18n
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
+const { consumeReturn } = useJourneyExploreIntegration()
 const hasMessage = (key: string): boolean => i18n.te(key)
 
 /**
@@ -73,6 +75,24 @@ const createMutation = useMutation({
     // 쓴다)를 무효화한다. 안 하면 30초 staleTime 안에 목록을 다시 조회할 때
     // (예: 약속 생성의 여정 선택 시트) 방금 만든 여정이 안 보인다.
     await queryClient.invalidateQueries({ queryKey: journeyKeys.all })
+
+    /*
+     * route param을 나르는 복귀다. 새 여정 id는 query로 실어 보낸다 — Discover 상세의
+     * `activeJourneyId`가 query를 먼저 보므로 그대로 담기 대상이 된다.
+     *
+     * `openJourneySelect`는 하던 일을 그대로 이어 담기 시트를 다시 열라는 표시다.
+     */
+    if (isExploreReturn()) {
+      const destination = consumeReturn()
+      if (destination !== null) {
+        await router.push({
+          name: destination.name,
+          params: destination.params,
+          query: { journeyId: String(journey.tripId), openJourneySelect: '1' },
+        })
+        return
+      }
+    }
 
     const returnTo = returnRouteName()
     if (returnTo !== null) {
