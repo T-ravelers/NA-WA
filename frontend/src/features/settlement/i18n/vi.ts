@@ -169,11 +169,11 @@ export default {
     pay: {
       confirmTitle: 'Xác nhận thanh toán',
       confirmDescription:
-        'Thao tác này chuyển phần của bạn ra khỏi số dư điểm. Không thể hoàn tác tại đây.',
+        'Số điểm tương ứng với phần của bạn sẽ được trừ khỏi số dư. Bạn không thể hoàn tác tại đây.',
       processing: 'Đang gửi thanh toán',
       processingHint: 'Giữ màn hình này mở trong khi chúng tôi chuyển điểm của bạn.',
       completeTitle: 'Đã gửi thanh toán',
-      completeDescription: 'Phần của bạn trong khoản chia này đã được quyết toán.',
+      completeDescription: 'Phần của bạn trong khoản chia này đã được thanh toán.',
       backToDetail: 'Về khoản chia tiền',
     },
     errorCode: {

@@ -27,7 +27,7 @@ export default {
         DEPOSIT_HOLD: 'Giữ tiền cọc',
         DEPOSIT_REFUND: 'Hoàn tiền cọc',
         DEPOSIT_NO_SHOW_DISTRIBUTION: 'Chia tiền cọc vắng mặt',
-        REVERSAL: 'Giao dịch đảo ngược',
+        REVERSAL: 'Giao dịch đã được hoàn tác',
         UNKNOWN: 'Giao dịch ví',
       },
       settlementDirection: {
@@ -78,7 +78,7 @@ export default {
       depositHold: 'Giữ tiền cọc',
       depositRefund: 'Hoàn tiền cọc',
       depositNoShowShare: 'Chia tiền cọc vắng mặt',
-      reversal: 'Đảo ngược',
+      reversal: 'Hoàn tác',
       applyFilters: 'Áp dụng bộ lọc',
       resetFilters: 'Đặt lại',
       dateError: 'Ngày bắt đầu phải trước ngày kết thúc.',
@@ -168,7 +168,7 @@ export default {
       },
       validity: 'NA-WA · Hết hạn sau {time}',
       balance: 'Số dư khả dụng {amount} P',
-      balanceUnavailable: 'Không có số dư khả dụng',
+      balanceUnavailable: 'Không thể hiển thị số dư khả dụng',
       emptyTitle: 'Chưa có mã QR',
       emptyDescription: 'Tạo yêu cầu thanh toán để hiện mã QR ở đây.',
       listError: 'Chúng tôi không tải được các mã QR đang hoạt động của bạn.',
@@ -245,7 +245,7 @@ export default {
       statusErrorTitle: 'Chúng tôi không tải được thanh toán này',
       statusError:
         'Chúng tôi không tải được kết quả thanh toán này. Vui lòng kiểm tra giao dịch của bạn.',
-      invalidContextTitle: 'Không có ngữ cảnh thanh toán',
+      invalidContextTitle: 'Không thể tải thông tin thanh toán',
       invalidContextDescription:
         'Liên kết thanh toán này không hợp lệ hoặc chưa đầy đủ. Hãy quay về ví và thử lại.',
       backToWallet: 'Về ví',

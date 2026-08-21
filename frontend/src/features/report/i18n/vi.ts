@@ -58,14 +58,15 @@ export default {
       dailyAverage: 'Trung bình mỗi ngày',
       zeroTitle: 'Không có chi tiêu được chọn',
       zeroDescription: 'Báo cáo này được tạo mà không liên kết khoản chi nào.',
-      legacyTitle: 'Không có phân tích chi tiêu',
+      legacyTitle: 'Không thể xem phân tích chi tiêu',
       legacyDescription:
         'Báo cáo này được tạo trước khi có tính năng phân tích chi tiêu. Bạn vẫn xem được tóm tắt hành trình.',
       persona: {
         heading: 'Phong cách chi tiêu',
         FOOD: {
           title: 'Tín đồ ẩm thực',
-          description: 'Bạn đi theo vị giác — {share} của hành trình này dành cho ẩm thực.',
+          description:
+            'Bạn đã đi theo tiếng gọi của vị giác — {share} của hành trình này dành cho ẩm thực.',
         },
         SHOPPING: {
           title: 'Thợ săn quà lưu niệm',

@@ -7,7 +7,7 @@
 export default {
   app: {
     name: 'NA-WA',
-    tagline: 'Lên kế hoạch, du lịch và quyết toán cùng nhau',
+    tagline: 'Cùng lên kế hoạch, đi du lịch và chia tiền',
   },
   action: {
     retry: 'Thử lại',

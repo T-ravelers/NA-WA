@@ -8,7 +8,7 @@ export default {
   auth: {
     welcome: {
       headline: 'Hành trình của bạn,\nđược ghi lại',
-      body: 'Lên kế hoạch hành trình ở Hàn Quốc, chia tiền với nhóm và biết từng won đã đi đâu.',
+      body: 'Lên kế hoạch hành trình ở Hàn Quốc, chia tiền cùng nhóm và theo dõi từng won được chi vào đâu.',
       // 탑승권 장식 문구. 워드마크와 영문 탑승권 표기라 번역하지 않는다.
       passLabel: 'Boarding · NAWA',
       passTitle: 'Seoul & Beyond',
@@ -18,7 +18,7 @@ export default {
     },
     signIn: {
       title: 'Chào mừng đến với NA-WA',
-      description: 'Đăng nhập để lên kế hoạch hành trình và quyết toán cùng bạn đồng hành.',
+      description: 'Đăng nhập để lên kế hoạch hành trình và chia tiền cùng bạn đồng hành.',
       google: 'Tiếp tục với Google',
       line: 'Tiếp tục với LINE',
       lineNotice: 'Đăng nhập bằng LINE đang được xác minh.',

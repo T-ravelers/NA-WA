@@ -84,7 +84,7 @@ export default {
       viewReport: 'Xem báo cáo tổng kết',
       createReport: 'Tạo báo cáo tổng kết',
       reportChecking: 'Đang kiểm tra trạng thái báo cáo tổng kết',
-      reportLoadFailed: 'Không có trạng thái báo cáo',
+      reportLoadFailed: 'Không thể tải trạng thái báo cáo',
       reportLoadFailedDescription:
         'Chúng tôi không kiểm tra được báo cáo tổng kết của hành trình này.',
       accessDeniedTitle: 'Hành trình này ở chế độ riêng tư',

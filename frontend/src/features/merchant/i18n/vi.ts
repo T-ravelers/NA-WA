@@ -18,11 +18,11 @@ export default {
       error: 'Chúng tôi không thiết lập được cửa hàng của bạn. Vui lòng thử lại.',
     },
     income: {
-      heading: 'Thu nhập hôm nay',
+      heading: 'Doanh thu hôm nay',
       amount: '{amount} P',
       count: 'Chưa có thanh toán | 1 thanh toán | {count} thanh toán',
       empty: 'Các khoản thanh toán sẽ hiện ở đây khi khách hàng thanh toán.',
-      error: 'Chúng tôi không tải được thu nhập của bạn.',
+      error: 'Chúng tôi không tải được doanh thu của bạn.',
       retry: 'Thử lại',
     },
     qr: {
