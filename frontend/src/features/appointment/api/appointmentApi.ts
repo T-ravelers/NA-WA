@@ -43,12 +43,22 @@ export interface AppointmentListResponse {
   hasNext: boolean
 }
 
+/**
+ * 목록 조회 status 필터가 받는 값. 서버 `LIST_STATUSES`와 1:1이다 — DB에
+ * 저장되지 않는 표시 전용 `AWAITING_ATTENDANCE`와 트랜잭션 안에서만 존재하는
+ * `PAYMENT_PENDING`은 검색 조건이 될 수 없다(서버가 400으로 거절한다).
+ */
+export type AppointmentStatusFilter = Exclude<
+  AppointmentStatus,
+  'AWAITING_ATTENDANCE' | 'PAYMENT_PENDING'
+>
+
 export interface AppointmentListFilters {
   itemId?: number
   itemType?: AppointmentItemType
   language?: AppointmentLanguage
   keyword?: string
-  status?: AppointmentStatus
+  status?: AppointmentStatusFilter
   page?: number
   size?: number
 }
