@@ -4,13 +4,16 @@
 
 ## 수록 파일
 
-| 파일             | 역할                   | 원본                 | 크기  |
-| ---------------- | ---------------------- | -------------------- | ----- |
-| `NotoSans.woff2` | Body / UI (`en`, `vi`) | `NotoSans.ttf` 2.0MB | 201KB |
+| 파일                                | 역할                                 | 원본                         | 크기                   |
+| ----------------------------------- | ------------------------------------ | ---------------------------- | ---------------------- |
+| `NotoSans.woff2`                    | Body / UI (`en`, `vi`)               | `NotoSans.ttf` 2.0MB         | 201KB                  |
+| `noto-sans-jp/NotoSansJP.<n>.woff2` | Body / UI (`ja`) — 슬라이스 124개    | Noto Sans JP Variable 9.1MB  | 합계 5.4MB, 최대 127KB |
+| `noto-sans-tc/NotoSansTC.<n>.woff2` | Body / UI (`zh-TW`) — 슬라이스 105개 | Noto Sans TC Variable 11.9MB | 합계 4.3MB, 최대 99KB  |
 
 Display 폰트는 여기에 없다. 아래 「Display 폰트」 절을 참조한다.
 
-`NotoSans.woff2`는 가변 폰트이며 `wght 100–900`, `wdth 62.5–100` 축을 유지한다.
+`NotoSans.woff2`는 가변 폰트이며 `wght 100–900`, `wdth 62.5–100` 축을 유지한다. CJK 슬라이스도
+가변 폰트이며 `wght 100–900` 축을 유지한다(`wdth` 축은 원본에 없다).
 
 ## 서브셋 범위
 
@@ -32,6 +35,41 @@ pyftsubset <원본> \
   --unicodes="<위 범위>" \
   --no-hinting --desubroutinize
 ```
+
+## CJK 본문 폰트 — unicode-range 슬라이스
+
+`ja`·`zh-TW`의 글자는 Noto Sans JP·TC가 맡는다. 원본이 9~12MB라 통째로 실을 수 없고, 화면에는
+DB에서 오는 문자열(이벤트·장소 이름)이 섞여 있어 글리프를 미리 골라낼 수도 없다. 그래서 폰트를
+**unicode-range 슬라이스**로 나눈다. 브라우저는 화면에 실제로 나온 글자가 속한 슬라이스만
+내려받는다. 한 화면이 받는 양은 보통 슬라이스 몇 개, 수백 KB 안쪽이다.
+
+슬라이스 범위는 Google Fonts가 두 패밀리에 쓰는 분할(`scripts/cjk-unicode-ranges.json`)을
+그대로 가져왔다. 사용 빈도 순으로 묶여 있어 흔한 글자일수록 적은 슬라이스로 끝난다.
+
+### 다시 만들기
+
+```shell
+uvx --from 'fonttools[woff]' python scripts/subset-cjk-fonts.py \
+  --jp <NotoSansJP-VariableFont_wght.ttf> --tc <NotoSansTC-VariableFont_wght.ttf>
+pnpm --filter @na-wa/frontend exec prettier --write src/app/styles/fonts-cjk.css
+```
+
+스크립트가 `public/fonts/noto-sans-jp/`·`noto-sans-tc/`의 woff2와
+`src/app/styles/fonts-cjk.css`(`@font-face` 229블록)를 함께 만든다. **`fonts-cjk.css`는 생성
+파일이다. 직접 고치지 않는다.** 원본 TTF는 저장소에 두지 않는다(Google Fonts에서 받는다).
+세로쓰기 테이블(`vhea`·`vmtx`·`VORG`)은 빼고 힌팅은 지운다.
+
+### 폴백 체인과 로케일 우선순위
+
+`tokens.css`의 `--font-body`·`--font-display`가 `'Noto Sans'` 뒤에 `'Noto Sans JP', 'Noto Sans TC'`를
+둔다. Latin·베트남어는 `Noto Sans`가 그리고, 거기 없는 글자만 CJK 슬라이스로 넘어간다.
+
+ja와 zh-TW가 공유하는 한자는 자형이 다르다. 두 패밀리가 같은 코드포인트를 덮으므로 체인의
+순서가 자형을 정한다. `index.css`의 `:root:lang(zh-TW)` 규칙이 zh-TW에서 TC를 앞세운다. `lang`은
+`applyLocale`이 `<html>`에 쓴다.
+
+한글은 어느 패밀리에도 없다. 한국어는 서비스 로케일이 아니므로 DB 원문의 한글은 시스템 폰트에
+맡긴다.
 
 ## Display 폰트
 
@@ -124,10 +162,9 @@ Sztos 로드 여부와 관계없이 워드마크 모양이 유지되고 추가 �
 
 ## 아직 없는 폰트
 
-- **CJK Body**: `ja`, `zh-TW`용 Noto Sans JP/TC. 원본 합계가 20MB라
-  서브셋 후 로케일별 동적 로드로 추가한다. 전체 선로드는 하지 않는다.
-- **CJK Display**: Taipei Sans TC Beta(`zh-TW`), M PLUS 1(`ja`).
-  디자인 번들에 없다. 확보 전까지 Body 폰트로 폴백한다.
+- **CJK Display**: Taipei Sans TC Beta(`zh-TW`), M PLUS 1p(`ja`).
+  디자인 번들에 없다. 확보 전까지 `ja`·`zh-TW` 헤드라인은 Body 폰트(Noto Sans JP·TC)로
+  폴백한다.
 
 ## Service Worker
 
@@ -137,6 +174,8 @@ Sztos 로드 여부와 관계없이 워드마크 모양이 유지되고 추가 �
 ## 라이선스
 
 - **Noto Sans**: SIL Open Font License 1.1. 전문은 `NotoSans-OFL.txt`.
+- **Noto Sans JP · Noto Sans TC**: SIL Open Font License 1.1. 전문은 `NotoSansCJK-OFL.txt`(두
+  패밀리의 OFL 원문이 같다).
 - **Ria Sans**: 온보딩 워드마크 네 글자만 SVG 패스로 포함한다. 원본 폰트 파일은
   저장소와 빌드 산출물에 넣지 않는다.
 - **Sztos**: 디자인 번들에 라이선스 파일이 없어 재배포 권한을 확인할 수 없었다. 셀프
