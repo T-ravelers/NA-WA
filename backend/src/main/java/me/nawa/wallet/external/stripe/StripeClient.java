@@ -33,9 +33,18 @@ public class StripeClient {
     // idempotencyKey를 같이 보내면, 네트워크 재시도 등으로 같은 요청이 중복 전송돼도
     // Stripe가 새로 만들지 않고 최초 응답을 그대로 돌려준다 (wallet_topups.idempotency_key와 짝).
     public StripePaymentIntent createPaymentIntent(BigDecimal amountKrw, String idempotencyKey) throws StripeException {
+        // 결제수단 타입을 지정하지 않으면 Stripe 계정 설정에 따라 Link가 함께 활성화되고,
+        // Stripe.js가 결제 후에도 지워지지 않는 Link "정보 저장" 위젯을 페이지에 붙인다.
+        // 한국 로컬 결제수단(카드/카카오페이/네이버페이/페이코/삼성페이)은 그대로 두고
+        // Link만 명시적으로 배제한다.
         PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
             .setAmount(amountKrw.longValueExact()) // KRW는 zero-decimal이라 그대로 정수 전달
             .setCurrency("krw")
+            .addPaymentMethodType("card")
+            .addPaymentMethodType("kakao_pay")
+            .addPaymentMethodType("naver_pay")
+            .addPaymentMethodType("payco")
+            .addPaymentMethodType("samsung_pay")
             .build();
 
         RequestOptions options = RequestOptions.builder()
