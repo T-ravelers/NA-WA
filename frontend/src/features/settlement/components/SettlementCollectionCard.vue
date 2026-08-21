@@ -47,9 +47,15 @@ const points = useSettlementPoints()
         :data-collection-for="participant.id"
         class="flex items-center gap-3"
       >
-        <!-- 사진을 아직 다루지 않는 자리라 이름 첫 글자를 대신 세운다. -->
+        <!--
+          사진을 아직 다루지 않는 자리라 이름 첫 글자를 대신 세운다.
+
+          면은 surface-3다. surface-2는 이름이 말하듯 입력칸·세그먼트 트랙의 면이고, 카드
+          위에 얹히는 자리는 surface-3다. 값으로도 그렇다 — surface-2는 카드 면과 거의 같은
+          값이라 동그라미가 배경에 묻혀 글자만 떠 있는 것처럼 보인다.
+        -->
         <span
-          class="flex size-9 shrink-0 items-center justify-center rounded-pill bg-surface-2 text-body-sm text-ink"
+          class="flex size-9 shrink-0 items-center justify-center rounded-pill bg-surface-3 text-body-sm text-ink"
           aria-hidden="true"
           >{{ participant.initials }}</span
         >
