@@ -289,19 +289,46 @@ public class AppointmentService {
                     AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
             );
         }
-        // 참여 취소는 참여 마감 시각 전까지만 가능하다. joinDeadline은 항상
-        // activityStartAt보다 늦을 수 없으므로(생성 시 검증), 이 조건 하나로
-        // 활동 시작 이후(IN_PROGRESS/COMPLETED) 취소도 함께 막힌다.
-        if (LocalDateTime.now().isAfter(appointment.getJoinDeadline())) {
+        // 참여 취소는 활동 종료 시각 전까지 가능하다. 종료 후에는 출석 확정
+        // 흐름이 전원을 처리하므로 나갈 길이 없다 — 나갈 수 있으면 노쇼 확정을
+        // 피해 몰수를 빠져나가는 구멍이 된다.
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime activityEndAt = appointment.getActivityEndAt();
+        if (activityEndAt == null || !now.isBefore(activityEndAt)) {
             throw new BusinessException(
                     AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
             );
         }
+        // 활동 시작 전 탈퇴는 마감(joinDeadline) 이후라도 보증금을 환급한다.
+        // 활동 시작~종료 사이 탈퇴는 노쇼로 확정된다 — 보증금을 환급하지 않고
+        // HELD로 남겨, 출석 확정 후 정산 배치가 출석 회원에게 분배한다(16절).
+        LocalDateTime activityStartAt = appointment.getActivityStartAt();
+        boolean noShowLeave = activityStartAt != null
+                && !now.isBefore(activityStartAt);
 
         Deposit deposit = depositMapper.findByAppointmentMemberId(
                 member.getAppointmentMemberId()
         );
-        if (deposit != null && deposit.isPending()) {
+        if (noShowLeave
+                && member.getMembershipStatus() == MembershipStatus.ACTIVE) {
+            // ACTIVE인데 예치(HELD)가 없으면 결제 트랜잭션 정합성이 깨진 것이다.
+            if (deposit == null || !deposit.isHeld()) {
+                throw new BusinessException(
+                        CommonErrorCode.INTERNAL_SERVER_ERROR
+                );
+            }
+            // 출석 상태를 먼저 굳힌다 — updateAttendance는 ACTIVE 행만 받으므로
+            // markMemberLeft보다 앞서야 한다.
+            if (appointmentMapper.updateAttendance(
+                    member.getAppointmentMemberId(),
+                    AttendanceStatus.NO_SHOW,
+                    now
+            ) != 1) {
+                throw new BusinessException(
+                        CommonErrorCode.INTERNAL_SERVER_ERROR
+                );
+            }
+        } else if (deposit != null && deposit.isPending()) {
             cancelPendingDeposit(deposit);
         } else if (deposit != null && deposit.isHeld()) {
             refundHeldDeposit(memberId, deposit);
@@ -313,11 +340,11 @@ public class AppointmentService {
                     CommonErrorCode.INTERNAL_SERVER_ERROR
             );
         }
-        // 정원 도달로 CLOSED된 약속에서 빈자리가 생겼다. joinDeadline은 이미
-        // 위에서 지나지 않았음을 확인했으므로(활동 시작 전) 시간 기준으로는
-        // 항상 재모집 가능한 상태다 — 마감 시각 경과로 CLOSED된 경우라면
-        // 애초에 이 지점까지 오지 못한다.
-        if (appointment.getAppointmentStatus() == AppointmentStatus.CLOSED) {
+        // 정원 도달로 CLOSED된 약속에서 빈자리가 생겼을 때만 재모집으로
+        // 되돌린다. 마감 시각이 지났다면 새로 참여할 수 없으므로 빈자리가
+        // 생겨도 CLOSED를 유지한다.
+        if (appointment.getAppointmentStatus() == AppointmentStatus.CLOSED
+                && !now.isAfter(appointment.getJoinDeadline())) {
             appointmentMapper.updateAppointmentStatus(
                     appointmentId,
                     AppointmentStatus.CLOSED,
@@ -427,6 +454,22 @@ public class AppointmentService {
             }
             Deposit deposit = depositMapper.findByAppointmentMemberId(
                     member.getAppointmentMemberId()
+            );
+            if (deposit == null || !deposit.isHeld()) {
+                throw new BusinessException(
+                        CommonErrorCode.INTERNAL_SERVER_ERROR
+                );
+            }
+            totalHeldAmount = totalHeldAmount.add(deposit.getAmount());
+        }
+
+        // 활동 중에 나가 노쇼로 굳은 LEFT 회원의 보증금도 HELD로 남아 있다.
+        // 이 배치가 그 분배까지 책임지므로 합산에 함께 넣는다 — 빠뜨리면
+        // 정산 총액과 실제 이체 합이 어긋난다.
+        for (AppointmentMember leftNoShow : appointmentMapper
+                .findLeftNoShowMembersByAppointmentId(appointmentId)) {
+            Deposit deposit = depositMapper.findByAppointmentMemberId(
+                    leftNoShow.getAppointmentMemberId()
             );
             if (deposit == null || !deposit.isHeld()) {
                 throw new BusinessException(

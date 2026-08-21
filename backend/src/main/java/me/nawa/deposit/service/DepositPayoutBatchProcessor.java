@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.mapper.AppointmentMapper;
@@ -70,8 +71,14 @@ public class DepositPayoutBatchProcessor {
                 .filter(member -> member.getAttendanceStatus() == AttendanceStatus.ATTENDED)
                 .sorted(Comparator.comparing(AppointmentMember::getAppointmentMemberId))
                 .toList();
-        List<AppointmentMember> noShow = activeMembers.stream()
-                .filter(member -> member.getAttendanceStatus() == AttendanceStatus.NO_SHOW)
+        // 활동 중에 나가 노쇼로 굳은 LEFT 회원도 분배 대상이다. ACTIVE만 보면
+        // 그 보증금이 HELD인 채 DEPOSIT_POOL에 영영 남는다.
+        List<AppointmentMember> noShow = Stream.concat(
+                activeMembers.stream()
+                        .filter(member -> member.getAttendanceStatus()
+                                == AttendanceStatus.NO_SHOW),
+                appointmentMapper.findLeftNoShowMembersByAppointmentId(
+                        batch.getAppointmentId()).stream())
                 .toList();
 
         if (attended.isEmpty()) {

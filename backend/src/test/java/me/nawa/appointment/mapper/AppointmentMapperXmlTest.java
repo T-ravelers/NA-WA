@@ -78,6 +78,22 @@ class AppointmentMapperXmlTest {
         assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.updateAttendance"
         ));
+        assertTrue(configuration.hasStatement(
+                "me.nawa.appointment.mapper.AppointmentMapper.findLeftNoShowMembersByAppointmentId"
+        ));
+    }
+
+    // 활동 중 탈퇴로 굳은 노쇼만 골라야 한다 — 마감 전 정상 탈퇴(LEFT +
+    // attendance PENDING)가 섞이면 환급이 끝난 보증금을 다시 분배하려 든다.
+    @Test
+    void findLeftNoShowMembers_onlyTargetsLeftNoShowMembers() throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("appointmentId", 1L);
+
+        String sql = boundSql("findLeftNoShowMembersByAppointmentId", parameters);
+
+        assertTrue(sql.contains("membership_status = 'LEFT'"));
+        assertTrue(sql.contains("attendance_status = 'NO_SHOW'"));
     }
 
     @Test

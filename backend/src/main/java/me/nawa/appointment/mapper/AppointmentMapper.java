@@ -93,6 +93,12 @@ public interface AppointmentMapper {
             @Param("appointmentId") Long appointmentId
     );
 
+    // 활동 중 탈퇴로 노쇼가 굳은 LEFT 회원. 보증금이 HELD로 남아 있어 출석
+    // 확정 합산과 정산 분배가 ACTIVE 회원과 함께 이 목록을 봐야 한다.
+    List<AppointmentMember> findLeftNoShowMembersByAppointmentId(
+            @Param("appointmentId") Long appointmentId
+    );
+
     // includeAll=true의 예정/지난 분류 기준도 DB의 NOW()가 아니라 애플리케이션이 넘긴
     // now를 쓴다. 이유는 closeExpiredRecruitingAppointments와 같다 — activity_start_at은
     // 애플리케이션의 LocalDateTime.now() 기준으로 저장되는데, DB 서버 컨테이너의 시간대가

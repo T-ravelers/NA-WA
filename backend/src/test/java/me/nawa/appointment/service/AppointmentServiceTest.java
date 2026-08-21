@@ -45,6 +45,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -793,13 +794,95 @@ class AppointmentServiceTest {
         verify(appointmentMapper, never()).markMemberLeft(any());
     }
 
+    // 참여 마감이 지나도 활동 시작 전이면 환급 탈퇴가 된다. 단 마감 후에는
+    // 빈자리를 새로 채울 수 없으므로 CLOSED를 RECRUITING으로 되돌리지 않는다.
     @Test
-    void leaveAppointment_afterJoinDeadline_rejectsCancellation() {
+    void leaveAppointment_afterJoinDeadlineBeforeStart_refundsWithoutReopening() {
         Appointment appointment = appointment(
                 10L,
-                AppointmentStatus.RECRUITING
+                AppointmentStatus.CLOSED
         );
         appointment.setJoinDeadline(LocalDateTime.now().minusDays(1));
+        AppointmentMember member = AppointmentMember.builder()
+                .appointmentMemberId(30L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .build();
+        Deposit deposit = mock(Deposit.class);
+        when(deposit.getDepositId()).thenReturn(40L);
+        when(deposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        when(deposit.isPending()).thenReturn(false);
+        when(deposit.isHeld()).thenReturn(true);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
+                10L, 2L
+        )).thenReturn(member);
+        when(depositMapper.findByAppointmentMemberId(30L))
+                .thenReturn(deposit);
+        when(walletTransferService.transferFromSystemWallet(
+                eq(2L), eq(SystemWalletCode.DEPOSIT_POOL), eq(2L),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_REFUND.name()), anyString()
+        )).thenReturn(600L);
+        when(depositMapper.markRefunded(eq(40L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberLeft(30L)).thenReturn(1);
+
+        appointmentService.leaveAppointment(2L, 10L);
+
+        verify(depositMapper).markRefunded(eq(40L), any());
+        verify(appointmentMapper).markMemberLeft(30L);
+        verify(appointmentMapper, never())
+                .updateAttendance(any(), any(), any());
+        verify(appointmentMapper, never())
+                .updateAppointmentStatus(any(), any(), any());
+    }
+
+    // 활동 중 탈퇴는 노쇼로 굳는다. 보증금은 환급하지 않고 HELD로 남겨,
+    // 출석 확정 후 정산 배치가 출석 회원에게 분배한다.
+    @Test
+    void leaveAppointment_duringActivity_marksNoShowAndKeepsDeposit() {
+        Appointment appointment = appointment(
+                10L,
+                AppointmentStatus.IN_PROGRESS
+        );
+        appointment.setActivityStartAt(LocalDateTime.now().minusHours(1));
+        appointment.setActivityEndAt(LocalDateTime.now().plusHours(1));
+        AppointmentMember member = AppointmentMember.builder()
+                .appointmentMemberId(30L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .membershipStatus(MembershipStatus.ACTIVE)
+                .build();
+        Deposit deposit = mock(Deposit.class);
+        when(deposit.isHeld()).thenReturn(true);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findMemberByAppointmentAndMemberForUpdate(
+                10L, 2L
+        )).thenReturn(member);
+        when(depositMapper.findByAppointmentMemberId(30L))
+                .thenReturn(deposit);
+        when(appointmentMapper.updateAttendance(
+                eq(30L), eq(AttendanceStatus.NO_SHOW), any()
+        )).thenReturn(1);
+        when(appointmentMapper.markMemberLeft(30L)).thenReturn(1);
+
+        appointmentService.leaveAppointment(2L, 10L);
+
+        verify(appointmentMapper).updateAttendance(
+                eq(30L), eq(AttendanceStatus.NO_SHOW), any());
+        verify(appointmentMapper).markMemberLeft(30L);
+        verify(walletTransferService, never()).transferFromSystemWallet(
+                any(), any(), anyLong(), any(), any(), any());
+        verify(depositMapper, never()).markRefunded(any(), any());
+    }
+
+    @Test
+    void leaveAppointment_afterActivityEnd_rejectsCancellation() {
+        Appointment appointment = endedAppointment(
+                10L, AppointmentStatus.IN_PROGRESS);
         AppointmentMember member = AppointmentMember.builder()
                 .appointmentMemberId(30L)
                 .appointmentId(10L)
@@ -950,6 +1033,72 @@ class AppointmentServiceTest {
                 batch.getResolutionReason());
         assertEquals(0, BigDecimal.valueOf(20_000)
                 .compareTo(batch.getTotalHeldAmount()));
+    }
+
+    // 활동 중에 나가 노쇼로 굳은 LEFT 회원의 보증금(HELD)도 이 배치가 분배할
+    // 몫이므로 합산에 포함돼야 한다.
+    @Test
+    void confirmAttendance_leftNoShowDeposit_includedInBatchTotal() {
+        Appointment appointment = endedAppointment(
+                10L, AppointmentStatus.IN_PROGRESS);
+        AppointmentMember host = AppointmentMember.builder()
+                .appointmentMemberId(20L)
+                .appointmentId(10L)
+                .memberId(1L)
+                .build();
+        AppointmentMember guest = AppointmentMember.builder()
+                .appointmentMemberId(21L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .build();
+        AppointmentMember leftNoShow = AppointmentMember.builder()
+                .appointmentMemberId(22L)
+                .appointmentId(10L)
+                .memberId(3L)
+                .membershipStatus(MembershipStatus.LEFT)
+                .attendanceStatus(AttendanceStatus.NO_SHOW)
+                .build();
+        Deposit hostDeposit = mock(Deposit.class);
+        when(hostDeposit.isHeld()).thenReturn(true);
+        when(hostDeposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        Deposit guestDeposit = mock(Deposit.class);
+        when(guestDeposit.isHeld()).thenReturn(true);
+        when(guestDeposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        Deposit leftDeposit = mock(Deposit.class);
+        when(leftDeposit.isHeld()).thenReturn(true);
+        when(leftDeposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of(host, guest));
+        when(appointmentMapper.findLeftNoShowMembersByAppointmentId(10L))
+                .thenReturn(List.of(leftNoShow));
+        when(appointmentMapper.updateAttendance(
+                eq(20L), eq(AttendanceStatus.ATTENDED), any()
+        )).thenReturn(1);
+        when(appointmentMapper.updateAttendance(
+                eq(21L), eq(AttendanceStatus.NO_SHOW), any()
+        )).thenReturn(1);
+        when(depositMapper.findByAppointmentMemberId(20L))
+                .thenReturn(hostDeposit);
+        when(depositMapper.findByAppointmentMemberId(21L))
+                .thenReturn(guestDeposit);
+        when(depositMapper.findByAppointmentMemberId(22L))
+                .thenReturn(leftDeposit);
+        when(appointmentMapper.updateAppointmentStatus(
+                10L,
+                AppointmentStatus.IN_PROGRESS,
+                AppointmentStatus.COMPLETED
+        )).thenReturn(1);
+        when(depositPayoutBatchMapper.insert(any())).thenReturn(1);
+
+        appointmentService.confirmAttendance(1L, 10L, attendanceRequest());
+
+        ArgumentCaptor<DepositPayoutBatch> batchCaptor =
+                ArgumentCaptor.forClass(DepositPayoutBatch.class);
+        verify(depositPayoutBatchMapper).insert(batchCaptor.capture());
+        assertEquals(0, BigDecimal.valueOf(30_000)
+                .compareTo(batchCaptor.getValue().getTotalHeldAmount()));
     }
 
     @Test
