@@ -89,7 +89,7 @@ class AppointmentMapperIntegrationTest {
             long ongoingId = insertAppointment(
                     itemId, memberId, "IN_PROGRESS", now.plusDays(2));
             long farFutureId = insertAppointment(
-                    itemId, memberId, "CONFIRMED", now.plusDays(10));
+                    itemId, memberId, "RECRUITING", now.plusDays(10));
             long finishedId = insertAppointment(
                     itemId, memberId, "COMPLETED", now.minusDays(5));
             long olderFinishedId = insertAppointment(
@@ -143,9 +143,9 @@ class AppointmentMapperIntegrationTest {
 
             LocalDateTime now = LocalDateTime.now();
             long justAheadId = insertAppointment(
-                    itemId, memberId, "CONFIRMED", now.plusMinutes(5));
+                    itemId, memberId, "RECRUITING", now.plusMinutes(5));
             long laterAheadId = insertAppointment(
-                    itemId, memberId, "CONFIRMED", now.plusMinutes(30));
+                    itemId, memberId, "RECRUITING", now.plusMinutes(30));
             long justPastId = insertAppointment(
                     itemId, memberId, "COMPLETED", now.minusMinutes(5));
             long olderPastId = insertAppointment(

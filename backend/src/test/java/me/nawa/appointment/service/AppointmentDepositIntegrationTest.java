@@ -341,6 +341,53 @@ class AppointmentDepositIntegrationTest {
         );
     }
 
+    // 참여 마감 시각을 없앤 뒤 FULL은 정원 충족만을 뜻한다. 정원이 차면 참여
+    // 트랜잭션이 즉시 FULL로 올리고, 빈자리가 생기면 활동 시작 전인 한 다시
+    // RECRUITING으로 돌아온다. 상태 값은 표시용 계산이 아니라 DB 컬럼으로 본다.
+    @Test
+    void joinToCapacity_marksFull_andLeaveReopensRecruiting() {
+        long hostMemberId = createMemberWithWallet("방장", new BigDecimal("50000.0000"));
+        long guestMemberId = createMemberWithWallet("참여자", new BigDecimal("50000.0000"));
+        long eventId = createApprovedEvent();
+
+        AppointmentCreateRequest request = new AppointmentCreateRequest();
+        request.setItemId(eventId);
+        request.setItemType("EVENT");
+        request.setLanguageCode("en");
+        request.setAppointmentName("Capacity Test Appointment");
+        request.setMaxMembers(2);
+        request.setDepositAmount(BigDecimal.valueOf(10_000));
+        request.setMeetingPlace("Test Meeting Place");
+        request.setTripId(createJourney(hostMemberId));
+        request.setVisitDate(LocalDate.now().plusDays(2));
+        request.setActivityStartTime(LocalTime.of(10, 0));
+        request.setActivityEndTime(LocalTime.of(12, 0));
+
+        Appointment created = appointmentService.createAppointment(hostMemberId, request);
+        appointmentIds.add(created.getAppointmentId());
+        assertEquals(AppointmentStatus.RECRUITING, created.getAppointmentStatus());
+
+        appointmentService.joinAppointment(guestMemberId, created.getAppointmentId());
+
+        assertEquals(
+                AppointmentStatus.FULL,
+                appointmentMapper.findAppointmentById(
+                        created.getAppointmentId()
+                ).getAppointmentStatus(),
+                "정원 2명이 다 찼으므로 참여 트랜잭션이 FULL로 올려야 한다"
+        );
+
+        appointmentService.leaveAppointment(guestMemberId, created.getAppointmentId());
+
+        assertEquals(
+                AppointmentStatus.RECRUITING,
+                appointmentMapper.findAppointmentById(
+                        created.getAppointmentId()
+                ).getAppointmentStatus(),
+                "활동 시작 전에 빈자리가 생겼으므로 다시 모집으로 돌아와야 한다"
+        );
+    }
+
     @Test
     void confirmAttendance_completesAppointmentAndCreatesPendingPayoutBatch() {
         poolBalanceBeforeTest = jdbcTemplate.queryForObject(
