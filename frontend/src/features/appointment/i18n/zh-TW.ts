@@ -37,8 +37,6 @@ export default {
     },
     status: {
       RECRUITING: '招募中',
-      CLOSED: '已截止',
-      CONFIRMED: '已確認',
       IN_PROGRESS: '進行中',
       AWAITING_ATTENDANCE: '待確認出席',
       COMPLETED: '已完成',
@@ -76,7 +74,6 @@ export default {
       visitDateNote: '依您選擇的旅程日期，這個活動會在 {date} 進行。',
       startAt: '活動開始',
       endAt: '活動結束',
-      joinDeadline: '加入截止時間',
       submit: '建立揪團',
       confirmTitle: '確認揪團',
       confirmDescription: '建立前請先確認揪團內容。',
@@ -102,8 +99,6 @@ export default {
         startInPast: '請選擇晚於現在的開始時間。',
         endRequired: '請選擇結束時間。',
         endAfterStart: '結束時間必須晚於開始時間。',
-        deadlineRequired: '請選擇加入截止時間。',
-        deadlineBeforeStart: '加入截止時間必須早於活動開始時間。',
       },
     },
     journeySelect: {
@@ -148,7 +143,6 @@ export default {
       meetingPlace: '集合地點',
       language: '語言',
       deposit: '可退還押金',
-      joinDeadline: '加入截止時間',
       notProvided: '未提供',
       join: '加入揪團',
       joinUnavailable: '這個揪團目前不開放加入。',

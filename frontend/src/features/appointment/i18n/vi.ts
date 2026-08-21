@@ -39,8 +39,6 @@ export default {
     },
     status: {
       RECRUITING: 'Đang mở',
-      CLOSED: 'Đã đóng',
-      CONFIRMED: 'Đã xác nhận',
       IN_PROGRESS: 'Đang diễn ra',
       AWAITING_ATTENDANCE: 'Chờ điểm danh',
       COMPLETED: 'Hoàn thành',
@@ -78,7 +76,6 @@ export default {
       visitDateNote: 'Hoạt động này diễn ra vào {date}, theo ngày hành trình bạn đã chọn.',
       startAt: 'Hoạt động bắt đầu',
       endAt: 'Hoạt động kết thúc',
-      joinDeadline: 'Hạn tham gia',
       submit: 'Tạo cuộc hẹn',
       confirmTitle: 'Xác nhận cuộc hẹn',
       confirmDescription: 'Kiểm tra thông tin cuộc hẹn trước khi tạo.',
@@ -107,8 +104,6 @@ export default {
         startInPast: 'Chọn giờ bắt đầu muộn hơn hiện tại.',
         endRequired: 'Chọn giờ kết thúc.',
         endAfterStart: 'Giờ kết thúc phải sau giờ bắt đầu.',
-        deadlineRequired: 'Chọn hạn tham gia.',
-        deadlineBeforeStart: 'Hạn tham gia phải trước khi hoạt động bắt đầu.',
       },
     },
     journeySelect: {
@@ -153,7 +148,6 @@ export default {
       meetingPlace: 'Điểm hẹn',
       language: 'Ngôn ngữ',
       deposit: 'Tiền cọc hoàn lại',
-      joinDeadline: 'Hạn tham gia',
       notProvided: 'Chưa cung cấp',
       join: 'Tham gia cuộc hẹn',
       joinUnavailable: 'Cuộc hẹn này không mở để tham gia.',

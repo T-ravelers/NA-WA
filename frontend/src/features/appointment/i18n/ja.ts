@@ -38,8 +38,6 @@ export default {
     },
     status: {
       RECRUITING: '募集中',
-      CLOSED: '募集終了',
-      CONFIRMED: '確定',
       IN_PROGRESS: '進行中',
       AWAITING_ATTENDANCE: '出席確認待ち',
       COMPLETED: '完了',
@@ -77,7 +75,6 @@ export default {
       visitDateNote: '選んだ旅程の日付に基づき、このアクティビティは{date}に行われます。',
       startAt: 'アクティビティ開始',
       endAt: 'アクティビティ終了',
-      joinDeadline: '参加締切',
       submit: '同行グループを作成',
       confirmTitle: '同行グループを確認',
       confirmDescription: '作成する前に同行グループの内容を確認してください。',
@@ -105,8 +102,6 @@ export default {
         startInPast: '開始時刻は現在より後にしてください。',
         endRequired: '終了時刻を選んでください。',
         endAfterStart: '終了時刻は開始時刻より後にしてください。',
-        deadlineRequired: '参加締切を選んでください。',
-        deadlineBeforeStart: '参加締切はアクティビティ開始より前にしてください。',
       },
     },
     journeySelect: {
@@ -151,7 +146,6 @@ export default {
       meetingPlace: '集合場所',
       language: '言語',
       deposit: '返金可能なデポジット',
-      joinDeadline: '参加締切',
       notProvided: '未設定',
       join: '同行グループに参加',
       joinUnavailable: 'この同行グループは現在参加を受け付けていません。',
