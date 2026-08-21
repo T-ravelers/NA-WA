@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 const fetchPlaceDetail = vi.fn()
 const fetchJourneys = vi.fn()
@@ -78,7 +79,7 @@ const place = {
   hasRestroom: false,
 }
 
-async function mountView() {
+async function mountView(path = '/explore/places/42') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -102,11 +103,16 @@ async function mountView() {
         name: 'appointment-list',
         component: { template: '<div>Appointments</div>' },
       },
+      {
+        path: '/journeys/new',
+        name: 'journey-create',
+        component: { template: '<div>Journey create</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
-  await router.push('/explore/places/42')
+  await router.push(path)
   await router.isReady()
 
   const wrapper = mount(PlaceDetailView, {
@@ -130,6 +136,7 @@ describe('PlaceDetailView', () => {
     ])
     addJourneyItem.mockResolvedValue({})
     openMapAppUrl.mockReset()
+    sessionStorage.clear()
   })
 
   it('renders Place details with enabled map buttons', async () => {
@@ -292,5 +299,97 @@ describe('PlaceDetailView', () => {
       visitDate: expect.any(String),
     })
     expect(router.currentRoute.value.name).toBe('journey-detail')
+  })
+
+  /*
+   * Place는 운영 기간이 없다. 예전에는 그래서 날짜 시트에 isPermanent=true를 넘겨
+   * **모든 날짜**를 열었고, 여정 기간 밖까지 열려 확정한 뒤에야 JOURNEY-007로 실패했다.
+   */
+  it('달력을 고른 여정의 기간으로 좁힌다', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul weekend'))
+      ?.trigger('click')
+    await flushPromises()
+
+    const dayCell = (label: string) =>
+      wrapper
+        .get('[role="dialog"]')
+        .findAll('button')
+        .find((button) => button.text().trim() === label)
+
+    expect(dayCell('11')?.attributes('disabled')).toBeUndefined()
+    expect(dayCell('9')?.attributes('disabled')).toBeDefined()
+    expect(dayCell('13')?.attributes('disabled')).toBeDefined()
+  })
+
+  it('담기 실패를 오류 코드별로 안내한다', async () => {
+    addJourneyItem.mockRejectedValue(
+      new NormalizedApiError('JOURNEY-004', 409, '이미 등록되어 있습니다.'),
+    )
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul weekend'))
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Add to'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('This is already on that day of your journey.')
+    expect(wrapper.text()).not.toContain('Please try again.')
+  })
+
+  it('담을 여정이 없으면 그 자리에서 여정 만들기로 나간다', async () => {
+    fetchJourneys.mockResolvedValue([])
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text() === 'Create a journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-create')
+    expect(router.currentRoute.value.query).toEqual({ returnToExplore: '1' })
+    expect(JSON.parse(sessionStorage.getItem('nawa.explore.returnContext') ?? '{}')).toMatchObject({
+      returnTo: { name: 'explore-place-detail', params: { placeId: '42' } },
+    })
+  })
+
+  it('여정을 만들고 돌아오면 담기 시트를 다시 연다', async () => {
+    const { wrapper, router } = await mountView('/explore/places/42?openJourneySelect=1')
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Choose a journey')
+    expect(router.currentRoute.value.query).toEqual({})
   })
 })

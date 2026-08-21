@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -45,11 +45,15 @@ import {
 import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMutation'
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
+import { journeyAddErrorMessageKey } from '../model/journeyAddErrors'
+import { intersectItemJourneyPeriod } from '../model/journeyPeriod'
 import { findExploreRegionLabelKey } from '../model/exploreRegions'
 
 const route = useRoute()
 const router = useRouter()
-const { locale, t } = useI18n()
+const i18n = useI18n()
+const { locale, t } = i18n
+const hasMessage = (key: string): boolean => i18n.te(key)
 const { addJourneyItem, parseJourneyRouteQuery, useJourneyListQuery } =
   useExploreJourneyIntegration()
 const returnContext = useExploreReturnContextStore()
@@ -67,7 +71,8 @@ const journeyDateSheetOpen = ref(false)
 const journeyDate = ref<string | null>(null)
 const selectedJourneyId = ref<number | null>(null)
 const journeyAddPending = ref(false)
-const journeyAddError = ref<'missing' | 'failed' | null>(null)
+/** 담기 실패 문구의 i18n key. 원인별로 다른 key가 들어온다. */
+const journeyAddError = ref<string | null>(null)
 const shared = ref(false)
 
 const imageUrls = computed(() => (event.value ? toImageUrls(event.value.imageUrls) : []))
@@ -103,6 +108,32 @@ const activeJourneyId = computed(
 )
 const journeyListQuery = useJourneyListQuery(journeySelectSheetOpen)
 const journeys = computed(() => journeyListQuery.data.value ?? [])
+
+/**
+ * 이벤트의 운영 기간.
+ *
+ * 상시 이벤트는 `end_date`가 NULL이라는 것이 DB 불변식이지만, 응답이 무엇을 주든
+ * `isPermanent`가 참이면 상한이 없는 것으로 읽는다.
+ */
+const itemPeriod = computed(() => ({
+  startDate: event.value?.startDate ?? null,
+  endDate: event.value?.isPermanent === true ? null : (event.value?.endDate ?? null),
+}))
+
+const selectedJourney = computed(
+  () => journeys.value.find((journey) => journey.tripId === selectedJourneyId.value) ?? null,
+)
+
+/**
+ * 달력이 열어 줄 구간. 이벤트 기간과 여정 기간이 겹치는 날만 담을 수 있다.
+ *
+ * 여정을 아직 고르지 않았거나 겹치는 날이 없으면 `null`이고, 그때는 날짜 시트를 열지
+ * 않는다 — 열어 봐야 고를 수 있는 날이 없다.
+ */
+const journeyDateRange = computed(() => {
+  const journey = selectedJourney.value
+  return journey === null ? null : intersectItemJourneyPeriod(itemPeriod.value, journey)
+})
 
 const mapSearchUrl = computed(() =>
   buildGoogleMapsSearchUrl(event.value?.latitude, event.value?.longitude),
@@ -256,7 +287,23 @@ function selectJourney(journeyId: number): void {
   returnContext.setJourneyId(journeyId)
   journeyDate.value = returnContext.visitDate
   journeySelectSheetOpen.value = false
-  journeyDateSheetOpen.value = true
+  // 시트가 고를 수 없는 여정을 막지만, 범위가 없으면 열 것이 없으므로 한 번 더 본다.
+  journeyDateSheetOpen.value = journeyDateRange.value !== null
+}
+
+/**
+ * 담을 여정이 없을 때 이 자리에서 만들러 나간다.
+ *
+ * 돌아올 위치를 먼저 심는다. route param(`eventId`)을 실어야 해서 query만 나르는
+ * `returnRouteName`으로는 이 화면으로 돌아올 수 없다.
+ */
+function goToCreateJourney(): void {
+  returnContext.captureReturnTo({
+    name: 'explore-event-detail',
+    params: { eventId: eventId.value },
+  })
+  journeySelectSheetOpen.value = false
+  void router.push({ name: 'journey-create', query: { returnToExplore: '1' } })
 }
 
 function closeJourneyDateSheet(): void {
@@ -269,7 +316,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
   const current = event.value
   const journeyId = selectedJourneyId.value ?? activeJourneyId.value
   if (!current || journeyId === null) {
-    journeyAddError.value = 'missing'
+    journeyAddError.value = 'explore.journeyDate.selectItemFirst'
     return
   }
 
@@ -287,12 +334,29 @@ async function confirmJourneyDate(date: string): Promise<void> {
     journeyDateSheetOpen.value = false
     const destination = returnContext.consumeReturn()
     await router.push(destination ?? { name: 'journey-detail', params: { tripId: journeyId } })
-  } catch {
-    journeyAddError.value = 'failed'
+  } catch (error) {
+    journeyAddError.value = journeyAddErrorMessageKey(error, hasMessage)
   } finally {
     journeyAddPending.value = false
   }
 }
+
+/**
+ * 여정을 만들고 돌아온 진입. 하던 일을 그대로 이어 담기 시트를 다시 연다.
+ *
+ * 새 여정 id는 `journeyId` query로 실려 오고 `activeJourneyId`가 그것을 먼저 보므로
+ * 시트는 그 여정이 골라진 채 열린다. 표시를 남겨 두면 새로고침이나 뒤로 가기에서도
+ * 시트가 다시 열리므로 읽자마자 주소에서 지운다.
+ */
+onMounted(() => {
+  if (route.query.openJourneySelect !== '1') return
+
+  openJourneyDateSheet()
+
+  const restQuery = { ...route.query }
+  delete restQuery.openJourneySelect
+  void router.replace({ query: restQuery })
+})
 
 function retry(): void {
   void eventQuery.refetch()
@@ -643,21 +707,14 @@ function retry(): void {
       </div>
 
       <JourneyDateSheet
-        v-if="journeyDateSheetOpen"
+        v-if="journeyDateSheetOpen && journeyDateRange"
         :item-title="event.title"
         :item-location="journeyLocation"
-        :start-date="event.startDate"
-        :end-date="event.endDate"
-        :is-permanent="event.isPermanent === true"
+        :start-date="journeyDateRange.start"
+        :end-date="journeyDateRange.end"
         :initial-date="journeyDate"
         :loading="journeyAddPending"
-        :error-message="
-          journeyAddError === 'missing'
-            ? t('explore.journeyDate.selectItemFirst')
-            : journeyAddError === 'failed'
-              ? t('explore.journeyDate.addItemFailed')
-              : null
-        "
+        :error-message="journeyAddError ? t(journeyAddError) : null"
         @close="closeJourneyDateSheet"
         @confirm="confirmJourneyDate"
       />
@@ -665,11 +722,14 @@ function retry(): void {
       <JourneySelectSheet
         v-if="journeySelectSheetOpen"
         :journeys="journeys"
+        :item-start-date="itemPeriod.startDate"
+        :item-end-date="itemPeriod.endDate"
         :selected-journey-id="selectedJourneyId"
         :loading="journeyListQuery.isPending.value"
         :error-message="journeyListQuery.isError.value ? t('explore.journeySelect.error') : null"
         @close="closeJourneySelectSheet"
         @select="selectJourney"
+        @create-journey="goToCreateJourney"
       />
     </template>
   </section>

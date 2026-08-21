@@ -364,6 +364,13 @@ export default {
       loading: 'Loading your journeys…',
       error: 'We could not load your journeys. Please try again.',
       empty: 'Create a journey before adding this event.',
+      /*
+       * 겹치는 여정이 하나도 없을 때. 목록에서 감추지 않고 왜 못 고르는지 함께
+       * 보여야 사용자가 자기 여정이 사라진 줄 알지 않는다.
+       */
+      noneAvailable: 'None of your journeys overlap these dates.',
+      outsideItemPeriod: 'Doesn’t overlap these dates',
+      createJourney: 'Create a journey',
     },
   },
 }
