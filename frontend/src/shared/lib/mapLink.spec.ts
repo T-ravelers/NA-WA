@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   buildGoogleMapsDirectionsUrl,
@@ -6,6 +6,7 @@ import {
   buildNaverMapPlaceUrl,
   buildNaverMapTransitRouteUrl,
   detectMapPlatform,
+  openMapAppUrl,
 } from './mapLink'
 
 describe('buildGoogleMapsSearchUrl', () => {
@@ -36,7 +37,7 @@ describe('buildGoogleMapsSearchUrl', () => {
 describe('buildGoogleMapsDirectionsUrl', () => {
   it('builds a directions URL from finite coordinates', () => {
     expect(buildGoogleMapsDirectionsUrl(37.5665, 126.978)).toBe(
-      'https://www.google.com/maps/dir/?api=1&destination=37.5665%2C126.978',
+      'https://www.google.com/maps/dir/?api=1&destination=37.5665%2C126.978&travelmode=transit',
     )
   })
 
@@ -124,5 +125,37 @@ describe('buildNaverMapTransitRouteUrl', () => {
   it('returns null when either coordinate is missing', () => {
     expect(buildNaverMapTransitRouteUrl(null, null, 'Seongsu Onsil', 'other')).toBeNull()
     expect(buildNaverMapTransitRouteUrl(37.5665, undefined, 'Seongsu Onsil', 'other')).toBeNull()
+  })
+})
+
+describe('openMapAppUrl', () => {
+  const NAVER_URL = 'nmap://place?lat=37.5665&lng=126.978&name=Seongsu%20Onsil&appname=NA-WA'
+
+  // jsdom은 location.assign을 재정의하지 못하게 막으므로 location 자체를 갈아 끼운다.
+  function stubLocation(): ReturnType<typeof vi.fn> {
+    const assign = vi.fn()
+    vi.stubGlobal('location', { assign })
+
+    return assign
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('moves the current document so the app scheme is not blocked as a popup', () => {
+    const assign = stubLocation()
+
+    openMapAppUrl(NAVER_URL)
+
+    expect(assign).toHaveBeenCalledWith(NAVER_URL)
+  })
+
+  it('does nothing when the coordinate builder returned null', () => {
+    const assign = stubLocation()
+
+    openMapAppUrl(null)
+
+    expect(assign).not.toHaveBeenCalled()
   })
 })

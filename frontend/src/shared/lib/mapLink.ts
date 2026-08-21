@@ -35,14 +35,21 @@ export function buildGoogleMapsSearchUrl(
   return query === null ? null : `https://www.google.com/maps/search/?api=1&query=${query}`
 }
 
-/** 현재 위치에서 해당 좌표까지의 길찾기 화면을 연다. 한국에서는 대중교통만 동작한다. */
+/**
+ * 현재 위치에서 해당 좌표까지의 대중교통 길찾기를 연다.
+ *
+ * `travelmode`를 비우면 구글이 기본값인 자동차 경로로 연다. 한국에서 구글은 자동차·도보
+ * 경로를 제공하지 않아 사용자가 대중교통 탭을 다시 눌러야 하므로 `transit`으로 고정한다.
+ */
 export function buildGoogleMapsDirectionsUrl(
   latitude: MapCoordinate,
   longitude: MapCoordinate,
 ): string | null {
   const query = toCoordinateQuery(latitude, longitude)
 
-  return query === null ? null : `https://www.google.com/maps/dir/?api=1&destination=${query}`
+  return query === null
+    ? null
+    : `https://www.google.com/maps/dir/?api=1&destination=${query}&travelmode=transit`
 }
 
 /** 네이버 지도 진입 방식을 가르는 플랫폼. intent 스킴을 쓸 수 있는 곳은 Android뿐이다. */

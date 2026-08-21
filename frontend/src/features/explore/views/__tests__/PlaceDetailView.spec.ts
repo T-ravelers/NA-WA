@@ -178,7 +178,7 @@ describe('PlaceDetailView', () => {
       .find((button) => button.text() === 'Google transit')
       ?.trigger('click')
     expect(openSpy).toHaveBeenCalledWith(
-      'https://www.google.com/maps/dir/?api=1&destination=37.54%2C127.05',
+      'https://www.google.com/maps/dir/?api=1&destination=37.54%2C127.05&travelmode=transit',
       '_blank',
       'noopener,noreferrer',
     )
