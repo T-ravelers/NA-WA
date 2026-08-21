@@ -2,7 +2,7 @@
 import { useMutation, useQuery } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { IconCheck } from '@tabler/icons-vue'
 
 import { vFitText } from '@/shared/lib/fitText'
@@ -29,9 +29,40 @@ type TopupStep = 'form' | 'preview' | 'payment' | 'complete'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
+
+/**
+ * 다른 화면이 "이만큼 부족하다"며 보낸 금액(`?amount=`). 약속 생성이 보증금을
+ * 예치할 잔액이 없을 때 그 보증금만큼 채워서 보낸다. 양의 정수가 아니면 무시한다.
+ */
+function requestedAmount(): number | null {
+  const raw = Array.isArray(route.query.amount) ? route.query.amount[0] : route.query.amount
+  const parsed = Number(raw)
+  return typeof raw === 'string' && Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+/**
+ * 다른 화면이 "충전이 끝나면 돌아와 달라"며 보낸 곳(`?returnRouteName=`). 여정 생성이
+ * 쓰는 것과 같은 규약이다. 나머지 query는 그 화면의 것이라 그대로 돌려주고, 이 화면의
+ * 금액과 이 키만 뺀다. `resume=1`을 붙여 그 화면이 저장해 둔 초안을 되살리게 한다.
+ */
+const returnTarget = computed<RouteLocationRaw | null>(() => {
+  const value = route.query.returnRouteName
+  if (typeof value !== 'string' || value === '') return null
+  const rest = { ...route.query }
+  delete rest.returnRouteName
+  delete rest.amount
+  return { name: value, query: { ...rest, resume: '1' } }
+})
+
+// 충전 화면들은 되돌아올 이유가 없으니 히스토리에서 자리를 내준다(replace).
+const returnToCaller = (): void => {
+  if (returnTarget.value === null) return
+  void router.replace(returnTarget.value)
+}
 
 // AmountInput의 계약이 number | null이다. null은 "아직 입력 전"이고 0과 구분된다.
-const amount = ref<number | null>(null)
+const amount = ref<number | null>(requestedAmount())
 const selectedMethod = ref(DEFAULT_TOPUP_METHOD)
 const step = ref<TopupStep>('form')
 const preview = ref<TopupPreviewResponse | null>(null)
@@ -442,13 +473,22 @@ const handlePaymentError = (message: string): void => {
         {{ t('wallet.topUp.currentBalance', { balance: formatPoints(completedBalance) }) }}
       </p>
 
-      <AppButton
-        block
-        class="mt-auto"
-        @click="goBack"
-      >
-        {{ t('wallet.topUp.backToWallet') }}
-      </AppButton>
+      <div class="mt-auto flex w-full flex-col gap-2">
+        <AppButton
+          v-if="returnTarget !== null"
+          block
+          @click="returnToCaller"
+        >
+          {{ t('wallet.topUp.backToCaller') }}
+        </AppButton>
+        <AppButton
+          block
+          :variant="returnTarget === null ? 'primary' : 'secondary'"
+          @click="goBack"
+        >
+          {{ t('wallet.topUp.backToWallet') }}
+        </AppButton>
+      </div>
     </section>
   </main>
 </template>

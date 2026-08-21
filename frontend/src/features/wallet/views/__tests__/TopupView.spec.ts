@@ -6,6 +6,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { i18n } from '@/app/i18n'
 
 import { createStripeIntent, getTopupMethods, previewTopup } from '../../api/topupApi'
+import StripePaymentStep from '../StripePaymentStep.vue'
 import TopupView from '../TopupView.vue'
 
 vi.mock('../../api/topupApi', () => ({
@@ -45,7 +46,7 @@ const stripeIntentResponse = {
   paymentMode: 'SANDBOX',
 }
 
-const mountTopup = async () => {
+const mountTopup = async (initialPath = '/wallet/top-up') => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -54,7 +55,7 @@ const mountTopup = async () => {
     ],
   })
 
-  await router.push('/wallet/top-up')
+  await router.push(initialPath)
   await router.isReady()
 
   return mount(TopupView, {
@@ -133,6 +134,21 @@ describe('TopupView', () => {
     expect(wrapper.text()).toContain('114,500 P')
   })
 
+  it('prefills the amount another screen asked for via the query', async () => {
+    // 약속 생성이 보증금을 예치할 잔액이 없을 때 그 금액을 ?amount=로 넘겨 보낸다.
+    const wrapper = await mountTopup('/wallet/top-up?amount=10000')
+    await flushPromises()
+
+    expect(wrapper.get<HTMLInputElement>('input[inputmode="numeric"]').element.value).toBe('10,000')
+  })
+
+  it('ignores a query amount that is not a positive whole number', async () => {
+    const wrapper = await mountTopup('/wallet/top-up?amount=abc')
+    await flushPromises()
+
+    expect(wrapper.get<HTMLInputElement>('input[inputmode="numeric"]').element.value).toBe('')
+  })
+
   it('accumulates quick amount taps instead of replacing the typed amount', async () => {
     const wrapper = await mountTopup()
 
@@ -179,6 +195,61 @@ describe('TopupView', () => {
       amount: 40000,
       method: 'STRIPE_CARD',
       currency: 'KRW',
+    })
+  })
+
+  it('offers to continue where the caller left off once the top-up completes', async () => {
+    // 약속 생성이 잔액 부족으로 보낸 경우. 완료 화면에서 그 화면으로 되돌아가되,
+    // 그쪽 query는 그대로 돌려주고 이 화면의 amount·returnRouteName만 뺀 뒤
+    // resume=1을 붙인다. 충전 화면들은 히스토리에 남지 않도록 replace로 간다.
+    const wrapper = await mountTopup(
+      '/wallet/top-up?amount=10000&returnRouteName=appointment-create&itemId=42&itemType=EVENT&tripId=7',
+    )
+    await flushPromises()
+    const router = wrapper.vm.$router
+    router.addRoute({
+      path: '/appointments/new',
+      name: 'appointment-create',
+      component: { template: '<div />' },
+    })
+    const replace = vi.spyOn(router, 'replace')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Next')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Execute top-up')
+      ?.trigger('click')
+    await flushPromises()
+    wrapper.findComponent(StripePaymentStep).vm.$emit('payment-confirmed', {
+      topupId: 44,
+      status: 'SUCCEEDED',
+      sandboxBalance: '15000',
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Top-up complete')
+    const continueButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Continue where you left off')
+    expect(continueButton).toBeDefined()
+    expect(
+      wrapper.findAll('button').find((button) => button.text() === 'Back to wallet'),
+    ).toBeDefined()
+
+    await continueButton?.trigger('click')
+    await flushPromises()
+
+    expect(replace).toHaveBeenCalledOnce()
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+    expect(router.currentRoute.value.query).toEqual({
+      itemId: '42',
+      itemType: 'EVENT',
+      tripId: '7',
+      resume: '1',
     })
   })
 
