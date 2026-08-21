@@ -8,15 +8,20 @@ import { queryClient } from '@/app/query/client'
 import { notificationSettlementIntegrationKey } from '../settlementIntegration'
 
 const fetchUnreadNotificationCount = vi.fn()
+const readAllNotifications = vi.fn()
 
 vi.mock('../../api/notificationApi', () => ({
   fetchUnreadNotificationCount: () => fetchUnreadNotificationCount(),
   fetchNotifications: vi.fn(),
-  readAllNotifications: vi.fn(),
+  readAllNotifications: () => readAllNotifications(),
 }))
 
-const { UNREAD_COUNT_POLL_INTERVAL_MS, useUnreadNotificationCount } =
-  await import('../notificationQueries')
+const {
+  UNREAD_COUNT_POLL_INTERVAL_MS,
+  notificationKeys,
+  useReadAllNotifications,
+  useUnreadNotificationCount,
+} = await import('../notificationQueries')
 
 const invalidateSettlements = vi.fn()
 
@@ -41,6 +46,8 @@ function mountBell() {
 beforeEach(() => {
   queryClient.clear()
   fetchUnreadNotificationCount.mockReset()
+  readAllNotifications.mockReset()
+  readAllNotifications.mockResolvedValue({ updatedCount: 2 })
   invalidateSettlements.mockReset()
 })
 
@@ -93,6 +100,34 @@ describe('useUnreadNotificationCount', () => {
     await flushPromises()
 
     expect(invalidateSettlements).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+})
+
+describe('useReadAllNotifications', () => {
+  /*
+   * 목록까지 무효화하면 방금 그린 화면을 곧바로 다시 받아 오는데, 그 응답은 전부 읽음
+   * 상태라 안 읽음 표시가 눈앞에서 지워진다. 사용자가 목록을 여는 이유가 바로 무엇이
+   * 새로 왔는지 보는 것이라, 요청 한 번을 더 쓰면서 화면은 더 나빠진다.
+   */
+  it('벨 개수만 다시 받고 보고 있는 목록은 건드리지 않는다', async () => {
+    queryClient.setQueryData(notificationKeys.list(), [])
+    queryClient.setQueryData(notificationKeys.unreadCount(), 2)
+
+    // defineComponent를 쓰지 않는 것은 한 파일에 컴포넌트를 둘 두지 않기 위해서다.
+    const wrapper = mount(
+      {
+        setup() {
+          useReadAllNotifications().mutate()
+          return () => ''
+        },
+      },
+      { global: { plugins: [[VueQueryPlugin, { queryClient }]] } },
+    )
+    await flushPromises()
+
+    expect(queryClient.getQueryState(notificationKeys.list())?.isInvalidated).toBe(false)
+    expect(queryClient.getQueryState(notificationKeys.unreadCount())?.isInvalidated).toBe(true)
     wrapper.unmount()
   })
 })
