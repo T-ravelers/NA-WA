@@ -13,7 +13,13 @@ import {
 } from '@tabler/icons-vue'
 
 import { formatCalendarDateString } from '@/shared/lib/datetime'
-import { buildGoogleMapsDirectionsUrl, buildGoogleMapsSearchUrl } from '@/shared/lib/mapLink'
+import {
+  buildGoogleMapsSearchUrl,
+  buildGoogleMapsTransitRouteUrl,
+  buildNaverMapPlaceUrl,
+  buildNaverMapTransitRouteUrl,
+  openMapAppUrl,
+} from '@/shared/lib/mapLink'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -100,8 +106,18 @@ const journeys = computed(() => journeyListQuery.data.value ?? [])
 const mapSearchUrl = computed(() =>
   buildGoogleMapsSearchUrl(event.value?.latitude, event.value?.longitude),
 )
-const mapDirectionsUrl = computed(() =>
-  buildGoogleMapsDirectionsUrl(event.value?.latitude, event.value?.longitude),
+const mapTransitRouteUrl = computed(() =>
+  buildGoogleMapsTransitRouteUrl(event.value?.latitude, event.value?.longitude),
+)
+const naverPlaceUrl = computed(() =>
+  buildNaverMapPlaceUrl(event.value?.latitude, event.value?.longitude, event.value?.title ?? ''),
+)
+const naverRouteUrl = computed(() =>
+  buildNaverMapTransitRouteUrl(
+    event.value?.latitude,
+    event.value?.longitude,
+    event.value?.title ?? '',
+  ),
 )
 
 const hours = computed(() => (event.value ? toDetailEntries(event.value.operatingHours) : []))
@@ -518,9 +534,9 @@ function retry(): void {
           </div>
           <div
             v-if="mapSearchUrl"
-            class="flex min-w-0 gap-2"
+            class="grid min-w-0 grid-cols-2 gap-2"
           >
-            <div class="min-w-0 flex-1">
+            <div class="min-w-0">
               <AppButton
                 block
                 compact
@@ -530,14 +546,34 @@ function retry(): void {
                 {{ t('explore.detail.openInGoogleMaps') }}
               </AppButton>
             </div>
-            <div class="min-w-0 flex-1">
+            <div class="min-w-0">
               <AppButton
                 block
                 compact
                 variant="secondary"
-                @click="openMapUrl(mapDirectionsUrl)"
+                @click="openMapUrl(mapTransitRouteUrl)"
               >
                 {{ t('explore.detail.directions') }}
+              </AppButton>
+            </div>
+            <div class="min-w-0">
+              <AppButton
+                block
+                compact
+                variant="secondary"
+                @click="openMapAppUrl(naverPlaceUrl)"
+              >
+                {{ t('explore.detail.openInNaverMap') }}
+              </AppButton>
+            </div>
+            <div class="min-w-0">
+              <AppButton
+                block
+                compact
+                variant="secondary"
+                @click="openMapAppUrl(naverRouteUrl)"
+              >
+                {{ t('explore.detail.naverDirections') }}
               </AppButton>
             </div>
           </div>

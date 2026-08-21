@@ -23,6 +23,15 @@ vi.mock('../../api/exploreApi', () => ({
     fetchEventDetail(eventId, language),
 }))
 
+const openMapAppUrl = vi.fn()
+
+// 앱 스킴 진입은 현재 문서를 이동시킨다. jsdom의 window.location을 직접 건드리면
+// navigation 경고가 다른 테스트로 새므로 이 함수만 부분 모킹한다.
+vi.mock('@/shared/lib/mapLink', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/shared/lib/mapLink')>()),
+  openMapAppUrl: (url: string | null) => openMapAppUrl(url),
+}))
+
 const EventDetailView = (await import('../EventDetailView.vue')).default
 
 const event: EventDetail = {
@@ -186,6 +195,7 @@ describe('EventDetailView', () => {
     addJourneyItem.mockReset()
     fetchEventDetail.mockResolvedValue(event)
     addJourneyItem.mockResolvedValue({})
+    openMapAppUrl.mockReset()
   })
 
   it('mounts with the app-provided Journey integration', async () => {
@@ -201,6 +211,53 @@ describe('EventDetailView', () => {
     ).toBeUndefined()
   })
 
+  it('opens Google Maps for the Event coordinates', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Google Maps')
+      ?.trigger('click')
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://www.google.com/maps/search/?api=1&query=37.48%2C127.01',
+      '_blank',
+      'noopener,noreferrer',
+    )
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Google transit')
+      ?.trigger('click')
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://www.google.com/maps/dir/?api=1&destination=37.48%2C127.01&travelmode=transit',
+      '_blank',
+      'noopener,noreferrer',
+    )
+
+    openSpy.mockRestore()
+  })
+
+  it('opens the Naver Map app scheme for the Event coordinates', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Naver Map')
+      ?.trigger('click')
+    expect(openMapAppUrl).toHaveBeenCalledWith(
+      'nmap://place?lat=37.48&lng=127.01&name=Seoul%20concert&appname=NA-WA',
+    )
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Naver transit')
+      ?.trigger('click')
+    expect(openMapAppUrl).toHaveBeenCalledWith(
+      'nmap://route/public?dlat=37.48&dlng=127.01&dname=Seoul%20concert&appname=NA-WA',
+    )
+  })
+
   it('hides map buttons when the Event has no coordinates', async () => {
     fetchEventDetail.mockResolvedValue({ ...event, latitude: null, longitude: null })
 
@@ -208,7 +265,9 @@ describe('EventDetailView', () => {
 
     const buttonLabels = wrapper.findAll('button').map((button) => button.text())
     expect(buttonLabels).not.toContain('Google Maps')
-    expect(buttonLabels).not.toContain('Directions')
+    expect(buttonLabels).not.toContain('Google transit')
+    expect(buttonLabels).not.toContain('Naver Map')
+    expect(buttonLabels).not.toContain('Naver transit')
   })
 
   it('translates operational region values and hides the raw hours key', async () => {

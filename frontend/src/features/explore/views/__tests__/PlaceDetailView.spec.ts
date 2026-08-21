@@ -34,6 +34,15 @@ vi.mock('../../api/exploreApi', () => ({
     fetchPlaceDetail(placeId, language),
 }))
 
+const openMapAppUrl = vi.fn()
+
+// 앱 스킴 진입은 현재 문서를 이동시킨다. jsdom의 window.location을 직접 건드리면
+// navigation 경고가 다른 테스트로 새므로 이 함수만 부분 모킹한다.
+vi.mock('@/shared/lib/mapLink', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/shared/lib/mapLink')>()),
+  openMapAppUrl: (url: string | null) => openMapAppUrl(url),
+}))
+
 const PlaceDetailView = (await import('../PlaceDetailView.vue')).default
 
 const place = {
@@ -120,6 +129,7 @@ describe('PlaceDetailView', () => {
       { tripId: 7, title: 'Seoul weekend', startDate: '2026-08-10', endDate: '2026-08-12' },
     ])
     addJourneyItem.mockResolvedValue({})
+    openMapAppUrl.mockReset()
   })
 
   it('renders Place details with enabled map buttons', async () => {
@@ -138,7 +148,7 @@ describe('PlaceDetailView', () => {
     expect(
       wrapper
         .findAll('button')
-        .find((button) => button.text() === 'Directions')
+        .find((button) => button.text() === 'Google transit')
         ?.attributes('disabled'),
     ).toBeUndefined()
     expect(
@@ -165,15 +175,35 @@ describe('PlaceDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Directions')
+      .find((button) => button.text() === 'Google transit')
       ?.trigger('click')
     expect(openSpy).toHaveBeenCalledWith(
-      'https://www.google.com/maps/dir/?api=1&destination=37.54%2C127.05',
+      'https://www.google.com/maps/dir/?api=1&destination=37.54%2C127.05&travelmode=transit',
       '_blank',
       'noopener,noreferrer',
     )
 
     openSpy.mockRestore()
+  })
+
+  it('opens the Naver Map app scheme for the Place coordinates', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Naver Map')
+      ?.trigger('click')
+    expect(openMapAppUrl).toHaveBeenCalledWith(
+      'nmap://place?lat=37.54&lng=127.05&name=Seongsu%20Onsil&appname=NA-WA',
+    )
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Naver transit')
+      ?.trigger('click')
+    expect(openMapAppUrl).toHaveBeenCalledWith(
+      'nmap://route/public?dlat=37.54&dlng=127.05&dname=Seongsu%20Onsil&appname=NA-WA',
+    )
   })
 
   it('hides map buttons when the Place has no coordinates', async () => {
@@ -183,7 +213,9 @@ describe('PlaceDetailView', () => {
 
     const buttonLabels = wrapper.findAll('button').map((button) => button.text())
     expect(buttonLabels).not.toContain('Google Maps')
-    expect(buttonLabels).not.toContain('Directions')
+    expect(buttonLabels).not.toContain('Google transit')
+    expect(buttonLabels).not.toContain('Naver Map')
+    expect(buttonLabels).not.toContain('Naver transit')
   })
 
   it('translates operational region values on the detail screen', async () => {
