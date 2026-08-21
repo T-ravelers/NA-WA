@@ -381,6 +381,41 @@ class AppointmentServiceTest {
     }
 
     @Test
+    void getAppointment_afterActivityEnd_showsAwaitingAttendance() {
+        Appointment appointment =
+                endedAppointment(10L, AppointmentStatus.IN_PROGRESS);
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of());
+
+        AppointmentDetailResponse result =
+                appointmentService.getAppointment(2L, 10L);
+
+        assertEquals(AppointmentStatus.AWAITING_ATTENDANCE,
+                result.getAppointmentStatus());
+    }
+
+    // 스케줄러가 CLOSED → IN_PROGRESS를 아직 못 따라잡은 채 활동이 끝났어도,
+    // 표시 계산이 CLOSED → IN_PROGRESS → AWAITING_ATTENDANCE를 연쇄로 거쳐
+    // 최종 표시 상태에 도달해야 한다.
+    @Test
+    void getAppointment_closedInDbAfterActivityEnd_showsAwaitingAttendance() {
+        Appointment appointment =
+                endedAppointment(10L, AppointmentStatus.CLOSED);
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of());
+
+        AppointmentDetailResponse result =
+                appointmentService.getAppointment(2L, 10L);
+
+        assertEquals(AppointmentStatus.AWAITING_ATTENDANCE,
+                result.getAppointmentStatus());
+    }
+
+    @Test
     void getAppointment_paymentPendingForNonHost_returnsNotFound() {
         Appointment appointment = appointment(
                 10L,

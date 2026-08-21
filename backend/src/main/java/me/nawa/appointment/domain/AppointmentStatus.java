@@ -9,6 +9,14 @@ public enum AppointmentStatus {
     CLOSED,
     CONFIRMED,
     IN_PROGRESS,
+    /**
+     * 활동 종료 시각이 지났지만 방장이 아직 출석을 확정하지 않은 상태.
+     *
+     * 표시 전용 값이라 DB `appointments.appointment_status`에는 저장되지 않습니다.
+     * DB는 출석 확정 전까지 IN_PROGRESS를 유지하고, 조회 응답이
+     * {@code resolveDisplayStatus}에서 시간 기준으로 이 값을 계산해 내보냅니다.
+     */
+    AWAITING_ATTENDANCE,
     COMPLETED,
     CANCELLED;
 
@@ -32,7 +40,8 @@ public enum AppointmentStatus {
                             || nextStatus == IN_PROGRESS
                             || nextStatus == CANCELLED;
             case IN_PROGRESS -> nextStatus == COMPLETED;
-            case CONFIRMED, COMPLETED, CANCELLED -> false;
+            // AWAITING_ATTENDANCE는 표시 전용이라 DB 상태 전이에 등장하지 않는다.
+            case AWAITING_ATTENDANCE, CONFIRMED, COMPLETED, CANCELLED -> false;
         };
     }
 }

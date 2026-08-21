@@ -34,6 +34,7 @@ DB 컬럼: `appointments.appointment_status`
 | `CLOSED` | 참여 마감 시각 도달 또는 정원 충족으로 모집이 종료된 상태 |
 | `CONFIRMED` | 코드에는 정의돼 있으나, 활동 시작 시각에 방장 확정 없이 바로 `IN_PROGRESS`로 넘어가기로 정하면서 실제로 도달하는 경로가 없는 상태(`CANCELLED`와 같은 취급) |
 | `IN_PROGRESS` | 활동 시작 시각에 도달하여 약속이 진행 중인 상태 |
+| `AWAITING_ATTENDANCE` | 활동 종료 시각이 지났지만 방장이 아직 출석을 확정하지 않은 상태. **표시 전용** — DB에는 저장되지 않고 조회 응답이 `resolveDisplayStatus`에서 시간 기준으로 계산해 내보냅니다(15절). DB 컬럼은 출석 확정 전까지 `IN_PROGRESS`를 유지합니다. |
 | `COMPLETED` | 출석 확정과 약속 진행이 모두 끝난 상태 |
 | `CANCELLED` | 코드에는 정의돼 있으나, 17절 정책에 따라 실제로 도달하는 경로가 없는 상태 |
 
@@ -404,10 +405,20 @@ DB 컬럼: `appointments.item_type`
 **화면에 보여주는 값과 DB에 저장된 값을 분리합니다.** 약속 목록·상세 조회
 (`AppointmentService.toSummaryResponse`/`toDetailResponse`가 호출하는
 `resolveDisplayStatus`)는 `appointment_status` 컬럼을 그대로 반환하지 않고,
-`join_deadline`·`activityStartAt`과 현재 시각을 비교해 "지금 시점의 실제 상태"를
-계산해서 반환합니다. 예를 들어 컬럼 값이 아직 `RECRUITING`이어도 `join_deadline`이
-이미 지났으면 응답은 `CLOSED`로 나갑니다. 이러면 사용자는 스케줄러 주기와 무관하게
-항상 정확한 상태를 봅니다.
+`join_deadline`·`activityStartAt`·`activityEndAt`과 현재 시각을 비교해 "지금
+시점의 실제 상태"를 계산해서 반환합니다. 예를 들어 컬럼 값이 아직
+`RECRUITING`이어도 `join_deadline`이 이미 지났으면 응답은 `CLOSED`로 나갑니다.
+이러면 사용자는 스케줄러 주기와 무관하게 항상 정확한 상태를 봅니다.
+
+이 계산에는 DB에 존재하지 않는 **표시 전용 상태 `AWAITING_ATTENDANCE`**가 하나
+있습니다. `activityEndAt`이 지났지만 방장이 아직 출석을 확정하지 않은 약속은 DB
+컬럼상 `IN_PROGRESS`지만, 응답에는 `AWAITING_ATTENDANCE`로 나갑니다.
+`IN_PROGRESS → COMPLETED`가 출석 확정 액션으로만 일어나는 이상(2절) "활동이
+끝났는데 진행 중"으로 보이는 구간이 무한정 남는데, 그 구간을 화면이 클라이언트
+시계로 다시 재지 않고 서버 판정 하나로 알 수 있게 한 것입니다. 이 값은
+`resolveDisplayStatus`만 만들어내며 DB에 쓰이지 않고, `canTransitionTo()`에서도
+어떤 전이에도 등장하지 않습니다. 프론트엔드 출석 확정 화면 게이트가 이 값을
+사용합니다.
 
 이 라이브 계산은 **화면 표시에만** 적용합니다. `GET /appointments/me`(트립 연결·
 QR 공동결제 게이팅에 쓰이는 엔드포인트, `findMyOngoingAppointments`)는 라이브
