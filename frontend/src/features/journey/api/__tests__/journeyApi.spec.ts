@@ -5,19 +5,29 @@ import {
   buildJourneyCreateRequest,
   checkJourneyItemExists,
   createJourney,
+  deleteJourney,
+  deleteJourneyItem,
   fetchJourney,
   fetchJourneyTimeline,
   fetchJourneys,
+  updateJourney,
   type Journey,
   type JourneyCreateInput,
 } from '../journeyApi'
 
-const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
+const { get, post, put, remove } = vi.hoisted(() => ({
+  get: vi.fn(),
+  post: vi.fn(),
+  put: vi.fn(),
+  remove: vi.fn(),
+}))
 
 vi.mock('@/shared/api/httpClient', () => ({
   httpClient: {
     get,
     post,
+    put,
+    delete: remove,
   },
 }))
 
@@ -50,6 +60,8 @@ describe('journeyApi', () => {
   beforeEach(() => {
     get.mockReset()
     post.mockReset()
+    put.mockReset()
+    remove.mockReset()
   })
 
   it('normalizes the create request at the API boundary', () => {
@@ -77,6 +89,31 @@ describe('journeyApi', () => {
       ],
     })
     expect(result.regions.map((region) => region.regionCode)).toEqual(['SEOUL', 'BUSAN'])
+  })
+
+  it('puts the full normalized settings request including preserved regions', async () => {
+    put.mockResolvedValue({ data: journey })
+
+    await expect(updateJourney(7, input)).resolves.toMatchObject({ tripId: 7 })
+
+    expect(put).toHaveBeenCalledWith('/api/v1/journeys/7', {
+      ...input,
+      title: 'Seoul Foodie Week',
+      regions: [
+        { regionCode: 'SEOUL', regionName: 'Seoul', displayOrder: 0 },
+        { regionCode: 'BUSAN', regionName: 'Busan', displayOrder: 1 },
+      ],
+    })
+  })
+
+  it('deletes one itinerary item or the whole journey through the shared client', async () => {
+    remove.mockResolvedValue({ status: 204 })
+
+    await deleteJourneyItem(7, 31)
+    await deleteJourney(7)
+
+    expect(remove).toHaveBeenNthCalledWith(1, '/api/v1/journeys/7/items/31')
+    expect(remove).toHaveBeenNthCalledWith(2, '/api/v1/journeys/7')
   })
 
   it('fetches detail through the shared client', async () => {

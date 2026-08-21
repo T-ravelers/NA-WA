@@ -59,6 +59,8 @@ export interface JourneyCreateInput {
   regions: JourneyRegion[]
 }
 
+export type JourneyUpdateInput = JourneyCreateInput
+
 export interface JourneyTimelineLocation {
   region1: string | null
   region2: string | null
@@ -219,4 +221,21 @@ export async function fetchJourneyTimeline(tripId: number): Promise<JourneyTimel
   )
 
   return normalizeTimeline(response.data)
+}
+
+export async function updateJourney(tripId: number, input: JourneyUpdateInput): Promise<Journey> {
+  const response = await httpClient.put<JourneyResponse>(
+    `/api/v1/journeys/${tripId}`,
+    buildJourneyCreateRequest(input),
+  )
+
+  return normalizeJourney(response.data)
+}
+
+export async function deleteJourneyItem(tripId: number, tripItemId: number): Promise<void> {
+  await httpClient.delete(`/api/v1/journeys/${tripId}/items/${tripItemId}`)
+}
+
+export async function deleteJourney(tripId: number): Promise<void> {
+  await httpClient.delete(`/api/v1/journeys/${tripId}`)
 }

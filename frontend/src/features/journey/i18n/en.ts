@@ -86,10 +86,53 @@ export default {
       loadFailed: 'Journey could not be loaded',
       retry: 'Try again',
     },
+    settings: {
+      open: 'Journey settings',
+      title: 'Journey settings',
+      basics: 'Journey basics',
+      preferences: 'Preferences',
+      name: 'Journey name',
+      budget: 'Budget',
+      budgetHelper: 'Optional. Leave empty to track spending without a cap. Amounts are in KRW.',
+      companions: 'Who travels?',
+      save: 'Save changes',
+      delete: 'Delete journey',
+      dateConflict:
+        'Some itinerary items fall outside the new dates. Remove them from the journey detail before changing the dates.',
+      loadFailed: 'Journey settings could not be loaded',
+    },
+    remove: {
+      actionFor: 'Remove {title} from itinerary',
+      title: 'Remove from itinerary?',
+      description:
+        'This removes {title} from this journey. The event or place itself will not be deleted.',
+      confirmedDescription:
+        'This removes {title} from this journey and leaves its appointment. The event or place itself will not be deleted.',
+      cancel: 'Cancel',
+      delete: 'Delete',
+      blockedTitle: 'This item cannot be removed',
+      blockedDescription:
+        'You are hosting this appointment. Transfer or close it before removing the item.',
+      unavailableTitle: 'The itinerary changed',
+      unavailableDescription:
+        'This item was already removed or its appointment can no longer be left. The itinerary will be refreshed.',
+    },
+    delete: {
+      title: 'Delete this journey?',
+      description:
+        'The journey and its saved itinerary will be removed. Events and places themselves will not be deleted.',
+      itemCount: '{count} itinerary items',
+      blockedTitle: 'Journey can’t be deleted',
+      blockedDescription:
+        'You’re hosting an upcoming or active appointment in this journey. Transfer or close it first.',
+    },
     errorCode: {
       'JOURNEY-001': 'This journey could not be found.',
       'JOURNEY-002': 'You do not have permission to view this journey.',
       'JOURNEY-003': 'Check the journey details and try again.',
+      'JOURNEY-009': 'Some itinerary items fall outside the selected dates.',
+      'JOURNEY-010': 'This itinerary item no longer exists.',
+      'JOURNEY-011': 'A hosted appointment must be transferred or closed first.',
     },
   },
 }

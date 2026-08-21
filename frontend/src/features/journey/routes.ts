@@ -19,6 +19,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/JourneyDetailView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/journeys/:tripId/settings',
+    name: 'journey-settings',
+    component: () => import('./views/JourneySettingsView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 export default routes

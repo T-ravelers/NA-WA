@@ -12,11 +12,13 @@ import { journeyReportIntegrationKey } from '../../model/reportIntegration'
 
 const fetchJourney = vi.fn()
 const fetchJourneyTimeline = vi.fn()
+const deleteJourneyItem = vi.fn()
 
 vi.mock('../../api/journeyApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/journeyApi')>()),
   fetchJourney: (tripId: number) => fetchJourney(tripId),
   fetchJourneyTimeline: (tripId: number) => fetchJourneyTimeline(tripId),
+  deleteJourneyItem: (tripId: number, tripItemId: number) => deleteJourneyItem(tripId, tripItemId),
 }))
 
 const JourneyDetailView = (await import('../JourneyDetailView.vue')).default
@@ -29,6 +31,41 @@ const journey = {
   budgetAmount: 1500000,
   companionPreference: '2-4',
   regions: [{ regionCode: 'SEOUL', regionName: 'Seoul', displayOrder: 0 }],
+}
+
+function oneItemTimeline(status: 'ADDED' | 'CONFIRMED' = 'ADDED') {
+  return {
+    tripId: 7,
+    timeline: [
+      {
+        visitDate: '2026-08-10',
+        items: [
+          {
+            tripItemId: 31,
+            itemId: 91,
+            status,
+            displayOrder: 0,
+            note: null,
+            exploreItem: {
+              itemType: 'EVENT',
+              title: 'Nanta Theatre',
+              thumbnailUrl: null,
+              imageUrls: [],
+              location: {
+                region1: 'Seoul',
+                region2: null,
+                region3: null,
+                addressRoad: null,
+                addressDetail: null,
+                latitude: null,
+                longitude: null,
+              },
+            },
+          },
+        ],
+      },
+    ],
+  }
 }
 
 interface ReportIntegrationOptions {
@@ -56,6 +93,11 @@ async function mountWithRouter(path: string, reportOptions: ReportIntegrationOpt
     history: createMemoryHistory(),
     routes: [
       { path: '/journeys/:tripId', name: 'journey-detail', component: JourneyDetailView },
+      {
+        path: '/journeys/:tripId/settings',
+        name: 'journey-settings',
+        component: { template: '<div>Settings</div>' },
+      },
       { path: '/explore', name: 'explore', component: { template: '<div>Explore</div>' } },
       {
         path: '/explore/events/:eventId',
@@ -112,6 +154,7 @@ describe('JourneyDetailView', () => {
   beforeEach(() => {
     fetchJourney.mockReset()
     fetchJourneyTimeline.mockReset()
+    deleteJourneyItem.mockReset()
   })
 
   it('shows journey details and a day skeleton for an empty itinerary', async () => {
@@ -133,6 +176,9 @@ describe('JourneyDetailView', () => {
     expect(wrapper.text()).not.toContain('Day 4')
     expect(wrapper.findAll('a[aria-label^="Add event on"]')).toHaveLength(3)
     expect(wrapper.findAll('a[aria-label^="Add place on"]')).toHaveLength(3)
+    expect(wrapper.get('a[aria-label="Journey settings"]').attributes('href')).toBe(
+      '/journeys/7/settings',
+    )
   })
 
   it('shows no report entry for an ongoing journey', async () => {
@@ -279,6 +325,37 @@ describe('JourneyDetailView', () => {
     expect(wrapper.text()).toContain('Gwangjang Market')
     expect(wrapper.text()).toContain('Place')
     expect(wrapper.text()).toContain('Try the tasting menu')
+  })
+
+  it('confirms and deletes one itinerary item through its real API action', async () => {
+    fetchJourney.mockResolvedValue(journey)
+    fetchJourneyTimeline.mockResolvedValue(oneItemTimeline())
+    deleteJourneyItem.mockResolvedValue(undefined)
+    const wrapper = await mountAt('/journeys/7')
+
+    await wrapper.get('button[aria-label="Remove Nanta Theatre from itinerary"]').trigger('click')
+    const dialog = wrapper.get('#remove-journey-item-dialog')
+    expect(dialog.text()).toContain('Remove from itinerary?')
+    await dialog.get('button.bg-danger').trigger('click')
+    await flushPromises()
+
+    expect(deleteJourneyItem).toHaveBeenCalledWith(7, 31)
+    expect(wrapper.find('#remove-journey-item-dialog').exists()).toBe(false)
+  })
+
+  it('shows the host blocker when the item delete API returns JOURNEY-011', async () => {
+    fetchJourney.mockResolvedValue(journey)
+    fetchJourneyTimeline.mockResolvedValue(oneItemTimeline('CONFIRMED'))
+    deleteJourneyItem.mockRejectedValue(new NormalizedApiError('JOURNEY-011', 409, 'host conflict'))
+    const wrapper = await mountAt('/journeys/7')
+
+    await wrapper.get('button[aria-label="Remove Nanta Theatre from itinerary"]').trigger('click')
+    await wrapper.get('#remove-journey-item-dialog button.bg-danger').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('#remove-journey-item-blocked-dialog').text()).toContain(
+      'This item cannot be removed',
+    )
   })
 
   it('shows a dedicated forbidden state', async () => {

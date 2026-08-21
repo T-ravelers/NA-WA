@@ -1044,6 +1044,21 @@ const SCREENS = [
       Promise.all([stubMemberProfile(page), stubJourneyDetail(page), stubEmptyReportList(page)]),
   },
   {
+    name: '07b-journey-settings',
+    path: '/journeys/42/settings',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetail(page)]),
+  },
+  {
+    name: '07c-journey-remove-item',
+    path: '/journeys/42',
+    setup: (page) =>
+      Promise.all([stubMemberProfile(page), stubJourneyDetail(page), stubEmptyReportList(page)]),
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Remove Seoul Night Market from itinerary' }).click()
+      await page.getByRole('dialog').waitFor()
+    },
+  },
+  {
     name: '17-report-list',
     path: '/reports',
     setup: (page) => Promise.all([stubMemberProfile(page), stubReportApis(page)]),
