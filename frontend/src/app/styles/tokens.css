@@ -96,6 +96,12 @@
   --radius-ticket: 20px;
   --radius-pill: 999px;
 
+  /* ── 컨테이너 ──
+   * 앱 셸 최대 폭. 시안 기준 폭이며 `max-w-shell`로 생성된다. 아직 앱 전역에
+   * `max-w-[390px]` 직접 표기가 남아 있다 — 각 화면을 손보는 PR에서 이 토큰으로
+   * 옮긴다(전수 교체는 별도 작업). */
+  --container-shell: 390px;
+
   /* ── 간격 ── */
   --spacing-screen: 20px;
   --spacing-section: 40px;
@@ -136,8 +142,11 @@
    * `wght` 축이 700에서 끝난다. Adobe Fonts에 정적 `Sztos` 패밀리는 없다. 800을 적어도
    * 700으로 잘리므로, 렌더되지 않는 값을 토큰에 남기지 않는다. Body 폰트(`Noto Sans`,
    * `wght 100–900`)를 쓰는 곳은 이 상한과 무관하다. */
-  --text-screen-title: 34px;
-  --text-screen-title--line-height: 35.7px;
+  /* 화면 제목은 폭을 따라 줄어든다. 8.72vw는 시안 기준 폭 390에서 정확히 34px를 넘겨
+   * 캡에 걸리고(390 산출물 불변), 폴더블 커버 280에서는 24.4px가 되어 제목이 화면을
+   * 넘치지 않는다(280 실측 4갈래 중 ①). 행간은 크기를 따라가도록 무단위(35.7/34)다. */
+  --text-screen-title: clamp(24px, 8.72vw, 34px);
+  --text-screen-title--line-height: 1.05;
   --text-screen-title--font-weight: 700;
   --text-screen-title--letter-spacing: 0.2px;
 
