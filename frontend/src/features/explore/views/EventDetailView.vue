@@ -20,6 +20,7 @@ import {
   buildNaverMapTransitRouteUrl,
   openMapAppUrl,
 } from '@/shared/lib/mapLink'
+import { vFitTextGroup } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -534,6 +535,7 @@ function retry(): void {
           </div>
           <div
             v-if="mapSearchUrl"
+            v-fit-text-group
             class="grid min-w-0 grid-cols-2 gap-2"
           >
             <div class="min-w-0">
@@ -594,6 +596,7 @@ function retry(): void {
       </main>
 
       <div
+        v-fit-text-group
         class="sticky bottom-0 z-10 mt-6 flex w-full min-w-0 items-center gap-2 bg-canvas/95 px-screen py-3 backdrop-blur"
       >
         <IconOrb
@@ -612,7 +615,8 @@ function retry(): void {
         <div class="min-w-0 flex-1">
           <AppButton
             block
-            class="h-12 whitespace-nowrap px-2 text-on-paper"
+            compact
+            class="whitespace-nowrap text-on-paper"
             @click="openJourneyDateSheet"
           >
             {{
@@ -623,8 +627,9 @@ function retry(): void {
         <div class="min-w-0 flex-1">
           <AppButton
             block
+            compact
             variant="secondary"
-            class="h-12 whitespace-nowrap border-success px-2 text-success"
+            class="whitespace-nowrap border-success text-success"
             @click="openAppointmentList"
           >
             {{ t('explore.detail.findCompanions') }}

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -76,7 +77,10 @@ function goBack(): void {
       >
         ‹
       </AppButton>
-      <h1 class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display">
+      <h1
+        v-fit-text
+        class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display"
+      >
         {{ t('appointment.profile.title') }}
       </h1>
     </header>
