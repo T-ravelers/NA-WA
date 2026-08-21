@@ -8,6 +8,7 @@ export default {
       'APPOINTMENT-006':
         'Attendance could not be confirmed. Mark at least one member as attended and try again.',
       'APPOINTMENT-007': 'You can no longer leave this appointment.',
+      'APPOINTMENT-009': 'Attendance opens once the activity ends.',
     },
     list: {
       title: 'Appointments',
