@@ -35,7 +35,8 @@ import javax.sql.DataSource;
     "me.nawa.wallet.mapper",
     "me.nawa.settlement.mapper",
     "me.nawa.deposit.mapper",
-    "me.nawa.ingest.mapper"})
+    "me.nawa.ingest.mapper",
+    "me.nawa.notification.mapper"})
 @ComponentScan(basePackages = {"me.nawa.auth.service",
     "me.nawa.auth.jwt",
     "me.nawa.auth.oauth",
@@ -58,6 +59,7 @@ import javax.sql.DataSource;
     "me.nawa.common.ocr",
     "me.nawa.deposit.service",
     "me.nawa.ingest.service",
+    "me.nawa.notification.service",
     // -Ploadtest 빌드에서만 존재한다. 운영 빌드에서는 패키지가 비어 있어
     // 스캔되지 않으며, 부하 테스트에서는 외부 Stripe 호출을 로컬 스텁으로 바꾼다.
     "me.nawa.loadtest.stripe"})
