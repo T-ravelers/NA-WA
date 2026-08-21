@@ -110,6 +110,24 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
   })
 
+  it('colors the status badge by stage so awaiting-attendance is not grey like completed', async () => {
+    fetchAppointments.mockResolvedValue({
+      content: [
+        { ...appointment, appointmentId: 1, appointmentStatus: 'AWAITING_ATTENDANCE' as const },
+        { ...appointment, appointmentId: 2, appointmentStatus: 'COMPLETED' as const },
+        { ...appointment, appointmentId: 3, appointmentStatus: 'IN_PROGRESS' as const },
+      ],
+    })
+    const { wrapper } = await mountView()
+
+    const badges = wrapper.findAll('span.rounded-pill')
+    const byText = (text: string) => badges.find((badge) => badge.text() === text)
+
+    expect(byText('Awaiting attendance')?.classes()).toContain('text-status-scheduled')
+    expect(byText('Completed')?.classes()).toContain('text-status-ongoing')
+    expect(byText('In progress')?.classes()).toContain('text-info')
+  })
+
   it('opens completed appointment details from the list', async () => {
     fetchAppointments.mockResolvedValueOnce({
       content: [{ ...appointment, appointmentStatus: 'COMPLETED' as const }],

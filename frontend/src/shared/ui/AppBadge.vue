@@ -9,7 +9,7 @@
  * 라벨을 보조하는 장식으로만 붙는다.
  */
 type BadgeTone =
-  'ongoing' | 'scheduled' | 'pending' | 'completed' | 'settlement' | 'onPaper' | 'neutral'
+  'ongoing' | 'scheduled' | 'info' | 'pending' | 'completed' | 'settlement' | 'onPaper' | 'neutral'
 
 interface Props {
   tone?: BadgeTone
@@ -28,6 +28,8 @@ const { tone = 'neutral', dot = false } = defineProps<Props>()
 const TONE_CLASS: Record<BadgeTone, string> = {
   ongoing: 'bg-canvas/70 text-ink',
   scheduled: 'bg-canvas/70 text-ink',
+  // 진행 중. `pending`(행동 필요, 앰버)·`completed`(끝남, 초록)와 나란히 놓여도 갈리도록 파랑.
+  info: 'border border-info/40 bg-info/10 text-info',
   pending: 'border border-status-scheduled/40 bg-status-scheduled/10 text-status-scheduled',
   completed: 'border border-status-ongoing/40 bg-status-ongoing/10 text-status-ongoing',
   settlement: 'border border-settlement bg-transparent text-settlement',
@@ -38,6 +40,7 @@ const TONE_CLASS: Record<BadgeTone, string> = {
 const DOT_CLASS: Record<BadgeTone, string> = {
   ongoing: 'bg-status-ongoing',
   scheduled: 'bg-status-scheduled',
+  info: 'bg-info',
   pending: 'bg-status-scheduled',
   completed: 'bg-status-ongoing',
   settlement: 'bg-settlement',

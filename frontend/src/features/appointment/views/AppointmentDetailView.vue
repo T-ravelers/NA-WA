@@ -31,6 +31,7 @@ import {
   appointmentMembersQueryOptions,
   appointmentParticipationQueryOptions,
 } from '../model/appointmentQueries'
+import { appointmentStatusTone } from '../model/appointmentStatus'
 
 const route = useRoute()
 const router = useRouter()
@@ -80,9 +81,7 @@ const hasJoined = computed(() => participationQuery.data.value?.joined === true)
 // 없다는 걸 버튼 단계에서 미리 알려준다.
 const participationCheckFailed = computed(() => participationQuery.isError.value)
 
-const statusTone = computed(() =>
-  appointment.value?.appointmentStatus === 'RECRUITING' ? 'ongoing' : 'neutral',
-)
+const statusTone = computed(() => appointmentStatusTone(appointment.value?.appointmentStatus))
 
 const isJoinAvailable = computed(() => {
   if (appointment.value?.appointmentStatus !== 'RECRUITING') return false
