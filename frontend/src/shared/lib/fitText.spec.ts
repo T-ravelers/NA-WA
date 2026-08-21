@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref, withDirectives } from 'vue'
 
-import { fitText, vFitText } from './fitText'
+import { fitText, vFitText, vFitTextGroup } from './fitText'
 
 /**
  * jsdom은 레이아웃을 계산하지 않는다. 칸 폭과 글자 폭을 흉내 낸다.
@@ -206,5 +206,129 @@ describe('fitText — 소수점 폭 측정', () => {
     const { el } = mountTitle(LABEL, 0.75)
 
     expect(Number.parseFloat(el.style.fontSize)).toBeLessThan(BASE_FONT_SIZE)
+  })
+})
+
+/**
+ * 칸 폭도 소수점으로 재는 경로.
+ *
+ * 글자 쪽만 소수점으로 재면 반쪽이다. 지갑의 `Top up`은 칸이 48.656px인데 `clientWidth`가 49로
+ * 올라가, 글자 48.984px를 「들어간다」로 판정하고 멈춰 `…`이 그대로 남았다.
+ */
+describe('fitText — 칸 폭도 소수점으로 잰다', () => {
+  const geom = { box: 0, text: 0 }
+
+  beforeEach(() => {
+    Object.defineProperty(Element.prototype, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ width: geom.box }) as unknown as DOMRect,
+    })
+    Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+      configurable: true,
+      value(this: Range) {
+        const el = this.commonAncestorContainer as HTMLElement
+
+        return { width: (geom.text * currentFontSize(el)) / BASE_FONT_SIZE } as unknown as DOMRect
+      },
+    })
+  })
+
+  afterEach(() => {
+    Reflect.deleteProperty(Element.prototype, 'getBoundingClientRect')
+    Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect')
+  })
+
+  it('shrinks when the column is narrower than clientWidth rounds it up to', () => {
+    box.available = 49 // 정수로는 49 = 49라 "들어간다"고 나온다
+    box.widthPerChar = 0 // scrollWidth는 재우지 않고 Range만 쓴다
+    geom.box = 48.656
+    geom.text = 48.984
+
+    const { el } = mountTitle('Top up', 0.75)
+
+    expect(Number.parseFloat(el.style.fontSize)).toBeLessThan(BASE_FONT_SIZE)
+  })
+})
+
+/**
+ * `v-fit-text-group` — 나란한 요소를 한 비율로 맞춘다.
+ */
+describe('vFitTextGroup', () => {
+  /** 묶음 안 n번째 라벨. 없으면 테스트가 조용히 통과하지 않도록 던진다. */
+  function member(members: HTMLElement[], index: number): HTMLElement {
+    const el = members[index]
+
+    if (el === undefined) {
+      throw new Error(`묶음에 ${index}번 멤버가 없다`)
+    }
+
+    return el
+  }
+
+  // `defineComponent`를 쓰지 않는다 — 한 파일에 컴포넌트가 둘이면 lint가 막는다.
+  function mountGroup(labels: readonly (readonly [string, number])[]): HTMLElement[] {
+    const wrapper = mount({
+      setup() {
+        return () =>
+          withDirectives(
+            h(
+              'div',
+              {},
+              labels.map(([text, minRatio]) =>
+                withDirectives(h('span', { class: 'truncate' }, text), [[vFitText, minRatio]]),
+              ),
+            ),
+            [[vFitTextGroup]],
+          )
+      },
+    })
+
+    return wrapper.findAll('span').map((found) => found.element as HTMLElement)
+  }
+
+  it('shrinks every member by the ratio the longest one needs', () => {
+    box.available = 150
+
+    // 'Short' 5자 = 50px는 그대로 들어가지만, 17자 = 170px에 맞춰 함께 줄어든다.
+    const members = mountGroup([
+      ['Short', 0.5],
+      ['Much longer label', 0.5],
+    ])
+    const short = member(members, 0)
+    const long = member(members, 1)
+
+    expect(short.style.fontSize).toBe(long.style.fontSize)
+    expect(Number.parseFloat(long.style.fontSize)).toBeCloseTo(BASE_FONT_SIZE * (150 / 170), 1)
+  })
+
+  it('leaves every member alone when they all fit', () => {
+    box.available = 300
+
+    const members = mountGroup([
+      ['Short', 0.5],
+      ['Also fits', 0.5],
+    ])
+
+    expect(member(members, 0).style.fontSize).toBe('')
+    expect(member(members, 1).style.fontSize).toBe('')
+  })
+
+  it('uses the largest floor among the members', () => {
+    box.available = 100
+
+    // 200px가 필요해 비율은 0.5지만, 멤버 하나가 0.75를 요구하므로 0.75에서 멈춘다.
+    const members = mountGroup([
+      ['Short', 0.5],
+      ['Twenty characters!!!', 0.75],
+    ])
+
+    expect(Number.parseFloat(member(members, 0).style.fontSize)).toBeCloseTo(
+      BASE_FONT_SIZE * 0.75,
+      2,
+    )
+    expect(Number.parseFloat(member(members, 1).style.fontSize)).toBeCloseTo(
+      BASE_FONT_SIZE * 0.75,
+      2,
+    )
   })
 })
