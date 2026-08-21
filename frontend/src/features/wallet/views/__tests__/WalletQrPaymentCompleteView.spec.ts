@@ -75,8 +75,8 @@ describe('WalletQrPaymentCompleteView', () => {
 
     expect(vi.mocked(getQrPaymentStatus)).toHaveBeenCalledWith(77)
     expect(wrapper.get('h1').text()).toBe('Payment complete')
-    expect(wrapper.text()).toContain('-₩18,500')
-    expect(wrapper.text()).toContain('Remaining balance ₩110,000')
+    expect(wrapper.text()).toContain('-18,500 P')
+    expect(wrapper.text()).toContain('Remaining balance 110,000 P')
     expect(wrapper.get('[role="img"]').attributes('aria-label')).toBe('Payment completed')
   })
 

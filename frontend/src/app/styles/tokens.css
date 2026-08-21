@@ -14,7 +14,11 @@
 @theme {
   /* ── 면 ──
    * canvas·surface-1은 V2 변수(bg/primary·bg/secondary)다. surface-2·3 단차는 V2가
-   * 변수화하지 않아 이전 시안 값을 유지한다 — 화면 디프에서 실측되면 그때 조정한다. */
+   * 변수화하지 않아 이전 시안 값을 유지한다.
+   * 2026-08-21 실측(#348): surface-1 위에서 surface-2는 1.00:1이라 단차가 사라진다.
+   * 카드 위에 얹히는 면에는 surface-3(1.18:1)을 쓴다. 값은 바꾸지 않았다 —
+   * bg-surface-2 58곳을 흔들지 않으려고 사용처만 옮겼다. surface-1 위에 surface-2를
+   * 쓰면 같은 결함이 재발한다. */
   --color-canvas: #171717; /* 앱 배경 */
   --color-surface-1: #262626; /* 카드·컨테이너 */
   --color-surface-2: #262624; /* 입력·세그먼트 트랙 (26회) */
@@ -133,8 +137,10 @@
    * 컷이라 시안과 다르다.** 폭은 `index.css`의 `.font-display`가 `font-stretch: 200%`로
    * 맞춘다. `wght`는 800을 요청해도 700으로 잘린다.
    * 자세한 내용은 `public/fonts/README.md`의 「Display 폰트」 절 참조. */
-  --font-display: 'sztos-variable', 'Noto Sans', sans-serif;
-  --font-body: 'Noto Sans', sans-serif;
+  --font-display: 'sztos-variable', 'Noto Sans', 'Noto Sans JP', 'Noto Sans TC', sans-serif;
+  /* CJK 로케일은 `Noto Sans`에 없는 글자만 JP·TC 슬라이스에서 받는다(`fonts-cjk.css`).
+   * `zh-TW`는 `index.css`의 `:lang()` 규칙이 TC를 JP보다 앞세운다. */
+  --font-body: 'Noto Sans', 'Noto Sans JP', 'Noto Sans TC', sans-serif;
 
   /* ── 타이포 스케일 ──
    * Display 토큰의 굵기 상한은 **700**이다. 시안은 화면 제목과 티켓 제목에

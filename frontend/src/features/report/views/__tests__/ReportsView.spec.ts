@@ -218,7 +218,7 @@ describe('ReportsView', () => {
 
     await findButton(wrapper, 'Choose expenses')?.trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('₩18,000')
+    expect(wrapper.text()).toContain('18,000 P')
     expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(2)
 
     await wrapper.get('form').trigger('submit')

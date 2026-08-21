@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-import { formatCurrency } from '@/shared/lib/money'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import type { Journey } from '../api/journeyApi'
@@ -15,14 +14,14 @@ defineProps<Props>()
 
 const { locale, t } = useI18n()
 
+// 지갑 통화(KRW)와 1:1이라 통화 스타일 대신 자릿수 구분만 로케일 대응으로 하고
+// 단위는 P로 직접 붙인다(#333).
 function formatBudget(value: number | null): string {
   if (value === null) {
     return t('journey.detail.noBudget')
   }
 
-  return formatCurrency(value, locale.value, 'KRW', {
-    maximumFractionDigits: 0,
-  })
+  return `${new Intl.NumberFormat(locale.value, { maximumFractionDigits: 0 }).format(value)} P`
 }
 
 function formatCompanionPreference(value: string | null): string {

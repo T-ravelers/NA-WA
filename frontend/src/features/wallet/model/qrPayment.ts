@@ -1,6 +1,6 @@
 import type { SpendingCategory } from '@/shared/lib/spendingCategory'
 
-export { formatKrw } from '@/shared/lib/money'
+export { formatPoints } from '@/shared/lib/money'
 
 export type SpendingScope = 'personal' | 'shared'
 

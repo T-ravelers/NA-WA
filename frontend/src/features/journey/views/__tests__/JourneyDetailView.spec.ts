@@ -168,6 +168,7 @@ describe('JourneyDetailView', () => {
     expect(wrapper.get('h1').text()).toBe('Seoul and Busan')
     expect(wrapper.text()).not.toContain('Visit regions')
     expect(wrapper.text()).not.toContain('No visit regions were added.')
+    expect(wrapper.text()).toContain('1,500,000 P')
 
     // 2026-08-10 ~ 2026-08-12. 항목이 하나도 없어도 날짜가 전부 보인다.
     // `time`은 JourneySummary도 쓰므로 날짜 블록은 추가 버튼 수로 센다.

@@ -24,7 +24,7 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 import { executeQrPayment, previewQrPayment } from '../api/qrPaymentApi'
 import { useWalletAppointmentIntegration } from '../model/appointmentIntegration'
 import {
-  formatKrw,
+  formatPoints,
   isValidQrPaymentAmount,
   qrPaymentKeys,
   toQrPaymentSpendingScope,
@@ -282,6 +282,8 @@ const completePayment = (): void => {
         >
           <AmountInput
             v-model="enteredAmount"
+            currency-symbol="P"
+            symbol-position="suffix"
             :label="t('wallet.qrPayment.amount')"
             :helper="t('wallet.qrPayment.amountInputHelper')"
           />
@@ -293,7 +295,7 @@ const completePayment = (): void => {
           <div class="flex items-center justify-between gap-4 py-3">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.amount') }}</dt>
             <dd class="text-body-sm font-semibold">
-              {{ formatKrw(session.resolved.amount ?? 0) }}
+              {{ formatPoints(session.resolved.amount ?? 0) }}
             </dd>
           </div>
         </dl>
@@ -318,13 +320,13 @@ const completePayment = (): void => {
           <div class="flex items-center justify-between gap-4 py-3">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.currentBalance') }}</dt>
             <dd class="text-body-sm font-semibold">
-              {{ formatKrw(previewQuery.data.value.currentBalance) }}
+              {{ formatPoints(previewQuery.data.value.currentBalance) }}
             </dd>
           </div>
           <div class="flex items-center justify-between gap-4 py-3 last:pb-0">
             <dt class="text-body-sm text-ink-2">{{ t('wallet.qrPayment.balanceAfter') }}</dt>
             <dd class="text-body-sm font-semibold">
-              {{ formatKrw(previewQuery.data.value.balanceAfter) }}
+              {{ formatPoints(previewQuery.data.value.balanceAfter) }}
             </dd>
           </div>
         </dl>
