@@ -204,15 +204,16 @@ class SettlementControllerTest {
                 .collection(SettlementCollectionResponse.builder()
                     .totalCount(2)
                     .paidCount(1)
+                    // 안 낸 사람이 먼저다. 조회가 정한 순서가 응답에 그대로 실린다.
                     .participants(List.of(
-                        SettlementCollectionParticipantResponse.builder()
-                            .id(72L).name("Bora").initials("B")
-                            .shareAmount(new BigDecimal("50"))
-                            .requestStatus("PAID").build(),
                         SettlementCollectionParticipantResponse.builder()
                             .id(73L).name("Chan").initials("C")
                             .shareAmount(new BigDecimal("50"))
-                            .requestStatus("PENDING").build()
+                            .requestStatus("PENDING").build(),
+                        SettlementCollectionParticipantResponse.builder()
+                            .id(72L).name("Bora").initials("B")
+                            .shareAmount(new BigDecimal("50"))
+                            .requestStatus("PAID").build()
                     ))
                     .build())
                 .build()
@@ -227,11 +228,11 @@ class SettlementControllerTest {
         JsonNode collection = objectMapper.readTree(responseBody).path("data").path("collection");
         assertEquals(2, collection.path("totalCount").asInt());
         assertEquals(1, collection.path("paidCount").asInt());
-        assertEquals(72, collection.path("participants").path(0).path("id").asInt());
-        assertEquals("Bora", collection.path("participants").path(0).path("name").asText());
+        assertEquals(73, collection.path("participants").path(0).path("id").asInt());
+        assertEquals("Chan", collection.path("participants").path(0).path("name").asText());
         assertEquals(50, collection.path("participants").path(0).path("shareAmount").asInt());
-        assertEquals("PAID", collection.path("participants").path(0).path("requestStatus").asText());
-        assertEquals("PENDING", collection.path("participants").path(1).path("requestStatus").asText());
+        assertEquals("PENDING", collection.path("participants").path(0).path("requestStatus").asText());
+        assertEquals("PAID", collection.path("participants").path(1).path("requestStatus").asText());
     }
 
     /**

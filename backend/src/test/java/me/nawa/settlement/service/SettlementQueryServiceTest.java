@@ -165,22 +165,23 @@ class SettlementQueryServiceTest {
         detail.setViewerShareAmount(new BigDecimal("25"));
         detail.setViewerRequestStatus("NOT_REQUESTED");
         when(settlementMapper.findDetail(90L, 1L)).thenReturn(detail);
-        // 조회는 청구한 상대만 돌려준다. 원결제자 본인 행은 쿼리에서 이미 빠져 있다.
+        // 조회는 청구한 상대만 돌려준다. 원결제자 본인 행은 쿼리에서 이미 빠져 있고,
+        // 안 낸 사람이 먼저 온다. 순서를 정하는 것은 조회의 몫이라 여기서 다시 세우지 않는다.
         when(settlementMapper.findCollectionMembers(90L)).thenReturn(List.of(
-            new SettlementCollectionMember(72L, "Bora", new BigDecimal("25"), "PAID"),
             new SettlementCollectionMember(73L, "Chan", new BigDecimal("25"), "PENDING"),
-            new SettlementCollectionMember(74L, "Dain", new BigDecimal("25"), "PENDING")
+            new SettlementCollectionMember(74L, "Dain", new BigDecimal("25"), "PENDING"),
+            new SettlementCollectionMember(72L, "Bora", new BigDecimal("25"), "PAID")
         ));
 
         SettlementDetailResponse response = service().getSettlement(1L, 90L);
 
         assertEquals(3, response.getCollection().getTotalCount());
         assertEquals(1, response.getCollection().getPaidCount());
-        assertEquals(List.of(72L, 73L, 74L), response.getCollection().getParticipants().stream()
+        assertEquals(List.of(73L, 74L, 72L), response.getCollection().getParticipants().stream()
             .map(participant -> participant.getId()).toList());
-        assertEquals(List.of("PAID", "PENDING", "PENDING"), response.getCollection().getParticipants().stream()
+        assertEquals(List.of("PENDING", "PENDING", "PAID"), response.getCollection().getParticipants().stream()
             .map(participant -> participant.getRequestStatus()).toList());
-        assertEquals("B", response.getCollection().getParticipants().get(0).getInitials());
+        assertEquals("C", response.getCollection().getParticipants().get(0).getInitials());
         assertEquals(new BigDecimal("25"), response.getCollection().getParticipants().get(0).getShareAmount());
     }
 

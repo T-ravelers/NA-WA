@@ -28,14 +28,16 @@ RUN_MYSQL_INTEGRATION_TESTS=true ./gradlew test --no-daemon
 ## 현재 로컬 결과
 
 - `2026-08-21 ./gradlew build --no-daemon`: 통과. 전체 단위 테스트와 WAR 생성을 포함한다.
-- `2026-08-21 RUN_MYSQL_INTEGRATION_TESTS=true ./gradlew test --tests
-  'me.nawa.settlement.mapper.SettlementMapperIntegrationTest' --tests 'me.nawa.config.*'`:
-  통과. 빈 스키마에 마이그레이션을 적용한 임시 데이터베이스에서 실행했고, 새로 추가한
-  `findCollectionMembers`와 mapper SQL 전수 검증(`MapperSqlSchemaIntegrationTest`)이 포함된다.
+- `2026-08-21 RUN_MYSQL_INTEGRATION_TESTS=true RUN_REDIS_INTEGRATION_TESTS=true
+  ./gradlew cleanTest test --no-daemon`: 통과. 118개 클래스 851건, 실패 0. 빈 스키마에
+  마이그레이션을 적용한 임시 데이터베이스에서 돌렸고, 새로 넣은 `findCollectionMembers`와
+  완료 시각 기록은 물론 mapper SQL 전수 검증(`MapperSqlSchemaIntegrationTest`)과 생성
+  동시성(`SettlementCreationConcurrencyIntegrationTest`)까지 포함한다. 건너뛴 2건은 실제
+  Stripe를 부르는 테스트와 시드 데이터가 필요한 장소 조회다.
+- 두 게이트는 함께 켠다. MySQL만 켜면 Redis 통합 테스트 클래스가 한 건도 돌지 않아
+  빌드가 게이트에서 실패한다 — 테스트가 틀린 것이 아니라 환경 변수가 빠진 것이다.
 - 로컬 MySQL은 `+09:00`이라 DB 시계에 기대는 코드가 여기서는 드러나지 않는다. 완료 시각을
   애플리케이션이 넘긴 값으로 적는지는 CI가 MySQL을 UTC로 띄워 확인한다.
-- 생성 동시성 통합 테스트(`SettlementCreationConcurrencyIntegrationTest`)는 이번 변경이
-  생성 경로를 건드리지 않아 실행하지 않았다.
 
 ## MySQL 생성 동시성 테스트
 
