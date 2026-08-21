@@ -50,12 +50,12 @@ export interface RecognizedReceiptItem {
 /**
  * 영수증 한 장에서 읽어낸 결과.
  *
- * `recognizedTotal`은 영수증에 찍힌 합계다. 할인이나 봉사료가 품목 줄 밖에 붙어서 품목을
- * 다 더한 값과 다를 수 있다. 그래서 정산 금액으로 쓰지 않고 견주어 볼 기준으로만 쓴다.
+ * 품목 줄만 담는다. 서버는 영수증에 찍힌 합계도 함께 내려주지만 화면은 쓰지 않는다.
+ * 인식이 하는 일은 품목 카드를 대신 채워 주는 것 하나이고, 무엇이 맞는 값인지는 사용자가
+ * 그 카드에서 정한다.
  */
 export interface RecognizedReceiptDraft {
   items: RecognizedReceiptItem[]
-  recognizedTotal: string | null
 }
 
 export interface CreateSettlementRequest {

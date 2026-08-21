@@ -172,7 +172,6 @@ describe('settlement response mappers', () => {
         { name: '', unitPrice: '4500', quantity: '' },
         { name: 'Wine', unitPrice: '', quantity: '' },
       ],
-      recognizedTotal: null,
     })
   })
 
@@ -185,7 +184,6 @@ describe('settlement response mappers', () => {
       }),
     ).toEqual({
       items: [{ name: 'Pasta', unitPrice: '10500', quantity: '2' }],
-      recognizedTotal: '21000',
     })
   })
 })

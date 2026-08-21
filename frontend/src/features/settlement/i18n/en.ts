@@ -81,9 +81,6 @@ export default {
       allocationIncomplete: 'Allocate every item quantity before continuing',
       itemInvalid: 'Check this item. Its allocated quantities must add up to the quantity above.',
       itemsTotal: 'Items total',
-      receiptTotal: 'Receipt total',
-      receiptTotalMismatch:
-        'The receipt total differs from what was paid. Discounts, service charges, or a split bill can explain this — check the photo if it looks wrong.',
       totalMismatch: 'Item totals must match the payment exactly before continuing',
       itemsOverPayment:
         'Items add up to {amount} more than the payment. Check the quantities, or lower a price — a discount on the receipt is not an item.',

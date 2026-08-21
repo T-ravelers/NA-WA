@@ -127,7 +127,6 @@ describe('SettlementCreateView', () => {
     uploadReceipt.mockReset().mockResolvedValue({ receiptId: '31' })
     recognizeReceipt.mockReset().mockResolvedValue({
       items: [{ name: 'Wine', unitPrice: '25.00', quantity: '1' }],
-      recognizedTotal: '25.00',
     })
   })
 
@@ -732,7 +731,6 @@ describe('SettlementCreateView', () => {
         { name: 'Pasta', unitPrice: '10.00', quantity: '1' },
         { name: 'Wine', unitPrice: '15.00', quantity: '1' },
       ],
-      recognizedTotal: '25.00',
     })
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)
@@ -841,13 +839,15 @@ describe('SettlementCreateView', () => {
   })
 
   /*
-   * 할인이나 봉사료가 붙거나 여러 명이 나눠 결제하면 영수증 합계와 결제 금액은 정상적으로도
-   * 달라진다. 인식 값 자체가 틀렸을 수도 있어서, 알리기만 하고 막지 않는다.
+   * 영수증에 찍힌 합계는 화면에 나오지도, 결제 금액과 견주어지지도 않는다.
+   *
+   * 사진을 반듯하게 찍지 않으면 합계부터 틀리게 읽힌다. 사용자가 손댈 수 없는 그 숫자로
+   * "결제 금액과 다릅니다"라고 알리면 멀쩡한 영수증을 두고 겁만 주게 된다. 인식이 하는 일은
+   * 품목 카드를 대신 채워 주는 것 하나다.
    */
-  it('warns about a receipt total that differs from the payment without blocking', async () => {
+  it('never compares the receipt total with the payment', async () => {
     recognizeReceipt.mockResolvedValue({
       items: [{ name: 'Dinner', unitPrice: '25.00', quantity: '1' }],
-      recognizedTotal: '30.00',
     })
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)
@@ -858,16 +858,41 @@ describe('SettlementCreateView', () => {
     await flushPromises()
     await allocate(wrapper, 0, '12', '1')
 
-    expect(wrapper.get('[data-testid="receipt-total"]').text()).toContain('30.00 P')
-    expect(wrapper.find('[data-testid="receipt-total-mismatch"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="receipt-total"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="receipt-total-mismatch"]').exists()).toBe(false)
 
     await wrapper.get('[data-action="next"]').trigger('click')
 
     expect(wrapper.find('[data-action="create"]').exists()).toBe(true)
   })
 
-  /** 사진을 바꿨는데 앞 영수증의 합계가 남아 있으면 무엇을 견주는 중인지 알 수 없다. */
+  /*
+   * 품목 합계는 성격이 다르다. 사용자가 카드에 확정한 값이고 서버가 결제 금액과 정확히
+   * 같을 때만 정산을 만드므로, 여기서 알려주지 않으면 제출에서야 거절당한다.
+   */
+  it('still blocks when the item cards do not add up to the payment', async () => {
+    recognizeReceipt.mockResolvedValue({
+      items: [{ name: 'Dinner', unitPrice: '30.00', quantity: '1' }],
+    })
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+    await wrapper.get('[data-type="ITEMIZED"]').trigger('click')
+    await pickReceipt(wrapper)
+    await wrapper.get('[data-action="load-items"]').trigger('click')
+    await flushPromises()
+    await allocate(wrapper, 0, '12', '1')
+
+    expect(wrapper.find('[data-testid="items-gap"]').exists()).toBe(true)
+
+    await wrapper.get('[data-action="next"]').trigger('click')
+
+    expect(wrapper.find('[data-action="create"]').exists()).toBe(false)
+  })
+
+  /** 사진을 바꾸면 앞 영수증에서 난 오류도 함께 거둔다. 남아 있으면 지금 사진의 문제로 읽힌다. */
   it('drops the previous reading when another photo is chosen', async () => {
+    recognizeReceipt.mockResolvedValueOnce({ items: [] })
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)
     await wrapper.get('[data-participant-id="19"]').trigger('click')
@@ -876,11 +901,11 @@ describe('SettlementCreateView', () => {
     await wrapper.get('[data-action="load-items"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="receipt-total"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ocr-error"]').exists()).toBe(true)
 
     await pickReceipt(wrapper, pngFile('another.png'))
 
-    expect(wrapper.find('[data-testid="receipt-total"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ocr-error"]').exists()).toBe(false)
   })
 
   /*
@@ -888,7 +913,7 @@ describe('SettlementCreateView', () => {
    * 사용자는 무엇이 잘못됐는지 알 길이 없다.
    */
   it('keeps the cards and explains when nothing readable came back', async () => {
-    recognizeReceipt.mockResolvedValue({ items: [], recognizedTotal: null })
+    recognizeReceipt.mockResolvedValue({ items: [] })
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)
     await wrapper.get('[data-participant-id="19"]').trigger('click')

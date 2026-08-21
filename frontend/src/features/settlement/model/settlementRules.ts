@@ -114,28 +114,6 @@ export function compareItemizedTotal(
   }
 }
 
-/**
- * 영수증에 찍힌 합계가 실제 결제 금액과 맞는지 본다.
- *
- * 어긋나도 **막지 않는다.** 여러 명이 나눠 결제했거나 할인·봉사료가 붙으면 정상적으로도
- * 달라지고, 인식 값 자체가 틀렸을 수도 있다. 잘못 읽은 값 때문에 멀쩡한 영수증이 거절되면
- * 사용자는 손쓸 방법이 없다. 그래서 알리기만 한다.
- *
- * 품목 합계와 결제 금액이 정확히 같아야 한다는 규칙은 `compareItemizedTotal`이 그대로 맡는다.
- */
-export function compareRecognizedTotal(
-  recognizedTotal: string | null,
-  sourceAmount: string,
-): { matches: boolean } | null {
-  if (recognizedTotal === null) return null
-
-  const recognized = parseScaled(recognizedTotal, TOTAL_DECIMALS)
-  const source = parseScaled(sourceAmount, TOTAL_DECIMALS)
-  if (recognized === null || source === null) return null
-
-  return { matches: recognized === source }
-}
-
 /** 정수로 세던 값을 다시 소수 문자열로 돌린다. 뒤에 남는 0은 떼어 읽기 쉽게 둔다. */
 function formatScaled(value: bigint, decimals: number): string {
   const unit = 10n ** BigInt(decimals)

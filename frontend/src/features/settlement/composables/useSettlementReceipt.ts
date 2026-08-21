@@ -105,8 +105,6 @@ export function useSettlementReceiptUpload(): SettlementReceiptUpload {
 export interface SettlementReceiptOcr {
   pending: Ref<boolean>
   errorKey: Ref<string | null>
-  /** 마지막으로 읽어낸 영수증 합계. 읽지 못했으면 비어 있다. */
-  recognizedTotal: Ref<string | null>
   recognize: (receiptId: string) => Promise<RecognizedReceiptItem[] | null>
   reset: () => void
 }
@@ -120,11 +118,14 @@ export interface SettlementReceiptOcr {
  *
  * 읽어낸 값은 어디에도 저장하지 않는다. 사용자가 확인하고 고친 값만 정산 생성 요청으로
  * 올라간다.
+ *
+ * 돌려주는 것은 품목 줄뿐이다. 서버가 함께 내려주는 영수증 합계는 받지 않는다. 사진이
+ * 반듯하지 않으면 합계부터 틀리게 읽히는데, 사용자가 손댈 수 없는 그 값으로 결제 금액과
+ * 견주어 알림을 띄우면 멀쩡한 영수증을 두고 겁만 주게 된다.
  */
 export function useSettlementReceiptOcr(): SettlementReceiptOcr {
   const pending = ref(false)
   const errorKey = ref<string | null>(null)
-  const recognizedTotal = ref<string | null>(null)
   /*
    * 읽는 사이 사용자는 다른 사진을 고르거나 다른 결제로 옮겨 갈 수 있다. 뒤늦게 도착한
    * 결과를 그대로 받으면 지금 화면과 무관한 품목이 카드에 채워진다.
@@ -134,7 +135,6 @@ export function useSettlementReceiptOcr(): SettlementReceiptOcr {
   function reset(): void {
     generation += 1
     errorKey.value = null
-    recognizedTotal.value = null
     // 읽던 것을 버렸으니 기다림도 함께 끝난다. 두지 않으면 버튼이 영영 잠긴다.
     pending.value = false
   }
@@ -156,17 +156,14 @@ export function useSettlementReceiptOcr(): SettlementReceiptOcr {
        * 카드가 한 장도 없는 화면이 되어, 사용자는 무엇이 잘못됐는지 알 길이 없다.
        */
       if (draft.items.length === 0) {
-        recognizedTotal.value = null
         errorKey.value = 'settlement.receipt.error.ocrUnreadable'
         return null
       }
 
-      recognizedTotal.value = draft.recognizedTotal
       return draft.items
     } catch (error) {
       if (attempt !== generation) return null
 
-      recognizedTotal.value = null
       errorKey.value = resolveOcrErrorKey(error)
       return null
     } finally {
@@ -175,7 +172,7 @@ export function useSettlementReceiptOcr(): SettlementReceiptOcr {
     }
   }
 
-  return { pending, errorKey, recognizedTotal, recognize, reset }
+  return { pending, errorKey, recognize, reset }
 }
 
 export interface SettlementReceiptViewer {

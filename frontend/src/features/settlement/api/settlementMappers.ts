@@ -162,6 +162,5 @@ export function mapRecognizedReceipt(dto: SettlementReceiptOcrDto): RecognizedRe
       unitPrice: optionalAmount(item.unitPrice),
       quantity: optionalAmount(item.quantity),
     })),
-    recognizedTotal: unread(dto.recognizedTotal) ? null : amount(dto.recognizedTotal),
   }
 }

@@ -85,8 +85,9 @@ export interface SettlementReceiptOcrItemDto {
 /**
  * 영수증 글자 인식 결과
  *
- * 'recognizedTotal'은 영수증에 찍힌 합계다. 할인이나 봉사료가 품목 줄 밖에 붙기 때문에
- * 품목을 다 더한 값과 다를 수 있다
+ * 'recognizedTotal'은 영수증에 찍힌 합계다. 서버가 내려주므로 계약에는 남겨 두지만
+ * **화면은 쓰지 않는다.** 사진을 반듯하게 찍지 않으면 합계부터 틀리게 읽히는데, 그 값으로
+ * "결제 금액과 다릅니다"라고 알리면 사용자가 고칠 수도 없는 숫자를 근거로 겁을 주게 된다.
  */
 export interface SettlementReceiptOcrDto {
   items: SettlementReceiptOcrItemDto[]
