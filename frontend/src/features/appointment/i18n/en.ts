@@ -10,7 +10,13 @@ export default {
       'APPOINTMENT-007': 'You can no longer leave this appointment.',
       'APPOINTMENT-009': 'Attendance opens once the activity ends.',
     },
-    /** 금액과 단위를 한 문구로 묶는다. 단위 위치는 로케일마다 다르다. */
+    /**
+     * 금액과 단위를 한 문구로 묶는다. 단위 위치는 로케일마다 다르다.
+     *
+     * 다만 매개변수가 있는 문구는 vue-i18n 링크 메시지가 인자를 받지 못해 이 키를
+     * 재사용할 수 없어서, 아래 여러 문구가 P를 직접 담는다. 단위 표기를 바꿀 때는
+     * 이 키만 고치지 말고 이 파일에서 P가 든 문구를 함께 고친다.
+     */
     points: '{amount} P',
     list: {
       title: 'Appointments',
