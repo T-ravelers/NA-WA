@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { IconArrowLeft } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 
 import JourneyCreateForm from '../components/JourneyCreateForm.vue'
 import { createJourney, type JourneyCreateInput } from '../api/journeyApi'
@@ -27,6 +28,17 @@ function returnRouteName(): string | null {
   const value = route.query.returnRouteName
   return typeof value === 'string' && value !== '' ? value : null
 }
+
+// 뒤로 가기도 제출 후 복귀와 같은 규칙을 쓴다. 다른 화면이 보낸 경우 그 화면으로
+// 나머지 query(itemId·itemType 등)를 그대로 들고 돌아가고, 직접 들어온 경우는
+// 여정 목록이다. 만든 것이 없으니 tripId는 더하지 않는다.
+const backTarget = computed<RouteLocationRaw>(() => {
+  const returnTo = returnRouteName()
+  if (returnTo === null) return { name: 'journey-list' }
+  const restQuery = { ...route.query }
+  delete restQuery.returnRouteName
+  return { name: returnTo, query: restQuery }
+})
 
 const createMutation = useMutation({
   mutationFn: createJourney,
@@ -67,9 +79,22 @@ function submit(input: JourneyCreateInput): void {
 
 <template>
   <main class="flex w-full flex-col gap-6 px-screen py-8">
-    <h1 class="font-display text-screen-title uppercase text-ink-display">
-      {{ t('journey.create.title') }}
-    </h1>
+    <header class="flex items-center gap-0.5">
+      <RouterLink
+        :to="backTarget"
+        :aria-label="t('action.back')"
+        class="-ml-3 flex size-11 shrink-0 items-center justify-center text-ink"
+      >
+        <IconArrowLeft
+          :size="24"
+          :stroke-width="1.75"
+          aria-hidden="true"
+        />
+      </RouterLink>
+      <h1 class="font-display text-screen-title uppercase text-ink-display">
+        {{ t('journey.create.title') }}
+      </h1>
+    </header>
     <JourneyCreateForm
       :pending="createMutation.isPending.value"
       :error-message="errorMessage"

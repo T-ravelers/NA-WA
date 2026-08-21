@@ -32,6 +32,11 @@ async function mountView(initialPath = '/journeys/new') {
     routes: [
       { path: '/journeys/new', name: 'journey-create', component: JourneyCreateView },
       {
+        path: '/journeys',
+        name: 'journey-list',
+        component: { template: '<div>Journey list</div>' },
+      },
+      {
         path: '/journeys/:tripId',
         name: 'journey-detail',
         component: { template: '<div>Journey detail</div>' },
@@ -104,6 +109,30 @@ describe('JourneyCreateView', () => {
       itemType: 'EVENT',
       tripId: '42',
     })
+  })
+
+  it('goes back to the journey list when opened directly', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('a[aria-label="Go back"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-list')
+  })
+
+  it('goes back to the requesting route, keeping its query, without creating anything', async () => {
+    // 약속 생성이 여정이 없어 보낸 경우다. 되돌아갈 때 itemId·itemType은 그대로
+    // 들고 가되, 만든 여정이 없으니 tripId는 붙이지 않는다.
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=appointment-create&itemId=100&itemType=EVENT',
+    )
+
+    await wrapper.get('a[aria-label="Go back"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+    expect(router.currentRoute.value.query).toEqual({ itemId: '100', itemType: 'EVENT' })
+    expect(createJourney).not.toHaveBeenCalled()
   })
 
   it('shows the normalized creation error without navigating', async () => {
