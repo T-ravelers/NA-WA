@@ -159,6 +159,29 @@ describe('TopupView', () => {
     })
   })
 
+  it('adds a quick amount on top of a directly typed amount', async () => {
+    const wrapper = await mountTopup()
+
+    await flushPromises()
+
+    await wrapper.get('input[inputmode="numeric"]').setValue('30000')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '+₩10,000')
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Next')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(previewTopup).mock.calls[0]?.[0]).toEqual({
+      amount: 40000,
+      method: 'STRIPE_CARD',
+      currency: 'KRW',
+    })
+  })
+
   it('creates a Stripe PaymentIntent before showing the Stripe payment step', async () => {
     const wrapper = await mountTopup()
 

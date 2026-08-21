@@ -5,9 +5,10 @@ import {
   type StripeElements,
   type StripePaymentElement,
 } from '@stripe/stripe-js'
-import { ref, onBeforeUnmount, onMounted } from 'vue'
+import { computed, ref, onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { isSupportedLocale } from '@/shared/i18n/locales'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
@@ -26,7 +27,14 @@ const emit = defineEmits<{
   back: []
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+/**
+ * 앱 4개 로케일(en·ja·zh-TW·vi)이 전부 Stripe Elements의 지원 로케일 코드와
+ * 그대로 일치한다. 브라우저 자동 감지("auto") 대신 앱이 실제로 렌더 중인
+ * 로케일을 넘겨서, 결제 위젯 언어가 나머지 화면과 갈리지 않게 한다.
+ */
+const stripeLocale = computed(() => (isSupportedLocale(locale.value) ? locale.value : 'en'))
 
 const paymentElementContainer = ref<HTMLDivElement | null>(null)
 const stripe = ref<Stripe | null>(null)
@@ -74,9 +82,10 @@ const initializePaymentElement = async (): Promise<void> => {
     stripe.value = loadedStripe
     const paymentElements = loadedStripe.elements({
       clientSecret: props.clientSecret,
-      // Stripe Payment Element는 브라우저 로케일을 자동 감지("auto")해 카드 입력
-      // 필드 라벨을 렌더링한다. 앱은 아직 다국어 결제 흐름을 지원하지 않으므로 영어로 고정한다.
-      locale: 'en',
+      // Stripe Payment Element는 locale을 지정하지 않으면 브라우저 로케일을
+      // 자동 감지("auto")해 카드 입력 필드 라벨을 렌더링한다. 앱이 렌더 중인
+      // 로케일과 다르면(예: 일본어 UI에서 영어 결제 위젯) 화면 언어가 갈린다.
+      locale: stripeLocale.value,
       // Payment Element는 별도 origin의 iframe이라 fontFamily: 'inherit'로는 부모
       // 페이지가 셀프 호스팅한 Noto Sans(frontend/public/fonts/NotoSans.woff2)를
       // 실제로 상속받지 못한다. 같은 파일을 iframe에도 명시적으로 로드시킨다.
