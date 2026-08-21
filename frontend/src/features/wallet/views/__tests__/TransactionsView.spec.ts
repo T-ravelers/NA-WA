@@ -1,6 +1,6 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
@@ -31,6 +31,20 @@ const transactionsResponse = {
     from: null,
     to: null,
   },
+}
+
+/**
+ * 고정된 오늘. 달력은 오늘이 속한 달부터 보여주므로 시각을 고정하지 않으면 어떤 달이
+ * 열릴지 알 수 없다.
+ */
+const NOW = new Date('2026-07-15T00:00:00Z')
+
+/** 달력에서 날짜를 고른다. 셀 이름은 앱 로케일(en)로 붙는다. */
+const pickDate = async (
+  wrapper: Awaited<ReturnType<typeof mountTransactions>>['wrapper'],
+  label: string,
+) => {
+  await wrapper.get(`button[aria-label="Select ${label}"]`).trigger('click')
 }
 
 const mountTransactions = async () => {
@@ -78,7 +92,13 @@ const mountTransactions = async () => {
 }
 
 describe('TransactionsView', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(NOW)
     vi.clearAllMocks()
     vi.mocked(getTransactions).mockResolvedValue(transactionsResponse)
   })
@@ -150,8 +170,8 @@ describe('TransactionsView', () => {
     await flushPromises()
     await wrapper.get('select[aria-label="Transaction type"]').setValue('TOPUP')
     await wrapper.get('select[aria-label="Status"]').setValue('COMPLETED')
-    await wrapper.get('input[aria-label="From"]').setValue('2026-07-01')
-    await wrapper.get('input[aria-label="To"]').setValue('2026-07-31')
+    await pickDate(wrapper, 'July 1, 2026')
+    await pickDate(wrapper, 'July 31, 2026')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
@@ -165,18 +185,38 @@ describe('TransactionsView', () => {
     })
   })
 
-  it('rejects an invalid date range before requesting filtered data', async () => {
+  /**
+   * 네이티브 날짜 입력을 쓰던 때는 시작일이 종료일보다 늦을 수 있어 오류를 띄웠다.
+   * 달력은 두 번째로 고른 날짜가 이르면 두 값을 뒤집어 그 상태를 만들지 않는다.
+   */
+  it('swaps the range when the second date comes first', async () => {
     const { wrapper } = await mountTransactions()
 
     await flushPromises()
-    await wrapper.get('input[aria-label="From"]').setValue('2026-08-01')
-    await wrapper.get('input[aria-label="To"]').setValue('2026-07-01')
+    await pickDate(wrapper, 'July 31, 2026')
+    await pickDate(wrapper, 'July 1, 2026')
     await wrapper.get('form').trigger('submit')
+    await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toContain(
-      'The start date must be before the end date.',
+    expect(vi.mocked(getTransactions)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ from: '2026-07-01', to: '2026-07-31' }),
     )
-    expect(vi.mocked(getTransactions)).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the chosen range and clears it', async () => {
+    const { wrapper } = await mountTransactions()
+
+    await flushPromises()
+    expect(wrapper.text()).toContain('Any date')
+
+    await pickDate(wrapper, 'July 1, 2026')
+    await pickDate(wrapper, 'July 31, 2026')
+
+    expect(wrapper.text()).toContain('Jul 1, 2026 – Jul 31, 2026')
+
+    await wrapper.get('button[type="button"].underline').trigger('click')
+
+    expect(wrapper.text()).toContain('Any date')
   })
 
   it('opens the transaction detail route when a transaction is selected', async () => {
