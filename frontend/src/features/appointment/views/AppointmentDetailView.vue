@@ -118,20 +118,15 @@ const isJoinDeadlinePassed = computed(() => {
   const deadline = parseServerDateTime(appointment.value?.joinDeadline ?? null)
   return deadline === null || Date.now() >= deadline.getTime()
 })
-// 출석 확정은 활동이 끝난 뒤에 연다. 백엔드는 IN_PROGRESS이기만 하면 받아주지만
-// (활동 시작 시각에 스케줄러가 바꾼다), 진행 중에 미리 확정하면 늦게 온 사람이
-// 노쇼로 굳어 보증금을 잃는다.
-const isActivityOver = computed(() => {
-  const endAt = parseServerDateTime(appointment.value?.activityEndAt ?? null)
-  return endAt !== null && Date.now() >= endAt.getTime()
-})
-
 // 세 항목은 언제나 시트에 있고, 조건을 만족하지 않으면 이유와 함께 비활성이다.
 // 조건에 맞는 것만 넣으면 시트가 열 때마다 다른 모양이 되고 나머지 기능이
 // 있다는 것조차 알 수 없다.
+//
+// 출석 확정은 활동이 끝난 뒤에 연다. "끝났는가"는 클라이언트 시계로 다시
+// 계산하지 않는다 — 서버가 활동 종료 후 확정 전인 약속의 appointmentStatus를
+// 표시 전용 AWAITING_ATTENDANCE로 내려주므로 그 판정을 그대로 쓴다.
 const canOpenAttendance = computed(
-  () =>
-    isHost.value && isActivityOver.value && appointment.value?.appointmentStatus === 'IN_PROGRESS',
+  () => isHost.value && appointment.value?.appointmentStatus === 'AWAITING_ATTENDANCE',
 )
 const canOpenReviews = computed(
   () => appointment.value?.appointmentStatus === 'COMPLETED' && isAttendedMember.value,
@@ -145,9 +140,10 @@ const attendanceDisabledReason = computed(() => {
   const status = appointment.value?.appointmentStatus
   if (status === 'CANCELLED') return t('appointment.detail.menu.attendanceCancelled')
   if (status === 'COMPLETED') return t('appointment.detail.menu.attendanceDone')
-  // 활동이 이미 끝났는데도 열리지 않았다면 남은 조건은 방장 여부뿐이다. 그것을
-  // 확인하지 못한 채 "활동이 끝나면 열린다"고 하면 틀린 안내가 된다.
-  if (participationCheckFailed.value && isActivityOver.value) {
+  // 활동이 이미 끝났는데도(서버가 AWAITING_ATTENDANCE로 판정) 열리지 않았다면
+  // 남은 조건은 방장 여부뿐이다. 그것을 확인하지 못한 채 "활동이 끝나면
+  // 열린다"고 하면 틀린 안내가 된다.
+  if (participationCheckFailed.value && status === 'AWAITING_ATTENDANCE') {
     return t('appointment.detail.participationCheckFailed')
   }
   return t('appointment.detail.menu.attendanceNotEnded')

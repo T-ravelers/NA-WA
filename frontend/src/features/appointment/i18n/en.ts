@@ -34,6 +34,7 @@ export default {
       CLOSED: 'Closed',
       CONFIRMED: 'Confirmed',
       IN_PROGRESS: 'In progress',
+      AWAITING_ATTENDANCE: 'Awaiting attendance',
       COMPLETED: 'Completed',
       CANCELLED: 'Canceled',
     },

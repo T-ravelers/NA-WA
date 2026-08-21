@@ -31,7 +31,9 @@ const appointment = {
   maxMembers: 4,
   currentMemberCount: 2,
   depositAmount: '10000',
-  appointmentStatus: 'IN_PROGRESS' as const,
+  // 활동이 끝나 출석 확정을 기다리는 약속. 서버가 조회 시점에 계산해 내려주는
+  // 표시 전용 상태라, 화면은 시각을 다시 재지 않고 이 값으로 게이트를 연다.
+  appointmentStatus: 'AWAITING_ATTENDANCE' as const,
   meetingPlace: 'Seongsu Beauty Lab',
   activityStartAt: '2026-08-08T18:30:00',
   activityEndAt: '2026-08-08T22:00:00',

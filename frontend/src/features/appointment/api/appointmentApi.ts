@@ -10,6 +10,8 @@ export type AppointmentStatus =
   | 'CLOSED'
   | 'CONFIRMED'
   | 'IN_PROGRESS'
+  /** 활동이 끝났지만 방장이 아직 출석을 확정하지 않음. 서버 조회 응답에만 있는 표시 전용 값. */
+  | 'AWAITING_ATTENDANCE'
   | 'COMPLETED'
   | 'CANCELLED'
 /** Jackson LocalDateTime may be serialized as an ISO string or numeric components. */
