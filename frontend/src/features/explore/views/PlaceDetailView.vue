@@ -18,6 +18,7 @@ import {
   buildNaverMapTransitRouteUrl,
   openMapAppUrl,
 } from '@/shared/lib/mapLink'
+import { vFitTextGroup } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -484,6 +485,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
           </div>
           <div
             v-if="mapSearchUrl"
+            v-fit-text-group
             class="grid min-w-0 grid-cols-2 gap-2"
           >
             <div class="min-w-0">
@@ -547,6 +549,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
       </main>
 
       <div
+        v-fit-text-group
         class="sticky bottom-0 z-10 mt-6 flex w-full min-w-0 items-center gap-2 bg-canvas/95 px-screen py-3 backdrop-blur"
       >
         <button

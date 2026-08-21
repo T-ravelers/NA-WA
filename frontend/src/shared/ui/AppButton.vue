@@ -27,10 +27,12 @@ interface Props {
   /** 폼 안에서 의도치 않게 submit되지 않도록 기본은 `button`이다. */
   type?: 'button' | 'submit'
   /**
-   * 좌우 여백을 줄인다.
+   * 좁은 칸에 놓는 버튼.
    *
    * 기본 여백(24px)은 한 줄을 채우는 CTA 기준이다. 지갑의 3분할 버튼처럼 좁은 칸에
-   * 넣으면 라벨이 먼저 잘린다. 높이와 라운드는 그대로 두고 여백만 좁힌다.
+   * 넣으면 라벨이 먼저 잘린다. 여백을 12px로 좁히고 **높이도 48px로 맞춘다** — 좁은 칸에
+   * 나란히 놓이는데 primary만 52px로 솟으면 줄이 어긋나 보인다. 라운드는 그대로 둔다.
+   * `dense`(44px)를 함께 주면 그쪽이 이긴다.
    */
   compact?: boolean
   /** 카드 안의 짧은 동작 버튼에 사용하는 높이. 최소 터치 영역(44px)은 유지한다. */
@@ -87,7 +89,7 @@ function handleClick(): void {
     class="relative inline-flex shrink-0 items-center justify-center text-title-sm transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
     :class="[
       VARIANT_CLASS[variant],
-      dense ? 'h-11' : HEIGHT_CLASS[variant],
+      dense ? 'h-11' : compact ? 'h-12' : HEIGHT_CLASS[variant],
       block ? 'w-full' : '',
       compact ? 'px-3' : 'px-6',
     ]"
