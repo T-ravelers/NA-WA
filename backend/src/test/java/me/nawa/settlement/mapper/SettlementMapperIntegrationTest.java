@@ -583,7 +583,6 @@ class SettlementMapperIntegrationTest {
             "language_code", "en",
             "appointment_name", marker,
             "max_members", 2,
-            "join_deadline", LocalDateTime.now().minusDays(2),
             "deposit_amount", new BigDecimal("5000"),
             "activity_start_at", LocalDateTime.now().minusHours(2),
             "activity_end_at", LocalDateTime.now().minusHours(1)

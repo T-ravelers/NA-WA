@@ -36,13 +36,13 @@
             keyColumn="appointment_id">
         INSERT INTO appointments
             (item_id, host_member_id, language_code, appointment_name,
-             appointment_description, max_members, join_deadline,
+             appointment_description, max_members,
              deposit_amount, appointment_status, meeting_place,
              meeting_latitude, meeting_longitude,
              activity_start_at, activity_end_at)
         VALUES
             (#{itemId}, #{hostMemberId}, #{languageCode}, #{appointmentName},
-             #{appointmentDescription}, #{maxMembers}, #{joinDeadline},
+             #{appointmentDescription}, #{maxMembers},
              #{depositAmount}, #{appointmentStatus}, #{meetingPlace},
              #{meetingLatitude}, #{meetingLongitude},
              #{activityStartAt}, #{activityEndAt})
@@ -79,20 +79,11 @@
           AND deleted_at IS NULL
     </update>
 
-    <update id="closeExpiredRecruitingAppointments">
-        UPDATE appointments
-        SET appointment_status = 'CLOSED',
-            updated_at = CURRENT_TIMESTAMP
-        WHERE appointment_status = 'RECRUITING'
-          AND join_deadline &lt; #{now}
-          AND deleted_at IS NULL
-    </update>
-
-    <update id="startDueClosedAppointments">
+    <update id="startDueAppointments">
         UPDATE appointments
         SET appointment_status = 'IN_PROGRESS',
             updated_at = CURRENT_TIMESTAMP
-        WHERE appointment_status = 'CLOSED'
+        WHERE appointment_status IN ('RECRUITING', 'FULL')
           AND activity_start_at &lt;= #{now}
           AND deleted_at IS NULL
     </update>
@@ -124,7 +115,6 @@
               AND count_member.membership_status = 'ACTIVE'
               AND count_member.deleted_at IS NULL
         ) AS current_member_count,
-        a.join_deadline,
         a.deposit_amount,
         a.appointment_status,
         a.meeting_place,

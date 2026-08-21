@@ -243,7 +243,6 @@ class AppointmentDepositIntegrationTest {
         request.setMaxMembers(5);
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Test Meeting Place");
-        request.setJoinDeadline(LocalDateTime.now().plusDays(1));
         request.setTripId(createJourney(hostMemberId));
         request.setVisitDate(LocalDate.now().plusDays(2));
         request.setActivityStartTime(LocalTime.of(10, 0));
@@ -303,7 +302,6 @@ class AppointmentDepositIntegrationTest {
         request.setMaxMembers(5);
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Test Meeting Place");
-        request.setJoinDeadline(LocalDateTime.now().plusDays(1));
         request.setTripId(createJourney(hostMemberId));
         request.setVisitDate(LocalDate.now().plusDays(2));
         request.setActivityStartTime(LocalTime.of(10, 0));
@@ -343,6 +341,53 @@ class AppointmentDepositIntegrationTest {
         );
     }
 
+    // 참여 마감 시각을 없앤 뒤 FULL은 정원 충족만을 뜻한다. 정원이 차면 참여
+    // 트랜잭션이 즉시 FULL로 올리고, 빈자리가 생기면 활동 시작 전인 한 다시
+    // RECRUITING으로 돌아온다. 상태 값은 표시용 계산이 아니라 DB 컬럼으로 본다.
+    @Test
+    void joinToCapacity_marksFull_andLeaveReopensRecruiting() {
+        long hostMemberId = createMemberWithWallet("방장", new BigDecimal("50000.0000"));
+        long guestMemberId = createMemberWithWallet("참여자", new BigDecimal("50000.0000"));
+        long eventId = createApprovedEvent();
+
+        AppointmentCreateRequest request = new AppointmentCreateRequest();
+        request.setItemId(eventId);
+        request.setItemType("EVENT");
+        request.setLanguageCode("en");
+        request.setAppointmentName("Capacity Test Appointment");
+        request.setMaxMembers(2);
+        request.setDepositAmount(BigDecimal.valueOf(10_000));
+        request.setMeetingPlace("Test Meeting Place");
+        request.setTripId(createJourney(hostMemberId));
+        request.setVisitDate(LocalDate.now().plusDays(2));
+        request.setActivityStartTime(LocalTime.of(10, 0));
+        request.setActivityEndTime(LocalTime.of(12, 0));
+
+        Appointment created = appointmentService.createAppointment(hostMemberId, request);
+        appointmentIds.add(created.getAppointmentId());
+        assertEquals(AppointmentStatus.RECRUITING, created.getAppointmentStatus());
+
+        appointmentService.joinAppointment(guestMemberId, created.getAppointmentId());
+
+        assertEquals(
+                AppointmentStatus.FULL,
+                appointmentMapper.findAppointmentById(
+                        created.getAppointmentId()
+                ).getAppointmentStatus(),
+                "정원 2명이 다 찼으므로 참여 트랜잭션이 FULL로 올려야 한다"
+        );
+
+        appointmentService.leaveAppointment(guestMemberId, created.getAppointmentId());
+
+        assertEquals(
+                AppointmentStatus.RECRUITING,
+                appointmentMapper.findAppointmentById(
+                        created.getAppointmentId()
+                ).getAppointmentStatus(),
+                "활동 시작 전에 빈자리가 생겼으므로 다시 모집으로 돌아와야 한다"
+        );
+    }
+
     @Test
     void confirmAttendance_completesAppointmentAndCreatesPendingPayoutBatch() {
         poolBalanceBeforeTest = jdbcTemplate.queryForObject(
@@ -363,7 +408,6 @@ class AppointmentDepositIntegrationTest {
         request.setMaxMembers(5);
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Test Meeting Place");
-        request.setJoinDeadline(LocalDateTime.now().plusDays(1));
         request.setTripId(createJourney(hostMemberId));
         request.setVisitDate(LocalDate.now().plusDays(2));
         request.setActivityStartTime(LocalTime.of(10, 0));
@@ -377,16 +421,13 @@ class AppointmentDepositIntegrationTest {
         // 확정 자체의 동작만 검증하기 위해 상태를 직접 IN_PROGRESS로 맞춘다.
         // 활동 종료도 지나 있어야 한다(APPOINTMENT-009). 시각은 DB의 NOW()가
         // 아니라 앱이 만든 값을 넘긴다 — CI는 MySQL을 UTC로 두기 때문에 DB 시계에
-        // 기대면 서비스가 보는 시각과 갈린다. join_deadline까지 함께 당기는 것은
-        // chk_appointments_schedule이 join_deadline <= activity_start_at
-        // < activity_end_at을 요구하기 때문이다.
+        // 기대면 서비스가 보는 시각과 갈린다. chk_appointments_activity_window가
+        // activity_start_at < activity_end_at을 요구한다.
         LocalDateTime endedAt = LocalDateTime.now().minusHours(1);
         jdbcTemplate.update(
                 "UPDATE appointments SET appointment_status = 'IN_PROGRESS',"
-                        + " join_deadline = ?,"
                         + " activity_start_at = ?, activity_end_at = ?"
                         + " WHERE appointment_id = ?",
-                Timestamp.valueOf(endedAt.minusHours(4)),
                 Timestamp.valueOf(endedAt.minusHours(3)),
                 Timestamp.valueOf(endedAt),
                 created.getAppointmentId()

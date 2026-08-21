@@ -7,8 +7,8 @@ export type AppointmentLanguage = 'en' | 'ja' | 'zh-TW' | 'vi'
 export type AppointmentStatus =
   | 'PAYMENT_PENDING'
   | 'RECRUITING'
-  | 'CLOSED'
-  | 'CONFIRMED'
+  /** 정원이 모두 참. 시간으로 도달하는 경로는 없다. */
+  | 'FULL'
   | 'IN_PROGRESS'
   /** 활동이 끝났지만 방장이 아직 출석을 확정하지 않음. 서버 조회 응답에만 있는 표시 전용 값. */
   | 'AWAITING_ATTENDANCE'
@@ -30,7 +30,6 @@ export interface AppointmentSummary {
   meetingPlace: string | null
   activityStartAt: AppointmentDateTimeValue
   activityEndAt: AppointmentDateTimeValue
-  joinDeadline: AppointmentDateTimeValue
   hostDisplayName: string | null
 }
 
@@ -73,7 +72,6 @@ export interface AppointmentCreateRequest {
   languageCode: AppointmentLanguage
   appointmentName: string
   maxMembers: number
-  joinDeadline: string
   depositAmount: string
   meetingPlace: string
   /** `visitDate` 위에서의 시각만(`HH:mm:ss`). 날짜는 서버가 `visitDate`와 합친다. */
