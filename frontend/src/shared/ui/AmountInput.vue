@@ -4,8 +4,10 @@ import { computed, useId } from 'vue'
 /**
  * 금액 입력.
  *
- * 통화기호를 앞에 두고 숫자는 우측 정렬한다. 예산·정산 금액이 자릿수가 흔들리면
- * 읽기 어려워 `tabular-nums`를 유지한다(전역 base에서 이미 켜져 있다).
+ * 단위 기호는 통화 관행대로 앞에 두는 것이 기본이고, 포인트(`10,000 P`)처럼 뒤에
+ * 붙는 단위는 `symbolPosition="suffix"`로 바꾼다. 숫자는 우측 정렬하며, 예산·정산
+ * 금액이 자릿수가 흔들리면 읽기 어려워 `tabular-nums`를 유지한다(전역 base에서
+ * 이미 켜져 있다).
  *
  * 값은 문자열이 아니라 숫자로 다룬다. 화면마다 파싱 규칙을 다시 만들면 통화·구분자
  * 처리가 갈라진다. 비어 있는 입력은 `0`이 아니라 `null`이다 — "0원"과 "아직 입력하지
@@ -14,8 +16,10 @@ import { computed, useId } from 'vue'
 interface Props {
   modelValue: number | null
   label: string
-  /** 통화기호. 표시 전용이며 값에 포함되지 않는다. */
+  /** 단위 기호. 표시 전용이며 값에 포함되지 않는다. */
   currencySymbol?: string
+  /** 단위 기호의 위치. 통화기호는 앞, 포인트 같은 단위는 뒤에 둔다. */
+  symbolPosition?: 'prefix' | 'suffix'
   error?: string
   helper?: string
   placeholder?: string
@@ -25,6 +29,7 @@ const {
   modelValue,
   label,
   currencySymbol = '₩',
+  symbolPosition = 'prefix',
   error = undefined,
   helper = undefined,
   placeholder = undefined,
@@ -71,6 +76,7 @@ function handleInput(event: Event): void {
       :class="hasError ? 'border-2 border-danger' : 'border-2 border-transparent'"
     >
       <span
+        v-if="symbolPosition === 'prefix'"
         aria-hidden="true"
         class="shrink-0 text-data-lg text-ink-3"
       >
@@ -87,6 +93,13 @@ function handleInput(event: Event): void {
         class="min-w-0 flex-1 bg-transparent text-right text-data-lg text-ink outline-none placeholder:text-ink-3"
         @input="handleInput"
       />
+      <span
+        v-if="symbolPosition === 'suffix'"
+        aria-hidden="true"
+        class="shrink-0 text-data-lg text-ink-3"
+      >
+        {{ currencySymbol }}
+      </span>
     </div>
     <p
       v-if="message !== undefined"

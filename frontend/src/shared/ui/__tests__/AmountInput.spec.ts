@@ -52,4 +52,16 @@ describe('AmountInput', () => {
     expect(wrapper.get('input').element.value).toBe('500')
     expect(wrapper.get('span[aria-hidden="true"]').text()).toBe('$')
   })
+
+  // 포인트(`10,000 P`)처럼 단위가 뒤에 붙는 화면은 기호를 입력칸 뒤에 그린다.
+  it('renders the symbol after the input when positioned as a suffix', () => {
+    const wrapper = mountAmount({ modelValue: 500, currencySymbol: 'P', symbolPosition: 'suffix' })
+
+    const symbol = wrapper.get('span[aria-hidden="true"]')
+    expect(symbol.text()).toBe('P')
+    expect(
+      symbol.element.compareDocumentPosition(wrapper.get('input').element) &
+        Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy()
+  })
 })

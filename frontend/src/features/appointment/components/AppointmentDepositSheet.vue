@@ -63,7 +63,9 @@ function formatDeposit(value: string): string {
 
       <div class="mt-4 rounded-sm bg-canvas p-4">
         <p class="text-caption text-settlement">{{ t('appointment.deposit.refundable') }}</p>
-        <p class="mt-1 text-data-lg text-ink-display">₩{{ formatDeposit(depositAmount) }}</p>
+        <p class="mt-1 text-data-lg text-ink-display">
+          {{ t('appointment.points', { amount: formatDeposit(depositAmount) }) }}
+        </p>
       </div>
 
       <p class="mt-3 text-caption text-on-paper/60">

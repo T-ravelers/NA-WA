@@ -16,7 +16,7 @@ describe('AppointmentDepositSheet', () => {
       global: { plugins: [i18n] },
     })
 
-    expect(wrapper.text()).toContain('₩10,000')
+    expect(wrapper.text()).toContain('10,000 P')
     expect(wrapper.text()).toContain('Refundable deposit')
     expect(
       wrapper
