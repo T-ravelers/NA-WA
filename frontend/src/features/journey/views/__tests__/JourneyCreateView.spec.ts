@@ -111,23 +111,42 @@ describe('JourneyCreateView', () => {
     })
   })
 
-  it('goes back to the journey list when opened directly', async () => {
+  it('goes back the way you came when there is history', async () => {
+    // 목적지를 push하면 이 화면이 히스토리에 남아, 돌아간 약속 생성 화면에서
+    // 시트를 닫을 때 목록이 아니라 이 화면으로 다시 튄다. 되감아야 빠진다.
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=appointment-create&itemId=100&itemType=EVENT',
+    )
+    const back = vi.spyOn(router, 'back').mockImplementation(() => {})
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(3)
+
+    await wrapper.get('button[aria-label="Go back"]').trigger('click')
+    await flushPromises()
+
+    expect(back).toHaveBeenCalledOnce()
+    expect(router.currentRoute.value.name).toBe('journey-create')
+
+    historyLength.mockRestore()
+    back.mockRestore()
+  })
+
+  it('falls back to the journey list when opened directly without history', async () => {
     const { wrapper, router } = await mountView()
 
-    await wrapper.get('a[aria-label="Go back"]').trigger('click')
+    await wrapper.get('button[aria-label="Go back"]').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('journey-list')
   })
 
-  it('goes back to the requesting route, keeping its query, without creating anything', async () => {
-    // 약속 생성이 여정이 없어 보낸 경우다. 되돌아갈 때 itemId·itemType은 그대로
-    // 들고 가되, 만든 여정이 없으니 tripId는 붙이지 않는다.
+  it('falls back to the requesting route, keeping its query, without creating anything', async () => {
+    // 히스토리가 없는데 약속 생성이 보낸 query가 있는 경우(딥링크). 되돌아갈 때
+    // itemId·itemType은 그대로 들고 가되, 만든 여정이 없으니 tripId는 붙이지 않는다.
     const { wrapper, router } = await mountView(
       '/journeys/new?returnRouteName=appointment-create&itemId=100&itemType=EVENT',
     )
 
-    await wrapper.get('a[aria-label="Go back"]').trigger('click')
+    await wrapper.get('button[aria-label="Go back"]').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('appointment-create')
