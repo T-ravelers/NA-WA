@@ -551,10 +551,43 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).not.toContain('You have already joined this appointment.')
   })
 
-  it('disables Leave group once the join deadline has passed', async () => {
+  it('lets a member leave during the activity, spelling out the no-show forfeit', async () => {
+    // 활동 중(IN_PROGRESS) 탈퇴는 막지 않는다 — 대신 노쇼로 굳어 보증금이
+    // 몰수된다는 것을 확인 모달이 예고하고, 완료 토스트도 환급이 아니라
+    // 몰수를 말한다.
     fetchAppointment.mockResolvedValueOnce({
       ...appointment,
       appointmentStatus: 'IN_PROGRESS',
+      joinDeadline: '2020-01-01T00:00:00',
+    })
+    fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
+    cancelAppointmentParticipation.mockResolvedValue(undefined)
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+    const leave = menuItem(wrapper)('Leave group')
+    expect(leave?.attributes('disabled')).toBeUndefined()
+
+    await leave?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('leaving now counts as a no-show')
+    expect(wrapper.text()).not.toContain('will be refunded to your wallet')
+
+    await wrapper
+      .findAll('[role="dialog"] button')
+      .find((button) => button.text() === 'Leave group')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(cancelAppointmentParticipation).toHaveBeenCalledWith(7)
+    expect(toasts.value[toasts.value.length - 1]?.message).toContain('forfeited as a no-show')
+  })
+
+  it('disables Leave group once the activity has ended', async () => {
+    fetchAppointment.mockResolvedValueOnce({
+      ...appointment,
+      appointmentStatus: 'AWAITING_ATTENDANCE',
       joinDeadline: '2020-01-01T00:00:00',
     })
     fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
@@ -564,7 +597,7 @@ describe('AppointmentDetailView', () => {
     const leave = menuItem(wrapper)('Leave group')
 
     expect(leave?.attributes('disabled')).toBeDefined()
-    expect(leave?.text()).toContain('The join deadline has passed')
+    expect(leave?.text()).toContain('The activity has ended')
   })
 
   it('refreshes the list and my-appointments caches after leaving', async () => {

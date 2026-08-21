@@ -12,8 +12,9 @@
 - 약속 생성·참여: 실제로 동작합니다. 보증금 예치(회원 지갑 → `DEPOSIT_POOL`)와
   `AppointmentStatus`/`MembershipStatus` 전환이 같은 트랜잭션에서 함께 끝납니다
   (14절).
-- 방장이 아닌 회원의 참여 취소: 실제로 동작합니다. `HELD` 보증금 환급과 상태
-  전환이 같은 트랜잭션에서 함께 끝납니다(12절).
+- 방장이 아닌 회원의 참여 취소: 실제로 동작합니다. 활동 시작 전에는 `HELD`
+  보증금 환급과 상태 전환이 같은 트랜잭션에서 함께 끝나고, 활동 시작~종료
+  사이에는 노쇼로 굳어 보증금이 정산 분배로 넘어갑니다(12절).
 - 약속 lifecycle 자동 전이(`RECRUITING → CLOSED → IN_PROGRESS`): 실제로
   동작합니다(15절).
 - 출석 확정(`IN_PROGRESS → COMPLETED`): 실제로 동작합니다. 방장이 `ACTIVE` 회원
@@ -71,7 +72,7 @@ DB 컬럼: `appointments.appointment_status`
 | --- | --- |
 | `PAYMENT_PENDING → RECRUITING` | 방장의 보증금 결제와 `DEPOSIT_POOL` 예치가 같은 트랜잭션에서 완료. 예치가 실패하면 트랜잭션이 롤백되어 약속 행 자체가 생기지 않으므로, `PAYMENT_PENDING`은 DB에 지속적으로 남는 상태가 아니라 같은 트랜잭션 안에서만 존재합니다. |
 | `RECRUITING → CLOSED` | 정원 도달은 `joinAppointment`가 참여 성공 트랜잭션 안에서 즉시 동기로 전환. 참여 마감 시각 도달은 시간 기반이라 스케줄러가 60초 주기로 전환(15절). |
-| `CLOSED → RECRUITING` | 정원 도달로 `CLOSED`된 약속에서, 마감 시각(`joinDeadline`) 전에 참여 취소가 발생해 빈자리가 생기면 `leaveAppointment`가 같은 트랜잭션에서 즉시 되돌립니다. 마감 시각이 지나 `CLOSED`된 경우는 참여 취소 자체가 마감 시각 전까지만 허용되므로 이 경로에 들어오지 않습니다. |
+| `CLOSED → RECRUITING` | 정원 도달로 `CLOSED`된 약속에서, 마감 시각(`joinDeadline`) 전에 참여 취소가 발생해 빈자리가 생기면 `leaveAppointment`가 같은 트랜잭션에서 즉시 되돌립니다. 마감 시각이 지난 뒤의 참여 취소(12절)에서는 빈자리가 생겨도 새로 참여할 수 없으므로 `CLOSED`를 유지합니다. |
 | `CLOSED → IN_PROGRESS` | `activityStartAt` 도달. 방장의 별도 확정 액션 없이 스케줄러가 시간만 보고 전환(15절). |
 | `IN_PROGRESS → COMPLETED` | 방장이 모든 `ACTIVE` 회원의 출석을 확정. `activityEndAt`이 지난 뒤에만 받습니다(4절). |
 | `* → CANCELLED` | 코드에는 정의돼 있으나 17절 정책에 따라 트리거하는 API·스케줄러를 만들지 않습니다. |
@@ -104,7 +105,7 @@ DB 컬럼: `appointment_members.membership_status`
 | --- | --- |
 | `PENDING → ACTIVE` | 보증금 결제 성공 및 `PENDING → HELD` 예치 완료 |
 | `PENDING → LEFT` | 보증금 결제 전 참여 취소. **방장은 대상이 아닙니다** — 아래 참조. |
-| `ACTIVE → LEFT` | 예치된 보증금 환급까지 같은 트랜잭션에서 완료된 참여 취소. **방장은 대상이 아닙니다.** |
+| `ACTIVE → LEFT` | 참여 취소. 활동 시작 전에는 예치된 보증금 환급까지 같은 트랜잭션에서 끝나고, 활동 시작~종료 사이에는 노쇼로 굳어 보증금이 `HELD`로 남습니다(12절). 활동 종료 후에는 취소할 수 없습니다. **방장은 대상이 아닙니다.** |
 | `LEFT → PENDING` | 참여 취소한 회원이 참여 마감 시각 전에 같은 약속에 다시 참여. `appointment_members`는 `(appointment_id, member_id)` UNIQUE, `deposits`는 `appointment_member_id` UNIQUE라 새 행을 만들 수 없어 `joinAppointment`가 기존 `appointment_member`·`deposit` 행을 `PENDING`으로 되돌려 재사용합니다(이후 정상적인 `PENDING → ACTIVE`와 동일하게 예치 진행). |
 
 **방장의 참여 취소 정책 (17절과 함께 확정)**
@@ -139,6 +140,11 @@ Java 패키지: `me.nawa.deposit.domain`(보증금 정산이 출석 결과를 �
 
     ATTENDED / NO_SHOW
     └─→ 전이 불가
+
+`PENDING → NO_SHOW`는 방장의 출석 확정 외에 한 경로가 더 있습니다 — 활동
+시작~종료 사이의 참여 취소가 같은 트랜잭션에서 노쇼를 굳힙니다(12절). 이렇게
+굳은 회원은 `LEFT`라 아래 출석 확정 대상(`ACTIVE` 전원)에는 들어가지 않고,
+이미 확정된 결과로 남습니다.
 
 출석 확정 조건:
 
@@ -333,19 +339,36 @@ DB 컬럼: `appointments.item_type`
     DepositStatus: HELD → REFUNDED
     MembershipStatus: ACTIVE → LEFT
 
-참여 성공 후 실제로 취소가 필요한 경우는 전부 이 경로입니다. 환급 이체
+참여 성공 후 활동 시작 전에 취소하는 경우는 전부 이 경로입니다. 환급 이체
 (`DEPOSIT_POOL` → 회원, `DEPOSIT_REFUND`)와 두 상태 변경은 같은 트랜잭션에서
 처리합니다. 이체 방향만 반대일 뿐 보증금 예치(14절)와 같은 패턴이라 별도 설계가
 필요 없습니다.
 
-취소 가능 여부는 약속 상태가 아니라 **참여 마감 시각(`joinDeadline`)** 기준으로
-판단합니다. 현재 시각이 `joinDeadline`을 지났으면 취소할 수 없습니다. 생성 시
-`joinDeadline`은 항상 `activityStartAt`보다 늦을 수 없도록 검증하므로(1절 생성
-검증), 이 조건 하나로 활동 시작 이후(향후 `IN_PROGRESS`/`COMPLETED`) 취소도 함께
-막힙니다. 기존에 있던 "약속 상태가 `IN_PROGRESS`/`COMPLETED`/`CANCELLED`이면
-취소 불가" 조건은 이 시각 조건으로 대체했습니다 — 두 조건은 같은 결과를 내지만,
-`CLOSED`(정원 마감)처럼 상태만으로는 구분할 수 없는 "마감 시각 전이지만 이미
-정원이 찬" 경우에도 마감 시각 전까지는 취소를 허용해야 하기 때문입니다.
+취소 가능 여부는 약속 상태가 아니라 **시각** 기준으로 판단합니다.
+
+- **활동 시작 전**(`activityStartAt` 이전): 위의 환급 경로. 참여 마감
+  (`joinDeadline`)이 지났어도 환급합니다. 단 마감 후에는 빈자리를 새로 채울 수
+  없으므로, 정원 도달로 `CLOSED`였던 약속을 `RECRUITING`으로 되돌리는 것은 마감
+  전 취소에서만 일어납니다(2절).
+- **활동 시작 후 ~ 종료 전**(`activityStartAt` ~ `activityEndAt`): 취소는 되지만
+  **노쇼로 굳습니다**. 같은 트랜잭션에서 `AttendanceStatus`를 `PENDING → NO_SHOW`로
+  먼저 확정한 뒤 `ACTIVE → LEFT`로 바꾸고, 보증금은 환급하지 않고 `HELD`로
+  남깁니다. 이 보증금은 방장의 출석 확정이 만든 정산 배치가 출석 회원에게
+  분배합니다(16절). 노쇼 확정에는 되돌리는 전이가 없고, 마감이 지나 재참여
+  (`LEFT → PENDING`)도 불가능합니다.
+- **활동 종료 후**(`activityEndAt` 이후): 취소할 수 없습니다(`APPOINTMENT-007`).
+  종료 후에는 출석 확정 흐름이 전원을 처리하므로, 나갈 수 있으면 노쇼 확정을
+  피해 몰수를 빠져나가는 구멍이 됩니다.
+
+    활동 중 참여 취소:
+    AttendanceStatus: PENDING → NO_SHOW
+    MembershipStatus: ACTIVE → LEFT
+    DepositStatus: HELD (유지) → 정산 배치에서 DISTRIBUTED
+
+주의: 출석 확정 합산과 정산 분배는 `ACTIVE` 회원만 봐서는 안 됩니다. 활동 중
+탈퇴로 굳은 노쇼는 `LEFT + NO_SHOW + HELD` 조합으로 남으므로
+(`findLeftNoShowMembersByAppointmentId`), 이 목록을 빠뜨리면 그 보증금이
+`DEPOSIT_POOL`에 영영 남습니다.
 
 ### 방장
 
@@ -462,7 +485,11 @@ tick에서 처리합니다. 이 앱의 다른 결제성 기능(정산·QR결제)
   영향이 없습니다.
 - `processBatch`가 하는 일: 출석한 회원에게는 본인 보증금을 환급
   (`SELF_REFUND`, `DEPOSIT_REFUND` 이체), 노쇼 회원의 보증금은 출석 회원에게
-  균등 분배(`NO_SHOW_SHARE`, `DEPOSIT_NO_SHOW_DISTRIBUTION` 이체)합니다. 분배는
+  균등 분배(`NO_SHOW_SHARE`, `DEPOSIT_NO_SHOW_DISTRIBUTION` 이체)합니다. 분배
+  대상 노쇼에는 `ACTIVE` 노쇼뿐 아니라 활동 중 탈퇴로 굳은 `LEFT` 노쇼
+  (`findLeftNoShowMembersByAppointmentId`, 12절)도 포함합니다 — `ACTIVE`만 보면
+  그 보증금이 `HELD`인 채 `DEPOSIT_POOL`에 영영 남습니다. `confirmAttendance`의
+  배치 합산(`totalHeldAmount`)도 같은 목록을 함께 더합니다. 분배는
   [SETTLEMENT.md](SETTLEMENT.md)의 `EQUAL` 분담과 같은
   `SettlementAmountAllocator`를 그대로 재사용합니다(참가 ID 오름차순으로 최소
   단위 금액을 하나씩 배분).

@@ -114,10 +114,12 @@ const isAttendedMember = computed(
   () => isActiveMember.value && participation.value?.attendanceStatus === 'ATTENDED',
 )
 
-const isJoinDeadlinePassed = computed(() => {
-  const deadline = parseServerDateTime(appointment.value?.joinDeadline ?? null)
-  return deadline === null || Date.now() >= deadline.getTime()
-})
+// 나가기는 활동 종료 전까지 열린다. 시작 전(RECRUITING·CLOSED)에는 보증금을
+// 환급받는 탈퇴, 활동 중(IN_PROGRESS)에는 노쇼로 굳어 보증금이 몰수되는
+// 탈퇴다. 어느 구간인지는 클라이언트 시계로 재지 않고 서버가 계산한 표시
+// 상태로 가른다 — 출석 확정 게이트와 같은 근거다.
+const LEAVE_OPEN_STATUSES: AppointmentStatus[] = ['RECRUITING', 'CLOSED', 'IN_PROGRESS']
+const isLeaveNoShow = computed(() => appointment.value?.appointmentStatus === 'IN_PROGRESS')
 // 세 항목은 언제나 시트에 있고, 조건을 만족하지 않으면 이유와 함께 비활성이다.
 // 조건에 맞는 것만 넣으면 시트가 열 때마다 다른 모양이 되고 나머지 기능이
 // 있다는 것조차 알 수 없다.
@@ -131,9 +133,15 @@ const canOpenAttendance = computed(
 const canOpenReviews = computed(
   () => appointment.value?.appointmentStatus === 'COMPLETED' && isAttendedMember.value,
 )
-const canLeave = computed(
-  () => isActiveMember.value && !isHost.value && !isJoinDeadlinePassed.value,
-)
+const canLeave = computed(() => {
+  const status = appointment.value?.appointmentStatus
+  return (
+    isActiveMember.value &&
+    !isHost.value &&
+    status !== undefined &&
+    LEAVE_OPEN_STATUSES.includes(status)
+  )
+})
 
 const attendanceDisabledReason = computed(() => {
   if (canOpenAttendance.value) return undefined
@@ -164,7 +172,7 @@ const leaveDisabledReason = computed(() => {
   // 가르지 않으면 못 읽었을 뿐인데 회원이 아니라고 단정한다.
   if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
   if (!isActiveMember.value) return t('appointment.detail.menu.leaveNotMember')
-  return t('appointment.detail.menu.leaveDeadlinePassed')
+  return t('appointment.detail.menu.leaveActivityEnded')
 })
 
 // 영영 켜질 수 없는 항목은 아예 넣지 않는다. 출석 확정은 방장만 할 수 있고
@@ -306,16 +314,20 @@ const joinMutation = useMutation({
 const leaveMutation = useMutation({
   mutationFn: () => cancelAppointmentParticipation(appointmentId.value as number),
   onSuccess: async () => {
-    // 서버가 같은 트랜잭션에서 보증금을 지갑으로 돌려준다(HELD → REFUNDED).
-    // 확인 모달에서 환급을 예고했으니 실제로 됐다는 것도 알려 준다. 모달만 조용히
-    // 닫히면 나간 것인지 확신할 수 없다.
+    // 활동 시작 전 탈퇴면 서버가 같은 트랜잭션에서 보증금을 지갑으로 돌려주고
+    // (HELD → REFUNDED), 활동 중 탈퇴면 노쇼로 굳어 몰수된다. 확인 모달에서
+    // 예고한 결과가 실제로 됐다는 것도 알려 준다 — 모달만 조용히 닫히면 나간
+    // 것인지, 돈이 어떻게 됐는지 확신할 수 없다.
+    const noShowLeave = isLeaveNoShow.value
     const refunded = appointment.value?.depositAmount
     leaveConfirmOpen.value = false
     await invalidateParticipationScopes()
     showToast(
-      refunded === undefined
-        ? t('appointment.leave.done')
-        : t('appointment.leave.doneRefunded', { amount: formatDeposit(refunded) }),
+      noShowLeave
+        ? t('appointment.leave.doneNoShow')
+        : refunded === undefined
+          ? t('appointment.leave.done')
+          : t('appointment.leave.doneRefunded', { amount: formatDeposit(refunded) }),
     )
   },
 })
@@ -543,6 +555,7 @@ function confirmJoin(): void {
         v-if="leaveConfirmOpen"
         :appointment-name="appointment.appointmentName"
         :deposit-amount="appointment.depositAmount"
+        :no-show="isLeaveNoShow"
         :confirm-disabled="leaveMutation.isPending.value"
         :error-message="leaveErrorMessage"
         @close="closeLeaveConfirm"

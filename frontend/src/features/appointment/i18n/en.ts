@@ -174,7 +174,7 @@ export default {
         reviewsNotAttended: 'Only members confirmed as attended can write reviews.',
         leave: 'Leave group',
         leaveDescription: 'You will no longer be a member',
-        leaveDeadlinePassed: 'The join deadline has passed, so you can no longer leave.',
+        leaveActivityEnded: 'The activity has ended, so you can no longer leave.',
         leaveNotMember: 'You are not a member of this appointment.',
       },
       invalidTitle: 'Appointment not found',
@@ -229,10 +229,14 @@ export default {
       description: 'You will no longer be a member of {name}.',
       refund:
         'Your deposit of {amount} P will be refunded to your wallet. To join again you will need to pay it once more.',
+      noShowForfeit:
+        'The activity has already started, so leaving now counts as a no-show. Your {amount} P deposit will not be refunded — it will be shared among the members who attended.',
       confirm: 'Leave group',
       cancel: 'Stay',
       done: 'You left this appointment.',
       doneRefunded: 'You left this appointment. {amount} P has been refunded to your wallet.',
+      doneNoShow:
+        'You left this appointment. Your deposit was forfeited as a no-show and will be shared among the members who attended.',
     },
     deposit: {
       title: 'Confirm participation',

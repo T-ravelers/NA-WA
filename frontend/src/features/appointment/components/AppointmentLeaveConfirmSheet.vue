@@ -9,13 +9,16 @@ import { useOverlayDismiss } from '../composables/useOverlayDismiss'
 /**
  * 약속에서 나가기 전 마지막으로 묻는 확인 모달.
  *
- * 나가면 서버가 같은 트랜잭션에서 보증금을 지갑으로 환급한다(HELD → REFUNDED).
- * 돈이 움직이는 행동이라 결과를 먼저 보여주고 묻는다. 다시 참여하려면 보증금을
- * 새로 결제해야 한다는 것도 함께 알린다.
+ * 활동 시작 전에는 서버가 같은 트랜잭션에서 보증금을 지갑으로 환급한다
+ * (HELD → REFUNDED). 활동이 시작된 뒤(noShow)에는 나가는 순간 노쇼로 굳어
+ * 보증금이 몰수되고 출석한 회원에게 분배된다 — 어느 쪽이든 돈이 움직이는
+ * 행동이라 결과를 먼저 보여주고 묻는다.
  */
 interface Props {
   appointmentName: string
   depositAmount: string
+  /** 활동이 시작된 뒤의 탈퇴 — 환급 대신 노쇼 몰수를 안내한다. */
+  noShow?: boolean
   confirmDisabled?: boolean
   errorMessage?: string
 }
@@ -23,6 +26,7 @@ interface Props {
 const {
   appointmentName,
   depositAmount,
+  noShow = false,
   confirmDisabled = false,
   errorMessage = undefined,
 } = defineProps<Props>()
@@ -71,7 +75,11 @@ function formatDeposit(value: string): string {
         {{ t('appointment.leave.description', { name: appointmentName }) }}
       </p>
       <p class="mt-2 text-body-sm text-on-paper/70">
-        {{ t('appointment.leave.refund', { amount: formatDeposit(depositAmount) }) }}
+        {{
+          noShow
+            ? t('appointment.leave.noShowForfeit', { amount: formatDeposit(depositAmount) })
+            : t('appointment.leave.refund', { amount: formatDeposit(depositAmount) })
+        }}
       </p>
 
       <p
