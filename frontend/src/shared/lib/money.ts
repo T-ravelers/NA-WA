@@ -216,8 +216,11 @@ export function formatCurrency(
   })
 }
 
-/** 기존 지갑 화면의 영문 원화 표기를 보존한다. */
-export function formatKrw(value: MoneyValue): string {
+/**
+ * 지갑 포인트 표기. 실제 통화는 KRW 1:1(`wallets.currency_code = 'KRW'`)이지만,
+ * 화면은 전부 P로 통일해서 보여준다(#333).
+ */
+export function formatPoints(value: MoneyValue): string {
   const amount = formatMoney(value, 'en-US', { maximumFractionDigits: 0 })
-  return amount === '' ? '' : `₩${amount}`
+  return amount === '' ? '' : `${amount} P`
 }

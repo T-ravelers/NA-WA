@@ -194,6 +194,8 @@ function submit(): void {
       <template v-else>
         <AmountInput
           v-model="draft.budgetAmount"
+          currency-symbol="P"
+          symbol-position="suffix"
           :label="t('journey.create.budget')"
           :helper="t('journey.create.budgetHelper')"
           :error="translatedError(errors.budgetAmount)"

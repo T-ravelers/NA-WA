@@ -13,7 +13,7 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import { getStripeTopupStatus } from '../api/topupApi'
-import { formatKrw, type StripeTopupStatusResponse } from '../model/topup'
+import { formatPoints, type StripeTopupStatusResponse } from '../model/topup'
 
 const props = defineProps<{
   clientSecret: string
@@ -232,7 +232,7 @@ onBeforeUnmount(() => {
         {{
           isSubmitting
             ? t('wallet.topUp.paymentSubmitting')
-            : t('wallet.topUp.paymentSubmit', { amount: formatKrw(amount) })
+            : t('wallet.topUp.paymentSubmit', { amount: formatPoints(amount) })
         }}
       </AppButton>
     </div>

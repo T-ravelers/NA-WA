@@ -16,7 +16,6 @@ import type { ReportDailyTrendPoint, ReportDailyTrendProps } from './types'
  */
 const {
   points,
-  currency,
   heading = undefined,
   description = undefined,
   locale = 'en',
@@ -55,7 +54,7 @@ const plotted = computed<PlottedPoint[]>(() => {
       x: PLOT_LEFT + (PLOT_RIGHT - PLOT_LEFT) * progress,
       y: PLOT_BOTTOM - (PLOT_BOTTOM - PLOT_TOP) * ratio,
       label: point.label,
-      amountText: formatMoney(point.amount, currency, locale),
+      amountText: formatMoney(point.amount, locale),
     }
   })
 })

@@ -4,8 +4,8 @@ import type { ReportSummary } from '../../api/reportApi'
 import { reportKeys } from '../reportKeys'
 import {
   buildReportJourneyOptions,
-  formatKrwAmount,
   formatPercentage,
+  formatReportAmount,
   getKoreaToday,
   isZeroAmount,
   parsePositiveRouteId,
@@ -75,8 +75,8 @@ describe('reportModel', () => {
   })
 
   it('formats decimal strings without binary floating-point conversion', () => {
-    expect(formatKrwAmount('1284500.0000')).toBe('₩1,284,500')
-    expect(formatKrwAmount('10.2500')).toBe('₩10.25')
+    expect(formatReportAmount('1284500.0000')).toBe('1,284,500 P')
+    expect(formatReportAmount('10.2500')).toBe('10.25 P')
     expect(formatPercentage('42.00')).toBe('42%')
     expect(formatPercentage('12.50')).toBe('12.5%')
     expect(isZeroAmount('0.0000')).toBe(true)

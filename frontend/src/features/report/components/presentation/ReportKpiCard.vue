@@ -64,8 +64,8 @@ onBeforeUnmount(() => {
   resizeObserver = null
 })
 
-const totalText = computed(() => formatMoney(data.totalSpent, data.currency, locale))
-const dailyAverageText = computed(() => formatMoney(data.dailyAverage, data.currency, locale))
+const totalText = computed(() => formatMoney(data.totalSpent, locale))
+const dailyAverageText = computed(() => formatMoney(data.dailyAverage, locale))
 </script>
 
 <template>

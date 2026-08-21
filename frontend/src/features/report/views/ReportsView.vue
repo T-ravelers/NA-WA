@@ -21,7 +21,7 @@ import { isReportConflict, reportErrorMessageKey } from '../model/reportErrors'
 import { reportKeys } from '../model/reportKeys'
 import {
   buildReportJourneyOptions,
-  formatKrwAmount,
+  formatReportAmount,
   formatReportDate,
   getKoreaToday,
   parsePositiveRouteId,
@@ -297,7 +297,7 @@ async function generateReport(): Promise<void> {
             <span class="flex min-w-0 flex-1 flex-col gap-1">
               <span class="flex justify-between gap-3 text-title-sm text-ink">
                 <span>{{ candidate.category }}</span>
-                <span>{{ formatKrwAmount(candidate.amount) }}</span>
+                <span>{{ formatReportAmount(candidate.amount) }}</span>
               </span>
               <span class="text-body-sm text-ink-3">
                 {{ formatReportDate(candidate.occurredDate) }} ·

@@ -149,7 +149,7 @@ describe('WalletQrView', () => {
     })
 
     expect(wrapper.text()).toContain('Payment request QR')
-    expect(wrapper.text()).toContain('₩18,500')
+    expect(wrapper.text()).toContain('18,500 P')
     expect(wrapper.text()).toContain('Seoul Food Tour')
     expect(wrapper.text()).toMatch(/NA-WA · Expires in \d+:\d{2}/)
     expect(wrapper.text()).toContain('Available balance 128,500 P')
