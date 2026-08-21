@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import { parseServerDateTime } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -71,13 +70,10 @@ const myAppointmentMemberId = computed(
 // 함께 사라져, 정작 출석을 확정해야 할 사람이 막힌다.
 const isHost = computed(() => participationQuery.data.value?.host === true)
 // 상세 화면의 시트와 같은 조건이다. 활동이 끝나기 전에 확정하면 늦게 온 사람이
-// 노쇼로 굳어 보증금을 잃는다.
-const isActivityOver = computed(() => {
-  const endAt = parseServerDateTime(detailQuery.data.value?.activityEndAt ?? null)
-  return endAt !== null && Date.now() >= endAt.getTime()
-})
+// 노쇼로 굳어 보증금을 잃는다. "끝났는가"는 클라이언트 시계로 계산하지 않고,
+// 서버가 활동 종료 후 확정 전 약속에 내려주는 표시 전용 상태를 그대로 쓴다.
 const attendanceOpen = computed(
-  () => detailQuery.data.value?.appointmentStatus === 'IN_PROGRESS' && isActivityOver.value,
+  () => detailQuery.data.value?.appointmentStatus === 'AWAITING_ATTENDANCE',
 )
 function initials(displayName: string): string {
   return displayName.trim().charAt(0).toUpperCase() || '?'

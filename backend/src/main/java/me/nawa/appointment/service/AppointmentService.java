@@ -730,6 +730,16 @@ public class AppointmentService {
                 && !now.isBefore(appointment.getActivityStartAt())) {
             status = AppointmentStatus.IN_PROGRESS;
         }
+        // 활동이 끝났는데 방장이 아직 출석을 확정하지 않은 약속. DB에는 확정
+        // 전까지 IN_PROGRESS로 남지만(스케줄러도 이 전이는 다루지 않는다 —
+        // COMPLETED는 출석 확정만이 만든다), 화면에는 "진행 중"이 아니라
+        // "출석 확정 대기"로 보여야 한다. AWAITING_ATTENDANCE는 이 메서드만
+        // 만들어내는 표시 전용 값이다.
+        if (status == AppointmentStatus.IN_PROGRESS
+                && appointment.getActivityEndAt() != null
+                && !now.isBefore(appointment.getActivityEndAt())) {
+            status = AppointmentStatus.AWAITING_ATTENDANCE;
+        }
         return status;
     }
 

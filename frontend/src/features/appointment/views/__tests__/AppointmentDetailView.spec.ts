@@ -361,9 +361,11 @@ describe('AppointmentDetailView', () => {
   })
 
   it('opens the attendance screen once the activity is over', async () => {
+    // 활동 종료 판정은 서버 몫이다 — 종료 후 확정 전이면 appointmentStatus가
+    // 표시 전용 AWAITING_ATTENDANCE로 온다.
     fetchAppointment.mockResolvedValueOnce({
       ...appointment,
-      appointmentStatus: 'IN_PROGRESS',
+      appointmentStatus: 'AWAITING_ATTENDANCE',
       activityStartAt: '2020-01-01T10:00:00',
       activityEndAt: '2020-01-01T12:00:00',
     })
@@ -457,7 +459,7 @@ describe('AppointmentDetailView', () => {
     // 방장에게서 출석 확정이 통째로 사라진다.
     fetchAppointment.mockResolvedValueOnce({
       ...appointment,
-      appointmentStatus: 'IN_PROGRESS',
+      appointmentStatus: 'AWAITING_ATTENDANCE',
       activityStartAt: '2020-01-01T10:00:00',
       activityEndAt: '2020-01-01T12:00:00',
     })
@@ -595,6 +597,7 @@ describe('AppointmentDetailView', () => {
     ['COMPLETED', true, 'ATTENDED'],
     ['COMPLETED', false, 'ATTENDED'],
     ['IN_PROGRESS', true, 'PENDING'],
+    ['AWAITING_ATTENDANCE', true, 'PENDING'],
     ['CLOSED', true, 'PENDING'],
     ['RECRUITING', false, 'PENDING'],
     ['CANCELLED', false, 'PENDING'],

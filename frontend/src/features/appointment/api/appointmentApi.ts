@@ -10,6 +10,8 @@ export type AppointmentStatus =
   | 'CLOSED'
   | 'CONFIRMED'
   | 'IN_PROGRESS'
+  /** 활동이 끝났지만 방장이 아직 출석을 확정하지 않음. 서버 조회 응답에만 있는 표시 전용 값. */
+  | 'AWAITING_ATTENDANCE'
   | 'COMPLETED'
   | 'CANCELLED'
 /** Jackson LocalDateTime may be serialized as an ISO string or numeric components. */
@@ -41,12 +43,22 @@ export interface AppointmentListResponse {
   hasNext: boolean
 }
 
+/**
+ * 목록 조회 status 필터가 받는 값. 서버 `LIST_STATUSES`와 1:1이다 — DB에
+ * 저장되지 않는 표시 전용 `AWAITING_ATTENDANCE`와 트랜잭션 안에서만 존재하는
+ * `PAYMENT_PENDING`은 검색 조건이 될 수 없다(서버가 400으로 거절한다).
+ */
+export type AppointmentStatusFilter = Exclude<
+  AppointmentStatus,
+  'AWAITING_ATTENDANCE' | 'PAYMENT_PENDING'
+>
+
 export interface AppointmentListFilters {
   itemId?: number
   itemType?: AppointmentItemType
   language?: AppointmentLanguage
   keyword?: string
-  status?: AppointmentStatus
+  status?: AppointmentStatusFilter
   page?: number
   size?: number
 }
