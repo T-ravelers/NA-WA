@@ -37,6 +37,7 @@ export default {
       loadFailedDescription: 'しばらくしてから、もう一度お試しください。',
     },
     status: {
+      PAYMENT_PENDING: '支払い待ち',
       RECRUITING: '募集中',
       FULL: '満員',
       IN_PROGRESS: '進行中',

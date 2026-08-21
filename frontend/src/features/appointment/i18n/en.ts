@@ -40,8 +40,9 @@ export default {
       loadFailedDescription: 'Please try again in a moment.',
     },
     status: {
-      RECRUITING: 'Open',
-      FULL: 'Full',
+      PAYMENT_PENDING: 'Payment pending',
+      RECRUITING: 'Recruiting',
+      FULL: 'Fully booked',
       IN_PROGRESS: 'In progress',
       AWAITING_ATTENDANCE: 'Awaiting attendance',
       COMPLETED: 'Completed',
