@@ -1704,7 +1704,9 @@ for (const screen of SCREENS) {
     await page.goto(`${BASE}/${screen.path.replace(/^\/+/, '')}`, { waitUntil: 'networkidle' })
     await screen.prepare?.(page)
 
-    // 웹폰트와 전환이 자리를 잡을 시간을 준다. 없으면 폴백 폰트가 찍히는 경우가 있다.
+    // 웹폰트가 도착한 뒤에 찍는다. 글자 폭에 맞춰 크기를 줄이는 제목·버튼(`v-fit-text`)은 폰트가
+    // 오면 다시 재므로, 도착 전에 찍으면 한 프레임 전 상태가 남는다. 전환이 자리 잡을 시간도 준다.
+    await page.evaluate(() => document.fonts.ready)
     await page.waitForTimeout(400)
     await page.screenshot({ path: `${OUT}/${screen.name}.png` })
 
@@ -1734,7 +1736,9 @@ for (const flow of FLOWS) {
         if (step.focus === undefined) await page.evaluate(() => window.scrollTo(0, 0))
         else await page.locator(step.focus).scrollIntoViewIfNeeded()
 
-        // 웹폰트와 전환이 자리를 잡을 시간을 준다. 없으면 폴백 폰트가 찍히는 경우가 있다.
+        // 웹폰트가 도착한 뒤에 찍는다. 글자 폭에 맞춰 크기를 줄이는 제목·버튼(`v-fit-text`)은 폰트가
+        // 오면 다시 재므로, 도착 전에 찍으면 한 프레임 전 상태가 남는다. 전환이 자리 잡을 시간도 준다.
+        await page.evaluate(() => document.fonts.ready)
         await page.waitForTimeout(400)
         await page.screenshot({ path: `${OUT}/${name}.png` })
 
