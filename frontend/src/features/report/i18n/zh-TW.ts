@@ -23,7 +23,7 @@ export default {
     },
     generate: {
       title: '選擇報告花費',
-      description: '選擇已完成的韓元花費，納入這份無法更改的報告快照。',
+      description: '選擇已完成的花費，納入這份無法更改的報告快照。',
       loading: '正在載入可選的花費',
       loadFailed: '無法載入可選的花費，請再試一次。',
       emptyTitle: '沒有可選的花費',

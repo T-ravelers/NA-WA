@@ -23,7 +23,7 @@ export default {
     },
     generate: {
       title: 'レポートの支出を選択',
-      description: '後から変更できないレポートに含める、完了済みのKRW支出を選んでください。',
+      description: '後から変更できないレポートに含める、完了済みの支出を選んでください。',
       loading: '対象の支出を読み込み中',
       loadFailed: '対象の支出を読み込めませんでした。もう一度お試しください。',
       emptyTitle: '対象の支出がありません',

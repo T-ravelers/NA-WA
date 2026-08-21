@@ -23,8 +23,7 @@ export default {
     },
     generate: {
       title: 'Chọn chi tiêu cho báo cáo',
-      description:
-        'Chọn các khoản chi KRW đã hoàn tất để đưa vào bản báo cáo không thể thay đổi này.',
+      description: 'Chọn các khoản chi đã hoàn tất để đưa vào bản báo cáo không thể thay đổi này.',
       loading: 'Đang tải các khoản chi hợp lệ',
       loadFailed: 'Chúng tôi không tải được các khoản chi hợp lệ. Vui lòng thử lại.',
       emptyTitle: 'Không có khoản chi hợp lệ',
