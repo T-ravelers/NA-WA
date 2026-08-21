@@ -10,6 +10,8 @@ export default {
       'APPOINTMENT-007': 'You can no longer leave this appointment.',
       'APPOINTMENT-009': 'Attendance opens once the activity ends.',
     },
+    /** 금액과 단위를 한 문구로 묶는다. 단위 위치는 로케일마다 다르다. */
+    points: '{amount} P',
     list: {
       title: 'Appointments',
       titleEvent: 'Appointments for this event',
@@ -21,7 +23,7 @@ export default {
       memberCount: '{current}/{max} members',
       scheduleUnavailable: 'Schedule unavailable',
       placePending: 'Meeting place to be confirmed',
-      deposit: 'Refundable deposit ₩{amount}',
+      deposit: 'Refundable deposit {amount} P',
       view: 'View',
       create: 'Create appointment',
       emptyTitle: 'No appointments yet',
@@ -58,7 +60,7 @@ export default {
       maxMembers: 'Maximum members',
       language: 'Preferred language',
       deposit: 'Refundable deposit',
-      depositHelper: 'Choose between ₩{min} and ₩{max}.',
+      depositHelper: 'Choose between {min} P and {max} P.',
       meetingPlace: 'Meeting place',
       meetingAtItem: 'Meet at the activity itself.',
       meetingAtItemNamed: 'Meet at {place}.',
@@ -88,7 +90,7 @@ export default {
         nameTooLong: 'Use 100 characters or fewer.',
         membersInvalid: 'Choose between 2 and 10 members.',
         languageRequired: 'Choose a preferred language.',
-        depositInvalid: 'Choose a deposit between ₩5,000 and ₩50,000.',
+        depositInvalid: 'Choose a deposit between 5,000 P and 50,000 P.',
         meetingPlaceRequired: 'Enter a meeting place.',
         meetingPlaceTooLong: 'Use 200 characters or fewer.',
         itemPlaceUnavailable:
@@ -217,11 +219,11 @@ export default {
       close: 'Close leave confirmation',
       description: 'You will no longer be a member of {name}.',
       refund:
-        'Your deposit of \u20a9{amount} will be refunded to your wallet. To join again you will need to pay it once more.',
+        'Your deposit of {amount} P will be refunded to your wallet. To join again you will need to pay it once more.',
       confirm: 'Leave group',
       cancel: 'Stay',
       done: 'You left this appointment.',
-      doneRefunded: 'You left this appointment. \u20a9{amount} has been refunded to your wallet.',
+      doneRefunded: 'You left this appointment. {amount} P has been refunded to your wallet.',
     },
     deposit: {
       title: 'Confirm participation',
@@ -229,8 +231,8 @@ export default {
       description: 'A deposit is required to secure your place in {name}.',
       refundable: 'Refundable deposit',
       paymentPending:
-        'The deposit will be held from your wallet balance and refunded once you attend. If you no-show, your deposit is forfeited and shared among the members who attended.',
-      confirm: 'Pay ₩{amount}',
+        'The deposit will be held from your wallet points and refunded once you attend. If you no-show, your deposit is forfeited and shared among the members who attended.',
+      confirm: 'Pay {amount} P',
       cancel: 'Cancel',
     },
     attendance: {

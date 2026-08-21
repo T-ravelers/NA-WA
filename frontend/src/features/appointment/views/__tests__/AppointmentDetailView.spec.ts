@@ -521,7 +521,7 @@ describe('AppointmentDetailView', () => {
     expect(cancelAppointmentParticipation).toHaveBeenCalledWith(7)
     // 모달만 조용히 닫히면 나간 것인지, 보증금이 돌아왔는지 알 수 없다.
     expect(toasts.value[toasts.value.length - 1]?.message).toBe(
-      'You left this appointment. ₩10,000 has been refunded to your wallet.',
+      'You left this appointment. 10,000 P has been refunded to your wallet.',
     )
   })
 

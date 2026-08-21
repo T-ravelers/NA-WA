@@ -409,6 +409,8 @@ defineExpose({ goToPreviousStep })
         </div>
         <AmountInput
           v-model="draft.depositAmount"
+          currency-symbol="P"
+          symbol-position="suffix"
           :label="t('appointment.create.deposit')"
           :helper="
             t('appointment.create.depositHelper', {
@@ -475,7 +477,11 @@ defineExpose({ goToPreviousStep })
       <div class="mt-4 rounded-sm bg-surface-1 p-4">
         <p class="text-caption text-settlement">{{ t('appointment.create.deposit') }}</p>
         <p class="mt-1 text-data-lg text-ink-display">
-          ₩{{ new Intl.NumberFormat('en-US').format(draft.depositAmount ?? 0) }}
+          {{
+            t('appointment.points', {
+              amount: new Intl.NumberFormat('en-US').format(draft.depositAmount ?? 0),
+            })
+          }}
         </p>
       </div>
       <div class="mt-5 grid grid-cols-2 gap-3">

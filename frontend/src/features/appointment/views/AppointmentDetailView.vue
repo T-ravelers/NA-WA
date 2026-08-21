@@ -451,7 +451,9 @@ function confirmJoin(): void {
             </div>
             <div class="grid grid-cols-[7rem_1fr] gap-3 py-3">
               <dt class="text-caption text-ink-3">{{ t('appointment.detail.deposit') }}</dt>
-              <dd class="text-body-sm text-ink">₩{{ formatDeposit(appointment.depositAmount) }}</dd>
+              <dd class="text-body-sm text-ink">
+                {{ t('appointment.points', { amount: formatDeposit(appointment.depositAmount) }) }}
+              </dd>
             </div>
             <div class="grid grid-cols-[7rem_1fr] gap-3 py-3 last:pb-0">
               <dt class="text-caption text-ink-3">{{ t('appointment.detail.joinDeadline') }}</dt>

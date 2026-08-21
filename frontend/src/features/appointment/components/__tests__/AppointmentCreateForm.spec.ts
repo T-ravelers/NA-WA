@@ -80,7 +80,7 @@ describe('AppointmentCreateForm', () => {
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.text()).toContain('Enter an appointment name.')
-    expect(wrapper.text()).not.toContain('Choose a deposit between ₩5,000 and ₩50,000.')
+    expect(wrapper.text()).not.toContain('Choose a deposit between 5,000 P and 50,000 P.')
     expect(wrapper.text()).toContain('Start with your appointment details')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
@@ -254,11 +254,11 @@ describe('AppointmentCreateForm', () => {
     await wrapper.find('input[inputmode="numeric"]').setValue('0')
     await wrapper.get('form').trigger('submit')
 
-    expect(wrapper.text()).toContain('Choose a deposit between ₩5,000 and ₩50,000.')
+    expect(wrapper.text()).toContain('Choose a deposit between 5,000 P and 50,000 P.')
 
     await wrapper.find('input[inputmode="numeric"]').setValue('10000')
 
-    expect(wrapper.text()).not.toContain('Choose a deposit between ₩5,000 and ₩50,000.')
+    expect(wrapper.text()).not.toContain('Choose a deposit between 5,000 P and 50,000 P.')
   })
 
   it('clears a schedule validation error once the user starts fixing it', async () => {
@@ -292,7 +292,7 @@ describe('AppointmentCreateForm', () => {
     await wrapper.find('input[inputmode="numeric"]').setValue('0')
     await wrapper.get('form').trigger('submit')
 
-    expect(wrapper.text()).toContain('Choose a deposit between ₩5,000 and ₩50,000.')
+    expect(wrapper.text()).toContain('Choose a deposit between 5,000 P and 50,000 P.')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 })
