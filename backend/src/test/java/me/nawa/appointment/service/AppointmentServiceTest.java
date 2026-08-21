@@ -860,7 +860,8 @@ class AppointmentServiceTest {
 
     @Test
     void confirmAttendance_success_completesAppointmentAndCreatesPendingBatch() {
-        Appointment appointment = appointment(10L, AppointmentStatus.IN_PROGRESS);
+        Appointment appointment = endedAppointment(
+                10L, AppointmentStatus.IN_PROGRESS);
         AppointmentMember host = AppointmentMember.builder()
                 .appointmentMemberId(20L)
                 .appointmentId(10L)
@@ -953,7 +954,8 @@ class AppointmentServiceTest {
 
     @Test
     void confirmAttendance_missingActiveMember_rejects() {
-        Appointment appointment = appointment(10L, AppointmentStatus.IN_PROGRESS);
+        Appointment appointment = endedAppointment(
+                10L, AppointmentStatus.IN_PROGRESS);
         AppointmentMember host = AppointmentMember.builder()
                 .appointmentMemberId(20L)
                 .appointmentId(10L)
@@ -987,8 +989,52 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void confirmAttendance_noAttendedMember_rejects() {
+    void confirmAttendance_activityNotEnded_rejects() {
+        // IN_PROGRESS는 활동 시작 시각에 스케줄러가 바꾼다. 상태만 맞으면 통과하면
+        // 활동 도중에 확정이 되고, 아직 오는 중인 참여자가 노쇼로 굳어 보증금을 잃는다.
         Appointment appointment = appointment(10L, AppointmentStatus.IN_PROGRESS);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.confirmAttendance(
+                        1L, 10L, attendanceRequest()
+                )
+        );
+
+        assertEquals(AppointmentErrorCode.ATTENDANCE_NOT_ENDED,
+                exception.getErrorCode());
+        verify(appointmentMapper, never()).updateAttendance(any(), any(), any());
+        verify(appointmentMapper, never()).findActiveMembersByAppointmentId(any());
+    }
+
+    @Test
+    void confirmAttendance_activityEndAtMissing_rejects() {
+        // 활동 종료 시각을 못 읽으면 끝났는지 확인할 방법이 없다. 되돌릴 수 없는
+        // 처리라 모르는 채로 진행하지 않는다.
+        Appointment appointment = endedAppointment(
+                10L, AppointmentStatus.IN_PROGRESS);
+        appointment.setActivityEndAt(null);
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.confirmAttendance(
+                        1L, 10L, attendanceRequest()
+                )
+        );
+
+        assertEquals(AppointmentErrorCode.ATTENDANCE_NOT_ENDED,
+                exception.getErrorCode());
+        verify(appointmentMapper, never()).updateAttendance(any(), any(), any());
+    }
+
+    @Test
+    void confirmAttendance_noAttendedMember_rejects() {
+        Appointment appointment = endedAppointment(
+                10L, AppointmentStatus.IN_PROGRESS);
         when(appointmentMapper.findAppointmentByIdForUpdate(10L))
                 .thenReturn(appointment);
 
@@ -1051,6 +1097,17 @@ class AppointmentServiceTest {
                 .activityEndAt(LocalDateTime.of(VISIT_DATE, LocalTime.of(22, 0)))
                 .joinDeadline(LocalDateTime.of(VISIT_DATE.minusDays(1), LocalTime.of(18, 0)))
                 .build();
+    }
+
+    // 출석 확정은 활동이 끝난 뒤에만 열린다(APPOINTMENT-009). 기본 픽스처는 아직
+    // 열리지 않은 약속이라 그 조건을 넘지 못하므로, 출석 테스트는 이것을 쓴다.
+    private static Appointment endedAppointment(
+            Long appointmentId,
+            AppointmentStatus status) {
+        Appointment appointment = appointment(appointmentId, status);
+        appointment.setActivityStartAt(LocalDateTime.now().minusHours(4));
+        appointment.setActivityEndAt(LocalDateTime.now().minusHours(1));
+        return appointment;
     }
 
     private static AppointmentAttendanceRequest attendanceRequest() {

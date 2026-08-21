@@ -41,6 +41,27 @@ export default {
     comingSoon: 'Coming soon',
   },
   /**
+   * 공용 달력. `shared/ui/CalendarGrid.vue`가 읽는다.
+   *
+   * 요일은 한 글자로 줄인다. 7칸이 390px 안에 들어가야 한다.
+   */
+  calendar: {
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
+    /** `{date}`는 로케일 표기로 풀어 쓴 날짜다. 스크린 리더만 읽는다. */
+    selectDate: 'Select {date}',
+    weekdays: {
+      sun: 'S',
+      mon: 'M',
+      tue: 'T',
+      wed: 'W',
+      thu: 'T',
+      fri: 'F',
+      sat: 'S',
+    },
+  },
+
+  /**
    * 소비 카테고리 표시명.
    *
    * 결제 화면·거래 상세·리포트가 함께 쓰는 어휘라 도메인이 아니라 여기에 둔다.

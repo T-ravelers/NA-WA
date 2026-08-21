@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -276,9 +277,20 @@ class DepositPayoutBatchProcessorIntegrationTest {
         appointmentIds.add(created.getAppointmentId());
         appointmentService.joinAppointment(guestMemberId, created.getAppointmentId());
 
+        // 출석 확정은 활동이 끝난 뒤에만 열린다(APPOINTMENT-009). 상태와 함께
+        // 활동 시각도 지난 값으로 맞춘다. DB의 NOW()가 아니라 앱이 만든 시각을
+        // 넘긴다 — CI의 MySQL은 UTC라 DB 시계에 기대면 서비스와 갈린다.
+        // join_deadline까지 함께 당기는 것은 chk_appointments_schedule이
+        // join_deadline <= activity_start_at < activity_end_at을 요구하기 때문이다.
+        LocalDateTime endedAt = LocalDateTime.now().minusHours(1);
         jdbcTemplate.update(
-                "UPDATE appointments SET appointment_status = 'IN_PROGRESS'"
+                "UPDATE appointments SET appointment_status = 'IN_PROGRESS',"
+                        + " join_deadline = ?,"
+                        + " activity_start_at = ?, activity_end_at = ?"
                         + " WHERE appointment_id = ?",
+                Timestamp.valueOf(endedAt.minusHours(4)),
+                Timestamp.valueOf(endedAt.minusHours(3)),
+                Timestamp.valueOf(endedAt),
                 created.getAppointmentId()
         );
 

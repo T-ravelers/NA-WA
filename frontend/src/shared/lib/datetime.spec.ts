@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildCalendarMonth,
   formatCalendarDate,
   formatCalendarDateString,
   formatServerDateTime,
   parseCalendarDate,
   parseServerDateTime,
   serializeCalendarDate,
+  shiftCalendarMonth,
 } from './datetime'
 
 describe('parseServerDateTime', () => {
@@ -90,5 +92,60 @@ describe('calendar-only helpers', () => {
     expect(formatCalendarDate('2026-02-30', 'en-US')).toBe('')
     expect(formatCalendarDateString(null)).toBe('')
     expect(serializeCalendarDate(new Date(Number.NaN))).toBe('')
+  })
+})
+
+describe('buildCalendarMonth', () => {
+  it('always fills six weeks so the grid height does not jump', () => {
+    expect(buildCalendarMonth(new Date(2026, 7, 1))).toHaveLength(42)
+    expect(buildCalendarMonth(new Date(2026, 1, 1))).toHaveLength(42)
+  })
+
+  /** 2026-08-01은 토요일이라 앞자리 여섯 칸을 7월에서 채운다. */
+  it('pads the first week with the previous month', () => {
+    const cells = buildCalendarMonth(new Date(2026, 7, 1))
+
+    expect(cells[0]).toEqual({ date: '2026-07-26', day: 26, inMonth: false })
+    expect(cells[5]).toEqual({ date: '2026-07-31', day: 31, inMonth: false })
+    expect(cells[6]).toEqual({ date: '2026-08-01', day: 1, inMonth: true })
+  })
+
+  it('pads the last week with the next month', () => {
+    const cells = buildCalendarMonth(new Date(2026, 7, 1))
+    const last = cells[41]
+
+    expect(last?.inMonth).toBe(false)
+    expect(last?.date.startsWith('2026-09')).toBe(true)
+  })
+
+  it('keeps every day of the month', () => {
+    const august = buildCalendarMonth(new Date(2026, 7, 1)).filter((cell) => cell.inMonth)
+
+    expect(august).toHaveLength(31)
+    expect(august[0]?.date).toBe('2026-08-01')
+    expect(august[30]?.date).toBe('2026-08-31')
+  })
+
+  it('handles a leap February', () => {
+    const february = buildCalendarMonth(new Date(2028, 1, 1)).filter((cell) => cell.inMonth)
+
+    expect(february).toHaveLength(29)
+    expect(february[28]?.date).toBe('2028-02-29')
+  })
+})
+
+describe('shiftCalendarMonth', () => {
+  it('moves by whole months and lands on the first', () => {
+    expect(serializeCalendarDate(shiftCalendarMonth(new Date(2026, 7, 15), 1))).toBe('2026-09-01')
+    expect(serializeCalendarDate(shiftCalendarMonth(new Date(2026, 7, 15), -1))).toBe('2026-07-01')
+  })
+
+  /** 31일에서 2월로 옮겨도 3월로 튀지 않아야 한다. */
+  it('does not overflow from a long month into the next one', () => {
+    expect(serializeCalendarDate(shiftCalendarMonth(new Date(2026, 0, 31), 1))).toBe('2026-02-01')
+  })
+
+  it('crosses the year boundary', () => {
+    expect(serializeCalendarDate(shiftCalendarMonth(new Date(2026, 11, 1), 1))).toBe('2027-01-01')
   })
 })

@@ -1,15 +1,10 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronUp,
-  IconChevronDown,
-  IconCheck,
-} from '@tabler/icons-vue'
+import { IconChevronUp, IconChevronDown, IconCheck } from '@tabler/icons-vue'
 
-import { parseCalendarDate, serializeCalendarDate } from '@/shared/lib/datetime'
+import { serializeCalendarDate } from '@/shared/lib/datetime'
+import CalendarGrid from '@/shared/ui/CalendarGrid.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 
@@ -35,7 +30,7 @@ const emit = defineEmits<{
 
 const REGION2_OTHER = '__OTHER_REGION2__'
 
-const { locale, t } = useI18n()
+const { t } = useI18n()
 
 const SHEET_TITLES: Record<ExploreSheetKind, string> = {
   date: 'explore.sheets.date',
@@ -162,7 +157,6 @@ const DATE_PRESETS = [
 const draft = reactive<EventSearchFilters>(cloneFilters(props.filters))
 const selectedRegion = ref(SEOUL_REGION1)
 const expandedCategories = ref<string[]>(['explore.categories.beauty'])
-const monthCursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
 watch(
   () => props.filters,
@@ -188,32 +182,6 @@ const currentRegion = computed(
   () => REGION_OPTIONS.find((region) => region.value === selectedRegion.value) ?? REGION_OPTIONS[0],
 )
 const selectedAreas = computed(() => new Set(draft.region2 ?? []))
-const monthLabel = computed(() =>
-  new Intl.DateTimeFormat(locale.value, { month: 'long', year: 'numeric' }).format(
-    monthCursor.value,
-  ),
-)
-
-const calendarDays = computed(() => {
-  const year = monthCursor.value.getFullYear()
-  const month = monthCursor.value.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const startOffset = firstDay.getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const previousMonthDays = new Date(year, month, 0).getDate()
-  const cells: Array<{ date: string; day: number; inMonth: boolean }> = []
-
-  for (let index = 0; index < 42; index += 1) {
-    const rawDay = index - startOffset + 1
-    const inMonth = rawDay >= 1 && rawDay <= daysInMonth
-    const date = new Date(year, month, rawDay)
-    const day = inMonth ? rawDay : rawDay < 1 ? previousMonthDays + rawDay : rawDay - daysInMonth
-    cells.push({ date: serializeCalendarDate(date), day, inMonth })
-  }
-
-  return cells
-})
-
 function cloneFilters(filters: EventSearchFilters): EventSearchFilters {
   return {
     ...filters,
@@ -258,10 +226,6 @@ function setDatePreset(value: string): void {
   draft.datePreset = value
   draft.startDate = range?.min
   draft.endDate = range?.max
-  const firstDay = parseCalendarDate(range?.min)
-  if (firstDay) {
-    monthCursor.value = new Date(firstDay.getFullYear(), firstDay.getMonth(), 1)
-  }
 }
 
 function setCalendarDate(value: string): void {
@@ -287,69 +251,6 @@ function setCalendarDate(value: string): void {
   }
 
   draft.endDate = value
-}
-
-function isDateInRange(value: string): boolean {
-  return (
-    draft.startDate !== undefined &&
-    draft.endDate !== undefined &&
-    value >= draft.startDate &&
-    value <= draft.endDate
-  )
-}
-
-/**
- * 하루만 고른 상태. 시작일만 고른 경우와 시작·종료가 같은 날인 경우를 함께
- * 본다. 같은 날을 두 번 탭하면 후자가 되는데, 둘을 다르게 그리면 같은 하루가
- * 탭 횟수에 따라 점과 띠로 갈린다.
- */
-function isSingleDaySelection(): boolean {
-  return (
-    draft.startDate !== undefined &&
-    (draft.endDate === undefined || draft.endDate === draft.startDate)
-  )
-}
-
-/**
- * 셀이 하루짜리 선택 점을 그리는지. 기간과 달리 칸을 채우지 않고 가운데
- * 알약으로 남는다 — 칸을 채우면 하루가 기간처럼 읽힌다.
- */
-function showsDot(index: number): boolean {
-  const cell = calendarDays.value[index]
-  return (
-    cell !== undefined && cell.inMonth && isSingleDaySelection() && cell.date === draft.startDate
-  )
-}
-
-/**
- * 셀이 기간 띠를 그리는지. 이웃 달 셀은 날짜가 기간에 들어도 띠를 그리지
- * 않는다 — 흐린 글자(text-ink-3/40) 위에 흰 배경이 얹혀, 선택할 수 없는
- * 날짜가 오히려 도드라진다. 하루짜리 선택도 띠가 아니라 점으로 그린다.
- */
-function showsBand(index: number): boolean {
-  const cell = calendarDays.value[index]
-  return cell !== undefined && cell.inMonth && !isSingleDaySelection() && isDateInRange(cell.date)
-}
-
-/**
- * 띠가 시각적으로 시작하거나 끝나는 자리만 둥글게 깎는다. 기간의 양 끝만이
- * 아니라, 주가 바뀌어 줄이 끊기는 자리와 이웃 달 셀에 잘리는 자리도 띠가
- * 새로 시작·끝나는 것으로 본다.
- */
-function isBandLeftEdge(index: number): boolean {
-  return showsBand(index) && (index % 7 === 0 || !showsBand(index - 1))
-}
-
-function isBandRightEdge(index: number): boolean {
-  return showsBand(index) && (index % 7 === 6 || !showsBand(index + 1))
-}
-
-function shiftMonth(offset: number): void {
-  monthCursor.value = new Date(
-    monthCursor.value.getFullYear(),
-    monthCursor.value.getMonth() + offset,
-    1,
-  )
 }
 
 function selectRegion(value: string): void {
@@ -524,72 +425,14 @@ function apply(): void {
 
           <div class="my-5 border-t border-hairline" />
 
-          <div class="flex items-center justify-between">
-            <button
-              type="button"
-              class="flex size-8 items-center justify-center text-ink-2"
-              :aria-label="t('explore.calendar.previousMonth')"
-              @click="shiftMonth(-1)"
-            >
-              <IconChevronLeft
-                :size="18"
-                aria-hidden="true"
-              />
-            </button>
-            <strong class="text-title-sm text-ink">{{ monthLabel }}</strong>
-            <button
-              type="button"
-              class="flex size-8 items-center justify-center text-ink-2"
-              :aria-label="t('explore.calendar.nextMonth')"
-              @click="shiftMonth(1)"
-            >
-              <IconChevronRight
-                :size="18"
-                aria-hidden="true"
-              />
-            </button>
-          </div>
+          <CalendarGrid
+            :range-start="draft.startDate ?? null"
+            :range-end="draft.endDate ?? null"
+            :is-date-allowed="isDateAllowed"
+            :label-dates="false"
+            @select="setCalendarDate"
+          />
 
-          <div class="mt-3 grid grid-cols-7 text-center text-micro text-ink-3">
-            <span
-              v-for="day in ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']"
-              :key="day"
-              >{{ t(`explore.calendar.weekdays.${day}`) }}</span
-            >
-          </div>
-          <div class="mt-2 grid grid-cols-7 gap-y-1 text-center">
-            <button
-              v-for="(cell, index) in calendarDays"
-              :key="cell.date"
-              type="button"
-              class="flex h-9 items-center justify-center text-caption"
-              :class="[
-                // 폭은 둘 중 하나만 붙는다. w-full과 w-9를 함께 두면 어느 쪽이
-                // 이기는지가 CSS 정의 순서에 좌우된다.
-                showsDot(index) ? 'mx-auto w-9' : 'w-full',
-                (!cell.inMonth || !isDateAllowed(cell.date)) && 'text-ink-3/40',
-                cell.inMonth &&
-                  isDateAllowed(cell.date) &&
-                  !showsBand(index) &&
-                  !showsDot(index) &&
-                  'rounded-pill text-ink-2',
-                // 기간은 칸 전체를 채워 하나의 띠로 이어진다. 칸보다 좁은 칩을
-                // 가운데 두면 흰색이어도 날짜마다 끊겨 보여 기간으로 읽히지
-                // 않는다. 띠가 시작·끝나는 자리(기간 양 끝, 줄 넘김, 이웃 달
-                // 경계)만 둥글게 깎고 사이는 각지게 둔다.
-                showsBand(index) && 'bg-paper-fill text-on-paper',
-                // 하루짜리 선택은 칸을 채우지 않고 점으로 남는다. 배경이 있어야
-                // 화면에 보인다 — 모서리만 깎으면 아무것도 그려지지 않는다.
-                showsDot(index) && 'rounded-pill bg-paper-fill text-on-paper',
-                isBandLeftEdge(index) && 'rounded-l-pill',
-                isBandRightEdge(index) && 'rounded-r-pill',
-              ]"
-              :disabled="!cell.inMonth || !isDateAllowed(cell.date)"
-              @click="cell.inMonth && setCalendarDate(cell.date)"
-            >
-              {{ cell.day }}
-            </button>
-          </div>
           <p class="mt-3 text-caption text-ink-3">
             {{ draft.startDate ?? t('explore.calendar.startDate')
             }}<span v-if="draft.endDate"> – {{ draft.endDate }}</span>

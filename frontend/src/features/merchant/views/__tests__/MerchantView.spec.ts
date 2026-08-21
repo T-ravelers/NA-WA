@@ -39,6 +39,30 @@ function account(accountType: string): MerchantAccount {
   }
 }
 
+/**
+ * 품목 한 줄을 채운다.
+ *
+ * 품목·수량·단가는 서버로 보내지 않는다. 합계만 QR에 실리므로 여기서 확인할 것은
+ * 입력이 합계로 이어지는지다.
+ */
+async function fillItem(
+  wrapper: Awaited<ReturnType<typeof mountView>>['wrapper'],
+  index: number,
+  quantity: string,
+  unitPrice: string,
+) {
+  const row = wrapper.findAll('li')[index]
+
+  if (row === undefined) {
+    throw new Error(`품목 ${index}번 줄이 없다`)
+  }
+
+  // DOM 순서가 아니라 id로 고른다. 순서로 고르면 수량과 단가가 뒤바뀌어도 곱셈 결과가
+  // 같아 테스트가 통과해 버린다.
+  await row.get('input[id^="merchant-qty-"]').setValue(quantity)
+  await row.get('input[id^="merchant-price-"]').setValue(unitPrice)
+}
+
 async function mountView() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const wrapper = mount(MerchantView, {
@@ -142,6 +166,100 @@ describe('MerchantView', () => {
     expect(wrapper.text()).not.toContain('Set up your store')
   })
 
+  it('adds up every item into the total', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    await fillItem(wrapper, 0, '2', '4500')
+    await wrapper.get('button[type="button"].w-full').trigger('click')
+    await fillItem(wrapper, 1, '1', '3000')
+
+    expect(wrapper.text()).toContain('12,000 P')
+  })
+
+  it('keeps the QR button unavailable until an item has a quantity and a price', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    const submit = wrapper.get('button[type="submit"]')
+
+    expect(submit.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('Add at least one item')
+
+    await fillItem(wrapper, 0, '1', '4500')
+
+    expect(submit.attributes('disabled')).toBeUndefined()
+  })
+
+  it('steps the quantity with the plus and minus buttons', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    const row = wrapper.get('li')
+    const quantity = row.get('input[id^="merchant-qty-"]')
+
+    await row.get('input[id^="merchant-price-"]').setValue('4500')
+
+    // 한 개를 파는 경우가 가장 흔해 새 줄은 1에서 시작한다.
+    expect((quantity.element as HTMLInputElement).value).toBe('1')
+    expect(wrapper.text()).toContain('4,500 P')
+
+    await row.get('button[aria-label^="Increase quantity"]').trigger('click')
+
+    expect((quantity.element as HTMLInputElement).value).toBe('2')
+    expect(wrapper.text()).toContain('9,000 P')
+
+    await row.get('button[aria-label^="Decrease quantity"]').trigger('click')
+
+    expect((quantity.element as HTMLInputElement).value).toBe('1')
+  })
+
+  it('stops the minus button at zero', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    const row = wrapper.get('li')
+    const decrease = row.get('button[aria-label^="Decrease quantity"]')
+
+    await decrease.trigger('click')
+
+    expect((row.get('input[id^="merchant-qty-"]').element as HTMLInputElement).value).toBe('0')
+    expect(decrease.attributes('disabled')).toBeDefined()
+  })
+
+  it('clears text that is not a number out of the price field', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    const price = wrapper.get('li').get('input[id^="merchant-price-"]')
+
+    await price.setValue('abc')
+
+    // 파싱 결과(null)가 직전과 같아 Vue는 다시 그리지 않는다. 되돌려 주지 않으면 합계는
+    // 0인데 칸에는 `abc`가 남아, 사용자는 금액이 아니라 지워지지 않는 글자를 보게 된다.
+    expect((price.element as HTMLInputElement).value).toBe('')
+    expect(wrapper.text()).toContain('Add at least one item')
+  })
+
+  it('snaps the quantity field back to the cap when the typed value exceeds it', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
+
+    const { wrapper } = await mountView()
+
+    const quantity = wrapper.get('li').get('input[id^="merchant-qty-"]')
+
+    await quantity.setValue('9999')
+    // 이미 상한이라 파싱 결과가 그대로다 — 되돌려 주지 않으면 `99999`가 칸에 남는다.
+    await quantity.setValue('99999')
+
+    expect((quantity.element as HTMLInputElement).value).toBe('9999')
+  })
+
   it('creates a QR code and renders it with a countdown', async () => {
     vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
     vi.mocked(createMerchantQr).mockResolvedValue({
@@ -157,11 +275,12 @@ describe('MerchantView', () => {
 
     const { wrapper } = await mountView()
 
-    await wrapper.find('input[inputmode="numeric"]').setValue('4500')
+    await fillItem(wrapper, 0, '2', '4500')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(createMerchantQr).toHaveBeenCalledWith(4500, null)
+    // 품목이 아니라 계산된 합계만 서버로 간다.
+    expect(createMerchantQr).toHaveBeenCalledWith(9000, null)
     expect(wrapper.find('img').attributes('src')).toBe('data:image/png;base64,stub')
     // 기기 시간대로 해석하면 9시간이 더해져 남은 시간이 전혀 달라진다.
     expect(wrapper.text()).toContain('Expires in 0:45')
@@ -182,7 +301,7 @@ describe('MerchantView', () => {
 
     const { wrapper } = await mountView()
 
-    await wrapper.find('input[inputmode="numeric"]').setValue('4500')
+    await fillItem(wrapper, 0, '1', '4500')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

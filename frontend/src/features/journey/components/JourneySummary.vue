@@ -42,13 +42,18 @@ function formatCompanionPreference(value: string | null): string {
 </script>
 
 <template>
-  <header class="flex flex-col gap-1">
-    <h1 class="font-display text-screen-title uppercase text-ink-display">{{ journey.title }}</h1>
-    <p class="text-body-sm font-medium tabular-nums text-ink-2">
-      <time :datetime="journey.startDate">{{ formatJourneyDate(journey.startDate, locale) }}</time>
-      –
-      <time :datetime="journey.endDate">{{ formatJourneyDate(journey.endDate, locale) }}</time>
-    </p>
+  <header class="flex items-start gap-3">
+    <div class="min-w-0 flex-1">
+      <h1 class="font-display text-screen-title uppercase text-ink-display">{{ journey.title }}</h1>
+      <p class="mt-1 text-body-sm font-medium tabular-nums text-ink-2">
+        <time :datetime="journey.startDate">{{
+          formatJourneyDate(journey.startDate, locale)
+        }}</time>
+        –
+        <time :datetime="journey.endDate">{{ formatJourneyDate(journey.endDate, locale) }}</time>
+      </p>
+    </div>
+    <slot />
   </header>
 
   <!--
