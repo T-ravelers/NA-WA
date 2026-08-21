@@ -227,9 +227,15 @@ function startPayment(): void {
       <!--
         누가 냈는지는 돈을 받을 사람에게만 온다. 낼 사람에게는 아예 오지 않으므로 이
         자리가 비고, 화면이 역할로 다시 가릴 필요가 없다.
+
+        목록이 비었는지는 따로 보지 않는다. 서버가 정산을 만들 때 자기 말고 낼 사람이
+        적어도 한 명은 있어야 통과시키므로(EqualSettlementCreator의
+        validatePayerAndPendingAmounts, 품목별도 같은 검사를 쓴다) 목록이 빈 채로 오는
+        정산은 만들어지지 않는다. 여기서 한 번 더 세면 "볼 수 없다"(오지 않음)와 "받을
+        사람이 없다"(빈 목록)가 같은 결과가 되어, 굳이 둘을 갈라 놓은 뜻이 사라진다.
       -->
       <SettlementCollectionCard
-        v-if="detail.collection !== undefined && detail.collection.participants.length > 0"
+        v-if="detail.collection !== undefined"
         class="mt-4"
         :collection="detail.collection"
       />
