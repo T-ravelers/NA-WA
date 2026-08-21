@@ -1,6 +1,7 @@
 package me.nawa.settlement.service;
 
 import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.settlement.domain.SettlementCollectionMember;
@@ -122,10 +123,14 @@ public class SettlementQueryServiceImpl implements SettlementQueryService {
      * 앞뒤 공백을 먼저 털어낸다. 그러지 않으면 " Alex"에서 공백 한 칸을 잘라 와 빈 동그라미가 된다.
      * 그리고 한 글자는 자리 하나가 아닐 수 있다. 이모지처럼 두 자리를 차지하는 글자를 한 자리만
      * 잘라내면 글자의 반쪽만 남아 깨져 보인다.
+     *
+     * 대문자로 바꿀 때 기준 언어를 못 박는다. 인자 없는 toUpperCase()는 서버에 잡힌 언어 설정을
+     * 따르는데, 그 설정이 터키어면 "i"가 "I"가 아니라 "İ"가 된다. 사람 이름의 첫 글자는 서버가
+     * 어느 나라에 떠 있든 같은 글자여야 하므로 언어에 얽매이지 않는 기준(ROOT)을 쓴다.
      */
     private String initialsOf(String displayName) {
         if (displayName == null || displayName.isBlank()) return "?";
         String trimmed = displayName.strip();
-        return new String(Character.toChars(trimmed.codePointAt(0))).toUpperCase();
+        return new String(Character.toChars(trimmed.codePointAt(0))).toUpperCase(Locale.ROOT);
     }
 }
