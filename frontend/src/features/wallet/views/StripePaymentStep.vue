@@ -74,6 +74,19 @@ const initializePaymentElement = async (): Promise<void> => {
     stripe.value = loadedStripe
     const paymentElements = loadedStripe.elements({
       clientSecret: props.clientSecret,
+      // Stripe Payment Element는 브라우저 로케일을 자동 감지("auto")해 카드 입력
+      // 필드 라벨을 렌더링한다. 앱은 아직 다국어 결제 흐름을 지원하지 않으므로 영어로 고정한다.
+      locale: 'en',
+      // Payment Element는 별도 origin의 iframe이라 fontFamily: 'inherit'로는 부모
+      // 페이지가 셀프 호스팅한 Noto Sans(frontend/public/fonts/NotoSans.woff2)를
+      // 실제로 상속받지 못한다. 같은 파일을 iframe에도 명시적으로 로드시킨다.
+      fonts: [
+        {
+          family: 'Noto Sans',
+          src: `url(${window.location.origin}/fonts/NotoSans.woff2) format('woff2-variations')`,
+          weight: '100 900',
+        },
+      ],
       appearance: {
         theme: 'night',
         variables: {
@@ -81,7 +94,7 @@ const initializePaymentElement = async (): Promise<void> => {
           colorBackground: readToken('--color-surface-1', '#262626'),
           colorText: readToken('--color-ink', '#fbfaf8'),
           colorDanger: readToken('--color-danger', '#ed3423'),
-          fontFamily: 'inherit',
+          fontFamily: "'Noto Sans', sans-serif",
           borderRadius: '12px',
         },
       },
@@ -143,8 +156,27 @@ onMounted(() => {
   void initializePaymentElement()
 })
 
+/**
+ * Stripe.js의 developer tools 위젯("testing assistant")은 Payment Element가 아니라
+ * Stripe() 인스턴스 자체에 붙어서 document.body 바로 아래에 별도로 뜬다. 그래서
+ * paymentElement.destroy()로는 안 지워지고, 다른 화면으로 이동해도 계속 떠 있는다.
+ *
+ * 공식 API로는 생성 시점에 끄거나 켜는 것만 가능하고(loadStripe의
+ * developerTools.assistant.enabled), 이미 뜬 위젯을 런타임에 숨기는 API는 없다
+ * (https://docs.stripe.com/sdks/stripejs-testing-assistant#hide-the-testing-assistant).
+ * 결제 화면에서는 자동완성 등에 쓸모가 있어 켜 둔 채로 쓰고, 이 화면을 벗어날 때만
+ * DOM에서 직접 지운다. title 속성은 Stripe SDK 내부 구현이라 버전이 바뀌면 셀렉터가
+ * 깨질 수 있다 — 결제 화면을 벗어나도 위젯이 남으면 이 title 문자열부터 다시 확인한다.
+ */
+const removeDeveloperToolsFrame = (): void => {
+  document
+    .querySelectorAll<HTMLIFrameElement>('iframe[title="Stripe developer tools frame"]')
+    .forEach((frame) => frame.remove())
+}
+
 onBeforeUnmount(() => {
   paymentElement.value?.destroy()
+  removeDeveloperToolsFrame()
 })
 </script>
 
