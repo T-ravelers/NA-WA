@@ -211,6 +211,33 @@ describe('EventDetailView', () => {
     ).toBeUndefined()
   })
 
+  it('opens Google Maps for the Event coordinates', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Google Maps')
+      ?.trigger('click')
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://www.google.com/maps/search/?api=1&query=37.48%2C127.01',
+      '_blank',
+      'noopener,noreferrer',
+    )
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Google transit')
+      ?.trigger('click')
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://www.google.com/maps/dir/?api=1&destination=37.48%2C127.01&travelmode=transit',
+      '_blank',
+      'noopener,noreferrer',
+    )
+
+    openSpy.mockRestore()
+  })
+
   it('opens the Naver Map app scheme for the Event coordinates', async () => {
     const { wrapper } = await mountView()
 

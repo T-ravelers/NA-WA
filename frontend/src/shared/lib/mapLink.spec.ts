@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  buildGoogleMapsDirectionsUrl,
   buildGoogleMapsSearchUrl,
+  buildGoogleMapsTransitRouteUrl,
   buildNaverMapPlaceUrl,
   buildNaverMapTransitRouteUrl,
   detectMapPlatform,
@@ -34,16 +34,16 @@ describe('buildGoogleMapsSearchUrl', () => {
   })
 })
 
-describe('buildGoogleMapsDirectionsUrl', () => {
-  it('builds a directions URL from finite coordinates', () => {
-    expect(buildGoogleMapsDirectionsUrl(37.5665, 126.978)).toBe(
+describe('buildGoogleMapsTransitRouteUrl', () => {
+  it('pins the travel mode to transit so the label is not a false promise', () => {
+    expect(buildGoogleMapsTransitRouteUrl(37.5665, 126.978)).toBe(
       'https://www.google.com/maps/dir/?api=1&destination=37.5665%2C126.978&travelmode=transit',
     )
   })
 
   it('returns null when either coordinate is missing', () => {
-    expect(buildGoogleMapsDirectionsUrl(null, null)).toBeNull()
-    expect(buildGoogleMapsDirectionsUrl(37.5665, undefined)).toBeNull()
+    expect(buildGoogleMapsTransitRouteUrl(null, null)).toBeNull()
+    expect(buildGoogleMapsTransitRouteUrl(37.5665, undefined)).toBeNull()
   })
 })
 

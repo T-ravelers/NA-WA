@@ -12,8 +12,8 @@ import {
 } from '@tabler/icons-vue'
 
 import {
-  buildGoogleMapsDirectionsUrl,
   buildGoogleMapsSearchUrl,
+  buildGoogleMapsTransitRouteUrl,
   buildNaverMapPlaceUrl,
   buildNaverMapTransitRouteUrl,
   openMapAppUrl,
@@ -103,8 +103,8 @@ const locationLabel = computed(() =>
 const mapSearchUrl = computed(() =>
   buildGoogleMapsSearchUrl(place.value?.latitude, place.value?.longitude),
 )
-const mapDirectionsUrl = computed(() =>
-  buildGoogleMapsDirectionsUrl(place.value?.latitude, place.value?.longitude),
+const mapTransitRouteUrl = computed(() =>
+  buildGoogleMapsTransitRouteUrl(place.value?.latitude, place.value?.longitude),
 )
 const naverPlaceUrl = computed(() =>
   buildNaverMapPlaceUrl(place.value?.latitude, place.value?.longitude, place.value?.name ?? ''),
@@ -501,7 +501,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
                 block
                 compact
                 variant="secondary"
-                @click="openMapUrl(mapDirectionsUrl)"
+                @click="openMapUrl(mapTransitRouteUrl)"
               >
                 {{ t('explore.placeDetail.directions') }}
               </AppButton>

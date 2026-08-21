@@ -14,8 +14,8 @@ import {
 
 import { formatCalendarDateString } from '@/shared/lib/datetime'
 import {
-  buildGoogleMapsDirectionsUrl,
   buildGoogleMapsSearchUrl,
+  buildGoogleMapsTransitRouteUrl,
   buildNaverMapPlaceUrl,
   buildNaverMapTransitRouteUrl,
   openMapAppUrl,
@@ -106,8 +106,8 @@ const journeys = computed(() => journeyListQuery.data.value ?? [])
 const mapSearchUrl = computed(() =>
   buildGoogleMapsSearchUrl(event.value?.latitude, event.value?.longitude),
 )
-const mapDirectionsUrl = computed(() =>
-  buildGoogleMapsDirectionsUrl(event.value?.latitude, event.value?.longitude),
+const mapTransitRouteUrl = computed(() =>
+  buildGoogleMapsTransitRouteUrl(event.value?.latitude, event.value?.longitude),
 )
 const naverPlaceUrl = computed(() =>
   buildNaverMapPlaceUrl(event.value?.latitude, event.value?.longitude, event.value?.title ?? ''),
@@ -551,7 +551,7 @@ function retry(): void {
                 block
                 compact
                 variant="secondary"
-                @click="openMapUrl(mapDirectionsUrl)"
+                @click="openMapUrl(mapTransitRouteUrl)"
               >
                 {{ t('explore.detail.directions') }}
               </AppButton>

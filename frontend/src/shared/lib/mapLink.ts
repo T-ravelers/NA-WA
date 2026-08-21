@@ -41,7 +41,7 @@ export function buildGoogleMapsSearchUrl(
  * `travelmode`를 비우면 구글이 기본값인 자동차 경로로 연다. 한국에서 구글은 자동차·도보
  * 경로를 제공하지 않아 사용자가 대중교통 탭을 다시 눌러야 하므로 `transit`으로 고정한다.
  */
-export function buildGoogleMapsDirectionsUrl(
+export function buildGoogleMapsTransitRouteUrl(
   latitude: MapCoordinate,
   longitude: MapCoordinate,
 ): string | null {
