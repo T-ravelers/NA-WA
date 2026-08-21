@@ -54,6 +54,11 @@ async function mountView(query = '?itemId=42&itemType=EVENT') {
         name: 'appointment-list',
         component: { template: '<div>List</div>' },
       },
+      {
+        path: '/wallet/top-up',
+        name: 'wallet-top-up',
+        component: { template: '<div>Top up</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -114,6 +119,7 @@ describe('AppointmentCreateView', () => {
     createAppointment.mockReset()
     checkJourneyItemExists.mockReset()
     checkJourneyItemExists.mockResolvedValue(false)
+    sessionStorage.clear()
   })
 
   it('opens the journey select sheet on entry and hides the form', async () => {
@@ -301,7 +307,9 @@ describe('AppointmentCreateView', () => {
     expect(router.currentRoute.value.name).toBe('appointment-create')
   })
 
-  it('shows an insufficient-balance message when the deposit hold fails', async () => {
+  it('offers to top up the deposit amount when the balance is too low', async () => {
+    // 빨간 한 줄 대신 "부족하다 + 그만큼 충전할까"를 한 번에 묻는다. 확인하면 충전
+    // 화면으로 가되, 보증금만큼 미리 채워지도록 금액을 query로 넘긴다.
     createAppointment.mockRejectedValueOnce(
       new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
     )
@@ -311,7 +319,107 @@ describe('AppointmentCreateView', () => {
     await fillAndConfirm(wrapper)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Your wallet balance is too low for this transfer.')
+    expect(wrapper.text()).toContain('Not enough balance')
+    expect(wrapper.text()).toContain('too low for the 10,000 P deposit')
+    expect(wrapper.text()).not.toContain('Your wallet balance is too low for this transfer.')
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+
+    await buttonByText(wrapper, 'Top up').trigger('click')
+    await flushPromises()
+
+    // 금액과 함께 "어디서 왔는지"와 이 화면의 query를 넘겨, 충전이 끝나면 같은 항목·
+    // 여정의 약속 생성으로 돌아올 수 있게 한다.
+    expect(router.currentRoute.value.name).toBe('wallet-top-up')
+    expect(router.currentRoute.value.query).toEqual({
+      amount: '10000',
+      returnRouteName: 'appointment-create',
+      itemId: '42',
+      itemType: 'EVENT',
+      tripId: '7',
+    })
+    // 떠나기 전 폼 초안을 같은 탭에 남겨, 돌아왔을 때 다시 적지 않게 한다.
+    const saved = JSON.parse(sessionStorage.getItem('appointment-create:resume') ?? 'null')
+    expect(saved).toMatchObject({
+      itemId: 42,
+      itemType: 'EVENT',
+      tripId: 7,
+      visitDate: '2026-08-31',
+      form: { step: 2, draft: { appointmentName: 'Seongsu K-Beauty Tour', depositAmount: 10000 } },
+    })
+  })
+
+  it('restores the saved form when the top-up screen sends the host back', async () => {
+    sessionStorage.setItem(
+      'appointment-create:resume',
+      JSON.stringify({
+        itemId: 42,
+        itemType: 'EVENT',
+        tripId: 7,
+        visitDate: '2026-08-31',
+        form: {
+          step: 2,
+          customMeetingPlace: '',
+          draft: {
+            itemId: 42,
+            itemType: 'EVENT',
+            tripId: 7,
+            visitDate: '2026-08-31',
+            appointmentName: 'Seongsu K-Beauty Tour',
+            maxMembers: 4,
+            languageCode: 'en',
+            depositAmount: 10000,
+            meetingPlaceMode: 'ITEM',
+            meetingPlace: 'DDP Design Plaza',
+            activityStartTime: '18:30',
+            activityEndTime: '22:00',
+          },
+        },
+      }),
+    )
+    const { wrapper } = await mountView('?itemId=42&itemType=EVENT&tripId=7&resume=1')
+
+    // 여정·날짜 시트를 다시 거치지 않고 2단계 폼이 바로, 적었던 값 그대로 열린다.
+    expect(wrapper.text()).not.toContain('Choose a journey')
+    expect(wrapper.text()).toContain('Set your appointment details')
+    expect(wrapper.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
+    expect(wrapper.find<HTMLInputElement>('input[inputmode="numeric"]').element.value).toBe(
+      '10,000',
+    )
+    // 한 번 되살렸으면 지운다 — 남겨두면 다음에 같은 항목으로 들어올 때 옛 초안이 뜬다.
+    expect(sessionStorage.getItem('appointment-create:resume')).toBeNull()
+  })
+
+  it('ignores a saved form that belongs to a different item', async () => {
+    sessionStorage.setItem(
+      'appointment-create:resume',
+      JSON.stringify({
+        itemId: 999,
+        itemType: 'PLACE',
+        tripId: 7,
+        visitDate: '2026-08-31',
+        form: {},
+      }),
+    )
+    const { wrapper } = await mountView('?itemId=42&itemType=EVENT&resume=1')
+
+    expect(wrapper.text()).toContain('Choose a journey')
+  })
+
+  it('closes the top-up prompt without leaving a stale error behind', async () => {
+    createAppointment.mockRejectedValueOnce(
+      new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
+    )
+    const { wrapper, router } = await mountView()
+    await completeJourneySelection(wrapper)
+
+    await fillAndConfirm(wrapper)
+    await flushPromises()
+    await buttonByText(wrapper, 'Not now').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Not enough balance')
+    expect(wrapper.text()).not.toContain('Your wallet balance is too low for this transfer.')
+    expect(wrapper.text()).not.toContain('Appointment could not be created')
     expect(router.currentRoute.value.name).toBe('appointment-create')
   })
 

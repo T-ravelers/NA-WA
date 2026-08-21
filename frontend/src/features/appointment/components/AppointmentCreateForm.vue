@@ -22,6 +22,7 @@ import {
   validateAppointmentSettings,
   type AppointmentFormDraft,
   type AppointmentFormErrors,
+  type AppointmentFormSnapshot,
 } from '../model/appointmentForm'
 import { useAppointmentItemLocation } from '../model/exploreIntegration'
 
@@ -226,7 +227,24 @@ function confirmCreation(): void {
   emit('submit', toAppointmentCreateRequest(draft))
 }
 
-defineExpose({ goToPreviousStep })
+// 충전처럼 화면을 떠났다 돌아오는 경우를 위해 폼 상태를 통째로 내보내고 되살린다.
+// 항목·여정·날짜는 부모가 props로 다시 주므로, 여기서는 사용자가 적은 값과 스텝만
+// 다룬다.
+function snapshot(): AppointmentFormSnapshot {
+  return { step: step.value, draft: { ...draft }, customMeetingPlace: customMeetingPlace.value }
+}
+
+function restore(saved: AppointmentFormSnapshot): void {
+  // 직접 적은 장소를 먼저 되돌려야, 모드를 되돌릴 때 도는 watch가 빈 값을 쓰지 않는다.
+  customMeetingPlace.value = saved.customMeetingPlace
+  Object.assign(draft, saved.draft, { itemId, itemType, tripId, visitDate })
+  step.value = saved.step
+  // 제출까지 갔던 폼이다. 돌아온 뒤에는 손대지 않은 칸도 바로 검증해 보여준다.
+  settingsSubmitted.value = saved.step === 2
+  applySettingsErrors()
+}
+
+defineExpose({ goToPreviousStep, snapshot, restore })
 </script>
 
 <template>

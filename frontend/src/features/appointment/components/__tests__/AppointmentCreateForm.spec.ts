@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
 
@@ -352,6 +352,28 @@ describe('AppointmentCreateForm', () => {
     expect(wrapper.text()).not.toContain('Choose a deposit between 5,000 P and 50,000 P.')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('10,000')
+  })
+
+  it('snapshots what the host typed and restores it, step included', async () => {
+    // 충전하러 떠났다 돌아올 때 부모가 쓴다. 항목·여정·날짜는 부모가 props로 다시
+    // 주므로 여기서는 적은 값과 스텝만 오간다.
+    const props = { itemId: 42, itemType: 'EVENT' as const, tripId: 7, visitDate: '2026-08-08' }
+    const source = mount(AppointmentCreateForm, { props, ...mountOptions })
+    await fillBasics(source)
+    await source.find('input[type="time"]').setValue('18:30')
+    // 종료 시각은 일부러 비워 둔 채 떠난다 — 돌아온 뒤 미입력 칸이 바로 보이는지 본다.
+    const saved = (source.vm as unknown as { snapshot: () => unknown }).snapshot()
+
+    const target = mount(AppointmentCreateForm, { props, ...mountOptions })
+    ;(target.vm as unknown as { restore: (saved: unknown) => void }).restore(saved)
+    await flushPromises()
+
+    expect(target.text()).toContain('Set your appointment details')
+    expect(target.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
+    expect(target.findAll<HTMLInputElement>('input[type="time"]')[1]?.element.value).toBe('')
+    expect(target.find<HTMLInputElement>('input[inputmode="numeric"]').element.value).toBe('10,000')
+    // 제출까지 갔던 폼이라 돌아온 뒤에는 손대지 않은 칸의 누락도 바로 보인다.
+    expect(target.text()).toContain('Choose an end time.')
   })
 
   it('rejects a deposit outside the configured range', async () => {

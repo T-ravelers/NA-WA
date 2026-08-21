@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -16,6 +16,7 @@ import {
 import AppointmentCreateForm from '../components/AppointmentCreateForm.vue'
 import AppointmentJourneyDateSheet from '../components/AppointmentJourneyDateSheet.vue'
 import AppointmentJourneySelectSheet from '../components/AppointmentJourneySelectSheet.vue'
+import type { AppointmentFormSnapshot } from '../model/appointmentForm'
 import { appointmentKeys } from '../model/appointmentKeys'
 import { useAppointmentJourneyIntegration } from '../model/journeyIntegration'
 
@@ -25,9 +26,27 @@ const queryClient = useQueryClient()
 const i18n = useI18n()
 const { t } = i18n
 
+// 충전하러 떠났다 돌아올 때 폼을 되살리기 위한 임시 저장. 화면을 떠나는 순간 사라지는
+// 컴포넌트 상태를 같은 탭 안에서만 이어 준다(sessionStorage) — 새 탭·재로그인까지
+// 이어질 필요는 없다. 다른 항목의 약속 생성으로 들어왔을 때 엉뚱한 초안을 쓰지 않도록
+// 항목·여정을 함께 적어 두고 돌아올 때 대조한다.
+const RESUME_STORAGE_KEY = 'appointment-create:resume'
+interface ResumeState {
+  itemId: number
+  itemType: AppointmentItemType
+  tripId: number
+  visitDate: string
+  form: AppointmentFormSnapshot
+}
+
+function clearResumeState(): void {
+  sessionStorage.removeItem(RESUME_STORAGE_KEY)
+}
+
 const createMutation = useMutation({
   mutationFn: (request: AppointmentCreateRequest) => createAppointment(request),
   onSuccess: async (appointment) => {
+    clearResumeState()
     queryClient.setQueryData(appointmentKeys.detail(appointment.appointmentId), appointment)
     await queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() })
     // push가 아니라 replace다. 상세의 뒤로 가기는 왔던 길을 되감으므로, 제출한
@@ -45,18 +64,27 @@ const createMutation = useMutation({
 const JOURNEY_ITEM_DUPLICATE_CODE = 'JOURNEY-004'
 const dateConflictRetryOpen = ref(false)
 
+// 보증금을 예치할 잔액이 없으면 서버가 WALLET-015로 거절한다(약속 행은 만들어지지
+// 않는다). 폼 위에 빨간 한 줄을 띄우는 대신, 부족하다는 사실과 다음 행동(그 금액만큼
+// 충전)을 한 번에 묻는 팝업을 띄운다 — 오류 문구만 보면 왜 안 되는지, 뭘 해야
+// 되는지 사용자가 스스로 알아내야 한다.
+const INSUFFICIENT_BALANCE_CODE = 'WALLET-015'
+const topupPromptOpen = ref(false)
+// 팝업 문구와 충전 화면에 넘길 금액. 방금 제출한 요청의 보증금이다.
+const requestedDepositAmount = ref<number | null>(null)
+
 watch(
   () => createMutation.error.value,
   (error) => {
-    if (error instanceof NormalizedApiError && error.code === JOURNEY_ITEM_DUPLICATE_CODE) {
-      dateConflictRetryOpen.value = true
-    }
+    if (!(error instanceof NormalizedApiError)) return
+    if (error.code === JOURNEY_ITEM_DUPLICATE_CODE) dateConflictRetryOpen.value = true
+    if (error.code === INSUFFICIENT_BALANCE_CODE) topupPromptOpen.value = true
   },
 )
 
 const errorMessage = computed(() => {
   const error = createMutation.error.value
-  if (error === null || dateConflictRetryOpen.value) return undefined
+  if (error === null || dateConflictRetryOpen.value || topupPromptOpen.value) return undefined
 
   if (!(error instanceof NormalizedApiError) || !i18n.te(error.messageKey)) {
     return t('appointment.create.loadFailed')
@@ -64,8 +92,20 @@ const errorMessage = computed(() => {
   return t(error.messageKey)
 })
 
+const formattedDepositAmount = computed(() =>
+  new Intl.NumberFormat('en-US').format(requestedDepositAmount.value ?? 0),
+)
+
+function closeTopupPrompt(): void {
+  topupPromptOpen.value = false
+  // 팝업을 닫았으면 그 오류는 다 본 것이다. 남겨두면 폼 위에 일반 오류 문구로
+  // 다시 나타난다.
+  createMutation.reset()
+}
+
 function submit(request: AppointmentCreateRequest): void {
   if (!createMutation.isPending.value) {
+    requestedDepositAmount.value = Number(request.depositAmount)
     createMutation.mutate(request)
   }
 }
@@ -224,9 +264,80 @@ function closeDateConflictRetry(): void {
 
 type AppointmentCreateFormExposed = {
   goToPreviousStep: () => boolean
+  snapshot: () => AppointmentFormSnapshot
+  restore: (saved: AppointmentFormSnapshot) => void
 }
 
 const createForm = ref<AppointmentCreateFormExposed | null>(null)
+
+// 충전 화면이 `?resume=1`로 돌려보낸 경우에만 저장해 둔 초안을 쓴다. 같은 항목의
+// 약속 생성이 아니면(다른 활동에서 새로 들어온 경우) 무시한다.
+function readResumeState(): ResumeState | null {
+  if (route.query.resume !== '1') return null
+  try {
+    const raw = sessionStorage.getItem(RESUME_STORAGE_KEY)
+    if (raw === null) return null
+    const saved = JSON.parse(raw) as ResumeState
+    if (saved.itemId !== itemId.value || saved.itemType !== itemType.value) return null
+    return saved
+  } catch {
+    return null
+  }
+}
+
+// 여정·날짜는 시트를 다시 거치지 않고 바로 폼으로 연다. 폼 자체의 값(이름·장소·
+// 시각·보증금·스텝)은 폼이 마운트된 뒤 되살린다 — 그 전에는 인스턴스가 없다.
+const resumeState = readResumeState()
+if (resumeState !== null) {
+  selectedTripId.value = resumeState.tripId
+  selectedVisitDate.value = resumeState.visitDate
+  phase.value = 'form'
+}
+onMounted(() => {
+  if (resumeState === null) return
+  createForm.value?.restore(resumeState.form)
+  // 한 번 되살렸으면 끝이다. 남겨두면 나중에 같은 항목으로 새로 들어올 때 옛 초안이 뜬다.
+  clearResumeState()
+})
+
+// 충전 화면으로 간다. 금액을 query로 넘겨 입력란이 보증금만큼 미리 채워지게 하고,
+// 어디서 왔는지(returnRouteName)와 이 화면의 query를 함께 넘겨 충전이 끝나면 여기로
+// 돌아오게 한다. 떠나기 전 폼 초안을 저장해 둬, 돌아왔을 때 "Create appointment"만
+// 다시 누르면 되게 한다. replace가 아니라 push다 — 충전을 포기하고 뒤로 와도 작성하던
+// 흐름으로 돌아와야 한다.
+function goToTopup(): void {
+  const amount = requestedDepositAmount.value
+  topupPromptOpen.value = false
+
+  const form = createForm.value?.snapshot()
+  if (
+    form !== undefined &&
+    itemId.value !== undefined &&
+    itemType.value !== undefined &&
+    selectedTripId.value !== null &&
+    selectedVisitDate.value !== null
+  ) {
+    const state: ResumeState = {
+      itemId: itemId.value,
+      itemType: itemType.value,
+      tripId: selectedTripId.value,
+      visitDate: selectedVisitDate.value,
+      form,
+    }
+    sessionStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(state))
+  }
+
+  void router.push({
+    name: 'wallet-top-up',
+    query: {
+      ...(amount === null ? {} : { amount: String(amount) }),
+      returnRouteName: 'appointment-create',
+      ...(itemId.value !== undefined ? { itemId: String(itemId.value) } : {}),
+      ...(itemType.value !== undefined ? { itemType: itemType.value } : {}),
+      ...(selectedTripId.value !== null ? { tripId: String(selectedTripId.value) } : {}),
+    },
+  })
+}
 
 // 흐름을 떠난다. 왔던 길을 되감고, 히스토리가 없을 때(딥링크·PWA 재진입)만
 // 약속 목록으로 보낸다.
@@ -358,6 +469,42 @@ function confirmExit(): void {
             @click="confirmExit"
           >
             {{ t('appointment.create.exitConfirmLeave') }}
+          </AppButton>
+        </div>
+      </section>
+    </div>
+
+    <div
+      v-if="topupPromptOpen"
+      class="fixed inset-0 z-50 flex items-end justify-center bg-scrim/70 px-screen pb-6"
+      role="presentation"
+      @click.self="closeTopupPrompt"
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('appointment.create.insufficientTitle')"
+        class="w-full max-w-[390px] rounded-card bg-surface-1 p-5 shadow-sheet"
+      >
+        <h2 class="text-title text-ink-display">
+          {{ t('appointment.create.insufficientTitle') }}
+        </h2>
+        <p class="mt-2 text-body-sm text-ink-3">
+          {{ t('appointment.create.insufficientDescription', { amount: formattedDepositAmount }) }}
+        </p>
+        <div class="mt-5 grid grid-cols-2 gap-3">
+          <AppButton
+            block
+            variant="secondary"
+            @click="closeTopupPrompt"
+          >
+            {{ t('appointment.create.insufficientLater') }}
+          </AppButton>
+          <AppButton
+            block
+            @click="goToTopup"
+          >
+            {{ t('appointment.create.insufficientTopup') }}
           </AppButton>
         </div>
       </section>

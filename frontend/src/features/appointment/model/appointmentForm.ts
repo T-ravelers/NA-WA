@@ -37,6 +37,16 @@ export interface AppointmentFormDraft {
 
 export type MeetingPlaceMode = 'ITEM' | 'CUSTOM'
 
+/**
+ * 화면을 떠났다 돌아올 때(예: 보증금 충전) 폼을 그대로 되살리기 위한 초안.
+ * 항목·여정·날짜는 부모가 다시 주므로, 사용자가 적은 값과 스텝만 담는다.
+ */
+export interface AppointmentFormSnapshot {
+  step: 1 | 2
+  draft: AppointmentFormDraft
+  customMeetingPlace: string
+}
+
 export interface AppointmentFormErrors {
   itemContext?: string
   appointmentName?: string
