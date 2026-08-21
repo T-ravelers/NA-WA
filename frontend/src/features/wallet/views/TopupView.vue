@@ -5,8 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { IconCheck } from '@tabler/icons-vue'
 
-import AmountInput from '@/shared/ui/AmountInput.vue'
 import { vFitText } from '@/shared/lib/fitText'
+import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
