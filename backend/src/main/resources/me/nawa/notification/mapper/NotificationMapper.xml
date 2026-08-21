@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.notification.mapper.NotificationMapper">
+
+    <select id="findByRecipient" resultType="me.nawa.notification.domain.Notification">
+        SELECT n.notification_id, n.recipient_member_id, n.notification_type, n.settlement_id,
+               n.actor_name, n.gathering_name, n.amount, n.currency_code,
+               n.read_at, n.created_at
+        FROM notifications n
+        WHERE n.recipient_member_id = #{memberId}
+          AND n.deleted_at IS NULL
+        ORDER BY n.created_at DESC, n.notification_id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countUnreadByRecipient" resultType="int">
+        SELECT COUNT(*)
+        FROM notifications n
+        WHERE n.recipient_member_id = #{memberId}
+          AND n.read_at IS NULL
+          AND n.deleted_at IS NULL
+    </select>
+
+    <update id="markAllRead">
+        UPDATE notifications n
+        SET n.read_at = #{readAt}
+        WHERE n.recipient_member_id = #{memberId}
+          AND n.read_at IS NULL
+          AND n.deleted_at IS NULL
+    </update>
+
+    <insert id="insertNotifications">
+        INSERT INTO notifications (
+            recipient_member_id, notification_type, settlement_id,
+            actor_name, gathering_name, amount, currency_code
+        ) VALUES
+        <foreach collection="notifications" item="notification" separator=",">
+            (
+                #{notification.recipientMemberId}, #{notification.notificationType},
+                #{notification.settlementId}, #{notification.actorName},
+                #{notification.gatheringName}, #{notification.amount},
+                #{notification.currencyCode}
+            )
+        </foreach>
+    </insert>
+
+    <!--
+        알림 문장에 넣을 값을 정산에서 한 번에 읽는다.
+
+        통화는 settlements에 없다. 정산의 근거가 된 원거래(wallet_transfers)에만 있어서
+        거기서 가져온다. payer_member_id는 스키마 제약(chk_settlements_creator_is_payer)상
+        생성자와 언제나 같으므로, 돈을 받을 사람 판정은 이 컬럼 하나로 끝난다.
+    -->
+    <select id="findSettlementSnapshot"
+            resultType="me.nawa.notification.domain.SettlementNotificationSnapshot">
+        SELECT s.payer_member_id, payer.display_name AS payer_name,
+               a.appointment_name AS gathering_name, s.total_amount, t.currency_code
+        FROM settlements s
+        JOIN appointments a ON a.appointment_id = s.appointment_id
+        JOIN wallet_transfers t ON t.transfer_id = s.source_transfer_id
+        JOIN members payer ON payer.member_id = s.payer_member_id
+        WHERE s.settlement_id = #{settlementId}
+          AND s.deleted_at IS NULL
+    </select>
+
+    <!--
+        누구에게 얼마로 보낼지는 이 목록 하나로 정한다. 알림 종류마다 SQL을 따로 두지 않는
+        이유는, 수신자 규칙이 바뀔 때 고칠 곳을 한 군데로 모아 두기 위해서다.
+
+        NOT_REQUESTED는 원결제자 본인 몫이라 청구 대상이 아니다. 정산 상세의 납부 현황이
+        쓰는 findCollectionMembers와 같은 기준이다.
+    -->
+    <select id="findSettlementMemberShares"
+            resultType="me.nawa.notification.domain.SettlementMemberShare">
+        SELECT am.member_id, m.display_name, sm.share_amount, sm.request_status
+        FROM settlement_members sm
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        JOIN members m ON m.member_id = am.member_id
+        WHERE sm.settlement_id = #{settlementId}
+          AND sm.request_status &lt;&gt; 'NOT_REQUESTED'
+          AND sm.deleted_at IS NULL
+        ORDER BY sm.appointment_member_id
+    </select>
+
+</mapper>
