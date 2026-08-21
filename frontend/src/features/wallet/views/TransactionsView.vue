@@ -19,6 +19,7 @@ import {
   formatTransactionAmount,
   formatTransactionDateTime,
   getTransactionStatusLabel,
+  isOutgoingEntry,
   toActivityKind,
   walletKeys,
   type TransactionSearchParams,
@@ -165,7 +166,7 @@ const transactionLabel = (transaction: WalletTransactionResponse): string =>
   t(
     activityLabelKey(
       toActivityKind(transaction.transferType),
-      transaction.entryType.toUpperCase() === 'DEBIT',
+      isOutgoingEntry(transaction.entryType),
     ),
   )
 
@@ -348,22 +349,18 @@ const openTransactionDetail = (transactionId: number): void => {
                 <!-- 들어온 돈만 민트 계열로 구분한다. V2 거래내역/01의 Credit 표기. -->
                 <p
                   class="text-title-sm font-bold"
-                  :class="
-                    transaction.entryType.toUpperCase() === 'DEBIT' ? 'text-ink' : 'text-success-2'
-                  "
+                  :class="isOutgoingEntry(transaction.entryType) ? 'text-ink' : 'text-success-2'"
                 >
                   {{ formatTransactionAmount(transaction) }}
                 </p>
                 <p
                   class="mt-1 text-caption"
                   :class="
-                    transaction.entryType.toUpperCase() === 'DEBIT'
-                      ? 'text-ink-3'
-                      : 'text-success-subtle'
+                    isOutgoingEntry(transaction.entryType) ? 'text-ink-3' : 'text-success-subtle'
                   "
                 >
                   {{
-                    transaction.entryType.toUpperCase() === 'DEBIT'
+                    isOutgoingEntry(transaction.entryType)
                       ? t('wallet.transactions.debit')
                       : t('wallet.transactions.credit')
                   }}

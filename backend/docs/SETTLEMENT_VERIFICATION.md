@@ -11,7 +11,7 @@
 | EQUAL 생성 | 선택한 ACTIVE 참가자, 최소 통화 단위 나머지, 합계 보존 |
 | ITEMIZED 생성 | 수동 품목·수량·참가자별 수량 배분, 품목/참가자/원거래 금액 일치, 스냅샷 저장 |
 | 상태 전이 | 생성 즉시 `REQUESTED`, 모든 `PENDING` 지급 후 `COMPLETED` |
-| 상세 납부 현황 | 원결제자에게만 `collection`, 참여자에게는 `null`, 집계 분모에서 원결제자 제외 |
+| 상세 납부 현황 | 원결제자에게만 `collection`, 참여자에게는 `null`, 집계 분모에서 원결제자 제외, 완료 전이와 같은 기준으로 세기, 미납자 우선 정렬 |
 | 멱등성 | create/pay 동일 키 재시도와 다른 키 409, 원거래 중복 방지 |
 | HTTP 계약 | 유지 API 5개, create/pay 헤더 누락 400, 제거된 request/cancel/game/receipt POST 동작 미노출 |
 | MySQL | V9 적용, 축소 ENUM·제약, mapper SQL, 실제 UNIQUE 충돌 뒤 생성 동시성의 승자 재조회 |
@@ -27,12 +27,13 @@ RUN_MYSQL_INTEGRATION_TESTS=true ./gradlew test --no-daemon
 
 ## 현재 로컬 결과
 
-- `2026-08-20 ./gradlew test --tests 'me.nawa.settlement.*' --no-daemon`: 통과.
-- `2026-08-20 ./gradlew build --no-daemon`: 통과. 전체 단위 테스트와 WAR 생성을 포함한다.
-- `2026-08-20 RUN_MYSQL_INTEGRATION_TESTS=true ./gradlew test --tests
+- `2026-08-21 ./gradlew build --no-daemon`: 통과. 전체 단위 테스트와 WAR 생성을 포함한다.
+- `2026-08-21 RUN_MYSQL_INTEGRATION_TESTS=true ./gradlew test --tests
   'me.nawa.settlement.mapper.SettlementMapperIntegrationTest' --tests 'me.nawa.config.*'`:
   통과. 빈 스키마에 마이그레이션을 적용한 임시 데이터베이스에서 실행했고, 새로 추가한
   `findCollectionMembers`와 mapper SQL 전수 검증(`MapperSqlSchemaIntegrationTest`)이 포함된다.
+- 로컬 MySQL은 `+09:00`이라 DB 시계에 기대는 코드가 여기서는 드러나지 않는다. 완료 시각을
+  애플리케이션이 넘긴 값으로 적는지는 CI가 MySQL을 UTC로 띄워 확인한다.
 - 생성 동시성 통합 테스트(`SettlementCreationConcurrencyIntegrationTest`)는 이번 변경이
   생성 경로를 건드리지 않아 실행하지 않았다.
 

@@ -23,6 +23,11 @@
 `GET /api/v1/settlements`의 각 요약은 `createdAt`과 `completedAt`을 함께 반환한다. 형식은
 `yyyy-MM-dd'T'HH:mm:ss`이고 기준 시간대는 서버와 같은 `Asia/Seoul`이다.
 
+`completedAt`은 **애플리케이션이 넘긴 시각**을 기록한다. DB의 `CURRENT_TIMESTAMP`를 쓰지
+않는다. 운영에서는 두 시계를 맞춰 두었지만 그 맞춤은 설정 한 줄에 달려 있고, CI는 이런
+의존을 드러내려고 MySQL을 일부러 UTC로 띄운다. 이 값이 기간 필터의 기준이 되므로 두 시계가
+어긋나면 경계 근처의 정산이 통째로 다른 날짜로 묶인다.
+
 `completedAt`은 settlement가 `COMPLETED`로 전이한 시각이며, `REQUESTED`인 동안에는 `null`이다.
 이 필드를 남기기 시작한 시점보다 먼저 완료된 정산도 `null`이다. `updated_at`이 갱신되지 않는
 스키마라 되살릴 근거 값이 없어 데이터를 보정하지 않았다. 완료 시각으로 목록을 거르거나
@@ -93,10 +98,18 @@ URL의 경로 변수이고, `transferId`는 생성 요청의 `sourceTransferId`�
 `participants`에는 `request_status`가 `NOT_REQUESTED`가 아닌 구성원만 담는다. 이 상태는
 생성자에게만 붙고 생성자가 곧 원결제자이므로(`chk_settlements_creator_is_payer`), 결과적으로
 원결제자 본인 행이 빠진다. 본인을 세면 자기 자신에게 보낼 돈이 없어 전원이 지급해도
-`paidCount`가 `totalCount`에 닿지 못한다. settlement가 `COMPLETED`로 전이하는 조건과
-같은 기준을 써서 집계와 상태가 어긋나지 않게 한다.
+`paidCount`가 `totalCount`에 닿지 못한다.
 
-정렬은 `appointment_member_id` 오름차순이며, 이는 EQUAL 나머지 배분 순서와 같다.
+**고르는 기준은 `COMPLETED` 전이 조건과 글자 그대로 같다.** 둘 다 정산 구성원 행만 보고
+약속 참가 쪽 상태(`membership_status`·`deleted_at`)는 보지 않는다. 약속에서 나가든 참가
+기록이 지워지든 이미 진 빚은 그대로라 정산은 그 사람이 낼 때까지 끝나지 않기 때문이다.
+목록만 한 사람이라도 더 걸러내면 화면은 다 냈다고 말하는데 정산은 `REQUESTED`에 멈춰 있고
+원결제자가 그 이유를 볼 방법이 없어진다. 약속 참가 행을 잇는 것은 이름을 얻기 위해서다.
+
+정렬은 **아직 내지 않은 사람이 먼저**이고, 같은 상태 안에서는 `appointment_member_id`
+오름차순이다(EQUAL 나머지 배분 순서와 같다). 이 목록을 여는 이유가 "누가 아직 안 냈나"라서,
+낸 사람 사이에 섞으면 원결제자가 배지를 하나씩 훑어야 한다. 사람이 지급할 때마다 그 행이
+아래로 내려가므로 목록의 위쪽은 항상 남은 사람이다.
 
 ## 멱등성
 

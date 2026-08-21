@@ -50,10 +50,6 @@ export default {
         paid: 'Split paid',
         collected: 'Split collected',
       },
-      activityStatus: {
-        available: 'Can be split',
-        settled: 'Already split',
-      },
       status: {
         ACTIVE: 'Active',
         SUSPENDED: 'Suspended',

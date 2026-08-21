@@ -80,18 +80,18 @@ describe('toWalletHomeData', () => {
     expect(data.activities[0]?.signedAmount).toBe(-18000)
   })
 
-  it('SETTLEMENT만 정산 완료로 본다', () => {
+  it('돈이 나간 거래와 들어온 거래를 방향으로 갈라 둔다', () => {
     const data = toWalletHomeData(
       response({
         recentTransactions: [
-          transaction({ transferId: 1, transferType: 'SETTLEMENT' }),
-          transaction({ transferId: 2, transferType: 'TOPUP' }),
+          transaction({ transferId: 1, entryType: 'DEBIT' }),
+          transaction({ transferId: 2, entryType: 'CREDIT' }),
         ],
       }),
     )
 
-    expect(data.activities[0]?.settled).toBe(true)
-    expect(data.activities[1]?.settled).toBe(false)
+    expect(data.activities[0]?.outgoing).toBe(true)
+    expect(data.activities[1]?.outgoing).toBe(false)
   })
 
   it('알 수 없는 지갑 상태는 UNKNOWN으로 떨어뜨린다', () => {

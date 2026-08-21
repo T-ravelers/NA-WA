@@ -207,16 +207,6 @@ const errorDescription = computed(() => {
 
               <div class="shrink-0 text-right">
                 <p class="text-title-sm text-ink">{{ formatPoints(activity.signedAmount) }}</p>
-                <p
-                  class="mt-0.5 text-caption"
-                  :class="activity.settled ? 'text-success' : 'text-settlement'"
-                >
-                  {{
-                    activity.settled
-                      ? t('wallet.home.activityStatus.settled')
-                      : t('wallet.home.activityStatus.available')
-                  }}
-                </p>
               </div>
             </div>
           </AppCard>

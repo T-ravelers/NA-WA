@@ -795,13 +795,16 @@ const COLLECT_SETTLEMENT_DETAIL = {
     requestStatus: 'NOT_REQUESTED',
     allowedActions: [],
   },
-  /* 셋이 나눈 48000원 중 요청자 본인 몫은 빠져서 받을 사람은 둘이다. */
+  /*
+   * 셋이 나눈 48000원 중 요청자 본인 몫은 빠져서 받을 사람은 둘이다.
+   * 서버가 안 낸 사람을 먼저 내려주므로 여기서도 그 순서로 둔다.
+   */
   collection: {
     totalCount: 2,
     paidCount: 1,
     participants: [
-      { id: 72, name: 'Jisoo Han', initials: 'J', shareAmount: '16000', requestStatus: 'PAID' },
       { id: 73, name: 'Tae Kim', initials: 'T', shareAmount: '16000', requestStatus: 'PENDING' },
+      { id: 72, name: 'Jisoo Han', initials: 'J', shareAmount: '16000', requestStatus: 'PAID' },
     ],
   },
 }

@@ -1,5 +1,6 @@
 package me.nawa.settlement.service;
 
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.settlement.domain.Settlement;
@@ -52,7 +53,7 @@ public class SettlementPaymentServiceImpl implements SettlementPaymentService {
             payment.getSettlementMemberId(), transferId, normalizedKey
         ) != 1)
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_PAYMENT_NOT_ALLOWED);
-        settlementMapper.completeSettlementIfNoPendingPayments(settlementId);
+        settlementMapper.completeSettlementIfNoPendingPayments(settlementId, LocalDateTime.now());
         payment.setRequestStatus("PAID");
         payment.setPaidTransferId(transferId);
         payment.setPaymentIdempotencyKey(normalizedKey);
