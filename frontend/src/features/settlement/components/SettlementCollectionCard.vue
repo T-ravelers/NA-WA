@@ -55,9 +55,19 @@ const points = useSettlementPoints()
         >
         <span class="min-w-0 flex-1 truncate text-body-sm">{{ participant.name }}</span>
         <span class="shrink-0 text-body-sm text-ink-2">{{ points(participant.shareAmount) }}</span>
-        <AppBadge :tone="participant.requestStatus === 'PAID' ? 'completed' : 'pending'">
-          {{ t(`settlement.detail.participantRequestStatus.${participant.requestStatus}`) }}
-        </AppBadge>
+        <!--
+          상태 칸의 너비를 고정한다.
+
+          배지를 제 글자 너비대로 두면 Paid 줄과 Pending 줄의 배지 폭이 달라서, 그 왼쪽에
+          있는 금액이 줄마다 다른 자리에 선다. 금액은 위아래로 훑어 비교하는 값이라 몇
+          픽셀만 어긋나도 눈에 걸린다. 칸을 고정하면 배지 글자가 바뀌어도 금액 자리는
+          그대로다.
+        -->
+        <span class="flex w-18 shrink-0 justify-end">
+          <AppBadge :tone="participant.requestStatus === 'PAID' ? 'completed' : 'pending'">
+            {{ t(`settlement.detail.participantRequestStatus.${participant.requestStatus}`) }}
+          </AppBadge>
+        </span>
       </li>
     </ul>
   </AppCard>
