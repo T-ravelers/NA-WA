@@ -140,11 +140,11 @@ describe('TopupView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === '+₩10,000')
+      .find((button) => button.text() === '+10,000 P')
       ?.trigger('click')
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === '+₩30,000')
+      .find((button) => button.text() === '+30,000 P')
       ?.trigger('click')
     await wrapper
       .findAll('button')
@@ -167,7 +167,7 @@ describe('TopupView', () => {
     await wrapper.get('input[inputmode="numeric"]').setValue('30000')
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === '+₩10,000')
+      .find((button) => button.text() === '+10,000 P')
       ?.trigger('click')
     await wrapper
       .findAll('button')
