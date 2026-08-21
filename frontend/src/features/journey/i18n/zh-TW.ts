@@ -111,20 +111,20 @@ export default {
       title: '要從行程中移除嗎？',
       description: '這會將 {title} 從這個旅程中移除。活動或地點本身不會被刪除。',
       confirmedDescription:
-        '這會將 {title} 從這個旅程中移除，並退出其約定。活動或地點本身不會被刪除。',
+        '這會將 {title} 從這個旅程中移除，並退出相關揪團。活動或地點本身不會被刪除。',
       cancel: '取消',
       delete: '刪除',
       blockedTitle: '無法移除這個項目',
-      blockedDescription: '您是這個約定的主辦人。請先轉讓或關閉約定，再移除這個項目。',
+      blockedDescription: '您是這個揪團的主揪。請先轉讓或關閉揪團，再移除這個項目。',
       unavailableTitle: '行程已變更',
-      unavailableDescription: '這個項目已被移除，或其約定已無法退出。行程將重新整理。',
+      unavailableDescription: '這個項目已被移除，或已無法退出相關揪團。行程將重新整理。',
     },
     delete: {
       title: '要刪除這個旅程嗎？',
       description: '旅程及其儲存的行程將被移除。活動和地點本身不會被刪除。',
       itemCount: '{count} 個行程項目',
       blockedTitle: '無法刪除旅程',
-      blockedDescription: '您是這個旅程中即將開始或進行中約定的主辦人。請先轉讓或關閉該約定。',
+      blockedDescription: '這個旅程中有由您主揪且即將開始或進行中的揪團。請先轉讓或關閉該揪團。',
     },
     errorCode: {
       'JOURNEY-001': '找不到這個旅程。',
@@ -132,7 +132,7 @@ export default {
       'JOURNEY-003': '請檢查旅程內容後再試一次。',
       'JOURNEY-009': '部分行程項目不在所選的日期範圍內。',
       'JOURNEY-010': '這個行程項目已不存在。',
-      'JOURNEY-011': '必須先轉讓或關閉您主辦的約定。',
+      'JOURNEY-011': '必須先轉讓或關閉由您主揪的揪團。',
     },
   },
 }

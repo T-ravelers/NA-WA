@@ -15,7 +15,7 @@ export default {
     resultCount: '{count} 個活動',
     resultUnit: '筆結果',
     eventKinds: {
-      POPUP: '快閃店',
+      POPUP: '快閃活動',
       CONCERT: '演唱會',
       ETC: '其他',
       FESTIVAL: '慶典',

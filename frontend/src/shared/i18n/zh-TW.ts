@@ -7,7 +7,7 @@
 export default {
   app: {
     name: 'NA-WA',
-    tagline: '一起規劃、旅行、結算',
+    tagline: '一起規劃、旅行、分帳',
   },
   action: {
     retry: '重試',

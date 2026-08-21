@@ -17,7 +17,7 @@ export default {
     },
     signIn: {
       title: '歡迎使用 NA-WA',
-      description: '登入後即可規劃旅程，並與旅伴結算費用。',
+      description: '登入後即可規劃旅程，並與旅伴分帳。',
       google: '使用 Google 繼續',
       line: '使用 LINE 繼續',
       lineNotice: 'LINE 登入功能仍在審核中。',
