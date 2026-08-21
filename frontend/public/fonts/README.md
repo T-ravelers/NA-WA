@@ -8,7 +8,7 @@
 | ----------------------------------- | ------------------------------------ | ---------------------------- | ---------------------- |
 | `NotoSans.woff2`                    | Body / UI (`en`, `vi`)               | `NotoSans.ttf` 2.0MB         | 201KB                  |
 | `noto-sans-jp/NotoSansJP.<n>.woff2` | Body / UI (`ja`) — 슬라이스 124개    | Noto Sans JP Variable 9.1MB  | 합계 5.4MB, 최대 127KB |
-| `noto-sans-tc/NotoSansTC.<n>.woff2` | Body / UI (`zh-TW`) — 슬라이스 105개 | Noto Sans TC Variable 11.9MB | 합계 4.3MB, 최대 99KB  |
+| `noto-sans-tc/NotoSansTC.<n>.woff2` | Body / UI (`zh-TW`) — 슬라이스 105개 | Noto Sans TC Variable 11.9MB | 합계 4.3MB, 최대 132KB |
 
 Display 폰트는 여기에 없다. 아래 「Display 폰트」 절을 참조한다.
 
@@ -45,6 +45,10 @@ DB에서 오는 문자열(이벤트·장소 이름)이 섞여 있어 글리프�
 
 슬라이스 범위는 Google Fonts가 두 패밀리에 쓰는 분할(`scripts/cjk-unicode-ranges.json`)을
 그대로 가져왔다. 사용 빈도 순으로 묶여 있어 흔한 글자일수록 적은 슬라이스로 끝난다.
+
+`@font-face` 선언 자체는 `index.css`가 `fonts-cjk.css`를 `@import`해 **모든 로케일이 싣는다.**
+로케일에 따라 갈리는 것은 내려받는 폰트 파일뿐이다. 선언을 `ja`·`zh-TW`에만 싣는 것과
+`/fonts` 응답의 캐시 헤더는 #372에서 다룬다.
 
 ### 다시 만들기
 

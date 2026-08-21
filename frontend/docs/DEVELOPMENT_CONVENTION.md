@@ -332,8 +332,9 @@ export default {
 - `src/app/styles/index.css`는 Tailwind import, `@font-face`, 최소한의 base 레이어만
   담습니다. 화면별 스타일을 여기에 추가하지 않습니다.
 - 화면마다 임의 색상과 z-index를 추가하지 않습니다.
-- 폰트는 `public/fonts`의 woff2를 `@font-face`로 등록합니다. CJK 폰트는 원본이 크므로
-  서브셋한 뒤 locale별로 필요한 것만 불러옵니다. 자세한 내용은
+- 폰트는 `public/fonts`의 woff2를 `@font-face`로 등록합니다. CJK 폰트는 원본이 9~12MB라
+  unicode-range 슬라이스로 나눠 등록하고, 브라우저가 화면에 실제로 나온 글자가 속한
+  슬라이스만 내려받습니다. 로케일이 아니라 글자 기준입니다. 자세한 내용은
   `public/fonts/README.md`를 보세요.
 - 모바일 viewport에서는 `dvh`와 safe-area를 고려합니다.
 - 터치 대상을 충분한 크기로 만들고 hover에만 의존하지 않습니다.
