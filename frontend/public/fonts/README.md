@@ -4,13 +4,16 @@
 
 ## 수록 파일
 
-| 파일                                | 역할                                 | 원본                         | 크기                   |
-| ----------------------------------- | ------------------------------------ | ---------------------------- | ---------------------- |
-| `NotoSans.woff2`                    | Body / UI (`en`, `vi`)               | `NotoSans.ttf` 2.0MB         | 201KB                  |
-| `noto-sans-jp/NotoSansJP.<n>.woff2` | Body / UI (`ja`) — 슬라이스 124개    | Noto Sans JP Variable 9.1MB  | 합계 5.4MB, 최대 127KB |
-| `noto-sans-tc/NotoSansTC.<n>.woff2` | Body / UI (`zh-TW`) — 슬라이스 105개 | Noto Sans TC Variable 11.9MB | 합계 4.3MB, 최대 132KB |
+| 파일                                                 | 역할                                        | 원본                                 | 크기                   |
+| ---------------------------------------------------- | ------------------------------------------- | ------------------------------------ | ---------------------- |
+| `NotoSans.woff2`                                     | Body / UI (`en`, `vi`)                      | `NotoSans.ttf` 2.0MB                 | 201KB                  |
+| `noto-sans-jp/NotoSansJP.<n>.woff2`                  | Body / UI (`ja`) — 슬라이스 124개           | Noto Sans JP Variable 9.1MB          | 합계 5.4MB, 최대 127KB |
+| `noto-sans-tc/NotoSansTC.<n>.woff2`                  | Body / UI (`zh-TW`) — 슬라이스 105개        | Noto Sans TC Variable 11.9MB         | 합계 4.3MB, 최대 132KB |
+| `m-plus-1p/MPLUS1p-{Light,Bold}.<n>.woff2`           | Display (`ja`) — 굵기 2 × 슬라이스 126개    | M PLUS 1p 정적 TTF 각 1.7MB          | 합계 1.9MB             |
+| `taipei-sans-tc/TaipeiSansTC-{Light,Bold}.<n>.woff2` | Display (`zh-TW`) — 굵기 2 × 슬라이스 105개 | Taipei Sans TC Beta 정적 TTF 각 20MB | 합계 4.6MB             |
 
-Display 폰트는 여기에 없다. 아래 「Display 폰트」 절을 참조한다.
+라틴 Display 폰트(Sztos)는 여기에 없다. 아래 「Display 폰트」 절을 참조한다. CJK Display는 위 표의
+두 패밀리다 — 「CJK 디스플레이 폰트」 절.
 
 `NotoSans.woff2`는 가변 폰트이며 `wght 100–900`, `wdth 62.5–100` 축을 유지한다. CJK 슬라이스도
 가변 폰트이며 `wght 100–900` 축을 유지한다(`wdth` 축은 원본에 없다).
@@ -54,9 +57,14 @@ DB에서 오는 문자열(이벤트·장소 이름)이 섞여 있어 글리프�
 
 ```shell
 uvx --from 'fonttools[woff]' python scripts/subset-cjk-fonts.py \
-  --jp <NotoSansJP-VariableFont_wght.ttf> --tc <NotoSansTC-VariableFont_wght.ttf>
+  --jp <NotoSansJP-VariableFont_wght.ttf> --tc <NotoSansTC-VariableFont_wght.ttf> \
+  --mplus-light <MPLUS1p-Light.ttf> --mplus-bold <MPLUS1p-Bold.ttf> \
+  --taipei-light <TaipeiSansTCBeta-Light.ttf> --taipei-bold <TaipeiSansTCBeta-Bold.ttf>
 pnpm --filter @na-wa/frontend exec prettier --write src/app/styles/fonts-cjk.css
 ```
+
+같은 입력이면 바이트까지 같은 슬라이스가 나온다(`recalcTimestamp=False` — 저장 시각을 파일에 넣지
+않는다). 다시 만들었는데 `git status`에 수백 장이 뜨면 입력 폰트나 범위 표가 바뀐 것이다.
 
 스크립트가 `public/fonts/noto-sans-jp/`·`noto-sans-tc/`의 woff2와
 `src/app/styles/fonts-cjk.css`(`@font-face` 229블록)를 함께 만든다. **`fonts-cjk.css`는 생성
@@ -74,6 +82,21 @@ ja와 zh-TW가 공유하는 한자는 자형이 다르다. 두 패밀리가 같�
 
 한글은 어느 패밀리에도 없다. 한국어는 서비스 로케일이 아니므로 DB 원문의 한글은 시스템 폰트에
 맡긴다.
+
+## CJK 디스플레이 폰트
+
+제목·섹션 헤더·티켓(`--font-display`)은 라틴만 있는 Sztos로 조판된다. `ja`·`zh-TW`의 글자는 Sztos에
+없어 체인의 다음 서체로 넘어가는데, 본문 서체(Noto Sans JP·TC)로 떨어지면 헤드라인이 본문처럼 보인다.
+그래서 `index.css`의 `:root:lang(ja)`는 Sztos 바로 뒤에 **M PLUS 1p**, `:root:lang(zh-TW)`는
+**Taipei Sans TC Beta**를 끼운다. 본문 체인은 그대로다.
+
+굵기는 디스플레이 토큰이 실제로 쓰는 값만 싣는다 — 700(화면 제목·섹션 헤더·티켓 제목)과 200·300(웰컴
+헤드라인·디스플레이 라벨). **Light(300)와 Bold(700) 두 벌**이면 전부 덮인다. 500(카테고리 티켓 제목)은
+CSS 굵기 매칭 규칙대로 Light로 떨어진다 — 얇아 보이면 그때 Medium/Regular을 더한다.
+
+슬라이스 범위는 M PLUS 1p는 Google Fonts의 분할(126), Taipei Sans TC Beta는 Google Fonts에 없어 Noto
+Sans TC의 분할(105)을 같이 쓴다. 두 패밀리 모두 `wdth` 축이 없어 `.font-display`의 `font-stretch: 200%`는
+영향이 없다.
 
 ## Display 폰트
 
@@ -166,9 +189,7 @@ Sztos 로드 여부와 관계없이 워드마크 모양이 유지되고 추가 �
 
 ## 아직 없는 폰트
 
-- **CJK Display**: Taipei Sans TC Beta(`zh-TW`), M PLUS 1p(`ja`).
-  디자인 번들에 없다. 확보 전까지 `ja`·`zh-TW` 헤드라인은 Body 폰트(Noto Sans JP·TC)로
-  폴백한다.
+- 없다. 한글은 서비스 로케일이 아니라 싣지 않는다 — DB 원문의 한글은 시스템 폰트에 맡긴다.
 
 ## Service Worker
 
@@ -180,6 +201,10 @@ Sztos 로드 여부와 관계없이 워드마크 모양이 유지되고 추가 �
 - **Noto Sans**: SIL Open Font License 1.1. 전문은 `NotoSans-OFL.txt`.
 - **Noto Sans JP · Noto Sans TC**: SIL Open Font License 1.1. 전문은 `NotoSansCJK-OFL.txt`(두
   패밀리의 OFL 원문이 같다).
+- **M PLUS 1p**: SIL Open Font License 1.1. 전문은 `MPLUS1p-OFL.txt`(배포 폴더의 `OFL.txt` 그대로).
+- **Taipei Sans TC Beta**: SIL Open Font License 1.1. 배포 파일에는 라이선스 문서가 따로 없고 폰트의
+  name 테이블(nameID 13·14)이 OFL 1.1과 `http://scripts.sil.org/OFL`을 가리킨다. Source Han Sans의
+  수정본(JT Foundry). `TaipeiSansTCBeta-OFL.txt`는 그 저작권 문구 + OFL 1.1 본문이다.
 - **Ria Sans**: 온보딩 워드마크 네 글자만 SVG 패스로 포함한다. 원본 폰트 파일은
   저장소와 빌드 산출물에 넣지 않는다.
 - **Sztos**: 디자인 번들에 라이선스 파일이 없어 재배포 권한을 확인할 수 없었다. 셀프
