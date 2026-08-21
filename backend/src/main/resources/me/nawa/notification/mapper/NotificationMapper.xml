@@ -32,17 +32,23 @@
           AND n.deleted_at IS NULL
     </update>
 
+    <!--
+        만든 시각은 컬럼 기본값(CURRENT_TIMESTAMP)에 맡기지 않고 애플리케이션이 넘긴 값을
+        적는다. 이 시각은 화면에 그대로 보이고 목록 정렬 기준이기도 해서, DB 시계에 기대면
+        DB와 앱의 시간대가 어긋난 만큼 알림 시각 전체가 밀린다. 같은 행의 read_at도 앱이
+        적으므로, 두 시각이 서로 다른 시계에서 나오는 일도 이걸로 없앤다.
+    -->
     <insert id="insertNotifications">
         INSERT INTO notifications (
             recipient_member_id, notification_type, settlement_id,
-            actor_name, gathering_name, amount, currency_code
+            actor_name, gathering_name, amount, currency_code, created_at
         ) VALUES
         <foreach collection="notifications" item="notification" separator=",">
             (
                 #{notification.recipientMemberId}, #{notification.notificationType},
                 #{notification.settlementId}, #{notification.actorName},
                 #{notification.gatheringName}, #{notification.amount},
-                #{notification.currencyCode}
+                #{notification.currencyCode}, #{notification.createdAt}
             )
         </foreach>
     </insert>
