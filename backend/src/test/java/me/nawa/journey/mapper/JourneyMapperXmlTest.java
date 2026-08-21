@@ -155,7 +155,7 @@ class JourneyMapperXmlTest {
             .replaceAll("\\s+", " ")
             .trim();
         assertTrue(duplicateSql.contains("FROM trip_items"));
-        assertFalse(duplicateSql.contains("deleted_at IS NULL"));
+        assertTrue(duplicateSql.contains("deleted_at IS NULL"));
 
         MappedStatement insertStatement = configuration
             .getMappedStatement(namespace + "insertJourneyItem");

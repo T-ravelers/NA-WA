@@ -9,9 +9,11 @@ import type { AppointmentMember } from '../api/appointmentApi'
 
 interface Props {
   members: AppointmentMember[]
+  /** 로그인 회원의 참여 id. 목록에서 자기 자신을 알아볼 수 있게 표시한다. */
+  currentAppointmentMemberId?: number | null
 }
 
-const { members } = defineProps<Props>()
+const { members, currentAppointmentMemberId = null } = defineProps<Props>()
 const emit = defineEmits<{ select: [member: AppointmentMember] }>()
 const { t } = useI18n()
 
@@ -44,6 +46,12 @@ function initials(displayName: string): string {
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="truncate text-title-sm text-ink">{{ member.displayName }}</h3>
+              <AppBadge
+                v-if="member.appointmentMemberId === currentAppointmentMemberId"
+                tone="neutral"
+              >
+                {{ t('appointment.members.you') }}
+              </AppBadge>
               <AppBadge
                 v-if="member.isHost"
                 tone="settlement"

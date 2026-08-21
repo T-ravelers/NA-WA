@@ -204,6 +204,26 @@ export async function confirmAppointmentAttendance(
   await httpClient.patch(`${APPOINTMENT_LIST_PATH}/${appointmentId}/attendance`, request)
 }
 
+/**
+ * 로그인 회원이 이 약속에서 이미 후기를 쓴 대상의 `appointmentMemberId` 목록.
+ *
+ * 백엔드 `MyReviewStatusResponse`와 1:1이다. 점수·키워드는 담기지 않는다 —
+ * 화면은 "누구에게 이미 썼는지"만 알면 되고, 저장된 후기를 고치는 기능이 없다.
+ */
+export interface MyAppointmentReviewStatus {
+  reviewedAppointmentMemberIds: number[]
+}
+
+export async function fetchMyAppointmentReviewStatus(
+  appointmentId: number,
+): Promise<MyAppointmentReviewStatus> {
+  const response = await httpClient.get<MyAppointmentReviewStatus>(
+    `${APPOINTMENT_LIST_PATH}/${appointmentId}/reviews/me`,
+  )
+
+  return response.data ?? { reviewedAppointmentMemberIds: [] }
+}
+
 export async function submitAppointmentReview(
   appointmentId: number,
   request: AppointmentReviewRequest,

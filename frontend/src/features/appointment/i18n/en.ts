@@ -153,16 +153,17 @@ export default {
         title: 'Group tools',
         attendance: 'Attendance',
         attendanceDescription: 'Confirm who attended · Host only',
-        attendanceNotStarted: 'Opens once the activity starts.',
+        attendanceNotEnded: 'Opens once the activity ends.',
         attendanceDone: 'Attendance has already been confirmed.',
         attendanceCancelled: 'This appointment was canceled.',
         reviews: 'Reviews',
-        reviewsDescription: 'Rate members you met',
+        reviewsDescription: 'Rate the members you met',
         reviewsNotCompleted: 'Opens once the host confirms attendance.',
         reviewsNotAttended: 'Only members confirmed as attended can write reviews.',
         leave: 'Leave group',
         leaveDescription: 'You will no longer be a member',
         leaveDeadlinePassed: 'The join deadline has passed, so you can no longer leave.',
+        leaveNotMember: 'You are not a member of this appointment.',
       },
       invalidTitle: 'Appointment not found',
       invalidDescription: 'The appointment link is invalid.',
@@ -175,6 +176,7 @@ export default {
       viewAll: 'View all',
       loading: 'Loading members',
       host: 'Host',
+      you: 'You',
       status: {
         ACTIVE: 'Active',
         LEFT: 'Left',
@@ -217,6 +219,8 @@ export default {
         'Your deposit of \u20a9{amount} will be refunded to your wallet. To join again you will need to pay it once more.',
       confirm: 'Leave group',
       cancel: 'Stay',
+      done: 'You left this appointment.',
+      doneRefunded: 'You left this appointment. \u20a9{amount} has been refunded to your wallet.',
     },
     deposit: {
       title: 'Confirm participation',
@@ -239,15 +243,28 @@ export default {
       },
       toggle: 'Toggle attendance for {name}',
       save: 'Confirm attendance',
-      hint: 'Tap a member to switch between attended and no-show. Everyone starts as attended.',
+      hint: 'Everyone starts as not attended. Tap each member who showed up.',
+      member: 'Member',
+      you: 'You',
       requireAttended: 'Mark at least one member as attended.',
+      confirmSheet: {
+        title: 'Confirm attendance?',
+        close: 'Close attendance confirmation',
+        counts: '{attended} attended \u00b7 {noShow} no-show',
+        forfeit:
+          'Deposits from everyone marked as no-show are forfeited and shared among the members who attended.',
+        irreversible: 'Attendance cannot be changed once confirmed.',
+        selfNoShow: 'You are marked as no-show, so your own deposit will be forfeited too.',
+        cancel: 'Go back',
+        confirm: 'Confirm attendance',
+      },
       invalidTitle: 'Attendance could not be loaded',
       invalidDescription: 'The appointment link is invalid.',
       accessDeniedTitle: 'Host access required',
       accessDeniedDescription: 'Only the appointment host can confirm attendance.',
       notCompletedTitle: 'Attendance is not open',
       notCompletedDescription:
-        'Attendance opens once the activity starts, and closes once you confirm it.',
+        'Attendance opens once the activity ends, and closes once you confirm it.',
       loadFailed: 'Attendance could not be loaded',
       loadFailedDescription: 'Please try again in a moment.',
     },
@@ -274,7 +291,6 @@ export default {
       pending: 'Pending',
       completed: 'Completed',
       finish: 'Finish reviews',
-      saveFailed: 'Review could not be saved. Please try again.',
       invalidTitle: 'Reviews could not be loaded',
       invalidDescription: 'The appointment link is invalid.',
       loadFailed: 'Reviews could not be loaded',
@@ -285,6 +301,18 @@ export default {
       accessDeniedDescription: 'Only active appointment members can write reviews.',
       emptyTitle: 'No reviews to write',
       emptyDescription: 'Active appointment members will appear here after the appointment.',
+    },
+  },
+  /**
+   * 후기 오류 코드는 `REVIEW-` 접두사를 쓴다. 공용 규칙이 코드 접두사로
+   * `<prefix>.errorCode.<CODE>` 키를 만들기 때문에(`resolveErrorMessageKey`)
+   * `appointment` 아래에 두면 찾지 못한다. 백엔드 도메인 이름(`me.nawa.review`)에
+   * 맞춰 최상위 `review` 네임스페이스에 둔다. 화면은 appointment feature가 갖는다.
+   */
+  review: {
+    errorCode: {
+      'REVIEW-001': 'Only members confirmed as attended can review this appointment.',
+      'REVIEW-002': 'You have already reviewed this member.',
     },
   },
 }

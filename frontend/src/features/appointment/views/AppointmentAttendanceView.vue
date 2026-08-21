@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { parseServerDateTime } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -11,6 +12,7 @@ import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
+import AppointmentAttendanceConfirmSheet from '../components/AppointmentAttendanceConfirmSheet.vue'
 import {
   confirmAppointmentAttendance,
   type AppointmentAttendanceStatus,
@@ -21,8 +23,8 @@ import { appointmentKeys } from '../model/appointmentKeys'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
+  appointmentParticipationQueryOptions,
 } from '../model/appointmentQueries'
-import { useAppointmentMemberProfile } from '../model/memberIntegration'
 
 /** 서버가 받는 값. `PENDING`은 확정 요청에 실을 수 없다. */
 type ConfirmedAttendance = 'ATTENDED' | 'NO_SHOW'
@@ -54,17 +56,28 @@ const membersQuery = useQuery({
   retry: false,
 })
 
-const profileQuery = useAppointmentMemberProfile()
-const members = computed(() => membersQuery.data.value ?? [])
-const isHost = computed(() => {
-  const currentMemberId = profileQuery.data.value?.memberId
-  return (
-    currentMemberId !== undefined &&
-    members.value.some((member) => member.memberId === currentMemberId && member.isHost)
-  )
+const participationQuery = useQuery({
+  ...appointmentParticipationQueryOptions(appointmentId),
+  enabled: computed(() => appointmentId.value !== null),
+  retry: false,
 })
-const appointmentInProgress = computed(
-  () => detailQuery.data.value?.appointmentStatus === 'IN_PROGRESS',
+
+const members = computed(() => membersQuery.data.value ?? [])
+const myAppointmentMemberId = computed(
+  () => participationQuery.data.value?.appointmentMemberId ?? null,
+)
+// 방장 여부는 상세 화면과 같은 근거(participation 응답)를 쓴다. 회원 목록에서
+// 내 memberId를 찾아 추리면 목록 조회나 프로필 연동이 실패했을 때 방장 권한까지
+// 함께 사라져, 정작 출석을 확정해야 할 사람이 막힌다.
+const isHost = computed(() => participationQuery.data.value?.host === true)
+// 상세 화면의 시트와 같은 조건이다. 활동이 끝나기 전에 확정하면 늦게 온 사람이
+// 노쇼로 굳어 보증금을 잃는다.
+const isActivityOver = computed(() => {
+  const endAt = parseServerDateTime(detailQuery.data.value?.activityEndAt ?? null)
+  return endAt !== null && Date.now() >= endAt.getTime()
+})
+const attendanceOpen = computed(
+  () => detailQuery.data.value?.appointmentStatus === 'IN_PROGRESS' && isActivityOver.value,
 )
 function initials(displayName: string): string {
   return displayName.trim().charAt(0).toUpperCase() || '?'
@@ -73,15 +86,14 @@ function initials(displayName: string): string {
 // 방장이 화면에서 고른 값. 저장 전까지 서버에 반영되지 않는다.
 const draft = reactive<Record<number, ConfirmedAttendance>>({})
 
-// 아직 확정 전(PENDING)인 회원은 ATTENDED에서 출발한다. NO_SHOW는 보증금을
-// 몰수해 참석자에게 나누는 처리라(16절), 방장이 명시적으로 고르지 않은 회원에게
-// 기본값으로 적용할 값이 아니다.
+// 아직 확정 전(PENDING)인 회원은 NO_SHOW에서 출발한다. 방장이 온 사람을 하나씩
+// 눌러 ATTENDED로 바꾼다. 이미 확정된 값이 있으면 그 값을 그대로 이어받는다.
 watch(
   members,
   (list) => {
     for (const member of list) {
       if (draft[member.memberId] === undefined) {
-        draft[member.memberId] = member.attendanceStatus === 'NO_SHOW' ? 'NO_SHOW' : 'ATTENDED'
+        draft[member.memberId] = member.attendanceStatus === 'ATTENDED' ? 'ATTENDED' : 'NO_SHOW'
       }
     }
   },
@@ -100,11 +112,25 @@ function toggleAttendance(member: AppointmentMember): void {
   draft[member.memberId] = attendanceStatus(member) === 'ATTENDED' ? 'NO_SHOW' : 'ATTENDED'
 }
 
+const attendedCount = computed(
+  () => members.value.filter((member) => attendanceStatus(member) === 'ATTENDED').length,
+)
+const noShowCount = computed(() => members.value.length - attendedCount.value)
 // 서버는 참석자가 한 명도 없는 확정을 거부한다(APPOINTMENT-006). 전원 노쇼면
 // 나눠 줄 상대가 없어 보증금 정산이 성립하지 않기 때문이다.
-const hasAttendedMember = computed(() =>
-  members.value.some((member) => attendanceStatus(member) === 'ATTENDED'),
+const hasAttendedMember = computed(() => attendedCount.value > 0)
+// 방장도 기본값이 미참석이라, 자기를 올리지 않은 채 제출하면 자기 보증금을 잃는다.
+// 화면에서는 "안 눌렀다"와 "안 왔다"가 같은 모양이라 확인 단계에서 따로 짚어 준다.
+const selfNoShow = computed(() =>
+  members.value.some(
+    (member) =>
+      member.appointmentMemberId === myAppointmentMemberId.value &&
+      attendanceStatus(member) !== 'ATTENDED',
+  ),
 )
+
+// 확정은 되돌리는 상태 전이가 없다. 누르자마자 보내지 않고 숫자로 한 번 되짚는다.
+const saveConfirmOpen = ref(false)
 
 const attendanceMutation = useMutation({
   mutationFn: () =>
@@ -115,6 +141,7 @@ const attendanceMutation = useMutation({
       })),
     }),
   onSuccess: async () => {
+    saveConfirmOpen.value = false
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: appointmentKeys.detail(appointmentId.value) }),
       queryClient.invalidateQueries({ queryKey: appointmentKeys.members(appointmentId.value) }),
@@ -137,8 +164,18 @@ const saveErrorMessage = computed(() =>
     : t(appointmentErrorMessageKey(attendanceMutation.error.value, hasMessage)),
 )
 
-function save(): void {
+function openSaveConfirm(): void {
   if (appointmentId.value === null || !hasAttendedMember.value) return
+
+  attendanceMutation.reset()
+  saveConfirmOpen.value = true
+}
+
+function closeSaveConfirm(): void {
+  saveConfirmOpen.value = false
+}
+
+function confirmSave(): void {
   if (!attendanceMutation.isPending.value) attendanceMutation.mutate()
 }
 
@@ -153,7 +190,7 @@ function goBack(): void {
 function retry(): void {
   void detailQuery.refetch()
   void membersQuery.refetch()
-  void profileQuery.refetch()
+  void participationQuery.refetch()
 }
 </script>
 
@@ -180,13 +217,15 @@ function retry(): void {
     />
     <StateLoading
       v-else-if="
-        detailQuery.isPending.value || membersQuery.isPending.value || profileQuery.isPending.value
+        detailQuery.isPending.value ||
+        membersQuery.isPending.value ||
+        participationQuery.isPending.value
       "
       :label="t('state.loading')"
     />
     <StateError
       v-else-if="
-        detailQuery.isError.value || membersQuery.isError.value || profileQuery.isError.value
+        detailQuery.isError.value || membersQuery.isError.value || participationQuery.isError.value
       "
       :title="t('appointment.attendance.loadFailed')"
       :description="t('appointment.attendance.loadFailedDescription')"
@@ -194,7 +233,7 @@ function retry(): void {
       @retry="retry"
     />
     <StateEmpty
-      v-else-if="!appointmentInProgress"
+      v-else-if="!attendanceOpen"
       :title="t('appointment.attendance.notCompletedTitle')"
       :description="t('appointment.attendance.notCompletedDescription')"
     />
@@ -244,24 +283,28 @@ function retry(): void {
                 </div>
 
                 <div class="min-w-0 flex-1">
-                  <h3 class="truncate text-title-sm text-ink">{{ member.displayName }}</h3>
-                  <p class="mt-1 text-caption text-ink-3">
-                    {{ statusLabel(attendanceStatus(member)) }}
-                  </p>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <!-- 본인도 이름을 그대로 적고 배지로 가른다. 회원 목록이 쓰는
+                         방식이고, 이름을 통째로 "You"로 바꾸면 토글의 aria-label이
+                         쓰는 실명과 어긋나 보이는 이름과 읽히는 이름이 달라진다. -->
+                    <h3 class="truncate text-title-sm text-ink">{{ member.displayName }}</h3>
+                    <AppBadge
+                      v-if="member.appointmentMemberId === myAppointmentMemberId"
+                      tone="neutral"
+                    >
+                      {{ t('appointment.attendance.you') }}
+                    </AppBadge>
+                    <AppBadge :tone="member.isHost ? 'settlement' : 'neutral'">
+                      {{
+                        member.isHost
+                          ? t('appointment.members.host')
+                          : t('appointment.attendance.member')
+                      }}
+                    </AppBadge>
+                  </div>
                 </div>
 
-                <AppBadge
-                  :tone="
-                    attendanceStatus(member) === 'ATTENDED'
-                      ? 'settlement'
-                      : attendanceStatus(member) === 'PENDING'
-                        ? 'pending'
-                        : 'onPaper'
-                  "
-                >
-                  {{ statusLabel(attendanceStatus(member)) }}
-                </AppBadge>
-                <div class="w-24 shrink-0">
+                <div class="w-28 shrink-0">
                   <AppButton
                     block
                     compact
@@ -284,8 +327,11 @@ function retry(): void {
       <div
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
+        <!-- 시트가 열려 있으면 같은 오류를 시트가 이미 말하고 있다. 여기까지
+             띄우면 라이브 리전이 둘이라 스크린 리더가 두 번 읽고, 그중 하나는
+             scrim 뒤라 눈으로는 보이지도 않는다. -->
         <p
-          v-if="saveErrorMessage !== undefined"
+          v-if="saveErrorMessage !== undefined && !saveConfirmOpen"
           class="mb-2 text-center text-body-sm text-danger"
           role="alert"
         >
@@ -301,11 +347,22 @@ function retry(): void {
           block
           :loading="attendanceMutation.isPending.value"
           :disabled="!hasAttendedMember || attendanceMutation.isPending.value"
-          @click="save"
+          @click="openSaveConfirm"
         >
           {{ t('appointment.attendance.save') }}
         </AppButton>
       </div>
+
+      <AppointmentAttendanceConfirmSheet
+        v-if="saveConfirmOpen"
+        :attended-count="attendedCount"
+        :no-show-count="noShowCount"
+        :self-no-show="selfNoShow"
+        :confirm-disabled="attendanceMutation.isPending.value"
+        :error-message="saveErrorMessage"
+        @close="closeSaveConfirm"
+        @confirm="confirmSave"
+      />
     </template>
   </main>
 </template>

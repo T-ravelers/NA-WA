@@ -7,24 +7,22 @@ import { useOverlayDismiss } from '../composables/useOverlayDismiss'
 /**
  * 약속 상세 헤더의 버거 버튼이 여는 바텀시트.
  *
- * 조건을 만족하지 않는 항목은 숨기지 않고 비활성으로 두고 이유를 함께 적는다.
- * 세 항목은 서로 다른 시점에만 열리기 때문에(출석은 활동 중, 후기는 완료 후,
- * 나가기는 참여 마감 전) 조건에 맞는 것만 넣으면 시트가 매번 다른 모양이 되고
- * 사용자는 나머지 기능이 있는 줄도 모른다.
+ * 항목은 조건을 만족하지 않아도 숨기지 않고 비활성으로 두고 이유를 함께 적는다.
+ * 항목마다 열리는 시점이 달라서(출석은 활동이 끝난 뒤, 후기는 출석 확정 뒤,
+ * 나가기는 참여 마감 전) 조건에 맞는 것만 넣으면 시트가 열 때마다 다른 모양이
+ * 되고, 사용자는 나머지 기능이 있다는 것조차 알 수 없다.
  *
- * 다만 볼 자격 자체가 없는 항목은 아예 넣지 않는다. 출석 확인은 방장만,
- * 나가기는 방장이 아닌 참여자만 해당한다 — 방장은 어떤 상태에서도 자기 참여를
- * 취소할 수 없어서(APPOINTMENT-007) 비활성으로 보여줄 이유가 없다.
+ * 예외는 영영 켜질 수 없는 항목이다. 출석 확정은 방장만 할 수 있고, 방장은 어떤
+ * 상태에서도 자기 참여를 취소할 수 없다. 그래서 출석은 방장에게만, 나가기는
+ * 방장이 아닌 사람에게만 넣는다.
  */
 interface Props {
   appointmentName: string
-  /** 방장에게만 노출한다. */
+  /** 방장에게만 넣는다. */
   showAttendance: boolean
   attendanceDisabledReason?: string
-  /** 참여 이력이 있는 회원에게만 노출한다. */
-  showReviews: boolean
   reviewsDisabledReason?: string
-  /** 방장이 아닌 활성 참여자에게만 노출한다. */
+  /** 방장에게는 넣지 않는다. */
   showLeave: boolean
   leaveDisabledReason?: string
 }
@@ -33,7 +31,6 @@ const {
   appointmentName,
   showAttendance,
   attendanceDisabledReason = undefined,
-  showReviews,
   reviewsDisabledReason = undefined,
   showLeave,
   leaveDisabledReason = undefined,
@@ -93,7 +90,6 @@ const title = computed(() => t('appointment.detail.menu.title'))
       </button>
 
       <button
-        v-if="showReviews"
         type="button"
         class="flex min-h-14 flex-col justify-center rounded-sm px-1 py-3 text-left active:bg-surface-3 disabled:active:bg-transparent"
         :disabled="reviewsDisabledReason !== undefined"

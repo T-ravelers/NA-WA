@@ -273,6 +273,7 @@
             WHERE trip_id = #{tripId}
               AND item_id = #{itemId}
               AND visit_date = #{visitDate}
+              AND deleted_at IS NULL
         )
     </select>
 

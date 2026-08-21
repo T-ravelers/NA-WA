@@ -9,6 +9,10 @@ import { SUPPORTED_LOCALES, isSupportedLocale, type AppLocale } from '@/shared/i
  *
  * 각 파일은 자기 네임스페이스를 최상위 key로 갖는 객체를 default export한다.
  * 네임스페이스는 feature 이름을 사용해 다른 feature와 겹치지 않게 한다.
+ *
+ * 예외는 오류 코드다. `resolveErrorMessageKey`가 코드 접두사로 키를 만들기 때문에,
+ * 접두사가 feature 이름과 다르면(appointment 화면이 쓰는 `REVIEW-*`처럼) 그 접두사
+ * 네임스페이스를 같은 파일에 함께 둔다. 화면의 소유는 그대로 feature에 있다.
  */
 export type MessageTree = { [key: string]: string | MessageTree }
 
