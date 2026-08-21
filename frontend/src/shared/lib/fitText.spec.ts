@@ -164,3 +164,47 @@ describe('fitText', () => {
     expect(el.style.fontSize).toBe('')
   })
 })
+
+/**
+ * `contentWidth`의 Range 측정 경로.
+ *
+ * jsdom에는 `Range.prototype.getBoundingClientRect`가 없어 위 케이스는 전부 정수 `scrollWidth`
+ * 폴백만 탄다. 칸과 글자가 95px로 같아 보여도 소수점만큼 넘쳐 `…`이 붙던 회귀
+ * (이벤트 상세의 `Add to journey`)는 그 경로로는 잡히지 않으므로, 여기서만 직접 심는다.
+ */
+describe('fitText — 소수점 폭 측정', () => {
+  const LABEL = 'Add to journey'
+  /** 반올림되지 않은 실제 글자 폭. 기본 글자 크기 기준이고, 줄인 만큼 같이 줄어든다. */
+  const exact = { width: 0 }
+
+  beforeEach(() => {
+    Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+      configurable: true,
+      value(this: Range) {
+        const el = this.commonAncestorContainer as HTMLElement
+
+        return { width: (exact.width * currentFontSize(el)) / BASE_FONT_SIZE } as unknown as DOMRect
+      },
+    })
+  })
+
+  afterEach(() => {
+    Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect')
+  })
+
+  it('shrinks when the fraction overflows a column that scrollWidth says fits', () => {
+    box.available = 95
+    box.widthPerChar = 95 / LABEL.length
+    exact.width = 95.4
+
+    // 정수 폭으로는 95 = 95라 "들어간다"고 나온다. 이 경로만 있으면 아무 일도 일어나지 않는다.
+    const probe = document.createElement('span')
+
+    probe.textContent = LABEL
+    expect(probe.scrollWidth).toBe(box.available)
+
+    const { el } = mountTitle(LABEL, 0.75)
+
+    expect(Number.parseFloat(el.style.fontSize)).toBeLessThan(BASE_FONT_SIZE)
+  })
+})
