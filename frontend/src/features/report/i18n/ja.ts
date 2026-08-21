@@ -23,8 +23,7 @@ export default {
     },
     generate: {
       title: 'レポートの支出を選択',
-      description:
-        'この変更不可のレポートスナップショットに含める、完了済みのKRW支出を選んでください。',
+      description: '後から変更できないレポートに含める、完了済みのKRW支出を選んでください。',
       loading: '対象の支出を読み込み中',
       loadFailed: '対象の支出を読み込めませんでした。もう一度お試しください。',
       emptyTitle: '対象の支出がありません',
@@ -65,7 +64,7 @@ export default {
         heading: '消費スタイル',
         FOOD: {
           title: '味の探求者',
-          description: '食欲のままに旅をしました。この旅程の{share}がグルメに使われました。',
+          description: '食欲のおもむくままに楽しんだ旅。この旅程の{share}がグルメに使われました。',
         },
         SHOPPING: {
           title: 'おみやげハンター',

@@ -8,7 +8,7 @@ export default {
   auth: {
     welcome: {
       headline: 'あなたの旅を、\n記録に',
-      body: '韓国での旅程を計画し、仲間と費用を割り勘にして、お金の流れをすべて確認できます。',
+      body: '韓国での旅程を計画し、仲間と費用を分担して、お金の流れをすべて確認できます。',
       // 탑승권 그래픽 위의 라틴 표기. 워드마크와 같은 조판 요소라 번역하지 않는다.
       passLabel: 'Boarding · NAWA',
       passTitle: 'Seoul & Beyond',

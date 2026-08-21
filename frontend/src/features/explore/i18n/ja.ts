@@ -19,7 +19,7 @@ export default {
       CONCERT: 'コンサート',
       ETC: 'その他',
       FESTIVAL: 'フェスティバル',
-      EXHIBITION: '展示',
+      EXHIBITION: '展示会',
     },
     placeKinds: {
       RESTAURANT: 'レストラン',
@@ -56,7 +56,7 @@ export default {
       animeWebtoon: 'アニメ / ウェブトゥーン',
       fanMeeting: 'ファンミーティング',
       game: 'ゲーム',
-      exhibition: '展示',
+      exhibition: '展示会',
       festival: 'フェスティバル',
       filmDrama: '映画 / ドラマ',
       creator: 'クリエイター',
