@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterView, useRoute } from 'vue-router'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 
+import { useEdgeSwipeHistory } from '@/shared/lib/edgeSwipeHistory'
 import AppToastHost from '@/shared/ui/AppToastHost.vue'
 import BottomNav from '@/shared/ui/BottomNav.vue'
 
 const route = useRoute()
+
+// 가장자리 스와이프로 뒤로·앞으로 가기. 브라우저 탭이든 설치형 PWA든 같은 제스처를 준다(#381).
+useEdgeSwipeHistory(useRouter())
 
 /**
  * 하단 탭은 서비스 화면에서만 보여준다.
