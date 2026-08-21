@@ -121,6 +121,7 @@ export default {
       previewTitle: 'チャージ内容の確認',
       back: '戻る',
       amountLabel: 'チャージ金額',
+      pointsRateNotice: '1 P = ₩1。カードには韓国ウォン（KRW）で請求されます。',
       paymentMethod: '支払い方法',
       cardDescription: 'Visa / Mastercard · テストモード',
       paypalDescription: 'PayPal Sandbox · 近日公開',

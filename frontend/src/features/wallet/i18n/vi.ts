@@ -121,6 +121,7 @@ export default {
       previewTitle: 'XEM TRƯỚC NẠP TIỀN',
       back: 'Quay lại',
       amountLabel: 'Số tiền nạp',
+      pointsRateNotice: '1 P = ₩1. Thẻ của bạn sẽ được tính phí bằng KRW.',
       paymentMethod: 'Phương thức thanh toán',
       cardDescription: 'Visa / Mastercard · Chế độ thử nghiệm',
       paypalDescription: 'PayPal Sandbox · Sắp ra mắt',

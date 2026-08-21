@@ -121,6 +121,7 @@ export default {
       previewTitle: '儲值預覽',
       back: '返回',
       amountLabel: '儲值金額',
+      pointsRateNotice: '1 P = ₩1。將以韓元（KRW）向您的卡片請款。',
       paymentMethod: '付款方式',
       cardDescription: 'Visa / Mastercard · 測試模式',
       paypalDescription: 'PayPal Sandbox · 即將推出',

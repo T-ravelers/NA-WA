@@ -33,7 +33,7 @@ export default {
       startDate: 'Ngày bắt đầu',
       endDate: 'Ngày kết thúc',
       budget: 'Ngân sách',
-      budgetHelper: 'Không bắt buộc, tính bằng KRW.',
+      budgetHelper: 'Không bắt buộc. 1 P = ₩1.',
       companions: 'Ai sẽ đi?',
       companionsOptional: 'Không bắt buộc',
       companionOne: '1',
@@ -52,7 +52,7 @@ export default {
         startDateRequired: 'Chọn ngày bắt đầu.',
         endDateRequired: 'Chọn ngày kết thúc.',
         dateOrder: 'Ngày kết thúc phải trùng hoặc sau ngày bắt đầu.',
-        budgetInvalid: 'Nhập ngân sách KRW không quá 15 chữ số.',
+        budgetInvalid: 'Nhập ngân sách không quá 15 chữ số.',
       },
     },
     detail: {
@@ -101,8 +101,7 @@ export default {
       preferences: 'Tùy chọn',
       name: 'Tên hành trình',
       budget: 'Ngân sách',
-      budgetHelper:
-        'Không bắt buộc. Để trống để theo dõi chi tiêu không giới hạn. Số tiền tính bằng KRW.',
+      budgetHelper: 'Không bắt buộc. Để trống nếu muốn theo dõi chi tiêu không giới hạn. 1 P = ₩1.',
       companions: 'Ai sẽ đi?',
       save: 'Lưu thay đổi',
       delete: 'Xóa hành trình',
