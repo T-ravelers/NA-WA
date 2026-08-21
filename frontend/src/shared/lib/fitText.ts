@@ -123,6 +123,11 @@ function restore(el: HTMLElement): void {
  *
  * 단어 하나가 칸보다 길면(`companions`) 줄을 꺾어도 잘리므로, 하이픈이 되면 하이픈으로,
  * 아니면 단어 안에서 끊는다.
+ *
+ * **줄이 버튼 높이를 넘으면 잘리는 것이 아니라 버튼 밖으로 나간다.** span은 `truncate`의
+ * `overflow: hidden`을 갖지만 높이를 따로 받지 않아 내용만큼 늘어나고, 감싸는 `button`은
+ * `overflow: visible`이다. 12px 세 줄 46.8px까지는 48px 버튼에 들어가고 네 줄(62.4px)부터
+ * 넘쳐, 위아래로 삐져나와 옆 내용과 겹친다.
  */
 function wrapLines(el: HTMLElement): void {
   el.style.whiteSpace = 'normal'
@@ -141,7 +146,10 @@ function measure(member: Member): Box | null {
   const available = availableWidth(member.el, style)
   const needed = contentWidth(member.el)
 
-  if (!Number.isFinite(base) || base <= 0 || available <= 0) {
+  // 한 글자도 못 담는 칸은 배치된 것으로 보지 않는다. 로딩 중 `AppButton` 라벨은 `sr-only`라
+  // 폭이 1px인데, 이것을 멤버로 세면 그 비율(≈0.01)이 `Math.min`을 타고 묶음 전체를 하한까지
+  // 끌어내린다. 형제가 로딩을 도는 내내 옆 버튼 라벨이 작아졌다 돌아온다.
+  if (!Number.isFinite(base) || base <= 0 || available < base) {
     return null
   }
 

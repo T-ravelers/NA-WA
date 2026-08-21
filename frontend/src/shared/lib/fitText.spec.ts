@@ -22,7 +22,12 @@ function currentFontSize(el: HTMLElement): number {
 beforeAll(() => {
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
     configurable: true,
-    get: () => box.available,
+    get(this: HTMLElement) {
+      // 멤버마다 다른 칸 폭이 필요한 테스트는 `data-available`로 준다.
+      const own = Number.parseFloat(this.dataset.available ?? '')
+
+      return Number.isFinite(own) ? own : box.available
+    },
   })
   Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
     configurable: true,
@@ -266,7 +271,7 @@ describe('vFitTextGroup', () => {
   }
 
   // `defineComponent`를 쓰지 않는다 — 한 파일에 컴포넌트가 둘이면 lint가 막는다.
-  function mountGroup(labels: readonly (readonly [string, number])[]): HTMLElement[] {
+  function mountGroup(labels: readonly (readonly [string, number, number?])[]): HTMLElement[] {
     const wrapper = mount({
       setup() {
         return () =>
@@ -274,8 +279,17 @@ describe('vFitTextGroup', () => {
             h(
               'div',
               {},
-              labels.map(([text, minRatio]) =>
-                withDirectives(h('span', { class: 'truncate' }, text), [[vFitText, minRatio]]),
+              labels.map(([text, minRatio, available]) =>
+                withDirectives(
+                  h(
+                    'span',
+                    available === undefined
+                      ? { class: 'truncate' }
+                      : { class: 'truncate', 'data-available': String(available) },
+                    text,
+                  ),
+                  [[vFitText, minRatio]],
+                ),
               ),
             ),
             [[vFitTextGroup]],
@@ -311,6 +325,22 @@ describe('vFitTextGroup', () => {
 
     expect(member(members, 0).style.fontSize).toBe('')
     expect(member(members, 1).style.fontSize).toBe('')
+  })
+
+  it('ignores a member whose column cannot hold one character', () => {
+    box.available = 150
+
+    // 로딩 중 `AppButton` 라벨은 `sr-only`라 폭이 1px이다. 멤버로 세면 그 비율이
+    // 묶음 전체를 하한까지 끌어내린다.
+    const members = mountGroup([
+      ['Much longer label', 0.75],
+      ['Loading label', 0.75, 1],
+    ])
+
+    expect(Number.parseFloat(member(members, 0).style.fontSize)).toBeCloseTo(
+      BASE_FONT_SIZE * (150 / 170),
+      1,
+    )
   })
 
   it('uses the largest floor among the members', () => {
