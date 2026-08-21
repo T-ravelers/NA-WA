@@ -1,6 +1,7 @@
 package me.nawa.notification.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -41,11 +42,12 @@ public class SettlementNotificationRecorder {
         if (snapshot == null) {
             return;
         }
+        LocalDateTime now = LocalDateTime.now();
         List<Notification> notifications = shares(settlementId).stream()
             .filter(share -> "PENDING".equals(share.getRequestStatus()))
             .map(share -> notification(
                 REQUESTED, settlementId, snapshot, share.getMemberId(),
-                snapshot.getPayerName(), share.getShareAmount()
+                snapshot.getPayerName(), share.getShareAmount(), now
             ))
             .toList();
         insert(notifications);
@@ -67,7 +69,7 @@ public class SettlementNotificationRecorder {
         }
         insert(List.of(notification(
             PAID, settlementId, snapshot, snapshot.getPayerMemberId(),
-            payer.getDisplayName(), payer.getShareAmount()
+            payer.getDisplayName(), payer.getShareAmount(), LocalDateTime.now()
         )));
     }
 
@@ -87,10 +89,11 @@ public class SettlementNotificationRecorder {
         shares(settlementId).forEach(share -> recipients.add(share.getMemberId()));
         recipients.add(snapshot.getPayerMemberId());
 
+        LocalDateTime now = LocalDateTime.now();
         List<Notification> notifications = new ArrayList<>();
         recipients.forEach(recipient -> notifications.add(notification(
             COMPLETED, settlementId, snapshot, recipient,
-            snapshot.getPayerName(), snapshot.getTotalAmount()
+            snapshot.getPayerName(), snapshot.getTotalAmount(), now
         )));
         insert(notifications);
     }
@@ -103,9 +106,16 @@ public class SettlementNotificationRecorder {
         return notificationMapper.findSettlementMemberShares(settlementId);
     }
 
+    /**
+     * 한 번의 상태 전이로 생긴 알림들은 같은 시각을 나눠 쓴다.
+     *
+     * 만든 시각을 DB 기본값에 맡기지 않는 이유는 이 값이 화면에 그대로 보이고 목록 정렬
+     * 기준이기 때문이다. DB와 앱의 시간대가 어긋나면 그만큼 알림 시각이 통째로 밀린다.
+     * 정산 완료 시각을 앱이 적는 것과 같은 이유다.
+     */
     private Notification notification(String type, Long settlementId,
             SettlementNotificationSnapshot snapshot, Long recipientMemberId,
-            String actorName, BigDecimal amount) {
+            String actorName, BigDecimal amount, LocalDateTime createdAt) {
         return Notification.builder()
             .recipientMemberId(recipientMemberId)
             .notificationType(type)
@@ -114,6 +124,7 @@ public class SettlementNotificationRecorder {
             .gatheringName(snapshot.getGatheringName())
             .amount(amount)
             .currencyCode(snapshot.getCurrencyCode())
+            .createdAt(createdAt)
             .build();
     }
 

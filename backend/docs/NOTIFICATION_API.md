@@ -43,12 +43,17 @@
 시각 형식은 `yyyy-MM-dd'T'HH:mm:ss`이고 기준 시간대는 서버와 같은 `Asia/Seoul`이다.
 `readAt`이 `null`이면 아직 안 읽은 알림이다.
 
+`createdAt`과 `readAt`은 **둘 다 애플리케이션이 넘긴 값**이다. 컬럼 기본값
+(`CURRENT_TIMESTAMP`)에 맡기지 않는 이유는 `createdAt`이 화면에 그대로 보이고 목록 정렬
+기준이기도 해서다 — DB 시계를 쓰면 DB와 앱의 시간대가 어긋난 만큼 알림 시각이 통째로
+밀린다. CI는 MySQL을 일부러 UTC로 띄워 이 의존을 드러낸다. 자세한 것은
+[docs/TECH_STACK.md](../../docs/TECH_STACK.md).
+
 ### 읽음 처리
 
 `POST /api/v1/notifications/read-all`은 `{ "updatedCount": 3 }`을 돌려준다. 이번 요청으로
-실제로 읽음이 된 건수이며, 이미 다 읽었으면 0이다. 읽은 시각은 **애플리케이션이 넘긴
-값**을 쓴다. DB 시계를 쓰지 않는 이유는 정산 완료 시각과 같다 — CI는 MySQL을 일부러 UTC로
-띄워 이 의존을 드러낸다. 자세한 것은 [docs/TECH_STACK.md](../../docs/TECH_STACK.md).
+실제로 읽음이 된 건수이며, 이미 다 읽었으면 0이다. 읽은 시각은 위의 `createdAt`과 같은
+이유로 애플리케이션이 넘긴 값을 쓴다.
 
 ## 알림 종류와 받는 사람
 

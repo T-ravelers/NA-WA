@@ -120,26 +120,29 @@ class NotificationMapperIntegrationTest {
     /**
      * 적재 → 최신순 조회 → 미읽음 개수 → 읽음 처리까지 한 번에 따라간다.
      *
-     * 읽은 시각은 DB에게 묻지 않고 애플리케이션이 넘긴 값이 그대로 들어가야 한다. CI는
-     * MySQL을 일부러 UTC로 띄우므로, DB 시계를 쓰면 여기서 9시간이 어긋나 드러난다.
+     * 만든 시각과 읽은 시각 **둘 다** DB에게 묻지 않고 애플리케이션이 넘긴 값이 그대로
+     * 들어가야 한다. CI는 MySQL을 일부러 UTC로 띄우므로, DB 시계를 쓰면 여기서 9시간이
+     * 어긋나 드러난다. 만든 시각은 화면에 그대로 보이는 값이라 특히 어긋나면 안 된다.
      */
     @Test
     void insertReadAndCount_followTheRecipientAndStoreTimeGivenByApplication() {
         Fixture fixture = createFixture();
         try {
+            LocalDateTime createdAt = LocalDateTime.now().withNano(0);
             mapper.insertNotifications(List.of(
-                notification(fixture, "SETTLEMENT_REQUESTED", new BigDecimal("60")),
-                notification(fixture, "SETTLEMENT_COMPLETED", new BigDecimal("100"))
+                notification(fixture, "SETTLEMENT_REQUESTED", new BigDecimal("60"), createdAt),
+                notification(fixture, "SETTLEMENT_COMPLETED", new BigDecimal("100"), createdAt)
             ));
 
             List<Notification> notifications =
                 mapper.findByRecipient(fixture.guestMemberId(), 10);
 
             assertEquals(2, notifications.size());
-            // 같은 초에 들어가도 뒤에 넣은 것이 위로 온다.
+            // 같은 시각에 들어가도 뒤에 넣은 것이 위로 온다.
             assertEquals("SETTLEMENT_COMPLETED", notifications.get(0).getNotificationType());
             assertEquals(fixture.gatheringName(), notifications.get(0).getGatheringName());
             assertEquals("KRW", notifications.get(0).getCurrencyCode());
+            assertEquals(createdAt, notifications.get(0).getCreatedAt());
             assertNull(notifications.get(0).getReadAt());
             assertEquals(2, mapper.countUnreadByRecipient(fixture.guestMemberId()));
 
@@ -164,7 +167,9 @@ class NotificationMapperIntegrationTest {
         }
     }
 
-    private static Notification notification(Fixture fixture, String type, BigDecimal amount) {
+    private static Notification notification(
+        Fixture fixture, String type, BigDecimal amount, LocalDateTime createdAt
+    ) {
         return Notification.builder()
             .recipientMemberId(fixture.guestMemberId())
             .notificationType(type)
@@ -173,6 +178,7 @@ class NotificationMapperIntegrationTest {
             .gatheringName(fixture.gatheringName())
             .amount(amount)
             .currencyCode("KRW")
+            .createdAt(createdAt)
             .build();
     }
 
