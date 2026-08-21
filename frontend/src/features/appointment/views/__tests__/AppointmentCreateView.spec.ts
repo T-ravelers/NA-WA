@@ -177,15 +177,15 @@ describe('AppointmentCreateView', () => {
     expect(wrapper.text()).toContain('Choose a journey')
   })
 
-  it('confirms and leaves the flow when the journey select sheet is closed', async () => {
+  it('leaves the flow immediately when the journey select sheet is closed', async () => {
+    // 여정 선택 단계에는 아직 적은 것이 없다. 시트 바깥을 누른 것만으로
+    // "잃어버린다"는 확인을 띄우지 않고 바로 떠난다.
     const { wrapper, router } = await mountView()
 
     await wrapper.get('button[aria-label="Close journey selector"]').trigger('click')
-    expect(wrapper.text()).toContain('Leave without creating?')
-
-    await buttonByText(wrapper, 'Leave').trigger('click')
     await flushPromises()
 
+    expect(wrapper.text()).not.toContain('Leave without creating?')
     expect(router.currentRoute.value.name).toBe('appointment-list')
   })
 

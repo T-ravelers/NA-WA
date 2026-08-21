@@ -228,6 +228,19 @@ type AppointmentCreateFormExposed = {
 
 const createForm = ref<AppointmentCreateFormExposed | null>(null)
 
+// 흐름을 떠난다. 왔던 길을 되감고, 히스토리가 없을 때(딥링크·PWA 재진입)만
+// 약속 목록으로 보낸다.
+function leaveFlow(): void {
+  if (window.history.length > 1) {
+    void router.back()
+    return
+  }
+  void router.push({ name: 'appointment-list' })
+}
+
+// 이탈 확인 모달은 폼에 적은 내용을 지키기 위한 것이다. 여정 선택 단계에는
+// 아직 적은 것이 없으므로 묻지 않고 바로 떠난다 — 시트 바깥을 한 번 눌렀을
+// 뿐인데 "잃어버린다"는 모달이 뜨면 무엇을 잃는지 알 수 없다.
 function goBack(): void {
   if (phase.value === 'form') {
     if (createForm.value?.goToPreviousStep()) return
@@ -238,7 +251,7 @@ function goBack(): void {
     closeJourneyDate()
     return
   }
-  exitConfirmOpen.value = true
+  leaveFlow()
 }
 
 function cancelExit(): void {
@@ -247,11 +260,7 @@ function cancelExit(): void {
 
 function confirmExit(): void {
   exitConfirmOpen.value = false
-  if (window.history.length > 1) {
-    void router.back()
-    return
-  }
-  void router.push({ name: 'appointment-list' })
+  leaveFlow()
 }
 </script>
 
@@ -292,7 +301,7 @@ function confirmExit(): void {
       :selected-journey-id="selectedTripId"
       :loading="journeyListQuery.isPending.value"
       :error-message="journeySelectErrorMessage"
-      @close="exitConfirmOpen = true"
+      @close="leaveFlow"
       @select="selectJourney"
       @create-journey="goToCreateJourney"
     />
