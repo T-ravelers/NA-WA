@@ -24,9 +24,22 @@
 `yyyy-MM-dd'T'HH:mm:ss`이고 기준 시간대는 서버와 같은 `Asia/Seoul`이다.
 
 `completedAt`은 **애플리케이션이 넘긴 시각**을 기록한다. DB의 `CURRENT_TIMESTAMP`를 쓰지
-않는다. 운영에서는 두 시계를 맞춰 두었지만 그 맞춤은 설정 한 줄에 달려 있고, CI는 이런
-의존을 드러내려고 MySQL을 일부러 UTC로 띄운다. 이 값이 기간 필터의 기준이 되므로 두 시계가
-어긋나면 경계 근처의 정산이 통째로 다른 날짜로 묶인다.
+않는다. 이 값이 기간 필터의 기준이 되므로, DB 시계에 기대면 시간대 설정이 어긋나는 순간
+경계 근처의 정산이 통째로 다른 날짜로 묶인다.
+
+**두 시각은 서로 다른 시계에서 나온다.** 아래 표가 정본이다.
+
+| 필드 | 값을 적는 쪽 | 기준 시계 |
+| --- | --- | --- |
+| `createdAt` | `settlements.created_at`의 컬럼 기본값 `CURRENT_TIMESTAMP` | DB 세션 시간대 |
+| `completedAt` | 애플리케이션이 넘긴 `LocalDateTime.now()` | JVM 시간대 |
+
+`created_at`을 DB가 적는 것은 이 저장소의 모든 테이블이 그렇게 하기 때문이고, 정산만
+바꾸면 오히려 규칙이 갈린다. 대신 **두 값이 같은 기준으로 읽히려면 DB와 애플리케이션의
+시간대가 맞아 있어야 한다.** 운영은 맞춰 두었다 — `docker-compose.yml`의 `mysql`이
+`--default-time-zone=+09:00`이고 백엔드 컨테이너가 `TZ=Asia/Seoul`이다(#294). CI는 이
+맞춤을 **일부러 깨서**(MySQL만 UTC) DB 시계에 기대는 코드가 드러나게 한다. 세 곳의 설정은
+[AGENTS.md](../../AGENTS.md)와 [docs/TECH_STACK.md](../../docs/TECH_STACK.md)가 정본이다.
 
 `completedAt`은 settlement가 `COMPLETED`로 전이한 시각이며, `REQUESTED`인 동안에는 `null`이다.
 이 필드를 남기기 시작한 시점보다 먼저 완료된 정산도 `null`이다. `updated_at`이 갱신되지 않는
