@@ -69,6 +69,8 @@ export function fitText(el: HTMLElement, minRatio = DEFAULT_MIN_RATIO, wrap = fa
   el.style.fontSize = ''
   el.style.whiteSpace = ''
   el.style.textAlign = ''
+  el.style.overflowWrap = ''
+  el.style.hyphens = ''
 
   const base = Number.parseFloat(getComputedStyle(el).fontSize)
   const available = el.clientWidth
@@ -99,9 +101,12 @@ export function fitText(el: HTMLElement, minRatio = DEFAULT_MIN_RATIO, wrap = fa
   }
 
   // 하한까지 줄여도 안 들어간다. 말줄임이 기본이고, `.wrap`이면 두 줄로 꺾는다.
+  // 단어 하나가 칸보다 길면(`companions`) 줄을 꺾어도 잘리므로, 하이픈이 되면 하이픈으로, 아니면 단어 안에서 끊는다.
   if (wrap && reachedFloor) {
     el.style.whiteSpace = 'normal'
     el.style.textAlign = 'center'
+    el.style.overflowWrap = 'anywhere'
+    el.style.hyphens = 'auto'
   }
 }
 
