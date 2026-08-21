@@ -626,7 +626,14 @@ const SETTLEMENT_PARTICIPANTS = [
  * 있고, 목록 카드는 그때만 `Paid` 표시를 낸다. 결제 직후 목록을 찍으려면 이 둘을 따로
  * 줘야 한다.
  */
-function settlementSummary({ id, title, status = 'REQUESTED', paid = status === 'COMPLETED' }) {
+function settlementSummary({
+  id,
+  title,
+  status = 'REQUESTED',
+  paid = status === 'COMPLETED',
+  createdAt,
+  completedAt = null,
+}) {
   return {
     id,
     title,
@@ -634,6 +641,8 @@ function settlementSummary({ id, title, status = 'REQUESTED', paid = status === 
     receivableAmount: '40200',
     type: 'EQUAL',
     status,
+    createdAt,
+    completedAt,
     viewer: {
       role: 'PARTICIPANT',
       shareAmount: '20100',
@@ -645,7 +654,7 @@ function settlementSummary({ id, title, status = 'REQUESTED', paid = status === 
 }
 
 /** 받을 쪽(요청자) 목록 항목. 요청자에게는 낼 몫이 없어 허용 동작도 비어 있다. */
-function collectSummary({ id, title, status = 'REQUESTED' }) {
+function collectSummary({ id, title, status = 'REQUESTED', createdAt, completedAt = null }) {
   return {
     id,
     title,
@@ -653,6 +662,8 @@ function collectSummary({ id, title, status = 'REQUESTED' }) {
     receivableAmount: '32000',
     type: 'EQUAL',
     status,
+    createdAt,
+    completedAt,
     viewer: {
       role: 'CREATOR',
       shareAmount: '16000',
@@ -663,22 +674,62 @@ function collectSummary({ id, title, status = 'REQUESTED' }) {
   }
 }
 
-/** `paidId`를 주면 그 정산만 이미 낸 상태로 바꾼다. 나머지는 그대로 둔다. */
+/**
+ * `paidId`를 주면 그 정산만 이미 낸 상태로 바꾼다. 나머지는 그대로 둔다.
+ *
+ * 완료 날짜를 두 달에 걸쳐 흩어 둔다. 전체 내역의 기간 필터가 실제로 무엇을 걸러내는지는
+ * 한 달에 몰려 있으면 사진으로 보이지 않는다. 마지막 한 건은 완료 시각이 없는 예전
+ * 정산이라 만든 날짜로 대신 나온다.
+ */
 function receivedSettlements(paidId = null) {
   return [
-    settlementSummary({ id: 42, title: 'Late-night Burger Club', paid: paidId === 42 }),
-    settlementSummary({ id: 41, title: 'Hongdae Karaoke', status: 'COMPLETED' }),
-    settlementSummary({ id: 40, title: 'Seongsu Coffee', status: 'COMPLETED' }),
-    settlementSummary({ id: 39, title: 'Namsan Cable Car', status: 'COMPLETED' }),
-    settlementSummary({ id: 38, title: 'Gwangjang Market', status: 'COMPLETED' }),
+    settlementSummary({
+      id: 42,
+      title: 'Late-night Burger Club',
+      paid: paidId === 42,
+      createdAt: '2026-08-18T20:42:00',
+    }),
+    settlementSummary({
+      id: 41,
+      title: 'Hongdae Karaoke',
+      status: 'COMPLETED',
+      createdAt: '2026-08-12T20:00:00',
+      completedAt: '2026-08-12T21:10:00',
+    }),
+    settlementSummary({
+      id: 40,
+      title: 'Seongsu Coffee',
+      status: 'COMPLETED',
+      createdAt: '2026-07-30T14:30:00',
+      completedAt: '2026-07-30T15:05:00',
+    }),
+    settlementSummary({
+      id: 39,
+      title: 'Namsan Cable Car',
+      status: 'COMPLETED',
+      createdAt: '2026-07-04T17:50:00',
+      completedAt: '2026-07-04T18:20:00',
+    }),
+    settlementSummary({
+      id: 38,
+      title: 'Gwangjang Market',
+      status: 'COMPLETED',
+      createdAt: '2026-06-21T12:40:00',
+    }),
   ]
 }
 
 /** 완료 건이 하나는 있어야 수금 쪽에도 "View all"이 나와 전체 내역으로 들어갈 수 있다. */
 function sentSettlements() {
   return [
-    collectSummary({ id: 50, title: 'Han River Picnic' }),
-    collectSummary({ id: 49, title: 'Ikseon-dong Tea House', status: 'COMPLETED' }),
+    collectSummary({ id: 50, title: 'Han River Picnic', createdAt: '2026-08-16T19:00:00' }),
+    collectSummary({
+      id: 49,
+      title: 'Ikseon-dong Tea House',
+      status: 'COMPLETED',
+      createdAt: '2026-08-02T18:00:00',
+      completedAt: '2026-08-02T19:30:00',
+    }),
   ]
 }
 
@@ -1642,6 +1693,44 @@ const FLOWS = [
           await page.getByTestId('segment-sent').click()
           await page.locator('[data-action="view-all"]').click()
           await page.getByTestId('settlement-history-sent').waitFor()
+        },
+      },
+      {
+        /*
+         * 고른 기간은 주소에 남는다. 주소로 바로 들어가 찍는 것은 지름길이 아니라 그
+         * 약속을 그대로 확인하는 것이다 — 달력을 눌러 들어오든 새로고침으로 들어오든
+         * 같은 화면이어야 한다. 달력에서 고르면 찍는 달이 실행하는 날에 따라 달라져
+         * 고정된 예시 날짜와 어긋난다.
+         */
+        name: '06-history-period',
+        act: async (page) => {
+          await page.goto(
+            `${BASE}/settlements/history?side=received&from=2026-07-01&to=2026-07-31`,
+            {
+              waitUntil: 'networkidle',
+            },
+          )
+          await page.getByRole('heading', { level: 1, name: 'Paid splits' }).waitFor()
+        },
+      },
+      {
+        name: '07-history-period-sheet',
+        act: async (page) => {
+          await page.locator('[data-testid="period-filter"]').click()
+          await page.getByRole('dialog', { name: 'Choose a period' }).waitFor()
+        },
+      },
+      {
+        // 기간 안에 아무것도 없는 것과 완료 건이 아예 없는 것은 다른 화면이어야 한다.
+        name: '08-history-period-empty',
+        act: async (page) => {
+          await page.goto(
+            `${BASE}/settlements/history?side=received&from=2026-01-01&to=2026-01-31`,
+            {
+              waitUntil: 'networkidle',
+            },
+          )
+          await page.getByText('Nothing in this period').waitFor()
         },
       },
     ],

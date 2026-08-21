@@ -2,10 +2,12 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { formatCalendarDate } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 
 import { useSettlementPoints } from '../composables/useSettlementPoints'
 import type { SettlementSummary } from '../model/settlement'
+import { settlementCompletedDate } from '../model/settlementHistoryFilter'
 import { hasViewerPaid, primaryAmount, type SettlementSide } from '../model/settlementList'
 
 /**
@@ -24,10 +26,19 @@ interface Props {
 const { settlement, side, compact = false } = defineProps<Props>()
 const emit = defineEmits<{ open: [] }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const points = useSettlementPoints()
 
 const amount = computed(() => points(primaryAmount(settlement, side)))
+/**
+ * 끝난 날짜.
+ *
+ * 기간으로 좁혀 보는 화면에서 카드에 날짜가 없으면 고른 기간이 맞는지 확인할 방법이 없다.
+ * 아주 예전 정산은 서버에 끝난 시각이 없어 만든 날짜로 대신 나온다.
+ */
+const completedOn = computed(() =>
+  formatCalendarDate(settlementCompletedDate(settlement), locale.value),
+)
 /** 낸 사람에게는 진행 중이어도 `Paid`가 더 정확한 상태다. */
 const showsPaidMark = computed(
   () => side === 'received' && settlement.status === 'REQUESTED' && hasViewerPaid(settlement),
@@ -43,7 +54,14 @@ const showsPaidMark = computed(
   >
     <template v-if="compact">
       <span class="flex items-center justify-between gap-3">
-        <span class="min-w-0 truncate text-body">{{ settlement.title }}</span>
+        <span class="min-w-0">
+          <span class="block truncate text-body">{{ settlement.title }}</span>
+          <span
+            v-if="completedOn"
+            class="mt-1 block text-caption text-ink-3"
+            >{{ completedOn }}</span
+          >
+        </span>
         <span class="flex shrink-0 items-center gap-2">
           <strong class="text-body">{{ amount }}</strong>
           <AppBadge tone="completed">{{ t('settlement.status.COMPLETED') }}</AppBadge>
