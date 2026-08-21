@@ -99,6 +99,8 @@ describe('JourneyCreateView', () => {
     const { wrapper, router } = await mountView(
       '/journeys/new?returnRouteName=appointment-create&itemId=100&itemType=EVENT',
     )
+    const replace = vi.spyOn(router, 'replace')
+    const push = vi.spyOn(router, 'push')
 
     wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
     await flushPromises()
@@ -109,6 +111,13 @@ describe('JourneyCreateView', () => {
       itemType: 'EVENT',
       tripId: '42',
     })
+    // 제출이 끝난 이 화면은 히스토리에 남기지 않는다. push로 돌아가면 돌아간
+    // 화면에서 흐름을 포기할 때 되감기가 이미 제출한 폼으로 다시 튄다.
+    expect(replace).toHaveBeenCalledOnce()
+    expect(push).not.toHaveBeenCalled()
+
+    replace.mockRestore()
+    push.mockRestore()
   })
 
   it('goes back the way you came when there is history', async () => {

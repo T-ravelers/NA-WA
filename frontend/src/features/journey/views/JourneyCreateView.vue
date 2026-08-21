@@ -67,7 +67,10 @@ const createMutation = useMutation({
     if (returnTo !== null) {
       const restQuery = { ...route.query }
       delete restQuery.returnRouteName
-      await router.push({
+      // push가 아니라 replace다. push하면 이 화면이 히스토리에 남아, 돌아간
+      // 화면에서 흐름을 포기할 때(되감기) 목록이 아니라 이미 제출한 이 폼으로
+      // 다시 튄다. 제출이 끝난 화면은 되돌아올 이유가 없으니 자리를 내준다.
+      await router.replace({
         name: returnTo,
         query: { ...restQuery, tripId: String(journey.tripId) },
       })
