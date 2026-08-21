@@ -127,7 +127,7 @@ class PlaceServiceTest {
         when(placeMapper.findPlaceDetail(1L, null)).thenReturn(place);
         when(placeMapper.findPlaceActivities(1L, "en")).thenReturn(List.of());
 
-        PlaceDetailResponse result = placeService.getPlaceDetail(1L, "EN");
+        PlaceDetailResponse result = placeService.getPlaceDetail(1L, "EN", null);
 
         assertEquals("BEAUTY", result.getPlaceKind());
         assertEquals(List.of(), result.getActivities());
@@ -151,7 +151,7 @@ class PlaceServiceTest {
         when(placeMapper.findPlaceDetail(1L, null)).thenReturn(null);
         BusinessException exception = assertThrows(
             BusinessException.class,
-            () -> placeService.getPlaceDetail(1L, "en")
+            () -> placeService.getPlaceDetail(1L, "en", null)
         );
         assertEquals(ExploreErrorCode.PLACE_NOT_FOUND, exception.getErrorCode());
     }

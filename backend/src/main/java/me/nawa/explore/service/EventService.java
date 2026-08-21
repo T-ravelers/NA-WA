@@ -47,11 +47,6 @@ public class EventService {
     private final EventMapper eventMapper;
 
     @Transactional(readOnly = true)
-    public EventListResponse searchEvents(EventSearchRequest request) {
-        return searchEvents(request, null);
-    }
-
-    @Transactional(readOnly = true)
     public EventListResponse searchEvents(
         EventSearchRequest request,
         Long memberId
@@ -168,11 +163,6 @@ public class EventService {
             return 0;
         }
         return (int) ((totalElements + size - 1) / size);
-    }
-
-    @Transactional(readOnly = true)
-    public EventDetailResponse getEventDetail(Long eventId, String language) {
-        return getEventDetail(eventId, language, null);
     }
 
     @Transactional(readOnly = true)

@@ -66,7 +66,7 @@ class EventServiceTest {
         ))
             .thenReturn(3L);
 
-        EventListResponse result = eventService.searchEvents(request);
+        EventListResponse result = eventService.searchEvents(request, null);
 
         assertEquals(1, result.getContent().size());
         assertEquals(1, result.getPage());
@@ -101,7 +101,7 @@ class EventServiceTest {
         ))
             .thenReturn(0L);
 
-        EventListResponse result = eventService.searchEvents(request);
+        EventListResponse result = eventService.searchEvents(request, null);
 
         assertEquals(0, result.getPage());
         assertEquals(20, result.getSize());
@@ -118,7 +118,7 @@ class EventServiceTest {
 
         assertThrows(
             BusinessException.class,
-            () -> eventService.searchEvents(request)
+            () -> eventService.searchEvents(request, null)
         );
         verifyNoInteractions(eventMapper);
     }
@@ -130,7 +130,7 @@ class EventServiceTest {
 
         assertThrows(
             BusinessException.class,
-            () -> eventService.searchEvents(request)
+            () -> eventService.searchEvents(request, null)
         );
         verifyNoInteractions(eventMapper);
     }
@@ -159,7 +159,7 @@ class EventServiceTest {
             isNull(Long.class)
         )).thenReturn(0L);
 
-        eventService.searchEvents(request);
+        eventService.searchEvents(request, null);
 
         var requestCaptor = forClass(EventSearchRequest.class);
         verify(eventMapper).searchEvents(
@@ -195,7 +195,7 @@ class EventServiceTest {
             isNull(Long.class)
         )).thenReturn(0L);
 
-        eventService.searchEvents(request);
+        eventService.searchEvents(request, null);
 
         var requestCaptor = forClass(EventSearchRequest.class);
         verify(eventMapper).searchEvents(
@@ -214,7 +214,7 @@ class EventServiceTest {
 
         assertThrows(
             BusinessException.class,
-            () -> eventService.searchEvents(request)
+            () -> eventService.searchEvents(request, null)
         );
         verifyNoInteractions(eventMapper);
     }
@@ -226,7 +226,7 @@ class EventServiceTest {
 
         assertThrows(
             BusinessException.class,
-            () -> eventService.searchEvents(request)
+            () -> eventService.searchEvents(request, null)
         );
         verifyNoInteractions(eventMapper);
     }
@@ -274,7 +274,8 @@ class EventServiceTest {
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "ko"
+            "ko",
+            null
         );
 
         assertEquals(990001L, result.getEventId());
@@ -289,7 +290,7 @@ class EventServiceTest {
     void getEventDetail_throwsInvalidInput_whenEventIdIsInvalid() {
         assertThrows(
             BusinessException.class,
-            () -> eventService.getEventDetail(0L, "ko")
+            () -> eventService.getEventDetail(0L, "ko", null)
         );
         verifyNoInteractions(eventMapper);
     }
@@ -301,7 +302,7 @@ class EventServiceTest {
 
         BusinessException exception = assertThrows(
             BusinessException.class,
-            () -> eventService.getEventDetail(990001L, "ko")
+            () -> eventService.getEventDetail(990001L, "ko", null)
         );
 
         assertEquals(
@@ -325,7 +326,8 @@ class EventServiceTest {
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "ko"
+            "ko",
+            null
         );
 
         assertEquals(List.of(), result.getActivities());
@@ -356,7 +358,8 @@ class EventServiceTest {
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "en"
+            "en",
+            null
         );
 
         assertEquals(
@@ -398,7 +401,8 @@ class EventServiceTest {
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "ko"
+            "ko",
+            null
         );
 
         assertEquals(
@@ -424,7 +428,8 @@ class EventServiceTest {
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "ko"
+            "ko",
+            null
         );
 
         assertEquals(
@@ -449,7 +454,8 @@ class EventServiceTest {
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "ko"
+            "ko",
+            null
         );
 
         assertEquals(
@@ -485,7 +491,7 @@ class EventServiceTest {
         when(eventMapper.findEventActivities(990001L, "en"))
             .thenReturn(List.of());
 
-        eventService.getEventDetail(990001L, null);
+        eventService.getEventDetail(990001L, null, null);
 
         verify(eventMapper).findEventDetail(990001L, "en", null);
         verify(eventMapper).findEventActivities(990001L, "en");

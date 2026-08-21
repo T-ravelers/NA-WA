@@ -129,6 +129,35 @@ class ExploreItemLikeMapperIntegrationTest {
         });
     }
 
+    /**
+     * 등록 게이트는 explore_items 행만 본다 — 목록·상세가 거르는 세 조건은 확인하지 않는다.
+     * EXPLORE_API.md의 찜 등록 불릿이 확정한 계약이라(#244) 여기서 고정한다. 이 셋 중
+     * 하나라도 findVisibleItemType에 추가되면 그 문서가 다시 거짓이 되고, 이미 찜한
+     * 항목의 재등록도 404로 깨진다.
+     */
+    @Test
+    void findVisibleItemType_returnsType_evenWhenListAndDetailWouldExclude() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long reviewerId = insertMember();
+
+            // 어제 끝난 Event — 목록·상세는 end_date로 거른다.
+            long endedEventId = insertEndedEventItem(reviewerId);
+            assertEquals("EVENT", likeMapper.findVisibleItemType(endedEventId));
+
+            // 비활성 Place — 목록·상세는 is_active로 거른다.
+            long inactivePlaceId = insertInactivePlaceItem(reviewerId);
+            assertEquals("PLACE", likeMapper.findVisibleItemType(inactivePlaceId));
+
+            // event 행만 soft-delete — 목록·상세는 e.deleted_at으로 거른다.
+            long deletedEventId = insertEventItem(reviewerId, "VISIBLE");
+            jdbcTemplate.update(
+                    "UPDATE event SET deleted_at = CURRENT_TIMESTAMP "
+                            + "WHERE event_id = ?", deletedEventId);
+            assertEquals("EVENT", likeMapper.findVisibleItemType(deletedEventId));
+        });
+    }
+
     private long insertMember() {
         jdbcTemplate.update(
                 "INSERT INTO members (display_name) VALUES ('찜 통합 테스트 회원')");
@@ -162,6 +191,40 @@ class ExploreItemLikeMapperIntegrationTest {
         long itemId = lastInsertId();
         jdbcTemplate.update(
                 "INSERT INTO place (place_id, name) VALUES (?, '찜 통합 테스트 플레이스')",
+                itemId);
+        return itemId;
+    }
+
+    /** chk_event_period — 상설이 아니면 end_date가 필수다. 어제 끝난 Event를 만든다. */
+    private long insertEndedEventItem(long reviewerId) {
+        jdbcTemplate.update(
+                "INSERT INTO explore_items "
+                        + "(item_type, approval_status, visibility_status, "
+                        + "reviewed_by, reviewed_at) "
+                        + "VALUES ('EVENT', 'APPROVED', 'VISIBLE', ?, CURRENT_TIMESTAMP)",
+                reviewerId);
+        long itemId = lastInsertId();
+        jdbcTemplate.update(
+                "INSERT INTO event "
+                        + "(event_id, title, start_date, end_date, is_permanent) "
+                        + "VALUES (?, '찜 통합 테스트 종료 이벤트', "
+                        + "CURRENT_DATE - INTERVAL 7 DAY, "
+                        + "CURRENT_DATE - INTERVAL 1 DAY, FALSE)",
+                itemId);
+        return itemId;
+    }
+
+    private long insertInactivePlaceItem(long reviewerId) {
+        jdbcTemplate.update(
+                "INSERT INTO explore_items "
+                        + "(item_type, approval_status, visibility_status, "
+                        + "reviewed_by, reviewed_at) "
+                        + "VALUES ('PLACE', 'APPROVED', 'VISIBLE', ?, CURRENT_TIMESTAMP)",
+                reviewerId);
+        long itemId = lastInsertId();
+        jdbcTemplate.update(
+                "INSERT INTO place (place_id, name, is_active) "
+                        + "VALUES (?, '찜 통합 테스트 비활성 플레이스', FALSE)",
                 itemId);
         return itemId;
     }
