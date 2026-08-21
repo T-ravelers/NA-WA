@@ -9,6 +9,7 @@ import {
   parseServerDateTime,
   serializeCalendarDate,
   shiftCalendarMonth,
+  toServerCalendarDate,
 } from './datetime'
 
 describe('parseServerDateTime', () => {
@@ -75,6 +76,27 @@ describe('server instant display', () => {
     ).toBe('Aug 7, 2026, 9:18 PM')
     expect(formatServerDateTime('not-a-date', 'en-US', { dateStyle: 'medium' })).toBe('')
     expect(formatServerDateTime(null, 'en-US', { dateStyle: 'medium' })).toBe('')
+  })
+})
+
+describe('toServerCalendarDate', () => {
+  it('keeps a late evening on the server day it happened, not the browser day', () => {
+    expect(toServerCalendarDate('2026-08-20T23:30:00')).toBe('2026-08-20')
+    expect(toServerCalendarDate('2026-08-20T14:30:00Z')).toBe('2026-08-20')
+  })
+
+  it('moves an instant that lands past midnight in Seoul onto the next day', () => {
+    expect(toServerCalendarDate('2026-08-20T16:00:00Z')).toBe('2026-08-21')
+  })
+
+  it('reads the numeric form Jackson sends when no format is set', () => {
+    expect(toServerCalendarDate([2026, 8, 20, 23, 30])).toBe('2026-08-20')
+  })
+
+  it('returns an empty string for a value it cannot read', () => {
+    expect(toServerCalendarDate('not-a-date')).toBe('')
+    expect(toServerCalendarDate(null)).toBe('')
+    expect(toServerCalendarDate('')).toBe('')
   })
 })
 

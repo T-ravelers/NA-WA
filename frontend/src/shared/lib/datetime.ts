@@ -191,6 +191,37 @@ export function formatServerDateTime(
   }).format(date)
 }
 
+/**
+ * 서버 시각에서 날짜만 남긴다(예: `2026-08-21`).
+ *
+ * 날짜로 거르거나 묶을 때 쓴다. 시각을 그대로 비교하면 브라우저가 어느 지역에 있느냐에
+ * 따라 같은 저녁에 끝난 일이 하루 앞뒤로 갈린다. 서버와 같은 서울 기준으로 날짜를
+ * 정해야 사용자가 고른 기간과 목록이 어긋나지 않는다. 읽을 수 없는 값은 빈 문자열이다.
+ */
+export function toServerCalendarDate(value: Date | ServerDateTimeValue): string {
+  const date = toValidDate(value)
+  if (date === null) return ''
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SERVER_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+
+  // 지역 표기를 문자열로 받아 자르지 않고 조각으로 읽는다. 자리 순서와 구분자는
+  // 브라우저마다 다를 수 있지만, 조각의 이름은 다르지 않다.
+  const find = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? ''
+
+  const year = find('year')
+  const month = find('month')
+  const day = find('day')
+  if (year === '' || month === '' || day === '') return ''
+
+  return `${year}-${month}-${day}`
+}
+
 function toValidCalendarDate(value: string | Date | null | undefined): Date | null {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value
   return parseCalendarDate(value)
