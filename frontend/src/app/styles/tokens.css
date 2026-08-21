@@ -37,6 +37,10 @@
   /* 비활성 아이콘 전용. 텍스트에는 ink-3을 쓴다. */
   --color-icon-muted: #abaaa5;
 
+  /* V2 text/secondary — ink와 ink-2 사이 단계. V2가 텍스트를 4단계로 늘려 신설했다.
+   * 소비는 P2(지갑 재토큰화)부터 시작한다. */
+  --color-text-secondary: #dbd9d3;
+
   /* ── 밝은 면과 그 위 텍스트 ── */
   --color-paper: #f1efe8; /* 카드·티켓 바탕 (13회) */
   --color-paper-fill: #f4f2ed; /* primary 버튼·선택 세그먼트 채움 (17회) */
@@ -61,6 +65,11 @@
   --color-warning: #ffb700;
   --color-danger: #ed3423;
   --color-info: #318cd5;
+
+  /* V2 민트 계열. success-subtle은 면(Attended 배지·Find companions 버튼),
+   * success-2는 보더(bg/boder/success). 지갑의 원시 #91cdbb 부채가 여기로 수렴한다. */
+  --color-success-subtle: #8ec4b1;
+  --color-success-2: #3a9878;
 
   /* 다크 이미지 위 진행 상태 전용 */
   --color-status-ongoing: #3bbe7a;
