@@ -51,7 +51,7 @@
    * `on-category`는 소비영역 코어색 면 위다. 둘 다 검정에 가까워 잘못 써도 눈으로는
    * 잡히지 않으므로, 면의 종류를 보고 고른다. */
   --color-on-paper: #171717; /* paper·paper-fill 면 위 제목·칩 */
-  --color-on-category: #0e0e0c; /* 소비영역 코어색 면 위 텍스트 (59회) */
+  --color-on-category: #171717; /* 소비영역 코어색 면 위 텍스트. V2 text/primary-2 */
 
   /* ── 소비영역 4색 ──
    * 소프트필(`*-soft` / `*-on`) 8색은 제거했다. Category Ticket 배경이 소프트필에서
