@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { formatServerDateTime, parseServerDateTime } from '@/shared/lib/datetime'
 import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
+import type { AppointmentStatus } from '@/shared/lib/appointmentStatus'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
@@ -23,7 +24,6 @@ import {
   cancelAppointmentParticipation,
   joinAppointment,
   type AppointmentDateTimeValue,
-  type AppointmentStatus,
 } from '../api/appointmentApi'
 import { appointmentKeys } from '../model/appointmentKeys'
 import { appointmentErrorMessageKey } from '../model/appointmentErrors'
