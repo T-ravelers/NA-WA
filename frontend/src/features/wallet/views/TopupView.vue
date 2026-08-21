@@ -3,6 +3,11 @@ import { useMutation, useQuery } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { IconCheck } from '@tabler/icons-vue'
+
+import AmountInput from '@/shared/ui/AmountInput.vue'
+import AppButton from '@/shared/ui/AppButton.vue'
+import AppCard from '@/shared/ui/AppCard.vue'
 
 import { createStripeIntent, getTopupMethods, previewTopup } from '../api/topupApi'
 import {
@@ -24,7 +29,8 @@ type TopupStep = 'form' | 'preview' | 'payment' | 'complete'
 const { t } = useI18n()
 const router = useRouter()
 
-const amount = ref(0)
+// AmountInput의 계약이 number | null이다. null은 "아직 입력 전"이고 0과 구분된다.
+const amount = ref<number | null>(null)
 const selectedMethod = ref(DEFAULT_TOPUP_METHOD)
 const step = ref<TopupStep>('form')
 const preview = ref<TopupPreviewResponse | null>(null)
@@ -63,7 +69,11 @@ const getTopupMethodLogo = (methodType: string): string =>
   methodType === DEFAULT_TOPUP_METHOD ? '/payment/stripe-mark.svg' : '/payment/paypal-mark.svg'
 
 const canContinue = computed(
-  () => amount.value > 0 && selectedMethodData.value !== null && !previewMutation.isPending.value,
+  () =>
+    amount.value !== null &&
+    amount.value > 0 &&
+    selectedMethodData.value !== null &&
+    !previewMutation.isPending.value,
 )
 
 watch(enabledMethods, (methods) => {
@@ -77,11 +87,12 @@ const setAmount = (nextAmount: number): void => {
 }
 
 const submitPreview = (): void => {
-  if (!canContinue.value) return
+  const amountValue = amount.value
+  if (!canContinue.value || amountValue === null) return
 
   previewMutation.mutate(
     {
-      amount: amount.value,
+      amount: amountValue,
       method: selectedMethod.value,
       currency: TOPUP_CURRENCY,
     },
@@ -147,17 +158,17 @@ const handlePaymentError = (message: string): void => {
 </script>
 
 <template>
-  <main class="min-h-dvh bg-[#151515] text-[#f5f4f0]">
-    <header class="flex items-center border-b border-[#2d2d2d] px-5 py-4">
-      <button
-        type="button"
-        class="grid size-8 place-items-center text-2xl leading-none text-[#f5f4f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
+  <main class="flex min-h-dvh w-full flex-col px-screen pb-8 pt-6">
+    <header class="flex items-center gap-3">
+      <AppButton
+        compact
+        variant="secondary"
         :aria-label="t('wallet.topUp.back')"
         @click="goBack"
       >
         ‹
-      </button>
-      <h1 class="flex-1 text-center text-lg font-bold tracking-[-0.03em]">
+      </AppButton>
+      <h1 class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display">
         {{
           step === 'preview'
             ? t('wallet.topUp.previewTitle')
@@ -166,15 +177,11 @@ const handlePaymentError = (message: string): void => {
               : t('wallet.topUp.title')
         }}
       </h1>
-      <span
-        class="size-8"
-        aria-hidden="true"
-      />
     </header>
 
     <section
       v-if="step === 'form'"
-      class="mx-auto flex min-h-[calc(100dvh-4.5rem)] max-w-[390px] flex-col gap-4 px-4 py-4"
+      class="mt-5 flex flex-1 flex-col gap-2"
       aria-labelledby="top-up-form-title"
     >
       <h2
@@ -184,46 +191,39 @@ const handlePaymentError = (message: string): void => {
         {{ t('wallet.topUp.title') }}
       </h2>
 
-      <section class="rounded-[22px] bg-[#1d1d1b] p-4">
-        <p class="text-xs text-[#aaa8a3]">{{ t('wallet.topUp.amountLabel') }}</p>
-        <label class="mt-2 flex items-center border-b border-[#30302e] pb-3">
-          <span class="text-2xl font-extrabold">₩</span>
-          <input
-            v-model.number="amount"
-            type="number"
-            min="0"
-            inputmode="numeric"
-            class="min-w-0 flex-1 bg-transparent px-1 text-3xl font-extrabold leading-none text-[#f5f4f0] outline-none placeholder:text-[#686865]"
-            :aria-label="t('wallet.topUp.amountLabel')"
-            placeholder="0"
-          />
-        </label>
+      <AppCard>
+        <AmountInput
+          v-model="amount"
+          :label="t('wallet.topUp.amountLabel')"
+        />
 
-        <div class="mt-3 grid grid-cols-2 gap-2">
-          <button
-            v-for="quickAmount in QUICK_TOPUP_AMOUNTS"
-            :key="quickAmount"
-            type="button"
-            class="rounded-lg border border-[#353533] py-2 text-sm text-[#c7c5c0] transition-colors hover:border-[#f5f4f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
-            @click="setAmount(quickAmount)"
-          >
-            +{{ formatKrw(quickAmount) }}
-          </button>
+        <div class="mt-4 border-t border-hairline pt-4">
+          <div class="grid grid-cols-2 gap-2.5">
+            <button
+              v-for="quickAmount in QUICK_TOPUP_AMOUNTS"
+              :key="quickAmount"
+              type="button"
+              class="h-10 rounded-pill border border-hairline-strong text-body-sm font-medium text-ink transition-colors hover:border-paper-fill focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              @click="setAmount(quickAmount)"
+            >
+              +{{ formatKrw(quickAmount) }}
+            </button>
+          </div>
         </div>
-      </section>
+      </AppCard>
 
-      <section class="rounded-[22px] bg-[#1d1d1b] p-4">
-        <h2 class="text-xs font-medium text-[#aaa8a3]">{{ t('wallet.topUp.paymentMethod') }}</h2>
+      <AppCard>
+        <h2 class="text-body-sm text-ink-2">{{ t('wallet.topUp.paymentMethod') }}</h2>
 
         <p
           v-if="methodsQuery.isPending.value"
-          class="mt-4 text-sm text-[#aaa8a3]"
+          class="mt-4 text-body-sm text-ink-2"
         >
           {{ t('wallet.topUp.loadingMethods') }}
         </p>
         <p
           v-else-if="methodsQuery.isError.value"
-          class="mt-4 text-sm text-[#ffaaa4]"
+          class="mt-4 text-body-sm text-danger"
         >
           {{ t('wallet.topUp.methodsError') }}
         </p>
@@ -235,67 +235,71 @@ const handlePaymentError = (message: string): void => {
             v-for="method in enabledMethods"
             :key="method.type"
             type="button"
-            class="w-full rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
-            :class="
-              selectedMethod === method.type ? 'border-[#f5f4f0] bg-[#292927]' : 'border-[#353533]'
-            "
+            class="w-full rounded-sm border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            :class="selectedMethod === method.type ? 'border-paper-fill' : 'border-hairline'"
             :aria-pressed="selectedMethod === method.type"
             @click="selectedMethod = method.type"
           >
-            <span class="flex items-center gap-3 text-sm font-semibold">
+            <span class="flex items-center gap-3 text-body-sm font-semibold text-ink">
               <img
                 :src="getTopupMethodLogo(method.type)"
                 alt=""
-                class="size-8 shrink-0 rounded-lg"
+                class="size-8 shrink-0 rounded-sm"
               />
               <span>
                 {{ getTopupMethodLabel(method) }}
                 <span
                   v-if="method.testMode"
-                  class="ml-1 rounded bg-[#f5f4f0] px-1.5 py-0.5 text-[10px] font-bold text-[#242422]"
+                  class="ml-1 rounded bg-paper-fill px-1.5 py-0.5 text-micro text-on-paper"
                 >
                   Test
                 </span>
               </span>
             </span>
-            <span class="mt-1 block text-xs text-[#aaa8a3]">
+            <span class="mt-1 block text-caption text-ink-2">
               {{ t('wallet.topUp.cardDescription') }}
             </span>
           </button>
 
-          <div class="rounded-xl border border-[#292927] px-3 py-3 text-left opacity-35">
-            <span class="flex items-center gap-3 text-sm font-semibold">
+          <!-- 시안(충전하기/01)의 비활성 수단 조형 — 캔버스색 면을 55% 투명도로 가라앉힌다. -->
+          <div class="rounded-sm bg-canvas p-4 text-left opacity-55">
+            <span class="flex items-center gap-3 text-body-sm font-semibold text-ink">
               <img
                 :src="getTopupMethodLogo('PAYPAL')"
                 alt=""
-                class="size-8 shrink-0 rounded-lg"
+                class="size-8 shrink-0 rounded-sm"
               />
               <span>
                 PayPal
-                <span class="ml-1 rounded bg-[#353533] px-1.5 py-0.5 text-[10px]">Coming soon</span>
+                <span class="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-micro text-ink-2">
+                  Coming soon
+                </span>
               </span>
             </span>
-            <span class="mt-1 block text-xs">{{ t('wallet.topUp.paypalDescription') }}</span>
+            <span class="mt-1 block text-caption text-ink-2">
+              {{ t('wallet.topUp.paypalDescription') }}
+            </span>
           </div>
         </div>
 
-        <p class="mt-3 rounded-lg bg-[#292927] px-2.5 py-2 text-[11px] text-[#aaa8a3]">
+        <p class="mt-3 rounded-md bg-canvas px-4 py-3 text-caption text-ink-2">
           {{ t('wallet.topUp.sandboxNotice') }}
         </p>
-      </section>
+      </AppCard>
 
       <p
         v-if="previewMutation.isError.value"
-        class="rounded-lg bg-[#3b2422] px-3 py-2 text-xs text-[#ffaaa4]"
+        class="mt-2 text-body-sm text-danger"
         role="alert"
       >
         {{ t('wallet.topUp.previewError') }}
       </p>
 
-      <button
-        type="button"
-        class="mt-auto min-h-13 rounded-xl bg-[#f2f0ea] px-4 text-sm font-bold text-[#172033] transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb] disabled:cursor-not-allowed disabled:opacity-40"
+      <AppButton
+        block
+        class="mt-auto"
         :disabled="!canContinue"
+        :loading="previewMutation.isPending.value"
         @click="submitPreview"
       >
         {{
@@ -303,69 +307,67 @@ const handlePaymentError = (message: string): void => {
             ? t('wallet.topUp.loadingPreview')
             : t('wallet.topUp.next')
         }}
-      </button>
+      </AppButton>
     </section>
 
     <section
       v-else-if="step === 'preview' && preview"
-      class="mx-auto flex min-h-[calc(100dvh-4.5rem)] max-w-[390px] flex-col px-4 py-4"
+      class="mt-5 flex flex-1 flex-col"
       aria-labelledby="top-up-preview-title"
     >
-      <article class="rounded-[22px] bg-[#1d1d1b] p-4">
+      <AppCard>
         <h2
           id="top-up-preview-title"
-          class="text-sm font-bold"
+          class="text-title-sm text-ink"
         >
           {{ t('wallet.topUp.previewHeading') }}
         </h2>
 
-        <dl class="mt-4 divide-y divide-[#30302e] text-sm">
+        <dl class="mt-4 divide-y divide-hairline text-body">
           <div class="flex items-center justify-between py-3 first:pt-0">
-            <dt class="text-[#aaa8a3]">{{ t('wallet.topUp.amountLabel') }}</dt>
-            <dd class="font-semibold">{{ formatKrw(preview.amount) }}</dd>
+            <dt class="text-ink-2">{{ t('wallet.topUp.amountLabel') }}</dt>
+            <dd class="font-semibold text-ink">{{ formatKrw(preview.amount) }}</dd>
           </div>
           <div class="flex items-center justify-between py-3">
-            <dt class="text-[#aaa8a3]">{{ t('wallet.topUp.fee') }}</dt>
-            <dd class="font-semibold">{{ formatKrw(preview.fee) }}</dd>
+            <dt class="text-ink-2">{{ t('wallet.topUp.fee') }}</dt>
+            <dd class="font-semibold text-ink">{{ formatKrw(preview.fee) }}</dd>
           </div>
           <div class="flex items-center justify-between py-3">
-            <dt class="text-[#aaa8a3]">{{ t('wallet.topUp.paymentMethod') }}</dt>
-            <dd class="font-semibold">{{ selectedMethodLabel }} (Test Mode)</dd>
+            <dt class="text-ink-2">{{ t('wallet.topUp.paymentMethod') }}</dt>
+            <dd class="font-semibold text-ink">{{ selectedMethodLabel }} (Test Mode)</dd>
           </div>
           <div class="flex items-center justify-between pb-0 pt-3">
-            <dt class="text-[#aaa8a3]">{{ t('wallet.topUp.balanceAfter') }}</dt>
-            <dd class="font-semibold">{{ formatKrw(preview.expectedSandboxBalance) }}</dd>
+            <dt class="text-ink-2">{{ t('wallet.topUp.balanceAfter') }}</dt>
+            <dd class="font-semibold text-ink">{{ formatKrw(preview.expectedSandboxBalance) }}</dd>
           </div>
         </dl>
-      </article>
+      </AppCard>
 
       <p
         v-if="preview.warning"
-        class="mt-3 rounded-lg bg-[#3b2422] px-3 py-2 text-xs text-[#ffaaa4]"
+        class="mt-3 text-body-sm text-warning"
       >
         {{ t('wallet.topUp.walletWarning') }}
       </p>
 
       <p
         v-if="stripeIntentMutation.isError.value"
-        class="mt-3 rounded-lg bg-[#3b2422] px-3 py-2 text-xs text-[#ffaaa4]"
+        class="mt-3 text-body-sm text-danger"
         role="alert"
       >
         {{ t('wallet.topUp.paymentRequestError') }}
       </p>
 
       <div class="mt-auto grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          class="min-h-13 rounded-xl border border-[#5e5e5b] px-4 text-sm font-semibold text-[#f5f4f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
+        <AppButton
+          variant="secondary"
           @click="step = 'form'"
         >
           {{ t('wallet.topUp.previous') }}
-        </button>
-        <button
-          type="button"
-          class="min-h-13 rounded-xl bg-[#f2f0ea] px-4 text-sm font-bold text-[#172033] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
+        </AppButton>
+        <AppButton
           :disabled="stripeIntentMutation.isPending.value"
+          :loading="stripeIntentMutation.isPending.value"
           @click="executeTopup"
         >
           {{
@@ -373,13 +375,13 @@ const handlePaymentError = (message: string): void => {
               ? t('wallet.topUp.loadingPaymentRequest')
               : t('wallet.topUp.execute')
           }}
-        </button>
+        </AppButton>
       </div>
     </section>
 
     <section
       v-else-if="step === 'payment' && stripeIntent"
-      class="mx-auto max-w-[390px] px-4 py-4"
+      class="mt-5 flex flex-1 flex-col"
       aria-labelledby="stripe-payment-title"
     >
       <h2
@@ -407,36 +409,37 @@ const handlePaymentError = (message: string): void => {
 
     <section
       v-else-if="step === 'complete'"
-      class="mx-auto flex min-h-[calc(100dvh-4.5rem)] max-w-[390px] flex-col items-center justify-center px-4 py-8 text-center"
+      class="mt-5 flex flex-1 flex-col items-center justify-center text-center"
       aria-labelledby="top-up-complete-title"
       aria-live="polite"
     >
       <div
-        class="grid size-16 place-items-center rounded-full border-2 border-[#4c4c49] text-3xl text-[#f5f4f0]"
+        class="grid size-16 place-items-center rounded-pill border-2 border-hairline-strong text-ink"
         aria-hidden="true"
       >
-        ✓
+        <IconCheck
+          :size="28"
+          aria-hidden="true"
+        />
       </div>
       <h2
         id="top-up-complete-title"
-        class="mt-5 text-xl font-bold"
+        class="mt-5 text-title text-ink"
       >
         {{ t('wallet.topUp.completeTitle') }}
       </h2>
-      <p class="mt-3 text-3xl font-extrabold text-[#47c887]">
-        +{{ formatKrw(preview?.amount ?? 0) }}
-      </p>
-      <p class="mt-2 text-sm text-[#aaa8a3]">
+      <p class="mt-3 text-data-xl text-success">+{{ formatKrw(preview?.amount ?? 0) }}</p>
+      <p class="mt-2 text-body-sm text-ink-2">
         {{ t('wallet.topUp.currentBalance', { balance: formatKrw(completedBalance) }) }}
       </p>
 
-      <button
-        type="button"
-        class="mt-auto min-h-13 w-full rounded-xl bg-[#f2f0ea] px-4 text-sm font-bold text-[#172033] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
+      <AppButton
+        block
+        class="mt-auto"
         @click="goBack"
       >
         {{ t('wallet.topUp.backToWallet') }}
-      </button>
+      </AppButton>
     </section>
   </main>
 </template>

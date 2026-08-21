@@ -105,7 +105,8 @@ describe('TopupView', () => {
     expect(wrapper.get('button[aria-pressed="true"] img').attributes('src')).toBe(
       '/payment/stripe-mark.svg',
     )
-    expect(wrapper.get('.opacity-35 img').attributes('src')).toBe('/payment/paypal-mark.svg')
+    // 비활성 수단 블록은 V2 시안(충전하기/01)대로 55% 투명도로 가라앉는다.
+    expect(wrapper.get('.opacity-55 img').attributes('src')).toBe('/payment/paypal-mark.svg')
   })
 
   it('requests a preview and shows the preview values', async () => {

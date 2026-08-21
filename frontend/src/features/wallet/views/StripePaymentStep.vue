@@ -8,6 +8,9 @@ import {
 import { ref, onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import AppButton from '@/shared/ui/AppButton.vue'
+import AppCard from '@/shared/ui/AppCard.vue'
+
 import { getStripeTopupStatus } from '../api/topupApi'
 import { formatKrw, type StripeTopupStatusResponse } from '../model/topup'
 
@@ -42,6 +45,15 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
   return fallback
 }
 
+/**
+ * Stripe iframe에 넘길 색. CSS 변수를 못 읽는 iframe이라 런타임에 계산값을 뽑아 넘긴다.
+ * 값을 여기 적어 두면 tokens.css가 바뀔 때마다 어긋나므로 토큰을 단일 정본으로 유지한다.
+ */
+const readToken = (name: string, fallback: string): string => {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value === '' ? fallback : value
+}
+
 const initializePaymentElement = async (): Promise<void> => {
   isLoading.value = true
   errorMessage.value = ''
@@ -65,10 +77,10 @@ const initializePaymentElement = async (): Promise<void> => {
       appearance: {
         theme: 'night',
         variables: {
-          colorPrimary: '#91cdbb',
-          colorBackground: '#1d1d1b',
-          colorText: '#f5f4f0',
-          colorDanger: '#ffaaa4',
+          colorPrimary: readToken('--color-success-subtle', '#8ec4b1'),
+          colorBackground: readToken('--color-surface-1', '#262626'),
+          colorText: readToken('--color-ink', '#fbfaf8'),
+          colorDanger: readToken('--color-danger', '#ed3423'),
           fontFamily: 'inherit',
           borderRadius: '12px',
         },
@@ -138,51 +150,50 @@ onBeforeUnmount(() => {
 
 <template>
   <form
-    class="flex min-h-[calc(100dvh-4.5rem)] flex-col gap-4"
+    class="flex flex-1 flex-col gap-4"
     @submit.prevent="submitPayment"
   >
-    <section class="rounded-[22px] bg-[#1d1d1b] p-4">
+    <AppCard>
       <div
         ref="paymentElementContainer"
         class="min-h-48"
       >
         <p
           v-if="isLoading"
-          class="rounded-xl border border-[#30302e] px-4 py-8 text-center text-sm text-[#aaa8a3]"
+          class="rounded-sm border border-hairline px-4 py-8 text-center text-body-sm text-ink-2"
           role="status"
         >
           {{ t('wallet.topUp.paymentLoading') }}
         </p>
       </div>
-    </section>
+    </AppCard>
 
     <p
       v-if="errorMessage"
-      class="rounded-lg bg-[#3b2422] px-3 py-2 text-sm text-[#ffaaa4]"
+      class="text-body-sm text-danger"
       role="alert"
     >
       {{ errorMessage }}
     </p>
 
     <div class="mt-auto grid grid-cols-2 gap-3">
-      <button
-        type="button"
-        class="min-h-13 rounded-xl border border-[#5e5e5b] px-4 text-sm font-semibold text-[#f5f4f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
+      <AppButton
+        variant="secondary"
         @click="emit('back')"
       >
         {{ t('wallet.topUp.previous') }}
-      </button>
-      <button
+      </AppButton>
+      <AppButton
         type="submit"
-        class="min-h-13 rounded-xl bg-[#f2f0ea] px-4 text-sm font-bold text-[#172033] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="isSubmitting"
+        :loading="isSubmitting"
       >
         {{
           isSubmitting
             ? t('wallet.topUp.paymentSubmitting')
             : t('wallet.topUp.paymentSubmit', { amount: formatKrw(amount) })
         }}
-      </button>
+      </AppButton>
     </div>
   </form>
 </template>
