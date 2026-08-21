@@ -243,7 +243,6 @@ class AppointmentDepositIntegrationTest {
         request.setMaxMembers(5);
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Test Meeting Place");
-        request.setJoinDeadline(LocalDateTime.now().plusDays(1));
         request.setTripId(createJourney(hostMemberId));
         request.setVisitDate(LocalDate.now().plusDays(2));
         request.setActivityStartTime(LocalTime.of(10, 0));
@@ -303,7 +302,6 @@ class AppointmentDepositIntegrationTest {
         request.setMaxMembers(5);
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Test Meeting Place");
-        request.setJoinDeadline(LocalDateTime.now().plusDays(1));
         request.setTripId(createJourney(hostMemberId));
         request.setVisitDate(LocalDate.now().plusDays(2));
         request.setActivityStartTime(LocalTime.of(10, 0));
@@ -363,7 +361,6 @@ class AppointmentDepositIntegrationTest {
         request.setMaxMembers(5);
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Test Meeting Place");
-        request.setJoinDeadline(LocalDateTime.now().plusDays(1));
         request.setTripId(createJourney(hostMemberId));
         request.setVisitDate(LocalDate.now().plusDays(2));
         request.setActivityStartTime(LocalTime.of(10, 0));
@@ -377,16 +374,13 @@ class AppointmentDepositIntegrationTest {
         // 확정 자체의 동작만 검증하기 위해 상태를 직접 IN_PROGRESS로 맞춘다.
         // 활동 종료도 지나 있어야 한다(APPOINTMENT-009). 시각은 DB의 NOW()가
         // 아니라 앱이 만든 값을 넘긴다 — CI는 MySQL을 UTC로 두기 때문에 DB 시계에
-        // 기대면 서비스가 보는 시각과 갈린다. join_deadline까지 함께 당기는 것은
-        // chk_appointments_schedule이 join_deadline <= activity_start_at
-        // < activity_end_at을 요구하기 때문이다.
+        // 기대면 서비스가 보는 시각과 갈린다. chk_appointments_activity_window가
+        // activity_start_at < activity_end_at을 요구한다.
         LocalDateTime endedAt = LocalDateTime.now().minusHours(1);
         jdbcTemplate.update(
                 "UPDATE appointments SET appointment_status = 'IN_PROGRESS',"
-                        + " join_deadline = ?,"
                         + " activity_start_at = ?, activity_end_at = ?"
                         + " WHERE appointment_id = ?",
-                Timestamp.valueOf(endedAt.minusHours(4)),
                 Timestamp.valueOf(endedAt.minusHours(3)),
                 Timestamp.valueOf(endedAt),
                 created.getAppointmentId()

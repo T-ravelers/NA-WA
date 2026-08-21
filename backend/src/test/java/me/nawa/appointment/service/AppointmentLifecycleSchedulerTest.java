@@ -20,10 +20,9 @@ class AppointmentLifecycleSchedulerTest {
     private AppointmentLifecycleScheduler scheduler;
 
     @Test
-    void advanceLifecycle_closesExpiredRecruitingThenStartsDueClosed() {
+    void advanceLifecycle_startsDueAppointments() {
         scheduler.advanceLifecycle();
 
-        verify(appointmentMapper).closeExpiredRecruitingAppointments(any());
-        verify(appointmentMapper).startDueClosedAppointments(any());
+        verify(appointmentMapper).startDueAppointments(any());
     }
 }

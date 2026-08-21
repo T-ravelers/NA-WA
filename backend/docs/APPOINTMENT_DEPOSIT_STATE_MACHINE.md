@@ -15,8 +15,9 @@
 - 방장이 아닌 회원의 참여 취소: 실제로 동작합니다. 활동 시작 전에는 `HELD`
   보증금 환급과 상태 전환이 같은 트랜잭션에서 함께 끝나고, 활동 시작~종료
   사이에는 노쇼로 굳어 보증금이 정산 분배로 넘어갑니다(12절).
-- 약속 lifecycle 자동 전이(`RECRUITING → CLOSED → IN_PROGRESS`): 실제로
-  동작합니다(15절).
+- 약속 lifecycle 자동 전이(`RECRUITING → FULL → IN_PROGRESS`): 실제로
+  동작합니다(15절). 정원이 차지 않은 약속은 `FULL`을 거치지 않고 `RECRUITING`
+  에서 곧바로 `IN_PROGRESS`로 갑니다.
 - 출석 확정(`IN_PROGRESS → COMPLETED`): 실제로 동작합니다. 방장이 `ACTIVE` 회원
   전원의 출석을 정확히 한 번씩 확정하면, 같은 트랜잭션에서 약속을 `COMPLETED`로
   전환하고 `DepositPayoutBatch`를 `PENDING`으로 만들어둡니다.
@@ -32,8 +33,7 @@ DB 컬럼: `appointments.appointment_status`
 | --- | --- |
 | `PAYMENT_PENDING` | 방장의 보증금 결제를 기다리는 약속 생성 대기 상태 |
 | `RECRUITING` | 방장 결제가 완료되어 참가자를 모집하는 상태 |
-| `CLOSED` | 참여 마감 시각 도달 또는 정원 충족으로 모집이 종료된 상태 |
-| `CONFIRMED` | 코드에는 정의돼 있으나, 활동 시작 시각에 방장 확정 없이 바로 `IN_PROGRESS`로 넘어가기로 정하면서 실제로 도달하는 경로가 없는 상태(`CANCELLED`와 같은 취급) |
+| `FULL` | 정원이 모두 찬 상태. 시간으로 도달하는 경로는 없습니다 — 참여 마감 시각을 두지 않으므로 정원이 차지 않은 약속은 활동이 시작될 때까지 `RECRUITING`에 머뭅니다. |
 | `IN_PROGRESS` | 활동 시작 시각에 도달하여 약속이 진행 중인 상태 |
 | `AWAITING_ATTENDANCE` | 활동 종료 시각이 지났지만 방장이 아직 출석을 확정하지 않은 상태. **표시 전용** — DB에는 저장되지 않고 조회 응답이 `resolveDisplayStatus`에서 시간 기준으로 계산해 내보냅니다(15절). DB 컬럼은 출석 확정 전까지 `IN_PROGRESS`를 유지합니다. |
 | `COMPLETED` | 출석 확정과 약속 진행이 모두 끝난 상태 |
@@ -46,11 +46,12 @@ DB 컬럼: `appointments.appointment_status`
     └─→ CANCELLED   # 17절 참고 — 현재 트리거 없음
 
     RECRUITING
-    ├─→ CLOSED
+    ├─→ FULL
+    ├─→ IN_PROGRESS # 정원이 차지 않은 채 활동 시작 시각 도달
     └─→ CANCELLED   # 17절 참고 — 현재 트리거 없음
 
-    CLOSED
-    ├─→ RECRUITING  # 정원 도달로 CLOSED된 뒤 마감 시각 전 참여 취소로 빈자리 발생
+    FULL
+    ├─→ RECRUITING  # 활동 시작 전 참여 취소로 빈자리 발생
     ├─→ IN_PROGRESS
     └─→ CANCELLED   # 17절 참고 — 현재 트리거 없음
 
@@ -60,9 +61,6 @@ DB 컬럼: `appointments.appointment_status`
     COMPLETED
     └─→ 전이 불가
 
-    CONFIRMED
-    └─→ 전이 불가   # 위 표 참고 — 현재 트리거 없음
-
     CANCELLED
     └─→ 전이 불가
 
@@ -71,9 +69,9 @@ DB 컬럼: `appointments.appointment_status`
 | 전이 | 조건 |
 | --- | --- |
 | `PAYMENT_PENDING → RECRUITING` | 방장의 보증금 결제와 `DEPOSIT_POOL` 예치가 같은 트랜잭션에서 완료. 예치가 실패하면 트랜잭션이 롤백되어 약속 행 자체가 생기지 않으므로, `PAYMENT_PENDING`은 DB에 지속적으로 남는 상태가 아니라 같은 트랜잭션 안에서만 존재합니다. |
-| `RECRUITING → CLOSED` | 정원 도달은 `joinAppointment`가 참여 성공 트랜잭션 안에서 즉시 동기로 전환. 참여 마감 시각 도달은 시간 기반이라 스케줄러가 60초 주기로 전환(15절). |
-| `CLOSED → RECRUITING` | 정원 도달로 `CLOSED`된 약속에서, 마감 시각(`joinDeadline`) 전에 참여 취소가 발생해 빈자리가 생기면 `leaveAppointment`가 같은 트랜잭션에서 즉시 되돌립니다. 마감 시각이 지난 뒤의 참여 취소(12절)에서는 빈자리가 생겨도 새로 참여할 수 없으므로 `CLOSED`를 유지합니다. |
-| `CLOSED → IN_PROGRESS` | `activityStartAt` 도달. 방장의 별도 확정 액션 없이 스케줄러가 시간만 보고 전환(15절). |
+| `RECRUITING → FULL` | 정원 도달. `joinAppointment`가 참여 성공 트랜잭션 안에서 즉시 동기로 전환합니다. 시간 기반 트리거는 없습니다. |
+| `FULL → RECRUITING` | 활동 시작 시각 전에 참여 취소가 발생해 빈자리가 생기면 `leaveAppointment`가 같은 트랜잭션에서 즉시 되돌립니다. 활동이 시작된 뒤의 참여 취소(12절)에서는 빈자리가 생겨도 새로 참여할 수 없으므로 `FULL`을 유지합니다. |
+| `RECRUITING·FULL → IN_PROGRESS` | `activityStartAt` 도달. 방장의 별도 확정 액션 없이 스케줄러가 시간만 보고 전환(15절). 정원이 차지 않은 약속은 `FULL`을 거치지 않으므로 `RECRUITING`도 대상입니다 — 빼면 그런 약속이 활동 시작 뒤에도 모집 중으로 남습니다. |
 | `IN_PROGRESS → COMPLETED` | 방장이 모든 `ACTIVE` 회원의 출석을 확정. `activityEndAt`이 지난 뒤에만 받습니다(4절). |
 | `* → CANCELLED` | 코드에는 정의돼 있으나 17절 정책에 따라 트리거하는 API·스케줄러를 만들지 않습니다. |
 
@@ -97,7 +95,7 @@ DB 컬럼: `appointment_members.membership_status`
     └─→ LEFT
 
     LEFT
-    └─→ PENDING   # 마감 시각 전 재참여. 기존 행을 재활용(아래 참고)
+    └─→ PENDING   # 활동 시작 전 재참여. 기존 행을 재활용(아래 참고)
 
 전이 조건:
 
@@ -106,7 +104,7 @@ DB 컬럼: `appointment_members.membership_status`
 | `PENDING → ACTIVE` | 보증금 결제 성공 및 `PENDING → HELD` 예치 완료 |
 | `PENDING → LEFT` | 보증금 결제 전 참여 취소. **방장은 대상이 아닙니다** — 아래 참조. |
 | `ACTIVE → LEFT` | 참여 취소. 활동 시작 전에는 예치된 보증금 환급까지 같은 트랜잭션에서 끝나고, 활동 시작~종료 사이에는 노쇼로 굳어 보증금이 `HELD`로 남습니다(12절). 활동 종료 후에는 취소할 수 없습니다. **방장은 대상이 아닙니다.** |
-| `LEFT → PENDING` | 참여 취소한 회원이 참여 마감 시각 전에 같은 약속에 다시 참여. `appointment_members`는 `(appointment_id, member_id)` UNIQUE, `deposits`는 `appointment_member_id` UNIQUE라 새 행을 만들 수 없어 `joinAppointment`가 기존 `appointment_member`·`deposit` 행을 `PENDING`으로 되돌려 재사용합니다(이후 정상적인 `PENDING → ACTIVE`와 동일하게 예치 진행). |
+| `LEFT → PENDING` | 참여 취소한 회원이 활동 시작 시각 전에 같은 약속에 다시 참여. `appointment_members`는 `(appointment_id, member_id)` UNIQUE, `deposits`는 `appointment_member_id` UNIQUE라 새 행을 만들 수 없어 `joinAppointment`가 기존 `appointment_member`·`deposit` 행을 `PENDING`으로 되돌려 재사용합니다(이후 정상적인 `PENDING → ACTIVE`와 동일하게 예치 진행). |
 
 **방장의 참여 취소 정책 (17절과 함께 확정)**
 
@@ -181,7 +179,7 @@ DB 컬럼: `deposits.deposit_status`
     └─→ DISTRIBUTED
 
     REFUNDED
-    └─→ PENDING   # 마감 시각 전 재참여. MembershipStatus의 LEFT → PENDING과 함께 일어남
+    └─→ PENDING   # 활동 시작 전 재참여. MembershipStatus의 LEFT → PENDING과 함께 일어남
 
     DISTRIBUTED / CANCELLED
     └─→ 전이 불가
@@ -301,11 +299,12 @@ DB 컬럼: `appointments.item_type`
        DepositStatus: PENDING → HELD
        (같은 트랜잭션, 같은 요청 안에서 함께 처리)
 
-    3. 참여 마감 또는 정원 도달 → AppointmentStatus: RECRUITING → CLOSED
-       (정원 도달은 참여 트랜잭션 안에서 즉시, 마감 시각 도달은 스케줄러가 처리)
+    3. 정원 도달 → AppointmentStatus: RECRUITING → FULL
+       (참여 트랜잭션 안에서 즉시 처리. 시간 기반 트리거는 없다)
 
-    4. 활동 시작 시각 도달 → AppointmentStatus: CLOSED → IN_PROGRESS
-       (방장의 별도 확정 액션 없이 스케줄러가 시간만 보고 전환, 2절)
+    4. 활동 시작 시각 도달 → AppointmentStatus: RECRUITING·FULL → IN_PROGRESS
+       (방장의 별도 확정 액션 없이 스케줄러가 시간만 보고 전환, 2절.
+        정원이 차지 않은 약속은 FULL을 거치지 않고 RECRUITING에서 바로 넘어간다)
 
     5. 방장이 ACTIVE 회원 전원의 출석 확정
        AttendanceStatus: PENDING → ATTENDED 또는 NO_SHOW
@@ -346,16 +345,15 @@ DB 컬럼: `appointments.item_type`
 
 취소 가능 여부는 약속 상태가 아니라 **시각** 기준으로 판단합니다.
 
-- **활동 시작 전**(`activityStartAt` 이전): 위의 환급 경로. 참여 마감
-  (`joinDeadline`)이 지났어도 환급합니다. 단 마감 후에는 빈자리를 새로 채울 수
-  없으므로, 정원 도달로 `CLOSED`였던 약속을 `RECRUITING`으로 되돌리는 것은 마감
-  전 취소에서만 일어납니다(2절).
+- **활동 시작 전**(`activityStartAt` 이전): 위의 환급 경로. 정원이 차서
+  `FULL`이던 약속은 빈자리가 생기므로 같은 트랜잭션에서 `RECRUITING`으로
+  되돌립니다(2절).
 - **활동 시작 후 ~ 종료 전**(`activityStartAt` ~ `activityEndAt`): 취소는 되지만
   **노쇼로 굳습니다**. 같은 트랜잭션에서 `AttendanceStatus`를 `PENDING → NO_SHOW`로
   먼저 확정한 뒤 `ACTIVE → LEFT`로 바꾸고, 보증금은 환급하지 않고 `HELD`로
   남깁니다. 이 보증금은 방장의 출석 확정이 만든 정산 배치가 출석 회원에게
-  분배합니다(16절). 노쇼 확정에는 되돌리는 전이가 없고, 마감이 지나 재참여
-  (`LEFT → PENDING`)도 불가능합니다.
+  분배합니다(16절). 노쇼 확정에는 되돌리는 전이가 없고, 활동이 시작된 뒤라
+  재참여(`LEFT → PENDING`)도 불가능합니다.
 - **활동 종료 후**(`activityEndAt` 이후): 취소할 수 없습니다(`APPOINTMENT-007`).
   종료 후에는 출석 확정 흐름이 전원을 처리하므로, 나갈 수 있으면 노쇼 확정을
   피해 몰수를 빠져나가는 구멍이 됩니다.
@@ -382,7 +380,7 @@ DB 컬럼: `appointments.item_type`
 | 약속 목록·상세·활성 회원·내 참여 상태 조회 | 사용 가능 |
 | 약속 생성·참여(보증금 예치 포함) | 사용 가능 |
 | 방장이 아닌 회원의 참여 취소(보증금 환급 포함) | 사용 가능 |
-| 약속 lifecycle 자동 전이(`RECRUITING → CLOSED → IN_PROGRESS`) | 사용 가능(15절) |
+| 약속 lifecycle 자동 전이(`RECRUITING → FULL → IN_PROGRESS`) | 사용 가능(15절) |
 | 회원 약속 프로필 조회 | 사용 가능 |
 | 조건을 만족하는 기존 완료 약속의 후기 등록 | 사용 가능 |
 | 출석 확정(`IN_PROGRESS → COMPLETED`, 정산 배치 `PENDING` 생성까지) | 사용 가능 |
@@ -419,18 +417,18 @@ DB 컬럼: `appointments.item_type`
 
 ## 15. 약속 lifecycle 전이 — 계산해서 표시 + 폴링 스케줄러로 뒷정리
 
-시간 기반 전이(`RECRUITING → CLOSED`, `CLOSED → IN_PROGRESS`)는 사용자 액션이
-아니라 시간이 조건입니다. `IN_PROGRESS → COMPLETED`는 방장의 출석 확정 액션이
-트리거이므로 아래 내용의 대상이 아닙니다. 정원이 차서 `CLOSED`가 되는 경우는
-시간과 무관한 이벤트라 스케줄러가 아니라 `joinAppointment`가 참여 성공 시점에
-동기로 처리합니다(2절).
+시간 기반 전이(`RECRUITING·FULL → IN_PROGRESS`)는 사용자 액션이 아니라 시간이
+조건입니다. `IN_PROGRESS → COMPLETED`는 방장의 출석 확정 액션이 트리거이므로
+아래 내용의 대상이 아닙니다. 정원이 차서 `FULL`이 되는 경우도 시간과 무관한
+이벤트라 스케줄러가 아니라 `joinAppointment`가 참여 성공 시점에 동기로
+처리합니다(2절).
 
 **화면에 보여주는 값과 DB에 저장된 값을 분리합니다.** 약속 목록·상세 조회
 (`AppointmentService.toSummaryResponse`/`toDetailResponse`가 호출하는
 `resolveDisplayStatus`)는 `appointment_status` 컬럼을 그대로 반환하지 않고,
-`join_deadline`·`activityStartAt`·`activityEndAt`과 현재 시각을 비교해 "지금
-시점의 실제 상태"를 계산해서 반환합니다. 예를 들어 컬럼 값이 아직
-`RECRUITING`이어도 `join_deadline`이 이미 지났으면 응답은 `CLOSED`로 나갑니다.
+정원과 `activityStartAt`·`activityEndAt`, 현재 시각을 비교해 "지금 시점의 실제
+상태"를 계산해서 반환합니다. 예를 들어 컬럼 값이 아직 `RECRUITING`이어도
+`activityStartAt`이 이미 지났으면 응답은 `IN_PROGRESS`로 나갑니다.
 이러면 사용자는 스케줄러 주기와 무관하게 항상 정확한 상태를 봅니다.
 
 이 계산에는 DB에 존재하지 않는 **표시 전용 상태 `AWAITING_ATTENDANCE`**가 하나

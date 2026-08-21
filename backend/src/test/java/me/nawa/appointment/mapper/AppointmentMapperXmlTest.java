@@ -70,10 +70,7 @@ class AppointmentMapperXmlTest {
                 "me.nawa.appointment.mapper.AppointmentMapper.markMemberActive"
         ));
         assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.closeExpiredRecruitingAppointments"
-        ));
-        assertTrue(configuration.hasStatement(
-                "me.nawa.appointment.mapper.AppointmentMapper.startDueClosedAppointments"
+                "me.nawa.appointment.mapper.AppointmentMapper.startDueAppointments"
         ));
         assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.updateAttendance"
@@ -110,29 +107,19 @@ class AppointmentMapperXmlTest {
         assertTrue(sql.contains("attendance_status = 'PENDING'"));
     }
 
+    // 정원이 차지 않아 RECRUITING에 남아 있는 약속도 활동 시작 시각이 되면
+    // IN_PROGRESS로 넘어가야 한다. 참여 마감이 없어진 뒤로 그런 약속은 FULL을
+    // 거치지 않으므로, IN 목록에서 RECRUITING이 빠지면 영원히 모집 중으로 남는다.
     @Test
-    void closeExpiredRecruitingAppointments_onlyTargetsExpiredRecruiting()
+    void startDueAppointments_targetsRecruitingAndFullPastActivityStart()
             throws Exception {
         String sql = boundSql(
-                "closeExpiredRecruitingAppointments",
-                Map.of("now", LocalDateTime.now())
-        );
-
-        assertTrue(sql.contains("appointment_status = 'CLOSED'"));
-        assertTrue(sql.contains("appointment_status = 'RECRUITING'"));
-        assertTrue(sql.contains("join_deadline <"));
-    }
-
-    @Test
-    void startDueClosedAppointments_onlyTargetsClosedPastActivityStart()
-            throws Exception {
-        String sql = boundSql(
-                "startDueClosedAppointments",
+                "startDueAppointments",
                 Map.of("now", LocalDateTime.now())
         );
 
         assertTrue(sql.contains("appointment_status = 'IN_PROGRESS'"));
-        assertTrue(sql.contains("appointment_status = 'CLOSED'"));
+        assertTrue(sql.contains("appointment_status IN ('RECRUITING', 'FULL')"));
         assertTrue(sql.contains("activity_start_at <="));
     }
 
