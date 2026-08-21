@@ -47,7 +47,7 @@ describe('ReportDailyTrend', () => {
     const wrapper = mountTrend({ points: reportDailyTrendFixture })
     const plotted = readPolyline(wrapper.get('polyline').attributes('points') ?? '')
 
-    // 최고액(₩262,000)은 상단 경계 16, 최저액(₩76,000)은 그보다 아래에 있다.
+    // 최고액(262,000 P)은 상단 경계 16, 최저액(76,000 P)은 그보다 아래에 있다.
     expect(plotted[0]?.y).toBe(16)
     expect(plotted[2]?.y).toBeGreaterThan(16)
     expect(plotted.every((point) => point.y <= 93)).toBe(true)
@@ -59,8 +59,8 @@ describe('ReportDailyTrend', () => {
     const readout = wrapper.findAll('ul.sr-only li')
 
     expect(readout).toHaveLength(7)
-    expect(readout[0]?.text()).toBe('Mar 28: ₩262,000')
-    expect(readout[6]?.text()).toBe('Apr 5: ₩108,000')
+    expect(readout[0]?.text()).toBe('Mar 28: 262,000 P')
+    expect(readout[6]?.text()).toBe('Apr 5: 108,000 P')
   })
 
   it('labels only the first, middle and last day on the axis', () => {
