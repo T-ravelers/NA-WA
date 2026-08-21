@@ -106,9 +106,11 @@ describe('TransactionDetailView', () => {
 
     await flushPromises()
 
-    const categoryRow = wrapper
-      .findAll('div')
-      .find((row) => row.find('dt')?.text() === 'Spending category')
+    // dt가 없는 래퍼 div(AppCard 등)에서 text()를 부르면 던진다. 존재부터 확인한다.
+    const categoryRow = wrapper.findAll('div').find((row) => {
+      const dt = row.find('dt')
+      return dt.exists() && dt.text() === 'Spending category'
+    })
 
     expect(categoryRow?.get('dd').text()).toBe('Not available')
   })

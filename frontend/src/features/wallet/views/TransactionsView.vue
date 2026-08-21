@@ -5,7 +5,12 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { formatCalendarDate } from '@/shared/lib/datetime'
+import AppButton from '@/shared/ui/AppButton.vue'
+import AppCard from '@/shared/ui/AppCard.vue'
 import CalendarGrid from '@/shared/ui/CalendarGrid.vue'
+import StateEmpty from '@/shared/ui/StateEmpty.vue'
+import StateError from '@/shared/ui/StateError.vue'
+import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { getTransactions } from '../api/walletApi'
 import {
@@ -160,164 +165,150 @@ const openTransactionDetail = (transactionId: number): void => {
 </script>
 
 <template>
-  <main class="min-h-dvh bg-[#151515] px-4 pb-8 text-[#f5f4f0]">
-    <header class="mx-auto flex max-w-[430px] items-center border-b border-[#2d2d2d] px-1 py-4">
-      <button
-        type="button"
-        class="grid size-8 place-items-center text-2xl leading-none text-[#f5f4f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
+  <main class="flex min-h-dvh w-full flex-col px-screen pb-8 pt-6">
+    <header class="flex items-center gap-3">
+      <AppButton
+        compact
+        variant="secondary"
         :aria-label="t('wallet.transactions.back')"
         @click="goBack"
       >
         ‹
-      </button>
-      <h1 class="flex-1 text-center text-lg font-bold tracking-[-0.03em]">
+      </AppButton>
+      <!-- TRANSACTIONS는 12자라 screen-title(34px·폭 200%)로는 390에서 잘린다.
+           긴 제목 화면은 section-header로 내린다 — 헤더 크기·폭 정합은 P3에서 전 화면 일괄. -->
+      <h1
+        class="min-w-0 flex-1 truncate font-display text-section-header uppercase text-ink-display"
+      >
         {{ t('wallet.transactions.title') }}
       </h1>
-      <span
-        class="size-8"
-        aria-hidden="true"
-      />
     </header>
 
-    <section class="mx-auto max-w-[430px] pt-4">
-      <form
-        class="rounded-[22px] bg-[#1d1d1b] p-4"
-        @submit.prevent="applyFilters"
-      >
-        <h2 class="text-sm font-bold">{{ t('wallet.transactions.filterTitle') }}</h2>
+    <section class="mt-5">
+      <AppCard>
+        <form @submit.prevent="applyFilters">
+          <h2 class="text-title-sm text-ink">{{ t('wallet.transactions.filterTitle') }}</h2>
 
-        <div class="mt-4 grid grid-cols-2 gap-3">
-          <label class="text-xs text-[#aaa8a3]">
-            {{ t('wallet.transactions.type') }}
-            <select
-              v-model="formType"
-              class="mt-2 w-full rounded-xl border border-[#353533] bg-[#292927] px-3 py-3 text-sm text-[#f5f4f0] outline-none focus:border-[#91cdbb]"
-              :aria-label="t('wallet.transactions.type')"
-            >
-              <option value="">{{ t('wallet.transactions.allTypes') }}</option>
-              <option
-                v-for="option in typeOptions"
-                :key="option.value"
-                :value="option.value"
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <!-- 폼 라벨은 보조 텍스트라 ink-2다. ink-3은 흐림·비활성 전용 — #332 참조. -->
+            <label class="text-caption text-ink-2">
+              {{ t('wallet.transactions.type') }}
+              <select
+                v-model="formType"
+                class="mt-2 w-full rounded-sm border border-hairline-2 bg-surface-2 px-3 py-3 text-body-sm text-ink outline-none focus:border-ink"
+                :aria-label="t('wallet.transactions.type')"
               >
-                {{ t(`wallet.transactions.${option.labelKey}`) }}
-              </option>
-            </select>
-          </label>
+                <option value="">{{ t('wallet.transactions.allTypes') }}</option>
+                <option
+                  v-for="option in typeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ t(`wallet.transactions.${option.labelKey}`) }}
+                </option>
+              </select>
+            </label>
 
-          <label class="text-xs text-[#aaa8a3]">
-            {{ t('wallet.transactions.status') }}
-            <select
-              v-model="formStatus"
-              class="mt-2 w-full rounded-xl border border-[#353533] bg-[#292927] px-3 py-3 text-sm text-[#f5f4f0] outline-none focus:border-[#91cdbb]"
-              :aria-label="t('wallet.transactions.status')"
-            >
-              <option value="">{{ t('wallet.transactions.allStatuses') }}</option>
-              <option
-                v-for="status in statusOptions"
-                :key="status"
-                :value="status"
+            <label class="text-caption text-ink-2">
+              {{ t('wallet.transactions.status') }}
+              <select
+                v-model="formStatus"
+                class="mt-2 w-full rounded-sm border border-hairline-2 bg-surface-2 px-3 py-3 text-body-sm text-ink outline-none focus:border-ink"
+                :aria-label="t('wallet.transactions.status')"
               >
-                {{ getTransactionStatusLabel(status) }}
-              </option>
-            </select>
-          </label>
+                <option value="">{{ t('wallet.transactions.allStatuses') }}</option>
+                <option
+                  v-for="status in statusOptions"
+                  :key="status"
+                  :value="status"
+                >
+                  {{ getTransactionStatusLabel(status) }}
+                </option>
+              </select>
+            </label>
 
-          <div class="col-span-2">
-            <p class="text-xs text-ink-3">{{ t('wallet.transactions.dateRange') }}</p>
-            <p
-              class="mt-1 text-sm text-ink"
-              aria-live="polite"
-            >
-              {{ dateRangeLabel }}
-            </p>
-            <!--
-              네이티브 <input type="date">를 쓰지 않는다. 표시 형식이 브라우저 UI 언어를
-              따라 한국어 브라우저에서 `연도. 월. 일.`로 나오고 lang 속성으로 바꿀 수 없다.
-            -->
-            <CalendarGrid
-              class="mt-3"
-              :range-start="formFrom || null"
-              :range-end="formTo || null"
-              @select="selectDate"
-            />
-            <button
-              v-if="formFrom || formTo"
-              type="button"
-              class="mt-2 text-xs text-ink-3 underline underline-offset-4"
-              @click="clearDates"
-            >
-              {{ t('wallet.transactions.clearDates') }}
-            </button>
+            <div class="col-span-2">
+              <p class="text-caption text-ink-2">{{ t('wallet.transactions.dateRange') }}</p>
+              <p
+                class="mt-1 text-body-sm text-ink"
+                aria-live="polite"
+              >
+                {{ dateRangeLabel }}
+              </p>
+              <!--
+                네이티브 <input type="date">를 쓰지 않는다. 표시 형식이 브라우저 UI 언어를
+                따라 한국어 브라우저에서 `연도. 월. 일.`로 나오고 lang 속성으로 바꿀 수 없다.
+              -->
+              <CalendarGrid
+                class="mt-3"
+                :range-start="formFrom || null"
+                :range-end="formTo || null"
+                @select="selectDate"
+              />
+              <button
+                v-if="formFrom || formTo"
+                type="button"
+                class="mt-2 text-caption text-ink-2 underline underline-offset-4"
+                @click="clearDates"
+              >
+                {{ t('wallet.transactions.clearDates') }}
+              </button>
+            </div>
           </div>
-        </div>
 
-        <p
-          v-if="filterError"
-          class="mt-3 rounded-lg bg-[#3b2422] px-3 py-2 text-xs text-[#ffaaa4]"
-          role="alert"
-        >
-          {{ filterError }}
-        </p>
+          <p
+            v-if="filterError"
+            class="mt-3 text-body-sm text-danger"
+            role="alert"
+          >
+            {{ filterError }}
+          </p>
 
-        <div class="mt-4 grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            class="min-h-11 rounded-xl border border-[#5e5e5b] px-3 text-sm font-semibold text-[#f5f4f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
-            @click="resetFilters"
-          >
-            {{ t('wallet.transactions.resetFilters') }}
-          </button>
-          <button
-            type="submit"
-            class="min-h-11 rounded-xl bg-[#f2f0ea] px-3 text-sm font-bold text-[#172033] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
-          >
-            {{ t('wallet.transactions.applyFilters') }}
-          </button>
-        </div>
-      </form>
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <AppButton
+              variant="secondary"
+              @click="resetFilters"
+            >
+              {{ t('wallet.transactions.resetFilters') }}
+            </AppButton>
+            <AppButton type="submit">
+              {{ t('wallet.transactions.applyFilters') }}
+            </AppButton>
+          </div>
+        </form>
+      </AppCard>
     </section>
 
     <section
-      class="mx-auto max-w-[430px] pt-6"
+      class="mt-6"
       aria-labelledby="transaction-list-title"
     >
       <h2
         id="transaction-list-title"
-        class="text-xl font-bold tracking-[-0.04em]"
+        class="font-display text-section-header uppercase text-ink-display"
       >
         {{ t('wallet.home.recentActivity') }}
       </h2>
 
-      <p
+      <StateLoading
         v-if="transactionsQuery.isPending.value && transactions.length === 0"
-        class="mt-4 rounded-2xl bg-[#262626] px-4 py-8 text-center text-sm text-[#aaa8a3]"
-        role="status"
-      >
-        {{ t('wallet.transactions.loading') }}
-      </p>
+        class="mt-4"
+        :label="t('wallet.transactions.loading')"
+      />
 
-      <div
+      <StateError
         v-else-if="transactionsQuery.isError.value && transactions.length === 0"
-        class="mt-4 flex flex-col items-center gap-3 rounded-2xl bg-[#262626] px-4 py-8 text-center text-sm"
-        role="alert"
-      >
-        <p>{{ t('wallet.transactions.error') }}</p>
-        <button
-          type="button"
-          class="rounded-xl border border-[#878787] px-4 py-2 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb]"
-          @click="transactionsQuery.refetch()"
-        >
-          {{ t('wallet.transactions.retry') }}
-        </button>
-      </div>
+        class="mt-4"
+        :description="t('wallet.transactions.error')"
+        :action-label="t('wallet.transactions.retry')"
+        @retry="transactionsQuery.refetch()"
+      />
 
-      <p
+      <StateEmpty
         v-else-if="transactions.length === 0"
-        class="mt-4 rounded-2xl bg-[#262626] px-4 py-8 text-center text-sm text-[#989898]"
-      >
-        {{ t('wallet.transactions.empty') }}
-      </p>
+        class="mt-4"
+        :description="t('wallet.transactions.empty')"
+      />
 
       <ul
         v-else
@@ -326,35 +317,41 @@ const openTransactionDetail = (transactionId: number): void => {
         <li
           v-for="transaction in transactions"
           :key="`${transaction.transferId}-${transaction.createdAt}`"
-          class="rounded-2xl bg-[#262626]"
+          class="rounded-md bg-surface-1"
         >
           <button
             type="button"
-            class="w-full p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#91cdbb]"
+            class="w-full p-4 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
             :aria-label="t('wallet.transactions.openDetail')"
             @click="openTransactionDetail(transaction.transferId)"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <p class="truncate text-sm font-semibold">
+                <p class="truncate text-body-sm font-semibold text-ink">
                   {{ t(`wallet.home.activity.${toActivityKind(transaction.transferType)}`) }}
                 </p>
-                <p class="mt-1 text-xs text-[#989898]">
+                <p class="mt-1 text-caption text-ink-3">
                   {{ formatTransactionDateTime(transaction.createdAt) }}
                 </p>
               </div>
               <div class="shrink-0 text-right">
+                <!-- 들어온 돈만 민트 계열로 구분한다. V2 거래내역/01의 Credit 표기. -->
                 <p
-                  class="text-base font-bold"
+                  class="text-title-sm font-bold"
                   :class="
-                    transaction.entryType.toUpperCase() === 'DEBIT'
-                      ? 'text-[#f5f4f0]'
-                      : 'text-[#47c887]'
+                    transaction.entryType.toUpperCase() === 'DEBIT' ? 'text-ink' : 'text-success-2'
                   "
                 >
                   {{ formatTransactionAmount(transaction) }}
                 </p>
-                <p class="mt-1 text-xs text-[#91cdbb]">
+                <p
+                  class="mt-1 text-caption"
+                  :class="
+                    transaction.entryType.toUpperCase() === 'DEBIT'
+                      ? 'text-ink-3'
+                      : 'text-success-subtle'
+                  "
+                >
                   {{
                     transaction.entryType.toUpperCase() === 'DEBIT'
                       ? t('wallet.transactions.debit')
@@ -365,18 +362,18 @@ const openTransactionDetail = (transactionId: number): void => {
             </div>
 
             <div
-              class="mt-3 flex items-center justify-between border-t border-[#353533] pt-3 text-xs"
+              class="mt-3 flex items-center justify-between border-t border-hairline pt-3 text-caption"
             >
-              <span class="text-[#aaa8a3]">
+              <span class="text-ink-2">
                 {{ t('wallet.transactions.balanceAfter') }}
-                <strong class="ml-1 font-semibold text-[#f5f4f0]">
+                <strong class="ml-1 font-semibold text-ink">
                   {{ formatPointAmount(String(transaction.balanceAfter)) }} P
                 </strong>
               </span>
-              <span class="flex items-center gap-1 font-semibold text-[#aaa8a3]">
+              <span class="flex items-center gap-1 font-semibold text-ink-2">
                 {{ t('wallet.transactions.details') }}
                 <span
-                  class="text-lg leading-none"
+                  class="text-title-sm leading-none"
                   aria-hidden="true"
                 >
                   ›
@@ -389,23 +386,24 @@ const openTransactionDetail = (transactionId: number): void => {
 
       <p
         v-if="transactionsQuery.isError.value && transactions.length > 0"
-        class="mt-3 rounded-lg bg-[#3b2422] px-3 py-2 text-xs text-[#ffaaa4]"
+        class="mt-3 text-body-sm text-danger"
         role="alert"
       >
         {{ t('wallet.transactions.error') }}
       </p>
 
-      <button
+      <AppButton
         v-if="nextCursor"
-        type="button"
-        class="mt-4 min-h-12 w-full rounded-xl border border-[#5e5e5b] px-4 text-sm font-semibold text-[#f5f4f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#91cdbb] disabled:cursor-not-allowed disabled:opacity-40"
+        variant="secondary"
+        block
+        class="mt-4"
         :disabled="isLoadingMore"
         @click="loadMore"
       >
         {{
           isLoadingMore ? t('wallet.transactions.loadingMore') : t('wallet.transactions.loadMore')
         }}
-      </button>
+      </AppButton>
     </section>
   </main>
 </template>
