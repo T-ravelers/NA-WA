@@ -278,6 +278,41 @@ describe('AppointmentCreateForm', () => {
     expect(wrapper.text()).not.toContain('Choose a deposit between 5,000 P and 50,000 P.')
   })
 
+  it('shows a settings error as soon as the field is edited, without pressing Create', async () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
+      ...mountOptions,
+    })
+
+    await fillBasics(wrapper)
+    await wrapper.find('input[type="time"]').setValue('18:30')
+    await wrapper.findAll('input[type="time"]')[1]?.setValue('18:00')
+
+    expect(wrapper.text()).toContain('The end time must be after the start time.')
+
+    await wrapper.find('input[inputmode="numeric"]').setValue('100')
+
+    expect(wrapper.text()).toContain('Choose a deposit between 5,000 P and 50,000 P.')
+  })
+
+  it('does not flag untouched settings fields until the host tries to submit', async () => {
+    // 스텝에 들어오자마자 전부 빨간 화면은 틀렸다는 뜻이 아니라 아직 안 적었다는
+    // 뜻일 뿐이다. 손댄 칸만 즉시 보여주고, 제출을 시도한 뒤에 전부 보여준다.
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
+      ...mountOptions,
+    })
+
+    await fillBasics(wrapper)
+    expect(wrapper.text()).not.toContain('Choose a start time.')
+
+    await wrapper.find('input[type="time"]').setValue('18:30')
+    expect(wrapper.text()).not.toContain('Choose an end time.')
+
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.text()).toContain('Choose an end time.')
+  })
+
   it('clears a schedule validation error once the user starts fixing it', async () => {
     const wrapper = mount(AppointmentCreateForm, {
       props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },

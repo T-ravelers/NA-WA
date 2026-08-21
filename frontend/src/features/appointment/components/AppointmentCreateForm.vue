@@ -131,9 +131,41 @@ clearErrorsOnEdit(
   () => [draft.appointmentName, draft.maxMembers, draft.languageCode, draft.meetingPlace],
   ['appointmentName', 'maxMembers', 'languageCode', 'meetingPlace'],
 )
-clearErrorsOnEdit(
+
+// 설정 스텝은 제출을 기다리지 않고 입력하는 즉시 검증한다. 시각·보증금은
+// 값을 넣는 순간 맞는지 틀리는지 알 수 있는데, "Create appointment"를 눌러야
+// 빨간 줄이 뜨면 한 번에 여러 칸이 틀렸다는 말을 듣고 위로 다시 올라가야 한다.
+//
+// 다만 아직 손대지 않은 칸에 "필수입니다"를 먼저 띄우지는 않는다 — 스텝에
+// 들어오자마자 전부 빨간 화면은 틀렸다는 뜻이 아니라 아직 안 적었다는 뜻일
+// 뿐이다. 그래서 한 번이라도 고친 칸만 즉시 보여주고, 제출을 시도한 뒤에는
+// 전부 보여준다. 종료가 시작보다 빨라야 하는 식의 맞물린 규칙은 다른 칸을 고칠
+// 때도 다시 계산되므로, 이미 손댄 칸의 문구는 늘 최신이다.
+const SETTINGS_KEYS = [
+  'activityStartTime',
+  'activityEndTime',
+  'depositAmount',
+] as const satisfies readonly (keyof AppointmentFormErrors)[]
+const touchedSettings = new Set<(typeof SETTINGS_KEYS)[number]>()
+const settingsSubmitted = ref(false)
+
+function applySettingsErrors(): void {
+  const live = validateAppointmentSettings(draft)
+  const next = { ...errors.value }
+  for (const key of SETTINGS_KEYS) {
+    next[key] = settingsSubmitted.value || touchedSettings.has(key) ? live[key] : undefined
+  }
+  errors.value = next
+}
+
+watch(
   () => [draft.activityStartTime, draft.activityEndTime, draft.depositAmount],
-  ['activityStartTime', 'activityEndTime', 'depositAmount'],
+  (current, previous) => {
+    SETTINGS_KEYS.forEach((key, index) => {
+      if (current[index] !== previous[index]) touchedSettings.add(key)
+    })
+    applySettingsErrors()
+  },
 )
 
 const languageOptions: AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
@@ -169,6 +201,8 @@ function goToPreviousStep(): boolean {
 function submitSettings(): void {
   if (pending) return
 
+  // 제출을 시도했으니 이제부터는 손대지 않은 칸의 오류도 모두 보여준다.
+  settingsSubmitted.value = true
   const nextErrors = validateAppointmentSettings(draft)
   errors.value = nextErrors
 
