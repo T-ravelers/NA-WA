@@ -38,6 +38,24 @@ function resolveMinRatio(value: unknown): number {
 }
 
 /**
+ * 글자가 실제로 차지하는 폭.
+ *
+ * `scrollWidth`는 정수로 반올림된다. 칸과 글자가 95px로 같아 보여도 소수점만큼 넘쳐 `…`이 붙는
+ * 일이 실제로 있었다(이벤트 상세의 `Add to journey`). Range로 소수점까지 재고, 레이아웃이 없는
+ * 환경(jsdom)에서는 0이 나오므로 `scrollWidth`와 큰 쪽을 쓴다.
+ */
+function contentWidth(el: HTMLElement): number {
+  const range = document.createRange()
+
+  range.selectNodeContents(el)
+
+  const measured =
+    typeof range.getBoundingClientRect === 'function' ? range.getBoundingClientRect().width : 0
+
+  return Math.max(measured, el.scrollWidth)
+}
+
+/**
  * 글자 크기를 원래 값으로 되돌린 뒤, 넘치는 만큼 줄인다.
  *
  * 디렉티브 밖에서도 쓸 수 있게 순수 함수로 둔다. `minRatio`는 원래 크기 대비 하한(0–1)이다.
@@ -47,19 +65,20 @@ export function fitText(el: HTMLElement, minRatio = DEFAULT_MIN_RATIO): void {
 
   const base = Number.parseFloat(getComputedStyle(el).fontSize)
   const available = el.clientWidth
+  const needed = contentWidth(el)
 
-  if (!Number.isFinite(base) || base <= 0 || available <= 0 || el.scrollWidth <= available) {
+  if (!Number.isFinite(base) || base <= 0 || available <= 0 || needed <= available) {
     return
   }
 
-  let ratio = available / el.scrollWidth
+  let ratio = available / needed
 
   for (let pass = 0; pass <= EXTRA_PASSES; pass += 1) {
     const applied = Math.max(minRatio, ratio)
 
     el.style.fontSize = `${(base * applied).toFixed(2)}px`
 
-    if (applied === minRatio || el.scrollWidth <= el.clientWidth) {
+    if (applied === minRatio || contentWidth(el) <= el.clientWidth) {
       return
     }
 

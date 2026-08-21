@@ -566,7 +566,8 @@ async function confirmJourneyDate(date: string): Promise<void> {
         <div class="min-w-0 flex-1">
           <AppButton
             block
-            class="h-12 whitespace-nowrap px-2 text-on-paper"
+            compact
+            class="h-12 whitespace-nowrap text-on-paper"
             @click="openJourneyDateSheet"
           >
             {{
@@ -579,8 +580,9 @@ async function confirmJourneyDate(date: string): Promise<void> {
         <div class="min-w-0 flex-1">
           <AppButton
             block
+            compact
             variant="secondary"
-            class="h-12 whitespace-nowrap border-success px-2 text-success"
+            class="h-12 whitespace-nowrap border-success text-success"
             @click="openAppointmentList"
           >
             {{ t('explore.placeDetail.findCompanions') }}
