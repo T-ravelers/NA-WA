@@ -55,11 +55,6 @@ public class PlaceService {
     }
 
     @Transactional(readOnly = true)
-    public PlaceDetailResponse getPlaceDetail(Long placeId, String language) {
-        return getPlaceDetail(placeId, language, null);
-    }
-
-    @Transactional(readOnly = true)
     public PlaceDetailResponse getPlaceDetail(
         Long placeId,
         String language,
