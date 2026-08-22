@@ -189,12 +189,17 @@ const optionBadges = computed(() => {
     .map(([key, , label]) => ({ key, label }))
 })
 
+/**
+ * 대표 메뉴는 한 문자열로 오고 구분자가 출처마다 다르다. 수집한 1,485건 중
+ * 1,441건이 `/`, 32건이 쉼표, 9건이 가운뎃점을 쓴다. `/`를 빼면 문장 전체가 칩
+ * 하나에 들어가 "A / B / C"가 통째로 붙어 나온다.
+ */
 const menuItems = computed(() => {
   const value = place.value?.menuSummary
   if (!value) return []
 
   return value
-    .split(/\n|\s*·\s*|\s*,\s*/)
+    .split(/\n|\s*·\s*|\s*,\s*|\s*\/\s*/)
     .map((item) => item.trim())
     .filter(Boolean)
 })
