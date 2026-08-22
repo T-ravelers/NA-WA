@@ -18,6 +18,7 @@ import me.nawa.member.dto.OnboardingProfileRequest;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.mapper.MemberMapper;
 import me.nawa.member.service.MemberProfileService;
+import me.nawa.notification.service.NotificationService;
 import me.nawa.settlement.service.SettlementCreationService;
 import me.nawa.settlement.service.SettlementPaymentService;
 import me.nawa.settlement.service.SettlementQueryService;
@@ -511,6 +512,39 @@ class SwaggerConfigTest {
                 @Override public me.nawa.settlement.dto.response.SettlementMutationResponse paySettlement(
                     Long memberId, Long settlementId, String idempotencyKey
                 ) { throw new UnsupportedOperationException(); }
+            };
+        }
+
+        @Bean
+        NotificationService notificationService() {
+            return new NotificationService() {
+                @Override public me.nawa.notification.dto.response.NotificationListResponse
+                    getNotifications(Long memberId, Integer limit, String cursor) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override public me.nawa.notification.dto.response.UnreadNotificationCountResponse
+                    getUnreadCount(Long memberId) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override public void markRead(Long memberId, Long notificationId) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override public me.nawa.notification.dto.response.NotificationReadAllResponse
+                    readAll(Long memberId) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override public void delete(Long memberId, Long notificationId) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override public me.nawa.notification.dto.response.NotificationDeleteAllResponse
+                    deleteAll(Long memberId) {
+                    throw new UnsupportedOperationException();
+                }
             };
         }
     }

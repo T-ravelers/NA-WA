@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.notification.mapper.NotificationMapper">
+
+    <!--
+        커서는 "이 알림 다음부터"를 뜻하는 알림 번호 하나다.
+
+        번호만으로 비교하지 않고 그 번호의 created_at까지 함께 읽어 (시각, 번호) 짝으로
+        비교한다. 정렬 기준이 created_at이고 이 값은 DB가 아니라 앱이 넣기 때문에, 번호
+        순서와 시각 순서가 어긋날 수 있다. 번호만 보고 자르면 그 어긋난 만큼 어떤 알림은
+        어느 쪽에도 안 나오고 어떤 알림은 두 쪽에 걸쳐 나온다.
+
+        (recipient_member_id, created_at DESC) 인덱스를 그대로 탄다.
+    -->
+    <select id="findByRecipient" resultType="me.nawa.notification.domain.Notification">
+        SELECT n.notification_id, n.recipient_member_id, n.notification_type, n.settlement_id,
+               n.actor_name, n.gathering_name, n.amount, n.currency_code,
+               n.read_at, n.created_at
+        FROM notifications n
+        WHERE n.recipient_member_id = #{memberId}
+          AND n.deleted_at IS NULL
+        <if test="cursor != null">
+          AND (n.created_at, n.notification_id) &lt; (
+              SELECT c.created_at, c.notification_id
+              FROM notifications c
+              WHERE c.notification_id = #{cursor}
+          )
+        </if>
+        ORDER BY n.created_at DESC, n.notification_id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countUnreadByRecipient" resultType="int">
+        SELECT COUNT(*)
+        FROM notifications n
+        WHERE n.recipient_member_id = #{memberId}
+          AND n.read_at IS NULL
+          AND n.deleted_at IS NULL
+    </select>
+
+    <update id="markAllRead">
+        UPDATE notifications n
+        SET n.read_at = #{readAt}
+        WHERE n.recipient_member_id = #{memberId}
+          AND n.read_at IS NULL
+          AND n.deleted_at IS NULL
+    </update>
+
+    <!--
+        아래 셋은 모두 recipient_member_id를 조건에 함께 건다. 알림 번호를 경로로 받으므로
+        남의 번호를 적어 보낼 수 있는데, 이 조건이 그런 요청을 0행으로 만든다. 번호가 아예
+        없는 경우와 결과가 같아서, 응답만 보고는 그 번호의 알림이 있는지 알 수 없다.
+    -->
+    <update id="markRead">
+        UPDATE notifications n
+        SET n.read_at = #{readAt}
+        WHERE n.notification_id = #{notificationId}
+          AND n.recipient_member_id = #{memberId}
+          AND n.read_at IS NULL
+          AND n.deleted_at IS NULL
+    </update>
+
+    <update id="softDelete">
+        UPDATE notifications n
+        SET n.deleted_at = #{deletedAt}
+        WHERE n.notification_id = #{notificationId}
+          AND n.recipient_member_id = #{memberId}
+          AND n.deleted_at IS NULL
+    </update>
+
+    <update id="softDeleteAll">
+        UPDATE notifications n
+        SET n.deleted_at = #{deletedAt}
+        WHERE n.recipient_member_id = #{memberId}
+          AND n.deleted_at IS NULL
+    </update>
+
+    <!--
+        만든 시각은 컬럼 기본값(CURRENT_TIMESTAMP)에 맡기지 않고 애플리케이션이 넘긴 값을
+        적는다. 이 시각은 화면에 그대로 보이고 목록 정렬 기준이기도 해서, DB 시계에 기대면
+        DB와 앱의 시간대가 어긋난 만큼 알림 시각 전체가 밀린다. 같은 행의 read_at도 앱이
+        적으므로, 두 시각이 서로 다른 시계에서 나오는 일도 이걸로 없앤다.
+    -->
+    <insert id="insertNotifications">
+        INSERT INTO notifications (
+            recipient_member_id, notification_type, settlement_id,
+            actor_name, gathering_name, amount, currency_code, created_at
+        ) VALUES
+        <foreach collection="notifications" item="notification" separator=",">
+            (
+                #{notification.recipientMemberId}, #{notification.notificationType},
+                #{notification.settlementId}, #{notification.actorName},
+                #{notification.gatheringName}, #{notification.amount},
+                #{notification.currencyCode}, #{notification.createdAt}
+            )
+        </foreach>
+    </insert>
+
+    <!--
+        알림 문장에 넣을 값을 정산에서 한 번에 읽는다.
+
+        통화는 settlements에 없다. 정산의 근거가 된 원거래(wallet_transfers)에만 있어서
+        거기서 가져온다. payer_member_id는 스키마 제약(chk_settlements_creator_is_payer)상
+        생성자와 언제나 같으므로, 돈을 받을 사람 판정은 이 컬럼 하나로 끝난다.
+    -->
+    <select id="findSettlementSnapshot"
+            resultType="me.nawa.notification.domain.SettlementNotificationSnapshot">
+        SELECT s.payer_member_id, payer.display_name AS payer_name,
+               a.appointment_name AS gathering_name, s.total_amount, t.currency_code
+        FROM settlements s
+        JOIN appointments a ON a.appointment_id = s.appointment_id
+        JOIN wallet_transfers t ON t.transfer_id = s.source_transfer_id
+        JOIN members payer ON payer.member_id = s.payer_member_id
+        WHERE s.settlement_id = #{settlementId}
+          AND s.deleted_at IS NULL
+    </select>
+
+    <!--
+        누구에게 얼마로 보낼지는 이 목록 하나로 정한다. 알림 종류마다 SQL을 따로 두지 않는
+        이유는, 수신자 규칙이 바뀔 때 고칠 곳을 한 군데로 모아 두기 위해서다.
+
+        NOT_REQUESTED는 원결제자 본인 몫이라 청구 대상이 아니다. 정산 상세의 납부 현황이
+        쓰는 findCollectionMembers와 같은 기준이다.
+    -->
+    <select id="findSettlementMemberShares"
+            resultType="me.nawa.notification.domain.SettlementMemberShare">
+        SELECT am.member_id, m.display_name, sm.share_amount, sm.request_status
+        FROM settlement_members sm
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        JOIN members m ON m.member_id = am.member_id
+        WHERE sm.settlement_id = #{settlementId}
+          AND sm.request_status &lt;&gt; 'NOT_REQUESTED'
+          AND sm.deleted_at IS NULL
+        ORDER BY sm.appointment_member_id
+    </select>
+
+</mapper>
