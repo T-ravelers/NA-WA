@@ -236,6 +236,49 @@ Notion의 20건은 QR 결제부터 리포트까지의 업무 API만 센 값입�
 `hikaricp_connections_pending`이 쌓이면 커넥션 풀이, `tomcat_threads_busy / config_max`가
 1에 가까우면 스레드풀이, GC 정지시간이 길면 힙이 병목입니다. 셋은 대응이 전혀 다릅니다.
 
+### Grafana 대시보드
+
+데이터소스 프로비저닝(`loadtest/grafana/provisioning/datasources/loadtest.yml`)만으로는
+패널이 없습니다. Grafana HTTP API로 4개를 등록합니다 — 데이터소스처럼 파일 프로비저닝을
+해도 되지만, 커뮤니티 대시보드 3개는 버전이 자주 바뀌어 최신본을 매번 받는 쪽이
+안전해서 수동/스크립트 임포트로 남겨 둡니다.
+
+| 대시보드 | 출처 | 데이터소스 |
+| --- | --- | --- |
+| k6 Load Testing Results | [grafana.com #2587](https://grafana.com/grafana/dashboards/2587/) | `k6` (InfluxDB) |
+| Node Exporter Full | [grafana.com #1860](https://grafana.com/grafana/dashboards/1860/) | `loadtest-prometheus` (템플릿 변수로 자체 선택) |
+| Cadvisor exporter | [grafana.com #14282](https://grafana.com/grafana/dashboards/14282/) | `loadtest-prometheus` |
+| NA-WA Backend (JVM/Tomcat/HikariCP) | 저장소 자체 제작, JSON 없음(API로만 생성) | `loadtest-prometheus` |
+
+임포트 예시(Grafana가 `127.0.0.1:3000`에서, admin/admin 기본 계정으로 떠 있다고 가정):
+
+```shell
+curl -s "https://grafana.com/api/dashboards/2587/revisions/latest/download" \
+  | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+payload = {
+    'dashboard': d, 'overwrite': True,
+    'inputs': [{'name': 'DS_K6', 'type': 'datasource', 'pluginId': 'influxdb', 'value': 'k6'}],
+}
+print(json.dumps(payload))
+" | curl -s -u admin:admin -H "Content-Type: application/json" \
+  -X POST http://127.0.0.1:3000/api/dashboards/import -d @-
+```
+
+`Cadvisor exporter`(#14282)도 같은 패턴이되 입력 이름이 `DS_PROMETHEUS`, `pluginId`가
+`prometheus`, `value`가 `loadtest-prometheus`입니다. `Node Exporter Full`(#1860)은
+`__inputs`가 비어 있고 대시보드 안의 `ds_prometheus` 템플릿 변수가 Prometheus 타입
+데이터소스를 자동으로 고르므로 `inputs: []`로 그대로 임포트합니다.
+
+네 번째(`NA-WA Backend`)는 이 저장소가 노출하는 커스텀 메트릭 전용이라 커뮤니티에
+없습니다 — `POST /api/dashboards/db`로 직접 만듭니다. 패널 6개: JVM 힙 사용/최대,
+GC 정지시간, Tomcat 스레드(`busy`/`current`/`config_max`), HikariCP 커넥션
+(`active`/`idle`/`pending`/`max`), 프로세스·시스템 CPU, HikariCP 커넥션 획득 p95.
+JSON은 커밋해 두지 않았습니다 — Grafana 인스턴스마다 새로 만드는 로컬 산출물이라
+소스에 넣을 이유가 없습니다(데이터소스 프로비저닝과 다른 점입니다: 그건 Grafana가
+어디를 봐야 하는지에 대한 저장소의 결정이고, 대시보드 패널 배치는 보는 사람의 취향).
+
 ## 이 환경이 재현하지 못하는 것
 
 절대 TPS 수치를 그대로 믿으면 안 됩니다. 넷 다 결과를 **실제보다 좋게** 만듭니다.

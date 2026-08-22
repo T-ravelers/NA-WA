@@ -64,6 +64,28 @@ function memberIdFor(vu) {
   return base + vu
 }
 
+/**
+ * 참여 대상 약속의 활동일을 감싸는 여정 기간.
+ *
+ * 시드가 recruiting 약속의 activity_start_at을 `CURRENT_TIMESTAMP + INTERVAL 30
+ * DAY`로 넣는다(고정 날짜가 아니다) — 시드를 실행한 시점 기준이라, 여기서도
+ * 같은 오프셋으로 계산해야 참여 시 JOURNEY_ITEM_DATE_OUT_OF_RANGE(JOURNEY-007)로
+ * 거절되지 않는다.
+ */
+function toDateString(date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function journeyDateRange() {
+  const now = new Date()
+  const start = new Date(now.getTime())
+  start.setUTCDate(start.getUTCDate() + 29)
+  const end = new Date(now.getTime())
+  end.setUTCDate(end.getUTCDate() + 31)
+
+  return { startDate: toDateString(start), endDate: toDateString(end) }
+}
+
 export default function () {
   sleep(((__VU - 1) * START_WINDOW_SECONDS) / DAU)
 
@@ -83,14 +105,16 @@ export default function () {
     // 쿠키에 XSRF-TOKEN 을 심는다. 이후 withCsrf 가 쿠키에서 최신 값을 읽는다.
     issueCsrfHeaders(jar)
 
+    const { startDate, endDate } = journeyDateRange()
+
     const created = dataOf(
       expectOk(
         http.post(
           `${BASE_URL}/api/v1/journeys`,
           JSON.stringify({
             title: `loadtest-journey-${__VU}-${__ITER}`,
-            startDate: '2026-09-01',
-            endDate: '2026-09-05',
+            startDate,
+            endDate,
           }),
           { headers: withCsrf(jar, true), jar },
         ),
@@ -124,11 +148,12 @@ export default function () {
     )
 
     const eventId = list && list.content && list.content.length > 0 ? list.content[0].itemId : null
+    const visitDate = journeyDateRange().startDate
 
     if (eventId && tripId) {
       expectOk(http.get(http.url`${BASE_URL}/api/v1/explore/events/${eventId}`, { headers: baseHeaders, jar }), 'event 상세')
       expectOk(
-        http.get(http.url`${BASE_URL}/api/v1/journeys/${tripId}/items/exists?itemId=${eventId}&visitDate=2026-09-02`, {
+        http.get(http.url`${BASE_URL}/api/v1/journeys/${tripId}/items/exists?itemId=${eventId}&visitDate=${visitDate}`, {
           headers: baseHeaders,
           jar,
         }),
@@ -137,7 +162,7 @@ export default function () {
       expectOk(
         http.post(
           http.url`${BASE_URL}/api/v1/journeys/${tripId}/items`,
-          JSON.stringify({ itemId: eventId, visitDate: '2026-09-02' }),
+          JSON.stringify({ itemId: eventId, visitDate }),
           { headers: withCsrf(jar, true), jar },
         ),
         'journey items 담기',
@@ -219,11 +244,17 @@ export default function () {
     )
 
     // 보증금 예치가 이 트랜잭션 안에서 함께 처리된다. 별도 엔드포인트가 없다.
+    // tripId 없이 보내면 서비스가 COMMON-001로 거절한다 — 2번 그룹에서 만든
+    // 여정에 이 약속을 연결한다.
     expectOk(
-      http.post(http.url`${BASE_URL}/api/v1/appointments/${appointmentId}/members`, null, {
-        headers: withCsrf(jar),
-        jar,
-      }),
+      http.post(
+        http.url`${BASE_URL}/api/v1/appointments/${appointmentId}/members`,
+        JSON.stringify({ tripId }),
+        {
+          headers: withCsrf(jar, true),
+          jar,
+        },
+      ),
       '약속 참여',
     )
   })
