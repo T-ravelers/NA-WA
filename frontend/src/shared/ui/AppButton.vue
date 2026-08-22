@@ -13,7 +13,13 @@ import { vFitText } from '@/shared/lib/fitText'
  * 시안 실측: primary h52 · 나머지 h48 · 라운드 12.
  */
 type ButtonVariant =
-  'primary' | 'secondary' | 'secondary-on-paper' | 'tertiary' | 'settle' | 'destructive'
+  | 'primary'
+  | 'secondary'
+  | 'secondary-on-paper'
+  | 'tertiary'
+  | 'settle'
+  | 'destructive'
+  | 'on-ticket'
 
 interface Props {
   variant?: ButtonVariant
@@ -63,6 +69,9 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
   tertiary: 'text-ink underline underline-offset-4',
   settle: 'rounded-sm bg-settlement text-on-paper',
   destructive: 'rounded-sm bg-danger text-on-category',
+  // 티켓(paper·소비 카테고리 코어색) 면 위의 짧은 동작 버튼. 시안 R4의 `Share ticket`.
+  // 캔버스색 알약이라 어느 티켓 색 위에서도 ink 글자가 기본 대비(ink/canvas)를 그대로 갖는다.
+  'on-ticket': 'rounded-pill bg-canvas text-ink',
 }
 
 const HEIGHT_CLASS: Record<ButtonVariant, string> = {
@@ -72,6 +81,7 @@ const HEIGHT_CLASS: Record<ButtonVariant, string> = {
   tertiary: 'h-11',
   settle: 'h-12',
   destructive: 'h-12',
+  'on-ticket': 'h-11',
 }
 
 function handleClick(): void {
