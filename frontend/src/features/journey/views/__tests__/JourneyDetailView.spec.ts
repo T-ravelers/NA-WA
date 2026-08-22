@@ -7,6 +7,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
+import type { JourneyTimeline } from '../../api/journeyApi'
 import type { JourneyReportIntegration, JourneyReportSummary } from '../../model/reportIntegration'
 import { journeyReportIntegrationKey } from '../../model/reportIntegration'
 
@@ -309,15 +310,16 @@ describe('JourneyDetailView', () => {
                 },
               },
               appointment: {
+                appointmentId: 61,
                 activityStartAt: '2026-08-10T10:20:00',
                 activityEndAt: '2026-08-10T11:20:00',
-                appointmentStatus: 'OPEN',
+                appointmentStatus: 'RECRUITING',
               },
             },
           ],
         },
       ],
-    })
+    } satisfies JourneyTimeline)
 
     const wrapper = await mountAt('/journeys/7')
 

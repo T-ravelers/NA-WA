@@ -62,8 +62,7 @@ public class AppointmentService {
     );
     private static final Set<AppointmentStatus> LIST_STATUSES = Set.of(
             AppointmentStatus.RECRUITING,
-            AppointmentStatus.CLOSED,
-            AppointmentStatus.CONFIRMED,
+            AppointmentStatus.FULL,
             AppointmentStatus.IN_PROGRESS,
             AppointmentStatus.COMPLETED,
             AppointmentStatus.CANCELLED
@@ -95,7 +94,6 @@ public class AppointmentService {
                 .languageCode(request.getLanguageCode())
                 .appointmentName(request.getAppointmentName().trim())
                 .maxMembers(request.getMaxMembers())
-                .joinDeadline(request.getJoinDeadline())
                 .depositAmount(request.getDepositAmount())
                 .appointmentStatus(AppointmentStatus.PAYMENT_PENDING)
                 .meetingPlace(request.getMeetingPlace().trim())
@@ -148,8 +146,10 @@ public class AppointmentService {
         validateIdentifiers(memberId, appointmentId);
         Appointment appointment = requireAppointmentForUpdate(appointmentId);
 
+        // 참여는 활동이 시작되기 전까지만 받는다. 참여 마감 시각을 따로 두지
+        // 않으므로 이 비교가 유일한 시간 경계다.
         if (appointment.getAppointmentStatus() != AppointmentStatus.RECRUITING
-                || appointment.getJoinDeadline().isBefore(LocalDateTime.now())
+                || !LocalDateTime.now().isBefore(appointment.getActivityStartAt())
                 || appointment.getCurrentMemberCount() >= appointment.getMaxMembers()) {
             throw new BusinessException(AppointmentErrorCode.JOIN_NOT_AVAILABLE);
         }
@@ -180,14 +180,14 @@ public class AppointmentService {
             reviveLeftMemberAndHoldDeposit(memberId, member);
         }
 
-        // 이번 참여로 정원이 다 찼으면 마감 시각을 기다리지 않고 바로 CLOSED로
-        // 전환한다. 정원 도달은 마감 시각과 달리 스케줄러가 아니라 이 트랜잭션이
-        // 이미 약속 행을 잠그고 있는 지금 시점에 정확히 알 수 있다.
+        // 이번 참여로 정원이 다 찼으면 바로 FULL로 전환한다. 정원 도달은 시간
+        // 기반 전이와 달리 스케줄러를 기다릴 필요가 없다 — 이 트랜잭션이 이미
+        // 약속 행을 잠그고 있어 지금 시점에 정확히 알 수 있다.
         if (appointment.getCurrentMemberCount() + 1 >= appointment.getMaxMembers()) {
             if (appointmentMapper.updateAppointmentStatus(
                     appointmentId,
                     AppointmentStatus.RECRUITING,
-                    AppointmentStatus.CLOSED
+                    AppointmentStatus.FULL
             ) != 1) {
                 throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
             }
@@ -299,7 +299,7 @@ public class AppointmentService {
                     AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE
             );
         }
-        // 활동 시작 전 탈퇴는 마감(joinDeadline) 이후라도 보증금을 환급한다.
+        // 활동 시작 전 탈퇴는 보증금을 환급한다.
         // 활동 시작~종료 사이 탈퇴는 노쇼로 확정된다 — 보증금을 환급하지 않고
         // HELD로 남겨, 출석 확정 후 정산 배치가 출석 회원에게 분배한다(16절).
         LocalDateTime activityStartAt = appointment.getActivityStartAt();
@@ -340,14 +340,14 @@ public class AppointmentService {
                     CommonErrorCode.INTERNAL_SERVER_ERROR
             );
         }
-        // 정원 도달로 CLOSED된 약속에서 빈자리가 생겼을 때만 재모집으로
-        // 되돌린다. 마감 시각이 지났다면 새로 참여할 수 없으므로 빈자리가
-        // 생겨도 CLOSED를 유지한다.
-        if (appointment.getAppointmentStatus() == AppointmentStatus.CLOSED
-                && !now.isAfter(appointment.getJoinDeadline())) {
+        // 정원이 차서 FULL이던 약속에서 빈자리가 생겼을 때만 재모집으로
+        // 되돌린다. 활동이 이미 시작됐다면 새로 참여할 수 없으므로 빈자리가
+        // 생겨도 FULL을 유지한다 — 참여 게이트와 같은 경계다.
+        if (appointment.getAppointmentStatus() == AppointmentStatus.FULL
+                && now.isBefore(appointment.getActivityStartAt())) {
             appointmentMapper.updateAppointmentStatus(
                     appointmentId,
-                    AppointmentStatus.CLOSED,
+                    AppointmentStatus.FULL,
                     AppointmentStatus.RECRUITING
             );
         }
@@ -724,7 +724,6 @@ public class AppointmentService {
                 .meetingPlace(appointment.getMeetingPlace())
                 .activityStartAt(appointment.getActivityStartAt())
                 .activityEndAt(appointment.getActivityEndAt())
-                .joinDeadline(appointment.getJoinDeadline())
                 .hostDisplayName(appointment.getHostDisplayName())
                 .build();
     }
@@ -746,7 +745,6 @@ public class AppointmentService {
                 .description(appointment.getAppointmentDescription())
                 .activityStartAt(appointment.getActivityStartAt())
                 .activityEndAt(appointment.getActivityEndAt())
-                .joinDeadline(appointment.getJoinDeadline())
                 .hostDisplayName(appointment.getHostDisplayName())
                 .members(members)
                 .build();
@@ -764,12 +762,14 @@ public class AppointmentService {
         LocalDateTime now = LocalDateTime.now();
 
         if (status == AppointmentStatus.RECRUITING
-                && (now.isAfter(appointment.getJoinDeadline())
-                        || appointment.getCurrentMemberCount()
-                                >= appointment.getMaxMembers())) {
-            status = AppointmentStatus.CLOSED;
+                && appointment.getCurrentMemberCount()
+                        >= appointment.getMaxMembers()) {
+            status = AppointmentStatus.FULL;
         }
-        if (status == AppointmentStatus.CLOSED
+        // 정원이 차지 않아 RECRUITING인 약속도 활동 시작 시각이 지나면 진행
+        // 중으로 보여야 한다. FULL을 거치지 않는 경로라 두 상태를 함께 본다.
+        if ((status == AppointmentStatus.RECRUITING
+                || status == AppointmentStatus.FULL)
                 && !now.isBefore(appointment.getActivityStartAt())) {
             status = AppointmentStatus.IN_PROGRESS;
         }
@@ -837,7 +837,6 @@ public class AppointmentService {
                 || request.getDepositAmount().compareTo(MAX_DEPOSIT) > 0
                 || isBlank(request.getMeetingPlace())
                 || request.getMeetingPlace().trim().length() > 200
-                || request.getJoinDeadline() == null
                 || request.getActivityStartTime() == null
                 || request.getActivityEndTime() == null
                 || !request.getActivityStartTime().isBefore(
@@ -850,8 +849,7 @@ public class AppointmentService {
         // 시작보다 늦은지는 시각 비교(위)만으로 항상 하루 안에서 성립한다.
         LocalDateTime activityStartAt = LocalDateTime.of(
                 request.getVisitDate(), request.getActivityStartTime());
-        if (request.getJoinDeadline().isAfter(activityStartAt)
-                || activityStartAt.isBefore(LocalDateTime.now())) {
+        if (activityStartAt.isBefore(LocalDateTime.now())) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 

@@ -25,7 +25,6 @@ public class Appointment {
     private String appointmentDescription;
     private Integer maxMembers;
     private Integer currentMemberCount;
-    private LocalDateTime joinDeadline;
     private BigDecimal depositAmount;
     private AppointmentStatus appointmentStatus;
     private String meetingPlace;

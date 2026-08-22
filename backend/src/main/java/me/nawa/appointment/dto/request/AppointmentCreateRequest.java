@@ -8,7 +8,6 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Getter
@@ -32,9 +31,6 @@ public class AppointmentCreateRequest {
 
     private String appointmentName;
     private Integer maxMembers;
-
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private LocalDateTime joinDeadline;
 
     private BigDecimal depositAmount;
     private String meetingPlace;

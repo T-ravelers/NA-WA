@@ -76,7 +76,7 @@ function confirmedItem(title: string, appointmentId: number | undefined): Timeli
       ...(appointmentId === undefined ? {} : { appointmentId }),
       activityStartAt: '2026-08-11T10:20:00',
       activityEndAt: '2026-08-11T12:00:00',
-      appointmentStatus: 'CONFIRMED',
+      appointmentStatus: 'RECRUITING',
     } as TimelineItem['appointment'],
   })
 }

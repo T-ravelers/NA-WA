@@ -6,6 +6,8 @@ import type {
 
 export const MIN_APPOINTMENT_DEPOSIT = 5_000
 export const MAX_APPOINTMENT_DEPOSIT = 50_000
+/** 생성 폼이 처음 보여주는 보증금. 방장이 비워둔 채 넘어가지 않게 범위 안의 값으로 시작한다. */
+export const DEFAULT_APPOINTMENT_DEPOSIT = 10_000
 export const MAX_MEETING_PLACE_LENGTH = 200
 export const MIN_APPOINTMENT_MEMBERS = 2
 export const MAX_APPOINTMENT_MEMBERS = 10
@@ -31,10 +33,19 @@ export interface AppointmentFormDraft {
   /** `visitDate` 하루 안에서의 시각만(`HH:mm`). 날짜 입력은 없다. */
   activityStartTime: string
   activityEndTime: string
-  joinDeadline: string
 }
 
 export type MeetingPlaceMode = 'ITEM' | 'CUSTOM'
+
+/**
+ * 화면을 떠났다 돌아올 때(예: 보증금 충전) 폼을 그대로 되살리기 위한 초안.
+ * 항목·여정·날짜는 부모가 다시 주므로, 사용자가 적은 값과 스텝만 담는다.
+ */
+export interface AppointmentFormSnapshot {
+  step: 1 | 2
+  draft: AppointmentFormDraft
+  customMeetingPlace: string
+}
 
 export interface AppointmentFormErrors {
   itemContext?: string
@@ -45,7 +56,6 @@ export interface AppointmentFormErrors {
   meetingPlace?: string
   activityStartTime?: string
   activityEndTime?: string
-  joinDeadline?: string
 }
 
 const APPOINTMENT_LANGUAGES: readonly AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
@@ -54,17 +64,8 @@ function isAppointmentLanguage(value: string): value is AppointmentLanguage {
   return APPOINTMENT_LANGUAGES.includes(value as AppointmentLanguage)
 }
 
-function toDateTimeRequest(value: string): string {
-  return value.length === 16 ? `${value}:00` : value
-}
-
 function toTimeRequest(value: string): string {
   return value.length === 5 ? `${value}:00` : value
-}
-
-/** `visitDate`(yyyy-MM-dd) + 시각(HH:mm)을 `joinDeadline`과 같은 형식으로 합친다. */
-function toLocalDateTimeString(visitDate: string, time: string): string {
-  return `${visitDate}T${time}`
 }
 
 function todayDateString(): string {
@@ -161,16 +162,6 @@ export function validateAppointmentSchedule(draft: AppointmentFormDraft): Appoin
     errors.activityEndTime = 'appointment.create.validation.endAfterStart'
   }
 
-  if (draft.joinDeadline === '') {
-    errors.joinDeadline = 'appointment.create.validation.deadlineRequired'
-  } else if (
-    draft.activityStartTime !== '' &&
-    draft.visitDate !== '' &&
-    draft.joinDeadline > toLocalDateTimeString(draft.visitDate, draft.activityStartTime)
-  ) {
-    errors.joinDeadline = 'appointment.create.validation.deadlineBeforeStart'
-  }
-
   return errors
 }
 
@@ -199,7 +190,6 @@ export function toAppointmentCreateRequest(draft: AppointmentFormDraft): Appoint
     languageCode: draft.languageCode,
     appointmentName: draft.appointmentName.trim(),
     maxMembers: draft.maxMembers,
-    joinDeadline: toDateTimeRequest(draft.joinDeadline),
     depositAmount: String(draft.depositAmount),
     meetingPlace: draft.meetingPlace.trim(),
     activityStartTime: toTimeRequest(draft.activityStartTime),

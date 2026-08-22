@@ -166,6 +166,7 @@ export default {
       completeTitle: 'Top-up complete',
       currentBalance: 'Current balance {balance}',
       backToWallet: 'Back to wallet',
+      backToCaller: 'Continue where you left off',
     },
     qr: {
       title: 'QR PAYMENT',

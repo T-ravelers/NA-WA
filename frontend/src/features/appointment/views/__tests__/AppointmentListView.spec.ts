@@ -27,7 +27,6 @@ const appointment = {
   meetingPlace: 'Seongsu Beauty Lab',
   activityStartAt: '2026-08-08T18:30:00',
   activityEndAt: '2026-08-08T22:00:00',
-  joinDeadline: '2026-08-08T17:30:00',
   hostDisplayName: 'Mina Park',
 }
 

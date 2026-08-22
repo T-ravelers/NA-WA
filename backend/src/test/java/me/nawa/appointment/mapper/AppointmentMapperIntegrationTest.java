@@ -89,7 +89,7 @@ class AppointmentMapperIntegrationTest {
             long ongoingId = insertAppointment(
                     itemId, memberId, "IN_PROGRESS", now.plusDays(2));
             long farFutureId = insertAppointment(
-                    itemId, memberId, "CONFIRMED", now.plusDays(10));
+                    itemId, memberId, "RECRUITING", now.plusDays(10));
             long finishedId = insertAppointment(
                     itemId, memberId, "COMPLETED", now.minusDays(5));
             long olderFinishedId = insertAppointment(
@@ -143,9 +143,9 @@ class AppointmentMapperIntegrationTest {
 
             LocalDateTime now = LocalDateTime.now();
             long justAheadId = insertAppointment(
-                    itemId, memberId, "CONFIRMED", now.plusMinutes(5));
+                    itemId, memberId, "RECRUITING", now.plusMinutes(5));
             long laterAheadId = insertAppointment(
-                    itemId, memberId, "CONFIRMED", now.plusMinutes(30));
+                    itemId, memberId, "RECRUITING", now.plusMinutes(30));
             long justPastId = insertAppointment(
                     itemId, memberId, "COMPLETED", now.minusMinutes(5));
             long olderPastId = insertAppointment(
@@ -197,10 +197,10 @@ class AppointmentMapperIntegrationTest {
         jdbcTemplate.update(
                 "INSERT INTO appointments "
                         + "(item_id, host_member_id, language_code, appointment_name, "
-                        + "max_members, join_deadline, deposit_amount, "
+                        + "max_members, deposit_amount, "
                         + "appointment_status, activity_start_at, activity_end_at) "
-                        + "VALUES (?, ?, 'en', '약속 목록 통합 테스트', 5, ?, 10000, ?, ?, ?)",
-                itemId, hostMemberId, activityStartAt.minusDays(1),
+                        + "VALUES (?, ?, 'en', '약속 목록 통합 테스트', 5, 10000, ?, ?, ?)",
+                itemId, hostMemberId,
                 appointmentStatus, activityStartAt, activityStartAt.plusHours(2));
         return lastInsertId();
     }

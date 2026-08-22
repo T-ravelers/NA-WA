@@ -12,6 +12,7 @@ import type {
   AppointmentLanguage,
 } from '../api/appointmentApi'
 import {
+  DEFAULT_APPOINTMENT_DEPOSIT,
   MAX_APPOINTMENT_DEPOSIT,
   MAX_APPOINTMENT_MEMBERS,
   MIN_APPOINTMENT_DEPOSIT,
@@ -21,6 +22,7 @@ import {
   validateAppointmentSettings,
   type AppointmentFormDraft,
   type AppointmentFormErrors,
+  type AppointmentFormSnapshot,
 } from '../model/appointmentForm'
 import { useAppointmentItemLocation } from '../model/exploreIntegration'
 
@@ -57,12 +59,11 @@ const draft = reactive<AppointmentFormDraft>({
   appointmentName: '',
   maxMembers: 4,
   languageCode: 'en',
-  depositAmount: null,
+  depositAmount: DEFAULT_APPOINTMENT_DEPOSIT,
   meetingPlaceMode: 'ITEM',
   meetingPlace: '',
   activityStartTime: '',
   activityEndTime: '',
-  joinDeadline: '',
 })
 
 // "이 자리에서 그대로 만난다"를 고르면 항목 위치가 그대로 meetingPlace가 된다.
@@ -132,9 +133,41 @@ clearErrorsOnEdit(
   () => [draft.appointmentName, draft.maxMembers, draft.languageCode, draft.meetingPlace],
   ['appointmentName', 'maxMembers', 'languageCode', 'meetingPlace'],
 )
-clearErrorsOnEdit(
-  () => [draft.activityStartTime, draft.activityEndTime, draft.joinDeadline, draft.depositAmount],
-  ['activityStartTime', 'activityEndTime', 'joinDeadline', 'depositAmount'],
+
+// 설정 스텝은 제출을 기다리지 않고 입력하는 즉시 검증한다. 시각·보증금은
+// 값을 넣는 순간 맞는지 틀리는지 알 수 있는데, "Create appointment"를 눌러야
+// 빨간 줄이 뜨면 한 번에 여러 칸이 틀렸다는 말을 듣고 위로 다시 올라가야 한다.
+//
+// 다만 아직 손대지 않은 칸에 "필수입니다"를 먼저 띄우지는 않는다 — 스텝에
+// 들어오자마자 전부 빨간 화면은 틀렸다는 뜻이 아니라 아직 안 적었다는 뜻일
+// 뿐이다. 그래서 한 번이라도 고친 칸만 즉시 보여주고, 제출을 시도한 뒤에는
+// 전부 보여준다. 종료가 시작보다 빨라야 하는 식의 맞물린 규칙은 다른 칸을 고칠
+// 때도 다시 계산되므로, 이미 손댄 칸의 문구는 늘 최신이다.
+const SETTINGS_KEYS = [
+  'activityStartTime',
+  'activityEndTime',
+  'depositAmount',
+] as const satisfies readonly (keyof AppointmentFormErrors)[]
+const touchedSettings = new Set<(typeof SETTINGS_KEYS)[number]>()
+const settingsSubmitted = ref(false)
+
+function applySettingsErrors(): void {
+  const live = validateAppointmentSettings(draft)
+  const next = { ...errors.value }
+  for (const key of SETTINGS_KEYS) {
+    next[key] = settingsSubmitted.value || touchedSettings.has(key) ? live[key] : undefined
+  }
+  errors.value = next
+}
+
+watch(
+  () => [draft.activityStartTime, draft.activityEndTime, draft.depositAmount],
+  (current, previous) => {
+    SETTINGS_KEYS.forEach((key, index) => {
+      if (current[index] !== previous[index]) touchedSettings.add(key)
+    })
+    applySettingsErrors()
+  },
 )
 
 const languageOptions: AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
@@ -170,6 +203,8 @@ function goToPreviousStep(): boolean {
 function submitSettings(): void {
   if (pending) return
 
+  // 제출을 시도했으니 이제부터는 손대지 않은 칸의 오류도 모두 보여준다.
+  settingsSubmitted.value = true
   const nextErrors = validateAppointmentSettings(draft)
   errors.value = nextErrors
 
@@ -192,7 +227,24 @@ function confirmCreation(): void {
   emit('submit', toAppointmentCreateRequest(draft))
 }
 
-defineExpose({ goToPreviousStep })
+// 충전처럼 화면을 떠났다 돌아오는 경우를 위해 폼 상태를 통째로 내보내고 되살린다.
+// 항목·여정·날짜는 부모가 props로 다시 주므로, 여기서는 사용자가 적은 값과 스텝만
+// 다룬다.
+function snapshot(): AppointmentFormSnapshot {
+  return { step: step.value, draft: { ...draft }, customMeetingPlace: customMeetingPlace.value }
+}
+
+function restore(saved: AppointmentFormSnapshot): void {
+  // 직접 적은 장소를 먼저 되돌려야, 모드를 되돌릴 때 도는 watch가 빈 값을 쓰지 않는다.
+  customMeetingPlace.value = saved.customMeetingPlace
+  Object.assign(draft, saved.draft, { itemId, itemType, tripId, visitDate })
+  step.value = saved.step
+  // 제출까지 갔던 폼이다. 돌아온 뒤에는 손대지 않은 칸도 바로 검증해 보여준다.
+  settingsSubmitted.value = saved.step === 2
+  applySettingsErrors()
+}
+
+defineExpose({ goToPreviousStep, snapshot, restore })
 </script>
 
 <template>
@@ -388,24 +440,41 @@ defineExpose({ goToPreviousStep })
           {{ t('appointment.create.visitDateNote', { date: draft.visitDate }) }}
         </p>
         <div class="grid gap-4">
-          <TextInput
-            v-model="draft.activityStartTime"
-            type="time"
-            :label="t('appointment.create.startAt')"
-            :error="translatedError(errors.activityStartTime)"
-          />
-          <TextInput
-            v-model="draft.activityEndTime"
-            type="time"
-            :label="t('appointment.create.endAt')"
-            :error="translatedError(errors.activityEndTime)"
-          />
-          <TextInput
-            v-model="draft.joinDeadline"
-            type="datetime-local"
-            :label="t('appointment.create.joinDeadline')"
-            :error="translatedError(errors.joinDeadline)"
-          />
+          <!--
+            시작·종료 시각은 위아래가 아니라 나란히 두고 사이에 "~"를 놓는다.
+            "18:30 ~ 22:00"처럼 한 줄로 읽혀야 시간 범위가 한눈에 들어온다.
+            각 입력의 라벨은 시각적으로 숨기고(sr-only) 묶음 라벨 하나만 보인다 —
+            스크린 리더에는 여전히 "Activity starts"·"Activity ends"로 읽힌다.
+            구분자는 입력 상자와 같은 높이(h-13)로 두어, 한쪽에 오류 문구가
+            붙어도 상자 가운데에 그대로 머문다.
+          -->
+          <fieldset class="min-w-0">
+            <legend class="mb-1.5 text-caption text-ink-2">
+              {{ t('appointment.create.activityTime') }}
+            </legend>
+            <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
+              <TextInput
+                v-model="draft.activityStartTime"
+                type="time"
+                label-hidden
+                :label="t('appointment.create.startAt')"
+                :error="translatedError(errors.activityStartTime)"
+              />
+              <span
+                aria-hidden="true"
+                class="flex h-13 items-center text-body text-ink-3"
+              >
+                ~
+              </span>
+              <TextInput
+                v-model="draft.activityEndTime"
+                type="time"
+                label-hidden
+                :label="t('appointment.create.endAt')"
+                :error="translatedError(errors.activityEndTime)"
+              />
+            </div>
+          </fieldset>
         </div>
         <AmountInput
           v-model="draft.depositAmount"
