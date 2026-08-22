@@ -61,6 +61,7 @@ export default {
       legacyDescription:
         'このレポートは支出分析の提供前に作成されました。旅程のスナップショットは引き続き閲覧できます。',
       persona: {
+        sectionTitle: 'あなたの消費タイプ',
         heading: '旅の消費タイプ',
         FOOD: {
           title: '#FLAVORSEEKER',
@@ -94,7 +95,8 @@ export default {
       categoryTitle: 'カテゴリー別',
       categoryCenterLabel: 'イベント',
       categoryEmpty: 'カテゴリー別の支出は記録されていません。',
-      categoryDescription: '金額と割合を添えて、カテゴリー別にまとめた支出です。',
+      categoryDescription:
+        '金額と割合を添えて、カテゴリー別にまとめた支出です。中央の数字はこの旅のイベント数です。',
       category: 'カテゴリー',
       amount: '金額',
       share: '割合',

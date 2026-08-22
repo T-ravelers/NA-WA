@@ -55,6 +55,7 @@ export default {
       legacyDescription:
         'This report was created before spending analytics were available. Its journey snapshot is still readable.',
       persona: {
+        sectionTitle: 'Your spending type',
         heading: 'Travel spending type',
         FOOD: {
           title: '#FLAVORSEEKER',
@@ -89,7 +90,8 @@ export default {
       categoryTitle: 'By category',
       categoryCenterLabel: 'events',
       categoryEmpty: 'No category spending was recorded.',
-      categoryDescription: 'Spending grouped by category with amount and share.',
+      categoryDescription:
+        'Spending grouped by category with amount and share. The number in the middle is how many events this journey has.',
       category: 'Category',
       amount: 'Amount',
       share: 'Share',

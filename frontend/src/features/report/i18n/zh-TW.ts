@@ -59,6 +59,7 @@ export default {
       legacyTitle: '無法提供花費分析',
       legacyDescription: '這份報告建立於花費分析功能推出之前，仍可查看其旅程快照。',
       persona: {
+        sectionTitle: '你的消費類型',
         heading: '旅行消費類型',
         FOOD: {
           title: '#FLAVORSEEKER',
@@ -92,7 +93,7 @@ export default {
       categoryTitle: '依類別',
       categoryCenterLabel: '個活動',
       categoryEmpty: '沒有記錄任何類別花費。',
-      categoryDescription: '依類別分組的花費，含金額與占比。',
+      categoryDescription: '依類別分組的花費，含金額與占比。中央的數字是這趟旅程的活動數。',
       category: '類別',
       amount: '金額',
       share: '占比',

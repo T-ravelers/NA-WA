@@ -19,20 +19,36 @@ describe('ReportPersonaTicket', () => {
     const wrapper = mount(ReportPersonaTicket, { props: PROPS })
 
     expect(wrapper.text()).toContain('Travel spending type')
-    expect(wrapper.get('h2').text()).toBe('#FLAVORSEEKER')
+    expect(wrapper.get('h3').text()).toBe('#FLAVORSEEKER')
     expect(wrapper.text()).toContain('42% of this journey went to food.')
     expect(wrapper.text()).toContain('42%')
     expect(wrapper.text()).toContain('Food')
   })
 
-  it('paints the ticket in the category tone it is given', () => {
+  // 시안 R4는 티켓 위에 `Your spending type` 제목을 둔다. 티켓 안의 라벨과는 다른 문구다.
+  it('draws the section heading above the ticket when it is given one', () => {
+    const wrapper = mount(ReportPersonaTicket, {
+      props: { ...PROPS, heading: 'Your spending type' },
+    })
+
+    expect(wrapper.get('h2').text()).toBe('Your spending type')
+    expect(wrapper.get('h3').text()).toBe('#FLAVORSEEKER')
+  })
+
+  it('omits the section heading when the screen does not pass one', () => {
+    const wrapper = mount(ReportPersonaTicket, { props: PROPS })
+
+    expect(wrapper.find('h2').exists()).toBe(false)
+  })
+
+  it('paints the ticket in the tone it is given', () => {
     const wrapper = mount(ReportPersonaTicket, { props: { ...PROPS, tone: 'food' } })
 
     expect(wrapper.getComponent(AppTicket).props('tone')).toBe('food')
     expect(wrapper.getComponent(AppTicket).classes()).toContain('bg-food')
   })
 
-  it('falls back to the paper tone for categories without a core color', () => {
+  it('falls back to the paper tone when no tone is given', () => {
     const wrapper = mount(ReportPersonaTicket, { props: PROPS })
 
     expect(wrapper.getComponent(AppTicket).classes()).toContain('bg-paper')

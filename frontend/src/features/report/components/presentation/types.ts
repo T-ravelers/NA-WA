@@ -68,7 +68,7 @@ export interface ReportKpiCardProps extends Headed, LocaleAware {
   dailyAverageLabel: string
 }
 
-export interface ReportPersonaTicketProps {
+export interface ReportPersonaTicketProps extends Headed {
   /** 티켓 상단 라벨. 예: `Travel spending type` */
   label: string
   /** 해시태그 칭호. 예: `#FLAVORSEEKER` */
@@ -80,8 +80,8 @@ export interface ReportPersonaTicketProps {
   /** 스탬프 작은 라벨. 1위 카테고리 표시명. 예: `Food` */
   stampLabel: string
   /**
-   * 티켓 색. 1위 카테고리가 Explore 소비영역 4종이면 그 코어색, 아니면 종이톤.
-   * 매핑은 화면(#153)이 정한다 — 여기서 소비 카테고리 문자열을 알지 않는다.
+   * 티켓 색. 시안 R4에서 티켓은 도넛 1위 조각과 같은 색이다.
+   * 어느 색인지는 화면(#153)이 정한다 — 여기서 소비 카테고리 문자열을 알지 않는다.
    */
   tone?: Category | 'paper'
 }

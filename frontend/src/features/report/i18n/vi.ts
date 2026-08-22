@@ -61,6 +61,7 @@ export default {
       legacyDescription:
         'Báo cáo này được tạo trước khi có tính năng phân tích chi tiêu. Bạn vẫn xem được tóm tắt hành trình.',
       persona: {
+        sectionTitle: 'Kiểu chi tiêu của bạn',
         heading: 'Kiểu chi tiêu du lịch',
         FOOD: {
           title: '#FLAVORSEEKER',
@@ -97,7 +98,8 @@ export default {
       categoryTitle: 'Theo danh mục',
       categoryCenterLabel: 'sự kiện',
       categoryEmpty: 'Không có chi tiêu theo danh mục được ghi nhận.',
-      categoryDescription: 'Chi tiêu gộp theo danh mục kèm số tiền và tỷ trọng.',
+      categoryDescription:
+        'Chi tiêu gộp theo danh mục kèm số tiền và tỷ trọng. Số ở giữa là số sự kiện của hành trình này.',
       category: 'Danh mục',
       amount: 'Số tiền',
       // 여기의 share는 정산의 몫이 아니라 비중(%)이다.

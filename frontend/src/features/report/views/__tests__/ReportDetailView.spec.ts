@@ -6,6 +6,8 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
+import { seriesTokenAt } from '../../components/presentation/seriesPalette'
+
 const { fetchReport } = vi.hoisted(() => ({ fetchReport: vi.fn() }))
 
 vi.mock('../../api/reportApi', async (importOriginal) => ({
@@ -115,13 +117,15 @@ describe('ReportDetailView', () => {
     expect(wrapper.text()).toContain('Travel spending type')
     expect(wrapper.text()).toContain('events')
     expect(wrapper.findAll('h2').map((heading) => heading.text())).toEqual([
-      '#FLAVORSEEKER',
+      'Your spending type',
       'Analysis',
       'By category',
       'Spending trend',
       'Journey snapshot',
       'Saved itinerary',
     ])
+    // 칭호는 섹션 제목 아래에 놓인다. 제목만 훑는 사용자가 맥락 없이 해시태그부터 만나지 않는다.
+    expect(wrapper.findAll('h3').map((heading) => heading.text())).toContain('#FLAVORSEEKER')
     expect(wrapper.get('button[aria-label="Back to reports"]').text()).toBe('')
   })
 
@@ -154,6 +158,58 @@ describe('ReportDetailView', () => {
     expect(wrapper.text()).toContain('No spending selected')
     expect(wrapper.text()).toContain('No category spending was recorded.')
     expect(wrapper.text()).not.toContain('#FREESPENDER')
+  })
+
+  // 목록 카드가 `5 events · 9 places`로 나눠 보여주므로, 상세가 합계를 세면 숫자가 어긋난다.
+  it('counts only events in the donut centre, not saved places', async () => {
+    fetchReport.mockResolvedValueOnce({
+      ...detail,
+      reportContent: {
+        ...detail.reportContent,
+        days: [
+          {
+            visitDate: '2026-07-18',
+            items: [
+              {
+                tripItemId: 1,
+                itemId: 101,
+                itemType: 'EVENT',
+                title: 'Night Market',
+                status: 'ADDED',
+              },
+              { tripItemId: 2, itemId: 102, itemType: 'PLACE', title: 'Seongsan', status: 'ADDED' },
+              { tripItemId: 3, itemId: 103, itemType: 'PLACE', title: 'Hallasan', status: 'ADDED' },
+            ],
+          },
+          {
+            visitDate: '2026-07-19',
+            items: [
+              {
+                tripItemId: 4,
+                itemId: 104,
+                itemType: 'EVENT',
+                title: 'Fireworks',
+                status: 'ADDED',
+              },
+            ],
+          },
+        ],
+      },
+    })
+    const { wrapper } = await mountView()
+
+    // 도넛 가운데 블록. 티켓 절취선도 `absolute`라 `inset-0`까지 짚는다.
+    const centre = wrapper.get('.absolute.inset-0')
+
+    expect(centre.text()).toBe('2events')
+  })
+
+  // 티켓은 도넛 1위 조각과 같은 색이어야 한다(시안 R4). 1위는 언제나 정렬 순번 0이다.
+  it('paints the ticket in the colour the donut gives its leading slice', async () => {
+    const { wrapper } = await mountView()
+
+    expect(seriesTokenAt(0)).toBe('food')
+    expect(wrapper.find('.bg-food').exists()).toBe(true)
   })
 
   it('names a spending persona from the top category and fills in its share', async () => {
