@@ -9,6 +9,7 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 
 import type { AppointmentSummary } from '../api/appointmentApi'
+import { appointmentStatusTone } from '../model/appointmentStatusPresentation'
 
 interface Props {
   appointment: AppointmentSummary
@@ -66,7 +67,7 @@ function formatDeposit(value: string): string {
           <p class="mt-1 text-body-sm text-ink-2">{{ scheduleLabel }}</p>
         </div>
         <AppBadge
-          :tone="appointment.appointmentStatus === 'RECRUITING' ? 'ongoing' : 'neutral'"
+          :tone="appointmentStatusTone(appointment.appointmentStatus)"
           dot
         >
           {{ t(`appointment.status.${appointment.appointmentStatus}`) }}

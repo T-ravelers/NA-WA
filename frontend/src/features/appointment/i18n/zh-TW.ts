@@ -36,6 +36,7 @@ export default {
       loadFailedDescription: '請稍後再試一次。',
     },
     status: {
+      PAYMENT_PENDING: '待付款',
       RECRUITING: '招募中',
       FULL: '已額滿',
       IN_PROGRESS: '進行中',

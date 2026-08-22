@@ -177,6 +177,8 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).not.toContain('Not attended')
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).not.toContain('Jamie Lee')
+    const statusBadge = wrapper.findAll('span').find((element) => element.text() === 'Recruiting')
+    expect(statusBadge?.classes()).toContain('bg-canvas/70')
     // 방장이라 모집 중에도 버거 버튼은 뜬다. 다만 시트 안의 항목은 아직 전부
     // 비활성이다.
     expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)

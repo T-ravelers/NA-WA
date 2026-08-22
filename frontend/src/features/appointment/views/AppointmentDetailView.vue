@@ -27,6 +27,7 @@ import {
 } from '../api/appointmentApi'
 import { appointmentKeys } from '../model/appointmentKeys'
 import { appointmentErrorMessageKey } from '../model/appointmentErrors'
+import { appointmentStatusTone } from '../model/appointmentStatusPresentation'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
@@ -81,9 +82,7 @@ const hasJoined = computed(() => participationQuery.data.value?.joined === true)
 // 없다는 걸 버튼 단계에서 미리 알려준다.
 const participationCheckFailed = computed(() => participationQuery.isError.value)
 
-const statusTone = computed(() =>
-  appointment.value?.appointmentStatus === 'RECRUITING' ? 'ongoing' : 'neutral',
-)
+const statusTone = computed(() => appointmentStatusTone(appointment.value?.appointmentStatus))
 
 // 참여 가능 여부를 클라이언트 시계로 다시 재지 않는다. 서버가 정원이 찬 약속을
 // FULL로, 활동이 시작된 약속을 IN_PROGRESS로 계산해 내려주므로 RECRUITING이라는

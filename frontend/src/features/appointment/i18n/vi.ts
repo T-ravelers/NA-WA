@@ -38,6 +38,7 @@ export default {
       loadFailedDescription: 'Vui lòng thử lại sau ít phút.',
     },
     status: {
+      PAYMENT_PENDING: 'Chờ thanh toán',
       RECRUITING: 'Đang mở',
       FULL: 'Đã đủ người',
       IN_PROGRESS: 'Đang diễn ra',
