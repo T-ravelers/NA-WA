@@ -55,9 +55,13 @@ public interface ReportMapper {
 
     ReportComparisonMember findComparisonMember(@Param("memberId") Long memberId);
 
+    // 참가자에게는 여정↔약속 연결이 없어 활동일이 여정 기간에 드는지로 근사한다.
+    // 기간이 필요한 이유는 ReportMapper.xml의 (C) 갈래 주석에 있다.
     List<ReportComparisonMember> findComparisonPeerMembers(
         @Param("tripId") Long tripId,
-        @Param("memberId") Long memberId
+        @Param("memberId") Long memberId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate
     );
 
     List<ReportComparisonSpending> findComparisonSpending(

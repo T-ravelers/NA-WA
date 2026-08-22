@@ -77,7 +77,7 @@ class ReportComparisonIntegrationTest {
     }
 
     @Test
-    void getComparison_findsAppointmentPeersThroughTripItemsAndSameNationalityCohort() {
+    void getComparison_findsPeersForHostAndParticipantAndSkipsCancelledAppointments() {
         Deque<Runnable> cleanup = new ArrayDeque<>();
         try {
             LocalDate endDate = LocalDate.now(KOREA_ZONE).minusDays(1);
@@ -91,10 +91,18 @@ class ReportComparisonIntegrationTest {
 
             long item = insertApprovedEventItem(host, cleanup);
             long hostTrip = insertTrip(host, startDate, endDate, cleanup);
-            long appointment = insertCompletedAppointment(item, host, endDate, cleanup);
+            long appointment = insertAppointment(item, host, endDate, "COMPLETED", cleanup);
             insertActiveMembership(appointment, host, hostTrip, cleanup);
+            // 참가자는 trip_id도 trip_items도 갖지 않는다 — joinAppointment가 둘 다 만들지
+            // 않기 때문이다. 활동일이 여정 기간에 드는 것으로만 이어진다.
             insertActiveMembership(appointment, peer, null, cleanup);
             insertConfirmedTripItem(hostTrip, item, appointment, endDate, cleanup);
+
+            // 취소된 약속의 참가자는 어느 쪽 리포트에도 나오지 않아야 한다.
+            long stranger = insertMember("Comparison stranger", "JP", cleanup);
+            long cancelled = insertAppointment(item, host, endDate, "CANCELLED", cleanup);
+            insertActiveMembership(cancelled, host, hostTrip, cleanup);
+            insertActiveMembership(cancelled, stranger, null, cleanup);
 
             insertPaidExpense(host, hostWallet, "FOOD", "12000.0000", paidAt, cleanup);
             insertPaidExpense(peer, peerWallet, "SHOPPING", "8000.0000", paidAt, cleanup);
@@ -103,7 +111,9 @@ class ReportComparisonIntegrationTest {
             long hostReport = insertCompletedReport(hostTrip, "12000.0000", "3000.00",
                 "FOOD", "12000.0000", cleanup);
             long peerTrip = insertTrip(peer, startDate, endDate, cleanup);
-            insertCompletedReport(peerTrip, "5000.0000", "1250.00", "FOOD", "5000.0000", cleanup);
+            long peerReport = insertCompletedReport(
+                peerTrip, "5000.0000", "1250.00", "FOOD", "5000.0000", cleanup
+            );
 
             ReportComparisonResponse group = reportService.getComparison(
                 host, hostReport, ReportComparisonScope.GROUP
@@ -119,6 +129,15 @@ class ReportComparisonIntegrationTest {
             assertEquals("FOOD", group.getRanks().get(0).getCategory());
             assertEquals(1, group.getRanks().get(0).getRank());
             assertEquals(2, group.getRanks().get(0).getOf());
+
+            // 참가자 쪽에서도 방장이 동료로 잡힌다. trip_items·trip_id 어느 쪽도 없으므로
+            // 활동일 갈래가 없으면 여기가 통째로 빈다.
+            ReportComparisonResponse peerGroup = reportService.getComparison(
+                peer, peerReport, ReportComparisonScope.GROUP
+            );
+            assertEquals(1, peerGroup.getPeers().size());
+            assertEquals(host, peerGroup.getPeers().get(0).getMemberId());
+            assertEquals(new BigDecimal("12000.0000"), peerGroup.getMe().getTotalSpent());
 
             ReportComparisonResponse similar = reportService.getComparison(
                 host, hostReport, ReportComparisonScope.SIMILAR
@@ -187,16 +206,17 @@ class ReportComparisonIntegrationTest {
         return id;
     }
 
-    private static long insertCompletedAppointment(
-        long itemId, long hostMemberId, LocalDate activityDate, Deque<Runnable> cleanup
+    private static long insertAppointment(
+        long itemId, long hostMemberId, LocalDate activityDate, String status,
+        Deque<Runnable> cleanup
     ) {
         LocalDateTime start = activityDate.atTime(10, 0);
         jdbcTemplate.update(
             "INSERT INTO appointments (item_id, host_member_id, language_code, appointment_name, "
                 + "max_members, deposit_amount, appointment_status, activity_start_at, "
                 + "activity_end_at) VALUES (?, ?, 'en', 'Comparison appointment', 5, 10000, "
-                + "'COMPLETED', ?, ?)",
-            itemId, hostMemberId, start, start.plusHours(2)
+                + "?, ?, ?)",
+            itemId, hostMemberId, status, start, start.plusHours(2)
         );
         long id = lastInsertId();
         cleanup.push(() -> jdbcTemplate.update(

@@ -52,7 +52,7 @@ class ReportComparisonServiceTest {
     void getComparison_group_sumsLiveSpendingForEveryoneAndRanksMyCategories() {
         when(reportMapper.findReportById(100L)).thenReturn(ownedReport(null));
         when(reportMapper.findComparisonMember(1L)).thenReturn(member(1L, "Me", "KR"));
-        when(reportMapper.findComparisonPeerMembers(7L, 1L)).thenReturn(List.of(
+        when(reportMapper.findComparisonPeerMembers(7L, 1L, START, END)).thenReturn(List.of(
             member(2L, "Mina", "KR"),
             member(3L, "Jae", null)
         ));
@@ -105,7 +105,7 @@ class ReportComparisonServiceTest {
     void getComparison_group_withoutPeersReturnsEmptyCohortAndNoRanks() {
         when(reportMapper.findReportById(100L)).thenReturn(ownedReport(null));
         when(reportMapper.findComparisonMember(1L)).thenReturn(member(1L, "Me", null));
-        when(reportMapper.findComparisonPeerMembers(7L, 1L)).thenReturn(List.of());
+        when(reportMapper.findComparisonPeerMembers(7L, 1L, START, END)).thenReturn(List.of());
         when(reportMapper.findComparisonSpending(List.of(1L), START, END))
             .thenReturn(List.of(spending(1L, "STAY", "20000.0000")));
 
@@ -185,7 +185,8 @@ class ReportComparisonServiceTest {
         );
 
         assertEquals(ReportErrorCode.REPORT_JOURNEY_FORBIDDEN, exception.getErrorCode());
-        verify(reportMapper, never()).findComparisonPeerMembers(anyLong(), anyLong());
+        verify(reportMapper, never())
+            .findComparisonPeerMembers(anyLong(), anyLong(), any(), any());
     }
 
     @Test

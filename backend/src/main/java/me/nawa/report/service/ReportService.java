@@ -480,7 +480,8 @@ public class ReportService {
         Report report, ReportComparisonMember me, long days
     ) {
         List<ReportComparisonMember> peers = reportMapper.findComparisonPeerMembers(
-            report.getTripId(), me.getMemberId()
+            report.getTripId(), me.getMemberId(),
+            report.getStartDate(), report.getEndDate()
         );
         List<Long> memberIds = new ArrayList<>();
         memberIds.add(me.getMemberId());
