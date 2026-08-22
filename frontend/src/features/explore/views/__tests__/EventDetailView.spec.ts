@@ -442,9 +442,12 @@ describe('EventDetailView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('journey-create')
-    expect(router.currentRoute.value.query).toEqual({ returnToExplore: '1' })
-    expect(readReturnContext()).toMatchObject({
-      returnTo: { name: 'explore-event-detail', params: { eventId: '42' } },
+    // 다른 화면에 들렀다 돌아오는 query 규약. 이 화면은 route param을 쓰므로
+    // returnParams도 함께 싣는다. openJourneySelect는 그대로 돌아와 하던 일을 잇는다.
+    expect(router.currentRoute.value.query).toEqual({
+      returnRouteName: 'explore-event-detail',
+      returnParams: 'eventId:42',
+      openJourneySelect: '1',
     })
   })
 

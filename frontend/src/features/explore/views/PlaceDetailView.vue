@@ -295,12 +295,25 @@ function selectJourney(journeyId: number): void {
  * `returnRouteName`으로는 이 화면으로 돌아올 수 없다.
  */
 function goToCreateJourney(): void {
-  returnContext.captureReturnTo({
-    name: 'explore-place-detail',
-    params: { placeId: placeId.value },
-  })
   journeySelectSheetOpen.value = false
-  void router.push({ name: 'journey-create', query: { returnToExplore: '1' } })
+  /*
+   * 다른 화면에 들렀다 돌아오는 query 규약을 쓴다(`frontend/docs/DEVELOPMENT_CONVENTION.md`).
+   * 두 feature가 서로를 import하지 않고 주소만으로 이어진다.
+   *
+   * `replace`인 것은 새 여정 id를 돌려받아야 해서다 — 받는 쪽이 이 자리를 넘겨받았다가
+   * 일을 마치든 그냥 나가든 돌려준다. 그래서 왕복이 히스토리에 한 자리만 차지한다.
+   *
+   * 이 화면은 route param을 쓰므로 `returnParams`로 함께 넘긴다. `openJourneySelect`는
+   * 규약이 "나머지 query"로 그대로 돌려주므로, 돌아왔을 때 하던 일을 이어 갈 표시가 된다.
+   */
+  void router.replace({
+    name: 'journey-create',
+    query: {
+      returnRouteName: 'explore-place-detail',
+      returnParams: `placeId:${placeId.value}`,
+      openJourneySelect: '1',
+    },
+  })
 }
 
 function closeJourneyDateSheet(): void {
@@ -349,8 +362,19 @@ onMounted(() => {
 
   openJourneyDateSheet()
 
+  /*
+   * 규약이 정한 결과 key는 `tripId`다. 여기서 한 번 읽어 고른 여정으로 삼고 주소에서
+   * 지운다 — 남겨두면 시트를 다시 열 때마다 사용자가 그 뒤에 고른 여정을 덮어쓴다.
+   */
+  const createdJourneyId = parseJourneyRouteQuery(route.query.tripId)
+  if (createdJourneyId !== null) {
+    selectedJourneyId.value = createdJourneyId
+    returnContext.setJourneyId(createdJourneyId)
+  }
+
   const restQuery = { ...route.query }
   delete restQuery.openJourneySelect
+  delete restQuery.tripId
   void router.replace({ query: restQuery })
 })
 </script>

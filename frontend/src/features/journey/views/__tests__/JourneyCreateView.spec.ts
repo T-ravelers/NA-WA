@@ -7,10 +7,8 @@ import { i18n } from '@/app/i18n'
 
 import type { JourneyCreateInput } from '../../api/journeyApi'
 import JourneyCreateForm from '../../components/JourneyCreateForm.vue'
-import { journeyExploreIntegrationKey } from '../../model/exploreIntegration'
 
 const createJourney = vi.fn()
-const consumeReturn = vi.fn()
 
 vi.mock('../../api/journeyApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/journeyApi')>()),
@@ -65,9 +63,6 @@ async function mountView(initialPath = '/journeys/new') {
   const wrapper = mount(JourneyCreateView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
-      provide: {
-        [journeyExploreIntegrationKey as symbol]: { consumeReturn },
-      },
     },
   })
 
@@ -77,8 +72,6 @@ async function mountView(initialPath = '/journeys/new') {
 describe('JourneyCreateView', () => {
   beforeEach(() => {
     createJourney.mockReset()
-    consumeReturn.mockReset()
-    consumeReturn.mockReturnValue(null)
   })
 
   it('creates a journey once and moves to the returned detail route', async () => {
@@ -194,57 +187,74 @@ describe('JourneyCreateView', () => {
   })
 
   /*
-   * Discover 상세는 route param(:eventId)을 쓴다. query만 나르는 returnRouteName으로는
-   * 돌아갈 수 없어 explore가 sessionStorage에 심어 둔 복귀 위치를 소비한다.
+   * Discover 상세는 route param(:eventId)을 쓴다. query만으로는 주소를 만들 수 없어
+   * 규약의 `returnParams`로 param을 함께 받는다. 나머지 query(`openJourneySelect`)는
+   * 그대로 돌려주고 결과 key만 더한다.
    */
-  it('Discover에서 온 생성은 params와 새 여정 id를 싣고 상세로 돌아간다', async () => {
+  it('Discover에서 온 생성은 returnParams로 params를 복원해 상세로 돌아간다', async () => {
     createJourney.mockResolvedValue({ ...input, tripId: 42 })
-    consumeReturn.mockReturnValue({
-      name: 'explore-event-detail',
-      params: { eventId: '301' },
-    })
-    const { wrapper, router } = await mountView('/journeys/new?returnToExplore=1')
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=explore-event-detail&returnParams=eventId%3A301&openJourneySelect=1',
+    )
 
     wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
     await flushPromises()
 
-    expect(consumeReturn).toHaveBeenCalledTimes(1)
     expect(router.currentRoute.value.name).toBe('explore-event-detail')
     expect(router.currentRoute.value.params).toEqual({ eventId: '301' })
+    // 규약 key는 돌려주지 않는다. 호출자 화면의 것이 아니다.
     expect(router.currentRoute.value.query).toEqual({
-      journeyId: '42',
       openJourneySelect: '1',
+      tripId: '42',
     })
-  })
-
-  it('복귀 위치가 사라졌으면 여정 상세로 떨어진다', async () => {
-    createJourney.mockResolvedValue({ ...input, tripId: 42 })
-    consumeReturn.mockReturnValue(null)
-    const { wrapper, router } = await mountView('/journeys/new?returnToExplore=1')
-
-    wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
-    await flushPromises()
-
-    expect(router.currentRoute.value.fullPath).toBe('/journeys/42')
   })
 
   /*
-   * 표시 없이 소비하면, 여정을 만들다 뒤로 나간 뒤 남은 맥락이 여정 목록에서 들어온
-   * 다음 생성까지 Discover 상세로 납치한다.
+   * 제출이 끝난 화면은 자리를 내준다. push였다면 여기서 뒤로 갈 때 이미 제출한 폼이
+   * 다시 떠서, 한 번 더 제출하면 여정이 하나 더 생긴다.
    */
-  it('표시가 없는 생성은 복귀 맥락을 건드리지 않는다', async () => {
+  it('Discover 복귀도 자리를 돌려주므로 뒤로 가도 이 폼으로 오지 않는다', async () => {
     createJourney.mockResolvedValue({ ...input, tripId: 42 })
-    consumeReturn.mockReturnValue({
-      name: 'explore-event-detail',
-      params: { eventId: '301' },
-    })
-    const { wrapper, router } = await mountView()
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=explore-event-detail&returnParams=eventId%3A301',
+    )
 
     wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
     await flushPromises()
 
-    expect(consumeReturn).not.toHaveBeenCalled()
-    expect(router.currentRoute.value.fullPath).toBe('/journeys/42')
+    router.back()
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).not.toBe('journey-create')
+  })
+
+  it('returnParams가 없는 호출자는 params 없이 그대로 돌아간다', async () => {
+    createJourney.mockResolvedValue({ ...input, tripId: 42 })
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=appointment-create&itemId=9&itemType=EVENT',
+    )
+
+    wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+    expect(router.currentRoute.value.query).toEqual({
+      itemId: '9',
+      itemType: 'EVENT',
+      tripId: '42',
+    })
+  })
+
+  it('쓸 수 없는 returnParams는 무시하고 주소만 만든다', async () => {
+    createJourney.mockResolvedValue({ ...input, tripId: 42 })
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=appointment-create&returnParams=%3A42%2Cnope',
+    )
+
+    wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-create')
   })
 
   it('shows the normalized creation error without navigating', async () => {

@@ -21,9 +21,7 @@ import { useJourneyListQuery } from '@/features/journey/composables/useJourneyLi
 import { parseJourneyRouteQuery } from '@/features/journey/model/journeyRouteQuery'
 import { useMemberAppointmentProfile } from '@/features/member/model/memberQueries'
 import { useExploreItemLocationQuery } from '@/features/explore/model/appointmentIntegration'
-import { useExploreReturnContextStore } from '@/features/explore/model/exploreReturnContext'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
-import { journeyExploreIntegrationKey } from '@/features/journey/model/exploreIntegration'
 import { journeyReportIntegrationKey } from '@/features/journey/model/reportIntegration'
 import { useReportSummariesQuery } from '@/features/report/composables/useReportQueries'
 import { walletAppointmentIntegrationKey } from '@/features/wallet/model/appointmentIntegration'
@@ -68,11 +66,6 @@ app.provide(appointmentMemberIntegrationKey, {
 app.provide(appointmentJourneyIntegrationKey, {
   useJourneyListQuery,
   checkJourneyItemExists,
-})
-// 스토어는 반드시 이 함수 **안에서** 부른다. 모듈 스코프에서 부르면
-// `app.use(createPinia())` 전이라 죽는다.
-app.provide(journeyExploreIntegrationKey, {
-  consumeReturn: () => useExploreReturnContextStore().consumeReturn(),
 })
 app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
 app.provide(walletAppointmentIntegrationKey, { useMyOngoingAppointmentsQuery })

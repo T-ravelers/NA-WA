@@ -112,54 +112,6 @@ describe('useExploreReturnContextStore', () => {
     expect(store.returnTo).toBeNull()
   })
 
-  /*
-   * Discover 상세에서 여정을 만들러 나갈 때 쓴다. `capture()`는 Journey에서 넘어온
-   * 진입만 다뤄 복귀 위치가 늘 journey-detail이라 이 자리에 쓸 수 없었다.
-   */
-  it('돌아올 위치를 직접 심고 새로고침을 견딘다', () => {
-    const store = useExploreReturnContextStore()
-    store.captureReturnTo({ name: 'explore-event-detail', params: { eventId: '42' } })
-
-    expect(store.returnTo).toEqual({
-      name: 'explore-event-detail',
-      params: { eventId: '42' },
-    })
-
-    setActivePinia(createPinia())
-    expect(useExploreReturnContextStore().returnTo).toEqual({
-      name: 'explore-event-detail',
-      params: { eventId: '42' },
-    })
-  })
-
-  it('돌아올 위치를 심어도 이미 고른 여정은 지우지 않는다', () => {
-    const store = useExploreReturnContextStore()
-    store.setJourneyId(7)
-    store.captureReturnTo({ name: 'explore-place-detail', params: { placeId: '501' } })
-
-    expect(store.journeyId).toBe(7)
-  })
-
-  it('쓸 수 없는 복귀 위치는 무시한다', () => {
-    const store = useExploreReturnContextStore()
-    store.captureReturnTo({ name: '', params: {} })
-    store.captureReturnTo({ name: 'explore-event-detail', params: { eventId: 42 } })
-    store.captureReturnTo('nope')
-
-    expect(store.returnTo).toBeNull()
-  })
-
-  it('심은 복귀 위치도 한 번 쓰면 사라진다', () => {
-    const store = useExploreReturnContextStore()
-    store.captureReturnTo({ name: 'explore-event-detail', params: { eventId: '42' } })
-
-    expect(store.consumeReturn()).toEqual({
-      name: 'explore-event-detail',
-      params: { eventId: '42' },
-    })
-    expect(store.consumeReturn()).toBeNull()
-  })
-
   it('hands back the return location and drops the one-shot context', () => {
     const store = useExploreReturnContextStore()
     store.capture({ journeyId: '7', startDate: '2026-09-03', endDate: '2026-09-03' })
