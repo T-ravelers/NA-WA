@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
-  type SpendingCategory,
+  SPENDING_CATEGORIES,
   spendingCategoryLabelKey,
   toSpendingCategory,
 } from '@/shared/lib/spendingCategory'
@@ -16,18 +16,29 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
 
 import ReportCategoryBreakdown from '../components/presentation/ReportCategoryBreakdown.vue'
+import ReportComparisonBars from '../components/presentation/ReportComparisonBars.vue'
 import ReportDailyTrend from '../components/presentation/ReportDailyTrend.vue'
+import ReportRadarChart from '../components/presentation/ReportRadarChart.vue'
+import ReportRankTiles from '../components/presentation/ReportRankTiles.vue'
 import { formatPercent } from '../components/presentation/format'
 import ReportKpiCard from '../components/presentation/ReportKpiCard.vue'
 import ReportPersonaTicket from '../components/presentation/ReportPersonaTicket.vue'
 import type {
   ReportCategoryBreakdownItem,
+  ReportComparisonBarRow,
   ReportDailyTrendPoint,
   ReportKpiData,
+  ReportRadarAxis,
+  ReportRankTile,
 } from '../components/presentation/types'
-import { useReportDetailQuery } from '../composables/useReportQueries'
+import { useReportComparisonQuery, useReportDetailQuery } from '../composables/useReportQueries'
 import { isReportForbidden, isReportNotFound, reportErrorMessageKey } from '../model/reportErrors'
-import { formatReportDate, isZeroAmount, parsePositiveRouteId } from '../model/reportModel'
+import {
+  formatReportDate,
+  isZeroAmount,
+  parsePositiveRouteId,
+  spendingCategoryTone,
+} from '../model/reportModel'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,23 +80,6 @@ const reportCategories = computed<ReportCategoryBreakdownItem[]>(() =>
 )
 
 /**
- * 칭호 티켓 색.
- *
- * 시안 R4에서 티켓 배경은 1위 카테고리의 색이고, 같은 화면의 도넛도 이제 같은 색을 쓴다
- * (`seriesPalette`). 그래서 두 자리가 어긋나지 않는다.
- *
- * **Explore 소비영역과 같은 어휘를 쓰는 네 카테고리만 코어색이 있다.** 나머지 셋은
- * `AppTicket`이 받는 톤에 없어 종이톤으로 둔다 — 임의 색을 만들지 않는다. 그 셋이 1위일 때
- * 티켓은 무채색이 되고, 색으로 카테고리를 말하지 않는다.
- */
-const PERSONA_TONE: Partial<Record<SpendingCategory, Category>> = {
-  FOOD: 'food',
-  SHOPPING: 'shopping',
-  BEAUTY: 'beauty',
-  SHOW: 'show',
-}
-
-/**
  * 소비 성향 칭호.
  *
  * 가장 많이 쓴 카테고리 하나로 정한다. 백엔드가 금액 내림차순으로 정렬해 내려주므로
@@ -117,7 +111,7 @@ const reportPersona = computed<{
     description: t(`report.detail.persona.${category}.description`, { share }),
     share,
     categoryLabel: top.label,
-    tone: PERSONA_TONE[category] ?? 'paper',
+    tone: spendingCategoryTone(category) ?? 'paper',
   }
 })
 /**
@@ -140,6 +134,86 @@ const reportTrend = computed<ReportDailyTrendPoint[]>(() =>
     amount: Number(row.amount),
   })),
 )
+
+/* ── 동료 비교 (#404) ──
+ * 스냅샷이 있고 지출이 0이 아닐 때만 부른다. 비교는 여정 기간의 결제를 다시 합산한 값이라
+ * 위 ANALYSIS(스냅샷)와 숫자가 다를 수 있다 — 백엔드 문서의 basis 설명. */
+const comparisonQuery = useReportComparisonQuery(
+  reportId,
+  'GROUP',
+  computed(
+    () =>
+      report.value?.analytics !== null &&
+      report.value?.analytics !== undefined &&
+      !isZeroSpending.value,
+  ),
+)
+const comparison = computed(() => comparisonQuery.data.value ?? null)
+const hasPeers = computed(() => (comparison.value?.peers.length ?? 0) > 0)
+
+const comparisonMe = computed<ReportComparisonBarRow>(() => ({
+  id: comparison.value?.me.memberId ?? 0,
+  label: t('report.detail.comparison.you'),
+  amount: Number(comparison.value?.me.totalSpent ?? 0),
+}))
+const comparisonPeers = computed<ReportComparisonBarRow[]>(() =>
+  (comparison.value?.peers ?? []).map((peer) => ({
+    id: peer.memberId,
+    label: peer.displayName,
+    amount: Number(peer.totalSpent),
+  })),
+)
+
+/** 레이더 축 — 나와 코호트 중 한쪽이라도 쓴 카테고리, 내 비중 순. 3개가 안 되면 나머지 카테고리로 채운다. */
+const comparisonAxes = computed<ReportRadarAxis[]>(() => {
+  const current = comparison.value
+
+  if (current === null) {
+    return []
+  }
+
+  const mine = new Map(
+    current.me.categoryBreakdown.map((row) => [row.category, Number(row.percentage)]),
+  )
+  const cohort = new Map(
+    current.cohort.categoryBreakdown.map((row) => [row.category, Number(row.percentage)]),
+  )
+  const ordered = [...mine.keys(), ...cohort.keys(), ...SPENDING_CATEGORIES].filter(
+    (category, index, all) => all.indexOf(category) === index,
+  )
+  const used = ordered.filter(
+    (category) => (mine.get(category) ?? 0) > 0 || (cohort.get(category) ?? 0) > 0,
+  )
+  const axes = used.length >= 3 ? used : ordered.slice(0, 3)
+
+  return axes.slice(0, 6).map((category) => ({
+    key: category,
+    label: t(spendingCategoryLabelKey(category)),
+    mine: mine.get(category) ?? 0,
+    cohort: cohort.get(category) ?? 0,
+  }))
+})
+
+function rankText(rank: number): string {
+  if (rank === 1) return t('report.detail.comparison.rankFirst')
+  if (rank === 2) return t('report.detail.comparison.rankSecond')
+  if (rank === 3) return t('report.detail.comparison.rankThird')
+
+  return t('report.detail.comparison.rankNth', { rank })
+}
+
+const comparisonTiles = computed<ReportRankTile[]>(() =>
+  (comparison.value?.ranks ?? []).slice(0, 4).map((row) => ({
+    key: row.category,
+    label: t(spendingCategoryLabelKey(row.category)),
+    rankText: rankText(row.rank),
+    tone: spendingCategoryTone(row.category) ?? 'surface',
+  })),
+)
+
+function retryComparison(): void {
+  void comparisonQuery.refetch()
+}
 
 function goBack(): void {
   void router.push({ name: 'report-list' })
@@ -272,6 +346,65 @@ function retry(): void {
           :empty-title="t('report.detail.trendTitle')"
           :empty-description="t('report.detail.trendEmpty')"
         />
+
+        <section
+          v-if="!isZeroSpending"
+          class="flex flex-col gap-3"
+          aria-labelledby="report-comparison-title"
+        >
+          <h2
+            id="report-comparison-title"
+            class="font-display text-section-header uppercase text-ink"
+          >
+            {{ t('report.detail.comparison.heading') }}
+          </h2>
+
+          <StateLoading
+            v-if="comparisonQuery.isPending.value"
+            :label="t('report.detail.comparison.loading')"
+          />
+
+          <StateError
+            v-else-if="comparisonQuery.isError.value"
+            :title="t('report.detail.comparison.loadFailed')"
+            :action-label="t('action.retry')"
+            @retry="retryComparison"
+          />
+
+          <AppCard v-else-if="!hasPeers">
+            <h3 class="text-title text-ink">{{ t('report.detail.comparison.emptyTitle') }}</h3>
+            <p class="mt-2 text-body-sm text-ink-3">
+              {{ t('report.detail.comparison.emptyDescription') }}
+            </p>
+          </AppCard>
+
+          <template v-else>
+            <AppCard padding="lg">
+              <div class="flex flex-col gap-6">
+                <ReportComparisonBars
+                  :total-label="t('report.detail.comparison.totalSpend')"
+                  :chips-label="t('report.detail.comparison.members')"
+                  :me="comparisonMe"
+                  :peers="comparisonPeers"
+                  :locale="i18n.locale.value"
+                />
+                <div class="flex flex-col gap-3">
+                  <p class="text-micro uppercase text-ink-3">
+                    {{ t('report.detail.comparison.categoryBalance') }}
+                  </p>
+                  <ReportRadarChart
+                    :axes="comparisonAxes"
+                    :mine-label="t('report.detail.comparison.you')"
+                    :cohort-label="t('report.detail.comparison.groupAvg')"
+                    :description="t('report.detail.comparison.radarDescription')"
+                  />
+                </div>
+              </div>
+            </AppCard>
+
+            <ReportRankTiles :tiles="comparisonTiles" />
+          </template>
+        </section>
       </template>
 
       <section

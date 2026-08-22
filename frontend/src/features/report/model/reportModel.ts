@@ -1,3 +1,6 @@
+import { type SpendingCategory, toSpendingCategory } from '@/shared/lib/spendingCategory'
+import type { Category } from '@/shared/ui/category'
+
 import type { ReportJourneySummary, ReportSummary } from '../api/reportApi'
 
 export interface ReportJourneyOption extends ReportJourneySummary {
@@ -74,4 +77,19 @@ export function formatPercentage(value: string): string {
 
 export function isZeroAmount(value: string): boolean {
   return /^0+(?:\.0+)?$/.test(value)
+}
+
+/**
+ * 소비 카테고리의 코어색. Explore 소비영역과 같은 어휘를 쓰는 네 카테고리만 색이 있고
+ * 나머지(TRANSPORT·STAY·OTHER)는 면 색으로 둔다 — 임의 색을 만들지 않는다.
+ */
+const SPENDING_CATEGORY_TONE: Partial<Record<SpendingCategory, Category>> = {
+  FOOD: 'food',
+  SHOPPING: 'shopping',
+  BEAUTY: 'beauty',
+  SHOW: 'show',
+}
+
+export function spendingCategoryTone(category: string): Category | null {
+  return SPENDING_CATEGORY_TONE[toSpendingCategory(category)] ?? null
 }

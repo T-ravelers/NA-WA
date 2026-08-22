@@ -107,3 +107,51 @@ export interface ReportDailyTrendProps extends Headed, LocaleAware {
   emptyTitle: string
   emptyDescription: string
 }
+
+/* ── 비교(#404) ── */
+
+export interface ReportComparisonBarRow {
+  id: number
+  /** 표시명. 나는 화면이 번역한 `You`다. */
+  label: string
+  amount: MoneyValue
+}
+
+export interface ReportComparisonBarsProps extends LocaleAware {
+  /** 블록 라벨. 예: `Total spend` */
+  totalLabel: string
+  /** 동료 칩 라디오 그룹의 접근 가능한 이름. 예: `Group members` */
+  chipsLabel: string
+  me: ReportComparisonBarRow
+  peers: ReportComparisonBarRow[]
+}
+
+export interface ReportRadarAxis {
+  key: string
+  label: string
+  /** 0–100 비중. */
+  mine: number
+  /** 0–100 비중. */
+  cohort: number
+}
+
+export interface ReportRadarChartProps {
+  /** 받은 순서대로 12시부터 시계 방향. 3개 미만이면 그리지 않는다. */
+  axes: ReportRadarAxis[]
+  mineLabel: string
+  cohortLabel: string
+  /** 차트를 한 문장으로 설명한다. 화면에는 보이지 않고 스크린 리더만 읽는다. */
+  description?: string
+}
+
+export interface ReportRankTile {
+  key: string
+  label: string
+  /** 로케일에 맞춰 만든 순위 글자. 예: `1st` */
+  rankText: string
+  tone: Category | 'surface'
+}
+
+export interface ReportRankTilesProps {
+  tiles: ReportRankTile[]
+}
