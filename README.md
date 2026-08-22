@@ -128,8 +128,16 @@ docker compose up -d --build backend
 2. 적용합니다.
 
 ```shell
-docker compose exec -T mysql mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < backend/docs/database/seed/report-demo.sql
+docker compose exec -T mysql sh -c 'exec mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' < backend/docs/database/seed/report-demo.sql
 ```
+
+세 변수는 `sh -c` 안에 두어 컨테이너에서 전개합니다. compose가 `.env`를 컨테이너에만
+넣어 주므로 실행하는 사람의 셸에는 값이 없고, 이렇게 하면 비밀번호가 셸 히스토리에도
+남지 않습니다.
+
+`--default-character-set=utf8mb4`는 빼지 마세요. `mysql` 클라이언트의 기본값 `auto`는
+`LANG`이 비어 있으면 latin1로 읽어서, 시드 메모의 `—`가 `â€”`로 저장됩니다
+(2026-08-22 로컬 MySQL 8.4에서 확인).
 
 3. 시연 계정으로 로그인해 여정 `Seed Report Journey`의 리포트를 UI에서 만듭니다. 호스트의
    결제는 일부러 리포트에 연결해 두지 않았습니다 — 연결돼 있으면 생성이 `REPORT-008`로
