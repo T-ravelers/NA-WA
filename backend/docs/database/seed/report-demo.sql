@@ -44,12 +44,24 @@ FROM appointment_members am
 JOIN appointments a ON a.appointment_id = am.appointment_id
 WHERE a.appointment_name = 'Seed Report Appointment';
 
+-- 시드 약속이 가리키던 탐색 항목을 기억해 둔다. 그 항목이 시드가 만든 빈 행일 때만 아래서 지운다.
+SET @seed_item := (
+    SELECT item_id FROM appointments
+    WHERE appointment_name = 'Seed Report Appointment'
+    ORDER BY appointment_id DESC
+    LIMIT 1
+);
+
 DELETE FROM appointments WHERE appointment_name = 'Seed Report Appointment';
 
--- 승인된 이벤트가 하나도 없을 때만 만들었던 빈 탐색 항목.
+-- 승인된 이벤트가 하나도 없을 때만 만들었던 빈 탐색 항목. 시드 약속이 쓰던 그 행이면서
+-- event/place 하위 행이 없어야(= 시드가 만든 orphan) 지운다. 시연 계정이 정상 등록한 이벤트는
+-- event 행이 있으므로 여기에 걸리지 않는다.
 DELETE FROM explore_items
-WHERE created_by = @host AND reviewed_by = @host AND item_type = 'EVENT'
-  AND appointment_count = 0 AND participant_count = 0;
+WHERE item_id = @seed_item
+  AND created_by = @host AND reviewed_by = @host AND item_type = 'EVENT'
+  AND NOT EXISTS (SELECT 1 FROM event e WHERE e.event_id = explore_items.item_id)
+  AND NOT EXISTS (SELECT 1 FROM place p WHERE p.place_id = explore_items.item_id);
 
 DELETE FROM wallet_transfers WHERE idempotency_key LIKE 'seed:report-demo:%';
 
