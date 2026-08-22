@@ -74,6 +74,15 @@ async function mountView() {
   return { wrapper, router }
 }
 
+const EMPTY_PAGE = {
+  content: [],
+  page: 0,
+  size: 20,
+  totalElements: 0,
+  totalPages: 0,
+  hasNext: false,
+}
+
 describe('AppointmentListView', () => {
   beforeEach(() => {
     fetchAppointments.mockReset()
@@ -90,11 +99,13 @@ describe('AppointmentListView', () => {
   it('requests appointments with the item context and opens the selected detail', async () => {
     const { wrapper, router } = await mountView()
 
+    // 기본 언어 칩은 회원이 고른 언어(테스트 로케일은 en)다. 목록 전체를 보여주면
+    // 대부분이 못 알아듣는 언어로 채워진다.
     expect(fetchAppointments).toHaveBeenCalledWith({
       itemId: 42,
       itemType: 'EVENT',
       keyword: undefined,
-      language: undefined,
+      language: 'en',
       page: 0,
       size: 20,
     })
@@ -107,6 +118,63 @@ describe('AppointmentListView', () => {
 
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
+  })
+
+  it('starts from the member language again on the next visit', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Japanese')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'ja' }))
+
+    // 고른 칩은 그 화면에 머무는 동안만 유지된다. 다시 들어오면 회원 언어다.
+    const revisited = await mountView()
+    await flushPromises()
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'en' }))
+    expect(
+      revisited.wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'English')
+        ?.attributes('aria-pressed'),
+    ).toBe('true')
+  })
+
+  // 사용자가 고르지 않은 조건으로 빈 화면을 보여주면, 약속이 없는 것인지 걸러진
+  // 것인지 구분되지 않는다.
+  it('falls back to every language when the member language has no appointments', async () => {
+    fetchAppointments.mockResolvedValueOnce(EMPTY_PAGE)
+
+    const { wrapper } = await mountView()
+    await flushPromises()
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ language: undefined }),
+    )
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'All')
+        ?.attributes('aria-pressed'),
+    ).toBe('true')
+  })
+
+  // 직접 고른 조건을 화면이 임의로 풀면 방금 누른 칩과 목록이 어긋난다.
+  it('keeps a chosen language even when it has no appointments', async () => {
+    const { wrapper } = await mountView()
+    fetchAppointments.mockResolvedValue(EMPTY_PAGE)
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Japanese')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'ja' }))
   })
 
   it('opens completed appointment details from the list', async () => {

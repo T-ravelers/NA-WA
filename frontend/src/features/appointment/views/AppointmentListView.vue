@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -11,19 +11,31 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 import TextInput from '@/shared/ui/TextInput.vue'
 
 import AppointmentListCard from '../components/AppointmentListCard.vue'
-import {
-  type AppointmentItemType,
-  type AppointmentLanguage,
-  type AppointmentListFilters,
-} from '../api/appointmentApi'
+import { type AppointmentItemType, type AppointmentListFilters } from '../api/appointmentApi'
 import { useAppointmentListQuery } from '../composables/useAppointmentListQuery'
+import {
+  defaultListLanguage,
+  type AppointmentLanguageFilter,
+} from '../model/appointmentListLanguage'
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const { locale, t } = useI18n()
 
 const keyword = ref('')
-const selectedLanguage = ref<'ALL' | AppointmentLanguage>('ALL')
+// 기본은 회원이 고른 언어다. 방한 외국인이 알아들을 수 있는 약속이 먼저 보여야
+// 하는데, 목록 전체를 보여주면 대부분이 못 알아듣는 언어로 채워진다.
+//
+// 고른 칩은 저장하지 않는다. 들어올 때는 언제나 회원 언어에서 시작하고, 다른 언어를
+// 보는 것은 이 화면에 머무는 동안의 일이다. 다만 그동안은 자동 되돌림을 멈춰야 해서
+// (아래 watch) 직접 골랐는지만 화면 안에서 기억한다.
+const userChoseLanguage = ref(false)
+const selectedLanguage = ref<AppointmentLanguageFilter>(defaultListLanguage(locale.value))
+
+function chooseLanguage(next: AppointmentLanguageFilter): void {
+  selectedLanguage.value = next
+  userChoseLanguage.value = true
+}
 
 function readPositiveInteger(value: unknown): number | undefined {
   const raw = Array.isArray(value) ? value[0] : value
@@ -60,7 +72,28 @@ const title = computed(() =>
       : t('appointment.list.title'),
 )
 
-const languageOptions: Array<'ALL' | AppointmentLanguage> = ['ALL', 'en', 'ja', 'zh-TW', 'vi']
+const languageOptions: AppointmentLanguageFilter[] = ['ALL', 'en', 'ja', 'zh-TW', 'vi']
+
+/**
+ * 자동으로 채운 언어로 걸러 아무것도 없으면 전체로 되돌린다.
+ *
+ * 사용자가 고르지 않은 조건 때문에 빈 화면을 보여주면, 약속이 없는 것인지 걸러진
+ * 것인지 구분되지 않는다.
+ *
+ * 직접 고른 언어에서는 되돌리지 않는다. 고른 조건을 화면이 임의로 풀면 방금 누른
+ * 칩과 목록이 어긋난다. 검색어가 있을 때도 두는데, 그때 빈 결과의 이유는 검색어일
+ * 수 있어서다.
+ */
+watch(
+  () => [appointmentQuery.isSuccess.value, appointments.value.length] as const,
+  ([isSuccess, count]) => {
+    if (userChoseLanguage.value || selectedLanguage.value === 'ALL') return
+    if (!isSuccess || count > 0 || keyword.value.trim() !== '') return
+
+    selectedLanguage.value = 'ALL'
+  },
+  { immediate: true },
+)
 
 function goBack(): void {
   if (itemId.value !== undefined && itemType.value === 'EVENT') {
@@ -145,7 +178,7 @@ function retry(): void {
             : 'border-hairline-strong text-ink-2'
         "
         :aria-pressed="selectedLanguage === language"
-        @click="selectedLanguage = language"
+        @click="chooseLanguage(language)"
       >
         {{
           language === 'ALL'
