@@ -21,6 +21,10 @@
  *                     검증용이며 출력이 screenshots-<width>/로 분리된다)
  *   SCREENSHOT_LOCALE 앱 로케일 (기본 en. ja·zh-TW·vi는 출력이 screenshots-<locale>/로
  *                     분리된다. 번역이 없는 문구는 en 폴백으로 찍힌다)
+ *   SCREENSHOT_ONLY   화면 이름에 포함된 글자로 고른다. 쉼표로 여러 개(예: report,wallet).
+ *                     플로우는 `<flow>-<step>` 이름으로 고른다. 한 화면만 고치고 전량을
+ *                     다시 찍지 않기 위한 것이고, PR 첨부용 기본 스냅샷은 여전히 전량
+ *                     실행으로 만든다.
  *
  * 출력물은 저장소에 커밋하지 않는다. `.gitignore`에 들어 있다.
  */
@@ -77,6 +81,10 @@ const OUT_SUFFIX =
   (WIDTH === DEFAULT_WIDTH ? '' : `-${WIDTH}`) + (LOCALE === DEFAULT_LOCALE ? '' : `-${LOCALE}`)
 const OUT = process.env.SCREENSHOT_OUT ?? `screenshots${OUT_SUFFIX}`
 const CHANNEL = process.env.SCREENSHOT_CHANNEL
+const ONLY = (process.env.SCREENSHOT_ONLY ?? '')
+  .split(',')
+  .map((part) => part.trim())
+  .filter((part) => part.length > 0)
 
 /** @typedef {(page: import('@playwright/test').Page) => Promise<unknown>} Hook */
 
@@ -1648,7 +1656,24 @@ const FLOWS = [
   },
 ]
 
-const TOTAL = SCREENS.length + FLOWS.reduce((count, flow) => count + flow.steps.length, 0)
+const selectedScreens =
+  ONLY.length === 0
+    ? SCREENS
+    : SCREENS.filter((screen) => ONLY.some((part) => screen.name.includes(part)))
+const selectedFlows =
+  ONLY.length === 0
+    ? FLOWS
+    : FLOWS.filter((flow) =>
+        flow.steps.some((step) => ONLY.some((part) => `${flow.name}-${step.name}`.includes(part))),
+      )
+
+if (selectedScreens.length === 0 && selectedFlows.length === 0) {
+  console.error(`SCREENSHOT_ONLY에 맞는 화면이 없다: ${ONLY.join(', ')}`)
+  process.exit(1)
+}
+
+const TOTAL =
+  selectedScreens.length + selectedFlows.reduce((count, flow) => count + flow.steps.length, 0)
 
 async function assertServerIsUp() {
   try {
@@ -1694,7 +1719,7 @@ const context = await browser.newContext({
 
 let failed = 0
 
-for (const screen of SCREENS) {
+for (const screen of selectedScreens) {
   const page = await context.newPage()
 
   try {
@@ -1720,7 +1745,7 @@ for (const screen of SCREENS) {
   }
 }
 
-for (const flow of FLOWS) {
+for (const flow of selectedFlows) {
   const page = await context.newPage()
 
   try {
