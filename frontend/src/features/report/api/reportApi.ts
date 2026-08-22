@@ -121,6 +121,63 @@ export interface ReportCreateInput {
   locale?: string
 }
 
+export type ReportComparisonScope = 'GROUP' | 'SIMILAR'
+
+export interface ReportComparisonMember {
+  memberId: number
+  displayName: string
+  profileImageUrl: string | null
+  totalSpent: string
+  dailyAverage: string
+  categoryBreakdown: ReportCategoryBreakdown[]
+}
+
+export interface ReportComparisonCohort {
+  size: number
+  avgTotalSpent: string
+  avgDailyAverage: string
+  categoryBreakdown: ReportCategoryBreakdown[]
+}
+
+export interface ReportComparisonRank {
+  category: string
+  rank: number
+  of: number
+}
+
+/** 비교 결과. 숫자는 전부 0 이상이고, 차이의 부호는 화면이 비중으로 계산한다. */
+export interface ReportComparison {
+  scope: ReportComparisonScope
+  basis: 'LIVE' | 'SNAPSHOT'
+  me: ReportComparisonMember
+  peers: ReportComparisonMember[]
+  cohort: ReportComparisonCohort
+  ranks: ReportComparisonRank[]
+}
+
+interface ReportComparisonMemberWire {
+  memberId: number
+  displayName: string
+  profileImageUrl: string | null
+  totalSpent: number
+  dailyAverage: number
+  categoryBreakdown: ReportCategoryBreakdownWire[] | null
+}
+
+interface ReportComparisonWire {
+  scope: ReportComparisonScope
+  basis: 'LIVE' | 'SNAPSHOT'
+  me: ReportComparisonMemberWire
+  peers: ReportComparisonMemberWire[] | null
+  cohort: {
+    size: number
+    avgTotalSpent: number
+    avgDailyAverage: number
+    categoryBreakdown: ReportCategoryBreakdownWire[] | null
+  }
+  ranks: ReportComparisonRank[] | null
+}
+
 export interface ReportCreateRequest {
   locale: string
   transferIds: number[]
@@ -153,6 +210,61 @@ function normalizeAnalytics(
       ...row,
       amount: normalizeDecimalNumber(row.amount, 'analytics.dailyTrend.amount'),
     })),
+  }
+}
+
+function normalizeBreakdownRows(
+  rows: ReportCategoryBreakdownWire[] | null | undefined,
+  field: string,
+): ReportCategoryBreakdown[] {
+  return (rows ?? []).map((row) => ({
+    category: row.category,
+    amount: normalizeDecimalNumber(row.amount, `${field}.amount`),
+    percentage: normalizeDecimalNumber(row.percentage, `${field}.percentage`),
+  }))
+}
+
+function normalizeComparisonMember(
+  member: ReportComparisonMemberWire,
+  field: string,
+): ReportComparisonMember {
+  return {
+    memberId: member.memberId,
+    displayName: member.displayName,
+    profileImageUrl: member.profileImageUrl ?? null,
+    totalSpent: normalizeDecimalNumber(member.totalSpent, `${field}.totalSpent`),
+    dailyAverage: normalizeDecimalNumber(member.dailyAverage, `${field}.dailyAverage`),
+    categoryBreakdown: normalizeBreakdownRows(
+      member.categoryBreakdown,
+      `${field}.categoryBreakdown`,
+    ),
+  }
+}
+
+function normalizeComparison(comparison: ReportComparisonWire): ReportComparison {
+  return {
+    scope: comparison.scope,
+    basis: comparison.basis,
+    me: normalizeComparisonMember(comparison.me, 'comparison.me'),
+    peers: (comparison.peers ?? []).map((peer, index) =>
+      normalizeComparisonMember(peer, `comparison.peers[${String(index)}]`),
+    ),
+    cohort: {
+      size: comparison.cohort.size,
+      avgTotalSpent: normalizeDecimalNumber(
+        comparison.cohort.avgTotalSpent,
+        'comparison.cohort.avgTotalSpent',
+      ),
+      avgDailyAverage: normalizeDecimalNumber(
+        comparison.cohort.avgDailyAverage,
+        'comparison.cohort.avgDailyAverage',
+      ),
+      categoryBreakdown: normalizeBreakdownRows(
+        comparison.cohort.categoryBreakdown,
+        'comparison.cohort.categoryBreakdown',
+      ),
+    },
+    ranks: comparison.ranks ?? [],
   }
 }
 
@@ -231,4 +343,16 @@ export async function fetchReport(reportId: number): Promise<ReportDetail> {
   const response = await httpClient.get<ReportDetailWire>(`/api/v1/reports/${reportId}`)
 
   return normalizeReportDetail(response.data)
+}
+
+export async function fetchReportComparison(
+  reportId: number,
+  scope: ReportComparisonScope,
+): Promise<ReportComparison> {
+  const response = await httpClient.get<ReportComparisonWire>(
+    `/api/v1/reports/${reportId}/comparison`,
+    { params: { scope } },
+  )
+
+  return normalizeComparison(response.data)
 }

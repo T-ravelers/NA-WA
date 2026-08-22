@@ -9,11 +9,15 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import ReportPersonaTicket from '../../components/presentation/ReportPersonaTicket.vue'
 import { seriesInkClass } from '../../components/presentation/seriesPalette'
 
-const { fetchReport } = vi.hoisted(() => ({ fetchReport: vi.fn() }))
+const { fetchReport, fetchReportComparison } = vi.hoisted(() => ({
+  fetchReport: vi.fn(),
+  fetchReportComparison: vi.fn(),
+}))
 
 vi.mock('../../api/reportApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/reportApi')>()),
   fetchReport,
+  fetchReportComparison,
 }))
 
 const ReportDetailView = (await import('../ReportDetailView.vue')).default
@@ -64,6 +68,46 @@ const detail = {
   },
 }
 
+const emptyComparison = {
+  scope: 'GROUP' as const,
+  basis: 'LIVE' as const,
+  me: {
+    memberId: 1,
+    displayName: 'Me',
+    profileImageUrl: null,
+    totalSpent: '1284500',
+    dailyAverage: '128450',
+    categoryBreakdown: [{ category: 'FOOD', amount: '1000000', percentage: '77.85' }],
+  },
+  peers: [],
+  cohort: { size: 0, avgTotalSpent: '0', avgDailyAverage: '0', categoryBreakdown: [] },
+  ranks: [],
+}
+
+const groupComparison = {
+  ...emptyComparison,
+  peers: [
+    {
+      memberId: 2,
+      displayName: 'Mina',
+      profileImageUrl: null,
+      totalSpent: '978400',
+      dailyAverage: '97840',
+      categoryBreakdown: [{ category: 'SHOPPING', amount: '978400', percentage: '100' }],
+    },
+  ],
+  cohort: {
+    size: 1,
+    avgTotalSpent: '978400',
+    avgDailyAverage: '97840',
+    categoryBreakdown: [{ category: 'SHOPPING', amount: '978400', percentage: '100' }],
+  },
+  ranks: [
+    { category: 'FOOD', rank: 1, of: 2 },
+    { category: 'OTHER', rank: 1, of: 2 },
+  ],
+}
+
 const mountedWrappers: VueWrapper[] = []
 const queryClients: QueryClient[] = []
 
@@ -93,6 +137,8 @@ describe('ReportDetailView', () => {
   beforeEach(() => {
     fetchReport.mockReset()
     fetchReport.mockResolvedValue(detail)
+    fetchReportComparison.mockReset()
+    fetchReportComparison.mockResolvedValue(emptyComparison)
   })
 
   afterEach(() => {
@@ -122,6 +168,7 @@ describe('ReportDetailView', () => {
       'Analysis',
       'By category',
       'Spending trend',
+      'Vs. group members',
       'Journey snapshot',
       'Saved itinerary',
     ])
@@ -298,5 +345,80 @@ describe('ReportDetailView', () => {
     fetchReport.mockRejectedValueOnce(new NormalizedApiError('REPORT-001', 404, 'missing'))
     const missing = await mountView()
     expect(missing.wrapper.text()).toContain('Report not found')
+  })
+  it('asks for the group comparison only when the snapshot has spending', async () => {
+    await mountView()
+
+    expect(fetchReportComparison).toHaveBeenCalledWith(100, 'GROUP')
+    expect(fetchReportComparison).toHaveBeenCalledTimes(1)
+  })
+
+  it('explains that there is nobody to compare with when the group is empty', async () => {
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('No group members yet')
+    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false)
+  })
+
+  it('compares total spend, category balance and ranks against group members', async () => {
+    fetchReportComparison.mockResolvedValueOnce(groupComparison)
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Total spend')
+    expect(wrapper.findAll('[role="radio"]').map((chip) => chip.text())).toEqual(['MMina'])
+    expect(wrapper.text()).toContain('978,400 P')
+    expect(wrapper.text()).toContain('Category balance')
+    // 레이더 축: 내 FOOD·OTHER + 코호트 SHOPPING — 세 축
+    // 추이 차트도 sr-only 목록을 가지므로 레이더 것만 고른다.
+    const radarList = wrapper
+      .findAll('ul.sr-only')
+      .find((list) => list.text().includes('Group avg'))
+    expect(radarList?.text()).toContain('Food: You 78%, Group avg 0%')
+    expect(radarList?.text()).toContain('Shopping: You 0%, Group avg 100%')
+    expect(wrapper.findAll('li.rounded-card').map((tile) => tile.text())).toEqual([
+      '# Food1st',
+      '# Other1st',
+    ])
+  })
+
+  it('warns that the comparison total is recalculated, but only when the basis is live', async () => {
+    fetchReportComparison.mockResolvedValueOnce(groupComparison)
+    const live = await mountView()
+
+    expect(live.wrapper.text()).toContain('We recalculate this from the payments made')
+
+    fetchReportComparison.mockReset()
+    fetchReportComparison.mockResolvedValue({ ...groupComparison, basis: 'SNAPSHOT' as const })
+    const snapshot = await mountView()
+
+    expect(snapshot.wrapper.text()).not.toContain('We recalculate this from the payments made')
+  })
+
+  it('says only the comparison failed, not the whole screen', async () => {
+    fetchReportComparison.mockReset()
+    fetchReportComparison.mockRejectedValue(new NormalizedApiError('UNKNOWN', 500, 'boom'))
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('We could not load the comparison.')
+    expect(wrapper.text()).toContain('The rest of this report is unaffected.')
+    expect(wrapper.text()).not.toContain('We could not load this screen.')
+    // 나머지 리포트는 그대로 남는다.
+    expect(wrapper.text()).toContain('Jeju Night Market')
+  })
+
+  it('skips the comparison for zero-spending reports', async () => {
+    fetchReport.mockResolvedValueOnce({
+      ...detail,
+      analytics: {
+        totalSpent: '0.0000',
+        dailyAverage: '0.0000',
+        categoryBreakdown: [],
+        dailyTrend: [{ date: '2026-07-18', amount: '0.0000' }],
+      },
+    })
+    const { wrapper } = await mountView()
+
+    expect(fetchReportComparison).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Vs. group members')
   })
 })

@@ -25,6 +25,8 @@
  *                     플로우는 `<flow>-<step>` 이름으로 고른다. 한 화면만 고치고 전량을
  *                     다시 찍지 않기 위한 것이고, PR 첨부용 기본 스냅샷은 여전히 전량
  *                     실행으로 만든다.
+ *   SCREENSHOT_FULL_PAGE 1이면 뷰포트가 아니라 페이지 전체를 찍는다. 스크롤이 긴 화면(리포트
+ *                     상세)의 아래쪽 섹션을 PR에 보일 때 쓴다. 기본 스냅샷은 뷰포트 그대로다.
  *
  * 출력물은 저장소에 커밋하지 않는다. `.gitignore`에 들어 있다.
  */
@@ -85,6 +87,7 @@ const ONLY = (process.env.SCREENSHOT_ONLY ?? '')
   .split(',')
   .map((part) => part.trim())
   .filter((part) => part.length > 0)
+const FULL_PAGE = process.env.SCREENSHOT_FULL_PAGE === '1'
 
 /** @typedef {(page: import('@playwright/test').Page) => Promise<unknown>} Hook */
 
@@ -339,6 +342,91 @@ function stubReportApis(page) {
               createdAt: '2021-07-28T09:00:00',
             },
           ],
+        }),
+      }),
+    ),
+    // 동료 비교(#404). 쿼리(scope=)가 붙으므로 정규식으로 받는다.
+    page.route(/\/api\/v1\/reports\/101\/comparison(\?.*)?$/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            scope: 'GROUP',
+            basis: 'LIVE',
+            me: {
+              memberId: 1,
+              displayName: 'Me',
+              profileImageUrl: null,
+              // 스냅샷(analytics 1,284,500)과 일부러 어긋나게 둔다 — LIVE 재합산이라
+              // 두 숫자가 다를 수 있고, 같은 값이면 캡처에서 그 차이가 안 드러난다.
+              totalSpent: 1310000,
+              dailyAverage: 131000,
+              categoryBreakdown: [
+                { category: 'FOOD', amount: 539500, percentage: 42 },
+                { category: 'SHOPPING', amount: 398200, percentage: 31 },
+                { category: 'SHOW', amount: 218400, percentage: 17 },
+                { category: 'BEAUTY', amount: 128400, percentage: 10 },
+              ],
+            },
+            peers: [
+              {
+                memberId: 2,
+                displayName: 'Mina',
+                profileImageUrl: null,
+                totalSpent: 978400,
+                dailyAverage: 97840,
+                categoryBreakdown: [
+                  { category: 'FOOD', amount: 420000, percentage: 42.93 },
+                  { category: 'SHOPPING', amount: 310000, percentage: 31.68 },
+                  { category: 'BEAUTY', amount: 248400, percentage: 25.39 },
+                ],
+              },
+              {
+                memberId: 3,
+                displayName: 'Jae',
+                profileImageUrl: null,
+                totalSpent: 510000,
+                dailyAverage: 51000,
+                categoryBreakdown: [
+                  { category: 'SHOW', amount: 300000, percentage: 58.82 },
+                  { category: 'FOOD', amount: 150000, percentage: 29.41 },
+                  { category: 'TRANSPORT', amount: 60000, percentage: 11.76 },
+                ],
+              },
+              {
+                memberId: 4,
+                displayName: 'Sora',
+                profileImageUrl: null,
+                totalSpent: 740000,
+                dailyAverage: 74000,
+                categoryBreakdown: [
+                  { category: 'SHOPPING', amount: 520000, percentage: 70.27 },
+                  { category: 'FOOD', amount: 130000, percentage: 17.57 },
+                  { category: 'BEAUTY', amount: 90000, percentage: 12.16 },
+                ],
+              },
+            ],
+            cohort: {
+              size: 3,
+              avgTotalSpent: 742800,
+              avgDailyAverage: 74280,
+              categoryBreakdown: [
+                { category: 'SHOPPING', amount: 276666.67, percentage: 37.25 },
+                { category: 'FOOD', amount: 233333.33, percentage: 31.41 },
+                { category: 'BEAUTY', amount: 112800, percentage: 15.19 },
+                { category: 'SHOW', amount: 100000, percentage: 13.46 },
+                { category: 'TRANSPORT', amount: 20000, percentage: 2.69 },
+              ],
+            },
+            ranks: [
+              { category: 'FOOD', rank: 1, of: 4 },
+              { category: 'SHOPPING', rank: 2, of: 4 },
+              { category: 'SHOW', rank: 2, of: 4 },
+              { category: 'BEAUTY', rank: 2, of: 4 },
+            ],
+          },
         }),
       }),
     ),
@@ -1921,7 +2009,7 @@ for (const screen of selectedScreens) {
     // 오면 다시 재므로, 도착 전에 찍으면 한 프레임 전 상태가 남는다. 전환이 자리 잡을 시간도 준다.
     await page.evaluate(() => document.fonts.ready)
     await page.waitForTimeout(400)
-    await page.screenshot({ path: `${OUT}/${screen.name}.png` })
+    await page.screenshot({ path: `${OUT}/${screen.name}.png`, fullPage: FULL_PAGE })
 
     console.log(`  ✓ ${screen.name}.png  ← ${screen.path}`)
   } catch (error) {
@@ -1953,7 +2041,7 @@ for (const flow of selectedFlows) {
         // 오면 다시 재므로, 도착 전에 찍으면 한 프레임 전 상태가 남는다. 전환이 자리 잡을 시간도 준다.
         await page.evaluate(() => document.fonts.ready)
         await page.waitForTimeout(400)
-        await page.screenshot({ path: `${OUT}/${name}.png` })
+        await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: FULL_PAGE })
 
         console.log(`  ✓ ${name}.png`)
       } catch (error) {
