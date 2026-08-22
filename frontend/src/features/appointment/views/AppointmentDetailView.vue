@@ -28,6 +28,7 @@ import {
 } from '../api/appointmentApi'
 import { appointmentKeys } from '../model/appointmentKeys'
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { serializeReturnParams } from '@/shared/lib/returnRoute'
 
 import { appointmentErrorMessageKey } from '../model/appointmentErrors'
 import { appointmentStatusTone } from '../model/appointmentStatusPresentation'
@@ -447,11 +448,17 @@ function selectJourney(tripId: number): void {
 
 // 이 약속을 담을 여정이 없다. 자리를 내주고(replace) 보내면 여정 생성이 그 자리를
 // 돌려주므로, 돌아온 뒤 상세가 히스토리에 두 번 쌓이지 않는다.
+// 이 약속을 담을 여정이 없다. 자리를 내주고(replace) 보내면 여정 생성이 그 자리를
+// 돌려주므로, 돌아온 뒤 상세가 히스토리에 두 번 쌓이지 않는다. 이 화면은 param
+// 라우트라 이름만으로는 돌아올 수 없어 returnParams도 함께 싣는다.
 function goToCreateJourney(): void {
   journeySelectOpen.value = false
-  void router.push({
+  void router.replace({
     name: 'journey-create',
-    query: { returnRouteName: 'appointment-detail', appointmentId: String(appointmentId.value) },
+    query: {
+      returnRouteName: 'appointment-detail',
+      returnParams: serializeReturnParams({ appointmentId: appointmentId.value ?? '' }),
+    },
   })
 }
 
@@ -497,14 +504,15 @@ function goToTopup(): void {
   topupPromptOpen.value = false
   const amount = appointment.value?.depositAmount
   const tripId = selectedTripId.value
-  const returnPath = tripId === null ? route.path : `${route.path}?tripId=${String(tripId)}`
 
   const openTopup = () =>
     router.push({
       name: 'wallet-top-up',
       query: {
         ...(amount === undefined ? {} : { amount: String(amount) }),
-        returnRoutePath: returnPath,
+        returnRouteName: 'appointment-detail',
+        returnParams: serializeReturnParams({ appointmentId: appointmentId.value ?? '' }),
+        ...(tripId === null ? {} : { tripId: String(tripId) }),
       },
     })
 
@@ -513,7 +521,7 @@ function goToTopup(): void {
     return
   }
 
-  // 돌아오는 길이 둘인데 도착지가 다르다. 충전을 마치면 충전 화면이 returnRoutePath로
+  // 돌아오는 길이 둘인데 도착지가 다르다. 충전을 마치면 충전 화면이 규약대로
   // 보내 주지만, 뒤로가기는 브라우저가 **떠날 때의 URL 그대로** 되돌린다. 그 자리에
   // 고른 여정이 없으면 충전을 포기했을 뿐인데 처음부터 다시 골라야 한다. 떠나기 전에
   // 지금 자리에도 tripId를 남겨 어느 길로 돌아오든 이어지게 한다.

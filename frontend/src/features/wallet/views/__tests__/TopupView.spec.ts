@@ -62,6 +62,11 @@ const mountTopup = async (initialPath = '/wallet/top-up') => {
     routes: [
       { path: '/wallet', name: 'wallet', component: { template: '<div />' } },
       { path: '/wallet/top-up', name: 'wallet-top-up', component: { template: '<div />' } },
+      {
+        path: '/appointments/:appointmentId',
+        name: 'appointment-detail',
+        component: { template: '<div>Appointment detail</div>' },
+      },
     ],
   })
 
@@ -118,6 +123,24 @@ describe('TopupView', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs()
+  })
+
+  it('returns to a caller whose route has a path param', async () => {
+    // 약속 상세(/appointments/:appointmentId)처럼 param을 쓰는 화면은 이름과 query만
+    // 으로는 주소를 만들 수 없다. 보내는 쪽이 returnParams로 실어 주고, 여기서 params로
+    // 풀어 돌아간다 — 여정 생성이 쓰는 것과 같은 규약이다.
+    const wrapper = await mountTopup(
+      '/wallet/top-up?amount=10000&returnRouteName=appointment-detail&returnParams=appointmentId%3A7&tripId=7',
+    )
+    await flushPromises()
+    const router = wrapper.vm.$router
+
+    await wrapper.get('button[aria-label="Back"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
+    expect(router.currentRoute.value.params).toEqual({ appointmentId: '7' })
+    expect(router.currentRoute.value.query).toEqual({ tripId: '7', resume: '1' })
   })
 
   it('renders the English top-up form and payment method', async () => {

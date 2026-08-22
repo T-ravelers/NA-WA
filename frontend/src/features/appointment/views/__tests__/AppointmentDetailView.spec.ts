@@ -492,9 +492,11 @@ describe('AppointmentDetailView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('journey-create')
+    // 이 화면은 param 라우트(/appointments/:appointmentId)라 이름만으로는 돌아올 수
+    // 없다. 여정 생성이 params로 풀 수 있게 returnParams로 싣는다.
     expect(router.currentRoute.value.query).toMatchObject({
       returnRouteName: 'appointment-detail',
-      appointmentId: '7',
+      returnParams: 'appointmentId:7',
     })
   })
 
@@ -535,7 +537,9 @@ describe('AppointmentDetailView', () => {
     expect(router.currentRoute.value.name).toBe('wallet-top-up')
     expect(router.currentRoute.value.query).toMatchObject({
       amount: '10000',
-      returnRoutePath: '/appointments/7?tripId=7',
+      returnRouteName: 'appointment-detail',
+      returnParams: 'appointmentId:7',
+      tripId: '7',
     })
   })
 
@@ -564,7 +568,7 @@ describe('AppointmentDetailView', () => {
       ?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('already has that place on that date')
+    expect(wrapper.text()).toContain('already on that day of your journey')
   })
 
   it('reopens the journey sheet with the journey the host just created', async () => {

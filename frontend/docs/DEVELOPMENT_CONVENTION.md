@@ -258,15 +258,18 @@ export default routes
 
 어떤 흐름이 중간에 다른 feature의 화면을 거쳐야 할 때(여정이 없어 여정 생성으로,
 잔액이 모자라 충전으로) 양쪽 feature가 서로를 import하지 않고 **query 규약**으로만
-연결합니다. 약속 생성 ↔ 여정 생성, 약속 생성 ↔ 충전, Discover 담기 ↔ 여정 생성이 이
-규약을 씁니다.
+연결합니다. 약속 생성 ↔ 여정 생성, 약속 생성 ↔ 충전, Discover 담기 ↔ 여정 생성,
+약속 상세(참여) ↔ 여정 생성·충전이 이 규약을 씁니다.
 
 - 보내는 쪽은 `returnRouteName=<자기 route name>`과 **자기 화면의 query를 그대로** 실어
   보냅니다. 받는 쪽은 호출자가 누구인지 알 필요가 없습니다.
 - 돌아갈 화면이 **route param을 쓰면** `returnParams=<key>:<value>` 도 함께 싣습니다
   (여럿이면 `,`로 잇습니다). 받는 쪽은 이것을 `params`로 풀어 주소를 만들 뿐이고, 값의
-  뜻은 여전히 호출자만 압니다. Discover 상세(`/explore/events/:eventId`)가 이 경우이고,
-  `appointment-create`처럼 param이 없는 화면은 싣지 않습니다.
+  뜻은 여전히 호출자만 압니다. Discover 상세(`/explore/events/:eventId`)와 약속
+  상세(`/appointments/:appointmentId`)가 이 경우이고, `appointment-create`처럼 param이
+  없는 화면은 싣지 않습니다.
+  - 이 규약을 읽고 쓰는 것은 **`shared/lib/returnRoute.ts` 하나뿐입니다.** 받는 쪽이
+    여정 생성과 충전 둘이라, 파싱이 각각 있으면 한쪽만 고쳐져 어긋납니다.
 - **이 왕복은 히스토리에 한 자리만 차지합니다.** 같은 화면이 두 번 쌓이면 돌아온 뒤
   뒤로 가기를 눌러도 흐름을 벗어나지 못하고 같은 라우트에 머뭅니다 — 라우트가 같으면
   화면이 다시 그려지지도 않아 **아무 반응이 없는 것처럼 보이고**, 초안을 이미 지운
