@@ -129,4 +129,15 @@ class RootConfigComponentScanTest {
                 ReportMapper.class.getPackageName()
         ));
     }
+
+    @Test
+    void componentScan_includesLoadTestStripePackage() {
+        ComponentScan componentScan = RootConfig.class.getAnnotation(
+                ComponentScan.class
+        );
+
+        assertTrue(Arrays.asList(componentScan.basePackages()).contains(
+                "me.nawa.loadtest.stripe"
+        ));
+    }
 }

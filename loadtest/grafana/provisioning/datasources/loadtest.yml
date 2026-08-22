@@ -1,0 +1,26 @@
+# Grafana 데이터소스 자동 등록.
+#
+# 쓰는 법 (macOS 네이티브 Grafana):
+#   brew services stop grafana
+#   ln -s "$PWD/loadtest/grafana/provisioning/datasources/loadtest.yml" \
+#         /opt/homebrew/etc/grafana/provisioning/datasources/loadtest.yml
+#   brew services start grafana
+#
+# 부하 테스트는 두 데이터소스를 나란히 봐야 한다. k6 결과만 보면 "느리다"까지만 알고
+# 왜 느린지는 모른다.
+apiVersion: 1
+
+datasources:
+  # k6가 --out influxdb 로 밀어 넣는 결과. 달성 TPS·응답시간 분포·에러율.
+  - name: k6
+    type: influxdb
+    access: proxy
+    url: http://127.0.0.1:8086
+    database: k6
+    isDefault: true
+
+  # 인프라와 JVM 지표.
+  - name: loadtest-prometheus
+    type: prometheus
+    access: proxy
+    url: http://127.0.0.1:9090
