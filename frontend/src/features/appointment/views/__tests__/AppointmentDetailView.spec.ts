@@ -402,6 +402,34 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).toContain('Confirm participation')
   })
 
+  it('rejects a journey that misses the numeric activity date', async () => {
+    // 위 테스트만으로는 "배열을 2099-08-08로 읽었다"와 "못 읽어서 아무것도 안 걸렀다"가
+    // 구분되지 않는다 — coversActivityDate는 날짜를 모르면 true를 돌려주기 때문이다.
+    // 담지 못하는 여정이 실제로 거절되는지까지 봐야 날짜를 읽었다는 게 고정된다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    fetchAppointment.mockResolvedValue({
+      ...appointment,
+      activityStartAt: [2099, 8, 8, 18, 30],
+      activityEndAt: [2099, 8, 8, 22, 0],
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+
+    // Busan Winter는 2099-12-01 – 2099-12-20이라 2099-08-08을 담지 못한다.
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Busan Winter'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('does not cover the appointment date')
+  })
+
   it('explains why a journey that cannot hold the activity date was refused', async () => {
     // 목록에서 감추지 않는다 — "내 여정이 왜 없지"로 읽힌다. 고르는 순간 이유를
     // 알려 주고 시트는 열어 둬, 다른 여정을 바로 고를 수 있게 한다.
