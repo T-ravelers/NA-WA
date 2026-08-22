@@ -118,6 +118,7 @@ export default {
       error: '無法載入您的旅程，請再試一次。',
       empty: '請先建立旅程，再建立這個揪團。',
       createJourney: '建立旅程',
+      dateOutOfRange: '這個旅程不包含揪團的日期，請選擇其他旅程。',
     },
     journeyDate: {
       close: '關閉日期選擇',
