@@ -223,15 +223,25 @@ const showMemberLeave = computed(() => !isHost.value)
 // 같은 조건을 쓴다. 버튼만 헤더에서 먼저 뜨면 눌러도 아무것도 열리지 않는다.
 const canOpenMenu = computed(() => appointment.value !== undefined)
 
-function formatDateTime(value: AppointmentDateTimeValue): string {
-  if (!value) return t('appointment.detail.notProvided')
-  const parsed = parseServerDateTime(value)
-  if (!parsed) return typeof value === 'string' ? value : t('appointment.detail.notProvided')
-  return formatServerDateTime(parsed, locale.value, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
+/**
+ * 일정은 날짜 한 줄과 시각 범위 한 줄로 나눠 적는다.
+ *
+ * 날짜를 시작·종료에 두 번 적으면 같은 날짜가 한 줄에서 반복돼, 정작 다른 값인
+ * 시각이 묻힌다. 서버가 활동 시작·종료를 `visitDate` 하루 위에서만 조립하므로
+ * (생성 검증도 시작 < 종료를 요구한다) 날짜는 언제나 하나다.
+ */
+function formatScheduleDate(value: AppointmentDateTimeValue): string | null {
+  const parsed = value ? parseServerDateTime(value) : null
+  return parsed ? formatServerDateTime(parsed, locale.value, { dateStyle: 'medium' }) : null
 }
+
+function formatScheduleTime(value: AppointmentDateTimeValue): string {
+  const parsed = value ? parseServerDateTime(value) : null
+  if (!parsed) return t('appointment.detail.notProvided')
+  return formatServerDateTime(parsed, locale.value, { timeStyle: 'short' })
+}
+
+const scheduleDate = computed(() => formatScheduleDate(appointment.value?.activityStartAt ?? null))
 
 function formatDeposit(value: string): string {
   const amount = Number(value)
@@ -657,9 +667,12 @@ function goToTopup(): void {
             <div class="grid grid-cols-[7rem_1fr] gap-3 py-3 first:pt-0 last:pb-0">
               <dt class="text-caption text-ink-3">{{ t('appointment.detail.schedule') }}</dt>
               <dd class="text-body-sm text-ink">
-                {{ formatDateTime(appointment.activityStartAt) }}
-                <span aria-hidden="true">–</span>
-                {{ formatDateTime(appointment.activityEndAt) }}
+                <span class="block">{{ scheduleDate ?? t('appointment.detail.notProvided') }}</span>
+                <span class="block">
+                  {{ formatScheduleTime(appointment.activityStartAt) }}
+                  <span aria-hidden="true">–</span>
+                  {{ formatScheduleTime(appointment.activityEndAt) }}
+                </span>
               </dd>
             </div>
             <div class="grid grid-cols-[7rem_1fr] gap-3 py-3">

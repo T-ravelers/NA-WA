@@ -19,23 +19,26 @@ const { appointment } = defineProps<Props>()
 const router = useRouter()
 const { t, locale } = useI18n()
 
-const scheduleLabel = computed(() => {
+/**
+ * 일정은 날짜 한 줄과 시각 범위 한 줄로 나눠 적는다. 상세 화면과 같은 규칙이다.
+ *
+ * 활동 시작·종료는 서버가 `visitDate` 하루 위에서만 조립하므로(생성 검증도 시작 <
+ * 종료를 요구한다) 날짜는 언제나 하나다. 그것을 양쪽에 다 적으면 같은 값이 한 줄에서
+ * 반복돼 정작 다른 값인 시각이 묻힌다.
+ */
+const schedule = computed(() => {
   const start = parseServerDateTime(appointment.activityStartAt)
   const end = parseServerDateTime(appointment.activityEndAt)
 
-  if (!start || !end) return t('appointment.list.scheduleUnavailable')
+  if (!start || !end) return null
 
-  const dateOptions = { month: 'numeric' as const, day: 'numeric' as const }
-  const timeOptions = { hour: 'numeric' as const, minute: '2-digit' as const }
-  const startDate = formatServerDateTime(start, locale.value, dateOptions)
-  const endDate = formatServerDateTime(end, locale.value, dateOptions)
+  const date = formatServerDateTime(start, locale.value, { dateStyle: 'medium' })
+  const timeOptions = { timeStyle: 'short' as const }
   const startTime = formatServerDateTime(start, locale.value, timeOptions)
   const endTime = formatServerDateTime(end, locale.value, timeOptions)
-  if (!startDate || !endDate || !startTime || !endTime) {
-    return t('appointment.list.scheduleUnavailable')
-  }
+  if (!date || !startTime || !endTime) return null
 
-  return `${startDate} ${startTime} – ${endDate} ${endTime}`
+  return { date, time: `${startTime} – ${endTime}` }
 })
 
 const memberLabel = computed(() =>
@@ -64,7 +67,19 @@ function formatDeposit(value: string): string {
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <h3 class="truncate text-title text-ink">{{ appointment.appointmentName }}</h3>
-          <p class="mt-1 text-body-sm text-ink-2">{{ scheduleLabel }}</p>
+          <p
+            v-if="schedule"
+            class="mt-1 text-body-sm text-ink-2"
+          >
+            <span class="block">{{ schedule.date }}</span>
+            <span class="block">{{ schedule.time }}</span>
+          </p>
+          <p
+            v-else
+            class="mt-1 text-body-sm text-ink-2"
+          >
+            {{ t('appointment.list.scheduleUnavailable') }}
+          </p>
         </div>
         <AppBadge
           :tone="appointmentStatusTone(appointment.appointmentStatus)"
