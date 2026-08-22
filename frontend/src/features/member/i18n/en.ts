@@ -56,9 +56,7 @@ export default {
       onboardingLead: 'Tell us your name and where you are from. You can change both later.',
       name: 'Name',
       namePlaceholder: 'The name other travelers will see',
-      photo: 'Photo address',
-      photoOptional: 'Optional. Paste a link to a picture of you.',
-      photoHint: 'Your photo shows up next to your name in appointments.',
+      photoHint: 'Your photo comes from the account you signed in with.',
       nationality: 'Nationality',
       nationalityPlaceholder: 'Choose a country',
       save: 'Save',
@@ -67,7 +65,6 @@ export default {
       error: {
         nameRequired: 'Enter a name.',
         nameTooLong: 'Use {max} characters or fewer.',
-        imageScheme: 'The address has to start with http:// or https://.',
         countryRequired: 'Choose a country.',
         /** 서버가 알려 준 코드가 없거나 문구가 없는 코드일 때의 일반 안내. */
         saveFailed: 'We could not save your profile. Please try again.',

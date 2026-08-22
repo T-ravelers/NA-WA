@@ -15,11 +15,15 @@ import { nationalityOptions } from '../model/nationalities'
  * 이름·국적이 모두 있어야 하고(`MEMBER-008`), 편집은 바꾸고 싶은 것만 바꾼다. 그래서 모양이
  * 아니라 `mode` 하나로 가른다 — 폼을 두 벌 만들면 입력 규칙이 갈라진다.
  *
- * 사진은 주소를 직접 받는다. 업로드 경로는 이 서비스에 없다(영수증만 S3에 올린다).
+ * **사진은 여기서 바꾸지 않는다.** 소셜 로그인이 가입 시점에 Google·LINE의 사진을 넣어 주고
+ * (`OAuthMemberTransactionImpl`), 직접 올리려면 첨부가 필요한데 S3 업로드 경로가 영수증
+ * 전용이다(`ReceiptStorageService`의 `receipts/` 접두사, IAM 정책도 그 접두사로 좁혀져 있다).
+ * 모바일에서 이미지 주소를 붙여넣는 칸은 소셜 기본값도 첨부도 아닌 중간물이라 두지 않는다.
  */
 interface Props {
   mode: 'edit' | 'onboarding'
   displayName: string
+  /** 소셜에서 온 사진. 보여 주기만 하고 이 폼은 바꾸지 않는다. */
   profileImageUrl: string | null
   nationalityCode: string | null
   /** 서버가 돌려준 실패 문구. 폼 자체 검사와 자리를 나눠 쓴다. */
@@ -37,22 +41,20 @@ const {
 } = defineProps<Props>()
 
 const emit = defineEmits<{
-  submit: [value: { displayName: string; profileImageUrl: string; nationalityCode: string }]
+  submit: [value: { displayName: string; nationalityCode: string }]
   cancel: []
 }>()
 
 const { t, locale } = useI18n()
 
 const name = ref(displayName)
-const imageUrl = ref(profileImageUrl ?? '')
 const country = ref(nationalityCode ?? '')
 
 // 프로필이 늦게 도착하면 폼이 이미 비어 있는 값으로 그려져 있다.
 watch(
-  () => [displayName, profileImageUrl, nationalityCode] as const,
-  ([nextName, nextImage, nextCountry]) => {
+  () => [displayName, nationalityCode] as const,
+  ([nextName, nextCountry]) => {
     name.value = nextName
-    imageUrl.value = nextImage ?? ''
     country.value = nextCountry ?? ''
   },
 )
@@ -60,7 +62,7 @@ watch(
 const countries = computed(() => nationalityOptions(locale.value))
 
 /** 사용자가 아직 그 칸을 만지지 않았으면 오류를 띄우지 않는다. */
-const touched = ref({ name: false, imageUrl: false, country: false })
+const touched = ref({ name: false, country: false })
 
 /**
  * 이름 길이는 백엔드와 같은 code point로 센다.
@@ -84,17 +86,6 @@ const nameError = computed(() => {
     : undefined
 })
 
-/** 이 값은 다른 회원 화면의 `img src`가 된다. 백엔드와 같게 http·https만 받는다. */
-const imageUrlError = computed(() => {
-  const value = imageUrl.value.trim()
-
-  if (value === '' || !touched.value.imageUrl) {
-    return undefined
-  }
-
-  return /^https?:\/\//i.test(value) ? undefined : t('member.form.error.imageScheme')
-})
-
 const countryError = computed(() =>
   country.value === '' && (mode === 'onboarding' || touched.value.country)
     ? t('member.form.error.countryRequired')
@@ -106,22 +97,17 @@ const canSubmit = computed(
     !submitting &&
     name.value.trim() !== '' &&
     country.value !== '' &&
-    nameError.value === undefined &&
-    imageUrlError.value === undefined,
+    nameError.value === undefined,
 )
 
 function handleSubmit(): void {
-  touched.value = { name: true, imageUrl: true, country: true }
+  touched.value = { name: true, country: true }
 
   if (!canSubmit.value) {
     return
   }
 
-  emit('submit', {
-    displayName: name.value.trim(),
-    profileImageUrl: imageUrl.value.trim(),
-    nationalityCode: country.value,
-  })
+  emit('submit', { displayName: name.value.trim(), nationalityCode: country.value })
 }
 </script>
 
@@ -134,8 +120,8 @@ function handleSubmit(): void {
     <div class="flex items-center gap-3.5">
       <span class="size-14 shrink-0 overflow-hidden rounded-pill">
         <img
-          v-if="imageUrl !== '' && imageUrlError === undefined"
-          :src="imageUrl"
+          v-if="profileImageUrl !== null"
+          :src="profileImageUrl"
           alt=""
           class="size-full object-cover"
         />
@@ -150,15 +136,6 @@ function handleSubmit(): void {
       :placeholder="t('member.form.namePlaceholder')"
       :error="nameError"
       @update:model-value="touched.name = true"
-    />
-
-    <TextInput
-      v-model="imageUrl"
-      :label="t('member.form.photo')"
-      placeholder="https://"
-      :error="imageUrlError"
-      :helper="t('member.form.photoOptional')"
-      @update:model-value="touched.imageUrl = true"
     />
 
     <div class="flex flex-col gap-1.5">
