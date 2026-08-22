@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { IconSettings } from '@tabler/icons-vue'
+import { IconSettings, IconUserPlus } from '@tabler/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -180,6 +180,20 @@ function closeRemoveDialog(): void {
 
     <template v-else-if="detailQuery.data.value !== undefined">
       <JourneySummary :journey="detailQuery.data.value">
+        <RouterLink
+          :to="{
+            name: 'journey-invite',
+            params: { tripId: detailQuery.data.value.tripId },
+          }"
+          :aria-label="t('journey.invite.open')"
+          class="flex size-11 shrink-0 items-center justify-center rounded-pill bg-surface-1 text-ink"
+        >
+          <IconUserPlus
+            :size="20"
+            :stroke-width="1.75"
+            aria-hidden="true"
+          />
+        </RouterLink>
         <RouterLink
           :to="{
             name: 'journey-settings',
