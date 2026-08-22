@@ -3,9 +3,11 @@ import { computed, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import AppTicket from '@/shared/ui/AppTicket.vue'
 import StateError from '@/shared/ui/StateError.vue'
 
 import SettlementStatusScreen from '../components/SettlementStatusScreen.vue'
+import { useSettlementPoints } from '../composables/useSettlementPoints'
 import { resolveSettlementError } from '../model/settlementErrors'
 import { resolveSide } from '../model/settlementList'
 import { useSettlementDetail } from '../model/settlementQueries'
@@ -24,6 +26,7 @@ import { useSettlementDetail } from '../model/settlementQueries'
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
+const points = useSettlementPoints()
 const settlementId = computed(() => String(route.params.settlementId))
 const detailQuery = useSettlementDetail(() => settlementId.value)
 const errorKey = computed(() => resolveSettlementError(detailQuery.error.value).messageKey)
@@ -66,5 +69,51 @@ watchEffect(() => {
     :description="t('settlement.pay.completeDescription')"
     :action-label="t('settlement.pay.backToDetail')"
     @action="goToDetail"
-  />
+  >
+    <!--
+      끝난 거래를 적어 두는 영수증. 시안은 절취선 위에 거래 번호와 받은 사람을, 아래에
+      보낸 금액을 둔다. 조형은 `AppTicket` 하나가 소유하므로 여기서 다시 만들지 않는다.
+
+      보낸 사람 줄은 두지 않는다. 이 화면이 아는 것은 정산 상세뿐이고 내 표시 이름은
+      회원 도메인에 있어서, 이름을 채우려면 feature 경계를 넘어야 한다.
+    -->
+    <template #summary>
+      <AppTicket
+        class="mt-8 text-left"
+        tone="paper"
+        :body-size="detailQuery.data.value?.transactionId === undefined ? 56 : 88"
+        :notch-size="16"
+      >
+        <template #body>
+          <div class="space-y-3 px-5 py-4 text-body-sm">
+            <div
+              v-if="detailQuery.data.value?.transactionId !== undefined"
+              class="flex justify-between gap-3"
+            >
+              <span class="text-on-paper/70">{{ t('settlement.detail.transactionId') }}</span>
+              <span class="min-w-0 truncate font-semibold">{{
+                detailQuery.data.value.transactionId
+              }}</span>
+            </div>
+            <div class="flex justify-between gap-3">
+              <span class="text-on-paper/70">{{ t('settlement.detail.sendTo') }}</span>
+              <span class="min-w-0 truncate font-semibold">{{
+                detailQuery.data.value?.requestedBy
+              }}</span>
+            </div>
+          </div>
+        </template>
+        <template #stub>
+          <div class="flex items-center justify-between gap-3 px-5 py-4">
+            <span class="text-body-sm text-on-paper/70">{{
+              t('settlement.detail.sendAmount')
+            }}</span>
+            <strong class="text-data-lg">{{
+              points(detailQuery.data.value?.viewer.shareAmount ?? '0')
+            }}</strong>
+          </div>
+        </template>
+      </AppTicket>
+    </template>
+  </SettlementStatusScreen>
 </template>

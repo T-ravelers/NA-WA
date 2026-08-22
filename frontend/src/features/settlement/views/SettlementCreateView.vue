@@ -513,7 +513,10 @@ defineExpose({ back })
         :description="t('settlement.create.noPaymentsDescription')"
       />
       <template v-else-if="selectedJourney === null">
-        <h2 class="mt-8 text-section-header">{{ t('settlement.create.journeys') }}</h2>
+        <h2 class="mt-8 text-section-header">{{ t('settlement.create.stepPayment') }}</h2>
+        <h3 class="mt-6 text-caption uppercase tracking-wider text-ink-3">
+          {{ t('settlement.create.journeys') }}
+        </h3>
         <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.selectJourney') }}</p>
         <ul class="mt-5 space-y-3">
           <li
@@ -579,7 +582,10 @@ defineExpose({ back })
         </dl>
 
         <template v-if="selectedAppointment === null">
-          <h2 class="mt-8 text-section-header">{{ t('settlement.create.appointments') }}</h2>
+          <h2 class="mt-8 text-section-header">{{ t('settlement.create.stepPayment') }}</h2>
+          <h3 class="mt-6 text-caption uppercase tracking-wider text-ink-3">
+            {{ t('settlement.create.appointments') }}
+          </h3>
           <p class="mt-2 text-body-sm text-ink-2">
             {{ t('settlement.create.selectAppointment') }}
           </p>
@@ -608,7 +614,10 @@ defineExpose({ back })
         </template>
 
         <template v-else>
-          <h2 class="mt-8 text-section-header">{{ t('settlement.create.transactions') }}</h2>
+          <h2 class="mt-8 text-section-header">{{ t('settlement.create.stepPayment') }}</h2>
+          <h3 class="mt-6 text-caption uppercase tracking-wider text-ink-3">
+            {{ t('settlement.create.transactions') }}
+          </h3>
           <p class="mt-2 text-body-sm text-ink-2">
             {{ t('settlement.create.selectTransaction') }}
           </p>
@@ -642,7 +651,6 @@ defineExpose({ back })
         data-action="next"
         class="mt-auto"
         block
-        variant="settle"
         :disabled="selectedCandidate === null"
         @click="goToDetails"
         >{{ t('settlement.continue') }}</AppButton
@@ -653,9 +661,12 @@ defineExpose({ back })
       v-else-if="step === 2"
       class="flex flex-1 flex-col"
     >
-      <h2 class="mt-8 text-section-header">{{ t('settlement.create.method') }}</h2>
+      <h2 class="mt-8 text-section-header">{{ t('settlement.create.stepDetails') }}</h2>
+      <h3 class="mt-6 text-caption uppercase tracking-wider text-ink-3">
+        {{ t('settlement.create.method') }}
+      </h3>
       <div
-        class="mt-5 grid grid-cols-2 gap-2"
+        class="mt-3 grid grid-cols-2 gap-2"
         role="radiogroup"
         :aria-label="t('settlement.create.method')"
       >
@@ -667,7 +678,7 @@ defineExpose({ back })
           :data-type="option"
           :aria-checked="type === option"
           class="min-h-11 rounded-pill px-3 text-body-sm"
-          :class="type === option ? 'bg-settlement text-on-paper' : 'bg-surface-1 text-ink-2'"
+          :class="type === option ? 'bg-info text-on-paper' : 'bg-surface-1 text-ink-2'"
           @click="setType(option)"
         >
           {{ t(`settlement.type.${option}`) }}
@@ -699,7 +710,9 @@ defineExpose({ back })
         {{ t('settlement.receipt.hint') }}
       </p>
 
-      <h3 class="mt-8 text-title">{{ t('settlement.create.participants') }}</h3>
+      <h3 class="mt-8 text-caption uppercase tracking-wider text-ink-3">
+        {{ t('settlement.create.participants') }}
+      </h3>
       <p class="mt-2 text-body-sm text-ink-2">{{ t('settlement.create.participantsHint') }}</p>
       <p class="mt-1 text-caption text-ink-3">{{ t('settlement.create.payerRequired') }}</p>
       <div class="mt-3 grid grid-cols-2 gap-2">
@@ -709,11 +722,11 @@ defineExpose({ back })
           type="button"
           :data-participant-id="participant.id"
           :aria-pressed="selectedIds.has(participant.id)"
-          class="min-h-12 rounded-sm border px-3 text-left"
+          class="min-h-12 rounded-sm px-3 text-left"
           :class="
             selectedIds.has(participant.id)
-              ? 'border-settlement bg-settlement/10 text-settlement'
-              : 'border-hairline-strong text-ink-2'
+              ? 'bg-paper-fill text-on-paper'
+              : 'bg-surface-1 text-ink-2'
           "
           @click="toggleParticipant(participant.id)"
         >
@@ -728,7 +741,9 @@ defineExpose({ back })
 
       <template v-if="type === 'ITEMIZED'">
         <div class="mt-8 flex items-center justify-between gap-3">
-          <h3 class="text-title">{{ t('settlement.create.items') }}</h3>
+          <h3 class="text-caption uppercase tracking-wider text-ink-3">
+            {{ t('settlement.create.items') }}
+          </h3>
           <div class="flex items-center gap-2">
             <AppButton
               v-if="receipt.receiptId.value !== null"
@@ -900,7 +915,6 @@ defineExpose({ back })
         <AppButton
           data-action="next"
           block
-          variant="settle"
           @click="goToReview"
           >{{ t('settlement.continue') }}</AppButton
         >
@@ -949,7 +963,9 @@ defineExpose({ back })
       </AppCard>
 
       <template v-if="itemizedShares !== null">
-        <h3 class="mt-6 text-title">{{ t('settlement.create.sharesTitle') }}</h3>
+        <h3 class="mt-6 text-caption uppercase tracking-wider text-ink-3">
+          {{ t('settlement.create.sharesTitle') }}
+        </h3>
         <AppCard class="mt-3">
           <dl class="space-y-3 text-body-sm">
             <div
@@ -1013,7 +1029,6 @@ defineExpose({ back })
         <AppButton
           data-action="create"
           block
-          variant="settle"
           @click="create"
           >{{
             itemizedShares === null
@@ -1042,7 +1057,6 @@ defineExpose({ back })
         <AppButton
           data-action="overwrite-items-confirm"
           block
-          variant="settle"
           @click="confirmOverwrite"
           >{{ t('settlement.create.overwriteItemsConfirm') }}</AppButton
         >

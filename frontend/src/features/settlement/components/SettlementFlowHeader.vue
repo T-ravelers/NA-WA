@@ -5,11 +5,16 @@ interface Props {
   current: number
   title: string
   backLabel?: string
-  /** 입력 단계 수. 처리 중·완료는 되돌아갈 수 없어 여기에 포함하지 않는다. */
+  /**
+   * 눈금 수.
+   *
+   * 시안은 입력 3단계와 전송 완료까지 네 칸으로 그린다. 완료 화면은 되돌아갈 수 없어
+   * 이 헤더를 쓰지 않지만, 눈금은 같은 네 칸을 이어받아 마지막 칸을 채운다.
+   */
   total?: number
 }
 
-const { current, title, backLabel = 'Back', total = 3 } = defineProps<Props>()
+const { current, title, backLabel = 'Back', total = 4 } = defineProps<Props>()
 const emit = defineEmits<{ back: [] }>()
 </script>
 
