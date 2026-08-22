@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { IconArrowLeft, IconChevronRight, IconShare } from '@tabler/icons-vue'
-import { computed } from 'vue'
+import { IconArrowLeft, IconChevronRight, IconShare, IconSparkles } from '@tabler/icons-vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -12,17 +12,20 @@ import {
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
+import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
 import { showToast } from '@/shared/ui/toast'
 
+import type { ReportComparisonScope } from '../api/reportApi'
 import ReportCategoryBreakdown from '../components/presentation/ReportCategoryBreakdown.vue'
 import ReportComparisonBars from '../components/presentation/ReportComparisonBars.vue'
 import ReportDailyTrend from '../components/presentation/ReportDailyTrend.vue'
 import ReportRadarChart from '../components/presentation/ReportRadarChart.vue'
 import ReportRankTiles from '../components/presentation/ReportRankTiles.vue'
-import { formatMoney, formatPercent } from '../components/presentation/format'
+import { seriesInkClass } from '../components/presentation/seriesPalette'
+import { formatMoney, formatPercent, formatSignedPercent } from '../components/presentation/format'
 import ReportKpiCard from '../components/presentation/ReportKpiCard.vue'
 import ReportPersonaTicket from '../components/presentation/ReportPersonaTicket.vue'
 import type {
@@ -140,33 +143,74 @@ const reportTrend = computed<ReportDailyTrendPoint[]>(() =>
 /* ── 동료 비교 (#404) ──
  * 스냅샷이 있고 지출이 0이 아닐 때만 부른다. 비교는 여정 기간의 결제를 다시 합산한 값이라
  * 위 ANALYSIS(스냅샷)와 숫자가 다를 수 있다 — 백엔드 문서의 basis 설명. */
-const comparisonQuery = useReportComparisonQuery(
-  reportId,
-  'GROUP',
-  computed(
-    () =>
-      report.value?.analytics !== null &&
-      report.value?.analytics !== undefined &&
-      !isZeroSpending.value,
-  ),
+const comparisonEnabled = computed(
+  () =>
+    report.value?.analytics !== null &&
+    report.value?.analytics !== undefined &&
+    !isZeroSpending.value,
 )
-const comparison = computed(() => comparisonQuery.data.value ?? null)
-const hasPeers = computed(() => (comparison.value?.peers.length ?? 0) > 0)
+const groupQuery = useReportComparisonQuery(reportId, 'GROUP', comparisonEnabled)
+// 같은 국적 여행자(SNAPSHOT, #421). 인사이트 문장도 이 코호트를 쓰므로 탭과 상관없이 같이 받는다.
+const similarQuery = useReportComparisonQuery(reportId, 'SIMILAR', comparisonEnabled)
+
+const comparisonScope = ref<ReportComparisonScope>('GROUP')
+const isSimilarScope = computed(() => comparisonScope.value === 'SIMILAR')
+const comparisonQuery = computed(() => (isSimilarScope.value ? similarQuery : groupQuery))
+const comparisonPending = computed(() => comparisonQuery.value.isPending.value)
+const comparisonFailed = computed(() => comparisonQuery.value.isError.value)
+const comparison = computed(() => comparisonQuery.value.data.value ?? null)
 /** `LIVE`는 여정 기간의 결제를 지금 다시 합산한 값이라 위 ANALYSIS(스냅샷)와 다를 수 있다. */
 const isLiveComparison = computed(() => comparison.value?.basis === 'LIVE')
+const comparisonScopeOptions = computed(() => [
+  { value: 'GROUP', label: t('report.detail.comparison.scopeGroup') },
+  { value: 'SIMILAR', label: t('report.detail.comparison.scopeSimilar') },
+])
+
+/** 같은 국적 코호트. 국적이 없거나 같은 국적의 리포트가 없으면 `size 0`으로 온다. */
+const similarCohort = computed(() => {
+  const cohort = similarQuery.data.value?.cohort
+
+  return cohort !== undefined && cohort.size > 0 ? cohort : null
+})
+/** 견줄 상대가 있는가 — GROUP은 동료, SIMILAR는 코호트. */
+const hasPeers = computed(() =>
+  isSimilarScope.value ? similarCohort.value !== null : (comparison.value?.peers.length ?? 0) > 0,
+)
+
+function setComparisonScope(value: string): void {
+  comparisonScope.value = value === 'SIMILAR' ? 'SIMILAR' : 'GROUP'
+}
 
 const comparisonMe = computed<ReportComparisonBarRow>(() => ({
   id: comparison.value?.me.memberId ?? 0,
   label: t('report.detail.comparison.you'),
   amount: Number(comparison.value?.me.totalSpent ?? 0),
 }))
-const comparisonPeers = computed<ReportComparisonBarRow[]>(() =>
-  (comparison.value?.peers ?? []).map((peer) => ({
+/** 막대의 상대. GROUP은 동료들(칩으로 고른다), SIMILAR는 코호트 평균 하나. */
+const comparisonPeers = computed<ReportComparisonBarRow[]>(() => {
+  const current = comparison.value
+
+  if (current === null) {
+    return []
+  }
+
+  if (isSimilarScope.value) {
+    // 막대 라벨 칸은 48px라 `Travelers avg`가 잘린다. 타일과 같은 `AVG`로 적고 풀네임은 레이더 범례가 맡는다.
+    return [
+      {
+        id: 0,
+        label: t('report.detail.comparison.average'),
+        amount: Number(current.cohort.avgTotalSpent),
+      },
+    ]
+  }
+
+  return current.peers.map((peer) => ({
     id: peer.memberId,
     label: peer.displayName,
     amount: Number(peer.totalSpent),
-  })),
-)
+  }))
+})
 
 /** 레이더 축 — 나와 코호트 중 한쪽이라도 쓴 카테고리, 내 비중 순. 3개가 안 되면 나머지 카테고리로 채운다. */
 const comparisonAxes = computed<ReportRadarAxis[]>(() => {
@@ -206,17 +250,39 @@ function rankText(rank: number): string {
   return t('report.detail.comparison.rankNth', { rank })
 }
 
-const comparisonTiles = computed<ReportRankTile[]>(() =>
-  (comparison.value?.ranks ?? []).slice(0, 4).map((row) => ({
+/**
+ * SIMILAR 타일과 인사이트가 「평균과 비슷하다」고 보는 폭(%p). 시안 VS.SIMILAR의 `AVG` 타일이
+ * 이것이다. 내 비중 − 코호트 비중이 이 안이면 `AVG`, 밖이면 `+12%`처럼 부호를 붙인다.
+ */
+const AVG_BAND_POINTS = 5
+
+function shareDiffText(points: number): string {
+  return Math.abs(points) <= AVG_BAND_POINTS
+    ? t('report.detail.comparison.average')
+    : formatSignedPercent(points, i18n.locale.value)
+}
+
+/** 타일 — GROUP은 카테고리별 순위, SIMILAR는 레이더 축 순서대로 코호트 대비 비중 차이. */
+const comparisonTiles = computed<ReportRankTile[]>(() => {
+  if (isSimilarScope.value) {
+    return comparisonAxes.value.slice(0, 4).map((axis) => ({
+      key: axis.key,
+      label: axis.label,
+      rankText: shareDiffText(axis.mine - axis.cohort),
+      tone: spendingCategoryTone(axis.key) ?? 'surface',
+    }))
+  }
+
+  return (comparison.value?.ranks ?? []).slice(0, 4).map((row) => ({
     key: row.category,
     label: t(spendingCategoryLabelKey(row.category)),
     rankText: rankText(row.rank),
     tone: spendingCategoryTone(row.category) ?? 'surface',
-  })),
-)
+  }))
+})
 
 function retryComparison(): void {
-  void comparisonQuery.refetch()
+  void comparisonQuery.value.refetch()
 }
 
 /**
@@ -317,6 +383,48 @@ function shareTicket(): void {
     )
   }
 }
+
+/* ── 인사이트 한 줄 (#421) ──
+ * 칭호의 1위 카테고리 비중을 같은 국적 여행자 평균과 견준다. 코호트가 없거나 아직 못 받았으면
+ * 비교 없이 비중만 말한다 — 비교 부분이 늦게 붙더라도 문장은 처음부터 있다.
+ * 카테고리 단어는 그 카테고리 색으로 강조하므로 문장은 `<i18n-t>`로 조립한다. */
+type InsightVariant = 'above' | 'same' | 'below' | 'alone'
+
+const reportInsight = computed<{
+  variant: InsightVariant
+  label: string
+  share: string
+  cohortShare: string
+  inkClass: string
+} | null>(() => {
+  const top = reportCategories.value[0]
+  const persona = reportPersona.value
+
+  if (top === undefined || persona === null) {
+    return null
+  }
+
+  const locale = i18n.locale.value
+  const base = {
+    label: top.label.toLocaleLowerCase(locale),
+    share: persona.share,
+    inkClass: seriesInkClass(top.category),
+  }
+  const cohort = similarCohort.value
+
+  if (cohort === null) {
+    return { ...base, variant: 'alone', cohortShare: '' }
+  }
+
+  const cohortShare = Number(
+    cohort.categoryBreakdown.find((row) => row.category === top.category)?.percentage ?? 0,
+  )
+  const diff = top.percentage - cohortShare
+  const variant: InsightVariant =
+    diff > AVG_BAND_POINTS ? 'above' : diff < -AVG_BAND_POINTS ? 'below' : 'same'
+
+  return { ...base, variant, cohortShare: formatPercent(cohortShare, locale) }
+})
 
 function goBack(): void {
   void router.push({ name: 'report-list' })
@@ -435,6 +543,33 @@ function retry(): void {
           @share="shareTicket"
         />
 
+        <AppCard v-if="reportInsight !== null">
+          <p class="flex items-start gap-2 text-body-sm text-ink-2">
+            <IconSparkles
+              :size="18"
+              :stroke-width="1.8"
+              aria-hidden="true"
+              class="mt-0.5 shrink-0"
+              :class="reportInsight.inkClass"
+            />
+            <i18n-t
+              :keypath="`report.detail.insight.${reportInsight.variant}`"
+              tag="span"
+              scope="global"
+            >
+              <template #category>
+                <span
+                  class="font-semibold"
+                  :class="reportInsight.inkClass"
+                  >{{ reportInsight.label }}</span
+                >
+              </template>
+              <template #share>{{ reportInsight.share }}</template>
+              <template #cohortShare>{{ reportInsight.cohortShare }}</template>
+            </i18n-t>
+          </p>
+        </AppCard>
+
         <ReportKpiCard
           :heading="t('report.detail.analysis')"
           :data="reportKpi"
@@ -478,16 +613,29 @@ function retry(): void {
             id="report-comparison-title"
             class="font-display text-section-header uppercase text-ink"
           >
-            {{ t('report.detail.comparison.heading') }}
+            {{
+              t(
+                isSimilarScope
+                  ? 'report.detail.comparison.similarHeading'
+                  : 'report.detail.comparison.heading',
+              )
+            }}
           </h2>
 
+          <SegmentedControl
+            :model-value="comparisonScope"
+            :label="t('report.detail.comparison.scopeLabel')"
+            :options="comparisonScopeOptions"
+            @update:model-value="setComparisonScope"
+          />
+
           <StateLoading
-            v-if="comparisonQuery.isPending.value"
+            v-if="comparisonPending"
             :label="t('report.detail.comparison.loading')"
           />
 
           <StateError
-            v-else-if="comparisonQuery.isError.value"
+            v-else-if="comparisonFailed"
             :title="t('report.detail.comparison.loadFailed')"
             :description="t('report.detail.comparison.loadFailedDescription')"
             :action-label="t('action.retry')"
@@ -495,9 +643,23 @@ function retry(): void {
           />
 
           <AppCard v-else-if="!hasPeers">
-            <h3 class="text-title text-ink">{{ t('report.detail.comparison.emptyTitle') }}</h3>
+            <h3 class="text-title text-ink">
+              {{
+                t(
+                  isSimilarScope
+                    ? 'report.detail.comparison.similarEmptyTitle'
+                    : 'report.detail.comparison.emptyTitle',
+                )
+              }}
+            </h3>
             <p class="mt-2 text-body-sm text-ink-3">
-              {{ t('report.detail.comparison.emptyDescription') }}
+              {{
+                t(
+                  isSimilarScope
+                    ? 'report.detail.comparison.similarEmptyDescription'
+                    : 'report.detail.comparison.emptyDescription',
+                )
+              }}
             </p>
           </AppCard>
 
@@ -510,6 +672,7 @@ function retry(): void {
                     :chips-label="t('report.detail.comparison.members')"
                     :me="comparisonMe"
                     :peers="comparisonPeers"
+                    :chips="!isSimilarScope"
                     :locale="i18n.locale.value"
                   />
                   <p
@@ -526,8 +689,20 @@ function retry(): void {
                   <ReportRadarChart
                     :axes="comparisonAxes"
                     :mine-label="t('report.detail.comparison.you')"
-                    :cohort-label="t('report.detail.comparison.groupAvg')"
-                    :description="t('report.detail.comparison.radarDescription')"
+                    :cohort-label="
+                      t(
+                        isSimilarScope
+                          ? 'report.detail.comparison.travelersAvg'
+                          : 'report.detail.comparison.groupAvg',
+                      )
+                    "
+                    :description="
+                      t(
+                        isSimilarScope
+                          ? 'report.detail.comparison.similarRadarDescription'
+                          : 'report.detail.comparison.radarDescription',
+                      )
+                    "
                   />
                 </div>
               </div>

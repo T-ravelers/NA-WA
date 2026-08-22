@@ -132,6 +132,25 @@ export default {
         loadFailed: 'We could not load the comparison.',
         loadFailedDescription: 'The rest of this report is unaffected. Please try again.',
         loading: 'Loading the comparison',
+        similarHeading: 'Vs. similar travelers',
+        scopeLabel: 'Comparison group',
+        scopeGroup: 'Group',
+        scopeSimilar: 'Similar',
+        travelersAvg: 'Travelers avg',
+        average: 'AVG',
+        similarRadarDescription:
+          'Your spending share per category compared with the average of travelers like you.',
+        similarEmptyTitle: 'No similar travelers yet',
+        similarEmptyDescription:
+          'Travelers with the same nationality and a final report show up here.',
+      },
+      insight: {
+        above:
+          'You leaned into {category} — {share} of this journey, well above travelers like you ({cohortShare}).',
+        same: 'You leaned into {category} — {share} of this journey, about the same as travelers like you ({cohortShare}).',
+        below:
+          'You leaned into {category} — {share} of this journey, below travelers like you ({cohortShare}).',
+        alone: 'You leaned into {category} — {share} of this journey.',
       },
       status: 'Report status: {status}',
     },

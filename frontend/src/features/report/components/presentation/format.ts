@@ -18,3 +18,12 @@ export function formatPercent(percentage: number, locale = 'en'): string {
     maximumFractionDigits: 0,
   }).format(percentage / 100)
 }
+
+/** 비중 차이(%p)를 부호와 함께 적는다. 예: `+12%`, `-8%`. 입력은 0–100 스케일이다. */
+export function formatSignedPercent(points: number, locale = 'en'): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'percent',
+    signDisplay: 'exceptZero',
+    maximumFractionDigits: 0,
+  }).format(points / 100)
+}
