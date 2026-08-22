@@ -16,19 +16,17 @@ import type { AppointmentMember } from '../api/appointmentApi'
  *
  * 나가기 버튼은 지금 나갈 수 있는지와 무관하게 언제나 눌린다. 막히는 이유는 누른
  * 뒤 모달이 말한다 — 이유를 이름 옆에 상시로 적어 두면 목록이 안내문으로 찬다.
- * 예외는 방장이다: 방장은 어떤 상태에서도 자기 참여를 취소할 수 없어
- * (APPOINTMENT-007) 버튼을 줘도 영영 열리지 않으므로 다른 회원과 같은 Visit으로
- * 남긴다.
+ *
+ * 방장 본인 행만 버튼 칸이 빈다. 방장은 어떤 상태에서도 자기 참여를 취소할 수 없고
+ * (APPOINTMENT-007) 자기 프로필을 방문할 일도 없어, 둘 다 놓을 것이 없다.
  */
 interface Props {
   members: AppointmentMember[]
   /** 로그인 회원의 참여 id. 목록에서 자기 자신을 알아볼 수 있게 표시한다. */
   currentAppointmentMemberId?: number | null
-  /** 내 행의 Visit을 나가기 버튼으로 바꾼다. 방장에게는 주지 않는다. */
-  showLeave?: boolean
 }
 
-const { members, currentAppointmentMemberId = null, showLeave = false } = defineProps<Props>()
+const { members, currentAppointmentMemberId = null } = defineProps<Props>()
 
 const emit = defineEmits<{
   select: [member: AppointmentMember]
@@ -50,7 +48,12 @@ function isCurrentMember(member: AppointmentMember): boolean {
 }
 
 function showsLeave(member: AppointmentMember): boolean {
-  return showLeave && isCurrentMember(member)
+  return isCurrentMember(member) && !member.isHost
+}
+
+/** 방장 본인 행. 나가기도 프로필 방문도 놓을 것이 없어 버튼 칸을 비운다. */
+function showsNoAction(member: AppointmentMember): boolean {
+  return isCurrentMember(member) && member.isHost
 }
 </script>
 
@@ -112,7 +115,7 @@ function showsLeave(member: AppointmentMember): boolean {
             {{ t('appointment.members.leave') }}
           </AppButton>
           <AppButton
-            v-else
+            v-else-if="!showsNoAction(member)"
             compact
             dense
             variant="primary"

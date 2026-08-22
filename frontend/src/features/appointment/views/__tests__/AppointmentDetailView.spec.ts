@@ -797,7 +797,8 @@ describe('AppointmentDetailView', () => {
     const { wrapper, router } = await mountView()
 
     expect(wrapper.text()).not.toContain('View all')
-    expect(wrapper.findAll('button').filter((button) => button.text() === 'Visit')).toHaveLength(2)
+    // 기본 participation은 방장이다. 방장 본인 행은 버튼이 없고 나머지 한 명만 Visit이다.
+    expect(wrapper.findAll('button').filter((button) => button.text() === 'Visit')).toHaveLength(1)
 
     await wrapper
       .findAll('button')
@@ -935,13 +936,14 @@ describe('AppointmentDetailView', () => {
     expect(attendance?.text()).toContain('We could not check your participation status.')
   })
 
-  it('leaves the host row on Visit instead of a leave button', async () => {
-    // 방장은 어떤 상태에서도 자기 참여를 취소할 수 없어(APPOINTMENT-007) 비활성으로
-    // 둬도 영영 켜지지 않는다. 다른 회원과 같은 Visit 버튼으로 남긴다.
+  it('gives the host no action on their own row', async () => {
+    // 방장은 어떤 상태에서도 자기 참여를 취소할 수 없고(APPOINTMENT-007) 자기
+    // 프로필을 방문할 일도 없다. 놓을 버튼이 없어 그 칸은 비운다.
     const { wrapper } = await mountView()
 
     expect(leaveButton(wrapper)).toBeUndefined()
-    expect(wrapper.findAll('li button').every((button) => button.text() === 'Visit')).toBe(true)
+    const hostRow = wrapper.findAll('li').find((row) => row.text().includes('Mina Park'))
+    expect(hostRow?.findAll('button')).toHaveLength(0)
 
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
 

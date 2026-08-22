@@ -94,7 +94,6 @@ describe('AppointmentMemberList', () => {
       props: {
         members: [host, me],
         currentAppointmentMemberId: 2,
-        showLeave: true,
       },
       global: { plugins: [i18n] },
     })
@@ -110,7 +109,7 @@ describe('AppointmentMemberList', () => {
   // 누른 뒤 화면이 말한다 — 비활성 버튼은 모바일에서 이유를 말할 자리가 없다.
   it('emits leave instead of select whenever the leave button is pressed', async () => {
     const wrapper = mount(AppointmentMemberList, {
-      props: { members: [me], currentAppointmentMemberId: 2, showLeave: true },
+      props: { members: [me], currentAppointmentMemberId: 2 },
       global: { plugins: [i18n] },
     })
 
@@ -126,7 +125,7 @@ describe('AppointmentMemberList', () => {
   // 폭을 고정하지 않으면 라벨 길이를 따라가 로케일마다 두 버튼 크기가 갈린다.
   it('draws the leave and visit buttons at the same size', () => {
     const wrapper = mount(AppointmentMemberList, {
-      props: { members: [host, me], currentAppointmentMemberId: 2, showLeave: true },
+      props: { members: [host, me], currentAppointmentMemberId: 2 },
       global: { plugins: [i18n] },
     })
 
@@ -139,14 +138,27 @@ describe('AppointmentMemberList', () => {
     ).toBe(true)
   })
 
-  // 방장은 자기 참여를 취소할 수 없어(APPOINTMENT-007) showLeave를 받지 않는다.
-  it('keeps every row on Visit when leaving is not offered', () => {
+  // 목록에서 나를 못 찾으면(참여 조회 실패로 id가 없으면) 붙일 행이 없다.
+  it('keeps every row on Visit when the current member is unknown', () => {
+    const wrapper = mount(AppointmentMemberList, {
+      props: { members: [host, me] },
+      global: { plugins: [i18n] },
+    })
+
+    expect(wrapper.findAll('button').every((button) => button.text() === 'Visit')).toBe(true)
+  })
+
+  // 방장은 자기 참여를 취소할 수 없고(APPOINTMENT-007) 자기 프로필을 방문할 일도
+  // 없어, 자기 행에는 놓을 버튼이 없다.
+  it('leaves the host their own row without any action', () => {
     const wrapper = mount(AppointmentMemberList, {
       props: { members: [host, me], currentAppointmentMemberId: 1 },
       global: { plugins: [i18n] },
     })
 
-    expect(wrapper.findAll('button').every((button) => button.text() === 'Visit')).toBe(true)
+    const rows = wrapper.findAll('li')
+    expect(rows[0]?.findAll('button')).toHaveLength(0)
+    expect(rows[1]?.text()).toContain('Visit')
   })
 
   it('emits the selected member when a member card is pressed', async () => {
