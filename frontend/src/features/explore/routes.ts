@@ -1,6 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 
-import { useExploreFilterMemoryStore } from './model/exploreFilterMemory'
+import { resolveExploreFilterEntry } from './model/exploreFilterEntry'
 import { useExploreReturnContextStore } from './model/exploreReturnContext'
 
 const EXPLORE_ROUTE_NAMES = new Set(['explore', 'explore-event-detail', 'explore-place-detail'])
@@ -26,17 +26,14 @@ const routes: RouteRecordRaw[] = [
        *
        * 쪽 번호는 상세를 보고 뒤로 나온 진입에서만 되돌린다. 보던 쪽으로 돌아가는 것과
        * 목록을 처음부터 보는 것은 같은 빈 주소로 들어오므로 어디에서 왔는지로 가른다.
+       *
+       * 이 guard는 route record에 처음 들어올 때만 돈다. 이미 Discover에 있는 채로 하단 탭을
+       * 다시 눌러 query만 바뀌는 이동은 `ExploreView`가 같은 판단을 이어받는다.
        */
-      (to, from) => {
-        const filterMemory = useExploreFilterMemoryStore()
-        const restored = filterMemory.resolveEntry(to.query, {
+      (to, from) =>
+        resolveExploreFilterEntry(to.query, {
           keepPage: EXPLORE_DETAIL_ROUTE_NAMES.has(String(from.name)),
-        })
-        if (restored !== null) return { name: 'explore', query: restored, replace: true }
-
-        filterMemory.remember(to.query)
-        return true
-      },
+        }) ?? true,
       /*
        * Journey 화면에서 날짜를 지정해 넘어온 맥락을 여기서 받는다.
        *

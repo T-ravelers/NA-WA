@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
+import { onBeforeRouteUpdate, useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { IconChevronDown, IconSearch } from '@tabler/icons-vue'
 
 import IconOrb from '@/shared/ui/IconOrb.vue'
@@ -26,6 +26,7 @@ import {
   type EventSearchFilters,
   type EventSort,
 } from '../model/eventExplore'
+import { resolveExploreFilterEntry } from '../model/exploreFilterEntry'
 import { useExploreFilterMemoryStore } from '../model/exploreFilterMemory'
 import {
   SEOUL_REGION1,
@@ -399,8 +400,30 @@ watch(selectedTab, (next, previous) => {
 
   const query =
     next === 'places' ? buildPlaceQuery(placeFilters.value) : buildEventQuery(filters.value)
+  /*
+   * 탭을 옮길 때 그 탭의 기억을 화면이 들고 있는 값으로 덮는다.
+   *
+   * 이 이동은 사용자가 보고 있던 목록을 그대로 옮겨 적는 것이지 새로 진입하는 것이 아니다.
+   * 덮지 않으면 아래 `onBeforeRouteUpdate`가 지난 방문의 필터를 되돌려, 화면에는 없던 조건이
+   * 탭을 누르는 순간 걸린다. 옮겨 적은 뒤 상세를 열었다 뒤로 나와도 같은 목록으로 돌아온다.
+   */
+  filterMemory.remember(query)
   router.push({ query }).catch(() => undefined)
 })
+
+/*
+ * 하단 탭으로 Discover를 다시 눌러 필터가 빠진 주소로 오면 마지막 필터를 되돌린다.
+ *
+ * route의 `beforeEnter`는 record에 처음 들어올 때만 돌아서 이 이동을 잡지 못한다. 화면이 이미
+ * 떠 있고 query만 바뀌는 경우가 여기다. 쪽 번호는 되돌리지 않는다 — 상세에서 뒤로 나오는
+ * 길은 record가 바뀌므로 언제나 `beforeEnter`가 맡고, 여기로는 오지 않는다.
+ *
+ * 화면이 스스로 고친 주소에는 되돌릴 것이 없어야 한다. 필터 watcher·탭 전환·
+ * `sanitizeExploreQuery`가 주소를 쓰기 직전에 같은 값을 기억에도 쓰는 이유가 이것이다.
+ * 그 순서가 깨지면 이 guard가 화면이 방금 지운 값으로 되돌리려 하고, 그 되돌린 주소가 곧
+ * 현재 주소라서 router가 이동 자체를 중복으로 취소한다. 화면이 지운 값이 주소에 남는다.
+ */
+onBeforeRouteUpdate((to) => resolveExploreFilterEntry(to.query, { keepPage: false }) ?? true)
 
 watch(
   () => route.query,
@@ -810,6 +833,8 @@ function sanitizeExploreQuery(tab: ExploreTab): void {
   }
 
   if (before !== JSON.stringify(query)) {
+    // 화면이 걸러낸 값은 기억에서도 지운다. 남겨두면 다음 진입에서 그 값이 되살아난다.
+    filterMemory.remember(query)
     router.replace({ query }).catch(() => undefined)
   }
 }

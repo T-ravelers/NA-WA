@@ -2,11 +2,12 @@ import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { RouterView, createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
 import { useExploreFilterMemoryStore } from '../../model/exploreFilterMemory'
+import exploreRoutes from '../../routes'
 
 const fetchEventList = vi.fn()
 const fetchPlaceList = vi.fn()
@@ -19,6 +20,15 @@ vi.mock('../../api/exploreApi', () => ({
 
 const ExploreView = (await import('../ExploreView.vue')).default
 const { presetDateRange } = await import('../../model/datePresets')
+
+const EMPTY_PAGE = {
+  content: [],
+  page: 0,
+  size: 20,
+  totalElements: 0,
+  totalPages: 0,
+  hasNext: false,
+}
 
 const place = {
   itemId: 42,
@@ -439,5 +449,90 @@ describe('ExploreView Place branch', () => {
     expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
     expect(fetchEventList).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, size: 20 }))
     expect(router.currentRoute.value.query.eventPage).toBe('1')
+  })
+})
+
+/**
+ * 실제 route 정의를 통해 화면을 띄운다.
+ *
+ * `onBeforeRouteUpdate`는 route record에 매칭된 컴포넌트에만 등록된다. 위의 `mountView`처럼
+ * 컴포넌트를 직접 mount하면 가드가 아예 달리지 않아 이 동작을 볼 수 없다.
+ *
+ * pinia는 하나만 쓴다. guard는 컴포넌트 밖에서 돌아 `setActivePinia`가 가리키는 것을 잡으므로,
+ * 화면에 다른 인스턴스를 넘기면 기억을 쓰는 쪽과 읽는 쪽이 갈라진다.
+ */
+async function mountRoutedView(path = '/explore') {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      ...exploreRoutes,
+      { path: '/appointments', name: 'appointments', component: { template: '<div />' } },
+    ],
+  })
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+  await router.push(path)
+  await router.isReady()
+
+  const wrapper = mount(RouterView, {
+    global: { plugins: [i18n, router, pinia, [VueQueryPlugin, { queryClient }]] },
+  })
+
+  await flushPromises()
+  return { wrapper, router }
+}
+
+describe('ExploreView filter memory across entries', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    scrollToMock.mockReset()
+    vi.stubGlobal('scrollTo', scrollToMock)
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
+    fetchEventList.mockReset()
+    fetchPlaceList.mockReset()
+    fetchEventList.mockResolvedValue(EMPTY_PAGE)
+    fetchPlaceList.mockResolvedValue(EMPTY_PAGE)
+  })
+
+  it('keeps the filters when the bottom tab opens Discover again', async () => {
+    const { router } = await mountRoutedView('/explore?eventKeyword=hongdae&eventPage=3')
+
+    /* 하단 탭은 query 없는 `/explore`로 보낸다. route record가 같아 beforeEnter는 안 돈다. */
+    await router.push('/explore')
+    await flushPromises()
+
+    /* 필터는 남고 쪽 번호만 버린다. 새로 누른 사람은 목록을 처음부터 본다. */
+    expect(router.currentRoute.value.query).toEqual({ eventKeyword: 'hongdae' })
+  })
+
+  it('does not revive a filter value the screen dropped from the URL', async () => {
+    /* 없는 분류 ID는 화면이 걸러내고 주소에서 지운다. 기억이 그것을 되돌리면 리다이렉트가 돈다. */
+    const { router } = await mountRoutedView('/explore?eventSectorIds=99999')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query).toEqual({})
+  })
+
+  it("does not bring another tab's remembered filters back on a tab switch", async () => {
+    const { wrapper, router } = await mountRoutedView('/explore?tab=places&placeKinds=CAFE')
+
+    await router.push('/appointments')
+    await router.push('/explore')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Places')
+      ?.trigger('click')
+    await flushPromises()
+
+    /* 화면에 없던 조건이 탭을 누르는 순간 걸리면 안 된다. */
+    expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
   })
 })
