@@ -156,6 +156,7 @@ public class JourneyService {
                 JourneyErrorCode.JOURNEY_ITEM_DATE_OUT_OF_RANGE
             );
         }
+        validateVisitDateWithinItemPeriod(exploreItem, request.getVisitDate());
         if (journeyMapper.existsJourneyItem(
             tripId,
             request.getItemId(),
@@ -629,6 +630,41 @@ public class JourneyService {
         if (note != null && note.length() > 500) {
             throw new BusinessException(
                 JourneyErrorCode.INVALID_JOURNEY_INPUT
+            );
+        }
+    }
+
+    /*
+     * 방문 날짜가 항목 자체의 운영 기간 안인지 본다.
+     *
+     * 여정 기간 검사(JOURNEY-007)와 별개다. 여정 기간 안이어도 이벤트가 열리지 않는
+     * 날일 수 있고, 지금까지는 프론트의 달력이 가려줬을 뿐이라 API를 직접 부르면
+     * 그대로 담겼다.
+     *
+     * PLACE는 운영 기간이라는 개념 자체가 없어(place 테이블에 컬럼이 없다) 건너뛴다.
+     * 그래서 EVENT일 때만 보고, 값이 비어 있으면 막지 않는다 — 없는 근거로 거절하면
+     * 사용자는 고칠 방법이 없다.
+     */
+    private void validateVisitDateWithinItemPeriod(
+        JourneyExploreItem exploreItem,
+        LocalDate visitDate
+    ) {
+        if (!"EVENT".equals(exploreItem.getItemType())) {
+            return;
+        }
+
+        LocalDate startDate = exploreItem.getStartDate();
+        if (startDate != null && visitDate.isBefore(startDate)) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD
+            );
+        }
+
+        // 상시 이벤트는 end_date가 NULL이라 상한이 없다. 하한은 위에서 이미 봤다.
+        LocalDate endDate = exploreItem.getEndDate();
+        if (endDate != null && visitDate.isAfter(endDate)) {
+            throw new BusinessException(
+                JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD
             );
         }
     }

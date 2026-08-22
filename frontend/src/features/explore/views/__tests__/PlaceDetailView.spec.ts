@@ -5,10 +5,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 const fetchPlaceDetail = vi.fn()
 const fetchJourneys = vi.fn()
 const addJourneyItem = vi.fn()
+
+/**
+ * 앱이 주입하는 `parseJourneyRouteQuery`와 같게 동작하는 스텁.
+ *
+ * journey feature를 직접 import할 수 없어(`architecture/no-cross-feature-imports`)
+ * 규칙만 여기에 옮겨 둔다. 예전처럼 `() => null`로 막아 두면 **복귀 진입이 새 여정
+ * id를 읽는 경로가 통째로 실행되지 않아**, 받는 쪽이 비어 있어도 테스트가 초록으로
+ * 남는다. 실제 구현(`journey/model/journeyRouteQuery`)이 바뀌면 여기도 맞춰야 한다.
+ */
+function parseJourneyRouteQuery(value: unknown): number | null {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null
+
+  const parsed = Number(raw)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
 
 vi.mock('../../model/journeyIntegration', async () => {
   const { useQuery } = await import('@tanstack/vue-query')
@@ -17,7 +34,7 @@ vi.mock('../../model/journeyIntegration', async () => {
     useExploreJourneyIntegration: () => ({
       addJourneyItem: (journeyId: number, request: { itemId: number; visitDate: string }) =>
         addJourneyItem(journeyId, request),
-      parseJourneyRouteQuery: () => null,
+      parseJourneyRouteQuery,
       useJourneyListQuery: (enabled: import('vue').MaybeRefOrGetter<boolean>) =>
         useQuery({
           queryKey: ['journeys', 'review-test'],
@@ -78,7 +95,7 @@ const place = {
   hasRestroom: false,
 }
 
-async function mountView() {
+async function mountView(path = '/explore/places/42') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -102,11 +119,16 @@ async function mountView() {
         name: 'appointment-list',
         component: { template: '<div>Appointments</div>' },
       },
+      {
+        path: '/journeys/new',
+        name: 'journey-create',
+        component: { template: '<div>Journey create</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
-  await router.push('/explore/places/42')
+  await router.push(path)
   await router.isReady()
 
   const wrapper = mount(PlaceDetailView, {
@@ -130,6 +152,7 @@ describe('PlaceDetailView', () => {
     ])
     addJourneyItem.mockResolvedValue({})
     openMapAppUrl.mockReset()
+    sessionStorage.clear()
   })
 
   it('renders Place details with enabled map buttons', async () => {
@@ -292,5 +315,107 @@ describe('PlaceDetailView', () => {
       visitDate: expect.any(String),
     })
     expect(router.currentRoute.value.name).toBe('journey-detail')
+  })
+
+  /*
+   * Place는 운영 기간이 없다. 예전에는 그래서 날짜 시트에 isPermanent=true를 넘겨
+   * **모든 날짜**를 열었고, 여정 기간 밖까지 열려 확정한 뒤에야 JOURNEY-007로 실패했다.
+   */
+  it('달력을 고른 여정의 기간으로 좁힌다', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul weekend'))
+      ?.trigger('click')
+    await flushPromises()
+
+    const dayCell = (label: string) =>
+      wrapper
+        .get('[role="dialog"]')
+        .findAll('button')
+        .find((button) => button.text().trim() === label)
+
+    expect(dayCell('11')?.attributes('disabled')).toBeUndefined()
+    expect(dayCell('9')?.attributes('disabled')).toBeDefined()
+    expect(dayCell('13')?.attributes('disabled')).toBeDefined()
+  })
+
+  it('담기 실패를 오류 코드별로 안내한다', async () => {
+    addJourneyItem.mockRejectedValue(
+      new NormalizedApiError('JOURNEY-004', 409, '이미 등록되어 있습니다.'),
+    )
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul weekend'))
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Add to'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('This is already on that day of your journey.')
+    expect(wrapper.text()).not.toContain('Please try again.')
+  })
+
+  it('담을 여정이 없으면 그 자리에서 여정 만들기로 나간다', async () => {
+    fetchJourneys.mockResolvedValue([])
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text() === 'Create a journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-create')
+    // 다른 화면에 들렀다 돌아오는 query 규약. 이 화면은 route param을 쓰므로
+    // returnParams도 함께 싣는다. openJourneySelect는 그대로 돌아와 하던 일을 잇는다.
+    expect(router.currentRoute.value.query).toEqual({
+      returnRouteName: 'explore-place-detail',
+      returnParams: 'placeId:42',
+      openJourneySelect: '1',
+    })
+  })
+
+  it('여정을 만들고 돌아오면 그 여정이 골라진 채 시트가 열리고 규약 key가 지워진다', async () => {
+    const { wrapper, router } = await mountView('/explore/places/42?tripId=7&openJourneySelect=1')
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Choose a journey')
+
+    const pressed = wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.attributes('aria-pressed') === 'true')
+    expect(pressed?.text()).toContain('Seoul weekend')
+
+    expect(router.currentRoute.value.query).toEqual({})
   })
 })

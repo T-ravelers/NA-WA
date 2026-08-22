@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -35,13 +35,17 @@ import { usePlaceDetailQuery } from '../composables/usePlaceDetailQuery'
 import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMutation'
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
+import { journeyAddErrorMessageKey } from '../model/journeyAddErrors'
+import { intersectItemJourneyPeriod } from '../model/journeyPeriod'
 import { findExploreRegionLabelKey } from '../model/exploreRegions'
 import { normalizePlaceKind, type PlaceKind } from '../model/placeExplore'
 import { toClosedDays, toDetailEntries } from '../model/placeDetail'
 
 const route = useRoute()
 const router = useRouter()
-const { locale, t } = useI18n()
+const i18n = useI18n()
+const { locale, t } = i18n
+const hasMessage = (key: string): boolean => i18n.te(key)
 const { addJourneyItem, parseJourneyRouteQuery, useJourneyListQuery } =
   useExploreJourneyIntegration()
 const returnContext = useExploreReturnContextStore()
@@ -66,7 +70,8 @@ const journeyDate = ref<string | null>(null)
 const selectedJourneyId = ref<number | null>(null)
 const journeyAdded = ref(false)
 const journeyAddPending = ref(false)
-const journeyAddError = ref<'missing' | 'failed' | null>(null)
+/** 담기 실패 문구의 i18n key. 원인별로 다른 key가 들어온다. */
+const journeyAddError = ref<string | null>(null)
 
 const imageUrls = computed(() => place.value?.imageUrls ?? [])
 const currentImage = computed(() => imageUrls.value[selectedImage.value])
@@ -184,6 +189,24 @@ const activeJourneyId = computed(
 const journeyListQuery = useJourneyListQuery(journeySelectSheetOpen)
 const journeys = computed(() => journeyListQuery.data.value ?? [])
 
+/**
+ * Place는 운영 기간이라는 개념이 없다. 그래서 담을 수 있는 날은 여정 기간 전체이며,
+ * 여정을 고르기 전까지는 알 수 없다.
+ *
+ * 예전에는 날짜 시트에 `isPermanent: true`를 넘겨 **모든 날짜**를 열었다. 여정 기간
+ * 밖까지 열려 확정한 뒤에야 `JOURNEY-007`로 실패했다.
+ */
+const itemPeriod = { startDate: null, endDate: null }
+
+const selectedJourney = computed(
+  () => journeys.value.find((journey) => journey.tripId === selectedJourneyId.value) ?? null,
+)
+
+const journeyDateRange = computed(() => {
+  const journey = selectedJourney.value
+  return journey === null ? null : intersectItemJourneyPeriod(itemPeriod, journey)
+})
+
 watch(imageUrls, () => {
   selectedImage.value = 0
 })
@@ -247,7 +270,7 @@ function openAppointmentList(): void {
   })
 }
 
-function openJourneyDateSheet(): void {
+function openJourneySelectSheet(): void {
   journeyAddError.value = null
   selectedJourneyId.value = activeJourneyId.value
   journeySelectSheetOpen.value = true
@@ -262,7 +285,35 @@ function selectJourney(journeyId: number): void {
   returnContext.setJourneyId(journeyId)
   journeyDate.value = returnContext.visitDate
   journeySelectSheetOpen.value = false
-  journeyDateSheetOpen.value = true
+  journeyDateSheetOpen.value = journeyDateRange.value !== null
+}
+
+/**
+ * 담을 여정이 없을 때 이 자리에서 만들러 나간다.
+ *
+ * 돌아올 위치를 먼저 심는다. route param(`placeId`)을 실어야 해서 query만 나르는
+ * `returnRouteName`으로는 이 화면으로 돌아올 수 없다.
+ */
+function goToCreateJourney(): void {
+  journeySelectSheetOpen.value = false
+  /*
+   * 다른 화면에 들렀다 돌아오는 query 규약을 쓴다(`frontend/docs/DEVELOPMENT_CONVENTION.md`).
+   * 두 feature가 서로를 import하지 않고 주소만으로 이어진다.
+   *
+   * `replace`인 것은 새 여정 id를 돌려받아야 해서다 — 받는 쪽이 이 자리를 넘겨받았다가
+   * 일을 마치든 그냥 나가든 돌려준다. 그래서 왕복이 히스토리에 한 자리만 차지한다.
+   *
+   * 이 화면은 route param을 쓰므로 `returnParams`로 함께 넘긴다. `openJourneySelect`는
+   * 규약이 "나머지 query"로 그대로 돌려주므로, 돌아왔을 때 하던 일을 이어 갈 표시가 된다.
+   */
+  void router.replace({
+    name: 'journey-create',
+    query: {
+      returnRouteName: 'explore-place-detail',
+      returnParams: `placeId:${placeId.value}`,
+      openJourneySelect: '1',
+    },
+  })
 }
 
 function closeJourneyDateSheet(): void {
@@ -275,7 +326,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
   const current = place.value
   const journeyId = selectedJourneyId.value ?? activeJourneyId.value
   if (!current || journeyId === null) {
-    journeyAddError.value = 'missing'
+    journeyAddError.value = 'explore.journeyDate.selectItemFirst'
     return
   }
 
@@ -293,12 +344,38 @@ async function confirmJourneyDate(date: string): Promise<void> {
     journeyDateSheetOpen.value = false
     const destination = returnContext.consumeReturn()
     await router.push(destination ?? { name: 'journey-detail', params: { tripId: journeyId } })
-  } catch {
-    journeyAddError.value = 'failed'
+  } catch (error) {
+    journeyAddError.value = journeyAddErrorMessageKey(error, hasMessage)
   } finally {
     journeyAddPending.value = false
   }
 }
+
+/**
+ * 여정을 만들고 돌아온 진입. 하던 일을 그대로 이어 담기 시트를 다시 연다.
+ *
+ * 새 여정 id를 어떻게 받는지는 아래 블록 주석에 적었다.
+ */
+onMounted(() => {
+  if (route.query.openJourneySelect !== '1') return
+
+  openJourneySelectSheet()
+
+  /*
+   * 규약이 정한 결과 key는 `tripId`다. 여기서 한 번 읽어 고른 여정으로 삼고 주소에서
+   * 지운다 — 남겨두면 시트를 다시 열 때마다 사용자가 그 뒤에 고른 여정을 덮어쓴다.
+   */
+  const createdJourneyId = parseJourneyRouteQuery(route.query.tripId)
+  if (createdJourneyId !== null) {
+    selectedJourneyId.value = createdJourneyId
+    returnContext.setJourneyId(createdJourneyId)
+  }
+
+  const restQuery = { ...route.query }
+  delete restQuery.openJourneySelect
+  delete restQuery.tripId
+  void router.replace({ query: restQuery })
+})
 </script>
 
 <template>
@@ -571,7 +648,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
             block
             compact
             class="whitespace-nowrap text-on-paper"
-            @click="openJourneyDateSheet"
+            @click="openJourneySelectSheet"
           >
             {{
               journeyAdded
@@ -594,21 +671,14 @@ async function confirmJourneyDate(date: string): Promise<void> {
       </div>
 
       <JourneyDateSheet
-        v-if="journeyDateSheetOpen"
+        v-if="journeyDateSheetOpen && journeyDateRange"
         :item-title="place.name"
         :item-location="locationLabel"
-        :start-date="null"
-        :end-date="null"
-        :is-permanent="true"
+        :start-date="journeyDateRange.start"
+        :end-date="journeyDateRange.end"
         :initial-date="journeyDate"
         :loading="journeyAddPending"
-        :error-message="
-          journeyAddError === 'missing'
-            ? t('explore.journeyDate.selectItemFirst')
-            : journeyAddError === 'failed'
-              ? t('explore.journeyDate.addItemFailed')
-              : null
-        "
+        :error-message="journeyAddError ? t(journeyAddError) : null"
         @close="closeJourneyDateSheet"
         @confirm="confirmJourneyDate"
       />
@@ -616,11 +686,14 @@ async function confirmJourneyDate(date: string): Promise<void> {
       <JourneySelectSheet
         v-if="journeySelectSheetOpen"
         :journeys="journeys"
+        :item-start-date="itemPeriod.startDate"
+        :item-end-date="itemPeriod.endDate"
         :selected-journey-id="selectedJourneyId"
         :loading="journeyListQuery.isPending.value"
         :error-message="journeyListQuery.isError.value ? t('explore.journeySelect.error') : null"
         @close="closeJourneySelectSheet"
         @select="selectJourney"
+        @create-journey="goToCreateJourney"
       />
     </template>
   </section>

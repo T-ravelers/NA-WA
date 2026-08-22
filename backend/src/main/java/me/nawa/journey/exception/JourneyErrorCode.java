@@ -73,6 +73,12 @@ public enum JourneyErrorCode implements ErrorCode {
         HttpStatus.CONFLICT,
         "JOURNEY-011",
         "방장으로 참여 중인 Appointment 일정은 삭제할 수 없습니다."
+    ),
+
+    JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD(
+        HttpStatus.BAD_REQUEST,
+        "JOURNEY-012",
+        "방문 날짜가 항목의 운영 기간을 벗어났습니다."
     );
 
     private final HttpStatus status;

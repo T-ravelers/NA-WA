@@ -130,9 +130,19 @@ export default {
       'JOURNEY-001': 'This journey could not be found.',
       'JOURNEY-002': 'You do not have permission to view this journey.',
       'JOURNEY-003': 'Check the journey details and try again.',
+      /*
+       * 004~007과 012는 Discover에서 항목을 담을 때 실제로 도달하는 코드다. 문구가
+       * 없으면 "다시 시도해 주세요"로 떨어지는데, 이 넷은 다시 시도해도 성공하지
+       * 않으므로 무엇이 어긋났는지 말해야 한다.
+       */
+      'JOURNEY-004': 'This is already on that day of your journey.',
+      'JOURNEY-005': 'This is no longer available to add.',
+      'JOURNEY-006': 'This kind of item can’t be added to a journey.',
+      'JOURNEY-007': 'That date falls outside your journey’s dates.',
       'JOURNEY-009': 'Some itinerary items fall outside the selected dates.',
       'JOURNEY-010': 'This itinerary item no longer exists.',
       'JOURNEY-011': 'A hosted appointment must be transferred or closed first.',
+      'JOURNEY-012': 'That date falls outside this event’s run dates.',
     },
   },
 }

@@ -46,6 +46,11 @@ async function mountView(initialPath = '/journeys/new') {
         name: 'appointment-create',
         component: { template: '<div>Appointment create</div>' },
       },
+      {
+        path: '/explore/events/:eventId',
+        name: 'explore-event-detail',
+        component: { template: '<div>Event detail</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({
@@ -179,6 +184,124 @@ describe('JourneyCreateView', () => {
     historyLength.mockRestore()
     push.mockRestore()
     back.mockRestore()
+  })
+
+  /*
+   * Discover 상세는 route param(:eventId)을 쓴다. query만으로는 주소를 만들 수 없어
+   * 규약의 `returnParams`로 param을 함께 받는다. 나머지 query(`openJourneySelect`)는
+   * 그대로 돌려주고 결과 key만 더한다.
+   */
+  it('Discover에서 온 생성은 returnParams로 params를 복원해 상세로 돌아간다', async () => {
+    createJourney.mockResolvedValue({ ...input, tripId: 42 })
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=explore-event-detail&returnParams=eventId%3A301&openJourneySelect=1',
+    )
+
+    wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('explore-event-detail')
+    expect(router.currentRoute.value.params).toEqual({ eventId: '301' })
+    // 규약 key는 돌려주지 않는다. 호출자 화면의 것이 아니다.
+    expect(router.currentRoute.value.query).toEqual({
+      openJourneySelect: '1',
+      tripId: '42',
+    })
+  })
+
+  /*
+   * 제출이 끝난 화면은 자리를 내준다. push였다면 여기서 뒤로 갈 때 이미 제출한 폼이
+   * 다시 떠서, 한 번 더 제출하면 여정이 하나 더 생긴다.
+   */
+  it('Discover 복귀도 자리를 돌려주므로 뒤로 가도 이 폼으로 오지 않는다', async () => {
+    createJourney.mockResolvedValue({ ...input, tripId: 42 })
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=explore-event-detail&returnParams=eventId%3A301',
+    )
+
+    wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
+    await flushPromises()
+
+    router.back()
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).not.toBe('journey-create')
+  })
+
+  it('returnParams가 없는 호출자는 params 없이 그대로 돌아간다', async () => {
+    createJourney.mockResolvedValue({ ...input, tripId: 42 })
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=appointment-create&itemId=9&itemType=EVENT',
+    )
+
+    wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+    expect(router.currentRoute.value.query).toEqual({
+      itemId: '9',
+      itemType: 'EVENT',
+      tripId: '42',
+    })
+  })
+
+  it('쓸 수 없는 returnParams는 무시하고 주소만 만든다', async () => {
+    createJourney.mockResolvedValue({ ...input, tripId: 42 })
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=appointment-create&returnParams=%3A42%2Cnope',
+    )
+
+    wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+  })
+
+  /*
+   * 보낸 화면이 실어 준 항목 기간이 폼 기본값이 된다. 없으면 그 사람은 무엇과 겹쳐야
+   * 하는지 모른 채 폼을 채우고, 또 안 겹치는 여정을 만들어 같은 자리로 돌아온다.
+   */
+  it('아직 시작하지 않은 항목이면 실어 준 기간이 그대로 폼 기본값이 된다', async () => {
+    const { wrapper } = await mountView(
+      '/journeys/new?returnRouteName=explore-event-detail&itemStartDate=2099-01-01&itemEndDate=2099-01-05',
+    )
+
+    const form = wrapper.findComponent(JourneyCreateForm)
+
+    expect(form.props('initialStartDate')).toBe('2099-01-01')
+    expect(form.props('initialEndDate')).toBe('2099-01-05')
+  })
+
+  /*
+   * 조회되는 항목은 아직 끝나지 않았을 뿐 시작은 과거일 수 있다. 그대로 쓰면 폼이
+   * 과거에 시작하는 여정을 제안하고, 여정 생성에는 과거 금지가 없어 그대로 만들어진다.
+   */
+  it('이미 시작한 항목이면 시작일을 오늘로 당긴다', async () => {
+    const { wrapper } = await mountView(
+      '/journeys/new?itemStartDate=2020-01-01&itemEndDate=2099-12-31',
+    )
+
+    const form = wrapper.findComponent(JourneyCreateForm)
+    const today = new Date()
+    const todayIso = [
+      String(today.getFullYear()).padStart(4, '0'),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getDate()).padStart(2, '0'),
+    ].join('-')
+
+    expect(form.props('initialStartDate')).toBe(todayIso)
+    // 종료일은 그대로다. 상한을 당길 이유가 없다.
+    expect(form.props('initialEndDate')).toBe('2099-12-31')
+  })
+
+  it('형식이 어긋난 기간은 무시하고 빈 폼으로 둔다', async () => {
+    const { wrapper } = await mountView('/journeys/new?itemStartDate=2026-8-1&itemEndDate=nope')
+
+    const form = wrapper.findComponent(JourneyCreateForm)
+
+    // prop 기본값이 빈 문자열이라 폼이 빈 채로 열린다.
+    expect(form.props('initialStartDate')).toBe('')
+    expect(form.props('initialEndDate')).toBe('')
   })
 
   it('shows the normalized creation error without navigating', async () => {

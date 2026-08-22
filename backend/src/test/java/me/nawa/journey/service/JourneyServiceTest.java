@@ -481,6 +481,123 @@ class JourneyServiceTest {
     }
 
     @Test
+    void addJourneyItem_throwsItemPeriodError_whenVisitDateIsBeforeEventStart() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            eventItem(LocalDate.of(2026, 4, 2), LocalDate.of(2026, 4, 3))
+        );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).insertJourneyItem(any(JourneyItem.class));
+    }
+
+    @Test
+    void addJourneyItem_throwsItemPeriodError_whenVisitDateIsAfterEventEnd() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            eventItem(LocalDate.of(2026, 3, 28), LocalDate.of(2026, 3, 30))
+        );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).insertJourneyItem(any(JourneyItem.class));
+    }
+
+    /*
+     * 상시 이벤트의 운영 기간은 [startDate, ∞)다. 상한이 없다고 해서 하한까지 없는 것이
+     * 아니라는 것을 고정한다 — 여기를 열어 두면 아직 시작하지 않은 상시 이벤트가 담긴다.
+     */
+    @Test
+    void addJourneyItem_throwsItemPeriodError_whenPermanentEventHasNotStarted() {
+        JourneyItemCreateRequest request = itemRequest();
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            eventItem(LocalDate.of(2026, 4, 2), null)
+        );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> journeyService.addJourneyItem(1L, 90L, request)
+        );
+
+        assertEquals(
+            JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD,
+            exception.getErrorCode()
+        );
+        verify(journeyMapper, never()).insertJourneyItem(any(JourneyItem.class));
+    }
+
+    @Test
+    void addJourneyItem_allowsPermanentEvent_whenVisitDateIsAfterStart() {
+        JourneyItemCreateRequest request = itemRequest();
+        stubSuccessfulItemInsert(
+            request,
+            eventItem(LocalDate.of(2026, 3, 28), null),
+            "EVENT"
+        );
+
+        JourneyItemResponse result = journeyService.addJourneyItem(
+            1L,
+            90L,
+            request
+        );
+
+        assertEquals(901L, result.getTripItemId());
+    }
+
+    /*
+     * place 테이블에는 운영 기간 컬럼이 없어 PLACE 행은 LEFT JOIN 때문에 기간이 비어
+     * 온다. 없는 근거로 거절하면 사용자가 고칠 방법이 없으므로 그냥 통과해야 한다.
+     */
+    @Test
+    void addJourneyItem_skipsItemPeriodCheck_whenItemIsPlace() {
+        JourneyItemCreateRequest request = itemRequest();
+        // 방문 날짜(2026-04-01) 밖의 기간을 일부러 채운다. 비워 두면 기간 검사가 그냥
+        // 지나가므로, itemType 분기를 지우더라도 이 테스트가 통과해 버린다.
+        stubSuccessfulItemInsert(
+            request,
+            JourneyExploreItem.builder()
+                .itemId(300L)
+                .itemType("PLACE")
+                .startDate(LocalDate.of(2026, 4, 2))
+                .endDate(LocalDate.of(2026, 4, 3))
+                .build(),
+            "PLACE"
+        );
+
+        JourneyItemResponse result = journeyService.addJourneyItem(
+            1L,
+            90L,
+            request
+        );
+
+        assertEquals("PLACE", result.getItemType());
+    }
+
+    @Test
     void addJourneyItem_throwsDisplayOrderError_whenNegative() {
         JourneyItemCreateRequest request = itemRequest();
         request.setDisplayOrder(-1);
@@ -1191,6 +1308,52 @@ class JourneyServiceTest {
             .region1("Seoul")
             .addressRoad("1 Jong-ro")
             .build();
+    }
+
+    /** 운영 기간을 가진 EVENT 항목. `endDate`가 null이면 상시 이벤트다. */
+    private JourneyExploreItem eventItem(LocalDate startDate, LocalDate endDate) {
+        return JourneyExploreItem.builder()
+            .itemId(300L)
+            .itemType("EVENT")
+            .startDate(startDate)
+            .endDate(endDate)
+            .build();
+    }
+
+    /** 담기가 끝까지 성공하도록 mapper를 세운다. */
+    private void stubSuccessfulItemInsert(
+        JourneyItemCreateRequest request,
+        JourneyExploreItem exploreItem,
+        String itemType
+    ) {
+        when(journeyMapper.findJourneyByIdForUpdate(90L)).thenReturn(
+            ownedJourney(90L)
+        );
+        when(journeyMapper.findAvailableExploreItemById(300L)).thenReturn(
+            exploreItem
+        );
+        when(journeyMapper.existsJourneyItem(
+            90L,
+            300L,
+            request.getVisitDate()
+        )).thenReturn(false);
+        doAnswer(invocation -> {
+            JourneyItem item = invocation.getArgument(0);
+            item.setTripItemId(901L);
+            return null;
+        }).when(journeyMapper).insertJourneyItem(any(JourneyItem.class));
+        when(journeyMapper.findJourneyItemById(901L)).thenReturn(
+            JourneyItem.builder()
+                .tripItemId(901L)
+                .tripId(90L)
+                .itemId(300L)
+                .itemType(itemType)
+                .visitDate(request.getVisitDate())
+                .tripItemStatus("ADDED")
+                .displayOrder(0)
+                .createdAt(LocalDateTime.of(2026, 4, 1, 10, 0))
+                .build()
+        );
     }
 
     private JourneyItemCreateRequest itemRequest() {

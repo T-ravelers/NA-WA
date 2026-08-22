@@ -9,9 +9,15 @@ import CalendarGrid from '@/shared/ui/CalendarGrid.vue'
 interface Props {
   itemTitle: string
   itemLocation?: string
-  startDate: string | null
-  endDate: string | null
-  isPermanent: boolean
+  /**
+   * 고를 수 있는 날짜 구간. **항목 운영 기간 ∩ 여정 기간**을 부모가 이미 좁혀서 넘긴다.
+   *
+   * 시트가 상시 여부를 다시 해석하지 않는 것은 의도한 것이다. 예전에는 `isPermanent`가
+   * 참이면 모든 날짜를 열어줬는데, 그러면 여정 기간 밖도 열려 확정한 뒤에야
+   * `JOURNEY-007`로 실패했다. 겹치는 구간이 없으면 부모가 이 시트를 열지 않는다.
+   */
+  startDate: string
+  endDate: string
   initialDate?: string | null
   loading?: boolean
   confirmDisabled?: boolean
@@ -36,10 +42,7 @@ function parseDate(value: string | null | undefined): Date | null {
 }
 
 function isDateAllowed(value: string): boolean {
-  if (props.isPermanent) return true
-  if (props.startDate && value < props.startDate) return false
-  if (props.endDate && value > props.endDate) return false
-  return true
+  return value >= props.startDate && value <= props.endDate
 }
 
 function getInitialDate(): string | null {

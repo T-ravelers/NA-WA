@@ -978,6 +978,55 @@ function stubPlaceDetail(page) {
 }
 
 /**
+ * Event 상세의 여정 담기 시트에 쓸 여정 목록.
+ *
+ * `stubJourneyList`를 그대로 쓸 수 없다. 그쪽 날짜는 2098·2020이라 이벤트 301의
+ * 개최 기간(2026-08-10 ~ 2026-08-31)과 하나도 겹치지 않아, 시트가 전부 비활성으로만
+ * 나온다. 겹치는 여정과 겹치지 않는 여정을 섞어야 #357이 만든 두 상태가 한 장에 든다.
+ *
+ * `overlapping: false`면 겹치는 여정이 하나도 없어 "여정 만들기" 진입점이 드러난다.
+ */
+function stubJourneyListForEvent(page, { overlapping = true } = {}) {
+  const journeys = [
+    {
+      tripId: 51,
+      title: 'Seoul Lantern Trip',
+      startDate: '2026-08-14',
+      endDate: '2026-08-18',
+      eventCount: 3,
+      placeCount: 5,
+    },
+    {
+      tripId: 52,
+      title: 'Autumn in Gyeongju',
+      startDate: '2026-09-04',
+      endDate: '2026-09-08',
+      eventCount: 2,
+      placeCount: 4,
+    },
+    {
+      tripId: 53,
+      title: 'Spring Jeju Escape',
+      startDate: '2026-04-02',
+      endDate: '2026-04-06',
+      eventCount: 6,
+      placeCount: 2,
+    },
+  ]
+
+  return page.route('**/api/v1/journeys', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: overlapping ? journeys : journeys.slice(1),
+      }),
+    }),
+  )
+}
+
+/**
  * Event 상세 응답을 세운다. 좌표가 있는 상세와, 좌표가 NULL이라 지도 버튼이 숨는
  * 상세(#221 완료 기준)를 id로 나눠 찍는다.
  */
@@ -1284,6 +1333,56 @@ const SCREENS = [
       const locationHeading = page.getByTestId('event-location')
       await locationHeading.waitFor()
       await locationHeading.scrollIntoViewIfNeeded()
+    },
+  },
+
+  {
+    // 기간이 겹치지 않는 여정은 감추지 않고 사유와 함께 비활성으로 둔다(#357).
+    name: '28-explore-event-journey-select',
+    path: '/explore/events/301',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEventDetail(page, { withCoordinates: true })
+      await stubJourneyListForEvent(page)
+    },
+    prepare: async (page) => {
+      const addButton = page.getByRole('button', { name: 'Add to journey' })
+      await addButton.waitFor()
+      await addButton.click()
+      await page.getByRole('dialog').getByText('Seoul Lantern Trip').waitFor()
+    },
+  },
+  {
+    // 겹치는 여정이 하나도 없을 때도 같은 자리에서 만들러 나갈 수 있어야 한다(#357).
+    name: '29-explore-event-journey-select-none',
+    path: '/explore/events/301',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEventDetail(page, { withCoordinates: true })
+      await stubJourneyListForEvent(page, { overlapping: false })
+    },
+    prepare: async (page) => {
+      const addButton = page.getByRole('button', { name: 'Add to journey' })
+      await addButton.waitFor()
+      await addButton.click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Create a journey' }).waitFor()
+    },
+  },
+  {
+    // 달력이 이벤트 기간과 여정 기간의 교집합(8/14~8/18)만 연다(#357).
+    name: '30-explore-event-journey-date',
+    path: '/explore/events/301',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEventDetail(page, { withCoordinates: true })
+      await stubJourneyListForEvent(page)
+    },
+    prepare: async (page) => {
+      const addButton = page.getByRole('button', { name: 'Add to journey' })
+      await addButton.waitFor()
+      await addButton.click()
+      await page.getByRole('dialog').getByText('Seoul Lantern Trip').click()
+      await page.getByRole('dialog').getByText('Which day?').waitFor()
     },
   },
 
