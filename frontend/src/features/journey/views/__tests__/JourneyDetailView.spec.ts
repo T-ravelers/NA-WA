@@ -95,6 +95,11 @@ async function mountWithRouter(path: string, reportOptions: ReportIntegrationOpt
     routes: [
       { path: '/journeys/:tripId', name: 'journey-detail', component: JourneyDetailView },
       {
+        path: '/journeys/:tripId/invite',
+        name: 'journey-invite',
+        component: { template: '<div>Invite</div>' },
+      },
+      {
         path: '/journeys/:tripId/settings',
         name: 'journey-settings',
         component: { template: '<div>Settings</div>' },

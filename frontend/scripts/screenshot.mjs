@@ -111,6 +111,37 @@ function stubMemberProfile(page) {
   )
 }
 
+/**
+ * 초대 화면용 여정 스텁.
+ *
+ * `stubJourneyDetail`은 `regions: []`라 탑승권의 지역 눈썹이 비어 나온다. 초대 화면은
+ * 지역을 보여주는 것이 요점이라 지역이 있는 여정을 따로 둔다. 기존 스텁은 다른 화면이
+ * 쓰고 있으므로 고치지 않는다.
+ */
+function stubJourneyDetailWithRegions(page) {
+  return page.route('**/api/v1/journeys/42', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          tripId: 42,
+          title: 'Seoul Foodie Week',
+          startDate: '2026-08-10',
+          endDate: '2026-08-12',
+          budgetAmount: 1500000,
+          companionPreference: '2-4',
+          regions: [
+            { regionCode: 'SEOUL', regionName: 'Seoul', displayOrder: 0 },
+            { regionCode: 'BUSAN', regionName: 'Busan', displayOrder: 1 },
+          ],
+        },
+      }),
+    }),
+  )
+}
+
 function stubJourneyDetail(page) {
   return Promise.all([
     page.route('**/api/v1/journeys/42', (route) =>
@@ -1207,6 +1238,20 @@ const SCREENS = [
     path: '/journeys/42',
     setup: (page) =>
       Promise.all([stubMemberProfile(page), stubJourneyDetail(page), stubEmptyReportList(page)]),
+  },
+  {
+    name: '07d-journey-invite',
+    path: '/journeys/42/invite',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetailWithRegions(page)]),
+  },
+  {
+    name: '07e-journey-invite-qr',
+    path: '/journeys/42/invite',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetailWithRegions(page)]),
+    prepare: async (page) => {
+      await page.getByRole('button', { name: 'Show QR' }).click()
+      await page.getByRole('dialog').waitFor()
+    },
   },
   {
     name: '07b-journey-settings',
