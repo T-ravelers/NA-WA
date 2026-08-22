@@ -8,6 +8,7 @@ import {
   idempotencyKey,
   issueCsrfHeaders,
   login,
+  runScopedBase,
   withCsrf,
 } from './common.js'
 
@@ -170,7 +171,8 @@ export default function () {
 
   group('2. 보증금 환급 (출석 체크)', () => {
     // 시드가 넣어 둔, 이 VU가 방장이고 이미 끝난 약속.
-    const hostedId = Number(__ENV.HOSTED_APPOINTMENT_BASE || 800000) + __VU
+    const hostedId =
+      runScopedBase(Number(__ENV.HOSTED_APPOINTMENT_BASE || 2000000)) + __VU
 
     expectOk(http.get(http.url`${BASE_URL}/api/v1/appointments/${hostedId}`, { headers: baseHeaders, jar }), '방장 약속 상세')
 

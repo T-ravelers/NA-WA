@@ -118,12 +118,37 @@ k6 run --out influxdb=http://127.0.0.1:8086/k6 \
 | `RUN_ID` | 현재 시각 | 멱등성 키 구분자 |
 | `MEMBER_ID_BASE` | `900000` | VU가 쓸 회원 번호 시작값 |
 | `PAYEE_ID_BASE` / `PAYEE_POOL_SIZE` | `950000` / `100` | QR 수취인 계정 풀 |
-| `HOSTED_APPOINTMENT_BASE` | `800000` | VU가 방장인 약속 번호 시작값 |
-| `RECRUITING_APPOINTMENT_BASE` / `VU_SLOTS_PER_APPOINTMENT` | `700000` / `5` | 시나리오 1에서 참여할 약속. **시드의 `@vu_slots_per_appointment`와 같아야 한다** |
+| `HOSTED_APPOINTMENT_BASE` | `2000000` | VU가 방장인 약속 번호 시작값 |
+| `RECRUITING_APPOINTMENT_BASE` / `VU_SLOTS_PER_APPOINTMENT` | `1000000` / `5` | 시나리오 1에서 참여할 약속. **시드의 `@vu_slots_per_appointment`와 같아야 한다** |
+| `RUN_INDEX` / `RUN_STRIDE` | `1` / `10000` | 몇 번째 실행인가. 시드의 `RUNS` 이하여야 한다 |
 | `SETTLEMENT_PARTICIPANT_MEMBER_ID_BASE` | `970000` | 생성자가 아닌 정산 납부 회원 번호 시작값 |
 
 시드 스크립트가 만드는 번호 범위와 **반드시 맞춰야 합니다.** 어긋나면 로그인 다음부터
 전부 404가 나는데, 부하는 정상으로 걸려서 눈치채기 어렵습니다.
+
+### 다시 돌릴 때는 `RUN_INDEX`를 올린다
+
+한 번 실행하면 두 가지가 소진됩니다.
+
+- 참여한 약속은 같은 VU의 재참여를 막습니다 (`ALREADY_JOINED`)
+- 출석을 확정한 약속은 `COMPLETED`가 되어 두 번째 확정을 받지 않습니다
+
+그래서 시드가 **회차분을 미리 깔아 둡니다.** 볼륨을 초기화하지 않고 `RUNS`번까지 그대로
+다시 돌릴 수 있습니다.
+
+```shell
+RUNS=5 VUS=8920 ./loadtest/seed.sh          # 5회차분을 미리 깐다
+
+k6 run ... -e RUN_INDEX=1 ...               # 1회차
+k6 run ... -e RUN_INDEX=2 ...               # 2회차 — 초기화 불필요
+```
+
+`RUN_INDEX`가 시드의 `RUNS`보다 크면 없는 약속을 불러 **404**가 납니다. 회차를 다 쓰면
+그때 볼륨을 초기화하고 다시 시드합니다.
+
+> 잔액은 회차 제약이 아닙니다. 실측해 보니 주 사용자는 충전(+50,000)이 소모(보증금
+> 5,000 + QR 9,000)보다 커서 **회차마다 잔액이 오히려 늡니다.** 정산 참여자만 회차당
+> 약 4,500을 내므로 시드가 `RUNS`에 맞춰 여유를 둡니다.
 
 ### 참여할 약속은 VU마다 다르다
 
@@ -135,7 +160,8 @@ k6 run --out influxdb=http://127.0.0.1:8086/k6 \
 슬롯이 정원(6)이 아니라 5인 것은 `current_member_count`가 **방장까지 세기** 때문입니다.
 
 ```
-VU 1~5   → 700001      VU 6~10  → 700002      VU 11~15 → 700003 ...
+RUN_INDEX=1:  VU 1~5 → 1000001   VU 6~10 → 1000002   VU 11~15 → 1000003 ...
+RUN_INDEX=2:  VU 1~5 → 1010001   VU 6~10 → 1010002   ...
 ```
 
 `VU_SLOTS_PER_APPOINTMENT`를 시드와 다르게 주면 뒤쪽 VU가 정원 초과(`JOIN_NOT_AVAILABLE`)로

@@ -9,6 +9,7 @@ import {
   idempotencyKey,
   issueCsrfHeaders,
   login,
+  runScopedBase,
   withCsrf,
 } from './common.js'
 
@@ -51,8 +52,9 @@ export const options = {
  */
 function assignedAppointmentId(vu) {
   const slots = Number(__ENV.VU_SLOTS_PER_APPOINTMENT || 5)
+  const base = runScopedBase(Number(__ENV.RECRUITING_APPOINTMENT_BASE || 1000000))
 
-  return Number(__ENV.RECRUITING_APPOINTMENT_BASE || 700000) + Math.ceil(vu / slots)
+  return base + Math.ceil(vu / slots)
 }
 
 /** VU 하나가 쓸 회원 번호. 시드가 만든 범위와 맞춰야 한다. */

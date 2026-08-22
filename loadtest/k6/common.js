@@ -47,6 +47,25 @@ if (!LOGIN_SECRET) {
  */
 const RUN_ID = __ENV.RUN_ID || `${Date.now()}`
 
+/**
+ * 이번이 몇 번째 실행인가.
+ *
+ * 참여한 약속은 재참여가 막히고(ALREADY_JOINED), 출석을 확정한 약속은 COMPLETED가
+ * 되어 두 번째 확정을 받지 않는다. 시드가 `RUNS`회차분을 미리 깔아 두므로 실행할
+ * 때마다 이 값을 1씩 올리면 볼륨을 초기화하지 않고 다시 돌릴 수 있다.
+ *
+ * 시드의 `RUNS`보다 큰 값을 주면 없는 약속을 불러 404가 난다.
+ */
+export const RUN_INDEX = Number(__ENV.RUN_INDEX || 1)
+
+/** 회차 사이의 ID 간격. 시드의 `@run_stride`와 같아야 한다. */
+export const RUN_STRIDE = Number(__ENV.RUN_STRIDE || 10000)
+
+/** 회차 블록의 시작 번호를 구한다. */
+export function runScopedBase(base) {
+  return base + (RUN_INDEX - 1) * RUN_STRIDE
+}
+
 /** VU·iteration·실행을 모두 섞어 전역에서 겹치지 않는 키를 만든다. */
 export function idempotencyKey(label) {
   return `${RUN_ID}-${label}-vu${__VU}-iter${__ITER}`

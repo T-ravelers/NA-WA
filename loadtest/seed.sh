@@ -9,6 +9,10 @@ readonly ENV_FILE="${REPO_ROOT}/.env.loadtest"
 
 vu_count="${VUS:-8920}"
 payee_pool_size="${PAYEE_POOL_SIZE:-100}"
+# 볼륨을 초기화하지 않고 다시 돌릴 수 있는 횟수.
+# 참여한 약속은 재참여가 막히고 출석을 확정한 약속은 COMPLETED가 되므로,
+# 회차분을 미리 깔아 둔다. k6는 RUN_INDEX로 자기 회차를 고른다.
+runs="${RUNS:-3}"
 
 if [[ ! ${vu_count} =~ ^[0-9]+$ ]] || ((vu_count < 1 || vu_count > 8920)); then
   echo "VUS는 1~8920 정수여야 합니다: ${vu_count}" >&2
@@ -16,6 +20,10 @@ if [[ ! ${vu_count} =~ ^[0-9]+$ ]] || ((vu_count < 1 || vu_count > 8920)); then
 fi
 if [[ ! ${payee_pool_size} =~ ^[0-9]+$ ]] || ((payee_pool_size < 1 || payee_pool_size > 100)); then
   echo "PAYEE_POOL_SIZE는 1~100 정수여야 합니다: ${payee_pool_size}" >&2
+  exit 1
+fi
+if [[ ! ${runs} =~ ^[0-9]+$ ]] || ((runs < 1 || runs > 20)); then
+  echo "RUNS는 1~20 정수여야 합니다: ${runs}" >&2
   exit 1
 fi
 if [[ ! -f ${ENV_FILE} ]]; then
@@ -57,10 +65,10 @@ if [[ ${existing} != "0" ]]; then
 fi
 
 {
-  printf 'SET @vu_count = %s; SET @payee_pool_size = %s;\n' \
-    "${vu_count}" "${payee_pool_size}"
+  printf 'SET @vu_count = %s; SET @payee_pool_size = %s; SET @runs = %s;\n' \
+    "${vu_count}" "${payee_pool_size}" "${runs}"
   sed -e 's/\r$//' "${SCRIPT_DIR}/seed.sql"
 } | docker exec -i -e MYSQL_PWD="${MYSQL_ROOT_PASSWORD}" "${mysql_container}" \
     mysql -uroot "${MYSQL_DATABASE}" --show-warnings
 
-echo "시드 적재 완료: VUS=${vu_count}, PAYEE_POOL_SIZE=${payee_pool_size}"
+echo "시드 적재 완료: VUS=${vu_count}, PAYEE_POOL_SIZE=${payee_pool_size}, RUNS=${runs}"
