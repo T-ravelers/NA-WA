@@ -200,3 +200,45 @@ Tomcat을 재시작하고 브라우저의 네트워크 탭을 연 뒤 Google과 
 Swagger UI는 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있습니다.
 OAuth 콜백은 브라우저 리다이렉트 API이므로 Swagger에서 공급자 로그인을 끝까지
 진행하는 대신 위 브라우저 스모크 테스트를 사용합니다.
+
+## 부하 테스트 로그인 경로
+
+소셜 로그인은 브라우저 동의 화면을 사람이 거쳐야 완료됩니다. k6 같은 부하 도구는
+그 화면을 통과할 수 없어 시나리오 첫 단계에서 막힙니다. 그 구간만 건너뛰는 경로를
+따로 둡니다.
+
+```text
+POST /internal/loadtest/login
+{ "secret": "<LOADTEST_LOGIN_SECRET>", "memberId": 1234 }
+```
+
+성공하면 정상 로그인과 **같은** `access_token`·`refresh_token` 쿠키를 발급합니다.
+토큰 발급과 검증은 기존 `AuthTokenService`·`AuthCookieManager`를 그대로 쓰므로 인증
+체계가 갈라지지 않습니다.
+
+`ServiceTokenController`와 달리 **대상 회원을 요청이 고릅니다.** 부하 테스트는 수천
+명이 서로 다른 계정으로 동시에 접속하는 상황을 만들어야 하기 때문입니다. 대신 그
+설계는 이 경로가 운영에 존재하지 않는다는 전제 위에서만 성립합니다.
+
+### 운영에 들어가지 않게 하는 두 겹
+
+| 겹 | 내용 |
+| --- | --- |
+| 빌드 | 클래스가 `backend/src/loadtest/java`에 있고, `build.gradle`이 `-Ploadtest`를 준 빌드에서만 컴파일합니다. 배포 워크플로는 이 플래그를 넘기지 않으므로 **운영 이미지에는 클래스 자체가 없습니다** |
+| 런타임 | `LOADTEST_LOGIN_SECRET`이 비어 있으면 요청을 거부합니다 (`AUTH-003`) |
+
+여기에 nginx가 `/internal/` 접두사를 `404`로 막는 것까지 더해집니다.
+
+확인 방법입니다.
+
+```shell
+# 운영과 같은 빌드 — 결과가 없어야 한다
+./gradlew war --no-daemon && unzip -l build/libs/*.war | grep -i loadtest
+
+# 부하 테스트용 빌드 — 클래스가 나와야 한다
+./gradlew war --no-daemon -Ploadtest && unzip -l build/libs/*.war | grep -i loadtest
+```
+
+이 격리는 **조용히 깨집니다.** 클래스를 `src/main/java`로 옮기거나 `build.gradle`의
+조건을 지워도 빌드는 성공하고 다른 테스트도 다 통과합니다.
+`LoadTestSourceIsolationTest`가 플래그 상태와 클래스패스 실제 상태를 대조해 막습니다.

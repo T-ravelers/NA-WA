@@ -25,7 +25,10 @@ import org.springframework.web.servlet.config.annotation.*;
     "me.nawa.settlement.controller",
     "me.nawa.deposit.controller",
     "me.nawa.ingest.controller",
-    "me.nawa.observability.controller"
+    "me.nawa.observability.controller",
+    // 부하 테스트 전용. src/loadtest/java 는 -Ploadtest 빌드에서만 컴파일되므로
+    // 운영 산출물에서는 이 패키지가 비어 있고 스캔이 조용히 지나간다.
+    "me.nawa.loadtest.controller"
 })
 public class ServletConfig implements WebMvcConfigurer {
 

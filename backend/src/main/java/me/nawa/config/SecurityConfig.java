@@ -135,7 +135,12 @@ public class SecurityConfig {
                                 // 외부 노출은 nginx가 /internal/ 접두사를 404로 막고,
                                 // 운영 compose가 backend 포트를 공개하지 않는 것으로 함께 막는다.
                                 // 이 줄만 보고 "열려 있다"고 판단하지 말 것.
-                                antMatcher("/internal/metrics")
+                                antMatcher("/internal/metrics"),
+                                // 부하 테스트 로그인. 인증 전에 닿아야 해서 여기서 연다.
+                                // 운영 산출물에는 이 경로를 처리할 컨트롤러 자체가 없다
+                                // (src/loadtest/java, -Ploadtest 빌드 전용).
+                                // nginx도 /internal/ 접두사를 404로 막는다.
+                                antMatcher("/internal/loadtest/login")
                         ).permitAll()
                         .requestMatchers(antMatcher("/api/**")).authenticated()
                         .anyRequest().permitAll())
