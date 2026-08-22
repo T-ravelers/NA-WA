@@ -89,7 +89,11 @@ public class AppointmentController {
     public ApiResponse<AppointmentMemberResponse> joinAppointment(
             @AuthenticationPrincipal AuthenticatedMember member,
             @PathVariable Long appointmentId,
-            @RequestBody AppointmentJoinRequest request) {
+            // required=false다. 필수로 두면 본문 없이 오는 요청이 스프링 단계에서
+            // COMMON-002(400)로 떨어져, 프론트와 백엔드 배포 시점이 벌어지는 동안
+            // 캐시된 옛 번들의 참여가 전부 실패한다. 서비스가 이미 tripId 누락을
+            // COMMON-001로 거절하므로 그 구간에도 같은 오류로 일관되게 답한다.
+            @RequestBody(required = false) AppointmentJoinRequest request) {
         return ApiResponse.success(appointmentService.joinAppointment(
                 member.getMemberId(),
                 appointmentId,

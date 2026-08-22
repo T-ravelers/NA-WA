@@ -401,8 +401,8 @@ describe('AppointmentDetailView', () => {
   })
 
   it('sends the host to journey creation when nothing can hold the appointment', async () => {
-    // 담을 여정이 하나도 없으면 만들러 보낸다. 만들고 돌아와 다시 참여를 누를 수
-    // 있도록 이 화면을 히스토리에 남긴 채(push) 보낸다.
+    // 담을 여정이 하나도 없으면 만들러 보낸다. 자리를 내주고(replace) 보내면 여정
+    // 생성이 그 자리를 돌려주므로, 돌아온 뒤 상세가 히스토리에 두 번 쌓이지 않는다.
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
     const { wrapper, router } = await mountView({ journeys: [] })
 
@@ -498,7 +498,7 @@ describe('AppointmentDetailView', () => {
     // 여정을 만들고 ?tripId=로 돌아온 길. 참여를 다시 누르게 하지 않고, 만든 여정을
     // 골라 둔 채로 시트를 열어 확인하고 넘어가게 한다.
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper } = await mountView({ path: '/appointments/7?tripId=7' })
+    const { wrapper, router } = await mountView({ path: '/appointments/7?tripId=7' })
 
     const sheet = wrapper.get('[role="dialog"]')
     expect(sheet.text()).toContain('Choose a journey')
@@ -508,6 +508,40 @@ describe('AppointmentDetailView', () => {
         .find((button) => button.text().includes('Seoul Foodie Week'))
         ?.attributes('aria-pressed'),
     ).toBe('true')
+    // 심었으면 지시는 소비된다. 남겨 두면 이 화면을 열 때마다 시트를 열라는 뜻이 된다.
+    expect(router.currentRoute.value.query.tripId).toBeUndefined()
+  })
+
+  it('does not reopen the sheet after the join succeeds', async () => {
+    // 참여가 끝나면 상세와 참여 정보를 함께 무효화한다. 상세가 먼저 도착하면 그
+    // 순간에는 아직 "참여 안 함"으로 보이므로, ?tripId=가 URL에 남아 있으면 가드를
+    // 통과해 시트가 다시 열린다 — 참여는 끝났는데 "Choose a journey"가 뜨는 화면이
+    // 된다. 응답 순서에 기대지 않도록 지시를 한 번만 소비한다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    const { wrapper, router } = await mountView({ path: '/appointments/7?tripId=7' })
+
+    expect(router.currentRoute.value.query.tripId).toBeUndefined()
+
+    // 골라진 여정을 눌러 보증금 확인으로 넘어간 뒤 참여한다.
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul Foodie Week'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Pay'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(joinAppointment).toHaveBeenCalledWith(7, 7)
+
+    // 참여 성공 뒤 상세만 먼저 갱신된 상황을 만든다.
+    fetchAppointment.mockResolvedValue({ ...appointment, currentMemberCount: 3 })
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Choose a journey')
   })
 
   it('does not reopen the sheet for a member who already joined', async () => {
