@@ -220,10 +220,7 @@ export default {
       averageRating: '平均評分',
       unavailable: '尚無資料',
       ratingUnavailable: '揪團結束後才會顯示評分。',
-      viewReviews: '查看評價',
       // 여기의 Report는 보고서가 아니라 신고다. 報告가 아닌 檢舉를 쓴다.
-      report: '檢舉成員',
-      actionsUnavailable: '這個功能稍後開放。',
       loadFailed: '無法載入參加者檔案',
       loadFailedDescription: '請稍後再試一次。',
     },
