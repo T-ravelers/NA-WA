@@ -135,7 +135,7 @@ class NotificationMapperIntegrationTest {
             ));
 
             List<Notification> notifications =
-                mapper.findByRecipient(fixture.guestMemberId(), 10);
+                mapper.findByRecipient(fixture.guestMemberId(), null, 10);
 
             assertEquals(2, notifications.size());
             // 같은 시각에 들어가도 뒤에 넣은 것이 위로 온다.
@@ -147,7 +147,7 @@ class NotificationMapperIntegrationTest {
             assertEquals(2, mapper.countUnreadByRecipient(fixture.guestMemberId()));
 
             // limit은 실제로 잘린다.
-            assertEquals(1, mapper.findByRecipient(fixture.guestMemberId(), 1).size());
+            assertEquals(1, mapper.findByRecipient(fixture.guestMemberId(), null, 1).size());
 
             // 남의 알림은 보이지 않는다.
             assertEquals(0, mapper.countUnreadByRecipient(fixture.payerMemberId()));
@@ -157,11 +157,155 @@ class NotificationMapperIntegrationTest {
             assertEquals(0, mapper.countUnreadByRecipient(fixture.guestMemberId()));
             assertEquals(
                 readAt,
-                mapper.findByRecipient(fixture.guestMemberId(), 10).get(0).getReadAt()
+                mapper.findByRecipient(fixture.guestMemberId(), null, 10).get(0).getReadAt()
             );
 
             // 이미 읽은 알림을 다시 읽음 처리해도 건드릴 것이 없다.
             assertEquals(0, mapper.markAllRead(fixture.guestMemberId(), readAt));
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    /**
+     * 커서가 다음 쪽을 이어 주는지 본다.
+     *
+     * 세 알림의 만든 시각이 모두 같아서 순서는 번호로만 갈린다. 알림은 보통 한 번에 여러
+     * 건이 함께 들어가므로 이것이 가장 흔한 모양이다.
+     */
+    @Test
+    void findByRecipient_cursorContinuesFromTheGivenNotification() {
+        Fixture fixture = createFixture();
+        try {
+            LocalDateTime createdAt = LocalDateTime.now().withNano(0);
+            mapper.insertNotifications(List.of(
+                notification(fixture, "SETTLEMENT_REQUESTED", new BigDecimal("60"), createdAt),
+                notification(fixture, "SETTLEMENT_PAID", new BigDecimal("30"), createdAt),
+                notification(fixture, "SETTLEMENT_COMPLETED", new BigDecimal("100"), createdAt)
+            ));
+
+            List<Notification> firstPage =
+                mapper.findByRecipient(fixture.guestMemberId(), null, 2);
+            assertEquals(2, firstPage.size());
+
+            Long cursor = firstPage.get(1).getNotificationId();
+            List<Notification> secondPage =
+                mapper.findByRecipient(fixture.guestMemberId(), cursor, 2);
+
+            // 첫 쪽과 겹치지 않고, 남은 하나가 이어서 나온다.
+            assertEquals(1, secondPage.size());
+            assertEquals("SETTLEMENT_REQUESTED", secondPage.get(0).getNotificationType());
+
+            // 마지막 알림을 커서로 주면 더 볼 것이 없다.
+            assertEquals(
+                0,
+                mapper.findByRecipient(
+                    fixture.guestMemberId(), secondPage.get(0).getNotificationId(), 2
+                ).size()
+            );
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    /**
+     * 번호 순서와 시각 순서가 어긋나도 한 건도 빠뜨리지 않는지 본다.
+     *
+     * created_at은 DB가 아니라 앱이 넣는 값이라 번호와 순서가 늘 같지는 않다. 먼저 들어간
+     * 행에 더 나중 시각을 적어 두 순서를 일부러 뒤집는다.
+     *
+     * 이 자리가 커서를 (시각, 번호) 짝으로 비교해야 하는 이유다. 번호 하나로만 비교하면
+     * 오래된 쪽의 번호가 더 커서 조건에 걸리지 못하고, 그 알림은 어느 쪽에도 나오지 않는다.
+     */
+    @Test
+    void findByRecipient_cursorLosesNothingWhenIdOrderDisagreesWithTimeOrder() {
+        Fixture fixture = createFixture();
+        try {
+            LocalDateTime newer = LocalDateTime.now().withNano(0);
+            mapper.insertNotifications(List.of(
+                notification(fixture, "SETTLEMENT_REQUESTED", new BigDecimal("60"), newer)
+            ));
+            mapper.insertNotifications(List.of(
+                notification(
+                    fixture, "SETTLEMENT_PAID", new BigDecimal("30"), newer.minusHours(1)
+                )
+            ));
+
+            List<Notification> firstPage =
+                mapper.findByRecipient(fixture.guestMemberId(), null, 1);
+            assertEquals(1, firstPage.size());
+            assertEquals("SETTLEMENT_REQUESTED", firstPage.get(0).getNotificationType());
+
+            List<Notification> secondPage = mapper.findByRecipient(
+                fixture.guestMemberId(), firstPage.get(0).getNotificationId(), 1
+            );
+
+            // 번호는 더 크지만 시각이 더 오래된 알림이다. 여기서 빠지면 영영 볼 수 없다.
+            assertEquals(1, secondPage.size());
+            assertEquals("SETTLEMENT_PAID", secondPage.get(0).getNotificationType());
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    /**
+     * 읽음·지우기는 알림 번호를 경로로 받는다. 수신자 조건이 빠지면 남의 알림 번호를 적어
+     * 남의 알림을 읽음 처리하거나 지울 수 있게 되므로, 그 조건이 실제로 막는지 확인한다.
+     */
+    @Test
+    void markReadAndSoftDelete_touchNothingWhenTheNotificationBelongsToSomeoneElse() {
+        Fixture fixture = createFixture();
+        try {
+            LocalDateTime createdAt = LocalDateTime.now().withNano(0);
+            mapper.insertNotifications(List.of(
+                notification(fixture, "SETTLEMENT_REQUESTED", new BigDecimal("60"), createdAt)
+            ));
+            Long notificationId =
+                mapper.findByRecipient(fixture.guestMemberId(), null, 1).get(0).getNotificationId();
+            LocalDateTime now = LocalDateTime.now().withNano(0);
+
+            // 남(원결제자)이 같은 번호를 적어 보내면 아무 행도 바뀌지 않는다.
+            assertEquals(0, mapper.markRead(fixture.payerMemberId(), notificationId, now));
+            assertEquals(0, mapper.softDelete(fixture.payerMemberId(), notificationId, now));
+            assertEquals(1, mapper.countUnreadByRecipient(fixture.guestMemberId()));
+
+            // 주인이 부르면 한 건이 바뀌고, 두 번째부터는 바꿀 것이 없다.
+            assertEquals(1, mapper.markRead(fixture.guestMemberId(), notificationId, now));
+            assertEquals(0, mapper.markRead(fixture.guestMemberId(), notificationId, now));
+            assertEquals(0, mapper.countUnreadByRecipient(fixture.guestMemberId()));
+
+            // 지우면 목록에서 빠진다. 행은 남아 있고 deleted_at만 적힌다.
+            assertEquals(1, mapper.softDelete(fixture.guestMemberId(), notificationId, now));
+            assertEquals(0, mapper.findByRecipient(fixture.guestMemberId(), null, 10).size());
+            assertEquals(0, mapper.softDelete(fixture.guestMemberId(), notificationId, now));
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    @Test
+    void softDeleteAll_emptiesOnlyTheCallersList() {
+        Fixture fixture = createFixture();
+        try {
+            LocalDateTime createdAt = LocalDateTime.now().withNano(0);
+            mapper.insertNotifications(List.of(
+                notification(fixture, "SETTLEMENT_REQUESTED", new BigDecimal("60"), createdAt),
+                notification(fixture, "SETTLEMENT_COMPLETED", new BigDecimal("100"), createdAt)
+            ));
+
+            // 남이 부르면 지울 것이 없다.
+            assertEquals(
+                0,
+                mapper.softDeleteAll(fixture.payerMemberId(), LocalDateTime.now().withNano(0))
+            );
+            assertEquals(2, mapper.findByRecipient(fixture.guestMemberId(), null, 10).size());
+
+            assertEquals(
+                2,
+                mapper.softDeleteAll(fixture.guestMemberId(), LocalDateTime.now().withNano(0))
+            );
+            assertEquals(0, mapper.findByRecipient(fixture.guestMemberId(), null, 10).size());
+            assertEquals(0, mapper.countUnreadByRecipient(fixture.guestMemberId()));
         } finally {
             deleteFixture(fixture);
         }

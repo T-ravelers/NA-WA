@@ -5,6 +5,16 @@
 
 <mapper namespace="me.nawa.notification.mapper.NotificationMapper">
 
+    <!--
+        커서는 "이 알림 다음부터"를 뜻하는 알림 번호 하나다.
+
+        번호만으로 비교하지 않고 그 번호의 created_at까지 함께 읽어 (시각, 번호) 짝으로
+        비교한다. 정렬 기준이 created_at이고 이 값은 DB가 아니라 앱이 넣기 때문에, 번호
+        순서와 시각 순서가 어긋날 수 있다. 번호만 보고 자르면 그 어긋난 만큼 어떤 알림은
+        어느 쪽에도 안 나오고 어떤 알림은 두 쪽에 걸쳐 나온다.
+
+        (recipient_member_id, created_at DESC) 인덱스를 그대로 탄다.
+    -->
     <select id="findByRecipient" resultType="me.nawa.notification.domain.Notification">
         SELECT n.notification_id, n.recipient_member_id, n.notification_type, n.settlement_id,
                n.actor_name, n.gathering_name, n.amount, n.currency_code,
@@ -12,6 +22,13 @@
         FROM notifications n
         WHERE n.recipient_member_id = #{memberId}
           AND n.deleted_at IS NULL
+        <if test="cursor != null">
+          AND (n.created_at, n.notification_id) &lt; (
+              SELECT c.created_at, c.notification_id
+              FROM notifications c
+              WHERE c.notification_id = #{cursor}
+          )
+        </if>
         ORDER BY n.created_at DESC, n.notification_id DESC
         LIMIT #{limit}
     </select>
@@ -29,6 +46,35 @@
         SET n.read_at = #{readAt}
         WHERE n.recipient_member_id = #{memberId}
           AND n.read_at IS NULL
+          AND n.deleted_at IS NULL
+    </update>
+
+    <!--
+        아래 셋은 모두 recipient_member_id를 조건에 함께 건다. 알림 번호를 경로로 받으므로
+        남의 번호를 적어 보낼 수 있는데, 이 조건이 그런 요청을 0행으로 만든다. 번호가 아예
+        없는 경우와 결과가 같아서, 응답만 보고는 그 번호의 알림이 있는지 알 수 없다.
+    -->
+    <update id="markRead">
+        UPDATE notifications n
+        SET n.read_at = #{readAt}
+        WHERE n.notification_id = #{notificationId}
+          AND n.recipient_member_id = #{memberId}
+          AND n.read_at IS NULL
+          AND n.deleted_at IS NULL
+    </update>
+
+    <update id="softDelete">
+        UPDATE notifications n
+        SET n.deleted_at = #{deletedAt}
+        WHERE n.notification_id = #{notificationId}
+          AND n.recipient_member_id = #{memberId}
+          AND n.deleted_at IS NULL
+    </update>
+
+    <update id="softDeleteAll">
+        UPDATE notifications n
+        SET n.deleted_at = #{deletedAt}
+        WHERE n.recipient_member_id = #{memberId}
           AND n.deleted_at IS NULL
     </update>
 
