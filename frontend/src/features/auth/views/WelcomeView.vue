@@ -3,6 +3,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import { MERCHANT_HOME_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
+import { vFitText } from '@/shared/lib/fitText'
 import BrandWordmark from '@/shared/ui/BrandWordmark.vue'
 
 const { t } = useI18n()
@@ -40,17 +41,24 @@ const router = useRouter()
         aria-hidden="true"
         class="h-welcome-ticket-height relative flex -rotate-2 items-stretch rounded-md bg-food"
       >
-        <div class="flex flex-1 flex-col gap-0.5 px-4 py-3.5">
+        <!--
+          `min-w-0`이 없으면 이 칸이 글자 길이만큼 벌어져 옆의 스텁을 화면 밖으로 밀어낸다.
+          280px에서 절취선과 스탬프가 통째로 사라지던 원인이다.
+        -->
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5 px-4 py-3.5">
           <span class="font-display text-caption tracking-wide text-on-category/65 uppercase">
             {{ t('auth.welcome.passLabel') }}
           </span>
           <!--
             시안은 ExtraBold(800)이지만 Sztos Variable의 wght 축이 700에서 끝난다.
             시안에서도 이 제목은 티켓 폭을 꽉 채우는 한 줄이다(텍스트 257px / 프레임 250px).
-            줄바꿈을 허용하면 티켓 밖으로 흘러넘치므로 한 줄로 고정한다.
+
+            줄을 꺾으면 고정 높이 티켓 밖으로 흘러넘치므로 한 줄은 그대로 지키되, 좁은 폭에서는
+            잘라내지 않고 글자를 줄인다(#326 결정 11). 390에서는 지금 크기 그대로다.
           -->
           <span
-            class="font-display text-section-header whitespace-nowrap text-on-category uppercase"
+            v-fit-text
+            class="font-display text-section-header truncate text-on-category uppercase"
           >
             {{ t('auth.welcome.passTitle') }}
           </span>
