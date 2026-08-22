@@ -102,65 +102,76 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <!--
+    바깥은 화면 전체를 덮는 어두운 배경이고, 내용은 그 가운데 앱 폭(max-w-shell)만큼만
+    차지한다. `fixed`는 앱 셸 밖으로 빠져나가기 때문에, 폭을 여기서 다시 잡아 주지 않으면
+    노트북처럼 넓은 화면에서 촬영 버튼이 창 끝까지 늘어난다. 하단 탭과 바텀시트도 같은
+    방식으로 폭을 다시 잡는다.
+  -->
   <div
-    class="fixed inset-0 z-50 flex flex-col bg-scrim/90"
-    role="dialog"
-    aria-modal="true"
-    :aria-label="t('settlement.receipt.camera.title')"
+    class="fixed inset-0 z-50 flex justify-center bg-scrim/90"
+    role="presentation"
   >
-    <header class="flex items-center justify-between px-screen py-4">
-      <p class="text-title-sm text-on-scrim">{{ t('settlement.receipt.camera.title') }}</p>
-      <button
-        type="button"
-        data-action="receipt-camera-close"
-        class="grid size-11 place-items-center rounded-sm text-on-scrim"
-        :aria-label="t('settlement.receipt.camera.cancel')"
-        @click="emit('close')"
-      >
-        <IconX
-          :size="22"
-          :stroke-width="1.8"
-          aria-hidden="true"
+    <section
+      class="flex h-full w-full max-w-shell flex-col"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('settlement.receipt.camera.title')"
+    >
+      <header class="flex items-center justify-between px-screen py-4">
+        <p class="text-title-sm text-on-scrim">{{ t('settlement.receipt.camera.title') }}</p>
+        <button
+          type="button"
+          data-action="receipt-camera-close"
+          class="grid size-11 place-items-center rounded-sm text-on-scrim"
+          :aria-label="t('settlement.receipt.camera.cancel')"
+          @click="emit('close')"
+        >
+          <IconX
+            :size="22"
+            :stroke-width="1.8"
+            aria-hidden="true"
+          />
+        </button>
+      </header>
+
+      <div class="flex flex-1 items-center justify-center px-screen">
+        <p
+          v-if="errorKey !== null"
+          class="text-center text-body-sm text-on-scrim"
+          role="alert"
+        >
+          {{ t(errorKey) }}
+        </p>
+        <!-- eslint-disable-next-line vuejs-accessibility/media-has-caption -->
+        <video
+          v-else
+          ref="video"
+          data-testid="receipt-camera-video"
+          playsinline
+          muted
+          class="max-h-full w-full rounded-sm object-contain"
         />
-      </button>
-    </header>
+      </div>
 
-    <div class="flex flex-1 items-center justify-center px-screen">
-      <p
-        v-if="errorKey !== null"
-        class="text-center text-body-sm text-on-scrim"
-        role="alert"
-      >
-        {{ t(errorKey) }}
-      </p>
-      <!-- eslint-disable-next-line vuejs-accessibility/media-has-caption -->
-      <video
-        v-else
-        ref="video"
-        data-testid="receipt-camera-video"
-        playsinline
-        muted
-        class="max-h-full w-full rounded-sm object-contain"
-      />
-    </div>
-
-    <div class="flex flex-col gap-2 px-screen pt-4 pb-8">
-      <AppButton
-        v-if="errorKey === null"
-        data-action="receipt-camera-shoot"
-        block
-        variant="settle"
-        :disabled="busy"
-        @click="shoot"
-        >{{ t('settlement.receipt.camera.shutter') }}</AppButton
-      >
-      <AppButton
-        data-action="receipt-camera-library"
-        block
-        variant="secondary"
-        @click="emit('useLibrary')"
-        >{{ t('settlement.receipt.source.library') }}</AppButton
-      >
-    </div>
+      <div class="flex flex-col gap-2 px-screen pt-4 pb-8">
+        <AppButton
+          v-if="errorKey === null"
+          data-action="receipt-camera-shoot"
+          block
+          variant="settle"
+          :disabled="busy"
+          @click="shoot"
+          >{{ t('settlement.receipt.camera.shutter') }}</AppButton
+        >
+        <AppButton
+          data-action="receipt-camera-library"
+          block
+          variant="secondary"
+          @click="emit('useLibrary')"
+          >{{ t('settlement.receipt.source.library') }}</AppButton
+        >
+      </div>
+    </section>
   </div>
 </template>

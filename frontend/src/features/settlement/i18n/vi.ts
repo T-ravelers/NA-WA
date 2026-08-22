@@ -44,6 +44,16 @@ export default {
       viewAllLabel: 'Xem tất cả khoản chia tiền đã hoàn thành',
       emptyTitle: 'Chưa có khoản chia tiền hoàn thành',
       emptyDescription: 'Các khoản chia tiền đã hoàn thành sẽ được liệt kê ở đây.',
+      period: 'Khoảng ngày',
+      anyDate: 'Mọi ngày',
+      periodRange: '{from} – {to}',
+      choosePeriod: 'Chọn khoảng ngày',
+      periodHint: 'Chạm vào ngày đầu tiên, rồi chạm vào ngày cuối cùng.',
+      applyPeriod: 'Áp dụng',
+      clearPeriod: 'Xóa ngày',
+      noneInPeriodTitle: 'Không có gì trong khoảng này',
+      noneInPeriodDescription:
+        'Các khoản chia tiền đã hoàn thành nằm ngoài khoảng ngày bạn đã chọn.',
     },
     create: {
       title: 'Yêu cầu mới',

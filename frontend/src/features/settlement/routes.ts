@@ -2,6 +2,15 @@ import type { RouteRecordRaw } from 'vue-router'
 
 /**
  * 정산 화면 라우트
+ *
+ * 모든 화면이 `hideBottomNav`로 하단 탭을 감춘다.
+ *
+ * 하단 탭은 Explore·Report·Profile·Wallet·Journey 다섯 곳으로 가는 길이고, 정산은 그중
+ * 어디도 아니다. 정산으로 들어오는 문은 지갑 홈 하나뿐이라 탭을 그려 두면 "여기가 탭 중
+ * 한 곳"이라는 잘못된 신호를 준다. 실제로 누르면 하던 일이 사라지는데, Start Split처럼
+ * 여러 단계를 거치는 화면에서는 적어 둔 참여자와 금액이 통째로 날아간다.
+ *
+ * 지갑도 같은 규칙이다 — 홈만 탭을 두고 충전·QR·거래 내역은 전부 감춘다.
  */
 
 const routes: RouteRecordRaw[] = [
@@ -16,7 +25,7 @@ const routes: RouteRecordRaw[] = [
     path: '/settlements',
     name: 'settlements',
     component: () => import('./views/SettlementListView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideBottomNav: true },
   },
   /**
    * 정산 요청 생성
@@ -29,7 +38,7 @@ const routes: RouteRecordRaw[] = [
     path: '/settlements/new',
     name: 'settlement-new',
     component: () => import('./views/SettlementRequestView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideBottomNav: true },
   },
   /**
    * 정산 전체 내역
@@ -42,7 +51,7 @@ const routes: RouteRecordRaw[] = [
     path: '/settlements/history',
     name: 'settlement-history',
     component: () => import('./views/SettlementHistoryView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideBottomNav: true },
   },
   /**
    * 정산 한 건 상세
@@ -53,7 +62,7 @@ const routes: RouteRecordRaw[] = [
     path: '/settlements/:settlementId',
     name: 'settlement-detail',
     component: () => import('./views/SettlementDetailView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideBottomNav: true },
   },
   /**
    * 정산 요청 완료 화면
@@ -65,7 +74,7 @@ const routes: RouteRecordRaw[] = [
     path: '/settlements/:settlementId/requested',
     name: 'settlement-requested',
     component: () => import('./views/SettlementRequestedView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideBottomNav: true },
   },
   /**
    * 결제 진행 화면
@@ -78,7 +87,7 @@ const routes: RouteRecordRaw[] = [
     path: '/settlements/:settlementId/pay',
     name: 'settlement-pay',
     component: () => import('./views/SettlementPayView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideBottomNav: true },
   },
   /**
    * 결제 완료 화면
@@ -87,7 +96,7 @@ const routes: RouteRecordRaw[] = [
     path: '/settlements/:settlementId/pay/complete',
     name: 'settlement-pay-complete',
     component: () => import('./views/SettlementPayCompleteView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, hideBottomNav: true },
   },
 ]
 

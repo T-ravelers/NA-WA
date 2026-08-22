@@ -32,6 +32,12 @@ describe('settlement routes', () => {
     ])
   })
 
+  it('hides the bottom tab bar on every settlement screen', () => {
+    // 정산은 하단 탭의 목적지가 아니라 지갑에서 들어오는 하위 흐름이다.
+    // 한 화면이라도 탭이 남으면 그 화면에서만 흐름을 벗어나는 길이 생긴다.
+    expect(routes.map((route) => route.meta?.hideBottomNav)).toEqual(routes.map(() => true))
+  })
+
   it('registers the fixed segments before the settlement id parameter', () => {
     const paths = routes.map((route) => route.path)
 

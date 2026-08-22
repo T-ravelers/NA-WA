@@ -412,6 +412,18 @@ describe('SettlementCreateView', () => {
     expect(wrapper.find('[data-action="receipt-camera-shoot"]').exists()).toBe(true)
   })
 
+  it('keeps the camera screen within the app width', async () => {
+    // 카메라는 화면 전체를 덮는 자리라 앱 셸 밖에 그려진다. 폭을 다시 잡아 주지 않으면
+    // 노트북처럼 넓은 화면에서 촬영 버튼이 창 끝까지 늘어난다.
+    stubCamera()
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await openCamera(wrapper)
+
+    expect(wrapper.get('[role="dialog"][aria-modal="true"]').classes()).toContain('max-w-shell')
+  })
+
   it('offers the photo library when the camera cannot open', async () => {
     stubCamera(null)
     const wrapper = mountCreate()

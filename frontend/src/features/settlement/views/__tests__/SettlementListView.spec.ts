@@ -19,6 +19,8 @@ function summary(id: string, status: SettlementStatus): SettlementSummary {
     receivableAmount: '18.00',
     type: 'EQUAL',
     status,
+    createdAt: '2026-08-01T19:00:00',
+    completedAt: status === 'COMPLETED' ? '2026-08-02T19:00:00' : '',
     viewer: {
       role: 'PARTICIPANT',
       shareAmount: '12.50',

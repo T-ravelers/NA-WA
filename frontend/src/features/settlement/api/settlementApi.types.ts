@@ -58,6 +58,14 @@ export interface SettlementSummaryDto {
   type: 'EQUAL' | 'ITEMIZED'
   status: 'REQUESTED' | 'COMPLETED'
   viewer: SettlementViewerDto
+  createdAt?: string | null
+  /**
+   * 정산이 끝난 시각.
+   *
+   * 진행 중이면 비어 있다. 이 값을 남기기 시작한 때보다 먼저 끝난 정산도 비어 있는데,
+   * 되살릴 근거가 없어 서버가 채우지 않기로 한 것이다.
+   */
+  completedAt?: string | null
 }
 
 /**
