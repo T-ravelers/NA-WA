@@ -581,6 +581,22 @@ describe('ExploreFilterSheet', () => {
     })
   })
 
+  it('shows the activities as checked when the sheet opens on a remembered sector', async () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'category', filters: { sort: 'NEWEST', sectorIds: [2] }, resultCount: 3 },
+    })
+
+    await expandSector(wrapper, 'Food')
+
+    /*
+     * 주소에는 대분류가 ID 하나로 실려 온다(`eventSectorIds=2`). 그것을 소분류로 펼쳐 두지
+     * 않으면 대분류만 체크로 보이고 아래 소분류 칩은 전부 꺼진 채로 그려진다.
+     */
+    expect(isSectorChecked(wrapper, 'Food')).toBe(true)
+    expect(FOOD_ACTIVITY_LABELS.every((label) => isActivityChecked(wrapper, label))).toBe(true)
+  })
+
   it('checks every activity under a sector when the sector is checked', async () => {
     const wrapper = mountCategorySheet()
 
