@@ -597,6 +597,39 @@ describe('ExploreFilterSheet', () => {
     expect(FOOD_ACTIVITY_LABELS.every((label) => isActivityChecked(wrapper, label))).toBe(true)
   })
 
+  it('opens with every sector collapsed', () => {
+    const wrapper = mountCategorySheet()
+
+    /* 하나만 펼쳐 두면 그 대분류만 있는 것처럼 보이고 나머지를 못 찾는다. */
+    expect(isActivityChecked(wrapper, 'Makeup / Cosmetics')).toBe(false)
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Skincare')).toBe(false)
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Cafe / Dessert')).toBe(
+      false,
+    )
+  })
+
+  it('writes how many activities are chosen next to the sector name', async () => {
+    const wrapper = mountCategorySheet()
+
+    await expandSector(wrapper, 'Food')
+    await pressButton(wrapper, 'Cafe / Dessert')
+    await pressButton(wrapper, 'Restaurant')
+
+    /* 접어 두면 무엇을 골랐는지 안 보이므로 헤더에 개수를 남긴다. */
+    expect(sectorHeader(wrapper, 'Food')?.text()).toContain('· 2')
+
+    await checkSector(wrapper, 'Food')
+
+    /* 전부 고른 상태에서도 개수는 그대로 보인다. */
+    expect(sectorHeader(wrapper, 'Food')?.text()).toContain('· 8')
+  })
+
+  it('leaves the sector name alone when nothing under it is chosen', () => {
+    const wrapper = mountCategorySheet()
+
+    expect(sectorHeader(wrapper, 'Food')?.text()).not.toContain('·')
+  })
+
   it('checks every activity under a sector when the sector is checked', async () => {
     const wrapper = mountCategorySheet()
 

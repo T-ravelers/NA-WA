@@ -156,7 +156,8 @@ const DATE_PRESETS = [
 
 const draft = reactive<EventSearchFilters>(cloneFilters(props.filters))
 const selectedRegion = ref(SEOUL_REGION1)
-const expandedCategories = ref<string[]>(['explore.categories.beauty'])
+// 시트를 열면 전부 접어 둔다. 하나만 펼쳐 두면 그 대분류만 있는 것처럼 보인다.
+const expandedCategories = ref<string[]>([])
 
 watch(
   () => props.filters,
@@ -337,6 +338,11 @@ const checkedActivities = computed<Set<number>>(() => {
 
 function isActivitySelected(activityId: number): boolean {
   return checkedActivities.value.has(activityId)
+}
+
+/** 그 대분류에서 고른 소분류 개수. 접혀 있어도 무엇을 골랐는지 알 수 있게 헤더에 적는다. */
+function selectedActivityCount(sector: (typeof EVENT_SECTOR_OPTIONS)[number]): number {
+  return sector.activities.filter((activity) => checkedActivities.value.has(activity.id)).length
 }
 
 /** 대분류 체크는 그 아래 소분류가 전부 체크됐을 때만 켜진다. */
@@ -592,7 +598,15 @@ function apply(): void {
                 @click="toggleExpandedCategory(sector.labelKey)"
               >
                 <CategoryDot :category="sector.category" />
-                <span class="flex-1 text-title-sm text-ink">{{ t(sector.labelKey) }}</span>
+                <span class="flex-1 text-title-sm text-ink"
+                  >{{ t(sector.labelKey)
+                  }}<span
+                    v-if="selectedActivityCount(sector) > 0"
+                    class="text-caption text-ink-3"
+                  >
+                    · {{ selectedActivityCount(sector) }}</span
+                  ></span
+                >
                 <span
                   role="checkbox"
                   tabindex="0"
