@@ -160,6 +160,7 @@ export default {
       join: '同行グループに参加',
       joinUnavailable: 'この同行グループは現在参加を受け付けていません。',
       alreadyJoined: 'この同行グループにはすでに参加しています。',
+      alreadyLeft: 'この同行グループから退出したため、再度参加することはできません。',
       participationCheckFailed: '参加状況を確認できませんでした。もう一度お試しください。',
       openMenu: '同行グループのメニューを開く',
       menu: {

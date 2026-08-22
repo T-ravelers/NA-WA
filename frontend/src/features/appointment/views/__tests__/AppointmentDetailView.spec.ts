@@ -989,12 +989,15 @@ describe('AppointmentDetailView', () => {
     )
   })
 
-  it('stops saying you already joined once you have left', async () => {
-    // 나갔는데 안내가 남으면 같은 화면에서 "이미 참여했다"와 환급 토스트가
-    // 서로 반대되는 말을 한다.
+  it('says you left instead of claiming you already joined', async () => {
+    // 서버는 나간 참여에도 joined: true를 준다. 그것만 보면 나간 사람에게
+    // "이미 참여했다"고 말해, 같은 화면에서 환급 토스트와 반대되는 안내가 된다.
     fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
     cancelAppointmentParticipation.mockImplementation(() => {
-      fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+      fetchMyAppointmentParticipation.mockResolvedValue({
+        ...memberParticipation,
+        membershipStatus: 'LEFT' as const,
+      })
       return Promise.resolve()
     })
     const { wrapper } = await mountView()
@@ -1010,6 +1013,7 @@ describe('AppointmentDetailView', () => {
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('You have already joined this appointment.')
+    expect(wrapper.text()).toContain('You left this appointment, so you cannot join it again.')
   })
 
   it('lets a member leave during the activity, spelling out the no-show forfeit', async () => {

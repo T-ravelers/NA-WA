@@ -162,6 +162,7 @@ export default {
       join: 'Tham gia cuộc hẹn',
       joinUnavailable: 'Cuộc hẹn này không mở để tham gia.',
       alreadyJoined: 'Bạn đã tham gia cuộc hẹn này rồi.',
+      alreadyLeft: 'Bạn đã rời khỏi cuộc hẹn này nên không thể tham gia lại.',
       participationCheckFailed:
         'Chúng tôi không kiểm tra được trạng thái tham gia của bạn. Vui lòng thử lại.',
       openMenu: 'Mở menu cuộc hẹn',
