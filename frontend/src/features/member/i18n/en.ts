@@ -4,8 +4,8 @@
  * `errorCode`는 백엔드 MemberErrorCode와 1:1로 맞춘다. 서버가 내려준 message를
  * 화면에 그대로 노출하지 않고 여기의 문구를 사용한다.
  *
- * MEMBER-005~008(국적·이름·이미지·온보딩)의 문구는 그 오류에 도달하는 화면이
- * 아직 없어 비어 있다 — 프로필 편집·온보딩 폼(#232 ②)에서 함께 채운다.
+ * MEMBER-005~008(국적·이름·이미지·온보딩)은 프로필 편집·온보딩 폼이 도달하는 오류다.
+ * 폼이 같은 조건을 먼저 검사하지만 서버 판정이 정본이므로 문구를 둘 다 둔다.
  */
 export default {
   member: {
@@ -50,11 +50,38 @@ export default {
           'Your language is set on this device, but we could not save it to your account.',
       },
     },
+    form: {
+      editTitle: 'Edit profile',
+      onboardingTitle: 'Welcome',
+      onboardingLead: 'Tell us your name and where you are from. You can change both later.',
+      name: 'Name',
+      namePlaceholder: 'The name other travelers will see',
+      photo: 'Photo address',
+      photoOptional: 'Optional. Paste a link to a picture of you.',
+      photoHint: 'Your photo shows up next to your name in appointments.',
+      nationality: 'Nationality',
+      nationalityPlaceholder: 'Choose a country',
+      save: 'Save',
+      start: 'Start',
+      cancel: 'Cancel',
+      error: {
+        nameRequired: 'Enter a name.',
+        nameTooLong: 'Use {max} characters or fewer.',
+        imageScheme: 'The address has to start with http:// or https://.',
+        countryRequired: 'Choose a country.',
+        /** 서버가 알려 준 코드가 없거나 문구가 없는 코드일 때의 일반 안내. */
+        saveFailed: 'We could not save your profile. Please try again.',
+      },
+    },
     errorCode: {
       'MEMBER-001': 'We could not find your account. Please sign in again.',
       'MEMBER-002': 'That language is not supported yet.',
       'MEMBER-003': 'That currency is not supported yet.',
       'MEMBER-004': 'There was nothing to change.',
+      'MEMBER-005': 'We do not support that country yet.',
+      'MEMBER-006': 'That name cannot be used. Try a shorter one.',
+      'MEMBER-007': 'That photo address is not valid.',
+      'MEMBER-008': 'Fill in every field to finish setting up.',
     },
   },
 }

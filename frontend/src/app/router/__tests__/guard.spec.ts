@@ -182,4 +182,72 @@ describe('authGuard', () => {
 
     expect(result).toBe(true)
   })
+
+  describe('onboarding', () => {
+    function unonboarded(accountType = 'TRAVELER') {
+      ensureMemberProfile.mockResolvedValue({
+        memberId: 1,
+        preferredLanguage: 'en',
+        accountType,
+        onboardingRequired: true,
+      })
+    }
+
+    it('sends someone who has not finished onboarding to the onboarding screen', async () => {
+      unonboarded()
+
+      const result = await authGuard(routeTo('/wallet', { requiresAuth: true }), from, next)
+
+      expect(result).toEqual({ path: '/onboarding' })
+    })
+
+    it('lets the onboarding screen itself through', async () => {
+      unonboarded()
+
+      const result = await authGuard(routeTo('/onboarding', { requiresAuth: true }), from, next)
+
+      expect(result).toBe(true)
+    })
+
+    /*
+     * 가맹점주는 로그인 직후 아직 TRAVELER이고 온보딩도 마치지 않은 채로 `/merchant`에서
+     * 상호명을 확정한다. 여기서 막으면 가맹점 가입 경로가 통째로 닫힌다.
+     */
+    it('does not trap a merchant signing up on the way to the merchant screen', async () => {
+      unonboarded()
+
+      const result = await authGuard(routeTo('/merchant', { requiresAuth: true }), from, next)
+
+      expect(result).toBe(true)
+    })
+
+    it('keeps sending a registered merchant to the merchant screen', async () => {
+      unonboarded('MERCHANT')
+
+      const result = await authGuard(routeTo('/wallet', { requiresAuth: true }), from, next)
+
+      expect(result).toEqual({ path: '/merchant' })
+    })
+
+    it('does not gate routes that declare no auth policy', async () => {
+      unonboarded()
+
+      const result = await authGuard(routeTo('/', {}), from, next)
+
+      expect(result).toBe(true)
+    })
+
+    it('turns someone who already finished away from the onboarding screen', async () => {
+      ensureMemberProfile.mockResolvedValue({
+        memberId: 1,
+        preferredLanguage: 'en',
+        accountType: 'TRAVELER',
+        onboardingRequired: false,
+      })
+
+      const result = await authGuard(routeTo('/onboarding', { requiresAuth: true }), from, next)
+
+      expect(result).toEqual({ path: '/explore' })
+    })
+  })
 })

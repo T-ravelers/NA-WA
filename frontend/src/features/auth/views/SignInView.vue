@@ -9,7 +9,7 @@ import { applyLocale } from '@/app/i18n/applyLocale'
 import IconOrb from '@/shared/ui/IconOrb.vue'
 import LocaleSheet from '@/shared/ui/LocaleSheet.vue'
 import { resolveInitialLocale } from '@/shared/i18n/localePreference'
-import type { AppLocale } from '@/shared/i18n/locales'
+import { nativeLocaleLabel, type AppLocale } from '@/shared/i18n/locales'
 import { requestSignOut } from '@/shared/api/sessionSignOut'
 import { isSignOutBarrierActive, subscribeSignOutBarrier } from '@/shared/api/signOutBarrier'
 
@@ -34,14 +34,7 @@ onMounted(() => {
 
 onUnmounted(() => unsubscribeSignOutBarrier?.())
 
-const NATIVE_LABEL: Record<AppLocale, string> = {
-  en: 'English',
-  ja: '日本語',
-  'zh-TW': '繁體中文',
-  vi: 'Tiếng Việt',
-}
-
-const currentLocaleLabel = computed(() => NATIVE_LABEL[selectedLocale.value])
+const currentLocaleLabel = computed(() => nativeLocaleLabel(selectedLocale.value))
 
 /**
  * 로그인 이전이라 서버에 저장할 곳이 없다. 브라우저에만 남기고, 로그인 이후 서버 반영은
