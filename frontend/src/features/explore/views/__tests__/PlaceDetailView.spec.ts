@@ -207,6 +207,23 @@ describe('PlaceDetailView', () => {
     expect(wrapper.text()).not.toContain('서울')
   })
 
+  // 수집한 영업시간은 대부분 { raw: '...' } 한 칸짜리 객체다. raw는 크롤러가 붙인
+  // 키 이름이고 행에는 이미 Hours가 적혀 있어, 그대로 찍으면 'raw: 12:00 ~ 22:00'이
+  // 된다. 값에 섞여 오는 <br>도 화면에서는 글자로 보인다.
+  it('hides the raw hours key and turns <br> into a line break', async () => {
+    fetchPlaceDetail.mockResolvedValue({
+      ...place,
+      openingHours: { raw: '- 12:00~22:00<br>- 준비시간 15:00~18:00' },
+    })
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('- 12:00~22:00')
+    expect(wrapper.text()).toContain('- 준비시간 15:00~18:00')
+    expect(wrapper.text()).not.toContain('raw:')
+    expect(wrapper.text()).not.toContain('<br>')
+  })
+
   it('returns to the Place list from the detail screen', async () => {
     const { wrapper, router } = await mountView()
 
