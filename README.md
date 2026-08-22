@@ -116,6 +116,25 @@ docker compose up -d --build backend
 - 로컬 3306/8080 포트를 다른 프로세스(네이티브 MySQL, IDE에서 띄운 Tomcat
   등)가 이미 쓰고 있다면 포트 충돌이 발생하니 먼저 정리하세요.
 
+### 시연용 시드 — 리포트 비교
+
+리포트 비교(`GET /api/v1/reports/{id}/comparison`)는 같은 약속 동료와 같은 국적 회원의
+결제·리포트가 있어야 화면에 무언가 보입니다. 시연 데이터는 Flyway 마이그레이션이
+아니라 SQL 파일 한 개로 넣습니다 — 스키마 버전을 올리지 않고, 두 번 돌려도 같은
+결과가 됩니다(앞서 넣은 시드를 먼저 지웁니다).
+
+1. `backend/docs/database/seed/report-demo.sql` 맨 위의 `SET @host := 1;`을 시연 계정의
+   `member_id`로 바꿉니다.
+2. 적용합니다.
+
+```shell
+docker compose exec -T mysql mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < backend/docs/database/seed/report-demo.sql
+```
+
+3. 시연 계정으로 로그인해 여정 `Seed Report Journey`의 리포트를 UI에서 만듭니다. 호스트의
+   결제는 일부러 리포트에 연결해 두지 않았습니다 — 연결돼 있으면 생성이 `REPORT-008`로
+   막힙니다.
+
 컨테이너는 다음 명령으로 종료합니다.
 
 ```shell
