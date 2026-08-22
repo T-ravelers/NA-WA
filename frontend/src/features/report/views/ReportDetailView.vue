@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IconArrowLeft, IconChevronRight, IconShare2 } from '@tabler/icons-vue'
+import { IconArrowLeft, IconChevronRight, IconShare } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -349,7 +349,7 @@ function retry(): void {
         variant="surface"
         @click="shareReport"
       >
-        <IconShare2
+        <IconShare
           :size="20"
           :stroke-width="1.8"
           aria-hidden="true"

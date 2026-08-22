@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IconShare2 } from '@tabler/icons-vue'
+import { IconShare } from '@tabler/icons-vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { vFitText } from '@/shared/lib/fitText'
@@ -121,7 +121,7 @@ onBeforeUnmount(() => {
             @click="emit('share')"
           >
             <span class="inline-flex items-center gap-2">
-              <IconShare2
+              <IconShare
                 :size="18"
                 :stroke-width="2"
                 aria-hidden="true"
