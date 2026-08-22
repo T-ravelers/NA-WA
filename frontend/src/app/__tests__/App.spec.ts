@@ -1,11 +1,19 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import App from '../App.vue'
 import { i18n } from '../i18n'
 
 describe('App', () => {
+  beforeEach(() => {
+    // jsdom에는 `matchMedia`가 없다. 가장자리 스와이프는 설치형 앱에서만 켜지므로 탭으로 둔다.
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
+  })
+
   it('renders the active route inside the app shell', async () => {
     const router = createRouter({
       history: createMemoryHistory(),

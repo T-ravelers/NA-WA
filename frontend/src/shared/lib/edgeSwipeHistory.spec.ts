@@ -5,137 +5,151 @@ import type { Router } from 'vue-router'
 
 import { createEdgeSwipeTracker, useEdgeSwipeHistory } from './edgeSwipeHistory'
 
-const WIDTH = 390
-
 describe('createEdgeSwipeTracker', () => {
-  it('ignores a swipe that starts away from the edges', () => {
+  it('ignores a swipe that starts away from the edge', () => {
     const tracker = createEdgeSwipeTracker()
 
-    tracker.start(100, 300, WIDTH)
+    tracker.start(100, 300)
     tracker.move(300, 300)
 
-    expect(tracker.end()).toBeNull()
+    expect(tracker.end()).toBe(false)
   })
 
   it('goes back on a long rightward swipe from the left edge', () => {
     const tracker = createEdgeSwipeTracker()
 
-    tracker.start(8, 300, WIDTH)
+    tracker.start(8, 300)
     tracker.move(120, 310)
 
-    expect(tracker.end()).toBe('back')
-  })
-
-  it('goes forward on a long leftward swipe from the right edge', () => {
-    const tracker = createEdgeSwipeTracker()
-
-    tracker.start(WIDTH - 8, 300, WIDTH)
-    tracker.move(WIDTH - 120, 300)
-
-    expect(tracker.end()).toBe('forward')
+    expect(tracker.end()).toBe(true)
   })
 
   it('ignores a short swipe', () => {
     const tracker = createEdgeSwipeTracker()
 
-    tracker.start(8, 300, WIDTH)
+    tracker.start(8, 300)
     tracker.move(60, 300) // 52px < 72px
 
-    expect(tracker.end()).toBeNull()
+    expect(tracker.end()).toBe(false)
   })
 
   it('ignores a swipe that moves more vertically than horizontally', () => {
     const tracker = createEdgeSwipeTracker()
 
-    tracker.start(8, 100, WIDTH)
+    tracker.start(8, 100)
     tracker.move(100, 250) // dx 92, dy 150 → 스크롤
 
-    expect(tracker.end()).toBeNull()
+    expect(tracker.end()).toBe(false)
   })
 
-  it('ignores a swipe toward the same edge it started from', () => {
+  it('ignores a leftward swipe that starts on the left edge', () => {
     const tracker = createEdgeSwipeTracker()
 
-    tracker.start(WIDTH - 8, 300, WIDTH)
-    tracker.move(WIDTH + 100, 300)
+    tracker.start(20, 300)
+    tracker.move(-100, 300)
 
-    expect(tracker.end()).toBeNull()
+    expect(tracker.end()).toBe(false)
   })
 
   it('does nothing after the browser takes the gesture (cancel)', () => {
     const tracker = createEdgeSwipeTracker()
 
-    tracker.start(8, 300, WIDTH)
+    tracker.start(8, 300)
     tracker.move(200, 300)
     tracker.cancel()
 
     expect(tracker.isTracking).toBe(false)
-    expect(tracker.end()).toBeNull()
+    expect(tracker.end()).toBe(false)
   })
 })
 
-/** jsdom에는 `Touch` 생성자가 없다. 평범한 Event에 `touches`만 얹어 보낸다. */
-function touch(type: string, x: number, y: number): void {
+/**
+ * jsdom에는 `Touch` 생성자가 없다. 평범한 Event에 좌표 목록만 얹어 보낸다.
+ *
+ * 끝나는 이벤트에서 좌표는 `touches`가 아니라 `changedTouches`에 있다 — 실제 브라우저와 같다.
+ */
+function touch(type: string, x: number, y = 300): void {
   const event = new Event(type, { bubbles: true })
+  const points = [{ clientX: x, clientY: y }]
+  const ended = type === 'touchend' || type === 'touchcancel'
 
-  Object.defineProperty(event, 'touches', {
-    value: type === 'touchend' || type === 'touchcancel' ? [] : [{ clientX: x, clientY: y }],
-  })
+  Object.defineProperty(event, 'touches', { value: ended ? [] : points })
+  Object.defineProperty(event, 'changedTouches', { value: ended ? points : [] })
   window.dispatchEvent(event)
 }
 
-function swipe(fromX: number, toX: number, cancel = false): void {
-  touch('touchstart', fromX, 300)
-  touch('touchmove', toX, 300)
-  touch(cancel ? 'touchcancel' : 'touchend', toX, 300)
+/** 시작 → 중간 `touchmove` → 손 뗌. 실기기에서 보통 오는 모양이다. */
+function swipe(fromX: number, toX: number): void {
+  touch('touchstart', fromX)
+  touch('touchmove', toX)
+  touch('touchend', toX)
 }
 
-describe('useEdgeSwipeHistory', () => {
-  const back = vi.fn()
-  const forward = vi.fn()
-  const router = { back, forward } as unknown as Router
-  let wrapper: ReturnType<typeof mount> | null = null
+const back = vi.fn()
+const router = { back } as unknown as Router
+let wrapper: ReturnType<typeof mount> | null = null
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: WIDTH })
-    window.history.replaceState(
-      { back: '/journeys', current: '/wallet', forward: '/wallet/top-up' },
-      '',
-    )
-    const Host = defineComponent({
-      setup() {
-        useEdgeSwipeHistory(router)
+function mountHost(): void {
+  const Host = defineComponent({
+    setup() {
+      useEdgeSwipeHistory(router)
 
-        return () => h('div')
-      },
-    })
-
-    wrapper = mount(Host, { attachTo: document.body })
+      return () => h('div')
+    },
   })
 
-  afterEach(() => {
-    wrapper?.unmount()
-    wrapper = null
-    document.body.innerHTML = ''
+  wrapper = mount(Host, { attachTo: document.body })
+}
+
+/** 홈 화면에 설치해 `standalone`으로 떴는지 정한다. jsdom에는 `matchMedia`가 없다. */
+function stubInstalledApp(installed: boolean): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({ matches: installed })),
+  )
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  window.history.replaceState({ back: '/journeys', current: '/wallet' }, '')
+})
+
+afterEach(() => {
+  wrapper?.unmount()
+  wrapper = null
+  document.body.innerHTML = ''
+  vi.unstubAllGlobals()
+})
+
+describe('useEdgeSwipeHistory in an installed app', () => {
+  beforeEach(() => {
+    stubInstalledApp(true)
+    mountHost()
   })
 
   it('calls router.back for a left-edge swipe when there is somewhere to go back to', () => {
     swipe(8, 200)
 
     expect(back).toHaveBeenCalledTimes(1)
-    expect(forward).not.toHaveBeenCalled()
   })
 
-  it('calls router.forward for a right-edge swipe when there is a forward entry', () => {
-    swipe(WIDTH - 8, WIDTH - 200)
+  it('decides on the release point when the browser sent no touchmove', () => {
+    touch('touchstart', 8)
+    touch('touchend', 200)
 
-    expect(forward).toHaveBeenCalledTimes(1)
-    expect(back).not.toHaveBeenCalled()
+    expect(back).toHaveBeenCalledTimes(1)
+  })
+
+  it('decides on the release point when the last touchmove was short of the threshold', () => {
+    touch('touchstart', 8)
+    touch('touchmove', 60) // 52px — 아직 임계값 아래
+    touch('touchend', 200) // 192px — 뗀 위치는 넘는다
+
+    expect(back).toHaveBeenCalledTimes(1)
   })
 
   it('stays put when history has no back entry', () => {
-    window.history.replaceState({ back: null, current: '/', forward: null }, '')
+    window.history.replaceState({ back: null, current: '/' }, '')
 
     swipe(8, 200)
 
@@ -143,7 +157,9 @@ describe('useEdgeSwipeHistory', () => {
   })
 
   it('does not navigate when the browser cancelled the touch (native swipe took over)', () => {
-    swipe(8, 200, true)
+    touch('touchstart', 8)
+    touch('touchmove', 200)
+    touch('touchcancel', 200)
 
     expect(back).not.toHaveBeenCalled()
   })
@@ -162,6 +178,17 @@ describe('useEdgeSwipeHistory', () => {
   it('stops listening after unmount', () => {
     wrapper?.unmount()
     wrapper = null
+
+    swipe(8, 200)
+
+    expect(back).not.toHaveBeenCalled()
+  })
+})
+
+describe('useEdgeSwipeHistory in a browser tab', () => {
+  it('does not listen at all — the browser has its own edge gesture', () => {
+    stubInstalledApp(false)
+    mountHost()
 
     swipe(8, 200)
 

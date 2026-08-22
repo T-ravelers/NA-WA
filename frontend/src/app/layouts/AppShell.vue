@@ -8,7 +8,7 @@ import BottomNav from '@/shared/ui/BottomNav.vue'
 
 const route = useRoute()
 
-// 가장자리 스와이프로 뒤로·앞으로 가기. 브라우저 탭이든 설치형 PWA든 같은 제스처를 준다(#381).
+// 왼쪽 가장자리 스와이프로 뒤로 가기. 네이티브 제스처와 겹치지 않게 설치형 PWA에서만 켜진다(#381).
 useEdgeSwipeHistory(useRouter())
 
 /**
