@@ -231,6 +231,7 @@ export default {
       noShowForfeit:
         '活動はすでに始まっているため、今退出すると無断欠席扱いになります。デポジット {amount} P は返金されず、出席したメンバーに分配されます。',
       confirm: 'グループを退出',
+      confirmNoShow: '退出してデポジットを放棄',
       cancel: 'とどまる',
       done: 'この同行グループから退出しました。',
       doneRefunded: 'この同行グループから退出しました。{amount} P をウォレットに返金しました。',

@@ -234,6 +234,7 @@ export default {
       noShowForfeit:
         'Hoạt động đã bắt đầu nên rời khỏi lúc này được tính là vắng mặt. Tiền cọc {amount} P của bạn sẽ không được hoàn lại mà được chia cho các thành viên đã có mặt.',
       confirm: 'Rời khỏi nhóm',
+      confirmNoShow: 'Rời nhóm và mất tiền cọc',
       cancel: 'Ở lại',
       done: 'Bạn đã rời khỏi cuộc hẹn này.',
       doneRefunded: 'Bạn đã rời khỏi cuộc hẹn này. {amount} P đã được hoàn về ví của bạn.',

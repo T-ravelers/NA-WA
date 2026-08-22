@@ -228,6 +228,7 @@ export default {
       noShowForfeit:
         '活動已經開始，現在退出將視為缺席。您的押金 {amount} P 不會退還，將分配給出席的成員。',
       confirm: '退出揪團',
+      confirmNoShow: '退出並放棄押金',
       cancel: '繼續參加',
       done: '您已退出這個揪團。',
       doneRefunded: '您已退出這個揪團。{amount} P 已退回您的錢包。',
