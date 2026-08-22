@@ -18,22 +18,26 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class LoadTestSourceIsolationTest {
 
-    private static final String LOAD_TEST_CONTROLLER =
-        "me.nawa.loadtest.controller.LoadTestLoginController";
+    private static final String[] LOAD_TEST_CLASSES = {
+        "me.nawa.loadtest.controller.LoadTestLoginController",
+        "me.nawa.loadtest.stripe.LoadTestStripeClient"
+    };
 
     @Test
     void loadTestSourcesAreIncludedOnlyWhenFlagged() {
         boolean flagged = Boolean.parseBoolean(
             System.getProperty("loadtest.sources.included", "false"));
 
-        assertEquals(
-            flagged,
-            isOnClasspath(LOAD_TEST_CONTROLLER),
-            flagged
-                ? "-Ploadtest 빌드인데 부하 테스트 컨트롤러가 없다. build.gradle의 srcDirs 조건을 확인하라."
-                : "플래그 없는 빌드에 부하 테스트 컨트롤러가 있다. "
-                    + "이대로 배포되면 공유 비밀만으로 임의 회원 로그인이 가능하다. "
-                    + "클래스를 src/loadtest/java 로 되돌리고 build.gradle 조건을 복구하라.");
+        for (String className : LOAD_TEST_CLASSES) {
+            assertEquals(
+                flagged,
+                isOnClasspath(className),
+                flagged
+                    ? "-Ploadtest 빌드인데 부하 테스트 클래스가 없다: " + className
+                    : "플래그 없는 빌드에 부하 테스트 클래스가 있다: " + className
+                        + ". src/loadtest/java 로 되돌리고 build.gradle 조건을 복구하라."
+            );
+        }
     }
 
     private boolean isOnClasspath(String className) {

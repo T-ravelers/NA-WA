@@ -44,6 +44,7 @@ import java.util.Base64;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -155,6 +156,15 @@ class SecurityConfigTest {
                 .getResponse();
 
         assertEquals(200, response.getStatus());
+
+        // 성공한 쓰기 요청 뒤에는 서버가 XSRF-TOKEN 쿠키를 갈아 끼운다.
+        // 처음 받은 값을 계속 쓰는 클라이언트는 두 번째 쓰기부터 403(AUTH-005)을
+        // 받는다 — 프런트엔드는 403 재시도로(`shared/api/csrf.ts`), 부하 스크립트는
+        // 매 요청 전 쿠키 재조회로 이 회전을 흡수한다.
+        // 회전을 없애는 방향으로 고치면 두 클라이언트의 전제가 함께 깨진다.
+        Cookie rotated = response.getCookie("XSRF-TOKEN");
+        assertNotNull(rotated);
+        assertNotEquals(csrfCredentials.cookie.getValue(), rotated.getValue());
     }
 
     @Test
