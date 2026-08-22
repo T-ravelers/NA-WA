@@ -33,4 +33,6 @@ public interface EventMapper {
         @Param("eventId") Long eventId,
         @Param("language") String language
     );
+
+    int increaseEventViewCount(@Param("eventId") Long eventId);
 }

@@ -248,4 +248,12 @@
         ORDER BY pa.is_primary DESC, s.display_order,
                  a.display_order, a.activity_id
     </select>
+
+    <!-- EventMapper.increaseEventViewCount와 같다. 상세 조회 1회당 1씩 올린다. -->
+    <update id="increasePlaceViewCount">
+        UPDATE place
+        SET view_count = view_count + 1
+        WHERE place_id = #{placeId}
+    </update>
+
 </mapper>

@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EventService {
@@ -45,6 +47,7 @@ public class EventService {
         "EXHIBITION"
     );
     private final EventMapper eventMapper;
+    private final ExploreViewCountRecorder viewCountRecorder;
 
     @Transactional(readOnly = true)
     public EventListResponse searchEvents(
@@ -165,11 +168,19 @@ public class EventService {
         return (int) ((totalElements + size - 1) / size);
     }
 
+    /**
+     * Event 상세를 읽는다.
+     *
+     * {@code countView}는 사용자가 상세 화면을 연 요청에서만 참이다. 약속 생성 폼처럼
+     * 같은 API로 위치만 읽어 가는 호출까지 세면 조회수가 부풀기 때문에, 셀지 말지를
+     * 요청이 알려준다. 기본값은 거짓이라 새 호출부가 모르고 조회수를 올리는 일이 없다.
+     */
     @Transactional(readOnly = true)
     public EventDetailResponse getEventDetail(
         Long eventId,
         String language,
-        Long memberId
+        Long memberId,
+        boolean countView
     ) {
         if (eventId == null || eventId <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
@@ -198,7 +209,26 @@ public class EventService {
         event.setActivities(activities == null ? List.of() : activities);
         normalizeJsonResponse(event);
         event.setReservationUrl(resolveReservationUrl(event));
+
+        if (countView) {
+            recordView(eventId);
+        }
+
         return event;
+    }
+
+    /**
+     * 조회수를 쌓되 실패는 삼킨다.
+     *
+     * 조회수는 부가 정보다. 집계가 실패했다고 상세 화면이 안 열리면 손해가 더 크다.
+     * 조용히 넘기지 않고 로그는 남겨서 집계가 멈춘 것을 알 수 있게 한다.
+     */
+    private void recordView(Long eventId) {
+        try {
+            viewCountRecorder.recordEventView(eventId);
+        } catch (RuntimeException exception) {
+            log.warn("Failed to record the Event view count. eventId={}", eventId, exception);
+        }
     }
 
     private void normalizeJsonResponse(EventDetailResponse event) {

@@ -6,8 +6,11 @@ import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +35,9 @@ class EventServiceTest {
 
     @Mock
     private EventMapper eventMapper;
+
+    @Mock
+    private ExploreViewCountRecorder viewCountRecorder;
 
     @InjectMocks
     private EventService eventService;
@@ -275,7 +281,8 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null
+            null,
+            false
         );
 
         assertEquals(990001L, result.getEventId());
@@ -287,10 +294,54 @@ class EventServiceTest {
     }
 
     @Test
+    void getEventDetail_countsTheViewOnlyWhenTheRequestAsksForIt() {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .build();
+        when(eventMapper.findEventDetail(990001L, "ko", null)).thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ko")).thenReturn(List.of());
+
+        eventService.getEventDetail(990001L, "ko", null, true);
+
+        verify(viewCountRecorder).recordEventView(990001L);
+    }
+
+    @Test
+    void getEventDetail_leavesTheViewCountAloneForCallersThatOnlyReadValues() {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .build();
+        when(eventMapper.findEventDetail(990001L, "ko", null)).thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ko")).thenReturn(List.of());
+
+        /* 약속 생성 폼처럼 같은 API로 위치만 읽어 가는 호출은 조회가 아니다. */
+        eventService.getEventDetail(990001L, "ko", null, false);
+
+        verifyNoInteractions(viewCountRecorder);
+    }
+
+    @Test
+    void getEventDetail_stillReturnsTheDetail_whenCountingTheViewFails() {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .title("서울 야시장 푸드 팝업(테스트)")
+            .build();
+        when(eventMapper.findEventDetail(990001L, "ko", null)).thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ko")).thenReturn(List.of());
+        doThrow(new IllegalStateException("boom"))
+            .when(viewCountRecorder).recordEventView(990001L);
+
+        EventDetailResponse result = eventService.getEventDetail(990001L, "ko", null, true);
+
+        /* 조회수는 부가 정보다. 집계가 멈춰도 상세 화면은 열려야 한다. */
+        assertEquals("서울 야시장 푸드 팝업(테스트)", result.getTitle());
+    }
+
+    @Test
     void getEventDetail_throwsInvalidInput_whenEventIdIsInvalid() {
         assertThrows(
             BusinessException.class,
-            () -> eventService.getEventDetail(0L, "ko", null)
+            () -> eventService.getEventDetail(0L, "ko", null, false)
         );
         verifyNoInteractions(eventMapper);
     }
@@ -302,7 +353,7 @@ class EventServiceTest {
 
         BusinessException exception = assertThrows(
             BusinessException.class,
-            () -> eventService.getEventDetail(990001L, "ko", null)
+            () -> eventService.getEventDetail(990001L, "ko", null, false)
         );
 
         assertEquals(
@@ -327,7 +378,8 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null
+            null,
+            false
         );
 
         assertEquals(List.of(), result.getActivities());
@@ -359,7 +411,8 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "en",
-            null
+            null,
+            false
         );
 
         assertEquals(
@@ -402,7 +455,8 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null
+            null,
+            false
         );
 
         assertEquals(
@@ -429,7 +483,8 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null
+            null,
+            false
         );
 
         assertEquals(
@@ -455,7 +510,8 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null
+            null,
+            false
         );
 
         assertEquals(
@@ -475,7 +531,7 @@ class EventServiceTest {
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
 
-        eventService.getEventDetail(990001L, "ko", 7L);
+        eventService.getEventDetail(990001L, "ko", 7L, false);
 
         verify(eventMapper).findEventDetail(990001L, "ko", 7L);
     }
@@ -491,7 +547,7 @@ class EventServiceTest {
         when(eventMapper.findEventActivities(990001L, "en"))
             .thenReturn(List.of());
 
-        eventService.getEventDetail(990001L, null, null);
+        eventService.getEventDetail(990001L, null, null, false);
 
         verify(eventMapper).findEventDetail(990001L, "en", null);
         verify(eventMapper).findEventActivities(990001L, "en");

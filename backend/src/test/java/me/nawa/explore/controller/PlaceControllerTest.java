@@ -95,7 +95,7 @@ class PlaceControllerTest {
 
     @Test
     void getPlaceDetail_returnsDetail() throws Exception {
-        when(placeService.getPlaceDetail(1L, "en", null))
+        when(placeService.getPlaceDetail(1L, "en", null, false))
             .thenReturn(PlaceDetailResponse.builder()
                 .placeId(1L).itemId(1L).name("테스트 Place")
                 .activities(List.of()).build());
@@ -109,7 +109,7 @@ class PlaceControllerTest {
 
     @Test
     void getPlaceDetail_returnsExplore002_whenNotFound() throws Exception {
-        when(placeService.getPlaceDetail(1L, "en", null))
+        when(placeService.getPlaceDetail(1L, "en", null, false))
             .thenThrow(new BusinessException(ExploreErrorCode.PLACE_NOT_FOUND));
         String response = mockMvc.perform(get("/api/v1/explore/places/1"))
             .andExpect(status().isNotFound())

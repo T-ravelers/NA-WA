@@ -207,7 +207,7 @@ class EventControllerTest {
             .activities(List.of())
             .build();
 
-        when(eventService.getEventDetail(990001L, "ko", null))
+        when(eventService.getEventDetail(990001L, "ko", null, false))
             .thenReturn(response);
 
         String body = mockMvc.perform(
@@ -266,7 +266,7 @@ class EventControllerTest {
     @Test
     void getEventDetail_returns404WithErrorCode_whenEventNotFound()
         throws Exception {
-        when(eventService.getEventDetail(990001L, "ko", null))
+        when(eventService.getEventDetail(990001L, "ko", null, false))
             .thenThrow(new BusinessException(ExploreErrorCode.EVENT_NOT_FOUND));
 
         String responseBody = mockMvc.perform(

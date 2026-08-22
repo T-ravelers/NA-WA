@@ -345,4 +345,16 @@
         <include refid="eventListWhere"/>
     </select>
 
+    <!--
+        상세 조회 1회당 1씩 올린다. 회원·중복을 가리지 않는다.
+
+        읽기만 하는 상세 조회에서 유일하게 쓰는 구문이라 호출부가 별도 트랜잭션으로
+        분리해서 부른다. 여기서 실패해도 상세 응답은 그대로 나가야 한다.
+    -->
+    <update id="increaseEventViewCount">
+        UPDATE event
+        SET view_count = view_count + 1
+        WHERE event_id = #{eventId}
+    </update>
+
 </mapper>
