@@ -23,6 +23,7 @@ ext {
     jacksonVersion = '2.22.1'
     jacksonToolsVersion = '3.1.5'
     awsSdkVersion = '2.46.7'
+    micrometerVersion = '1.14.4'
 }
 
 java {
@@ -124,6 +125,13 @@ dependencies {
     // S3 (영수증 이미지 저장)
     // 버킷은 별도 AWS 계정이 소유하므로 인스턴스 역할이 아니라 IAM 사용자 키로 접근한다.
     implementation 'software.amazon.awssdk:s3'
+
+    // 지표 수집 (Micrometer)
+    // Spring Boot가 아니라서 Actuator가 없다. 레지스트리·바인더·노출 엔드포인트를
+    // MetricsConfig에서 직접 배선한다.
+    implementation platform("io.micrometer:micrometer-bom:${micrometerVersion}")
+    implementation 'io.micrometer:micrometer-core'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 }
 
 test {

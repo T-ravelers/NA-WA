@@ -61,6 +61,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
@@ -103,6 +105,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.MemberTestConfig.class,
         SwaggerConfigTest.AppointmentTestConfig.class,
         SwaggerConfigTest.ReviewTestConfig.class,
+        SwaggerConfigTest.MetricsTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -538,6 +541,20 @@ class SwaggerConfigTest {
                                     .getBytes(StandardCharsets.UTF_8)),
                     "nawa",
                     900);
+        }
+    }
+
+    /**
+     * 지표 컨트롤러가 서블릿 컨텍스트에 등록되므로 레지스트리가 있어야 합니다.
+     * 실제 레지스트리는 루트 컨텍스트의 MetricsConfig가 만들지만, 이 테스트는
+     * ServletConfig 만 올립니다.
+     */
+    @Configuration
+    static class MetricsTestConfig {
+
+        @Bean
+        PrometheusMeterRegistry meterRegistry() {
+            return new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
         }
     }
 
