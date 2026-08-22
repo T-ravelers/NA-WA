@@ -52,6 +52,69 @@ class EventMapperXmlTest {
     }
 
     @Test
+    void categoryFilters_joinTheSectorAndActivityConditionsWithOr() throws Exception {
+        Configuration configuration = new Configuration();
+
+        try (InputStream input = Resources.getResourceAsStream(MAPPER_RESOURCE)) {
+            new XMLMapperBuilder(
+                input,
+                configuration,
+                MAPPER_RESOURCE,
+                configuration.getSqlFragments()
+            ).parse();
+        }
+
+        EventSearchRequest request = new EventSearchRequest();
+        request.setSectorIds(List.of(2L));
+        request.setActivityIds(List.of(2L));
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+        parameters.put("offset", 0);
+
+        MappedStatement statement = configuration.getMappedStatement(
+            "me.nawa.explore.mapper.EventMapper.searchEvents"
+        );
+        String sql = statement.getBoundSql(parameters).getSql().replaceAll("\\s+", " ");
+
+        /*
+         * AND로 묶으면 한 대분류를 통째로 고르고 다른 대분류를 일부만 고른 조합에서
+         * 교집합만 남아 결과가 거의 0건이 된다.
+         */
+        assertTrue(sql.contains(") OR EXISTS ("));
+    }
+
+    @Test
+    void categoryFilters_leaveNoDanglingOr_whenOnlyActivitiesAreGiven() throws Exception {
+        Configuration configuration = new Configuration();
+
+        try (InputStream input = Resources.getResourceAsStream(MAPPER_RESOURCE)) {
+            new XMLMapperBuilder(
+                input,
+                configuration,
+                MAPPER_RESOURCE,
+                configuration.getSqlFragments()
+            ).parse();
+        }
+
+        EventSearchRequest request = new EventSearchRequest();
+        request.setActivityIds(List.of(9L));
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+        parameters.put("offset", 0);
+
+        MappedStatement statement = configuration.getMappedStatement(
+            "me.nawa.explore.mapper.EventMapper.searchEvents"
+        );
+        String sql = statement.getBoundSql(parameters).getSql().replaceAll("\\s+", " ");
+
+        /* 대분류가 없으면 앞의 OR가 남아 문법이 깨진다. trim이 지워야 한다. */
+        assertFalse(sql.contains("AND ( OR EXISTS"));
+        assertTrue(sql.contains("filter_ea.activity_id IN"));
+    }
+
+    @Test
     void eventListOtherAreas_usesUnclassifiedAreaCondition() throws Exception {
         Configuration configuration = new Configuration();
 

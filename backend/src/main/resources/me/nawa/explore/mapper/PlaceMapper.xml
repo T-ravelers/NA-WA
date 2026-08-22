@@ -136,28 +136,36 @@
         <if test="request.kidFacility == true">AND p.kid_facility = TRUE</if>
         <if test="request.hasRestroom == true">AND p.has_restroom = TRUE</if>
 
-        <if test="request.sectorIds != null and request.sectorIds.size() > 0">
-            AND EXISTS (
-                SELECT 1
-                FROM place_activity filter_pa
-                JOIN activity filter_a ON filter_a.activity_id = filter_pa.activity_id
-                WHERE filter_pa.place_id = p.place_id
-                  AND filter_pa.deleted_at IS NULL
-                  AND filter_a.deleted_at IS NULL
-                  AND filter_a.sector_id IN
-                <foreach collection="request.sectorIds" item="sectorId"
-                         open="(" separator="," close=")">#{sectorId}</foreach>
-            )
-        </if>
-        <if test="request.activityIds != null and request.activityIds.size() > 0">
-            AND EXISTS (
-                SELECT 1
-                FROM place_activity filter_pa
-                WHERE filter_pa.place_id = p.place_id
-                  AND filter_pa.deleted_at IS NULL
-                  AND filter_pa.activity_id IN
-                <foreach collection="request.activityIds" item="activityId"
-                         open="(" separator="," close=")">#{activityId}</foreach>
+        <!-- EventMapper와 같다. 대분류와 소분류는 OR로 묶는다. 이유는 그쪽 주석 참고. -->
+        <if test="(request.sectorIds != null and request.sectorIds.size() > 0)
+                  or (request.activityIds != null and request.activityIds.size() > 0)">
+            AND (
+            <trim prefixOverrides="OR ">
+                <if test="request.sectorIds != null and request.sectorIds.size() > 0">
+                    EXISTS (
+                        SELECT 1
+                        FROM place_activity filter_pa
+                        JOIN activity filter_a ON filter_a.activity_id = filter_pa.activity_id
+                        WHERE filter_pa.place_id = p.place_id
+                          AND filter_pa.deleted_at IS NULL
+                          AND filter_a.deleted_at IS NULL
+                          AND filter_a.sector_id IN
+                        <foreach collection="request.sectorIds" item="sectorId"
+                                 open="(" separator="," close=")">#{sectorId}</foreach>
+                    )
+                </if>
+                <if test="request.activityIds != null and request.activityIds.size() > 0">
+                    OR EXISTS (
+                        SELECT 1
+                        FROM place_activity filter_pa
+                        WHERE filter_pa.place_id = p.place_id
+                          AND filter_pa.deleted_at IS NULL
+                          AND filter_pa.activity_id IN
+                        <foreach collection="request.activityIds" item="activityId"
+                                 open="(" separator="," close=")">#{activityId}</foreach>
+                    )
+                </if>
+            </trim>
             )
         </if>
         <if test="request.savedOnly == true">
