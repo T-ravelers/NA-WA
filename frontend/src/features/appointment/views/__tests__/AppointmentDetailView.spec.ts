@@ -373,6 +373,35 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).not.toContain('Confirm participation')
   })
 
+  it('reads the activity date even when the server sends it as numbers', async () => {
+    // Jackson LocalDateTime은 숫자 배열로도 나갈 수 있는 형태다. 문자열이라고 보고
+    // slice로 자르면 배열이 나오고, 여정 기간 비교가 문자열 대 배열이 되어 조용히
+    // 전부 false가 된다 — 담을 수 있는 여정까지 "날짜를 담지 못함"으로 막힌다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    fetchAppointment.mockResolvedValue({
+      ...appointment,
+      activityStartAt: [2099, 8, 8, 18, 30],
+      activityEndAt: [2099, 8, 8, 22, 0],
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+
+    // 2099-08-08을 담는 여정을 고르면 그대로 보증금 확인으로 넘어간다.
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul Foodie Week'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('does not cover the appointment date')
+    expect(wrapper.text()).toContain('Confirm participation')
+  })
+
   it('explains why a journey that cannot hold the activity date was refused', async () => {
     // 목록에서 감추지 않는다 — "내 여정이 왜 없지"로 읽힌다. 고르는 순간 이유를
     // 알려 주고 시트는 열어 둬, 다른 여정을 바로 고를 수 있게 한다.
