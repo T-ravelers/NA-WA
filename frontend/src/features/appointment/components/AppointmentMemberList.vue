@@ -98,11 +98,14 @@ function showsLeave(member: AppointmentMember): boolean {
 
           <!-- 두 버튼은 라벨 길이와 무관하게 같은 크기다. 폭을 고정하지 않으면
                로케일마다('Visit' / 'プロフィール') 행마다 크기가 갈린다. -->
+          <!-- 빨강(destructive)은 손실이 확정되는 순간에만 쓴다(#371) — 이 버튼은
+               확인 모달을 한 번 더 거치고, 환급되는 탈퇴에서도 눌린다. 그래서
+               보증금이 오가는 동작에 써 온 노랑을 쓴다. -->
           <AppButton
             v-if="showsLeave(member)"
             compact
             dense
-            variant="destructive"
+            variant="settle"
             class="w-24"
             @click="emit('leave')"
           >
