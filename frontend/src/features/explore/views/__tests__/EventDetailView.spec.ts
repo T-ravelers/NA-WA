@@ -476,7 +476,11 @@ describe('EventDetailView', () => {
    * 새로고침이나 뒤로 가기에서 시트가 되살아나지 않는다.
    */
   it('여정을 만들고 돌아오면 그 여정이 골라진 채 시트가 열리고 규약 key가 지워진다', async () => {
-    const { wrapper, router } = await mountView('/explore/events/42?tripId=7&openJourneySelect=1')
+    // 보낼 때 실은 항목 기간도 규약대로 그대로 돌아온다. 진입 주소에 함께 넣어야
+    // 아래 `toEqual({})`가 그 key를 지우는 줄까지 지킨다.
+    const { wrapper, router } = await mountView(
+      '/explore/events/42?tripId=7&openJourneySelect=1&itemStartDate=2026-08-10&itemEndDate=2026-08-12',
+    )
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
     expect(wrapper.get('[role="dialog"]').text()).toContain('Choose a journey')

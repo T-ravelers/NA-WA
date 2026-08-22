@@ -5,6 +5,8 @@ import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 
+import { serializeCalendarDate } from '@/shared/lib/datetime'
+
 import JourneyCreateForm from '../components/JourneyCreateForm.vue'
 import { createJourney, type JourneyCreateInput } from '../api/journeyApi'
 import { journeyErrorMessageKey } from '../model/journeyErrors'
@@ -59,6 +61,21 @@ function itemPeriodDate(key: 'itemStartDate' | 'itemEndDate'): string | undefine
   const value = route.query[key]
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined
 }
+
+/**
+ * 폼의 시작일 기본값. 항목이 이미 시작했으면 **오늘로 당긴다.**
+ *
+ * 조회되는 항목은 아직 끝나지 않았을 뿐 시작은 과거일 수 있다. 6월에 시작해 12월까지
+ * 도는 이벤트를 그대로 쓰면 폼이 과거에 시작하는 일곱 달짜리 여정을 제안한다. 여정
+ * 생성에는 기간 상한도 과거 금지도 없어 그대로 만들어진다.
+ */
+const initialStartDate = computed(() => {
+  const itemStart = itemPeriodDate('itemStartDate')
+  if (itemStart === undefined) return undefined
+
+  const today = serializeCalendarDate(new Date())
+  return itemStart < today ? today : itemStart
+})
 
 /** 복귀 주소를 만들 때 규약 key는 돌려주지 않는다. 호출자 화면의 것이 아니다. */
 function restQueryWithoutContract() {
@@ -165,7 +182,7 @@ function submit(input: JourneyCreateInput): void {
     <JourneyCreateForm
       :pending="createMutation.isPending.value"
       :error-message="errorMessage"
-      :initial-start-date="itemPeriodDate('itemStartDate')"
+      :initial-start-date="initialStartDate"
       :initial-end-date="itemPeriodDate('itemEndDate')"
       @submit="submit"
     />

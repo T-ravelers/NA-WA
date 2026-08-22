@@ -261,15 +261,37 @@ describe('JourneyCreateView', () => {
    * 보낸 화면이 실어 준 항목 기간이 폼 기본값이 된다. 없으면 그 사람은 무엇과 겹쳐야
    * 하는지 모른 채 폼을 채우고, 또 안 겹치는 여정을 만들어 같은 자리로 돌아온다.
    */
-  it('보낸 화면이 실어 준 항목 기간이 폼 기본값이 된다', async () => {
+  it('아직 시작하지 않은 항목이면 실어 준 기간이 그대로 폼 기본값이 된다', async () => {
     const { wrapper } = await mountView(
-      '/journeys/new?returnRouteName=explore-event-detail&itemStartDate=2026-08-10&itemEndDate=2026-08-12',
+      '/journeys/new?returnRouteName=explore-event-detail&itemStartDate=2099-01-01&itemEndDate=2099-01-05',
     )
 
     const form = wrapper.findComponent(JourneyCreateForm)
 
-    expect(form.props('initialStartDate')).toBe('2026-08-10')
-    expect(form.props('initialEndDate')).toBe('2026-08-12')
+    expect(form.props('initialStartDate')).toBe('2099-01-01')
+    expect(form.props('initialEndDate')).toBe('2099-01-05')
+  })
+
+  /*
+   * 조회되는 항목은 아직 끝나지 않았을 뿐 시작은 과거일 수 있다. 그대로 쓰면 폼이
+   * 과거에 시작하는 여정을 제안하고, 여정 생성에는 과거 금지가 없어 그대로 만들어진다.
+   */
+  it('이미 시작한 항목이면 시작일을 오늘로 당긴다', async () => {
+    const { wrapper } = await mountView(
+      '/journeys/new?itemStartDate=2020-01-01&itemEndDate=2099-12-31',
+    )
+
+    const form = wrapper.findComponent(JourneyCreateForm)
+    const today = new Date()
+    const todayIso = [
+      String(today.getFullYear()).padStart(4, '0'),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getDate()).padStart(2, '0'),
+    ].join('-')
+
+    expect(form.props('initialStartDate')).toBe(todayIso)
+    // 종료일은 그대로다. 상한을 당길 이유가 없다.
+    expect(form.props('initialEndDate')).toBe('2099-12-31')
   })
 
   it('형식이 어긋난 기간은 무시하고 빈 폼으로 둔다', async () => {
