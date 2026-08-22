@@ -271,9 +271,9 @@ export default {
     },
     mapLinks: {
       openInGoogleMaps: 'Google Maps',
-      directions: 'Google transit',
+      googleTransit: 'Google transit',
       openInNaverMap: 'Naver Map',
-      naverDirections: 'Naver transit',
+      naverTransit: 'Naver transit',
     },
     placeDetail: {
       back: 'Back to places',

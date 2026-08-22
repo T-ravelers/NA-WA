@@ -278,9 +278,9 @@ export default {
     },
     mapLinks: {
       openInGoogleMaps: 'Google Maps',
-      directions: 'Chỉ đường Google',
+      googleTransit: 'Chỉ đường Google',
       openInNaverMap: 'Naver Map',
-      naverDirections: 'Chỉ đường Naver',
+      naverTransit: 'Chỉ đường Naver',
     },
     placeDetail: {
       back: 'Về danh sách địa điểm',

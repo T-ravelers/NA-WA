@@ -8,7 +8,9 @@ import {
   buildGoogleMapsTransitRouteUrl,
   buildNaverMapPlaceUrl,
   buildNaverMapTransitRouteUrl,
+  hasMapCoordinates,
   openMapAppUrl,
+  openMapWebUrl,
   type MapCoordinate,
 } from '@/shared/lib/mapLink'
 import AppButton from '@/shared/ui/AppButton.vue'
@@ -33,20 +35,17 @@ const { latitude, longitude, name } = defineProps<Props>()
 
 const { t } = useI18n()
 
+const hasCoordinates = computed(() => hasMapCoordinates(latitude, longitude))
+
 const googleSearchUrl = computed(() => buildGoogleMapsSearchUrl(latitude, longitude))
 const googleTransitRouteUrl = computed(() => buildGoogleMapsTransitRouteUrl(latitude, longitude))
 const naverPlaceUrl = computed(() => buildNaverMapPlaceUrl(latitude, longitude, name))
 const naverRouteUrl = computed(() => buildNaverMapTransitRouteUrl(latitude, longitude, name))
-
-/** 웹 URL 전용 진입. 앱 스킴은 현재 문서를 옮기는 `openMapAppUrl`이 따로 맡는다. */
-function openMapUrl(url: string | null): void {
-  if (url) window.open(url, '_blank', 'noopener,noreferrer')
-}
 </script>
 
 <template>
   <div
-    v-if="googleSearchUrl"
+    v-if="hasCoordinates"
     v-fit-text-group
     class="grid min-w-0 grid-cols-2 gap-2"
   >
@@ -55,7 +54,7 @@ function openMapUrl(url: string | null): void {
         block
         compact
         variant="secondary"
-        @click="openMapUrl(googleSearchUrl)"
+        @click="openMapWebUrl(googleSearchUrl)"
       >
         {{ t('explore.mapLinks.openInGoogleMaps') }}
       </AppButton>
@@ -65,9 +64,9 @@ function openMapUrl(url: string | null): void {
         block
         compact
         variant="secondary"
-        @click="openMapUrl(googleTransitRouteUrl)"
+        @click="openMapWebUrl(googleTransitRouteUrl)"
       >
-        {{ t('explore.mapLinks.directions') }}
+        {{ t('explore.mapLinks.googleTransit') }}
       </AppButton>
     </div>
     <div class="min-w-0">
@@ -87,7 +86,7 @@ function openMapUrl(url: string | null): void {
         variant="secondary"
         @click="openMapAppUrl(naverRouteUrl)"
       >
-        {{ t('explore.mapLinks.naverDirections') }}
+        {{ t('explore.mapLinks.naverTransit') }}
       </AppButton>
     </div>
   </div>

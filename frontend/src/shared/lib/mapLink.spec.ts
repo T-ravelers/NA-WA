@@ -6,8 +6,23 @@ import {
   buildNaverMapPlaceUrl,
   buildNaverMapTransitRouteUrl,
   detectMapPlatform,
+  hasMapCoordinates,
   openMapAppUrl,
+  openMapWebUrl,
 } from './mapLink'
+
+describe('hasMapCoordinates', () => {
+  it('accepts a pair of finite coordinates', () => {
+    expect(hasMapCoordinates(37.5665, 126.978)).toBe(true)
+    expect(hasMapCoordinates(0, 0)).toBe(true)
+  })
+
+  it('rejects a missing or non-finite coordinate', () => {
+    expect(hasMapCoordinates(null, 126.978)).toBe(false)
+    expect(hasMapCoordinates(37.5665, undefined)).toBe(false)
+    expect(hasMapCoordinates(Number.NaN, 126.978)).toBe(false)
+  })
+})
 
 describe('buildGoogleMapsSearchUrl', () => {
   it('builds a pin URL from finite coordinates', () => {
@@ -125,6 +140,36 @@ describe('buildNaverMapTransitRouteUrl', () => {
   it('returns null when either coordinate is missing', () => {
     expect(buildNaverMapTransitRouteUrl(null, null, 'Seongsu Onsil', 'other')).toBeNull()
     expect(buildNaverMapTransitRouteUrl(37.5665, undefined, 'Seongsu Onsil', 'other')).toBeNull()
+  })
+})
+
+describe('openMapWebUrl', () => {
+  const GOOGLE_URL = 'https://www.google.com/maps/search/?api=1&query=37.5665%2C126.978'
+
+  // 단언이 실패하면 그 자리에서 멈춰 복원 줄에 닿지 못한다. spy가 다음 테스트로 새면
+  // 실패 한 건이 두 건으로 불어나므로 복원은 afterEach가 맡는다.
+  function stubOpen() {
+    return vi.spyOn(window, 'open').mockReturnValue(null)
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('opens a new tab without handing the opener to the map site', () => {
+    const open = stubOpen()
+
+    openMapWebUrl(GOOGLE_URL)
+
+    expect(open).toHaveBeenCalledWith(GOOGLE_URL, '_blank', 'noopener,noreferrer')
+  })
+
+  it('does nothing when the coordinate builder returned null', () => {
+    const open = stubOpen()
+
+    openMapWebUrl(null)
+
+    expect(open).not.toHaveBeenCalled()
   })
 })
 

@@ -278,9 +278,9 @@ export default {
     mapLinks: {
       openInGoogleMaps: 'Google Maps',
       // 대중교통 경로를 여는 버튼. 서비스명이 아니라 동작이라 '乗換案内'로 옮긴다.
-      directions: 'Google 乗換案内',
+      googleTransit: 'Google 乗換案内',
       openInNaverMap: 'Naver Map',
-      naverDirections: 'Naver 乗換案内',
+      naverTransit: 'Naver 乗換案内',
     },
     placeDetail: {
       back: 'スポット一覧へ戻る',

@@ -4,12 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '@/app/i18n'
 
 const openMapAppUrl = vi.fn()
+const openMapWebUrl = vi.fn()
 
-// 앱 스킴 진입은 현재 문서를 이동시킨다. jsdom의 window.location을 직접 건드리면
-// navigation 경고가 다른 테스트로 새므로 이 함수만 부분 모킹한다.
+// 진입 함수 두 개만 부분 모킹한다. 앱 스킴은 현재 문서를 이동시켜 jsdom의 navigation
+// 경고가 다른 테스트로 새고, 웹 URL은 `window.open`의 인자 규칙(`noopener,noreferrer`)을
+// `mapLink.spec.ts`가 소유하기 때문이다. 여기서는 **어떤 버튼이 어떤 URL을 여는가**만 본다.
 vi.mock('@/shared/lib/mapLink', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/shared/lib/mapLink')>()),
   openMapAppUrl: (url: string | null) => openMapAppUrl(url),
+  openMapWebUrl: (url: string | null) => openMapWebUrl(url),
 }))
 
 const MapLinkButtons = (await import('../MapLinkButtons.vue')).default
@@ -31,6 +34,7 @@ function clickButton(wrapper: ReturnType<typeof mountButtons>, label: string) {
 describe('MapLinkButtons', () => {
   beforeEach(() => {
     openMapAppUrl.mockReset()
+    openMapWebUrl.mockReset()
   })
 
   it('renders the four map buttons', () => {
@@ -41,34 +45,24 @@ describe('MapLinkButtons', () => {
     expect(labels).toEqual(['Google Maps', 'Google transit', 'Naver Map', 'Naver transit'])
   })
 
-  it('opens the Google Maps pin in a new tab', async () => {
-    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+  it('opens the Google Maps pin as a web URL', async () => {
     const wrapper = mountButtons()
 
     await clickButton(wrapper, 'Google Maps')
 
-    expect(openSpy).toHaveBeenCalledWith(
+    expect(openMapWebUrl).toHaveBeenCalledWith(
       'https://www.google.com/maps/search/?api=1&query=37.48%2C127.01',
-      '_blank',
-      'noopener,noreferrer',
     )
-
-    openSpy.mockRestore()
   })
 
-  it('opens the Google transit route in a new tab', async () => {
-    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+  it('opens the Google transit route as a web URL', async () => {
     const wrapper = mountButtons()
 
     await clickButton(wrapper, 'Google transit')
 
-    expect(openSpy).toHaveBeenCalledWith(
+    expect(openMapWebUrl).toHaveBeenCalledWith(
       'https://www.google.com/maps/dir/?api=1&destination=37.48%2C127.01&travelmode=transit',
-      '_blank',
-      'noopener,noreferrer',
     )
-
-    openSpy.mockRestore()
   })
 
   it('opens the Naver Map place scheme with the place name', async () => {

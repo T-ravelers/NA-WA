@@ -276,9 +276,9 @@ export default {
     },
     mapLinks: {
       openInGoogleMaps: 'Google Maps',
-      directions: 'Google 大眾運輸',
+      googleTransit: 'Google 大眾運輸',
       openInNaverMap: 'Naver Map',
-      naverDirections: 'Naver 大眾運輸',
+      naverTransit: 'Naver 大眾運輸',
     },
     placeDetail: {
       back: '返回地點列表',
