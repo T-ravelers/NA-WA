@@ -198,6 +198,45 @@ describe('TopupView', () => {
     })
   })
 
+  it('sends the host back to the caller when leaving without topping up', async () => {
+    // 모바일 PWA에는 브라우저 뒤로가기가 없어 화면 안 ‹ 가 사실상 유일한 출구다.
+    // 여기서 지갑 탭으로 떨어지면 약속을 만들던 흐름이 끊기고, 그 화면이 저장해 둔
+    // 초안은 아무도 읽지 않는다. 완료 후 복귀와 같은 자리(resume=1)로 보낸다.
+    const wrapper = await mountTopup(
+      '/wallet/top-up?amount=10000&returnRouteName=appointment-create&itemId=42&itemType=EVENT&tripId=7',
+    )
+    await flushPromises()
+    const router = wrapper.vm.$router
+    router.addRoute({
+      path: '/appointments/new',
+      name: 'appointment-create',
+      component: { template: '<div />' },
+    })
+
+    await wrapper.get('button[aria-label="Back"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+    expect(router.currentRoute.value.query).toEqual({
+      itemId: '42',
+      itemType: 'EVENT',
+      tripId: '7',
+      resume: '1',
+    })
+  })
+
+  it('falls back to the wallet tab when no caller asked for a return', async () => {
+    // 지갑에서 곧장 들어온 평소 경로. 돌아갈 곳이 없으면 지금까지처럼 지갑 탭이다.
+    const wrapper = await mountTopup('/wallet/top-up')
+    await flushPromises()
+    const router = wrapper.vm.$router
+
+    await wrapper.get('button[aria-label="Back"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('wallet')
+  })
+
   it('offers to continue where the caller left off once the top-up completes', async () => {
     // 약속 생성이 잔액 부족으로 보낸 경우. 완료 화면에서 그 화면으로 되돌아가되,
     // 그쪽 query는 그대로 돌려주고 이 화면의 amount·returnRouteName만 뺀 뒤

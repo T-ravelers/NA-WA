@@ -156,6 +156,16 @@ const goBack = (): void => {
     return
   }
 
+  // 충전을 시작하지도 않고 나가는 길. 보낸 화면이 있으면 지갑 탭이 아니라 그리로
+  // 돌려보낸다 — 약속 생성처럼 흐름 도중에 들렀다면 지갑으로 떨어지는 순간 작성하던
+  // 흐름이 끊기고, 저장해 둔 초안은 아무도 읽지 않는다. 모바일 PWA에는 브라우저
+  // 뒤로가기가 없어 이 버튼이 사실상 유일한 출구다. 완료 화면은 예외다 — 거기엔
+  // "Continue where you left off"가 따로 있고, 이 버튼은 지갑으로 가는 쪽이 맞다.
+  if (returnTarget.value !== null) {
+    void router.replace(returnTarget.value)
+    return
+  }
+
   void router.push({ name: 'wallet' })
 }
 
