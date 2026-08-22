@@ -418,6 +418,95 @@ describe('TopupView', () => {
     historyLength.mockRestore()
   })
 
+  it('gives up the finished top-up entry when heading to the wallet', async () => {
+    // "Back to wallet"은 목적지가 분명하니 되감지 않지만, 끝난 충전 화면을 히스토리에
+    // 남기면 안 된다 — 지갑에서 뒤로 갈 때 방금 끝낸 충전 화면이 (폼 단계로) 다시 뜬다.
+    const { wrapper, router } = await mountTopupInFlow()
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(3)
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Next')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Execute top-up')
+      ?.trigger('click')
+    await flushPromises()
+    wrapper.findComponent(StripePaymentStep).vm.$emit('payment-confirmed', {
+      topupId: 44,
+      status: 'SUCCEEDED',
+      sandboxBalance: '15000',
+    })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Back to wallet')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('wallet')
+
+    router.back()
+    await flushPromises()
+
+    // 충전 화면이 아니라 보낸 화면으로 빠진다.
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+
+    historyLength.mockRestore()
+  })
+
+  it('rewinds to the wallet it came from instead of stacking it twice', async () => {
+    // 지갑에서 곧장 들어온 평소 경로. 바로 아래 엔트리가 이미 지갑이라, 지갑을 새로
+    // 얹으면 [지갑, 지갑]이 되어 뒤로 가기가 한 번 헛돈다.
+    const wrapper = await mountTopup('/wallet/top-up')
+    await flushPromises()
+    const router = wrapper.vm.$router
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '+30,000 P')
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Next')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Execute top-up')
+      ?.trigger('click')
+    await flushPromises()
+    wrapper.findComponent(StripePaymentStep).vm.$emit('payment-confirmed', {
+      topupId: 44,
+      status: 'SUCCEEDED',
+      sandboxBalance: '15000',
+    })
+    await flushPromises()
+
+    const back = vi.spyOn(router, 'back').mockImplementation(() => {})
+    const replace = vi.spyOn(router, 'replace')
+    const push = vi.spyOn(router, 'push')
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(3)
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Back to wallet')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(back).toHaveBeenCalledOnce()
+    expect(replace).not.toHaveBeenCalled()
+    expect(push).not.toHaveBeenCalled()
+
+    historyLength.mockRestore()
+    push.mockRestore()
+    replace.mockRestore()
+    back.mockRestore()
+  })
+
   it('creates a Stripe PaymentIntent before showing the Stripe payment step', async () => {
     const wrapper = await mountTopup()
 

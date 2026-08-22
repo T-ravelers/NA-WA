@@ -168,7 +168,15 @@ const goBack = (): void => {
   }
 
   if (step.value === 'complete') {
-    void router.push({ name: 'wallet' })
+    // 끝난 충전 화면은 되돌아올 이유가 없으니 자리를 내준다. 지갑에서 들어왔으면
+    // 바로 아래 엔트리가 이미 지갑이라 되감고(지갑이 두 번 쌓이면 뒤로 가기가 한 번
+    // 헛돈다), 다른 화면이 보낸 경우에는 그 화면 위에 지갑을 얹는 대신 이 자리를
+    // 지갑으로 바꾼다 — 그래야 지갑에서 뒤로 갈 때 끝난 충전 화면이 다시 뜨지 않는다.
+    if (returnTarget.value === null && window.history.length > 1) {
+      void router.back()
+      return
+    }
+    void router.replace({ name: 'wallet' })
     return
   }
 
