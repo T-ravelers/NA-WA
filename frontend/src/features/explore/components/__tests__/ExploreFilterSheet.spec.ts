@@ -264,7 +264,68 @@ describe('ExploreFilterSheet date presets', () => {
   })
 })
 
+const FOOD_ACTIVITY_LABELS = [
+  'Cafe / Dessert',
+  'Restaurant',
+  'Tourist Restaurant',
+  'Street Food',
+  'Bar / Liquor',
+  'Tea House',
+  'Snack',
+  'Food Festival',
+]
+
 describe('ExploreFilterSheet', () => {
+  function mountCategorySheet() {
+    return mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'category', filters: { sort: 'NEWEST' }, resultCount: 3 },
+    })
+  }
+
+  function sectorHeader(wrapper: VueWrapper, label: string) {
+    return wrapper.findAll('button').find((button) => button.text().includes(label))
+  }
+
+  function checkSector(wrapper: VueWrapper, label: string) {
+    return sectorHeader(wrapper, label)?.find('[role="checkbox"]').trigger('click')
+  }
+
+  /** 접혀 있는 대분류의 소분류 칩은 아예 그려지지 않는다. 눌러 보려면 먼저 펼쳐야 한다. */
+  function expandSector(wrapper: VueWrapper, label: string) {
+    return sectorHeader(wrapper, label)?.trigger('click')
+  }
+
+  function isSectorChecked(wrapper: VueWrapper, label: string): boolean {
+    return (
+      sectorHeader(wrapper, label)?.find('[role="checkbox"]').attributes('aria-checked') === 'true'
+    )
+  }
+
+  function pressButton(wrapper: VueWrapper, text: string) {
+    return wrapper
+      .findAll('button')
+      .find((button) => button.text() === text)
+      ?.trigger('click')
+  }
+
+  /** 소분류 칩은 선택되면 채워진 배경으로 바뀐다. */
+  function isActivityChecked(wrapper: VueWrapper, label: string): boolean {
+    return (
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === label)
+        ?.classes()
+        .includes('bg-paper-fill') === true
+    )
+  }
+
+  function lastChange(wrapper: VueWrapper): Record<string, unknown> {
+    const changes = wrapper.emitted('change') ?? []
+
+    return changes[changes.length - 1]?.[0] as Record<string, unknown>
+  }
+
   it('applies the Saved toggle now that the like API is wired', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },
@@ -507,19 +568,64 @@ describe('ExploreFilterSheet', () => {
     const foodHeader = wrapper.findAll('button').find((button) => button.text().includes('Food'))
     await foodHeader?.find('[role="checkbox"]').trigger('click')
 
-    expect(wrapper.emitted('change')?.[wrapper.emitted('change')!.length - 1]?.[0]).toMatchObject({
-      sectorIds: [2],
-    })
+    /* 소분류가 전부 켜져도 서버로는 대분류 하나로 접어 보낸다. */
+    expect(lastChange(wrapper)).toMatchObject({ sectorIds: [2], activityIds: undefined })
 
     await foodHeader?.trigger('click')
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Cafe / Dessert')
-      ?.trigger('click')
+    await pressButton(wrapper, 'Cafe / Dessert')
 
-    expect(wrapper.emitted('change')?.[wrapper.emitted('change')!.length - 1]?.[0]).toMatchObject({
+    /* 대분류를 켜면 소분류도 켜져 있으므로, 한 번 누르면 그 소분류만 꺼진다. */
+    expect(lastChange(wrapper)).toMatchObject({
       sectorIds: undefined,
-      activityIds: [9],
+      activityIds: [10, 11, 12, 13, 14, 15, 16],
     })
+  })
+
+  it('checks every activity under a sector when the sector is checked', async () => {
+    const wrapper = mountCategorySheet()
+
+    await checkSector(wrapper, 'Food')
+    await expandSector(wrapper, 'Food')
+
+    expect(isSectorChecked(wrapper, 'Food')).toBe(true)
+    expect(FOOD_ACTIVITY_LABELS.every((label) => isActivityChecked(wrapper, label))).toBe(true)
+  })
+
+  it('clears every activity under a sector when the sector is unchecked', async () => {
+    const wrapper = mountCategorySheet()
+
+    await checkSector(wrapper, 'Food')
+    await checkSector(wrapper, 'Food')
+    await expandSector(wrapper, 'Food')
+
+    expect(isSectorChecked(wrapper, 'Food')).toBe(false)
+    expect(FOOD_ACTIVITY_LABELS.some((label) => isActivityChecked(wrapper, label))).toBe(false)
+    expect(lastChange(wrapper)).toMatchObject({ sectorIds: undefined, activityIds: undefined })
+  })
+
+  it('keeps the remaining activities checked when the sector loses one', async () => {
+    const wrapper = mountCategorySheet()
+
+    await checkSector(wrapper, 'Food')
+    await expandSector(wrapper, 'Food')
+    await pressButton(wrapper, 'Cafe / Dessert')
+
+    /* 대분류만 풀리고 나머지 소분류 체크는 그대로 남는다. */
+    expect(isSectorChecked(wrapper, 'Food')).toBe(false)
+    expect(isActivityChecked(wrapper, 'Cafe / Dessert')).toBe(false)
+    expect(isActivityChecked(wrapper, 'Restaurant')).toBe(true)
+  })
+
+  it('checks the sector once its last activity is checked', async () => {
+    const wrapper = mountCategorySheet()
+
+    await expandSector(wrapper, 'Food')
+    for (const label of FOOD_ACTIVITY_LABELS) {
+      await pressButton(wrapper, label)
+    }
+
+    expect(isSectorChecked(wrapper, 'Food')).toBe(true)
+    /* 하나씩 눌러 채운 것도 대분류를 통째로 고른 것과 같은 요청이 된다. */
+    expect(lastChange(wrapper)).toMatchObject({ sectorIds: [2], activityIds: undefined })
   })
 })

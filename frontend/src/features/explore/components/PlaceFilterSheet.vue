@@ -116,10 +116,16 @@ watch(
   { deep: true },
 )
 
-watch(draft, (filters) => emit('change', cloneFilters(filters)), { deep: true })
+watch(
+  draft,
+  (filters) => {
+    const changed = cloneFilters(filters)
+    collapseCategorySelection(changed)
+    emit('change', changed)
+  },
+  { deep: true },
+)
 
-const selectedSectors = computed(() => new Set(draft.sectorIds ?? []))
-const selectedActivities = computed(() => new Set(draft.activityIds ?? []))
 const currentRegion = computed(() => REGION_OPTIONS[0])
 const selectedAreas = computed(() => new Set(draft.region2 ?? []))
 
@@ -163,50 +169,80 @@ function isAreaSelected(value: string): boolean {
   return selectedAreas.value.has(value)
 }
 
-function isSectorSelected(sectorId: number): boolean {
-  return selectedSectors.value.has(sectorId)
-}
+/**
+ * 화면이 들고 있는 소분류 체크 상태. `ExploreFilterSheet`와 같은 규칙이다.
+ *
+ * 대분류 체크는 따로 저장하지 않고 "그 아래 소분류가 전부 체크됐는가"로만 판단한다.
+ * 주소에는 대분류가 ID 하나로 실려 오므로 여기서 소분류로 펼쳐 두고, 서버로 보낼 때
+ * `collapseCategorySelection`이 다시 접는다.
+ */
+const checkedActivities = computed<Set<number>>(() => {
+  const values = new Set(draft.activityIds ?? [])
+  ;(draft.sectorIds ?? []).forEach((sectorId) => {
+    PLACE_SECTOR_OPTIONS.find((sector) => sector.id === sectorId)?.activities.forEach((activity) =>
+      values.add(activity.id),
+    )
+  })
+
+  return values
+})
 
 function isActivitySelected(activityId: number): boolean {
-  return selectedActivities.value.has(activityId)
+  return checkedActivities.value.has(activityId)
 }
 
+/** 대분류 체크는 그 아래 소분류가 전부 체크됐을 때만 켜진다. */
 function isSectorFullySelected(sector: (typeof PLACE_SECTOR_OPTIONS)[number]): boolean {
-  return (
-    isSectorSelected(sector.id) ||
-    sector.activities.every((activity) => selectedActivities.value.has(activity.id))
-  )
+  return sector.activities.every((activity) => checkedActivities.value.has(activity.id))
 }
 
+/** 화면 상태를 하나의 소분류 집합으로 확정한다. 대분류 칸은 늘 비운다. */
+function writeCheckedActivities(values: Set<number>): void {
+  draft.sectorIds = undefined
+  draft.activityIds = values.size > 0 ? [...values].sort((a, b) => a - b) : undefined
+}
+
+/** 대분류를 켜면 그 아래 소분류가 전부 켜지고, 끄면 전부 꺼진다. */
 function toggleSector(sector: (typeof PLACE_SECTOR_OPTIONS)[number]): void {
-  const sectorIds = new Set(draft.sectorIds ?? [])
-  const activityIds = new Set(draft.activityIds ?? [])
-  const selected = isSectorFullySelected(sector)
+  const values = new Set(checkedActivities.value)
+  const turningOff = isSectorFullySelected(sector)
 
-  sector.activities.forEach((activity) => activityIds.delete(activity.id))
-  if (selected) sectorIds.delete(sector.id)
-  else sectorIds.add(sector.id)
+  sector.activities.forEach((activity) => {
+    if (turningOff) values.delete(activity.id)
+    else values.add(activity.id)
+  })
 
-  draft.sectorIds = sectorIds.size > 0 ? [...sectorIds] : undefined
-  draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
+  writeCheckedActivities(values)
 }
 
-function toggleActivity(sectorId: number, activityId: number): void {
-  const sectorIds = new Set(draft.sectorIds ?? [])
-  const activityIds = new Set(draft.activityIds ?? [])
+/** 소분류 하나를 켜고 끈다. 대분류 체크는 소분류 상태에서 저절로 따라온다. */
+function toggleActivity(activityId: number): void {
+  const values = new Set(checkedActivities.value)
+  if (values.has(activityId)) values.delete(activityId)
+  else values.add(activityId)
 
-  if (activityIds.has(activityId)) activityIds.delete(activityId)
-  else activityIds.add(activityId)
-  sectorIds.delete(sectorId)
+  writeCheckedActivities(values)
+}
 
-  const sector = PLACE_SECTOR_OPTIONS.find((option) => option.id === sectorId)
-  if (sector?.activities.every((activity) => activityIds.has(activity.id))) {
-    sector.activities.forEach((activity) => activityIds.delete(activity.id))
-    sectorIds.add(sectorId)
-  }
+/**
+ * 서버로 보낼 형태로 접는다. 소분류가 전부 켜진 대분류는 대분류 ID 하나로 바꾼다.
+ *
+ * 접지 않으면 대분류 조건과 소분류 조건이 함께 나가는데 서버는 그 둘을 AND로 묶는다.
+ * 다른 대분류의 소분류를 섞어 고른 순간 조건이 무너지므로 지금까지 보내던 형태를 지킨다.
+ */
+function collapseCategorySelection(filters: PlaceSearchFilters): void {
+  const values = new Set(checkedActivities.value)
+  const sectorIds: number[] = []
 
-  draft.sectorIds = sectorIds.size > 0 ? [...sectorIds] : undefined
-  draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
+  PLACE_SECTOR_OPTIONS.forEach((sector) => {
+    if (!sector.activities.every((activity) => values.has(activity.id))) return
+
+    sector.activities.forEach((activity) => values.delete(activity.id))
+    sectorIds.push(sector.id)
+  })
+
+  filters.sectorIds = sectorIds.length > 0 ? sectorIds : undefined
+  filters.activityIds = values.size > 0 ? [...values].sort((a, b) => a - b) : undefined
 }
 
 function toggleExpandedCategory(label: string): void {
@@ -257,7 +293,9 @@ function resetSheet(): void {
 }
 
 function apply(): void {
-  emit('apply', cloneFilters(draft))
+  const filters = cloneFilters(draft)
+  collapseCategorySelection(filters)
+  emit('apply', filters)
 }
 </script>
 
@@ -420,7 +458,7 @@ function apply(): void {
                       ? 'border-paper-fill bg-paper-fill text-on-paper'
                       : 'border-hairline text-ink-2'
                   "
-                  @click="toggleActivity(sector.id, activity.id)"
+                  @click="toggleActivity(activity.id)"
                 >
                   {{ t(activity.labelKey) }}
                 </button>
