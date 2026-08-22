@@ -10,13 +10,13 @@
 
 | 값 | 뜻 | 리포트 칭호 |
 | --- | --- | --- |
-| `FOOD` | 식당·카페·주점 | Flavor Seeker |
-| `SHOPPING` | 상품 구매·기념품 | Souvenir Hunter |
-| `BEAUTY` | 미용·뷰티 시술 | Glow Getter |
-| `SHOW` | 전시·공연·체험 | Front Row Traveler |
-| `TRANSPORT` | 이동 수단 | Ground Coverer |
-| `STAY` | 숙박 | Slow Traveler |
-| `OTHER` | 위에 들어가지 않는 소비 | Free Spender |
+| `FOOD` | 식당·카페·주점 | `#FLAVORSEEKER` |
+| `SHOPPING` | 상품 구매·기념품 | `#SOUVENIRHUNTER` |
+| `BEAUTY` | 미용·뷰티 시술 | `#GLOWGETTER` |
+| `SHOW` | 전시·공연·체험 | `#FRONTROWTRAVELER` |
+| `TRANSPORT` | 이동 수단 | `#GROUNDCOVERER` |
+| `STAY` | 숙박 | `#SLOWTRAVELER` |
+| `OTHER` | 위에 들어가지 않는 소비 | `#FREESPENDER` |
 
 앞의 네 값은 프론트엔드 Explore의 소비영역(`beauty`·`shopping`·`show`·`food`)과 같은
 어휘를 쓴다. 사용자가 두 화면에서 같은 말을 보게 하려는 것이고, **타입은 공유하지

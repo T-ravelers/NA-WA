@@ -10,6 +10,8 @@
  * 컴포넌트가 개별 prop으로 받으므로 `useI18n`이나 #153의 i18n key에 의존하지 않는다.
  */
 
+import type { Category } from '@/shared/ui/category'
+
 /** 정규화가 끝난 금액. 소수점 없는 최소 화폐 단위 정수다. */
 export type MoneyValue = number
 
@@ -64,6 +66,24 @@ export interface ReportKpiCardProps extends Headed, LocaleAware {
   totalLabel: string
   /** 일 평균 라벨. 예: `Daily avg` */
   dailyAverageLabel: string
+}
+
+export interface ReportPersonaTicketProps {
+  /** 티켓 상단 라벨. 예: `Travel spending type` */
+  label: string
+  /** 해시태그 칭호. 예: `#FLAVORSEEKER` */
+  title: string
+  /** 비중이 채워진 설명 문장. */
+  description: string
+  /** 스탬프 큰 값. 예: `42%` */
+  stampValue: string
+  /** 스탬프 작은 라벨. 1위 카테고리 표시명. 예: `Food` */
+  stampLabel: string
+  /**
+   * 티켓 색. 1위 카테고리가 Explore 소비영역 4종이면 그 코어색, 아니면 종이톤.
+   * 매핑은 화면(#153)이 정한다 — 여기서 소비 카테고리 문자열을 알지 않는다.
+   */
+  tone?: Category | 'paper'
 }
 
 export interface ReportCategoryBreakdownProps extends Headed, LocaleAware {

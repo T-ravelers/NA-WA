@@ -59,37 +59,38 @@ export default {
       legacyTitle: '無法提供花費分析',
       legacyDescription: '這份報告建立於花費分析功能推出之前，仍可查看其旅程快照。',
       persona: {
-        heading: '消費風格',
+        heading: '旅行消費類型',
         FOOD: {
-          title: '美食探索家',
+          title: '#FLAVORSEEKER',
           description: '您跟著味蕾走，這趟旅程有 {share} 花在美食上。',
         },
         SHOPPING: {
-          title: '伴手禮獵人',
+          title: '#SOUVENIRHUNTER',
           description: '您把旅程帶回了家，有 {share} 花在購物上。',
         },
         BEAUTY: {
-          title: '美麗達人',
+          title: '#GLOWGETTER',
           description: '您以最美的姿態離開，這趟旅程有 {share} 花在美容上。',
         },
         SHOW: {
-          title: '前排旅人',
+          title: '#FRONTROWTRAVELER',
           description: '您為當下而來，這趟旅程有 {share} 花在表演上。',
         },
         TRANSPORT: {
-          title: '移動達人',
+          title: '#GROUNDCOVERER',
           description: '您不停移動，這趟旅程有 {share} 花在交通上。',
         },
         STAY: {
-          title: '慢活旅人',
+          title: '#SLOWTRAVELER',
           description: '您安穩住下，這趟旅程有 {share} 花在住宿上。',
         },
         OTHER: {
-          title: '隨心消費家',
+          title: '#FREESPENDER',
           description: '您的花費不拘一格，有 {share} 落在常見類別之外。',
         },
       },
       categoryTitle: '依類別',
+      categoryCenterLabel: '個活動',
       categoryEmpty: '沒有記錄任何類別花費。',
       categoryDescription: '依類別分組的花費，含金額與占比。',
       category: '類別',

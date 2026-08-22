@@ -112,9 +112,11 @@ describe('ReportDetailView', () => {
     expect(wrapper.find('button[aria-label="Share"]').exists()).toBe(false)
     expect(wrapper.findAll('button').some((button) => button.text() === 'Group')).toBe(false)
     expect(wrapper.text()).not.toContain('similar travelers')
+    expect(wrapper.text()).toContain('Travel spending type')
+    expect(wrapper.text()).toContain('events')
     expect(wrapper.findAll('h2').map((heading) => heading.text())).toEqual([
+      '#FLAVORSEEKER',
       'Analysis',
-      'Flavor Seeker',
       'By category',
       'Spending trend',
       'Journey snapshot',
@@ -151,13 +153,13 @@ describe('ReportDetailView', () => {
 
     expect(wrapper.text()).toContain('No spending selected')
     expect(wrapper.text()).toContain('No category spending was recorded.')
-    expect(wrapper.text()).not.toContain('Free Spender')
+    expect(wrapper.text()).not.toContain('#FREESPENDER')
   })
 
   it('names a spending persona from the top category and fills in its share', async () => {
     const { wrapper } = await mountView()
 
-    expect(wrapper.text()).toContain('Flavor Seeker')
+    expect(wrapper.text()).toContain('#FLAVORSEEKER')
     expect(wrapper.text()).toContain(
       'You followed your appetite — 78% of this journey went to food.',
     )
@@ -177,8 +179,8 @@ describe('ReportDetailView', () => {
     })
     const { wrapper } = await mountView()
 
-    expect(wrapper.text()).toContain('Slow Traveler')
-    expect(wrapper.text()).not.toContain('Flavor Seeker')
+    expect(wrapper.text()).toContain('#SLOWTRAVELER')
+    expect(wrapper.text()).not.toContain('#FLAVORSEEKER')
   })
 
   it('translates category codes instead of printing them raw', async () => {

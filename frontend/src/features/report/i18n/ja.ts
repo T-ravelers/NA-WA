@@ -61,37 +61,38 @@ export default {
       legacyDescription:
         'このレポートは支出分析の提供前に作成されました。旅程のスナップショットは引き続き閲覧できます。',
       persona: {
-        heading: '消費スタイル',
+        heading: '旅の消費タイプ',
         FOOD: {
-          title: '味の探求者',
+          title: '#FLAVORSEEKER',
           description: '食欲のおもむくままに楽しんだ旅。この旅程の{share}がグルメに使われました。',
         },
         SHOPPING: {
-          title: 'おみやげハンター',
+          title: '#SOUVENIRHUNTER',
           description: '旅を家に持ち帰りました。この旅程の{share}がショッピングに使われました。',
         },
         BEAUTY: {
-          title: '輝きの追求者',
+          title: '#GLOWGETTER',
           description: '最高の自分で帰路へ。この旅程の{share}がビューティーに使われました。',
         },
         SHOW: {
-          title: '最前列の旅人',
+          title: '#FRONTROWTRAVELER',
           description: 'その瞬間を求めて。この旅程の{share}がエンタメに使われました。',
         },
         TRANSPORT: {
-          title: '行動派の旅人',
+          title: '#GROUNDCOVERER',
           description: '動き続けた旅。この旅程の{share}が移動に使われました。',
         },
         STAY: {
-          title: 'スローな旅人',
+          title: '#SLOWTRAVELER',
           description: 'じっくり腰を据えた旅。この旅程の{share}が宿泊に使われました。',
         },
         OTHER: {
-          title: '自由な消費家',
+          title: '#FREESPENDER',
           description: 'ひとつの枠に収まらない支出。{share}が通常のカテゴリー以外に使われました。',
         },
       },
       categoryTitle: 'カテゴリー別',
+      categoryCenterLabel: 'イベント',
       categoryEmpty: 'カテゴリー別の支出は記録されていません。',
       categoryDescription: '金額と割合を添えて、カテゴリー別にまとめた支出です。',
       category: 'カテゴリー',

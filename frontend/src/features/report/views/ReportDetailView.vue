@@ -4,16 +4,22 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import { spendingCategoryLabelKey, toSpendingCategory } from '@/shared/lib/spendingCategory'
+import {
+  type SpendingCategory,
+  spendingCategoryLabelKey,
+  toSpendingCategory,
+} from '@/shared/lib/spendingCategory'
 import AppCard from '@/shared/ui/AppCard.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import type { Category } from '@/shared/ui/category'
 
 import ReportCategoryBreakdown from '../components/presentation/ReportCategoryBreakdown.vue'
 import ReportDailyTrend from '../components/presentation/ReportDailyTrend.vue'
 import { formatPercent } from '../components/presentation/format'
 import ReportKpiCard from '../components/presentation/ReportKpiCard.vue'
+import ReportPersonaTicket from '../components/presentation/ReportPersonaTicket.vue'
 import type {
   ReportCategoryBreakdownItem,
   ReportDailyTrendPoint,
@@ -63,6 +69,17 @@ const reportCategories = computed<ReportCategoryBreakdownItem[]>(() =>
 )
 
 /**
+ * 칭호 티켓 색. Explore 소비영역과 같은 어휘를 쓰는 네 카테고리만 코어색이 있다.
+ * 나머지(TRANSPORT·STAY·OTHER)는 종이톤으로 둔다 — 임의 색을 만들지 않는다.
+ */
+const PERSONA_TONE: Partial<Record<SpendingCategory, Category>> = {
+  FOOD: 'food',
+  SHOPPING: 'shopping',
+  BEAUTY: 'beauty',
+  SHOW: 'show',
+}
+
+/**
  * 소비 성향 칭호.
  *
  * 가장 많이 쓴 카테고리 하나로 정한다. 백엔드가 금액 내림차순으로 정렬해 내려주므로
@@ -73,7 +90,13 @@ const reportCategories = computed<ReportCategoryBreakdownItem[]>(() =>
  *
  * 지출이 없으면 칭호를 주지 않는다 — 근거 없는 성향이 된다.
  */
-const reportPersona = computed<{ title: string; description: string } | null>(() => {
+const reportPersona = computed<{
+  title: string
+  description: string
+  share: string
+  categoryLabel: string
+  tone: Category | 'paper'
+} | null>(() => {
   const top = reportCategories.value[0]
 
   if (top === undefined || isZeroSpending.value) {
@@ -81,14 +104,20 @@ const reportPersona = computed<{ title: string; description: string } | null>(()
   }
 
   const category = toSpendingCategory(top.category)
+  const share = formatPercent(top.percentage, i18n.locale.value)
 
   return {
     title: t(`report.detail.persona.${category}.title`),
-    description: t(`report.detail.persona.${category}.description`, {
-      share: formatPercent(top.percentage, i18n.locale.value),
-    }),
+    description: t(`report.detail.persona.${category}.description`, { share }),
+    share,
+    categoryLabel: top.label,
+    tone: PERSONA_TONE[category] ?? 'paper',
   }
 })
+/** 도넛 가운데 숫자 — 스냅샷에 저장된 일정 항목 수. */
+const itineraryItemCount = computed(() =>
+  (report.value?.reportContent.days ?? []).reduce((count, day) => count + day.items.length, 0),
+)
 const reportTrend = computed<ReportDailyTrendPoint[]>(() =>
   (report.value?.analytics?.dailyTrend ?? []).map((row) => ({
     date: row.date,
@@ -121,7 +150,7 @@ function retry(): void {
           aria-hidden="true"
         />
       </IconOrb>
-      <h1 class="font-display text-screen-title font-bold text-ink-display">
+      <h1 class="font-display text-screen-title font-bold uppercase text-ink-display">
         {{ t('report.detail.title') }}
       </h1>
     </header>
@@ -184,6 +213,16 @@ function retry(): void {
       </section>
 
       <template v-else-if="reportKpi !== null">
+        <ReportPersonaTicket
+          v-if="reportPersona !== null"
+          :label="t('report.detail.persona.heading')"
+          :title="reportPersona.title"
+          :description="reportPersona.description"
+          :stamp-value="reportPersona.share"
+          :stamp-label="reportPersona.categoryLabel"
+          :tone="reportPersona.tone"
+        />
+
         <ReportKpiCard
           :heading="t('report.detail.analysis')"
           :data="reportKpi"
@@ -198,18 +237,12 @@ function retry(): void {
           </p>
         </AppCard>
 
-        <AppCard v-if="reportPersona !== null">
-          <p class="text-caption uppercase text-ink-3">
-            {{ t('report.detail.persona.heading') }}
-          </p>
-          <h2 class="mt-1 font-display text-title text-ink">{{ reportPersona.title }}</h2>
-          <p class="mt-2 text-body-sm text-ink-3">{{ reportPersona.description }}</p>
-        </AppCard>
-
         <ReportCategoryBreakdown
           :heading="t('report.detail.categoryTitle')"
           :items="reportCategories"
           currency="KRW"
+          :center-value="String(itineraryItemCount)"
+          :center-label="t('report.detail.categoryCenterLabel')"
           :description="t('report.detail.categoryDescription')"
           :empty-title="t('report.detail.categoryTitle')"
           :empty-description="t('report.detail.categoryEmpty')"
