@@ -74,17 +74,21 @@ describe('AppointmentMemberProfileView', () => {
     fetchAppointmentMembers.mockResolvedValue(members)
   })
 
-  it('renders the selected participant and unavailable trust actions', async () => {
+  it('renders the selected participant and their trust indicators', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Participant profile')
     expect(wrapper.text()).toContain('Mina Park')
     expect(wrapper.text()).toContain('Trust indicators')
-    expect(
-      wrapper
-        .findAll('button')
-        .find((button) => button.text() === 'View reviews')
-        ?.attributes('disabled'),
-    ).toBeDefined()
+  })
+
+  // 후기 보기·신고는 연결할 곳이 없어 비활성으로만 놓여 있었다. 누를 수 없는 버튼은
+  // 화면에서 할 수 있는 일을 잘못 알린다.
+  it('does not offer actions that go nowhere', async () => {
+    const { wrapper } = await mountView()
+
+    const labels = wrapper.findAll('button').map((button) => button.text())
+    expect(labels).not.toContain('View reviews')
+    expect(labels).not.toContain('Report member')
   })
 })
