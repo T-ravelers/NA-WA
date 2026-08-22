@@ -52,6 +52,12 @@ const filters = computed<AppointmentListFilters>(() => ({
 
 const appointmentQuery = useAppointmentListQuery(filters)
 const appointments = computed(() => appointmentQuery.data.value?.content ?? [])
+// 목록은 5초마다 다시 조회한다. 그 주기마다 실패할 기회도 함께 생기므로, 이미
+// 받아 둔 목록이 있으면 지우지 않고 그대로 둔다. 오류 화면은 보여줄 카드가 아예
+// 없을 때만 띄우고, 다음 조회가 성공하면 조용히 되돌아온다.
+const listLoadFailed = computed(
+  () => appointmentQuery.isError.value && appointmentQuery.data.value === undefined,
+)
 const title = computed(() =>
   itemType.value === 'PLACE'
     ? t('appointment.list.titlePlace')
@@ -178,7 +184,7 @@ function retry(): void {
       />
 
       <StateError
-        v-else-if="appointmentQuery.isError.value"
+        v-else-if="listLoadFailed"
         :title="t('appointment.list.loadFailed')"
         :description="t('appointment.list.loadFailedDescription')"
         :action-label="t('action.retry')"

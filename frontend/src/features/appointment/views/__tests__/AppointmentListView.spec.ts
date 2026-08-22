@@ -141,4 +141,56 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.name).toBe('explore-event-detail')
     expect(router.currentRoute.value.params.eventId).toBe('42')
   })
+
+  // 폴링만 가짜 시계에 올린다. flushPromises는 setTimeout·setImmediate를 쓰므로
+  // 전부 가짜로 만들면 이 테스트가 영영 끝나지 않는다.
+  it('follows the server while the list stays open', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+
+    try {
+      const { wrapper } = await mountView()
+      expect(wrapper.text()).toContain('Recruiting')
+
+      fetchAppointments.mockResolvedValue({
+        content: [
+          { ...appointment, appointmentStatus: 'FULL' as const, currentMemberCount: 4 },
+          { ...appointment, appointmentId: 8, appointmentName: 'Hongdae Night Market' },
+        ],
+        page: 0,
+        size: 20,
+        totalElements: 2,
+        totalPages: 1,
+        hasNext: false,
+      })
+
+      vi.advanceTimersByTime(5_000)
+      await flushPromises()
+
+      expect(fetchAppointments).toHaveBeenCalledTimes(2)
+      // 새로 등록된 약속이 카드로 들어오고, 이미 있던 카드의 상태도 함께 바뀐다.
+      expect(wrapper.text()).toContain('Hongdae Night Market')
+      expect(wrapper.text()).toContain('Fully booked')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the cards on screen when a refresh fails', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+
+    try {
+      const { wrapper } = await mountView()
+      fetchAppointments.mockRejectedValue(new Error('offline'))
+
+      vi.advanceTimersByTime(5_000)
+      await flushPromises()
+
+      // 5초마다 조회하면 실패할 기회도 5초마다 생긴다. 신호가 한 번 끊겼다고
+      // 보고 있던 목록을 오류 화면으로 바꾸지 않는다.
+      expect(wrapper.text()).toContain('Seongsu K-Beauty Tour')
+      expect(wrapper.text()).not.toContain('Appointments could not be loaded')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

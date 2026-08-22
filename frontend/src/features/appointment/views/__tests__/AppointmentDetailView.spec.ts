@@ -1094,4 +1094,64 @@ describe('AppointmentDetailView', () => {
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
+
+  // 폴링만 가짜 시계에 올린다. flushPromises는 setTimeout·setImmediate를 쓰므로
+  // 전부 가짜로 만들면 이 테스트가 영영 끝나지 않는다.
+  it('follows the server while the detail stays open', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+
+    try {
+      const { wrapper } = await mountView()
+      const item = menuItem(wrapper)
+
+      expect(wrapper.text()).toContain('Recruiting')
+      expect(wrapper.text()).toContain('Alex Kim')
+
+      // 시트를 연 채로 둔다. 상태가 넘어가면 항목의 활성 여부도 같이 따라와야 한다.
+      await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+      expect(item('Attendance')?.attributes('disabled')).toBeDefined()
+
+      fetchAppointment.mockResolvedValue({
+        ...appointment,
+        appointmentStatus: 'AWAITING_ATTENDANCE',
+      })
+      fetchAppointmentMembers.mockResolvedValue([members[0], leftMember])
+
+      vi.advanceTimersByTime(5_000)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Awaiting attendance')
+      expect(wrapper.text()).not.toContain('Alex Kim')
+      expect(item('Attendance')?.attributes('disabled')).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the detail on screen when a refresh fails', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+
+    try {
+      const { wrapper } = await mountView()
+      await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+
+      fetchAppointment.mockRejectedValue(new Error('offline'))
+      fetchAppointmentMembers.mockRejectedValue(new Error('offline'))
+      fetchMyAppointmentParticipation.mockRejectedValue(new Error('offline'))
+
+      vi.advanceTimersByTime(5_000)
+      await flushPromises()
+
+      // 세 쿼리 모두 retry를 쓰지 않아 한 번 끊기면 곧바로 실패한다. 그렇다고
+      // 보고 있던 상세·회원 목록을 지우거나, 이미 알던 참여 정보를 "확인하지
+      // 못했다"로 바꾸지 않는다. 다음 폴링이 성공하면 조용히 되돌아온다.
+      expect(wrapper.text()).toContain('Seongsu K-Beauty Tour')
+      expect(wrapper.text()).toContain('Alex Kim')
+      expect(wrapper.text()).not.toContain('Appointment details could not be loaded')
+      expect(wrapper.text()).not.toContain('Members could not be loaded')
+      expect(wrapper.text()).not.toContain('We could not check your participation status')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
