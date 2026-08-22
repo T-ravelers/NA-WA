@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IconChevronDown } from '@tabler/icons-vue'
+import { IconChevronDown, IconX } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -49,8 +49,9 @@ const completed = computed(
 const visible = computed(() => filterByCompletedDate(completed.value, range.value))
 const errorKey = computed(() => resolveSettlementError(settlementQuery.error.value).messageKey)
 
+/** 고른 기간을 사람이 읽는 말로. 고른 것이 없으면 필터 칩이 기간을 아예 붙이지 않는다. */
 const rangeLabel = computed(() => {
-  if (range.value === null) return t('settlement.history.anyDate')
+  if (range.value === null) return ''
 
   const from = formatCalendarDate(range.value.from, locale.value) || range.value.from
   if (range.value.to === range.value.from) return from
@@ -110,21 +111,53 @@ function open(settlementId: string): void {
     />
     <template v-else>
       <!-- 거를 완료 건이 있을 때만 보여준다. 아무것도 없는 화면의 필터는 누를 이유가 없다. -->
-      <button
-        type="button"
-        data-testid="period-filter"
-        class="mt-8 flex w-full items-center justify-between gap-3 rounded-card bg-surface-1 px-4 py-3 text-left"
-        @click="filterOpen = true"
-      >
-        <span class="text-caption text-ink-3">{{ t('settlement.history.period') }}</span>
-        <span class="flex min-w-0 items-center gap-1 text-body-sm text-ink">
-          <span class="truncate">{{ rangeLabel }}</span>
+      <div class="mt-8 flex items-center gap-2">
+        <!--
+          탐색 화면의 필터와 같은 알약 모양이다. 목록 카드와 같은 모양으로 두면 거르는
+          도구가 걸러진 결과처럼 보이고, 칠이 없으면 지금 좁혀 보는 중인지 알 수 없다.
+        -->
+        <button
+          type="button"
+          data-testid="period-filter"
+          class="flex h-11 min-w-0 items-center gap-1 rounded-pill border px-4 text-body-sm transition-colors"
+          :class="
+            range === null
+              ? 'border-hairline-2 bg-transparent text-ink-2'
+              : 'border-paper-fill bg-paper-fill text-on-paper'
+          "
+          @click="filterOpen = true"
+        >
+          <span class="shrink-0">{{ t('settlement.history.period') }}</span>
+          <span
+            v-if="range !== null"
+            class="min-w-0 truncate"
+          >
+            · {{ rangeLabel }}
+          </span>
           <IconChevronDown
+            class="shrink-0"
             :size="16"
+            :stroke-width="1.8"
             aria-hidden="true"
           />
-        </span>
-      </button>
+        </button>
+
+        <!-- 고른 기간이 아무것도 남기지 않았을 때 시트를 열지 않고 한 번에 되돌린다. -->
+        <button
+          v-if="range !== null"
+          type="button"
+          data-testid="period-filter-clear"
+          class="flex h-9 shrink-0 items-center gap-1 rounded-pill bg-surface-2 px-3 text-caption text-ink"
+          @click="applyRange(null)"
+        >
+          {{ t('settlement.history.clearPeriod') }}
+          <IconX
+            :size="14"
+            :stroke-width="2"
+            aria-hidden="true"
+          />
+        </button>
+      </div>
 
       <SettlementEmptyState
         v-if="visible.length === 0"

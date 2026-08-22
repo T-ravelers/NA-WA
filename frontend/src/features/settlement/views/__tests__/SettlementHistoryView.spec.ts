@@ -192,6 +192,19 @@ describe('SettlementHistoryView', () => {
     expect(wrapper.findAll('[data-settlement-id]')).toHaveLength(1)
   })
 
+  it('drops the period straight from the list when the chip beside the filter is tapped', async () => {
+    const { wrapper, router } = await mountHistory(
+      '/settlements/history?side=sent&from=2026-01-01&to=2026-01-31',
+    )
+
+    await wrapper.get('[data-testid="period-filter-clear"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.from).toBeUndefined()
+    expect(router.currentRoute.value.query.to).toBeUndefined()
+    expect(wrapper.find('[data-testid="period-filter-clear"]').exists()).toBe(false)
+  })
+
   it('separates an empty period from having no completed settlements at all', async () => {
     const { wrapper } = await mountHistory(
       '/settlements/history?side=sent&from=2026-01-01&to=2026-01-31',
