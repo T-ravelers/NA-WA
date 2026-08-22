@@ -31,16 +31,15 @@ class ReportComparisonMapperXmlTest {
         assertTrue(memberSql.contains("nationality_code"));
         assertTrue(memberSql.contains("deleted_at IS NULL"));
 
-        // 방장은 trip_items(CONFIRMED)로, 참가자는 활동일이 여정 기간에 드는지로 잇는다.
+        // 여정↔약속은 trip_items(CONFIRMED)와 appointment_members.trip_id 두 갈래뿐이다 —
+        // 활동일 근사 갈래(#415)가 없어야 기간이 겹치는 다른 여정의 동료가 섞이지 않는다.
         // 동료는 ACTIVE 참가자만 세고, 취소된 약속은 통째로 뺀다.
         String peersSql = boundSql(
-            configuration, "findComparisonPeerMembers",
-            Map.of("tripId", 7L, "memberId", 1L,
-                "startDate", LocalDate.of(2026, 8, 1), "endDate", LocalDate.of(2026, 8, 5))
+            configuration, "findComparisonPeerMembers", Map.of("tripId", 7L, "memberId", 1L)
         );
         assertTrue(peersSql.contains("trip_item_status = 'CONFIRMED'"));
-        assertTrue(peersSql.contains("DATE(a3.activity_start_at) BETWEEN ? AND ?"));
-        assertTrue(peersSql.contains("am3.membership_status = 'ACTIVE'"));
+        assertTrue(peersSql.contains("am.trip_id = ?"));
+        assertTrue(!peersSql.contains("activity_start_at"));
         assertTrue(peersSql.contains("a.appointment_status != 'CANCELLED'"));
         assertTrue(peersSql.contains("am2.membership_status = 'ACTIVE'"));
         assertTrue(peersSql.contains("am2.member_id != ?"));

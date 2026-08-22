@@ -228,24 +228,10 @@
     </select>
 
     <!--
-      같은 약속 동료. 내 약속을 세 갈래로 모은다 — 하나만으로는 방장과 참가자 중 한쪽이
-      통째로 빈다.
-
-        (A) trip_items(CONFIRMED).appointment_id — 여정과 약속을 정확히 잇는 유일한 경로.
-            다만 이 행은 AppointmentService.confirmJourneyItem만 만들고, 그것은 약속을
-            만들 때만 불린다. 즉 방장 경로 전용이다.
-        (B) appointment_members.trip_id — 운영 코드가 아직 채우지 않는다. 장래 대비.
-        (C) 내가 ACTIVE로 참여한 약속 중 활동일이 여정 기간에 드는 것. joinAppointment는
-            tripId를 받지도 않고 trip_items를 만들지도 않으므로, 참가자에게는 (A)와 (B)가
-            둘 다 0건이다. 여정 연결이 없어 기간으로 근사한다 — 기간이 겹치는 여정을 여러 개
-            가지면 다른 여정의 약속이 섞일 수 있다. (B)가 채워지기 시작하면 이 갈래를 뺀다.
-
-      (C)가 (A)를 사실상 덮지만 (A)를 지우지는 않는다. 방장이 약속에서 나가 membership_status가
-      LEFT가 되어도 그 약속은 그의 여정에 남기 때문이다.
-
-      취소된 약속은 제외한다 — appointment_status만 CANCELLED가 되고 deleted_at은 NULL로
-      남는데, isPrivateFromMember가 취소 약속을 방장 아닌 사람에게 감추므로 상대 쪽에서는
-      보이지도 않는 약속의 동료로 등장하게 된다.
+      같은 약속 동료. 내 약속은 두 갈래 — 리포트 여정의 trip_items(CONFIRMED)가 가리키는 약속과,
+      appointment_members.trip_id가 이 여정인 내 ACTIVE 참여. #407부터 만들 때도 참여할 때도 둘 다
+      채워지므로 방장·참가자가 같은 길로 잡힌다. 활동일로 근사하던 갈래는 #415에서 뺐다 — 기간이
+      겹치는 다른 여정의 동료가 섞였다. 호스트도 appointment_members 행을 가지므로 따로 더하지 않는다.
     -->
     <select id="findComparisonPeerMembers"
             resultType="me.nawa.report.domain.ReportComparisonMember">
@@ -268,15 +254,6 @@
               AND am.trip_id = #{tripId}
               AND am.membership_status = 'ACTIVE'
               AND am.deleted_at IS NULL
-            UNION
-            SELECT am3.appointment_id
-            FROM appointment_members am3
-            JOIN appointments a3 ON a3.appointment_id = am3.appointment_id
-                AND a3.deleted_at IS NULL
-            WHERE am3.member_id = #{memberId}
-              AND am3.membership_status = 'ACTIVE'
-              AND am3.deleted_at IS NULL
-              AND DATE(a3.activity_start_at) BETWEEN #{startDate} AND #{endDate}
         ) mine
         JOIN appointments a ON a.appointment_id = mine.appointment_id
             AND a.deleted_at IS NULL

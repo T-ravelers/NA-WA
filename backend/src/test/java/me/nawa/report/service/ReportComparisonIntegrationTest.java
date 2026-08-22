@@ -94,10 +94,20 @@ class ReportComparisonIntegrationTest {
             long hostTrip = insertTrip(host, startDate, endDate, cleanup);
             long appointment = insertAppointment(item, host, endDate, "COMPLETED", cleanup);
             insertActiveMembership(appointment, host, hostTrip, cleanup);
-            // 참가자는 trip_id도 trip_items도 갖지 않는다 — joinAppointment가 둘 다 만들지
-            // 않기 때문이다. 활동일이 여정 기간에 드는 것으로만 이어진다.
-            insertActiveMembership(appointment, peer, null, cleanup);
+            // #407부터 참여자도 자기 여정을 고르므로 appointment_members.trip_id가 채워진다.
+            long peerTrip = insertTrip(peer, startDate, endDate, cleanup);
+            insertActiveMembership(appointment, peer, peerTrip, cleanup);
             insertConfirmedTripItem(hostTrip, item, appointment, endDate, cleanup);
+
+            // 기간이 겹치는 호스트의 다른 여정에 묶인 약속 동료는 이 여정 리포트에 섞이지 않아야 한다.
+            // 활동일로 근사하던 갈래(#415에서 제거)가 있으면 여기서 bystander가 섞인다.
+            long bystander = insertMember("Comparison bystander", "KR", cleanup);
+            long otherTrip = insertTrip(host, startDate, endDate, cleanup);
+            long otherItem = insertApprovedEventItem(host, cleanup);
+            long otherAppointment = insertAppointment(otherItem, host, endDate, "COMPLETED", cleanup);
+            insertActiveMembership(otherAppointment, host, otherTrip, cleanup);
+            insertActiveMembership(otherAppointment, bystander, null, cleanup);
+            insertConfirmedTripItem(otherTrip, otherItem, otherAppointment, endDate, cleanup);
 
             // 취소된 약속의 참가자는 어느 쪽 리포트에도 나오지 않아야 한다.
             long stranger = insertMember("Comparison stranger", "JP", cleanup);
@@ -111,7 +121,6 @@ class ReportComparisonIntegrationTest {
 
             long hostReport = insertCompletedReport(hostTrip, "12000.0000", "3000.00",
                 "FOOD", "12000.0000", cleanup);
-            long peerTrip = insertTrip(peer, startDate, endDate, cleanup);
             long peerReport = insertCompletedReport(
                 peerTrip, "5000.0000", "1250.00", "FOOD", "5000.0000", cleanup
             );
@@ -123,6 +132,8 @@ class ReportComparisonIntegrationTest {
             assertEquals(new BigDecimal("12000.0000"), group.getMe().getTotalSpent());
             assertEquals(1, group.getPeers().size());
             assertEquals(peer, group.getPeers().get(0).getMemberId());
+            assertTrue(group.getPeers().stream()
+                .noneMatch(member -> member.getMemberId().equals(bystander)));
             assertEquals(new BigDecimal("12000.0000"), group.getPeers().get(0).getTotalSpent());
             assertEquals("SHOPPING",
                 group.getPeers().get(0).getCategoryBreakdown().get(0).getCategory());
@@ -131,8 +142,7 @@ class ReportComparisonIntegrationTest {
             assertEquals(1, group.getRanks().get(0).getRank());
             assertEquals(2, group.getRanks().get(0).getOf());
 
-            // 참가자 쪽에서도 방장이 동료로 잡힌다. trip_items·trip_id 어느 쪽도 없으므로
-            // 활동일 갈래가 없으면 여기가 통째로 빈다.
+            // 참가자 쪽에서도 방장이 동료로 잡힌다 — appointment_members.trip_id 갈래.
             ReportComparisonResponse peerGroup = reportService.getComparison(
                 peer, peerReport, ReportComparisonScope.GROUP
             );
