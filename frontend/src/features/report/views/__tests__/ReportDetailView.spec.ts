@@ -114,7 +114,7 @@ const groupComparison = {
 const mountedWrappers: VueWrapper[] = []
 const queryClients: QueryClient[] = []
 
-async function mountView(path = '/reports/100') {
+async function mountView(path = '/reports/100', reuseClient?: QueryClient) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -122,8 +122,13 @@ async function mountView(path = '/reports/100') {
       { path: '/reports/:reportId', name: 'report-detail', component: ReportDetailView },
     ],
   })
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  queryClients.push(queryClient)
+  const queryClient =
+    reuseClient ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+  if (reuseClient === undefined) {
+    queryClients.push(queryClient)
+  }
+
   await router.push(path)
   await router.isReady()
 
@@ -133,7 +138,7 @@ async function mountView(path = '/reports/100') {
   mountedWrappers.push(wrapper)
   await flushPromises()
 
-  return { router, wrapper }
+  return { router, wrapper, queryClient }
 }
 
 describe('ReportDetailView', () => {
@@ -164,7 +169,6 @@ describe('ReportDetailView', () => {
     expect(wrapper.text()).toContain('0 P')
     expect(wrapper.find('polyline').exists()).toBe(true)
     expect(wrapper.findAll('table')).toHaveLength(0)
-    expect(wrapper.find('button[aria-label="Share report"]').exists()).toBe(true)
     expect(wrapper.findAll('button').some((button) => button.text() === 'Group')).toBe(false)
     expect(wrapper.text()).not.toContain('similar travelers')
     expect(wrapper.text()).toContain('Travel spending type')
@@ -482,7 +486,53 @@ describe('ReportDetailView', () => {
 
     expect(writeText).toHaveBeenCalledTimes(1)
     expect(writeText.mock.calls[0]?.[0]).toContain('#FLAVORSEEKER')
-    expect(showToast).toHaveBeenCalledWith('Report text copied to clipboard.')
+    expect(showToast).toHaveBeenCalledWith('Report text copied.')
+  })
+
+  // 복사한 것이 티켓이면 티켓이라고 말한다. 두 자리가 같은 문구를 쓰면 무엇을 복사했는지 어긋난다.
+  it('names the ticket when the ticket text is the thing copied', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(undefined, { writeText })
+    const { wrapper } = await mountView()
+
+    await buttonByText(wrapper, 'Share ticket').trigger('click')
+    await flushPromises()
+
+    expect(writeText.mock.calls[0]?.[0]).toBe(
+      '#FLAVORSEEKER\nYou followed your appetite — 78% of this journey went to food.',
+    )
+    expect(showToast).toHaveBeenCalledWith('Ticket text copied.')
+  })
+
+  // 취소가 아닌 거절은 실패다. `web-share` 권한이 없는 iframe과 인앱 브라우저가 여기에 걸린다.
+  // 이때 폴백까지 막으면 시트도 토스트도 없이 끝나 버튼이 고장 난 것처럼 보인다.
+  it('falls back to the clipboard when the share sheet rejects for a reason other than dismissal', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError')), {
+      writeText,
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledTimes(1)
+    expect(writeText.mock.calls[0]?.[0]).toContain('#FLAVORSEEKER')
+    expect(showToast).toHaveBeenCalledWith('Report text copied.')
+  })
+
+  // 시트가 거절되고 복사까지 실패하면 그때는 안내가 있어야 한다.
+  it('tells the user when both the share sheet and the clipboard fail', async () => {
+    stubNavigator(vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError')), {
+      writeText: vi.fn().mockRejectedValue(new Error('denied')),
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    // 기기가 못 하는 것이 아니라 쓰기가 실패한 것이므로 문구가 다르다.
+    expect(showToast).toHaveBeenCalledWith('We could not copy the text. Please try again.')
   })
 
   it('tells the user when neither the share sheet nor the clipboard exists', async () => {
@@ -521,5 +571,18 @@ describe('ReportDetailView', () => {
     expect(summary.text).toContain('Jeju Island')
     expect(summary.text).toContain('final travel report')
     expect(summary.text).not.toContain('#')
+  })
+
+  // 캐시가 있는 재방문에서 재요청이 실패하면 `data`는 남고 `isError`만 켜진다. 본문이 오류
+  // 화면인데 헤더에 공유 아이콘만 남으면, 화면이 못 보여 준 리포트를 공유하게 된다.
+  it('hides the header share icon when a refetch fails on a cached report', async () => {
+    const { wrapper: cached, queryClient } = await mountView()
+    expect(cached.find('button[aria-label="Share report"]').exists()).toBe(true)
+
+    fetchReport.mockRejectedValue(new Error('network'))
+    const { wrapper } = await mountView('/reports/100', queryClient)
+
+    expect(wrapper.text()).toContain('We could not load this report.')
+    expect(wrapper.find('button[aria-label="Share report"]').exists()).toBe(false)
   })
 })

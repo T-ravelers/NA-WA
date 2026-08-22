@@ -254,16 +254,24 @@ const shareSummary = computed<string | null>(() => {
 
 /**
  * 공유 시트가 있으면 시트로, 없으면 클립보드로, 둘 다 없으면 안내만 한다.
- * 시트를 닫아 취소한 것은 실패가 아니므로 조용히 넘어간다(Explore 상세와 같은 규칙).
+ *
+ * 시트를 닫아 취소한 것(`AbortError`)만 조용히 넘어간다. 취소가 아닌 거절은 실패이므로
+ * 아래 클립보드 경로가 받는다 — `web-share` 권한이 없는 교차 출처 iframe과 인앱 브라우저는
+ * `navigator.share`가 있는데도 `NotAllowedError`로 거절한다. 이때 폴백까지 막으면 시트도
+ * 토스트도 없이 끝나 버튼이 고장 난 것처럼 보인다.
+ *
+ * 복사 완료 문구는 무엇을 복사했는지가 달라서 화면이 인자로 준다.
  */
-async function shareText(title: string, text: string): Promise<void> {
+async function shareText(title: string, text: string, copiedMessage: string): Promise<void> {
   if (navigator.share) {
     try {
       await navigator.share({ title, text })
-    } catch {
-      // 공유 시트를 닫은 것. 실패가 아니다.
+      return
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return
+      }
     }
-    return
   }
 
   if (!navigator.clipboard) {
@@ -273,9 +281,9 @@ async function shareText(title: string, text: string): Promise<void> {
 
   try {
     await navigator.clipboard.writeText(text)
-    showToast(t('report.detail.sharing.copied'))
+    showToast(copiedMessage)
   } catch {
-    showToast(t('report.detail.sharing.unavailable'))
+    showToast(t('report.detail.sharing.copyFailed'))
   }
 }
 
@@ -283,7 +291,11 @@ function shareReport(): void {
   const summary = shareSummary.value
 
   if (summary !== null) {
-    void shareText(t('report.detail.sharing.reportTitle'), summary)
+    void shareText(
+      t('report.detail.sharing.reportTitle'),
+      summary,
+      t('report.detail.sharing.copiedReport'),
+    )
   }
 }
 
@@ -294,6 +306,7 @@ function shareTicket(): void {
     void shareText(
       t('report.detail.sharing.ticketTitle'),
       `${persona.title}\n${persona.description}`,
+      t('report.detail.sharing.copiedTicket'),
     )
   }
 }
@@ -325,8 +338,12 @@ function retry(): void {
       <h1 class="flex-1 font-display text-screen-title font-bold uppercase text-ink-display">
         {{ t('report.detail.title') }}
       </h1>
+      <!--
+        캐시가 있는 재방문에서 재요청이 실패하면 `data`는 남고 `isError`만 켜진다.
+        그러면 본문은 `StateError`인데 헤더에는 공유 아이콘이 남으므로 함께 본다.
+      -->
       <IconOrb
-        v-if="shareSummary !== null"
+        v-if="shareSummary !== null && !reportQuery.isError.value"
         :label="t('report.detail.sharing.report')"
         size="md"
         variant="surface"

@@ -114,10 +114,10 @@ onBeforeUnmount(() => {
       <template #stub>
         <!-- 280px에서는 알약과 스탬프가 한 줄에 안 들어간다. 스탬프가 둘째 줄 오른쪽으로 내려간다. -->
         <div class="flex min-h-20 flex-wrap items-center gap-3 px-5 py-4">
+          <!-- 높이(44px)는 `on-ticket` 변형이 갖는다. 여기서 `dense`로 다시 정하지 않는다. -->
           <AppButton
             v-if="shareLabel !== undefined"
             variant="on-ticket"
-            dense
             @click="emit('share')"
           >
             <span class="inline-flex items-center gap-2">
