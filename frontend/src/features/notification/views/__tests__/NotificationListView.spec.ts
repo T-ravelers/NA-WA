@@ -231,11 +231,44 @@ describe('NotificationListView', () => {
       fetchNotifications.mockResolvedValue(page([REQUESTED]))
 
       const wrapper = await mountView()
+      // 지우고 나면 서버도 빈 목록을 돌려준다. 목록은 성공 뒤 서버 값으로 다시 채워진다.
+      fetchNotifications.mockResolvedValue(page([]))
       await wrapper.get('[data-testid="notification-dismiss-all"]').trigger('click')
       await flushPromises()
 
       expect(deleteAllNotifications).toHaveBeenCalledTimes(1)
       expect(wrapper.text()).toContain('No notifications yet')
+    })
+
+    /*
+     * 낙관적으로 지웠는데 서버가 거절하면 카드가 돌아와야 한다.
+     *
+     * 화면이 목록을 따로 베껴 두던 시절에는 뮤테이션이 캐시를 되돌려도 그 사본이 그대로
+     * 남아, 알림이 하나도 없는 것처럼 보인 채 굳었다.
+     */
+    it('X가 실패하면 지웠던 카드가 돌아온다', async () => {
+      fetchNotifications.mockResolvedValue(page([REQUESTED, { ...REQUESTED, id: 2 }]))
+      deleteNotification.mockRejectedValue(new Error('boom'))
+
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="notification-dismiss"]').trigger('click')
+      await flushPromises()
+      await flushPromises()
+
+      expect(wrapper.findAll('li')).toHaveLength(2)
+      expect(wrapper.text()).not.toContain('No notifications yet')
+    })
+
+    it('모두 지우기가 실패하면 목록이 돌아온다', async () => {
+      fetchNotifications.mockResolvedValue(page([REQUESTED, { ...REQUESTED, id: 2 }]))
+      deleteAllNotifications.mockRejectedValue(new Error('boom'))
+
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="notification-dismiss-all"]').trigger('click')
+      await flushPromises()
+      await flushPromises()
+
+      expect(wrapper.findAll('li')).toHaveLength(2)
     })
 
     /* 지울 것이 없으면 누를 것도 없어야 한다. */
@@ -254,11 +287,25 @@ describe('NotificationListView', () => {
       fetchNotifications.mockResolvedValue(page([REQUESTED]))
 
       const wrapper = await mountView()
+      // 읽고 나면 서버도 읽은 상태로 돌려준다.
+      fetchNotifications.mockResolvedValue(page([{ ...REQUESTED, readAt: '2026-08-21T12:05:00' }]))
       await wrapper.get('[data-testid="notification-mark-all-read"]').trigger('click')
       await flushPromises()
 
       expect(readAllNotifications).toHaveBeenCalledTimes(1)
       expect(wrapper.find('li button .sr-only').exists()).toBe(false)
+    })
+
+    it('모두 읽음이 실패하면 안 읽음 표시가 돌아온다', async () => {
+      fetchNotifications.mockResolvedValue(page([REQUESTED]))
+      readAllNotifications.mockRejectedValue(new Error('boom'))
+
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="notification-mark-all-read"]').trigger('click')
+      await flushPromises()
+      await flushPromises()
+
+      expect(wrapper.find('li button .sr-only').exists()).toBe(true)
     })
 
     it('전부 읽은 목록에는 버튼이 없다', async () => {
@@ -277,6 +324,45 @@ describe('NotificationListView', () => {
       const wrapper = await mountView()
 
       expect(wrapper.find('[data-testid="notification-load-more"]').exists()).toBe(false)
+    })
+
+    /*
+     * 다음 쪽을 기다리는 동안 화면을 로딩으로 덮으면, 읽고 있던 목록이 통째로 사라졌다가
+     * 돌아온다. 첫 쪽이 아직 없을 때만 덮어야 한다.
+     */
+    it('다음 쪽을 받는 동안에도 이미 받은 쪽이 그대로 있다', async () => {
+      fetchNotifications.mockResolvedValueOnce(page([REQUESTED], '1'))
+      let release: (value: unknown) => void = () => {}
+      fetchNotifications.mockReturnValueOnce(
+        new Promise((resolve) => {
+          release = resolve
+        }),
+      )
+
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="notification-load-more"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.findAll('li')).toHaveLength(1)
+
+      release(page([{ ...REQUESTED, id: 2 }]))
+      await flushPromises()
+
+      expect(wrapper.findAll('li')).toHaveLength(2)
+    })
+
+    /* 다음 쪽만 실패한 것이라 앞 쪽까지 잃으면 안 된다. */
+    it('다음 쪽이 실패해도 앞 쪽은 남고 그 자리에서만 알린다', async () => {
+      fetchNotifications.mockResolvedValueOnce(page([REQUESTED], '1'))
+      fetchNotifications.mockRejectedValue(new Error('boom'))
+
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="notification-load-more"]').trigger('click')
+      await flushPromises()
+      await flushPromises()
+
+      expect(wrapper.findAll('li')).toHaveLength(1)
+      expect(wrapper.text()).not.toContain('went wrong')
     })
 
     it('누르면 커서를 실어 다음 쪽을 받아 이어 붙인다', async () => {

@@ -66,22 +66,43 @@ beforeEach(() => {
   invalidateSettlements.mockReset()
 })
 
-/** 캐시에 들어 있는 알림 한 쪽. 서버 DTO 모양 그대로다. */
-function page(...ids: string[]) {
+/**
+ * 캐시에 들어 있는 알림 목록.
+ *
+ * 쪽이 여러 개여도 캐시 항목은 하나다. 화면이 목록을 따로 베껴 두지 않고 이것만 보기
+ * 때문에, 여기가 되돌아가면 눈앞의 목록도 함께 되돌아간다.
+ */
+function cached(...pages: string[][]) {
   return {
-    notifications: ids.map((id) => ({
-      id,
-      type: 'SETTLEMENT_REQUESTED',
-      settlementId: '1',
-      actorName: 'Ari',
-      gatheringName: 'Dinner',
-      amount: 30,
-      currencyCode: 'KRW',
-      readAt: null,
-      createdAt: '2026-08-21T12:00:00',
+    pages: pages.map((ids, index) => ({
+      notifications: ids.map((id) => ({
+        id,
+        type: 'SETTLEMENT_REQUESTED',
+        settlementId: '1',
+        actorName: 'Ari',
+        gatheringName: 'Dinner',
+        amount: 30,
+        currencyCode: 'KRW',
+        readAt: null,
+        createdAt: '2026-08-21T12:00:00',
+      })),
+      nextCursor: index === pages.length - 1 ? null : ids[ids.length - 1],
     })),
-    nextCursor: null,
+    pageParams: pages.map((_, index) => (index === 0 ? undefined : String(index))),
   }
+}
+
+/** 캐시에 쌓인 모든 쪽의 알림을 한 줄로 편다. */
+function cachedIds() {
+  const data = queryClient.getQueryData<ReturnType<typeof cached>>(notificationKeys.list())
+  return (data?.pages ?? []).flatMap((page) => page.notifications.map((n) => n.id))
+}
+
+function cachedReadAt(id: string) {
+  const data = queryClient.getQueryData<ReturnType<typeof cached>>(notificationKeys.list())
+  return (data?.pages ?? [])
+    .flatMap((page) => page.notifications)
+    .find((notification) => notification.id === id)?.readAt
 }
 
 /** 뮤테이션 하나를 부르고 정리까지 기다린다. */
@@ -158,16 +179,23 @@ describe('useReadNotification', () => {
    * 보지 못한다. 눌렀는데 아무 일도 없어 보이는 것이 이번에 고치는 문제의 출발점이다.
    */
   it('응답을 기다리지 않고 그 알림만 읽음으로 바꾼다', async () => {
-    queryClient.setQueryData(notificationKeys.page(undefined), page('1', '2'))
+    queryClient.setQueryData(notificationKeys.list(), cached(['1', '2']))
 
     await run(() => useReadNotification().mutate('1'))
 
-    const cached = queryClient.getQueryData<ReturnType<typeof page>>(
-      notificationKeys.page(undefined),
-    )
-    expect(cached?.notifications[0]?.readAt).not.toBeNull()
+    expect(cachedReadAt('1')).not.toBeNull()
     // 누르지 않은 알림은 그대로 안 읽음이다.
-    expect(cached?.notifications[1]?.readAt).toBeNull()
+    expect(cachedReadAt('2')).toBeNull()
+  })
+
+  /* "더 보기"로 받아 둔 뒤쪽 알림을 눌러도 읽음이 되어야 한다. */
+  it('뒤쪽에서 받아 온 알림도 읽음으로 바꾼다', async () => {
+    queryClient.setQueryData(notificationKeys.list(), cached(['1', '2'], ['3', '4']))
+
+    await run(() => useReadNotification().mutate('4'))
+
+    expect(cachedReadAt('4')).not.toBeNull()
+    expect(cachedReadAt('3')).toBeNull()
   })
 
   it('안 읽은 알림이 하나 줄었으므로 벨 개수를 다시 받는다', async () => {
@@ -181,27 +209,26 @@ describe('useReadNotification', () => {
 
 describe('useDeleteNotification', () => {
   it('응답을 기다리지 않고 그 카드를 목록에서 뺀다', async () => {
-    queryClient.setQueryData(notificationKeys.page(undefined), page('1', '2'))
+    queryClient.setQueryData(notificationKeys.list(), cached(['1', '2']))
 
     await run(() => useDeleteNotification().mutate('1'))
 
-    const cached = queryClient.getQueryData<ReturnType<typeof page>>(
-      notificationKeys.page(undefined),
-    )
-    expect(cached?.notifications.map((notification) => notification.id)).toEqual(['2'])
+    expect(cachedIds()).toEqual(['2'])
   })
 
-  /* 낙관적으로 지웠는데 서버가 거절하면, 사용자는 사라진 알림을 되찾을 방법이 없다. */
+  /*
+   * 낙관적으로 지웠는데 서버가 거절하면, 사용자는 사라진 알림을 되찾을 방법이 없다.
+   *
+   * 화면이 목록을 따로 베껴 두면 이 되돌리기가 화면까지 닿지 못한다. 그래서 캐시 하나만
+   * 두고, 화면은 그것을 그대로 읽는다.
+   */
   it('실패하면 지웠던 카드를 되돌린다', async () => {
-    queryClient.setQueryData(notificationKeys.page(undefined), page('1', '2'))
+    queryClient.setQueryData(notificationKeys.list(), cached(['1', '2'], ['3']))
     deleteNotification.mockRejectedValueOnce(new Error('boom'))
 
     await run(() => useDeleteNotification().mutate('1'))
 
-    const cached = queryClient.getQueryData<ReturnType<typeof page>>(
-      notificationKeys.page(undefined),
-    )
-    expect(cached?.notifications.map((notification) => notification.id)).toEqual(['1', '2'])
+    expect(cachedIds()).toEqual(['1', '2', '3'])
   })
 
   /* 안 읽은 알림을 지우면 그만큼 벨 숫자도 줄어야 한다. */
@@ -220,23 +247,45 @@ describe('useDeleteNotification', () => {
  * 목록을 열 때 지운 알림이 되살아나 보인다.
  */
 describe('useReadAllNotifications · useDeleteAllNotifications', () => {
-  it('모두 읽음은 목록과 벨 개수를 함께 다시 받는다', async () => {
-    queryClient.setQueryData(notificationKeys.page(undefined), page('1'))
+  it('모두 읽음은 점을 먼저 지우고 목록과 벨 개수를 다시 받는다', async () => {
+    queryClient.setQueryData(notificationKeys.list(), cached(['1'], ['2']))
     queryClient.setQueryData(notificationKeys.unreadCount(), 2)
 
     await run(() => useReadAllNotifications().mutate())
 
-    expect(queryClient.getQueryState(notificationKeys.page(undefined))?.isInvalidated).toBe(true)
+    expect(cachedReadAt('1')).not.toBeNull()
+    expect(cachedReadAt('2')).not.toBeNull()
+    expect(queryClient.getQueryState(notificationKeys.list())?.isInvalidated).toBe(true)
     expect(queryClient.getQueryState(notificationKeys.unreadCount())?.isInvalidated).toBe(true)
   })
 
-  it('모두 지우기도 목록과 벨 개수를 함께 다시 받는다', async () => {
-    queryClient.setQueryData(notificationKeys.page(undefined), page('1'))
+  it('모두 지우기는 목록을 먼저 비우고 벨 개수를 다시 받는다', async () => {
+    queryClient.setQueryData(notificationKeys.list(), cached(['1'], ['2']))
     queryClient.setQueryData(notificationKeys.unreadCount(), 2)
 
     await run(() => useDeleteAllNotifications().mutate())
 
-    expect(queryClient.getQueryState(notificationKeys.page(undefined))?.isInvalidated).toBe(true)
+    expect(cachedIds()).toEqual([])
+    expect(queryClient.getQueryState(notificationKeys.list())?.isInvalidated).toBe(true)
     expect(queryClient.getQueryState(notificationKeys.unreadCount())?.isInvalidated).toBe(true)
+  })
+
+  /* 일괄 동작이 실패했을 때도 눈앞의 목록이 사라진 채로 굳으면 안 된다. */
+  it('모두 지우기가 실패하면 목록을 되돌린다', async () => {
+    queryClient.setQueryData(notificationKeys.list(), cached(['1'], ['2']))
+    deleteAllNotifications.mockRejectedValueOnce(new Error('boom'))
+
+    await run(() => useDeleteAllNotifications().mutate())
+
+    expect(cachedIds()).toEqual(['1', '2'])
+  })
+
+  it('모두 읽음이 실패하면 점을 되돌린다', async () => {
+    queryClient.setQueryData(notificationKeys.list(), cached(['1']))
+    readAllNotifications.mockRejectedValueOnce(new Error('boom'))
+
+    await run(() => useReadAllNotifications().mutate())
+
+    expect(cachedReadAt('1')).toBeNull()
   })
 })
