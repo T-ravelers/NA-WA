@@ -102,6 +102,8 @@ export default {
       comparison: {
         heading: 'Vs. group members',
         totalSpend: 'Total spend',
+        liveBasisNote:
+          'We recalculate this from the payments made during this journey, so it can differ from the analysis above.',
         you: 'You',
         groupAvg: 'Group avg',
         categoryBalance: 'Category balance',
@@ -114,7 +116,8 @@ export default {
         emptyTitle: 'No group members yet',
         emptyDescription:
           'Join an appointment during this journey and the comparison shows up here.',
-        loadFailed: 'We could not load the comparison. Please try again.',
+        loadFailed: 'We could not load the comparison.',
+        loadFailedDescription: 'The rest of this report is unaffected. Please try again.',
         loading: 'Loading the comparison',
       },
       status: 'Report status: {status}',

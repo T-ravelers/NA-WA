@@ -102,75 +102,82 @@ const canDraw = computed(() => axes.length >= 3)
 
 <template>
   <div class="flex flex-col gap-3">
+    <!--
+      상자에 좌우 여백을 둬 축 라벨이 카드(`overflow-hidden`) 밖으로 나가지 않게 한다.
+      라벨은 상자 폭의 94%에 놓이므로 상자가 카드 안쪽 폭을 다 쓰면 긴 라벨(`ショッピング`)이
+      280px에서 잘린다. `max-w-72 - px-6`은 390px에서 다시 240px라 그쪽 렌더는 그대로다.
+    -->
     <div
       v-if="canDraw"
-      class="relative mx-auto w-full max-w-60"
+      class="mx-auto w-full max-w-72 px-6"
     >
-      <svg
-        aria-hidden="true"
-        :viewBox="`0 0 ${VIEW} ${VIEW}`"
-        class="block w-full"
-      >
-        <polygon
-          v-for="(ring, index) in ringPolygons"
-          :key="index"
-          :points="ring"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1"
-          class="text-hairline"
-        />
-        <line
-          v-for="spoke in spokes"
-          :key="spoke.key"
-          :x1="CENTER"
-          :y1="CENTER"
-          :x2="spoke.end.x"
-          :y2="spoke.end.y"
-          stroke="currentColor"
-          stroke-width="1"
-          class="text-hairline"
-        />
-        <polygon
-          :points="cohortPolygon"
-          fill="currentColor"
-          fill-opacity="0.12"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-dasharray="4 3"
-          stroke-linejoin="round"
-          class="text-ink-3"
-        />
-        <polygon
-          :points="minePolygon"
-          fill="currentColor"
-          fill-opacity="0.1"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linejoin="round"
-          class="text-ink transition-all duration-500 motion-reduce:transition-none"
-        />
-        <circle
-          v-for="point in minePoints"
-          :key="point.key"
-          :cx="point.x"
-          :cy="point.y"
-          r="3"
-          fill="currentColor"
-          class="text-ink"
-        />
-      </svg>
+      <div class="relative">
+        <svg
+          aria-hidden="true"
+          :viewBox="`0 0 ${VIEW} ${VIEW}`"
+          class="block w-full"
+        >
+          <polygon
+            v-for="(ring, index) in ringPolygons"
+            :key="index"
+            :points="ring"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+            class="text-hairline"
+          />
+          <line
+            v-for="spoke in spokes"
+            :key="spoke.key"
+            :x1="CENTER"
+            :y1="CENTER"
+            :x2="spoke.end.x"
+            :y2="spoke.end.y"
+            stroke="currentColor"
+            stroke-width="1"
+            class="text-hairline"
+          />
+          <polygon
+            :points="cohortPolygon"
+            fill="currentColor"
+            fill-opacity="0.12"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-dasharray="4 3"
+            stroke-linejoin="round"
+            class="text-ink-3"
+          />
+          <polygon
+            :points="minePolygon"
+            fill="currentColor"
+            fill-opacity="0.1"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linejoin="round"
+            class="text-ink transition-all duration-500 motion-reduce:transition-none"
+          />
+          <circle
+            v-for="point in minePoints"
+            :key="point.key"
+            :cx="point.x"
+            :cy="point.y"
+            r="3"
+            fill="currentColor"
+            class="text-ink"
+          />
+        </svg>
 
-      <span
-        v-for="item in labels"
-        :key="item.key"
-        aria-hidden="true"
-        class="absolute -translate-x-1/2 -translate-y-1/2 text-caption font-semibold whitespace-nowrap"
-        :class="item.inkClass"
-        :style="{ left: item.left, top: item.top }"
-      >
-        {{ item.label }}
-      </span>
+        <span
+          v-for="item in labels"
+          :key="item.key"
+          aria-hidden="true"
+          class="absolute -translate-x-1/2 -translate-y-1/2 text-caption font-semibold whitespace-nowrap"
+          :class="item.inkClass"
+          :style="{ left: item.left, top: item.top }"
+        >
+          {{ item.label }}
+        </span>
+      </div>
     </div>
 
     <div

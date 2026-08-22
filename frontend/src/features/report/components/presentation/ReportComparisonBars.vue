@@ -33,6 +33,14 @@ watch(
   },
 )
 
+/**
+ * 칩 이니셜. `slice(0, 1)`은 UTF-16 코드 유닛 하나를 잘라 이모지로 시작하는 표시명을
+ * 서로게이트 페어 절반으로 만든다. `AppointmentMemberList`와 같은 규칙을 쓴다.
+ */
+function initials(label: string): string {
+  return [...label.trim()][0]?.toUpperCase() ?? '?'
+}
+
 const selectedPeer = computed<ReportComparisonBarRow | null>(
   () => peers.find((peer) => peer.id === selectedPeerId.value) ?? null,
 )
@@ -99,7 +107,7 @@ const rows = computed<BarRow[]>(() => {
           aria-hidden="true"
           class="flex size-5 items-center justify-center rounded-pill bg-surface-3 text-micro font-semibold text-ink"
         >
-          {{ peer.label.slice(0, 1) }}
+          {{ initials(peer.label) }}
         </span>
         <span class="truncate">{{ peer.label }}</span>
       </button>

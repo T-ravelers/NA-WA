@@ -381,6 +381,31 @@ describe('ReportDetailView', () => {
     ])
   })
 
+  it('warns that the comparison total is recalculated, but only when the basis is live', async () => {
+    fetchReportComparison.mockResolvedValueOnce(groupComparison)
+    const live = await mountView()
+
+    expect(live.wrapper.text()).toContain('We recalculate this from the payments made')
+
+    fetchReportComparison.mockReset()
+    fetchReportComparison.mockResolvedValue({ ...groupComparison, basis: 'SNAPSHOT' as const })
+    const snapshot = await mountView()
+
+    expect(snapshot.wrapper.text()).not.toContain('We recalculate this from the payments made')
+  })
+
+  it('says only the comparison failed, not the whole screen', async () => {
+    fetchReportComparison.mockReset()
+    fetchReportComparison.mockRejectedValue(new NormalizedApiError('UNKNOWN', 500, 'boom'))
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('We could not load the comparison.')
+    expect(wrapper.text()).toContain('The rest of this report is unaffected.')
+    expect(wrapper.text()).not.toContain('We could not load this screen.')
+    // 나머지 리포트는 그대로 남는다.
+    expect(wrapper.text()).toContain('Jeju Night Market')
+  })
+
   it('skips the comparison for zero-spending reports', async () => {
     fetchReport.mockResolvedValueOnce({
       ...detail,

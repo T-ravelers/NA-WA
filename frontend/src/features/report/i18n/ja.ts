@@ -107,6 +107,7 @@ export default {
       comparison: {
         heading: 'グループと比較',
         totalSpend: '合計支出',
+        liveBasisNote: 'この旅程中の支払いを再集計した金額のため、上の分析と異なる場合があります。',
         you: 'あなた',
         groupAvg: 'グループ平均',
         categoryBalance: 'カテゴリーバランス',
@@ -118,7 +119,8 @@ export default {
         rankNth: '{rank}位',
         emptyTitle: 'まだグループメンバーがいません',
         emptyDescription: 'この旅程中に約束に参加すると、ここに比較が表示されます。',
-        loadFailed: '比較を読み込めませんでした。もう一度お試しください。',
+        loadFailed: '比較を読み込めませんでした。',
+        loadFailedDescription: 'レポートの他の部分には影響ありません。もう一度お試しください。',
         loading: '比較を読み込み中',
       },
       status: 'レポートの状態：{status}',

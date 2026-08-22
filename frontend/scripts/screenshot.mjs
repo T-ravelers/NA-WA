@@ -359,8 +359,10 @@ function stubReportApis(page) {
               memberId: 1,
               displayName: 'Me',
               profileImageUrl: null,
-              totalSpent: 1284500,
-              dailyAverage: 128450,
+              // 스냅샷(analytics 1,284,500)과 일부러 어긋나게 둔다 — LIVE 재합산이라
+              // 두 숫자가 다를 수 있고, 같은 값이면 캡처에서 그 차이가 안 드러난다.
+              totalSpent: 1310000,
+              dailyAverage: 131000,
               categoryBreakdown: [
                 { category: 'FOOD', amount: 539500, percentage: 42 },
                 { category: 'SHOPPING', amount: 398200, percentage: 31 },

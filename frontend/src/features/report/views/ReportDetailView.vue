@@ -150,6 +150,8 @@ const comparisonQuery = useReportComparisonQuery(
 )
 const comparison = computed(() => comparisonQuery.data.value ?? null)
 const hasPeers = computed(() => (comparison.value?.peers.length ?? 0) > 0)
+/** `LIVE`는 여정 기간의 결제를 지금 다시 합산한 값이라 위 ANALYSIS(스냅샷)와 다를 수 있다. */
+const isLiveComparison = computed(() => comparison.value?.basis === 'LIVE')
 
 const comparisonMe = computed<ReportComparisonBarRow>(() => ({
   id: comparison.value?.me.memberId ?? 0,
@@ -367,6 +369,7 @@ function retry(): void {
           <StateError
             v-else-if="comparisonQuery.isError.value"
             :title="t('report.detail.comparison.loadFailed')"
+            :description="t('report.detail.comparison.loadFailedDescription')"
             :action-label="t('action.retry')"
             @retry="retryComparison"
           />
@@ -381,13 +384,21 @@ function retry(): void {
           <template v-else>
             <AppCard padding="lg">
               <div class="flex flex-col gap-6">
-                <ReportComparisonBars
-                  :total-label="t('report.detail.comparison.totalSpend')"
-                  :chips-label="t('report.detail.comparison.members')"
-                  :me="comparisonMe"
-                  :peers="comparisonPeers"
-                  :locale="i18n.locale.value"
-                />
+                <div class="flex flex-col gap-2">
+                  <ReportComparisonBars
+                    :total-label="t('report.detail.comparison.totalSpend')"
+                    :chips-label="t('report.detail.comparison.members')"
+                    :me="comparisonMe"
+                    :peers="comparisonPeers"
+                    :locale="i18n.locale.value"
+                  />
+                  <p
+                    v-if="isLiveComparison"
+                    class="text-micro text-ink-3"
+                  >
+                    {{ t('report.detail.comparison.liveBasisNote') }}
+                  </p>
+                </div>
                 <div class="flex flex-col gap-3">
                   <p class="text-micro uppercase text-ink-3">
                     {{ t('report.detail.comparison.categoryBalance') }}

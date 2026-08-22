@@ -29,7 +29,7 @@ const TILE_CLASS: Record<ReportRankTile['tone'], string> = {
       class="flex min-h-22 flex-col justify-between rounded-card p-4"
       :class="TILE_CLASS[tile.tone]"
     >
-      <span class="text-caption font-semibold opacity-85"># {{ tile.label }}</span>
+      <span class="text-caption font-semibold"># {{ tile.label }}</span>
       <span class="self-end font-display text-title font-bold uppercase tabular-nums">
         {{ tile.rankText }}
       </span>

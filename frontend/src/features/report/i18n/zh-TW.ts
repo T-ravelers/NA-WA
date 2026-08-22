@@ -104,6 +104,7 @@ export default {
       comparison: {
         heading: '與揪團成員比較',
         totalSpend: '總花費',
+        liveBasisNote: '這是重新加總這趟旅程期間付款後的金額，可能與上方的分析不同。',
         you: '您',
         groupAvg: '揪團平均',
         categoryBalance: '類別平衡',
@@ -115,7 +116,8 @@ export default {
         rankNth: '第 {rank} 名',
         emptyTitle: '還沒有揪團成員',
         emptyDescription: '在這趟旅程中參加揪團後，比較會顯示在這裡。',
-        loadFailed: '無法載入比較，請再試一次。',
+        loadFailed: '無法載入比較。',
+        loadFailedDescription: '這份報告的其他部分不受影響，請再試一次。',
         loading: '正在載入比較',
       },
       status: '報告狀態：{status}',

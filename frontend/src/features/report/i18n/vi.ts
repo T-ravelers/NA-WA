@@ -111,6 +111,8 @@ export default {
       comparison: {
         heading: 'So với nhóm',
         totalSpend: 'Tổng chi tiêu',
+        liveBasisNote:
+          'Chúng tôi tính lại từ các khoản thanh toán trong hành trình này nên số liệu có thể khác với phần phân tích ở trên.',
         you: 'Bạn',
         groupAvg: 'Trung bình nhóm',
         categoryBalance: 'Cân bằng danh mục',
@@ -123,7 +125,8 @@ export default {
         emptyTitle: 'Chưa có thành viên nhóm',
         emptyDescription:
           'Tham gia một cuộc hẹn trong hành trình này và phần so sánh sẽ hiện ở đây.',
-        loadFailed: 'Không tải được phần so sánh. Vui lòng thử lại.',
+        loadFailed: 'Không tải được phần so sánh.',
+        loadFailedDescription: 'Các phần còn lại của báo cáo không bị ảnh hưởng. Vui lòng thử lại.',
         loading: 'Đang tải phần so sánh',
       },
       status: 'Trạng thái báo cáo: {status}',

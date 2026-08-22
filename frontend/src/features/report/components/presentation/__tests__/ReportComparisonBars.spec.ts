@@ -28,6 +28,25 @@ describe('ReportComparisonBars', () => {
     expect(fills[1]?.attributes('style')).toContain('width: 76.')
   })
 
+  it('keeps an emoji display name whole in the chip initial', () => {
+    const wrapper = mount(ReportComparisonBars, {
+      props: { ...PROPS, peers: [{ id: 4, label: '\u{1F319} Mina', amount: 1000 }] },
+    })
+
+    // `slice(0, 1)`은 서로게이트 페어를 반으로 잘라 U+FFFD를 남긴다.
+    const initial = wrapper.get('[role="radio"] span').text()
+    expect(initial).toBe('\u{1F319}')
+    expect(initial).not.toContain('\uFFFD')
+  })
+
+  it('falls back when the display name starts with blanks', () => {
+    const wrapper = mount(ReportComparisonBars, {
+      props: { ...PROPS, peers: [{ id: 5, label: '  ada', amount: 1000 }] },
+    })
+
+    expect(wrapper.get('[role="radio"] span').text()).toBe('A')
+  })
+
   it('switches the compared peer from the chips', async () => {
     const wrapper = mount(ReportComparisonBars, { props: PROPS })
     const chips = wrapper.findAll('[role="radio"]')
