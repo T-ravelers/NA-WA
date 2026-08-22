@@ -31,6 +31,72 @@ describe('ExploreFilterBar', () => {
     expect(wrapper.emitted('toggleKind')).toEqual([['POPUP']])
   })
 
+  /** 그 버튼이 켜져 있는가. 켜지면 채워진 배경으로 바뀐다. */
+  function isButtonActive(wrapper: ReturnType<typeof mount>, label: string): boolean {
+    return (
+      wrapper
+        .findAll('button')
+        .find((button) => button.text().startsWith(label))
+        ?.classes()
+        .includes('bg-paper-fill') === true
+    )
+  }
+
+  it('lights up the button that owns each active filter', () => {
+    const wrapper = mount(ExploreFilterBar, {
+      global: { plugins: [i18n] },
+      props: {
+        ...props,
+        activeFilters: [
+          { key: 'date:preset', label: 'This weekend' },
+          { key: 'region2:Seongsu', label: 'Seongsu' },
+          { key: 'sector:2', label: 'Food' },
+          { key: 'option:freeOnly', label: 'Free' },
+        ],
+      },
+    })
+
+    /*
+     * 칩 key는 시트 이름이 아니라 필터 이름이다. 버튼 이름으로 startsWith를 하면
+     * category가 sector:·activity:를, options가 option:을 놓쳐 영영 켜지지 않는다.
+     */
+    expect(isButtonActive(wrapper, 'Date')).toBe(true)
+    expect(isButtonActive(wrapper, 'Region')).toBe(true)
+    expect(isButtonActive(wrapper, 'Category')).toBe(true)
+    expect(isButtonActive(wrapper, 'Options')).toBe(true)
+  })
+
+  it('counts only the filters that belong to each button', () => {
+    const wrapper = mount(ExploreFilterBar, {
+      global: { plugins: [i18n] },
+      props: {
+        ...props,
+        activeFilters: [
+          { key: 'sector:2', label: 'Food' },
+          { key: 'activity:9', label: 'Cafe / Dessert' },
+          { key: 'option:freeOnly', label: 'Free' },
+        ],
+      },
+    })
+
+    const categoryButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('Category'))
+
+    expect(categoryButton?.text()).toContain('· 2')
+  })
+
+  it('leaves a button dark when nothing under it is selected', () => {
+    const wrapper = mount(ExploreFilterBar, {
+      global: { plugins: [i18n] },
+      props: { ...props, activeFilters: [{ key: 'sector:2', label: 'Food' }] },
+    })
+
+    expect(isButtonActive(wrapper, 'Category')).toBe(true)
+    expect(isButtonActive(wrapper, 'Options')).toBe(false)
+    expect(isButtonActive(wrapper, 'Date')).toBe(false)
+  })
+
   it('shows the global reset when only an event kind is selected', () => {
     const wrapper = mount(ExploreFilterBar, { global: { plugins: [i18n] }, props })
 

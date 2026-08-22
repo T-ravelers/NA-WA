@@ -40,6 +40,28 @@ const FILTER_LABELS: Record<ExploreSheetKind, string> = {
   sort: 'explore.sheets.sort',
 }
 
+const FILTERABLE_SHEET_KINDS = ['date', 'region', 'category', 'options'] as const
+
+/**
+ * 버튼과 그 버튼이 여는 시트에서 나온 칩을 잇는 표. `PlaceFilterBar`와 같은 방식이다.
+ *
+ * 버튼 이름으로 `startsWith`를 하면 안 된다 — 칩 key는 시트 이름이 아니라 필터 이름이라
+ * `category` 버튼이 `sector:`·`activity:` 칩을, `options` 버튼이 `option:` 칩을 놓친다.
+ * 그러면 그 두 버튼은 필터를 아무리 걸어도 켜지지 않는다.
+ */
+const FILTER_PREFIXES: Record<(typeof FILTERABLE_SHEET_KINDS)[number], string[]> = {
+  date: ['date:'],
+  region: ['region1:', 'region2:', 'region3:'],
+  category: ['sector:', 'activity:'],
+  options: ['option:'],
+}
+
+function filtersFor(kind: (typeof FILTERABLE_SHEET_KINDS)[number]): ActiveFilter[] {
+  return activeFilters.filter((filter) =>
+    FILTER_PREFIXES[kind].some((prefix) => filter.key.startsWith(prefix)),
+  )
+}
+
 const hasAnyFilter = computed(
   () => activeFilters.length > 0 || eventKindOptions.some((option) => option.selected),
 )
@@ -49,12 +71,12 @@ const hasAnyFilter = computed(
   <div class="flex min-w-0 flex-col gap-2">
     <div class="scrollbar-hidden -mx-screen flex gap-2 overflow-x-auto px-screen">
       <button
-        v-for="kind in ['date', 'region', 'category', 'options'] as ExploreSheetKind[]"
+        v-for="kind in FILTERABLE_SHEET_KINDS"
         :key="kind"
         type="button"
         class="flex h-11 shrink-0 items-center gap-1 rounded-pill border px-4 text-body-sm transition-colors"
         :class="
-          activeSheet === kind || activeFilters.some((filter) => filter.key.startsWith(kind))
+          activeSheet === kind || filtersFor(kind).length > 0
             ? 'border-paper-fill bg-paper-fill text-on-paper'
             : 'border-hairline-2 bg-transparent text-ink-2'
         "
@@ -62,10 +84,10 @@ const hasAnyFilter = computed(
       >
         {{ t(FILTER_LABELS[kind]) }}
         <span
-          v-if="activeFilters.some((filter) => filter.key.startsWith(kind))"
+          v-if="filtersFor(kind).length > 0"
           class="text-caption"
         >
-          · {{ activeFilters.filter((filter) => filter.key.startsWith(kind)).length }}
+          · {{ filtersFor(kind).length }}
         </span>
         <IconChevronDown
           :size="16"
