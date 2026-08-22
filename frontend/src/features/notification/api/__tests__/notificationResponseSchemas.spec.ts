@@ -24,21 +24,35 @@ function omit(source: typeof notification, key: keyof typeof notification) {
   return copy
 }
 
+/** 목록은 배열이 아니라 쪽으로 온다. nextCursor를 실을 자리가 필요해서다. */
+function page(notifications: unknown[], nextCursor: string | null = null) {
+  return { notifications, nextCursor }
+}
+
 describe('notification response schemas', () => {
   it('accepts amounts as numbers or strings and ids in either form', () => {
-    expect(notificationListResponseSchema.safeParse([notification]).success).toBe(true)
+    expect(notificationListResponseSchema.safeParse(page([notification])).success).toBe(true)
     expect(
-      notificationListResponseSchema.safeParse([
-        { ...notification, id: '1', settlementId: '90', amount: 30 },
-      ]).success,
+      notificationListResponseSchema.safeParse(
+        page([{ ...notification, id: '1', settlementId: '90', amount: 30 }]),
+      ).success,
     ).toBe(true)
   })
 
   it('accepts a missing readAt as well as an explicit null', () => {
     const withoutReadAt = omit(notification, 'readAt')
 
-    expect(notificationListResponseSchema.safeParse([withoutReadAt]).success).toBe(true)
-    expect(notificationListResponseSchema.safeParse([notification]).success).toBe(true)
+    expect(notificationListResponseSchema.safeParse(page([withoutReadAt])).success).toBe(true)
+    expect(notificationListResponseSchema.safeParse(page([notification])).success).toBe(true)
+  })
+
+  /* 마지막 쪽에서는 커서가 없다. 빠진 것과 null을 둘 다 "더 없다"로 읽는다. */
+  it('treats a missing nextCursor the same as an explicit null', () => {
+    expect(
+      notificationListResponseSchema.safeParse({ notifications: [notification] }).success,
+    ).toBe(true)
+    expect(notificationListResponseSchema.safeParse(page([notification], null)).success).toBe(true)
+    expect(notificationListResponseSchema.safeParse(page([notification], '12')).success).toBe(true)
   })
 
   /*
@@ -47,14 +61,15 @@ describe('notification response schemas', () => {
    */
   it('does not reject a notification type the client does not know yet', () => {
     expect(
-      notificationListResponseSchema.safeParse([{ ...notification, type: 'APPOINTMENT_REMINDER' }])
-        .success,
+      notificationListResponseSchema.safeParse(
+        page([{ ...notification, type: 'APPOINTMENT_REMINDER' }]),
+      ).success,
     ).toBe(true)
   })
 
   it('keeps parsing when the server adds a field', () => {
     expect(
-      notificationListResponseSchema.safeParse([{ ...notification, deepLink: '/splits/90' }])
+      notificationListResponseSchema.safeParse(page([{ ...notification, deepLink: '/splits/90' }]))
         .success,
     ).toBe(true)
   })
@@ -62,10 +77,18 @@ describe('notification response schemas', () => {
   it('rejects a notification that is missing what the screen needs', () => {
     const withoutGathering = omit(notification, 'gatheringName')
 
-    expect(notificationListResponseSchema.safeParse([withoutGathering]).success).toBe(false)
+    expect(notificationListResponseSchema.safeParse(page([withoutGathering])).success).toBe(false)
     expect(
-      notificationListResponseSchema.safeParse([{ ...notification, amount: null }]).success,
+      notificationListResponseSchema.safeParse(page([{ ...notification, amount: null }])).success,
     ).toBe(false)
+  })
+
+  /*
+   * 배열을 그대로 받으면 화면은 빈 목록으로 그린다. 서버가 옛 모양으로 돌아간 것을
+   * 알림이 없는 것과 구분할 수 없게 되므로 검증에서 막는다.
+   */
+  it('rejects the old bare-array shape', () => {
+    expect(notificationListResponseSchema.safeParse([notification]).success).toBe(false)
   })
 
   it('rejects an unread count that is not a whole non-negative number', () => {

@@ -73,3 +73,25 @@ export function settlementSideFor(kind: NotificationKind): 'received' | 'sent' |
   if (kind === 'SETTLEMENT_PAID') return 'sent'
   return undefined
 }
+
+/**
+ * 정산 상세가 "알림에서 왔다"고 알아보는 표시.
+ *
+ * 이 값이 없으면 정산 상세는 뒤로 갈 때 정산 홈으로 보낸다. 벨을 눌러 들어온 사용자는
+ * 지갑에서 두 화면이나 떨어진 곳에 서게 되고, 눌렀던 벨을 다시 찾지 못한다.
+ *
+ * 짝이 되는 코드는 정산 쪽 `settlementReturn.ts`의 `resolveDetailBackTarget`이다. 알림이
+ * 정산 feature를 직접 import하지 않으려고 값을 여기서 따로 적는다 — 위의 `side`도 같은
+ * 이유로 같은 방식이다. **한쪽만 고치면 조용히 옛 동작으로 돌아간다.**
+ */
+export const SETTLEMENT_RETURN_ORIGIN = 'notifications'
+
+/** 정산 상세로 갈 때 주소에 실을 값. */
+export function settlementReturnQuery(
+  side: 'received' | 'sent' | undefined,
+): Record<string, string> {
+  return {
+    origin: SETTLEMENT_RETURN_ORIGIN,
+    ...(side === undefined ? {} : { side }),
+  }
+}

@@ -20,6 +20,17 @@ export default {
      * 같다. 배지의 `{count} unread`와 짝을 이룬다.
      */
     unread: 'Unread',
+    /**
+     * 카드의 X에 읽히는 이름.
+     *
+     * 알림마다 "Dismiss"만 들리면 목록에서 어느 것을 지우는 버튼인지 알 수 없다. 그 알림의
+     * 문장을 함께 실어 구분되게 한다.
+     */
+    dismissOne: 'Dismiss: {message}',
+    dismissAll: 'Clear all',
+    markAllRead: 'Mark all read',
+    loadMore: 'Show older',
+    loadingMore: 'Loading',
     empty: {
       title: 'No notifications yet',
       description: 'Split requests and payments will show up here.',

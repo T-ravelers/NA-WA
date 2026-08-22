@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { toAppNotification, toNotificationKind } from '../notification'
+import { settlementReturnQuery, toAppNotification, toNotificationKind } from '../notification'
 
 const dto = {
   id: 1,
@@ -39,5 +39,27 @@ describe('toAppNotification', () => {
     expect(toAppNotification(dto).isRead).toBe(false)
     expect(toAppNotification({ ...dto, readAt: undefined }).isRead).toBe(false)
     expect(toAppNotification({ ...dto, readAt: '2026-08-21T13:00:00' }).isRead).toBe(true)
+  })
+})
+
+/*
+ * 정산 상세는 이 `origin` 값을 보고 뒤로 갈 곳을 정한다. 값이 어긋나면 알림에서 연 정산이
+ * 정산 홈으로 떨어지고, 벨을 눌러 들어온 사용자는 지갑에서 두 화면이나 떨어진 곳에 선다.
+ *
+ * 두 feature는 서로를 import할 수 없어(`no-cross-feature-imports`) 값을 양쪽에 따로 적는다.
+ * 그래서 양쪽 테스트가 각자 이 글자를 붙잡는다 — 짝이 되는 것은 정산 쪽
+ * `settlementReturn.spec.ts`의 "opened from a notification" 테스트다.
+ */
+describe('settlementReturnQuery', () => {
+  it('marks that the settlement was opened from the notification list', () => {
+    expect(settlementReturnQuery('received')).toEqual({
+      origin: 'notifications',
+      side: 'received',
+    })
+  })
+
+  /* 완료 알림은 어느 쪽인지 알 수 없다. 그때도 온 곳 표시는 남아야 한다. */
+  it('still marks where it came from when the side is unknown', () => {
+    expect(settlementReturnQuery(undefined)).toEqual({ origin: 'notifications' })
   })
 })

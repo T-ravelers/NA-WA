@@ -11,6 +11,18 @@ import type { SettlementSide } from './settlementList'
  */
 const HISTORY_ORIGIN = 'history'
 
+/**
+ * 알림 목록에서 들어왔다는 표시.
+ *
+ * 이 갈래가 없으면 알림에서 연 정산은 뒤로 갈 때 정산 홈으로 떨어진다. 벨은 지갑 화면에만
+ * 있어서, 벨을 눌러 들어온 사용자가 지갑에서 두 화면이나 떨어진 곳에 서게 된다.
+ *
+ * 값은 알림 쪽 `notification.ts`의 `SETTLEMENT_RETURN_ORIGIN`과 같아야 한다. 알림이 정산을
+ * 직접 import하지 않으려고 양쪽에 따로 적는데(`side`도 같은 방식이다), **한쪽만 고치면
+ * 오류 없이 옛 동작으로 돌아간다.**
+ */
+const NOTIFICATIONS_ORIGIN = 'notifications'
+
 /** 주소 값은 같은 이름이 두 번 적히면 배열로 온다. 첫 값만 본다. */
 function first(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : value
@@ -46,6 +58,12 @@ export function resolveDetailBackTarget(
   query: Record<string, unknown>,
   side: SettlementSide,
 ): RouteLocationRaw {
+  // 알림 목록에는 좁혀 둔 기간이나 보고 있던 쪽 같은 상태가 없다. 온 곳으로 돌려보내는
+  // 것만으로 충분해서 주소에 아무것도 싣지 않는다.
+  if (first(query.origin) === NOTIFICATIONS_ORIGIN) {
+    return { name: 'notifications' }
+  }
+
   if (first(query.origin) !== HISTORY_ORIGIN) {
     return { name: 'settlements', query: { side } }
   }
