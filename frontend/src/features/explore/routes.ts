@@ -1,6 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router'
 
 import { resolveExploreFilterEntry } from './model/exploreFilterEntry'
+import { useExploreFilterMemoryStore } from './model/exploreFilterMemory'
 import { useExploreReturnContextStore } from './model/exploreReturnContext'
 
 const EXPLORE_ROUTE_NAMES = new Set(['explore', 'explore-event-detail', 'explore-place-detail'])
@@ -29,11 +30,20 @@ const routes: RouteRecordRaw[] = [
        *
        * 이 guard는 route record에 처음 들어올 때만 돈다. 이미 Discover에 있는 채로 하단 탭을
        * 다시 눌러 query만 바뀌는 이동은 `ExploreView`가 같은 판단을 이어받는다.
+       *
+       * 단 Discover 밖에서 들어오는 진입은 되돌리지 않고 기억을 버린다. 다른 화면을 보다가
+       * 돌아온 사람은 목록을 처음부터 보려는 것이고, 지난 조건이 그대로 걸려 있으면 왜
+       * 목록이 좁은지 알 방법이 없다. 아래 맥락 guard가 일회성 맥락을 버리는 조건과 같다.
        */
-      (to, from) =>
-        resolveExploreFilterEntry(to.query, {
-          keepPage: EXPLORE_DETAIL_ROUTE_NAMES.has(String(from.name)),
-        }) ?? true,
+      (to, from) => {
+        if (!EXPLORE_ROUTE_NAMES.has(String(from.name))) useExploreFilterMemoryStore().clear()
+
+        return (
+          resolveExploreFilterEntry(to.query, {
+            keepPage: EXPLORE_DETAIL_ROUTE_NAMES.has(String(from.name)),
+          }) ?? true
+        )
+      },
       /*
        * Journey 화면에서 날짜를 지정해 넘어온 맥락을 여기서 받는다.
        *

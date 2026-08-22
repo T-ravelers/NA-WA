@@ -91,14 +91,15 @@ describe('explore routes', () => {
     expect(context.journeyId).toBe(7)
   })
 
-  it('restores the last filters when Discover is entered without any', async () => {
+  it('forgets the filters when Discover is entered from another screen', async () => {
     const router = createTestRouter()
     await router.push('/explore?eventKeyword=hongdae')
 
     await router.push('/')
     await router.push('/explore')
 
-    expect(router.currentRoute.value.query).toEqual({ eventKeyword: 'hongdae' })
+    /* 다른 화면을 보다 돌아온 사람은 목록을 처음부터 본다. */
+    expect(router.currentRoute.value.query).toEqual({})
   })
 
   it('brings the filters back when returning from an item detail', async () => {
@@ -147,8 +148,8 @@ describe('explore routes', () => {
     await router.push('/')
     await router.push('/explore')
 
-    /* 날짜는 필터라 되돌아오지만 journeyId는 맥락이라 되살아나지 않는다. */
-    expect(router.currentRoute.value.query).toEqual(CONTEXT_DATES)
+    /* 날짜는 필터라 기억과 함께 버려지고, journeyId는 맥락이라 애초에 되살아나지 않는다. */
+    expect(router.currentRoute.value.query).toEqual({})
     const context = useExploreReturnContextStore()
     expect(context.visitDate).toBeNull()
     expect(context.returnTo).toBeNull()
@@ -175,8 +176,25 @@ describe('explore routes', () => {
     await router.push('/')
     await router.push('/explore')
 
-    /* 필터는 되돌리되 쪽 번호는 버린다. Discover를 새로 누른 사람은 목록을 처음부터 본다. */
-    expect(router.currentRoute.value.query).toEqual({ eventKeyword: 'hongdae' })
+    /* 필터도 쪽 번호도 남기지 않는다. Discover를 새로 누른 사람은 목록을 처음부터 본다. */
+    expect(router.currentRoute.value.query).toEqual({})
+  })
+
+  it('forgets both tabs at once when Discover is entered from outside', async () => {
+    const router = createTestRouter()
+    await router.push('/explore?tab=places&placeKinds=CAFE')
+
+    await router.push('/')
+    await router.push('/explore')
+
+    /*
+     * Events로 들어왔다고 Events 칸만 비우면 Places 칸이 살아남는다. 그러면 Places 탭을
+     * 누르거나 장소 상세에서 뒤로 나오는 순간 화면에 없던 조건이 걸린다.
+     */
+    await router.push('/explore/places/9')
+    await router.push('/explore?tab=places')
+
+    expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
   })
 
   it('lets an explicit shared URL win over the remembered filters', async () => {
@@ -198,21 +216,22 @@ describe('explore routes', () => {
     await router.push('/explore?tab=events')
     expect(router.currentRoute.value.query).toEqual({ tab: 'events' })
 
-    /* Place 상세에서 뒤로 나온 진입에서만 Place 필터가 돌아온다. */
+    /* `/`를 거치면서 두 칸이 함께 비워졌으므로 Place 필터도 남아 있지 않다. */
     await router.push('/explore/places/9')
     await router.push('/explore?tab=places')
-    expect(router.currentRoute.value.query).toEqual({ tab: 'places', placeKinds: 'CAFE' })
+    expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
   })
 
-  it('keeps a cleared filter state cleared on the next entry', async () => {
+  it('keeps a cleared filter state cleared when coming back from an item detail', async () => {
     const router = createTestRouter()
     await router.push('/explore?eventKeyword=hongdae')
     /* 필터를 모두 지우는 것은 화면이 한다. 같은 라우트라 가드가 아니라 watcher가 기억한다. */
     useExploreFilterMemoryStore().remember({})
 
-    await router.push('/')
-    await router.push('/explore')
+    await router.push('/explore/events/42')
+    await router.push('/explore?tab=events')
 
+    /* Events는 `tab`을 쓰지 않으므로 비운 상태로 정리된 주소가 된다. */
     expect(router.currentRoute.value.query).toEqual({})
   })
 
