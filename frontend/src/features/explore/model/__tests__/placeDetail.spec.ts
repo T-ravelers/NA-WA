@@ -57,4 +57,15 @@ describe('placeDetail model helpers', () => {
     expect(toClosedDays(['Seollal', 'Chuseok'])).toBe('Seollal, Chuseok')
     expect(toClosedDays({ regular: 'Mondays' })).toBe('regular: Mondays')
   })
+
+  // 수집한 영업시간의 3분의 1가량이 <br>을 그대로 달고 온다. 화면은 문자열을
+  // 이스케이프하므로 두면 태그가 글자로 보인다.
+  it('turns the crawled <br> tags into line breaks', () => {
+    expect(toDetailEntries({ raw: '- 12:00~22:00<br>- 준비시간 15:00~18:00' })).toEqual([
+      { label: 'raw', value: '- 12:00~22:00\n- 준비시간 15:00~18:00' },
+    ])
+    expect(toDetailEntries('12:00~22:00 <BR/>13:00~14:00')).toEqual([
+      { label: 'hours', value: '12:00~22:00\n13:00~14:00' },
+    ])
+  })
 })

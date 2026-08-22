@@ -17,7 +17,10 @@ function mountSheet(noShow = false) {
 }
 
 describe('AppointmentLeaveConfirmSheet', () => {
-  it('keeps the refundable leave confirmation neutral', () => {
+  // 환급 탈퇴는 경고가 아니므로 문구는 중립으로 둔다(#371). 다만 확정 버튼까지
+  // paper-fill로 두면 모달의 밝은 바탕과 대비가 1.02라 버튼이 보이지 않아,
+  // 보증금이 오가는 확정에 써 온 노랑으로 바꿨다.
+  it('keeps the refundable leave copy neutral and its action visible', () => {
     const wrapper = mountSheet()
     const refundCopy = wrapper
       .findAll('p')
@@ -28,7 +31,7 @@ describe('AppointmentLeaveConfirmSheet', () => {
 
     expect(refundCopy?.classes()).toContain('text-on-paper/70')
     expect(refundCopy?.classes()).not.toContain('bg-danger/10')
-    expect(confirmButton?.classes()).toContain('bg-paper-fill')
+    expect(confirmButton?.classes()).toContain('bg-settlement')
   })
 
   it('shows the C-2 warning surface and destructive action for a no-show forfeiture', () => {

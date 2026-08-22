@@ -100,14 +100,18 @@ function formatDeposit(value: string): string {
       <div class="mt-5 flex flex-col gap-2">
         <AppButton
           block
-          variant="secondary"
+          variant="secondary-on-paper"
           @click="emit('close')"
         >
           {{ t('appointment.leave.cancel') }}
         </AppButton>
+        <!-- 몰수(노쇼)는 손실이 확정되는 순간이라 빨강을 유지한다(#371). 환급 탈퇴는
+             보증금이 지갑으로 오가는 확정이라 노랑을 쓴다 — 회원 목록의 나가기
+             버튼과 같은 색이고, primary(paper-fill)는 이 모달의 밝은 바탕과 대비가
+             1.02라 버튼이 배경에 묻힌다. 경고 문구는 그대로 중립이다. -->
         <AppButton
           block
-          :variant="noShow ? 'destructive' : 'primary'"
+          :variant="noShow ? 'destructive' : 'settle'"
           :loading="confirmDisabled"
           :disabled="confirmDisabled"
           @click="emit('confirm')"

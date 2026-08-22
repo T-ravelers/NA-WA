@@ -126,6 +126,22 @@ const naverRouteUrl = computed(() =>
 const hours = computed(() => (place.value ? toDetailEntries(place.value.openingHours) : []))
 const closedDays = computed(() => (place.value ? toClosedDays(place.value.closedDays) : ''))
 
+/**
+ * 영업시간 한 줄을 적는다.
+ *
+ * 수집한 영업시간은 대부분 `{ raw: '12:00 ~ 22:00' }` 한 칸짜리 객체다. `raw`는
+ * 크롤러가 붙인 키 이름이라 화면 라벨이 아니고, 행에는 이미 "Hours"가 적혀 있다.
+ * 그대로 찍으면 `raw: 12:00 ~ 22:00`이 된다. 문자열로 온 값에 우리가 붙이는
+ * `hours`도 같은 이유로 감춘다. Event 상세도 같은 규칙이다.
+ */
+const SYNTHETIC_HOURS_LABELS = new Set(['raw', 'hours'])
+
+function formatHoursEntry(entry: { label: string; value: string }): string {
+  return SYNTHETIC_HOURS_LABELS.has(entry.label.toLowerCase())
+    ? entry.value
+    : `${entry.label}: ${entry.value}`
+}
+
 const detailRows = computed(() => {
   const current = place.value
   if (!current) return []
@@ -134,7 +150,7 @@ const detailRows = computed(() => {
   if (hours.value.length > 0) {
     rows.push({
       label: t('explore.placeDetail.hours'),
-      value: hours.value.map((entry) => `${entry.label}: ${entry.value}`).join('\n'),
+      value: hours.value.map(formatHoursEntry).join('\n'),
     })
   }
   if (closedDays.value) {
@@ -173,12 +189,17 @@ const optionBadges = computed(() => {
     .map(([key, , label]) => ({ key, label }))
 })
 
+/**
+ * 대표 메뉴는 한 문자열로 오고 구분자가 출처마다 다르다. 수집한 1,485건 중
+ * 1,441건이 `/`, 32건이 쉼표, 9건이 가운뎃점을 쓴다. `/`를 빼면 문장 전체가 칩
+ * 하나에 들어가 "A / B / C"가 통째로 붙어 나온다.
+ */
 const menuItems = computed(() => {
   const value = place.value?.menuSummary
   if (!value) return []
 
   return value
-    .split(/\n|\s*·\s*|\s*,\s*/)
+    .split(/\n|\s*·\s*|\s*,\s*|\s*\/\s*/)
     .map((item) => item.trim())
     .filter(Boolean)
 })

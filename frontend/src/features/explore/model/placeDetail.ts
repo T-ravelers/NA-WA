@@ -60,16 +60,30 @@ export function normalizePlaceDetail(payload: PlaceDetailResponse): PlaceDetail 
   }
 }
 
+/**
+ * 원본 문자열에 섞여 오는 `<br>`을 줄바꿈으로 되돌린다.
+ *
+ * 수집한 영업시간의 3분의 1가량이 `- 12:00~22:00<br>- 준비시간 15:00~18:00`처럼
+ * 태그를 그대로 달고 온다. 화면은 문자열을 이스케이프하므로 그대로 두면 `<br>`이
+ * 글자로 보인다. HTML로 렌더링하지 않고 문자열만 바꾸므로 태그가 실행될 여지는 없다.
+ */
+function unescapeLineBreaks(value: string): string {
+  return value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim()
+}
+
 export function toDetailEntries(value: unknown): DetailEntry[] {
   if (typeof value === 'string' && value.trim() !== '') {
-    return [{ label: 'hours', value }]
+    return [{ label: 'hours', value: unescapeLineBreaks(value) }]
   }
 
   if (!isRecord(value)) return []
 
   return Object.entries(value)
     .filter(([, item]) => typeof item === 'string' || typeof item === 'number')
-    .map(([label, item]) => ({ label, value: String(item) }))
+    .map(([label, item]) => ({ label, value: unescapeLineBreaks(String(item)) }))
 }
 
 export function toClosedDays(value: unknown): string {
