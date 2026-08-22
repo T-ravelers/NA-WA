@@ -3,6 +3,7 @@ package me.nawa.appointment.controller;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import me.nawa.appointment.dto.request.AppointmentCreateRequest;
+import me.nawa.appointment.dto.request.AppointmentJoinRequest;
 import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import me.nawa.appointment.dto.response.AppointmentDetailResponse;
@@ -87,10 +88,12 @@ public class AppointmentController {
     @ApiOperation("약속 참여 요청")
     public ApiResponse<AppointmentMemberResponse> joinAppointment(
             @AuthenticationPrincipal AuthenticatedMember member,
-            @PathVariable Long appointmentId) {
+            @PathVariable Long appointmentId,
+            @RequestBody AppointmentJoinRequest request) {
         return ApiResponse.success(appointmentService.joinAppointment(
                 member.getMemberId(),
-                appointmentId
+                appointmentId,
+                request
         ));
     }
 

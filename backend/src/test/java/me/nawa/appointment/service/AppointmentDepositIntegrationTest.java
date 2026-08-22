@@ -20,6 +20,7 @@ import me.nawa.appointment.domain.AppointmentStatus;
 import me.nawa.appointment.domain.MembershipStatus;
 import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentCreateRequest;
+import me.nawa.appointment.dto.request.AppointmentJoinRequest;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.config.MySqlSchemaExtension;
@@ -263,7 +264,11 @@ class AppointmentDepositIntegrationTest {
         assertEquals(0, new BigDecimal("40000.0000").compareTo(walletBalance(hostMemberId)));
 
         AppointmentMemberResponse joined =
-                appointmentService.joinAppointment(guestMemberId, created.getAppointmentId());
+                appointmentService.joinAppointment(
+                        guestMemberId,
+                        created.getAppointmentId(),
+                        joinRequestFor(guestMemberId)
+                );
         assertEquals(MembershipStatus.ACTIVE, joined.getMembershipStatus());
         assertEquals(0, new BigDecimal("40000.0000").compareTo(walletBalance(guestMemberId)));
 
@@ -309,7 +314,11 @@ class AppointmentDepositIntegrationTest {
 
         Appointment created = appointmentService.createAppointment(hostMemberId, request);
         appointmentIds.add(created.getAppointmentId());
-        appointmentService.joinAppointment(guestMemberId, created.getAppointmentId());
+        appointmentService.joinAppointment(
+                        guestMemberId,
+                        created.getAppointmentId(),
+                        joinRequestFor(guestMemberId)
+                );
         assertEquals(0, new BigDecimal("40000.0000").compareTo(walletBalance(guestMemberId)));
 
         appointmentService.leaveAppointment(guestMemberId, created.getAppointmentId());
@@ -367,7 +376,11 @@ class AppointmentDepositIntegrationTest {
         appointmentIds.add(created.getAppointmentId());
         assertEquals(AppointmentStatus.RECRUITING, created.getAppointmentStatus());
 
-        appointmentService.joinAppointment(guestMemberId, created.getAppointmentId());
+        appointmentService.joinAppointment(
+                        guestMemberId,
+                        created.getAppointmentId(),
+                        joinRequestFor(guestMemberId)
+                );
 
         assertEquals(
                 AppointmentStatus.FULL,
@@ -415,7 +428,11 @@ class AppointmentDepositIntegrationTest {
 
         Appointment created = appointmentService.createAppointment(hostMemberId, request);
         appointmentIds.add(created.getAppointmentId());
-        appointmentService.joinAppointment(guestMemberId, created.getAppointmentId());
+        appointmentService.joinAppointment(
+                        guestMemberId,
+                        created.getAppointmentId(),
+                        joinRequestFor(guestMemberId)
+                );
 
         // 스케줄러가 실제로 IN_PROGRESS로 넘길 때까지 기다리지 않고, 출석
         // 확정 자체의 동작만 검증하기 위해 상태를 직접 IN_PROGRESS로 맞춘다.
@@ -509,6 +526,13 @@ class AppointmentDepositIntegrationTest {
                 walletOwnerId, balance
         );
         return memberId;
+    }
+
+    /** 참여도 여정을 고른다. 참여자 몫의 여정을 만들어 요청에 싣는다. */
+    private AppointmentJoinRequest joinRequestFor(long memberId) {
+        AppointmentJoinRequest request = new AppointmentJoinRequest();
+        request.setTripId(createJourney(memberId));
+        return request;
     }
 
     private long createJourney(long memberId) {
