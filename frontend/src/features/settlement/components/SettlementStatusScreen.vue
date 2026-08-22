@@ -22,7 +22,10 @@ const emit = defineEmits<{ action: [] }>()
 
 <template>
   <!-- 하단 고정 내비게이션이 CTA를 덮지 않도록 목록 화면과 같은 여백을 둔다. -->
-  <section class="flex min-h-dvh flex-col px-screen pt-8 pb-32">
+  <section
+    class="flex min-h-dvh flex-col px-screen pt-8 pb-32"
+    :data-testid="`settlement-status-${state}`"
+  >
     <div
       class="my-auto flex flex-col items-center text-center"
       role="status"

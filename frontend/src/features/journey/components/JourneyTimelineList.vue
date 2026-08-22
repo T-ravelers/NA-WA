@@ -256,6 +256,7 @@ const displayDays = computed(() => {
               <button
                 type="button"
                 :aria-label="item.removeName"
+                :data-testid="`itinerary-remove-${item.tripItemId}`"
                 :disabled="props.removingTripItemId === item.tripItemId"
                 class="absolute right-0.5 top-0.5 flex size-11 items-center justify-center rounded-pill text-ink-3 disabled:opacity-40"
                 @click="emit('remove', item.source)"

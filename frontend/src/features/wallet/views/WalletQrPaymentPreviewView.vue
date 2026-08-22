@@ -433,6 +433,7 @@ const completePayment = (): void => {
             :key="option.value"
             type="button"
             role="radio"
+            :data-testid="`payment-category-${option.value}`"
             :aria-checked="option.value === spendingCategory"
             class="h-9 rounded-pill px-3.5 text-caption transition-transform active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             :class="

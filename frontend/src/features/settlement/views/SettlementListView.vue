@@ -53,6 +53,7 @@ function open(settlementId: string): void {
 <template>
   <section class="flex min-h-dvh flex-col px-screen pt-8 pb-32">
     <SettlementPageHeader
+      data-testid="settlement-home"
       :title="t('settlement.title')"
       :back-label="t('settlement.backToWallet')"
       @back="router.push({ name: 'wallet' })"
@@ -162,6 +163,7 @@ function open(settlementId: string): void {
       class="mt-auto"
       block
       variant="settle"
+      data-testid="settlement-start"
       @click="router.push({ name: 'settlement-new' })"
       >{{ t('settlement.start') }}</AppButton
     >

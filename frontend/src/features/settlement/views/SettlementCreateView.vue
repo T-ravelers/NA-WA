@@ -508,6 +508,7 @@ defineExpose({ back })
       <SettlementEmptyState
         v-if="candidates.length === 0"
         class="flex-1"
+        data-testid="settlement-no-payments"
         :title="t('settlement.create.noPaymentsTitle')"
         :description="t('settlement.create.noPaymentsDescription')"
       />

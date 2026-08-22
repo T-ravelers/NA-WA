@@ -303,7 +303,7 @@ describe('ReportsView', () => {
     const { wrapper } = await mountView('/reports?tripId=9')
 
     expect(wrapper.text()).toContain('Choose report expenses')
-    expect(wrapper.text()).toContain('Jeju Island · Select completed KRW expenses')
+    expect(wrapper.text()).toContain('Jeju Island · Select completed expenses')
   })
 
   it('silently ignores an invalid or unknown ?tripId query param', async () => {
@@ -343,6 +343,6 @@ describe('ReportsView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Choose report expenses')
-    expect(wrapper.text()).toContain('Jeju Island · Select completed KRW expenses')
+    expect(wrapper.text()).toContain('Jeju Island · Select completed expenses')
   })
 })

@@ -150,6 +150,7 @@ const errorDescription = computed(() => {
         <AppButton
           v-for="action in quickActions"
           :key="action.id"
+          :data-testid="`wallet-action-${action.id}`"
           :variant="action.variant"
           block
           compact

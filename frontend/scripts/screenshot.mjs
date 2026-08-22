@@ -1066,7 +1066,7 @@ const SCREENS = [
     path: '/settings',
     setup: (page) => stubMemberProfile(page),
     prepare: async (page) => {
-      await page.getByLabel('Change screen language').click()
+      await page.getByTestId('settings-language').click()
       await page.waitForSelector('[role="dialog"]')
     },
   },
@@ -1090,8 +1090,8 @@ const SCREENS = [
       await page.locator('input[type="text"]').first().fill('Seoul Foodie Week')
       await page.locator('input[type="date"]').nth(0).fill('2026-08-10')
       await page.locator('input[type="date"]').nth(1).fill('2026-08-12')
-      await page.getByRole('button', { name: 'Next' }).click()
-      await page.getByText('Step 2 of 2').waitFor()
+      await page.getByTestId('journey-create-next').click()
+      await page.getByTestId('journey-create-step-2').waitFor()
     },
   },
   {
@@ -1111,7 +1111,7 @@ const SCREENS = [
     setup: (page) =>
       Promise.all([stubMemberProfile(page), stubJourneyDetail(page), stubEmptyReportList(page)]),
     prepare: async (page) => {
-      await page.getByRole('button', { name: 'Remove Seoul Night Market from itinerary' }).click()
+      await page.getByTestId('itinerary-remove-1').click()
       await page.getByRole('dialog').waitFor()
     },
   },
@@ -1156,7 +1156,7 @@ const SCREENS = [
       stubWalletApis(page)
     },
     prepare: async (page) => {
-      await page.getByLabel('Top-up amount').fill('50000')
+      await page.getByTestId('topup-amount').locator('input').fill('50000')
     },
   },
   {
@@ -1214,7 +1214,7 @@ const SCREENS = [
     prepare: async (page) => {
       await seedQrPaymentSession(page)
       // 소비 카테고리 칩이 그려질 때까지 기다린다. 세션이 없으면 빈 상태만 찍힌다.
-      await page.getByRole('radio', { name: 'Food' }).waitFor()
+      await page.getByTestId('payment-category-FOOD').waitFor()
     },
   },
   {
@@ -1233,7 +1233,7 @@ const SCREENS = [
       await stubMemberProfile(page)
       await stubEmptySettlementCandidates(page)
     },
-    prepare: (page) => page.getByText('No payments available', { exact: true }).waitFor(),
+    prepare: (page) => page.getByTestId('settlement-no-payments').waitFor(),
   },
   {
     name: '24-settlement-create-error',
@@ -1281,7 +1281,7 @@ const SCREENS = [
     },
     // 버튼이 없는 것을 보여줘야 하므로 위치 섹션 자체로 스크롤한다.
     prepare: async (page) => {
-      const locationHeading = page.getByRole('heading', { name: 'Location' })
+      const locationHeading = page.getByTestId('event-location')
       await locationHeading.waitFor()
       await locationHeading.scrollIntoViewIfNeeded()
     },
@@ -1355,8 +1355,8 @@ const FLOWS = [
       {
         name: '02-splits-to-pay',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Splits' }).click()
-          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+          await page.getByTestId('wallet-action-settlement').click()
+          await page.getByTestId('settlement-home').waitFor()
         },
       },
       {
@@ -1370,7 +1370,7 @@ const FLOWS = [
         name: '04-paying',
         act: async (page) => {
           await page.locator('[data-action="pay"]').click()
-          await page.getByText('Sending your payment').waitFor()
+          await page.getByTestId('settlement-status-processing').waitFor()
         },
       },
       {
@@ -1378,7 +1378,7 @@ const FLOWS = [
         name: '05-paid',
         act: async (page) => {
           payResponseGate.open()
-          await page.getByText('Payment sent').waitFor({ timeout: 10_000 })
+          await page.getByTestId('settlement-status-done').waitFor({ timeout: 10_000 })
         },
       },
       {
@@ -1391,10 +1391,10 @@ const FLOWS = [
       {
         name: '07-list-paid',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Back', exact: true }).click()
+          await page.getByTestId('settlement-back').click()
           await page
             .locator('[data-settlement-id="42"]')
-            .getByText('Paid', { exact: true })
+            .getByTestId('settlement-paid-mark')
             .waitFor()
         },
       },
@@ -1416,14 +1416,14 @@ const FLOWS = [
       {
         name: '02-splits',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Splits' }).click()
-          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+          await page.getByTestId('wallet-action-settlement').click()
+          await page.getByTestId('settlement-home').waitFor()
         },
       },
       {
         name: '03-journeys',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Start Split' }).click()
+          await page.getByTestId('settlement-start').click()
           await page.locator('[data-journey-key]').first().waitFor()
         },
       },
@@ -1476,7 +1476,7 @@ const FLOWS = [
         name: '10-requesting',
         act: async (page) => {
           await page.locator('[data-action="create"]').click()
-          await page.getByText('Sending your request').waitFor()
+          await page.getByTestId('settlement-status-processing').waitFor()
         },
       },
       {
@@ -1484,7 +1484,7 @@ const FLOWS = [
         name: '11-requested',
         act: async (page) => {
           createResponseGate.open()
-          await page.getByText('Request sent').waitFor({ timeout: 10_000 })
+          await page.getByTestId('settlement-status-done').waitFor({ timeout: 10_000 })
         },
       },
       {
@@ -1572,14 +1572,14 @@ const FLOWS = [
       {
         name: '02-splits-to-pay',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Splits' }).click()
-          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+          await page.getByTestId('wallet-action-settlement').click()
+          await page.getByTestId('settlement-home').waitFor()
         },
       },
       {
         name: '03-splits-to-collect',
         act: async (page) => {
-          await page.getByRole('radio', { name: 'To Collect', exact: true }).click()
+          await page.getByTestId('segment-sent').click()
           await page.locator('[data-settlement-id="50"]').waitFor()
         },
       },
@@ -1587,13 +1587,13 @@ const FLOWS = [
         name: '04-detail-creator',
         act: async (page) => {
           await page.locator('[data-settlement-id="50"]').click()
-          await page.getByText('Who has paid').waitFor()
+          await page.getByTestId('collection-summary').waitFor()
         },
       },
       {
         name: '05-back-to-collect',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Back to your requests' }).click()
+          await page.getByTestId('settlement-back-to-collect').click()
           await page.locator('[data-settlement-id="50"]').waitFor()
         },
       },
@@ -1614,15 +1614,15 @@ const FLOWS = [
       {
         name: '02-splits',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Splits' }).click()
-          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+          await page.getByTestId('wallet-action-settlement').click()
+          await page.getByTestId('settlement-home').waitFor()
         },
       },
       {
         name: '03-history-paid',
         act: async (page) => {
           await page.locator('[data-action="view-all"]').click()
-          await page.getByRole('heading', { level: 1, name: 'Paid splits' }).waitFor()
+          await page.getByTestId('settlement-history-received').waitFor()
         },
       },
       {
@@ -1638,10 +1638,10 @@ const FLOWS = [
       {
         name: '05-history-collected',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Back', exact: true }).click()
-          await page.getByRole('radio', { name: 'To Collect', exact: true }).click()
+          await page.getByTestId('settlement-back').click()
+          await page.getByTestId('segment-sent').click()
           await page.locator('[data-action="view-all"]').click()
-          await page.getByRole('heading', { level: 1, name: 'Collected splits' }).waitFor()
+          await page.getByTestId('settlement-history-sent').waitFor()
         },
       },
     ],

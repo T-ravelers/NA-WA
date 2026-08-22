@@ -34,11 +34,12 @@ describe('i18n messages', () => {
   it('falls back to en instead of exposing the raw key', () => {
     const { t, locale } = i18n.global
 
+    // 번역 파일이 모든 key를 채우면 "빠진 key"가 없어진다. 폴백을 보려면 en에만 있는 key를 만든다.
+    i18n.global.mergeLocaleMessage('en', { fallbackProbe: 'Probe message' })
     locale.value = 'ja'
 
-    // ja는 아직 번역이 없으므로 en 문구가 나와야 한다.
-    expect(t('app.tagline')).toBe('Plan, travel and settle up together')
-    expect(t('app.tagline')).not.toBe('app.tagline')
+    expect(t('fallbackProbe')).toBe('Probe message')
+    expect(t('fallbackProbe')).not.toBe('fallbackProbe')
 
     locale.value = DEFAULT_LOCALE
   })
