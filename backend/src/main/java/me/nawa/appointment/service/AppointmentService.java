@@ -6,6 +6,7 @@ import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.domain.AppointmentStatus;
 import me.nawa.appointment.domain.MembershipStatus;
 import me.nawa.appointment.dto.request.AppointmentCreateRequest;
+import me.nawa.appointment.dto.request.AppointmentJoinRequest;
 import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import me.nawa.appointment.dto.response.AppointmentDetailResponse;
@@ -36,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -105,9 +107,14 @@ public class AppointmentService {
         }
         confirmJourneyItem(appointment, request);
 
+        // 방장이 고른 여정을 멤버십에도 남긴다. trip_items 쪽만 연결하고 여기를 비우면
+        // 진행 중인 약속 목록(am.trip_id IS NOT NULL로 거른다)에서 방장이 통째로 빠지고,
+        // QR 공동결제도 여행이 연결되지 않았다며 거절한다. 값은 validateJourneyLink가
+        // 본인 여정인지·visitDate가 기간 안인지까지 이미 확인한 것이다.
         AppointmentMember host = AppointmentMember.builder()
                 .appointmentId(appointment.getAppointmentId())
                 .memberId(memberId)
+                .tripId(request.getTripId())
                 .membershipStatus(MembershipStatus.PENDING)
                 .attendanceStatus(AttendanceStatus.PENDING)
                 .build();
@@ -142,8 +149,13 @@ public class AppointmentService {
     @Transactional
     public AppointmentMemberResponse joinAppointment(
             Long memberId,
-            Long appointmentId) {
+            Long appointmentId,
+            AppointmentJoinRequest request) {
         validateIdentifiers(memberId, appointmentId);
+        // 생성과 같은 기준이다 — 여정을 고르지 않은 참여는 받지 않는다.
+        if (request == null || request.getTripId() == null || request.getTripId() <= 0) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
         Appointment appointment = requireAppointmentForUpdate(appointmentId);
 
         // 참여는 활동이 시작되기 전까지만 받는다. 참여 마감 시각을 따로 두지
@@ -160,11 +172,17 @@ public class AppointmentService {
             throw new BusinessException(AppointmentErrorCode.ALREADY_JOINED);
         }
 
+        // 참여자도 자기 여정에 약속을 건다. 멤버십의 trip_id를 비워 두면 진행 중인
+        // 약속 목록(am.trip_id IS NOT NULL로 거른다)에서 빠지고 QR 공동결제도 거절한다.
+        Long tripId = request.getTripId();
+        validateJoinJourneyLink(memberId, appointment, tripId);
+
         AppointmentMember member;
         if (existing == null) {
             member = AppointmentMember.builder()
                     .appointmentId(appointmentId)
                     .memberId(memberId)
+                    .tripId(tripId)
                     .membershipStatus(MembershipStatus.PENDING)
                     .attendanceStatus(AttendanceStatus.PENDING)
                     .build();
@@ -177,8 +195,10 @@ public class AppointmentService {
             // member_id, appointment_member_id UNIQUE 제약 때문에 새 행을
             // 만들 수 없어 기존 참여·보증금 행을 재활용한다.
             member = existing;
+            member.setTripId(tripId);
             reviveLeftMemberAndHoldDeposit(memberId, member);
         }
+        linkJoinedJourneyItem(appointment, tripId);
 
         // 이번 참여로 정원이 다 찼으면 바로 FULL로 전환한다. 정원 도달은 시간
         // 기반 전이와 달리 스케줄러를 기다릴 필요가 없다 — 이 트랜잭션이 이미
@@ -220,7 +240,10 @@ public class AppointmentService {
     private void reviveLeftMemberAndHoldDeposit(
             Long memberId,
             AppointmentMember member) {
-        if (appointmentMapper.reviveLeftMember(member.getAppointmentMemberId()) != 1) {
+        if (appointmentMapper.reviveLeftMember(
+                member.getAppointmentMemberId(),
+                member.getTripId()
+        ) != 1) {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
         member.setMembershipStatus(MembershipStatus.PENDING);
@@ -338,6 +361,17 @@ public class AppointmentService {
         ) != 1) {
             throw new BusinessException(
                     CommonErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
+        // 참여하며 여정에 걸어 둔 약속 항목도 함께 내린다. 남겨 두면 참여하지도
+        // 않는 약속이 여정에 남는다. 방장은 여기 오지 못하므로(위에서 차단) 이
+        // 삭제가 방장의 여정 항목을 건드릴 일은 없다. 담아 두기만 했던 항목을
+        // 승격시킨 경우까지 함께 사라지는데, 되살리려면 승격 전 상태를 따로
+        // 기억해야 해서 이번 범위 밖으로 둔다.
+        if (member.getTripId() != null) {
+            journeyMapper.softDeleteJourneyItemByAppointment(
+                    member.getTripId(),
+                    appointmentId
             );
         }
         // 정원이 차서 FULL이던 약속에서 빈자리가 생겼을 때만 재모집으로
@@ -885,6 +919,76 @@ public class AppointmentService {
                 request.getVisitDate()
         )) {
             throw new BusinessException(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE);
+        }
+    }
+
+    /**
+     * 참여자가 고른 여정이 이 약속을 담을 수 있는지 본다. 생성과 달리 날짜를 받지
+     * 않는다 — 약속이 이미 활동 날짜를 갖고 있어 고를 여지가 없고, 그 날짜가 여정
+     * 기간 밖이면 애초에 담을 수 없는 여정이다. 중복은 여기서 막지 않는다.
+     * "Add to journey"로 이미 담아 둔 자리는 거절 대신 약속 항목으로 올린다.
+     */
+    private void validateJoinJourneyLink(
+            Long memberId,
+            Appointment appointment,
+            Long tripId) {
+        Journey journey = journeyMapper.findJourneyByIdForUpdate(tripId);
+        if (journey == null) {
+            throw new BusinessException(JourneyErrorCode.JOURNEY_NOT_FOUND);
+        }
+        if (!journey.getMemberId().equals(memberId)) {
+            throw new BusinessException(JourneyErrorCode.JOURNEY_FORBIDDEN);
+        }
+        LocalDate visitDate = appointment.getActivityStartAt().toLocalDate();
+        if (visitDate.isBefore(journey.getStartDate())
+                || visitDate.isAfter(journey.getEndDate())) {
+            throw new BusinessException(
+                    JourneyErrorCode.JOURNEY_ITEM_DATE_OUT_OF_RANGE
+            );
+        }
+    }
+
+    /**
+     * 참여자의 여정에 약속을 건다. (trip_id, item_id, visit_date)는 살아 있는 행에
+     * 대해 UNIQUE라, 그 장소를 이미 같은 날짜로 담아 둔 참여자는 새 행을 넣을 수
+     * 없다 — 담아 뒀다는 이유로 참여가 막히면 앞뒤가 맞지 않으므로, 그 행을 약속
+     * 항목으로 올린다. 다른 약속이 이미 걸려 있을 때만 중복으로 거절한다.
+     */
+    private void linkJoinedJourneyItem(Appointment appointment, Long tripId) {
+        LocalDate visitDate = appointment.getActivityStartAt().toLocalDate();
+        JourneyItem existingItem = journeyMapper.findJourneyItemByItemAndDateForUpdate(
+                tripId,
+                appointment.getItemId(),
+                visitDate
+        );
+        if (existingItem != null) {
+            if (appointment.getAppointmentId().equals(existingItem.getAppointmentId())) {
+                return;
+            }
+            if (journeyMapper.promoteJourneyItemToAppointment(
+                    existingItem.getTripItemId(),
+                    appointment.getAppointmentId()
+            ) != 1) {
+                throw new BusinessException(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE);
+            }
+            return;
+        }
+
+        JourneyItem journeyItem = JourneyItem.builder()
+                .tripId(tripId)
+                .itemId(appointment.getItemId())
+                .visitDate(visitDate)
+                .tripItemStatus("CONFIRMED")
+                .displayOrder(0)
+                .appointmentId(appointment.getAppointmentId())
+                .build();
+        try {
+            journeyMapper.insertConfirmedJourneyItem(journeyItem);
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessException(
+                    JourneyErrorCode.JOURNEY_ITEM_DUPLICATE,
+                    exception
+            );
         }
     }
 

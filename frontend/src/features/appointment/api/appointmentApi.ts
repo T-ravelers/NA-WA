@@ -166,9 +166,17 @@ export async function fetchAppointmentMembers(appointmentId: number): Promise<Ap
   return response.data ?? []
 }
 
-export async function joinAppointment(appointmentId: number): Promise<AppointmentMember> {
+/**
+ * 참여도 여정을 고른다. 방문 날짜는 보내지 않는다 — 약속이 이미 활동 날짜를 갖고
+ * 있어 참여자가 고를 여지가 없고, 고르는 것은 "그 날짜를 어느 여정에 넣을지"뿐이다.
+ */
+export async function joinAppointment(
+  appointmentId: number,
+  tripId: number,
+): Promise<AppointmentMember> {
   const response = await httpClient.post<AppointmentMember>(
     `${APPOINTMENT_LIST_PATH}/${appointmentId}/members`,
+    { tripId },
   )
 
   return response.data

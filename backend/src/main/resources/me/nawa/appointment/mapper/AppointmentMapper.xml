@@ -284,6 +284,7 @@
         UPDATE appointment_members
         SET membership_status = 'PENDING',
             attendance_status = 'PENDING',
+            trip_id = #{tripId},
             joined_at = CURRENT_TIMESTAMP,
             left_at = NULL,
             updated_at = CURRENT_TIMESTAMP

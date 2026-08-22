@@ -174,7 +174,11 @@ function toggleMember(memberId: number): void {
   expandedMemberId.value = expandedMemberId.value === memberId ? null : memberId
 }
 
-function goBack(): void {
+// 약속 상세에서 push로 열린 화면이다. 일을 마치든 그냥 나가든 자기 엔트리를 소비해
+// 되감는다 — 바로 아래가 이미 상세다. replace로 자리를 바꿔치기하면 상세가 두 번 쌓여,
+// 돌아온 뒤 뒤로 가기를 눌러도 같은 라우트에 머물러 아무 반응이 없는 것처럼 보인다.
+// 되감을 히스토리가 없을 때(딥링크·PWA 재진입)만 상세로 보낸다.
+function returnToDetail(): void {
   if (window.history.length > 1) {
     void router.back()
     return
@@ -189,9 +193,10 @@ function retry(): void {
   void reviewStatusQuery.refetch()
 }
 
+// 다 쓴 후기 화면은 되돌아가 다시 쓸 화면이 아니다. ‹ 로 나가든 다 쓰고 나가든 같은 길이다.
 function finishReviews(): void {
   if (!canReview.value || !allReviewsComplete.value) return
-  void router.push({ name: 'appointment-detail', params: { appointmentId: appointmentId.value } })
+  returnToDetail()
 }
 </script>
 
@@ -202,7 +207,7 @@ function finishReviews(): void {
         compact
         variant="secondary"
         :aria-label="t('action.back')"
-        @click="goBack"
+        @click="returnToDetail"
       >
         ‹
       </AppButton>

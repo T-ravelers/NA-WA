@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { IconMenu2 } from '@tabler/icons-vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -18,6 +18,7 @@ import { showToast } from '@/shared/ui/toast'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
+import AppointmentJourneySelectSheet from '../components/AppointmentJourneySelectSheet.vue'
 import AppointmentLeaveConfirmSheet from '../components/AppointmentLeaveConfirmSheet.vue'
 import AppointmentMenuSheet from '../components/AppointmentMenuSheet.vue'
 import {
@@ -26,8 +27,12 @@ import {
   type AppointmentDateTimeValue,
 } from '../api/appointmentApi'
 import { appointmentKeys } from '../model/appointmentKeys'
+import { NormalizedApiError } from '@/shared/api/apiError'
+import { serializeReturnParams } from '@/shared/lib/returnRoute'
+
 import { appointmentErrorMessageKey } from '../model/appointmentErrors'
 import { appointmentStatusTone } from '../model/appointmentStatusPresentation'
+import { useAppointmentJourneyIntegration } from '../model/journeyIntegration'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
@@ -72,6 +77,7 @@ const members = computed(() =>
   ),
 )
 
+const journeyIntegration = useAppointmentJourneyIntegration()
 const depositSheetOpen = ref(false)
 const menuOpen = ref(false)
 const leaveConfirmOpen = ref(false)
@@ -303,7 +309,7 @@ async function invalidateParticipationScopes(): Promise<void> {
 }
 
 const joinMutation = useMutation({
-  mutationFn: () => joinAppointment(appointmentId.value as number),
+  mutationFn: (tripId: number) => joinAppointment(appointmentId.value as number, tripId),
   onSuccess: async () => {
     depositSheetOpen.value = false
     await invalidateParticipationScopes()
@@ -338,18 +344,122 @@ const leaveErrorMessage = computed(() =>
 )
 
 const joinErrorMessage = computed(() =>
-  joinMutation.error.value === null
+  joinMutation.error.value === null || topupPromptOpen.value
     ? undefined
     : t(appointmentErrorMessageKey(joinMutation.error.value, hasMessage)),
 )
 
-function openDepositSheet(): void {
+// 참여도 방장처럼 여정을 고른다. 서버가 멤버십의 trip_id와 여정 항목을 함께 걸어
+// 두므로, 고르지 않으면 참여한 약속이 진행 중 목록과 QR 공동결제에서 빠진다.
+// 여정을 먼저 고르고 보증금 확인으로 넘어간다 — 보증금 시트가 마지막 확인이다.
+const journeySelectOpen = ref(false)
+const selectedTripId = ref<number | null>(null)
+const journeyListQuery = journeyIntegration.useJourneyListQuery(journeySelectOpen)
+
+// 약속 날짜는 이미 정해져 있다. 그 날짜를 품지 못하는 여정을 고르면 서버가
+// JOURNEY-007로 되돌려보내므로, 목록은 다 보여 주되 고르는 순간 이유를 알려 준다.
+// 걸러서 감추지 않는 것은 "내 여정이 왜 없지"로 읽히지 않게 하기 위해서다.
+const activityDate = computed(() => appointment.value?.activityStartAt?.slice(0, 10) ?? null)
+const journeySelectionError = ref<string | null>(null)
+
+const journeyListErrorMessage = computed(() =>
+  journeyListQuery.isError.value ? t('appointment.journeySelect.error') : null,
+)
+
+function coversActivityDate(journey: { startDate: string; endDate: string }): boolean {
+  const date = activityDate.value
+  if (date === null) return true
+  return journey.startDate <= date && date <= journey.endDate
+}
+
+function readPositiveInteger(value: unknown): number | undefined {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number(raw)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
+}
+
+// 여정을 만들거나 충전하고 돌아온 경우(?tripId=). 참여를 다시 누르게 하지 않고 시트를
+// 열어, 그 여정을 골라 둔 채로 보여 준다 — 맞는지 확인하고 넘어간다.
+//
+// 이 값은 **사용자가 시트에서 행동하면 소비한다**(고르거나 닫으면 URL에서 지운다).
+// 남겨 두면 "이 화면을 열 때마다 시트를 열라"는 상시 지시가 되어, 참여가 끝난 뒤
+// 목록이 갱신되기만 해도 시트가 혼자 다시 뜬다 — 참여 직후에는 상세와 참여 정보를
+// 함께 무효화하는데 상세가 먼저 도착하면 "아직 참여 안 함"으로 보여 가드를 통과한다.
+//
+// 심는 즉시 지우지는 않는다. 충전으로 떠날 때 자기 자리에 tripId를 남겨 두는데(뒤로
+// 가기로 돌아와도 이어지도록), 적용과 동시에 지우면 그 표시가 바로 사라진다.
+const createdTripId = computed(() => readPositiveInteger(route.query.tripId))
+
+function consumeCreatedTripId(): void {
+  const rest = { ...route.query }
+  delete rest.tripId
+  void router.replace({ path: route.path, query: rest })
+}
+
+watch(
+  () => [createdTripId.value, appointment.value, journeyListQuery.data.value] as const,
+  ([tripId, current, journeys]) => {
+    if (tripId === undefined || current === undefined) return
+    // 이미 참여했거나 참여할 수 없는 약속이면 열지 않는다. 버튼과 같은 기준이다.
+    if (joinBlockedReason.value !== undefined) return
+    // 보증금 확인까지 넘어간 뒤에는 시트를 다시 열지 않는다.
+    if (depositSheetOpen.value) return
+
+    journeySelectOpen.value = true
+    // 목록이 오기 전에는 고를 수 없다. 오고 나서 그 여정이 실제로 있을 때만 고른다.
+    if (journeys?.some((journey) => journey.tripId === tripId) === true) {
+      selectedTripId.value = tripId
+    }
+  },
+  { immediate: true },
+)
+
+function openJourneySelect(): void {
   // 이유는 이미 버튼 위에 떠 있다. 여기서는 시트를 열지 않는 것으로 끝낸다. 이미
   // 참여한 사람은 서버도 APPOINTMENT-003으로 막으므로 미리 알려 주는 셈이다.
   if (joinBlockedReason.value !== undefined) return
 
   joinMutation.reset()
+  selectedTripId.value = null
+  journeySelectionError.value = null
+  journeySelectOpen.value = true
+}
+
+function closeJourneySelect(): void {
+  journeySelectOpen.value = false
+  consumeCreatedTripId()
+}
+
+function selectJourney(tripId: number): void {
+  const journey = journeyListQuery.data.value?.find((candidate) => candidate.tripId === tripId)
+  if (journey !== undefined && !coversActivityDate(journey)) {
+    // 시트를 닫지 않는다 — 다른 여정을 바로 고를 수 있어야 한다.
+    journeySelectionError.value = t('appointment.journeySelect.dateOutOfRange')
+    selectedTripId.value = null
+    return
+  }
+
+  journeySelectionError.value = null
+  selectedTripId.value = tripId
+  journeySelectOpen.value = false
   depositSheetOpen.value = true
+  consumeCreatedTripId()
+}
+
+// 이 약속을 담을 여정이 없다. 자리를 내주고(replace) 보내면 여정 생성이 그 자리를
+// 돌려주므로, 돌아온 뒤 상세가 히스토리에 두 번 쌓이지 않는다.
+// 이 약속을 담을 여정이 없다. 자리를 내주고(replace) 보내면 여정 생성이 그 자리를
+// 돌려주므로, 돌아온 뒤 상세가 히스토리에 두 번 쌓이지 않는다. 이 화면은 param
+// 라우트라 이름만으로는 돌아올 수 없어 returnParams도 함께 싣는다.
+function goToCreateJourney(): void {
+  journeySelectOpen.value = false
+  void router.replace({
+    name: 'journey-create',
+    query: {
+      returnRouteName: 'appointment-detail',
+      returnParams: serializeReturnParams({ appointmentId: appointmentId.value ?? '' }),
+    },
+  })
 }
 
 function closeDepositSheet(): void {
@@ -357,7 +467,68 @@ function closeDepositSheet(): void {
 }
 
 function confirmJoin(): void {
-  if (!joinMutation.isPending.value) joinMutation.mutate()
+  if (joinMutation.isPending.value || selectedTripId.value === null) return
+  joinMutation.mutate(selectedTripId.value)
+}
+
+// 보증금을 예치할 잔액이 없으면 서버가 WALLET-015로 거절한다. 빨간 한 줄 대신
+// 부족하다는 사실과 다음 행동(그만큼 충전)을 한 번에 묻는다 — 약속 생성과 같은 규칙이다.
+const INSUFFICIENT_BALANCE_CODE = 'WALLET-015'
+const topupPromptOpen = ref(false)
+
+watch(
+  () => joinMutation.error.value,
+  (error) => {
+    if (!(error instanceof NormalizedApiError)) return
+    if (error.code !== INSUFFICIENT_BALANCE_CODE) return
+    // 보증금 시트를 닫고 팝업만 남긴다. 두 겹으로 쌓이면 무엇을 눌러야 할지 흐려진다.
+    depositSheetOpen.value = false
+    topupPromptOpen.value = true
+  },
+)
+
+const formattedDepositAmount = computed(() =>
+  new Intl.NumberFormat('en-US').format(Number(appointment.value?.depositAmount ?? 0)),
+)
+
+function closeTopupPrompt(): void {
+  topupPromptOpen.value = false
+  // 팝업을 닫았으면 그 오류는 다 본 것이다. 남겨두면 일반 오류 문구로 다시 나타난다.
+  joinMutation.reset()
+}
+
+// 충전 화면으로 간다. 금액을 미리 채우고, 돌아올 곳으로 지금 고른 여정까지 실어
+// 보낸다 — 돌아오면 그 여정이 골라진 채로 참여 시트가 다시 열린다(?tripId=).
+// replace가 아니라 push다. 충전을 포기하고 뒤로 와도 이 화면으로 돌아와야 한다.
+function goToTopup(): void {
+  topupPromptOpen.value = false
+  const amount = appointment.value?.depositAmount
+  const tripId = selectedTripId.value
+
+  const openTopup = () =>
+    router.push({
+      name: 'wallet-top-up',
+      query: {
+        ...(amount === undefined ? {} : { amount: String(amount) }),
+        returnRouteName: 'appointment-detail',
+        returnParams: serializeReturnParams({ appointmentId: appointmentId.value ?? '' }),
+        ...(tripId === null ? {} : { tripId: String(tripId) }),
+      },
+    })
+
+  if (tripId === null) {
+    void openTopup()
+    return
+  }
+
+  // 돌아오는 길이 둘인데 도착지가 다르다. 충전을 마치면 충전 화면이 규약대로
+  // 보내 주지만, 뒤로가기는 브라우저가 **떠날 때의 URL 그대로** 되돌린다. 그 자리에
+  // 고른 여정이 없으면 충전을 포기했을 뿐인데 처음부터 다시 골라야 한다. 떠나기 전에
+  // 지금 자리에도 tripId를 남겨 어느 길로 돌아오든 이어지게 한다.
+  // 표시를 먼저 남기고 떠난다. 순서가 뒤집히면 replace가 충전 화면 위에서 일어난다.
+  void router
+    .replace({ path: route.path, query: { ...route.query, tripId: String(tripId) } })
+    .then(openTopup)
 }
 </script>
 
@@ -517,11 +688,24 @@ function confirmJoin(): void {
         </p>
         <AppButton
           block
-          @click="openDepositSheet"
+          @click="openJourneySelect"
         >
           {{ t('appointment.detail.join') }}
         </AppButton>
       </div>
+
+      <AppointmentJourneySelectSheet
+        v-if="journeySelectOpen"
+        :journeys="journeyListQuery.data.value ?? []"
+        :selected-journey-id="selectedTripId"
+        :loading="journeyListQuery.isPending.value"
+        :error-message="journeyListErrorMessage"
+        :selection-error="journeySelectionError"
+        :empty-message="t('appointment.journeySelect.emptyForJoin')"
+        @close="closeJourneySelect"
+        @select="selectJourney"
+        @create-journey="goToCreateJourney"
+      />
 
       <AppointmentDepositSheet
         v-if="depositSheetOpen"
@@ -532,6 +716,42 @@ function confirmJoin(): void {
         @close="closeDepositSheet"
         @confirm="confirmJoin"
       />
+
+      <div
+        v-if="topupPromptOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-scrim/70 px-screen"
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('appointment.create.insufficientTitle')"
+          class="w-full max-w-[390px] rounded-card bg-surface-1 p-5 shadow-sheet"
+        >
+          <h2 class="text-title text-ink-display">
+            {{ t('appointment.create.insufficientTitle') }}
+          </h2>
+          <p class="mt-2 text-body-sm text-ink-3">
+            {{
+              t('appointment.create.insufficientDescription', { amount: formattedDepositAmount })
+            }}
+          </p>
+          <div class="mt-5 grid grid-cols-2 gap-3">
+            <AppButton
+              block
+              variant="secondary"
+              @click="closeTopupPrompt"
+            >
+              {{ t('appointment.create.insufficientLater') }}
+            </AppButton>
+            <AppButton
+              block
+              @click="goToTopup"
+            >
+              {{ t('appointment.create.insufficientTopup') }}
+            </AppButton>
+          </div>
+        </section>
+      </div>
 
       <AppointmentMenuSheet
         v-if="menuOpen"

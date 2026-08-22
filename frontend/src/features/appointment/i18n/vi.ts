@@ -122,7 +122,9 @@ export default {
       loading: 'Đang tải hành trình của bạn',
       error: 'Chúng tôi không tải được hành trình của bạn. Vui lòng thử lại.',
       empty: 'Hãy tạo hành trình trước khi tạo cuộc hẹn này.',
+      emptyForJoin: 'Hãy tạo hành trình trước khi tham gia cuộc hẹn này.',
       createJourney: 'Tạo hành trình',
+      dateOutOfRange: 'Hành trình này không bao gồm ngày của cuộc hẹn. Hãy chọn hành trình khác.',
     },
     journeyDate: {
       close: 'Đóng bộ chọn ngày',

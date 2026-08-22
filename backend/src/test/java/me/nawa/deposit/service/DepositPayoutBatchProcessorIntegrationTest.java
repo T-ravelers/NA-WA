@@ -17,6 +17,7 @@ import java.util.List;
 import me.nawa.appointment.domain.Appointment;
 import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentCreateRequest;
+import me.nawa.appointment.dto.request.AppointmentJoinRequest;
 import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.appointment.service.AppointmentService;
 import me.nawa.config.MySqlSchemaExtension;
@@ -274,7 +275,11 @@ class DepositPayoutBatchProcessorIntegrationTest {
 
         Appointment created = appointmentService.createAppointment(hostMemberId, request);
         appointmentIds.add(created.getAppointmentId());
-        appointmentService.joinAppointment(guestMemberId, created.getAppointmentId());
+        appointmentService.joinAppointment(
+                        guestMemberId,
+                        created.getAppointmentId(),
+                        joinRequestFor(guestMemberId)
+                );
 
         // 출석 확정은 활동이 끝난 뒤에만 열린다(APPOINTMENT-009). 상태와 함께
         // 활동 시각도 지난 값으로 맞춘다. DB의 NOW()가 아니라 앱이 만든 시각을
@@ -386,6 +391,13 @@ class DepositPayoutBatchProcessorIntegrationTest {
                 walletOwnerId, balance
         );
         return memberId;
+    }
+
+    /** 참여도 여정을 고른다. 참여자 몫의 여정을 만들어 요청에 싣는다. */
+    private AppointmentJoinRequest joinRequestFor(long memberId) {
+        AppointmentJoinRequest request = new AppointmentJoinRequest();
+        request.setTripId(createJourney(memberId));
+        return request;
     }
 
     private long createJourney(long memberId) {

@@ -6,6 +6,11 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 
 import { serializeCalendarDate } from '@/shared/lib/datetime'
+import {
+  readReturnParams,
+  readReturnRouteName,
+  withoutReturnContract,
+} from '@/shared/lib/returnRoute'
 
 import JourneyCreateForm from '../components/JourneyCreateForm.vue'
 import { createJourney, type JourneyCreateInput } from '../api/journeyApi'
@@ -27,29 +32,11 @@ const hasMessage = (key: string): boolean => i18n.te(key)
  * 돌아가고, 새로 만든 tripId만 더한다.
  */
 function returnRouteName(): string | null {
-  const value = route.query.returnRouteName
-  return typeof value === 'string' && value !== '' ? value : null
+  return readReturnRouteName(route.query)
 }
 
-/**
- * 돌아갈 화면이 route param을 쓰면 그 값도 함께 받는다 — `eventId:42` 형식이고,
- * 여럿이면 `,`로 잇는다.
- *
- * `appointment-create`처럼 param이 없는 화면은 이 key를 싣지 않는다. Discover 상세는
- * `/explore/events/:eventId`라 query만으로는 주소를 만들 수 없어 이 key가 필요하다.
- * 값의 뜻은 호출자만 알면 되므로 이 feature는 여전히 호출자를 모른다.
- */
 function returnParams(): Record<string, string> {
-  const value = route.query.returnParams
-  if (typeof value !== 'string' || value === '') return {}
-
-  const entries = value.split(',').flatMap((pair) => {
-    const separator = pair.indexOf(':')
-    if (separator <= 0) return []
-    return [[pair.slice(0, separator), pair.slice(separator + 1)] as const]
-  })
-
-  return Object.fromEntries(entries)
+  return readReturnParams(route.query)
 }
 
 /**
@@ -77,12 +64,8 @@ const initialStartDate = computed(() => {
   return itemStart < today ? today : itemStart
 })
 
-/** 복귀 주소를 만들 때 규약 key는 돌려주지 않는다. 호출자 화면의 것이 아니다. */
 function restQueryWithoutContract() {
-  const restQuery = { ...route.query }
-  delete restQuery.returnRouteName
-  delete restQuery.returnParams
-  return restQuery
+  return withoutReturnContract(route.query)
 }
 
 // 뒤로 가기 목적지. 제출 후 복귀와 같은 규칙이다 — 다른 화면이 보낸 경우 그 화면으로

@@ -49,6 +49,28 @@ public interface JourneyMapper {
         @Param("visitDate") LocalDate visitDate
     );
 
+    // 참여자가 "Add to journey"로 이미 담아 둔 자리에 약속이 겹칠 수 있다.
+    // (trip_id, item_id, visit_date)는 살아 있는 행에 대해 UNIQUE이므로, 새로 넣기
+    // 전에 그 행을 잠그고 가져와 약속 항목으로 올릴지 판단한다.
+    JourneyItem findJourneyItemByItemAndDateForUpdate(
+        @Param("tripId") Long tripId,
+        @Param("itemId") Long itemId,
+        @Param("visitDate") LocalDate visitDate
+    );
+
+    // 이미 담아 둔 항목을 약속 항목으로 올린다. 다른 약속이 이미 걸려 있으면 0을
+    // 돌려주므로, 호출하는 쪽이 중복으로 처리한다.
+    int promoteJourneyItemToAppointment(
+        @Param("tripItemId") Long tripItemId,
+        @Param("appointmentId") Long appointmentId
+    );
+
+    // 참여를 취소하면 그 약속으로 잡아 둔 여정 항목도 함께 내린다.
+    int softDeleteJourneyItemByAppointment(
+        @Param("tripId") Long tripId,
+        @Param("appointmentId") Long appointmentId
+    );
+
     void insertJourneyItem(JourneyItem journeyItem);
 
     // 약속 생성과 동시에 여정 항목을 CONFIRMED로 만든다. ADDED로 넣고 나중에

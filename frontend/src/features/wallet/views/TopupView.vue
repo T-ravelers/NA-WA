@@ -5,6 +5,11 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { IconCheck } from '@tabler/icons-vue'
 
+import {
+  readReturnParams,
+  readReturnRouteName,
+  withoutReturnContract,
+} from '@/shared/lib/returnRoute'
 import { vFitText } from '@/shared/lib/fitText'
 import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
@@ -47,12 +52,13 @@ function requestedAmount(): number | null {
  * 금액과 이 키만 뺀다. `resume=1`을 붙여 그 화면이 저장해 둔 초안을 되살리게 한다.
  */
 const returnTarget = computed<RouteLocationRaw | null>(() => {
-  const value = route.query.returnRouteName
-  if (typeof value !== 'string' || value === '') return null
-  const rest = { ...route.query }
-  delete rest.returnRouteName
+  const name = readReturnRouteName(route.query)
+  if (name === null) return null
+  const rest = withoutReturnContract(route.query)
   delete rest.amount
-  return { name: value, query: { ...rest, resume: '1' } }
+  // 돌아갈 화면이 path param을 쓰면(약속 상세 등) 이름과 query만으로는 주소를 만들 수
+  // 없다. 여정 생성이 쓰는 것과 같은 규약이다.
+  return { name, params: readReturnParams(route.query), query: { ...rest, resume: '1' } }
 })
 
 /**

@@ -76,7 +76,7 @@ const attendedParticipation = {
   host: true,
 }
 
-async function mountView() {
+async function mountView(initialPath = '/appointments/7/reviews') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -90,10 +90,15 @@ async function mountView() {
         name: 'appointment-detail',
         component: { template: '<div>Detail</div>' },
       },
+      {
+        path: '/appointments',
+        name: 'appointment-list',
+        component: { template: '<div>List</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  await router.push('/appointments/7/reviews')
+  await router.push(initialPath)
   await router.isReady()
 
   const wrapper = mount(AppointmentReviewView, {
@@ -102,7 +107,7 @@ async function mountView() {
     },
   })
   await flushPromises()
-  return { wrapper }
+  return { wrapper, router }
 }
 
 describe('AppointmentReviewView', () => {
@@ -117,6 +122,36 @@ describe('AppointmentReviewView', () => {
     submitAppointmentReview.mockRejectedValue(new Error('save failed'))
     fetchMyAppointmentParticipation.mockReset()
     fetchMyAppointmentParticipation.mockResolvedValue(attendedParticipation)
+  })
+
+  it('consumes its own history entry so one back press leaves the flow', async () => {
+    // 방장이 겪던 자리. push로 빠져나가면 다 쓴 후기 화면이 다시 열리고, replace로
+    // 나가면 상세가 두 번 쌓여 뒤로 가기가 같은 화면에 머문다. 자기 자리를 소비해
+    // 되감으면 상세에서 한 번만 눌러도 흐름을 벗어난다.
+    fetchMyAppointmentReviewStatus.mockResolvedValue({ reviewedAppointmentMemberIds: [2] })
+    // memory history를 쓰는 테스트에서는 window.history.length가 라우터의 히스토리를
+    // 반영하지 않는다(실제 브라우저에서는 같은 것을 가리킨다). "되감을 자리가 있다"를
+    // 만들어 줘야 되감기 경로를 탄다.
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(3)
+    const { wrapper, router } = await mountView('/appointments')
+    await router.push('/appointments/7')
+    await router.push('/appointments/7/reviews')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Finish reviews')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
+
+    router.back()
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-list')
+
+    historyLength.mockRestore()
   })
 
   it('shows a save error for the member whose review failed', async () => {
