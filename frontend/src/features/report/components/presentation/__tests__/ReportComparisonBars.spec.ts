@@ -79,4 +79,12 @@ describe('ReportComparisonBars', () => {
     expect(fills.every((fill) => fill.attributes('style')?.includes('width: 0%'))).toBe(true)
     expect(wrapper.text()).toContain('0 P')
   })
+
+  // SIMILAR처럼 상대가 평균 하나뿐이면 고를 것이 없다. 칩 없이 막대 둘만 그린다.
+  it('draws the first peer without chips when chips are turned off', () => {
+    const wrapper = mount(ReportComparisonBars, { props: { ...PROPS, chips: false } })
+
+    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false)
+    expect(wrapper.findAll('dt').map((cell) => cell.text())).toEqual(['You', 'Mina'])
+  })
 })

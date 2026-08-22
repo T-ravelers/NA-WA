@@ -18,6 +18,7 @@ const {
   peers,
   totalLabel,
   chipsLabel,
+  chips = true,
   locale = 'en',
 } = defineProps<ReportComparisonBarsProps>()
 
@@ -88,7 +89,7 @@ const rows = computed<BarRow[]>(() => {
 <template>
   <div class="flex flex-col gap-4">
     <div
-      v-if="peers.length > 0"
+      v-if="chips && peers.length > 0"
       role="radiogroup"
       :aria-label="chipsLabel"
       class="flex flex-wrap gap-2"

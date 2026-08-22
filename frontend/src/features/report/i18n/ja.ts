@@ -122,6 +122,24 @@ export default {
         loadFailed: '比較を読み込めませんでした。',
         loadFailedDescription: 'レポートの他の部分には影響ありません。もう一度お試しください。',
         loading: '比較を読み込み中',
+        similarHeading: '似た旅行者と比較',
+        scopeLabel: '比較対象',
+        scopeGroup: 'グループ',
+        scopeSimilar: '似た旅行者',
+        travelersAvg: '似た旅行者の平均',
+        average: '平均',
+        similarRadarDescription:
+          'カテゴリーごとの支出比率を、あなたに似た旅行者の平均と比べたものです。',
+        similarEmptyTitle: 'まだ似た旅行者がいません',
+        similarEmptyDescription: '同じ国籍で最終レポートを持つ旅行者がここに表示されます。',
+      },
+      insight: {
+        above:
+          '{category} に寄った旅でした — 旅全体の {share}。あなたに似た旅行者（{cohortShare}）をはっきり上回ります。',
+        same: '{category} に寄った旅でした — 旅全体の {share}。あなたに似た旅行者（{cohortShare}）とほぼ同じです。',
+        below:
+          '{category} に寄った旅でした — 旅全体の {share}。あなたに似た旅行者（{cohortShare}）を下回ります。',
+        alone: '{category} に寄った旅でした — 旅全体の {share}。',
       },
       status: 'レポートの状態：{status}',
     },
