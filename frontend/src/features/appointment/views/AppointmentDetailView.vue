@@ -197,8 +197,8 @@ const reviewsDisabledReason = computed(() => {
   return t('appointment.detail.menu.reviewsNotAttended')
 })
 // 나가기 버튼을 눌렀는데 막혔을 때 모달이 말할 이유. 버튼이 그려졌다는 것 자체가
-// 내가 ACTIVE 회원이라는 뜻이고(목록은 ACTIVE만 담는다) 방장에게는 버튼을 주지
-// 않으므로, 여기 남는 것은 활동이 끝났거나 약속이 취소된 경우뿐이다.
+// 내가 방장이 아닌 ACTIVE 회원이라는 뜻이므로(목록은 ACTIVE만 담고, 방장 본인 행은
+// 버튼 칸이 비어 있다) 남는 것은 활동이 끝났거나 약속이 취소된 경우다.
 const leaveBlockedReason = computed(() => {
   if (canLeave.value) return undefined
   if (appointment.value?.appointmentStatus === 'CANCELLED') {
@@ -215,10 +215,6 @@ const leaveBlockedReason = computed(() => {
 // isHost가 false로 남아 정작 방장에게서 출석 확정이 통째로 사라진다. 모를 때는
 // 감추지 말고 이유로 "확인하지 못했다"를 적는다.
 const showAttendanceItem = computed(() => isHost.value || participationCheckFailed.value)
-// 나가기 버튼은 회원 목록의 내 행에 있다. 방장은 어떤 상태에서도 자기 참여를
-// 취소할 수 없어(APPOINTMENT-007) 그 행은 다른 회원과 같은 Visit으로 남긴다.
-const showMemberLeave = computed(() => !isHost.value)
-
 // 시트는 상세를 다 받은 뒤에만 렌더되므로(약속 이름과 보증금이 필요하다) 버튼도
 // 같은 조건을 쓴다. 버튼만 헤더에서 먼저 뜨면 눌러도 아무것도 열리지 않는다.
 const canOpenMenu = computed(() => appointment.value !== undefined)
@@ -739,7 +735,6 @@ function goToTopup(): void {
           v-else
           :members="members"
           :current-appointment-member-id="participation?.appointmentMemberId ?? null"
-          :show-leave="showMemberLeave"
           @select="openMemberProfile"
           @leave="requestLeave"
         />
