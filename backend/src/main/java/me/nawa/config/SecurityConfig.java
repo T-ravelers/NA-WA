@@ -130,7 +130,12 @@ public class SecurityConfig {
                                 antMatcher("/api/v1/stripe/webhook"),
                                 // 공유 비밀을 본문으로 확인하고 토큰을 내준다.
                                 // 인증 전에 닿아야 하므로 여기서 열어 둔다.
-                                antMatcher("/api/v1/auth/service-token")
+                                antMatcher("/api/v1/auth/service-token"),
+                                // 지표 수집기가 인증 없이 읽어야 해서 여기서는 연다.
+                                // 외부 노출은 nginx가 /internal/ 접두사를 404로 막고,
+                                // 운영 compose가 backend 포트를 공개하지 않는 것으로 함께 막는다.
+                                // 이 줄만 보고 "열려 있다"고 판단하지 말 것.
+                                antMatcher("/internal/metrics")
                         ).permitAll()
                         .requestMatchers(antMatcher("/api/**")).authenticated()
                         .anyRequest().permitAll())

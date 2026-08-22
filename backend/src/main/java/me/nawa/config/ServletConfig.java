@@ -24,7 +24,8 @@ import org.springframework.web.servlet.config.annotation.*;
     "me.nawa.wallet.controller",
     "me.nawa.settlement.controller",
     "me.nawa.deposit.controller",
-    "me.nawa.ingest.controller"
+    "me.nawa.ingest.controller",
+    "me.nawa.observability.controller"
 })
 public class ServletConfig implements WebMvcConfigurer {
 
