@@ -103,7 +103,7 @@ useOverlayDismiss(dialog, () => emit('close'))
       <div class="mt-5 flex flex-col gap-2">
         <AppButton
           block
-          variant="secondary"
+          variant="secondary-on-paper"
           @click="emit('close')"
         >
           {{ t('appointment.attendance.confirmSheet.cancel') }}
