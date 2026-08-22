@@ -18,6 +18,7 @@ import { showToast } from '@/shared/ui/toast'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
+import AppointmentJourneySelectSheet from '../components/AppointmentJourneySelectSheet.vue'
 import AppointmentLeaveConfirmSheet from '../components/AppointmentLeaveConfirmSheet.vue'
 import AppointmentMenuSheet from '../components/AppointmentMenuSheet.vue'
 import {
@@ -28,6 +29,7 @@ import {
 import { appointmentKeys } from '../model/appointmentKeys'
 import { appointmentErrorMessageKey } from '../model/appointmentErrors'
 import { appointmentStatusTone } from '../model/appointmentStatusPresentation'
+import { useAppointmentJourneyIntegration } from '../model/journeyIntegration'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
@@ -72,6 +74,7 @@ const members = computed(() =>
   ),
 )
 
+const journeyIntegration = useAppointmentJourneyIntegration()
 const depositSheetOpen = ref(false)
 const menuOpen = ref(false)
 const leaveConfirmOpen = ref(false)
@@ -303,7 +306,7 @@ async function invalidateParticipationScopes(): Promise<void> {
 }
 
 const joinMutation = useMutation({
-  mutationFn: () => joinAppointment(appointmentId.value as number),
+  mutationFn: (tripId: number) => joinAppointment(appointmentId.value as number, tripId),
   onSuccess: async () => {
     depositSheetOpen.value = false
     await invalidateParticipationScopes()
@@ -343,13 +346,67 @@ const joinErrorMessage = computed(() =>
     : t(appointmentErrorMessageKey(joinMutation.error.value, hasMessage)),
 )
 
-function openDepositSheet(): void {
+// 참여도 방장처럼 여정을 고른다. 서버가 멤버십의 trip_id와 여정 항목을 함께 걸어
+// 두므로, 고르지 않으면 참여한 약속이 진행 중 목록과 QR 공동결제에서 빠진다.
+// 여정을 먼저 고르고 보증금 확인으로 넘어간다 — 보증금 시트가 마지막 확인이다.
+const journeySelectOpen = ref(false)
+const selectedTripId = ref<number | null>(null)
+const journeyListQuery = journeyIntegration.useJourneyListQuery(journeySelectOpen)
+
+// 약속 날짜는 이미 정해져 있다. 그 날짜를 품지 못하는 여정을 고르면 서버가
+// JOURNEY-007로 되돌려보내므로, 목록은 다 보여 주되 고르는 순간 이유를 알려 준다.
+// 걸러서 감추지 않는 것은 "내 여정이 왜 없지"로 읽히지 않게 하기 위해서다.
+const activityDate = computed(() => appointment.value?.activityStartAt?.slice(0, 10) ?? null)
+const journeySelectionError = ref<string | null>(null)
+
+const journeyListErrorMessage = computed(() =>
+  journeyListQuery.isError.value ? t('appointment.journeySelect.error') : null,
+)
+
+function coversActivityDate(journey: { startDate: string; endDate: string }): boolean {
+  const date = activityDate.value
+  if (date === null) return true
+  return journey.startDate <= date && date <= journey.endDate
+}
+
+function openJourneySelect(): void {
   // 이유는 이미 버튼 위에 떠 있다. 여기서는 시트를 열지 않는 것으로 끝낸다. 이미
   // 참여한 사람은 서버도 APPOINTMENT-003으로 막으므로 미리 알려 주는 셈이다.
   if (joinBlockedReason.value !== undefined) return
 
   joinMutation.reset()
+  selectedTripId.value = null
+  journeySelectionError.value = null
+  journeySelectOpen.value = true
+}
+
+function closeJourneySelect(): void {
+  journeySelectOpen.value = false
+}
+
+function selectJourney(tripId: number): void {
+  const journey = journeyListQuery.data.value?.find((candidate) => candidate.tripId === tripId)
+  if (journey !== undefined && !coversActivityDate(journey)) {
+    // 시트를 닫지 않는다 — 다른 여정을 바로 고를 수 있어야 한다.
+    journeySelectionError.value = t('appointment.journeySelect.dateOutOfRange')
+    selectedTripId.value = null
+    return
+  }
+
+  journeySelectionError.value = null
+  selectedTripId.value = tripId
+  journeySelectOpen.value = false
   depositSheetOpen.value = true
+}
+
+// 이 약속을 담을 여정이 없다. 만들고 돌아오면 다시 참여를 누를 수 있게, 이 화면을
+// 히스토리에 남긴 채(push) 보낸다 — 되감기 규약은 여정 생성 쪽이 지킨다.
+function goToCreateJourney(): void {
+  journeySelectOpen.value = false
+  void router.push({
+    name: 'journey-create',
+    query: { returnRouteName: 'appointment-detail', appointmentId: String(appointmentId.value) },
+  })
 }
 
 function closeDepositSheet(): void {
@@ -357,7 +414,8 @@ function closeDepositSheet(): void {
 }
 
 function confirmJoin(): void {
-  if (!joinMutation.isPending.value) joinMutation.mutate()
+  if (joinMutation.isPending.value || selectedTripId.value === null) return
+  joinMutation.mutate(selectedTripId.value)
 }
 </script>
 
@@ -517,11 +575,23 @@ function confirmJoin(): void {
         </p>
         <AppButton
           block
-          @click="openDepositSheet"
+          @click="openJourneySelect"
         >
           {{ t('appointment.detail.join') }}
         </AppButton>
       </div>
+
+      <AppointmentJourneySelectSheet
+        v-if="journeySelectOpen"
+        :journeys="journeyListQuery.data.value ?? []"
+        :selected-journey-id="selectedTripId"
+        :loading="journeyListQuery.isPending.value"
+        :error-message="journeyListErrorMessage"
+        :selection-error="journeySelectionError"
+        @close="closeJourneySelect"
+        @select="selectJourney"
+        @create-journey="goToCreateJourney"
+      />
 
       <AppointmentDepositSheet
         v-if="depositSheetOpen"

@@ -11,6 +11,11 @@ interface Props {
   selectedJourneyId?: number | null
   loading?: boolean
   errorMessage?: string | null
+  /**
+   * 고른 여정이 이 약속을 담을 수 없을 때의 안내. errorMessage와 달리 목록을
+   * 대신하지 않고 목록 위에 붙는다 — 다른 여정을 바로 고를 수 있어야 한다.
+   */
+  selectionError?: string | null
 }
 
 defineProps<Props>()
@@ -95,8 +100,15 @@ const { t } = useI18n()
           {{ t('appointment.journeySelect.createJourney') }}
         </AppButton>
       </div>
+      <p
+        v-if="!loading && !errorMessage && selectionError"
+        role="alert"
+        class="mt-4 text-body-sm text-danger"
+      >
+        {{ selectionError }}
+      </p>
       <div
-        v-else
+        v-if="!loading && !errorMessage && journeys.length > 0"
         class="mt-4 flex max-h-[45dvh] flex-col gap-2 overflow-y-auto"
       >
         <button

@@ -124,6 +124,7 @@ export default {
       error: 'We could not load your journeys. Please try again.',
       empty: 'Create a journey before creating this appointment.',
       createJourney: 'Create a journey',
+      dateOutOfRange: 'This journey does not cover the appointment date. Choose another one.',
     },
     journeyDate: {
       close: 'Close date picker',

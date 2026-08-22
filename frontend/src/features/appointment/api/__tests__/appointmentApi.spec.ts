@@ -65,10 +65,11 @@ describe('appointmentApi', () => {
     })
     const post = vi.spyOn(httpClient, 'post').mockResolvedValue({ data: member })
 
-    await expect(joinAppointment(7)).resolves.toEqual(member)
+    await expect(joinAppointment(7, 5)).resolves.toEqual(member)
     await expect(fetchMyAppointmentParticipation(7)).resolves.toMatchObject({ joined: true })
 
-    expect(post).toHaveBeenCalledWith('/api/v1/appointments/7/members')
+    // 참여도 여정을 고른다. 방문 날짜는 약속이 이미 갖고 있어 보내지 않는다.
+    expect(post).toHaveBeenCalledWith('/api/v1/appointments/7/members', { tripId: 5 })
     expect(get).toHaveBeenCalledWith('/api/v1/appointments/7/members/me')
     get.mockRestore()
     post.mockRestore()
