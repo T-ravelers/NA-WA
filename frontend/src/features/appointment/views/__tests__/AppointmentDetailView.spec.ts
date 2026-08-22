@@ -430,6 +430,31 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).toContain('does not cover the appointment date')
   })
 
+  it('does not filter journeys when the activity date is unknown', async () => {
+    // 날짜를 못 읽으면 빈 문자열이 온다. 그대로 두면 journey.startDate <= ''가 언제나
+    // false라 **모든 여정이** "날짜를 담지 못함"으로 거절되어 참여가 통째로 막힌다 —
+    // 이 PR이 없애려던 증상 그대로다. 모를 때는 거르지 않고 서버 판단에 맡긴다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    fetchAppointment.mockResolvedValue({ ...appointment, activityStartAt: null })
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+
+    // 담지 못하는 여정(Busan Winter)조차 거절되지 않아야 한다.
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Busan Winter'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('does not cover the appointment date')
+    expect(wrapper.text()).toContain('Confirm participation')
+  })
+
   it('explains why a journey that cannot hold the activity date was refused', async () => {
     // 목록에서 감추지 않는다 — "내 여정이 왜 없지"로 읽힌다. 고르는 순간 이유를
     // 알려 주고 시트는 열어 둬, 다른 여정을 바로 고를 수 있게 한다.
