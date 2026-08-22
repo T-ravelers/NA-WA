@@ -7,6 +7,8 @@ import me.nawa.auth.token.AuthTokens;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.response.ApiResponse;
 import me.nawa.auth.exception.AuthErrorCode;
+import me.nawa.member.domain.MemberAuthState;
+import me.nawa.member.mapper.MemberMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -43,14 +45,17 @@ public class LoadTestLoginController {
 
     private final AuthTokenService authTokenService;
     private final AuthCookieManager authCookieManager;
+    private final MemberMapper memberMapper;
     private final byte[] expectedSecret;
 
     public LoadTestLoginController(
             AuthTokenService authTokenService,
             AuthCookieManager authCookieManager,
+            MemberMapper memberMapper,
             @Value("${loadtest.login-secret:}") String loginSecret) {
         this.authTokenService = authTokenService;
         this.authCookieManager = authCookieManager;
+        this.memberMapper = memberMapper;
         this.expectedSecret = loginSecret.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -74,6 +79,7 @@ public class LoadTestLoginController {
         if (request.getMemberId() == null || request.getMemberId() <= 0) {
             throw new BusinessException(AuthErrorCode.AUTHENTICATION_REQUIRED);
         }
+        requireActiveMember(request.getMemberId());
 
         AuthTokens tokens = authTokenService.issueTokens(request.getMemberId());
 
@@ -88,6 +94,25 @@ public class LoadTestLoginController {
                     .toString()
             )
             .body(ApiResponse.success());
+    }
+
+    /**
+     * 회원이 실제로 있고 쓸 수 있는 상태인지 봅니다.
+     *
+     * <p>{@code issueTokens}는 회원 상태를 확인하지 않고 세션 저장소가 Redis라 FK
+     * 제약도 없습니다. 그래서 없는 번호나 탈퇴·정지 회원 번호로도 쿠키가 그대로
+     * 발급됩니다. 그대로 두면 부하 테스트 결과가 <b>"로그인은 성공했는데 뒤 API가
+     * 전부 실패"</b>로 나와서, 시드 번호가 어긋난 것인지 서버가 느린 것인지 구분하는 데
+     * 시간이 듭니다. 여기서 바로 끊어 원인을 분명히 합니다.
+     */
+    private void requireActiveMember(long memberId) {
+        MemberAuthState authState = memberMapper.findAuthState(memberId);
+
+        if (authState == null
+                || authState.isDeleted()
+                || !"ACTIVE".equals(authState.getMemberStatus())) {
+            throw new BusinessException(AuthErrorCode.AUTHENTICATION_REQUIRED);
+        }
     }
 
     /**

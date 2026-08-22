@@ -220,6 +220,41 @@ POST /internal/loadtest/login
 명이 서로 다른 계정으로 동시에 접속하는 상황을 만들어야 하기 때문입니다. 대신 그
 설계는 이 경로가 운영에 존재하지 않는다는 전제 위에서만 성립합니다.
 
+### 필터 두 개를 함께 면제해야 합니다
+
+이 경로는 POST라 컨트롤러에 닿기 전에 두 검사를 지납니다. **`permitAll`과는 별개로
+적용되므로** 하나라도 빠지면 403으로 끊깁니다.
+
+| 검사 | 빠졌을 때 | 등록할 곳 |
+| --- | --- | --- |
+| Origin | `AUTH-006` | `OriginValidationFilter.ORIGINLESS_PATHS` |
+| CSRF | `AUTH-005` | `SecurityConfig`의 `csrf.ignoringRequestMatchers` |
+
+`/api/v1/auth/service-token`이 같은 이유로 두 곳 모두에 등록돼 있습니다. `/internal/metrics`는
+**GET**이라 두 검사 어디에도 걸리지 않으므로 이 경로의 선례가 되지 못합니다.
+
+`SecurityConfigTest.loadTestLogin_passesOriginAndCsrfFilters`가 둘 다 고정합니다.
+
+### 실행 환경
+
+이 경로는 **`-Ploadtest`로 빌드한 산출물에만** 있고, nginx가 최상위 `/internal/`을 404로
+막으며 운영 compose는 backend 포트를 공개하지 않습니다. 즉 컨테이너 포트에 직접 붙는
+별도 환경에서만 부를 수 있습니다.
+
+```shell
+# 이미지를 부하 테스트용으로 만든다
+docker build --build-arg GRADLE_ARGS=-Ploadtest -t nawa-backend:loadtest ./backend
+
+# 컨테이너에 시크릿을 넣고 포트를 127.0.0.1 에만 연다
+LOADTEST_LOGIN_SECRET=$(openssl rand -hex 16)
+```
+
+> **이미지 태그를 운영과 나눠 쓰세요.** 배포는 `nawa-backend:latest` 하나를 봅니다.
+> `-Ploadtest`로 만든 이미지를 그 태그로 push하면 **다음 배포에 그대로 들어갑니다.**
+> 위처럼 `:loadtest` 같은 별도 태그를 쓰고, 절대 `latest`로 push하지 않습니다.
+
+부하 테스트 환경 전체 구성은 별도 이슈에서 다룹니다.
+
 ### 운영에 들어가지 않게 하는 두 겹
 
 | 겹 | 내용 |

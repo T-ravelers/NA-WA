@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -427,6 +428,31 @@ class SecurityConfigTest {
         assertEquals("metrics", response.getContentAsString());
     }
 
+    /**
+     * 부하 도구는 브라우저가 아니라 Origin 헤더도 CSRF 토큰도 없이 POST한다.
+     *
+     * 두 검사는 `permitAll` 여부와 무관하게 적용되므로, 면제가 하나라도 빠지면
+     * **컨트롤러에 닿기 전에** 403으로 끊긴다 — Origin이 없으면 `AUTH-006`,
+     * CSRF가 없으면 `AUTH-005`다. 시나리오가 첫 요청에서 멈추는데 CI는 초록이라
+     * (클래스패스만 보는 격리 테스트뿐이라) 조용히 지나간다.
+     *
+     * 이 경로를 처리할 컨트롤러는 `-Ploadtest` 빌드에만 있지만 두 면제 설정은
+     * main 에 있으므로, 여기서 스텁 컨트롤러로 고정한다.
+     */
+    @Test
+    void loadTestLogin_passesOriginAndCsrfFilters() throws Exception {
+        MockHttpServletResponse response = mockMvc.perform(
+                        post("/internal/loadtest/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}")
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(200, response.getStatus());
+        assertEquals("loadtest-login", response.getContentAsString());
+    }
+
     @Test
     void nonApiRequest_withoutAccessToken_remainsPublic() throws Exception {
         MockHttpServletResponse response = mockMvc.perform(
@@ -627,6 +653,11 @@ class SecurityConfigTest {
         @GetMapping("/internal/metrics")
         String metrics() {
             return "metrics";
+        }
+
+        @PostMapping("/internal/loadtest/login")
+        String loadTestLogin() {
+            return "loadtest-login";
         }
     }
 }

@@ -96,7 +96,11 @@ public class SecurityConfig {
                             antMatcher("/api/v1/internal/ingest/event-translations"),
                             antMatcher("/api/v1/internal/ingest/place-translations"),
                             antMatcher("/api/v1/internal/ingest/event-activities"),
-                            antMatcher("/api/v1/internal/ingest/place-activities")))
+                            antMatcher("/api/v1/internal/ingest/place-activities"),
+                            // 부하 도구가 부르는 경로다. 브라우저 세션이 없어 CSRF
+                            // 토큰을 받아 올 방법이 없다. CSRF 검사는 permitAll 여부와
+                            // 무관하게 모든 POST에 적용되므로 여기에도 등록해야 한다.
+                            antMatcher("/internal/loadtest/login")))
                 .cors(cors -> cors
                         .configurationSource(corsConfigurationSource))
                 .formLogin(formLogin -> formLogin.disable())

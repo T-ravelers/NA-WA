@@ -39,7 +39,11 @@ public class OriginValidationFilter extends OncePerRequestFilter {
             "/api/v1/internal/ingest/event-translations",
             "/api/v1/internal/ingest/place-translations",
             "/api/v1/internal/ingest/event-activities",
-            "/api/v1/internal/ingest/place-activities"
+            "/api/v1/internal/ingest/place-activities",
+            // 부하 도구가 부르는 경로다. 브라우저가 아니라 Origin 헤더가 없다.
+            // 운영 산출물에는 이 경로를 처리할 컨트롤러 자체가 없다
+            // (backend/src/loadtest/java, -Ploadtest 빌드 전용).
+            "/internal/loadtest/login"
     );
 
     @Override
