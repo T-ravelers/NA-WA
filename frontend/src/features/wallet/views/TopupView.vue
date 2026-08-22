@@ -55,10 +55,26 @@ const returnTarget = computed<RouteLocationRaw | null>(() => {
   return { name: value, query: { ...rest, resume: '1' } }
 })
 
-// 충전 화면들은 되돌아올 이유가 없으니 히스토리에서 자리를 내준다(replace).
-const returnToCaller = (): void => {
-  if (returnTarget.value === null) return
-  void router.replace(returnTarget.value)
+/**
+ * 이 화면을 떠나 왔던 자리로 돌아간다. **되감아서 이 화면의 히스토리 엔트리를
+ * 소비한다.** 충전으로 보낸 화면은 떠나기 전에 자기 엔트리를 돌아올 자리(`resume=1`)로
+ * 바꿔 두므로, 바로 아래 엔트리가 이미 목적지다. 여기서 목적지를 다시 `replace`하면
+ * 같은 화면이 히스토리에 두 번 쌓여, 돌아간 화면에서 뒤로 가기를 눌러도 흐름을 벗어나지
+ * 못하고 같은 라우트에 머문다 — 그 자리는 초안을 이미 지운 뒤라 빈 폼으로 열린다.
+ *
+ * 되감을 히스토리가 없을 때(딥링크·PWA 재진입)만 목적지를 만들어 보낸다. 보낸 화면이
+ * 있으면 그리로(`resume=1`), 없으면 지갑 탭이다.
+ */
+const leaveTopup = (): void => {
+  if (window.history.length > 1) {
+    void router.back()
+    return
+  }
+  if (returnTarget.value !== null) {
+    void router.replace(returnTarget.value)
+    return
+  }
+  void router.push({ name: 'wallet' })
 }
 
 // AmountInput의 계약이 number | null이다. null은 "아직 입력 전"이고 0과 구분된다.
@@ -156,17 +172,12 @@ const goBack = (): void => {
     return
   }
 
-  // 충전을 시작하지도 않고 나가는 길. 보낸 화면이 있으면 지갑 탭이 아니라 그리로
-  // 돌려보낸다 — 약속 생성처럼 흐름 도중에 들렀다면 지갑으로 떨어지는 순간 작성하던
-  // 흐름이 끊기고, 저장해 둔 초안은 아무도 읽지 않는다. 모바일 PWA에는 브라우저
-  // 뒤로가기가 없어 이 버튼이 사실상 유일한 출구다. 완료 화면은 예외다 — 거기엔
-  // "Continue where you left off"가 따로 있고, 이 버튼은 지갑으로 가는 쪽이 맞다.
-  if (returnTarget.value !== null) {
-    void router.replace(returnTarget.value)
-    return
-  }
-
-  void router.push({ name: 'wallet' })
+  // 충전을 시작하지도 않고 나가는 길. 왔던 길을 되감는다 — 약속 생성처럼 흐름 도중에
+  // 들렀다면 지갑 탭으로 떨어지는 순간 작성하던 흐름이 끊기고, 저장해 둔 초안은 아무도
+  // 읽지 않는다. 모바일 PWA에는 브라우저 뒤로가기가 없어 이 버튼이 사실상 유일한
+  // 출구다. 완료 화면은 예외다 — 거기엔 "Continue where you left off"가 따로 있고,
+  // 이 버튼은 지갑으로 가는 쪽이 맞다.
+  leaveTopup()
 }
 
 const executeTopup = (): void => {
@@ -487,7 +498,7 @@ const handlePaymentError = (message: string): void => {
         <AppButton
           v-if="returnTarget !== null"
           block
-          @click="returnToCaller"
+          @click="leaveTopup"
         >
           {{ t('wallet.topUp.backToCaller') }}
         </AppButton>
