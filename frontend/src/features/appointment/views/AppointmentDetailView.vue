@@ -23,12 +23,14 @@ import { showToast } from '@/shared/ui/toast'
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
 import AppointmentJourneySelectSheet from '../components/AppointmentJourneySelectSheet.vue'
+import AppointmentLeaveBlockedDialog from '../components/AppointmentLeaveBlockedDialog.vue'
 import AppointmentLeaveConfirmSheet from '../components/AppointmentLeaveConfirmSheet.vue'
 import AppointmentMenuSheet from '../components/AppointmentMenuSheet.vue'
 import {
   cancelAppointmentParticipation,
   joinAppointment,
   type AppointmentDateTimeValue,
+  type AppointmentMember,
 } from '../api/appointmentApi'
 import { appointmentKeys } from '../model/appointmentKeys'
 import { NormalizedApiError } from '@/shared/api/apiError'
@@ -83,16 +85,27 @@ const participationQuery = useQuery({
   refetchInterval: APPOINTMENT_LIVE_REFETCH_INTERVAL_MS,
 })
 const appointment = computed(() => detailQuery.data.value)
-const members = computed(() =>
-  (membersQuery.data.value ?? appointment.value?.members ?? []).filter(
-    (member) => member.membershipStatus === 'ACTIVE',
-  ),
-)
+// 목록 순서는 방장 → 나 → 참여한 순서다. 서버가 이미 방장을 먼저, 그 뒤를
+// joined_at 오름차순으로 내려주므로(findActiveMembersByAppointmentId) 여기서는
+// "나"만 방장 뒤로 끌어올린다. 안정 정렬이라 나머지 참여 순서는 서버 것 그대로다.
+// 응답에 참여 시각이 없어 클라이언트가 순서를 다시 계산할 방법도 없다.
+const members = computed(() => {
+  const currentId = participationQuery.data.value?.appointmentMemberId ?? null
+  const rank = (member: AppointmentMember): number => {
+    if (member.isHost) return 0
+    return currentId !== null && member.appointmentMemberId === currentId ? 1 : 2
+  }
+
+  return (membersQuery.data.value ?? appointment.value?.members ?? [])
+    .filter((member) => member.membershipStatus === 'ACTIVE')
+    .sort((left, right) => rank(left) - rank(right))
+})
 
 const journeyIntegration = useAppointmentJourneyIntegration()
 const depositSheetOpen = ref(false)
 const menuOpen = ref(false)
 const leaveConfirmOpen = ref(false)
+const leaveBlockedOpen = ref(false)
 const hasJoined = computed(() => participationQuery.data.value?.joined === true)
 // 조회 실패 시 hasJoined는 false로 남는다. 서버가 최종적으로 중복 참여를
 // 막아주니 데이터는 안전하지만, 그대로 두면 사용자가 결제 시트까지 갔다가
@@ -153,7 +166,7 @@ const isAttendedMember = computed(
 // 상태로 가른다 — 출석 확정 게이트와 같은 근거다.
 const LEAVE_OPEN_STATUSES: AppointmentStatus[] = ['RECRUITING', 'FULL', 'IN_PROGRESS']
 const isLeaveNoShow = computed(() => appointment.value?.appointmentStatus === 'IN_PROGRESS')
-// 세 항목은 언제나 시트에 있고, 조건을 만족하지 않으면 이유와 함께 비활성이다.
+// 두 항목은 언제나 시트에 있고, 조건을 만족하지 않으면 이유와 함께 비활성이다.
 // 조건에 맞는 것만 넣으면 시트가 열 때마다 다른 모양이 되고 나머지 기능이
 // 있다는 것조차 알 수 없다.
 //
@@ -199,13 +212,15 @@ const reviewsDisabledReason = computed(() => {
   if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
   return t('appointment.detail.menu.reviewsNotAttended')
 })
-const leaveDisabledReason = computed(() => {
+// 나가기 버튼을 눌렀는데 막혔을 때 모달이 말할 이유. 버튼이 그려졌다는 것 자체가
+// 내가 ACTIVE 회원이라는 뜻이고(목록은 ACTIVE만 담는다) 방장에게는 버튼을 주지
+// 않으므로, 여기 남는 것은 활동이 끝났거나 약속이 취소된 경우뿐이다.
+const leaveBlockedReason = computed(() => {
   if (canLeave.value) return undefined
-  // isActiveMember는 조회 실패와 "회원이 아님"을 구분하지 못한다. 실패를 먼저
-  // 가르지 않으면 못 읽었을 뿐인데 회원이 아니라고 단정한다.
-  if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
-  if (!isActiveMember.value) return t('appointment.detail.menu.leaveNotMember')
-  return t('appointment.detail.menu.leaveActivityEnded')
+  if (appointment.value?.appointmentStatus === 'CANCELLED') {
+    return t('appointment.members.leaveCancelled')
+  }
+  return t('appointment.members.leaveEnded')
 })
 
 // 영영 켜질 수 없는 항목은 아예 넣지 않는다. 출석 확정은 방장만 할 수 있고
@@ -216,7 +231,9 @@ const leaveDisabledReason = computed(() => {
 // isHost가 false로 남아 정작 방장에게서 출석 확정이 통째로 사라진다. 모를 때는
 // 감추지 말고 이유로 "확인하지 못했다"를 적는다.
 const showAttendanceItem = computed(() => isHost.value || participationCheckFailed.value)
-const showLeaveItem = computed(() => !isHost.value)
+// 나가기 버튼은 회원 목록의 내 행에 있다. 방장은 어떤 상태에서도 자기 참여를
+// 취소할 수 없어(APPOINTMENT-007) 그 행은 다른 회원과 같은 Visit으로 남긴다.
+const showMemberLeave = computed(() => !isHost.value)
 
 // 시트는 상세를 다 받은 뒤에만 렌더되므로(약속 이름과 보증금이 필요하다) 버튼도
 // 같은 조건을 쓴다. 버튼만 헤더에서 먼저 뜨면 눌러도 아무것도 열리지 않는다.
@@ -297,11 +314,17 @@ function openReviews(): void {
   })
 }
 
-function openLeaveConfirm(): void {
-  if (!canLeave.value) return
+/**
+ * 나가기 버튼은 언제나 눌린다. 지금 나갈 수 없으면 확인 모달 대신 이유를 말하는
+ * 모달을 연다 — 비활성 버튼은 모바일에서 이유를 말할 자리가 없다.
+ */
+function requestLeave(): void {
+  if (!canLeave.value) {
+    leaveBlockedOpen.value = true
+    return
+  }
 
   leaveMutation.reset()
-  menuOpen.value = false
   leaveConfirmOpen.value = true
 }
 
@@ -688,6 +711,16 @@ function goToTopup(): void {
           {{ t('appointment.members.title') }}
         </h2>
 
+        <!-- 참여 조회가 실패하면 어느 행이 내 것인지 알 수 없어 나가기 버튼을
+             어디에도 붙일 수 없다. 버튼이 사라진 이유를 목록 위에서 말한다. -->
+        <p
+          v-if="participationCheckFailed"
+          role="status"
+          class="-mt-2 text-caption text-ink-3"
+        >
+          {{ t('appointment.members.leaveCheckFailed') }}
+        </p>
+
         <StateLoading
           v-if="membersQuery.isPending.value"
           :label="t('appointment.members.loading')"
@@ -709,7 +742,9 @@ function goToTopup(): void {
           v-else
           :members="members"
           :current-appointment-member-id="participation?.appointmentMemberId ?? null"
+          :show-leave="showMemberLeave"
           @select="openMemberProfile"
+          @leave="requestLeave"
         />
       </section>
 
@@ -796,12 +831,15 @@ function goToTopup(): void {
         :show-attendance="showAttendanceItem"
         :attendance-disabled-reason="attendanceDisabledReason"
         :reviews-disabled-reason="reviewsDisabledReason"
-        :show-leave="showLeaveItem"
-        :leave-disabled-reason="leaveDisabledReason"
         @close="menuOpen = false"
         @attendance="openAttendance"
         @reviews="openReviews"
-        @leave="openLeaveConfirm"
+      />
+
+      <AppointmentLeaveBlockedDialog
+        v-if="leaveBlockedOpen && leaveBlockedReason !== undefined"
+        :reason="leaveBlockedReason"
+        @close="leaveBlockedOpen = false"
       />
 
       <AppointmentLeaveConfirmSheet

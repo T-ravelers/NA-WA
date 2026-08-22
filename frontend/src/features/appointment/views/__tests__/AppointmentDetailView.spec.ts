@@ -186,6 +186,15 @@ function menuItem(wrapper: MountedWrapper) {
     wrapper.findAll('[role="dialog"] button').find((button) => button.text().startsWith(label))
 }
 
+/**
+ * 회원 목록의 내 행에 붙는 나가기 버튼.
+ *
+ * 확인 모달의 확정 버튼('Leave group')과 섞이지 않도록 목록 안에서만 찾는다.
+ */
+function leaveButton(wrapper: MountedWrapper) {
+  return wrapper.findAll('li button').find((button) => button.text() === 'Leave')
+}
+
 const toasts = useToasts()
 
 describe('AppointmentDetailView', () => {
@@ -215,6 +224,33 @@ describe('AppointmentDetailView', () => {
     // 방장이라 모집 중에도 버거 버튼은 뜬다. 다만 시트 안의 항목은 아직 전부
     // 비활성이다.
     expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
+  })
+
+  it('orders members as host, me, then the order they joined', async () => {
+    // 서버가 방장 먼저·참여 순으로 내려준다. 여기서 확인하는 것은 "나"가 방장
+    // 바로 뒤로 올라오고 나머지 참여 순서는 서버 것 그대로 남는다는 것이다.
+    const laterMember = {
+      appointmentMemberId: 4,
+      memberId: 14,
+      displayName: 'Sora Han',
+      profileImageUrl: null,
+      preferredLanguage: 'en' as const,
+      membershipStatus: 'ACTIVE' as const,
+      attendanceStatus: 'PENDING' as const,
+      isHost: false,
+    }
+    fetchAppointmentMembers.mockResolvedValue([...members, laterMember])
+    fetchMyAppointmentParticipation.mockResolvedValue({
+      ...memberParticipation,
+      appointmentMemberId: 4,
+    })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.findAll('li h3').map((name) => name.text())).toEqual([
+      'Mina Park',
+      'Sora Han',
+      'Alex Kim',
+    ])
   })
 
   it('goes back to the appointment list for this item when there is no history', async () => {
@@ -802,7 +838,19 @@ describe('AppointmentDetailView', () => {
 
     expect(menuItem(wrapper)('Attendance')).toBeUndefined()
     expect(menuItem(wrapper)('Reviews')).toBeDefined()
-    expect(menuItem(wrapper)('Leave group')).toBeDefined()
+  })
+
+  it('keeps leaving out of the burger menu', async () => {
+    // 나가기는 회원 목록의 내 행으로 옮겼다. 시트는 "약속"을 대상으로 하는 자리라
+    // 자기 참여를 취소하는 것인지 약속을 없애는 것인지 구분되지 않았다.
+    fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
+    const { wrapper } = await mountView()
+
+    expect(leaveButton(wrapper)).toBeDefined()
+
+    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+
+    expect(menuItem(wrapper)('Leave group')).toBeUndefined()
   })
 
   it('opens reviews from the detail sheet after completion', async () => {
@@ -829,29 +877,30 @@ describe('AppointmentDetailView', () => {
     expect(attendance?.text()).toContain('Attendance has already been confirmed.')
   })
 
-  it('still shows the menu to someone who never joined, with every item disabled', async () => {
+  it('still shows the menu to someone who never joined, with its item disabled', async () => {
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
     const { wrapper } = await mountView()
+
+    // 참여하지 않았으면 목록에 내 행이 없어 나가기 버튼이 놓일 자리도 없다.
+    expect(leaveButton(wrapper)).toBeUndefined()
 
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
     const item = menuItem(wrapper)
 
     expect(item('Attendance')).toBeUndefined()
     expect(item('Reviews')?.attributes('disabled')).toBeDefined()
-    expect(item('Leave group')?.text()).toContain('You are not a member of this appointment.')
   })
 
-  it('does not claim you are not a member when the participation check failed', async () => {
-    // isActiveMember는 조회 실패와 "회원이 아님"을 구분하지 못한다. 못 읽었을
-    // 뿐인데 단정하면 사용자는 자기가 회원이 아니라고 믿는다.
+  it('says why leaving is unavailable when the participation check failed', async () => {
+    // 조회가 실패하면 목록에서 어느 행이 내 것인지 알 수 없어 나가기 버튼을 붙일
+    // 자리가 없다. 버튼만 조용히 빠지면 기능이 사라진 것처럼 보인다.
     fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
     const { wrapper } = await mountView()
 
-    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    const leave = menuItem(wrapper)('Leave group')
-
-    expect(leave?.text()).toContain('We could not check your participation status.')
-    expect(leave?.text()).not.toContain('You are not a member of this appointment.')
+    expect(leaveButton(wrapper)).toBeUndefined()
+    expect(wrapper.text()).toContain(
+      'We could not check your participation status, so the leave button is unavailable.',
+    )
   })
 
   it('does not claim you were absent when the participation check failed', async () => {
@@ -886,14 +935,16 @@ describe('AppointmentDetailView', () => {
     expect(attendance?.text()).toContain('We could not check your participation status.')
   })
 
-  it('hides Leave group from the host', async () => {
+  it('leaves the host row on Visit instead of a leave button', async () => {
     // 방장은 어떤 상태에서도 자기 참여를 취소할 수 없어(APPOINTMENT-007) 비활성으로
-    // 둬도 영영 켜지지 않는다.
+    // 둬도 영영 켜지지 않는다. 다른 회원과 같은 Visit 버튼으로 남긴다.
     const { wrapper } = await mountView()
+
+    expect(leaveButton(wrapper)).toBeUndefined()
+    expect(wrapper.findAll('li button').every((button) => button.text() === 'Visit')).toBe(true)
 
     await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
 
-    expect(menuItem(wrapper)('Leave group')).toBeUndefined()
     expect(menuItem(wrapper)('Attendance')).toBeDefined()
     expect(menuItem(wrapper)('Reviews')).toBeDefined()
   })
@@ -919,8 +970,7 @@ describe('AppointmentDetailView', () => {
     cancelAppointmentParticipation.mockResolvedValue(undefined)
     const { wrapper } = await mountView()
 
-    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    await menuItem(wrapper)('Leave group')?.trigger('click')
+    await leaveButton(wrapper)?.trigger('click')
     await flushPromises()
 
     expect(wrapper.text()).toContain('Leave this appointment?')
@@ -951,8 +1001,7 @@ describe('AppointmentDetailView', () => {
 
     expect(wrapper.text()).toContain('You have already joined this appointment.')
 
-    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    await menuItem(wrapper)('Leave group')?.trigger('click')
+    await leaveButton(wrapper)?.trigger('click')
     await flushPromises()
     await wrapper
       .findAll('[role="dialog"] button')
@@ -975,8 +1024,7 @@ describe('AppointmentDetailView', () => {
     cancelAppointmentParticipation.mockResolvedValue(undefined)
     const { wrapper } = await mountView()
 
-    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    const leave = menuItem(wrapper)('Leave group')
+    const leave = leaveButton(wrapper)
     expect(leave?.attributes('disabled')).toBeUndefined()
 
     await leave?.trigger('click')
@@ -995,7 +1043,9 @@ describe('AppointmentDetailView', () => {
     expect(toasts.value[toasts.value.length - 1]?.message).toContain('forfeited as a no-show')
   })
 
-  it('disables Leave group once the activity has ended', async () => {
+  it('says why leaving is blocked only once the button is pressed', async () => {
+    // 이유를 회원 이름 옆에 상시로 적어 두면 목록이 안내문으로 찬다. 버튼은 언제나
+    // 눌리고, 막히는 이유는 누른 자리에서 한 번만 말한다.
     fetchAppointment.mockResolvedValueOnce({
       ...appointment,
       appointmentStatus: 'AWAITING_ATTENDANCE',
@@ -1003,11 +1053,30 @@ describe('AppointmentDetailView', () => {
     fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
     const { wrapper } = await mountView()
 
-    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    const leave = menuItem(wrapper)('Leave group')
+    const leave = leaveButton(wrapper)
+    expect(leave?.attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).not.toContain('The activity has ended, so you can no longer leave.')
 
-    expect(leave?.attributes('disabled')).toBeDefined()
-    expect(leave?.text()).toContain('The activity has ended')
+    await leave?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("You can't leave this appointment")
+    expect(wrapper.text()).toContain('The activity has ended, so you can no longer leave.')
+    // 확인 모달은 열리지 않는다 — 나가는 흐름 자체가 시작되지 않는다.
+    expect(wrapper.text()).not.toContain('Leave this appointment?')
+    expect(cancelAppointmentParticipation).not.toHaveBeenCalled()
+  })
+
+  it('blames the cancellation, not the clock, on a canceled appointment', async () => {
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'CANCELLED' })
+    fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
+    const { wrapper } = await mountView()
+
+    await leaveButton(wrapper)?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('This appointment was canceled.')
+    expect(wrapper.text()).not.toContain('The activity has ended, so you can no longer leave.')
   })
 
   it('refreshes the list and my-appointments caches after leaving', async () => {
@@ -1016,8 +1085,7 @@ describe('AppointmentDetailView', () => {
     const { wrapper, queryClient } = await mountView()
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
 
-    await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
-    await menuItem(wrapper)('Leave group')?.trigger('click')
+    await leaveButton(wrapper)?.trigger('click')
     await flushPromises()
     await wrapper
       .findAll('[role="dialog"] button')
