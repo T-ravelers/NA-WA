@@ -407,6 +407,26 @@ class SecurityConfigTest {
         );
     }
 
+    /**
+     * 지표 수집기는 인증 정보를 갖지 않는다. 이 경로가 인증 뒤로 넘어가면 수집이
+     * 통째로 끊기는데, 스크랩이 끊긴 것은 대시보드가 빌 때까지 아무도 모른다.
+     *
+     * 열어 두는 대신 외부 차단은 다른 두 겹이 맡는다 — nginx가 `/internal/` 접두사를
+     * 404로 막고, 운영 compose가 backend 포트를 공개하지 않는다.
+     * 이 테스트는 SecurityConfig 쪽 의도가 조용히 뒤집히지 않게 고정할 뿐이다.
+     */
+    @Test
+    void metricsEndpoint_withoutAccessToken_remainsReachable() throws Exception {
+        MockHttpServletResponse response = mockMvc.perform(
+                        get("/internal/metrics")
+                )
+                .andReturn()
+                .getResponse();
+
+        assertEquals(200, response.getStatus());
+        assertEquals("metrics", response.getContentAsString());
+    }
+
     @Test
     void nonApiRequest_withoutAccessToken_remainsPublic() throws Exception {
         MockHttpServletResponse response = mockMvc.perform(
@@ -602,6 +622,11 @@ class SecurityConfigTest {
         @GetMapping("/public-test")
         String publicRequest() {
             return "public";
+        }
+
+        @GetMapping("/internal/metrics")
+        String metrics() {
+            return "metrics";
         }
     }
 }

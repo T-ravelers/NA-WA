@@ -66,7 +66,11 @@ public class TomcatThreadPoolMetrics implements MeterBinder {
             String meterName,
             String description) {
         Gauge.builder(meterName, server, mbeanServer -> readAttribute(mbeanServer, pool, attribute))
-            .tag("name", poolName == null ? "unknown" : poolName)
+            // Tomcat은 커넥터를 `name="http-nio-8080"`으로 등록하고 getKeyProperty는
+            // 따옴표를 벗기지 않는다. 그대로 두면 라벨이 `"http-nio-8080"`이 되어
+            // 표준 대시보드의 `name="http-nio-8080"` 쿼리가 빗나간다.
+            // Micrometer의 TomcatMetrics도 같은 자리에서 따옴표를 벗긴다.
+            .tag("name", poolName == null ? "unknown" : poolName.replace("\"", ""))
             .description(description)
             .register(registry);
     }

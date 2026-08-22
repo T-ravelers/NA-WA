@@ -23,7 +23,16 @@ public class MetricsController {
 
     private final PrometheusMeterRegistry registry;
 
-    @GetMapping(value = "/internal/metrics", produces = MediaType.TEXT_PLAIN_VALUE)
+    /*
+     * charset을 명시하는 이유.
+     *
+     * Spring 5의 StringHttpMessageConverter 기본 문자셋은 ISO-8859-1이다(UTF-8이 된 것은
+     * Spring 6부터). 적지 않으면 지표 설명의 한글이 전부 `?`로 나간다. ASCII라 Prometheus
+     * 파싱은 통과해서, 빌드도 스크랩도 멀쩡한 채로 설명만 사라진다.
+     */
+    @GetMapping(
+        value = "/internal/metrics",
+        produces = MediaType.TEXT_PLAIN_VALUE + ";charset=UTF-8")
     public ResponseEntity<String> scrape() {
         return ResponseEntity.ok(registry.scrape());
     }

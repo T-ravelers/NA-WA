@@ -37,7 +37,6 @@ public class MetricsConfig {
             new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
 
         new JvmMemoryMetrics().bindTo(registry);
-        new JvmGcMetrics().bindTo(registry);
         new JvmThreadMetrics().bindTo(registry);
         new ClassLoaderMetrics().bindTo(registry);
         new ProcessorMetrics().bindTo(registry);
@@ -45,6 +44,21 @@ public class MetricsConfig {
         new TomcatThreadPoolMetrics().bindTo(registry);
 
         return registry;
+    }
+
+    /**
+     * GC 지표.
+     *
+     * `JvmGcMetrics`는 GC 알림 리스너를 등록해서 닫지 않으면 남는다. 컨테이너를 통째로
+     * 새로 띄우는 배포라 실질 영향은 없지만, 빈으로 등록해 두면 Spring이 컨텍스트를
+     * 닫을 때 함께 정리한다. 다른 바인더와 달리 이것만 `AutoCloseable`이다.
+     */
+    @Bean(destroyMethod = "close")
+    public JvmGcMetrics jvmGcMetrics(MeterRegistry registry) {
+        JvmGcMetrics metrics = new JvmGcMetrics();
+        metrics.bindTo(registry);
+
+        return metrics;
     }
 
     /**
