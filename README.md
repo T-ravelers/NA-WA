@@ -128,12 +128,16 @@ docker compose up -d --build backend
 2. 적용합니다.
 
 ```shell
-docker compose exec -T mysql sh -c 'exec mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' < backend/docs/database/seed/report-demo.sql
+docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" "$MYSQL_DATABASE"' < backend/docs/database/seed/report-demo.sql
 ```
 
 세 변수는 `sh -c` 안에 두어 컨테이너에서 전개합니다. compose가 `.env`를 컨테이너에만
 넣어 주므로 실행하는 사람의 셸에는 값이 없고, 이렇게 하면 비밀번호가 셸 히스토리에도
 남지 않습니다.
+
+비밀번호는 `-p`가 아니라 `MYSQL_PWD`로 넘깁니다. `-p`로 넘기면 `mysql`이 실행할 때마다
+`[Warning] Using a password on the command line interface can be insecure.`를 내고,
+컨테이너 안에서 `ps`로 값이 보입니다.
 
 `--default-character-set=utf8mb4`는 빼지 마세요. `mysql` 클라이언트의 기본값 `auto`는
 `LANG`이 비어 있으면 latin1로 읽어서, 시드 메모의 `—`가 `â€”`로 저장됩니다

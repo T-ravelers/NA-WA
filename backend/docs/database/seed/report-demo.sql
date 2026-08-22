@@ -4,11 +4,13 @@
 -- Flyway 밖에서 손으로 적용한다. 두 번 돌려도 결과가 같다 — 앞서 넣은 시드를 먼저 지운다.
 --
 --   docker compose exec -T mysql \
---     sh -c 'exec mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' \
+--     sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" "$MYSQL_DATABASE"' \
 --     < backend/docs/database/seed/report-demo.sql
 --
 -- 세 변수는 컨테이너 안에서 전개한다. compose가 .env를 컨테이너에만 넣어 주므로 실행하는
 -- 사람의 셸에는 값이 없고, 이렇게 하면 비밀번호가 셸 히스토리에도 남지 않는다.
+-- 비밀번호는 -p가 아니라 MYSQL_PWD로 넘긴다. -p로 넘기면 mysql이 실행할 때마다 경고 한 줄을
+-- 내고, 컨테이너 안에서 ps로 값이 보인다.
 -- --default-character-set=utf8mb4는 뺄 수 없다. 클라이언트 기본값 auto는 LANG이 비면 latin1이라
 -- 아래 메모의 '—'가 'â€”'로 들어간다(2026-08-22 로컬 실측).
 --
