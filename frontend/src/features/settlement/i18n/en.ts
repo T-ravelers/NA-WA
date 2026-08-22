@@ -40,8 +40,10 @@ export default {
       emptyTitle: 'No completed splits',
       emptyDescription: 'Completed splits will be listed here.',
       period: 'Period',
-      /** 기간을 고르지 않은 상태. 트리거 버튼과 시트의 되돌리기 버튼이 함께 쓴다. */
+      /** 기간을 고르지 않은 상태. 시트의 되돌리기 버튼이 쓴다. */
       anyDate: 'Any date',
+      /** 목록 화면에서 고른 기간을 한 번에 걷어내는 칩. 지갑 내역의 같은 동작과 문구를 맞춘다. */
+      clearPeriod: 'Clear dates',
       periodRange: '{from} – {to}',
       choosePeriod: 'Choose a period',
       periodHint: 'Tap the first day, then the last day.',
