@@ -59,6 +59,11 @@ function createTestRouter() {
         name: 'wallet-top-up',
         component: { template: '<div>Top up</div>' },
       },
+      {
+        path: '/events/:eventId',
+        name: 'event-detail',
+        component: { template: '<div>Event</div>' },
+      },
     ],
   })
 }
@@ -254,15 +259,91 @@ describe('AppointmentCreateView', () => {
     })
     await flushPromises()
 
+    const push = vi.spyOn(router, 'push')
     await buttonByText(wrapper, 'Create a journey').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('journey-create')
+    // 이 화면은 자리를 내주고 간다. push하면 여정을 만들고 돌아왔을 때 같은 라우트가
+    // 히스토리에 두 번 쌓인다.
+    expect(push).not.toHaveBeenCalled()
+    push.mockRestore()
     expect(router.currentRoute.value.query).toMatchObject({
       returnRouteName: 'appointment-create',
       itemId: '42',
       itemType: 'EVENT',
     })
+  })
+
+  it('leaves the flow in one tap after creating a journey inline', async () => {
+    // 여정 생성으로 갈 때 이 화면이 히스토리에 남으면, 여정을 만들고 돌아온 뒤 같은
+    // 라우트가 두 번 쌓인다. 그러면 시트를 닫아 흐름을 떠나려 해도 같은 라우트의 옛
+    // 엔트리로 되감길 뿐이고(라우트가 같아 화면이 다시 그려지지도 않는다) 한 번 더
+    // 눌러야 빠져나간다. 여정 생성에는 자리를 내주고 가야 한 번에 떠난다.
+    const journeyList = ref<typeof journeys>([])
+    const router = createTestRouter()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const vueQuery: [typeof VueQueryPlugin, { queryClient: QueryClient }] = [
+      VueQueryPlugin,
+      { queryClient },
+    ]
+
+    await router.push('/events/42')
+    await router.push('/appointments/new?itemId=42&itemType=EVENT')
+    await router.isReady()
+
+    const wrapper = mount(
+      { template: '<RouterView />' },
+      {
+        global: {
+          plugins: [i18n, router, vueQuery],
+          provide: {
+            [appointmentJourneyIntegrationKey as symbol]: {
+              useJourneyListQuery: () => ({
+                data: journeyList,
+                isPending: ref(false),
+                isError: ref(false),
+              }),
+              checkJourneyItemExists,
+            },
+            [appointmentExploreIntegrationKey as symbol]: {
+              useItemLocation: () => ({
+                data: ref({ placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' }),
+                isLoading: ref(false),
+                isError: ref(false),
+              }),
+            },
+          },
+        },
+      },
+    )
+    await flushPromises()
+
+    // 여정이 없어 여정 생성으로 간다. 이 화면은 자리를 내주고 간다(replace).
+    await buttonByText(wrapper, 'Create a journey').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('journey-create')
+
+    // 여정 생성이 제출을 마치고 새 tripId를 실어 이 자리로 돌려보낸다.
+    await router.replace('/appointments/new?itemId=42&itemType=EVENT&tripId=7')
+    journeyList.value = journeys
+    await flushPromises()
+    expect(wrapper.text()).toContain('Which day?')
+
+    // 날짜 시트를 닫아 여정 선택으로 돌아온 뒤, 시트를 닫아 흐름을 떠난다.
+    await wrapper.get('button[aria-label="Go back"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Choose a journey')
+
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(3)
+    await wrapper.get('button[aria-label="Close journey selector"]').trigger('click')
+    await flushPromises()
+
+    // 한 번에 흐름 이전 화면으로 나간다. 옛 엔트리가 남아 있으면 여기서 약속 생성에
+    // 그대로 머물고, 시트도 닫히지 않는다.
+    expect(router.currentRoute.value.name).toBe('event-detail')
+
+    historyLength.mockRestore()
   })
 
   it('moves to the previous form step, then opens an exit confirmation on the first step', async () => {

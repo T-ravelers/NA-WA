@@ -169,8 +169,13 @@ function selectJourney(tripId: number): void {
   phase.value = 'journeyDate'
 }
 
+// 여정 생성으로 간다. push가 아니라 replace다 — 이 단계에는 아직 적은 것이 없어
+// 자리를 지킬 이유가 없고, 남겨두면 여정을 만들고 돌아왔을 때 같은 라우트가 히스토리에
+// 두 번 쌓인다. 그러면 시트를 닫아 흐름을 떠나려 해도 같은 라우트의 옛 엔트리로 되감길
+// 뿐이라(라우트가 같아 화면이 다시 그려지지도 않는다) 한 번 더 눌러야 빠져나간다.
+// 여정 생성은 나갈 때(제출이든 포기든) 이 자리를 돌려준다.
 function goToCreateJourney(): void {
-  void router.push({
+  void router.replace({
     name: 'journey-create',
     query: {
       returnRouteName: 'appointment-create',
