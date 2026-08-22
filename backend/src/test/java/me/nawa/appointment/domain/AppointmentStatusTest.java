@@ -15,7 +15,23 @@ class AppointmentStatusTest {
     }
 
     @Test
+    void canTransitionTo_activityEnded_allowsAwaitingAttendance() {
+        assertTrue(AppointmentStatus.IN_PROGRESS.canTransitionTo(
+                AppointmentStatus.AWAITING_ATTENDANCE
+        ));
+    }
+
+    @Test
     void canTransitionTo_attendanceConfirmed_allowsCompleted() {
+        assertTrue(AppointmentStatus.AWAITING_ATTENDANCE.canTransitionTo(
+                AppointmentStatus.COMPLETED
+        ));
+    }
+
+    // 스케줄러가 출석 확정 대기로 옮기기 전 몇 초 사이에도 화면은 이미 출석
+    // 확정을 열어 준다. 그 사이에 확정한 방장이 막히지 않아야 한다.
+    @Test
+    void canTransitionTo_attendanceConfirmedBeforeScheduler_allowsCompleted() {
         assertTrue(AppointmentStatus.IN_PROGRESS.canTransitionTo(
                 AppointmentStatus.COMPLETED
         ));

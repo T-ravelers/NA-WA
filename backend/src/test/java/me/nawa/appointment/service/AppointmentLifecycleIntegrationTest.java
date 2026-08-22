@@ -26,8 +26,8 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 
 /**
- * closeExpiredRecruitingAppointments·startDueClosedAppointments가 실제 MySQL
- * 위에서 시간 조건에 맞는 약속만 정확히 골라 전환하는지 검증한다.
+ * startDueAppointments·endDueAppointments가 실제 MySQL 위에서 시간 조건에 맞는
+ * 약속만 정확히 골라 전환하는지 검증한다.
  *
  * QrPaymentConcurrencyIntegrationTest·AppointmentDepositIntegrationTest와 같은
  * 이유로, 여기서 만드는 AppointmentMapper는 Spring 컨테이너가 관리하는 빈이 아니라
@@ -123,6 +123,49 @@ class AppointmentLifecycleIntegrationTest {
         assertEquals("IN_PROGRESS", appointmentStatus(dueRecruitingId));
         assertEquals("IN_PROGRESS", appointmentStatus(dueFullId));
         assertEquals("RECRUITING", appointmentStatus(notYetDueId));
+    }
+
+    @Test
+    void endDueAppointments_movesInProgressPastActivityEndToAwaitingAttendance() {
+        long eventId = createApprovedEvent();
+        // insertAppointment는 활동 종료를 시작 +2시간으로 잡는다.
+        long endedId = insertAppointment(eventId, "IN_PROGRESS",
+                LocalDateTime.now().minusHours(3));
+        long stillRunningId = insertAppointment(eventId, "IN_PROGRESS",
+                LocalDateTime.now().minusMinutes(1));
+
+        appointmentMapper.endDueAppointments(LocalDateTime.now());
+
+        assertEquals("AWAITING_ATTENDANCE", appointmentStatus(endedId));
+        assertEquals("IN_PROGRESS", appointmentStatus(stillRunningId));
+    }
+
+    // 스케줄러가 오래 멈춰 있던 사이에 활동이 통째로 지나간 약속도 한 주기에
+    // 끝까지 따라와야 한다. 시작을 먼저 반영하는 순서가 그것을 보장한다.
+    @Test
+    void lifecycleTick_appointmentThatCameAndWent_reachesAwaitingAttendance() {
+        long eventId = createApprovedEvent();
+        long appointmentId = insertAppointment(eventId, "RECRUITING",
+                LocalDateTime.now().minusHours(3));
+
+        LocalDateTime now = LocalDateTime.now();
+        appointmentMapper.startDueAppointments(now);
+        appointmentMapper.endDueAppointments(now);
+
+        assertEquals("AWAITING_ATTENDANCE", appointmentStatus(appointmentId));
+    }
+
+    // 출석 확정이 만드는 COMPLETED는 스케줄러가 건드리지 않는다. 종료 조건만
+    // 보고 되돌리면 이미 정산까지 끝난 약속이 다시 확정 대기로 돌아간다.
+    @Test
+    void endDueAppointments_completedAppointment_staysCompleted() {
+        long eventId = createApprovedEvent();
+        long completedId = insertAppointment(eventId, "COMPLETED",
+                LocalDateTime.now().minusHours(3));
+
+        appointmentMapper.endDueAppointments(LocalDateTime.now());
+
+        assertEquals("COMPLETED", appointmentStatus(completedId));
     }
 
     private String appointmentStatus(long appointmentId) {

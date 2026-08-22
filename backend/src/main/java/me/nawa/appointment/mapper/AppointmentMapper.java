@@ -46,6 +46,10 @@ public interface AppointmentMapper {
     // 실제보다 늦게(또는 빠르게) 일어난다.
     int startDueAppointments(@Param("now") LocalDateTime now);
 
+    // 활동 종료 시각이 지난 IN_PROGRESS 약속을 AWAITING_ATTENDANCE로 옮긴다.
+    // 시각 비교 기준을 애플리케이션에서 받는 이유는 위와 같다.
+    int endDueAppointments(@Param("now") LocalDateTime now);
+
     List<Appointment> searchAppointments(
             @Param("request") AppointmentSearchRequest request,
             @Param("offset") int offset

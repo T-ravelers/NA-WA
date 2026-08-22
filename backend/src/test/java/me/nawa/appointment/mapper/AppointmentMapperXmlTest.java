@@ -183,7 +183,12 @@ class AppointmentMapperXmlTest {
 
         assertTrue(sql.contains("am.membership_status = 'ACTIVE'"));
         assertTrue(sql.contains("am.trip_id IS NOT NULL"));
-        assertTrue(sql.contains("a.appointment_status = 'IN_PROGRESS'"));
+        // 활동이 끝나도 방장이 출석을 확정하기 전까지는 공동결제 대상으로 남는다.
+        // 종료 전이를 DB에 적기 시작하면서 그 구간의 상태가 갈렸을 뿐이라, 한
+        // 상태만 보면 활동이 끝나는 순간 목록에서 사라진다.
+        assertTrue(sql.contains(
+                "a.appointment_status IN ('IN_PROGRESS', 'AWAITING_ATTENDANCE')"
+        ));
     }
 
     @Test

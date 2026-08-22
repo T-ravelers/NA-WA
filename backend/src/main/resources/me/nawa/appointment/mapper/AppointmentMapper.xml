@@ -88,6 +88,15 @@
           AND deleted_at IS NULL
     </update>
 
+    <update id="endDueAppointments">
+        UPDATE appointments
+        SET appointment_status = 'AWAITING_ATTENDANCE',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_status = 'IN_PROGRESS'
+          AND activity_end_at &lt;= #{now}
+          AND deleted_at IS NULL
+    </update>
+
     <update id="updateAttendance">
         UPDATE appointment_members
         SET attendance_status = #{attendanceStatus},
@@ -407,7 +416,11 @@
                          a.appointment_id DESC
             </when>
             <otherwise>
-                AND a.appointment_status = 'IN_PROGRESS'
+                <!--
+                    활동이 끝나도 출석 확정 전까지는 남긴다. 종료 시각은 방장이 적어 둔
+                    예정 시각이라 그 시각을 넘겨 공동결제하는 일이 흔하다.
+                -->
+                AND a.appointment_status IN ('IN_PROGRESS', 'AWAITING_ATTENDANCE')
                 ORDER BY a.activity_start_at ASC
             </otherwise>
         </choose>
