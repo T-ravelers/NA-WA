@@ -30,8 +30,8 @@ function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
   return button
 }
 
-async function mountView(query = '?itemId=42&itemType=EVENT') {
-  const router = createRouter({
+function createTestRouter() {
+  return createRouter({
     history: createMemoryHistory(),
     routes: [
       {
@@ -61,32 +61,55 @@ async function mountView(query = '?itemId=42&itemType=EVENT') {
       },
     ],
   })
+}
+
+function globalOptions(router: ReturnType<typeof createTestRouter>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  // 튜플로 못박는다. 인라인이 아니면 [플러그인, 옵션]이 그냥 배열로 추론돼 어긋난다.
+  const vueQuery: [typeof VueQueryPlugin, { queryClient: QueryClient }] = [
+    VueQueryPlugin,
+    { queryClient },
+  ]
+  return {
+    plugins: [i18n, router, vueQuery],
+    provide: {
+      [appointmentJourneyIntegrationKey as symbol]: {
+        useJourneyListQuery: () => ({
+          data: ref(journeys),
+          isPending: ref(false),
+          isError: ref(false),
+        }),
+        checkJourneyItemExists,
+      },
+      [appointmentExploreIntegrationKey as symbol]: {
+        useItemLocation: () => ({
+          data: ref({ placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' }),
+          isLoading: ref(false),
+          isError: ref(false),
+        }),
+      },
+    },
+  }
+}
+
+async function mountView(query = '?itemId=42&itemType=EVENT') {
+  const router = createTestRouter()
   await router.push(`/appointments/new${query}`)
   await router.isReady()
 
-  const wrapper = mount(AppointmentCreateView, {
-    global: {
-      plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
-      provide: {
-        [appointmentJourneyIntegrationKey as symbol]: {
-          useJourneyListQuery: () => ({
-            data: ref(journeys),
-            isPending: ref(false),
-            isError: ref(false),
-          }),
-          checkJourneyItemExists,
-        },
-        [appointmentExploreIntegrationKey as symbol]: {
-          useItemLocation: () => ({
-            data: ref({ placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' }),
-            isLoading: ref(false),
-            isError: ref(false),
-          }),
-        },
-      },
-    },
-  })
+  const wrapper = mount(AppointmentCreateView, { global: globalOptions(router) })
+  await flushPromises()
+  return { wrapper, router }
+}
+
+// 라우터가 화면을 직접 갈아끼우게 띄운다. 뒤로가기로 돌아오는 길은 "화면이 새로
+// 열리는 것"까지가 동작이라, 컴포넌트를 손으로 마운트하면 재현되지 않는다.
+async function mountRoutedApp(query = '?itemId=42&itemType=EVENT') {
+  const router = createTestRouter()
+  await router.push(`/appointments/new${query}`)
+  await router.isReady()
+
+  const wrapper = mount({ template: '<RouterView />' }, { global: globalOptions(router) })
   await flushPromises()
   return { wrapper, router }
 }
@@ -346,6 +369,41 @@ describe('AppointmentCreateView', () => {
       visitDate: '2026-08-31',
       form: { step: 2, draft: { appointmentName: 'Seongsu K-Beauty Tour', depositAmount: 10000 } },
     })
+  })
+
+  it('restores the saved form when the host backs out of top-up without paying', async () => {
+    // 충전을 끝내지 않고 브라우저·시스템 뒤로가기로 돌아오는 길. 브라우저는 떠날 때의
+    // URL로 되돌리므로, 그 자리에 복원 표시가 없으면 저장해 둔 초안을 읽지 못하고 빈
+    // 폼이 열린다 — 충전을 포기했을 뿐인데 적은 내용이 사라진다.
+    createAppointment.mockRejectedValueOnce(
+      new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
+    )
+    const { wrapper, router } = await mountRoutedApp()
+    await completeJourneySelection(wrapper)
+    await fillAndConfirm(wrapper)
+    await flushPromises()
+
+    await buttonByText(wrapper, 'Top up').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('wallet-top-up')
+
+    // 충전하지 않고 그대로 뒤로 간다. 브라우저는 떠날 때의 자리로 되돌린다.
+    router.back()
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+    // 떠나기 전에 남긴 복원 표시. 이게 없으면 화면은 저장한 초안을 읽지 않는다.
+    expect(router.currentRoute.value.query.resume).toBe('1')
+
+    // 여정·날짜 시트를 다시 거치지 않고 2단계 폼이 적었던 값 그대로 열린다.
+    expect(wrapper.text()).not.toContain('Choose a journey')
+    expect(wrapper.text()).toContain('Set your appointment details')
+    expect(wrapper.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
+    expect(wrapper.find<HTMLInputElement>('input[inputmode="numeric"]').element.value).toBe(
+      '10,000',
+    )
+    // 한 번 되살렸으면 지운다 — 완료로 돌아온 길과 같은 규칙이다.
+    expect(sessionStorage.getItem('appointment-create:resume')).toBeNull()
   })
 
   it('restores the saved form when the top-up screen sends the host back', async () => {

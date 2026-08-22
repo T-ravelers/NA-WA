@@ -305,9 +305,27 @@ onMounted(() => {
 // 돌아오게 한다. 떠나기 전 폼 초안을 저장해 둬, 돌아왔을 때 "Create appointment"만
 // 다시 누르면 되게 한다. replace가 아니라 push다 — 충전을 포기하고 뒤로 와도 작성하던
 // 흐름으로 돌아와야 한다.
+//
+// 다만 돌아오는 길이 둘이고 도착지가 다르다. 충전을 마치면 충전 화면이 `?resume=1`을
+// 붙여 보내지만, 뒤로가기는 브라우저가 **떠날 때의 URL 그대로** 되돌린다. 그 자리에
+// 표시가 없으면 초안을 저장해 두고도 읽지 않아, 충전을 포기했을 뿐인데 적은 내용이
+// 사라진다. 그래서 떠나기 전에 지금 자리를 `?resume=1`로 바꿔 둔다 — 어느 길로 돌아오든
+// 같은 자리에서 되살아난다. 초안을 실제로 저장했을 때만 표시한다.
 function goToTopup(): void {
   const amount = requestedDepositAmount.value
   topupPromptOpen.value = false
+
+  const openTopup = () =>
+    router.push({
+      name: 'wallet-top-up',
+      query: {
+        ...(amount === null ? {} : { amount: String(amount) }),
+        returnRouteName: 'appointment-create',
+        ...(itemId.value !== undefined ? { itemId: String(itemId.value) } : {}),
+        ...(itemType.value !== undefined ? { itemType: itemType.value } : {}),
+        ...(selectedTripId.value !== null ? { tripId: String(selectedTripId.value) } : {}),
+      },
+    })
 
   const form = createForm.value?.snapshot()
   if (
@@ -325,18 +343,12 @@ function goToTopup(): void {
       form,
     }
     sessionStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(state))
+    // 표시를 먼저 남기고 떠난다. 순서가 뒤집히면 replace가 충전 화면 위에서 일어난다.
+    void router.replace({ query: { ...route.query, resume: '1' } }).then(openTopup)
+    return
   }
 
-  void router.push({
-    name: 'wallet-top-up',
-    query: {
-      ...(amount === null ? {} : { amount: String(amount) }),
-      returnRouteName: 'appointment-create',
-      ...(itemId.value !== undefined ? { itemId: String(itemId.value) } : {}),
-      ...(itemType.value !== undefined ? { itemType: itemType.value } : {}),
-      ...(selectedTripId.value !== null ? { tripId: String(selectedTripId.value) } : {}),
-    },
-  })
+  void openTopup()
 }
 
 // 흐름을 떠난다. 왔던 길을 되감고, 히스토리가 없을 때(딥링크·PWA 재진입)만
