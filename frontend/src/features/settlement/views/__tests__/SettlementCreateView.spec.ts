@@ -183,6 +183,35 @@ describe('SettlementCreateView', () => {
     expect(wrapper.text()).toContain('Request overview')
   })
 
+  /*
+   * 결제자는 정산에서 뺄 수 없다. 그런데 칩이 평범한 버튼이라 눌러도 아무 일이 없고 왜
+   * 그런지 알 수 없었다 — 보조기술은 누를 수 있는 버튼으로 읽었고, #380이 선택 상태를
+   * 또렷하게 만들면서 다른 선택 칩과 완전히 같아 보이게 됐다(#382).
+   */
+  it('marks the payer chip as disabled and gives it its own fill', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    const payer = wrapper.get('[data-participant-id="12"]')
+    const other = wrapper.get('[data-participant-id="19"]')
+
+    expect(payer.attributes('aria-disabled')).toBe('true')
+    expect(other.attributes('aria-disabled')).toBeUndefined()
+
+    /* 꽉 찬 면 = 고정됨. 다른 선택 칩은 10% 면이라 「골랐다」로 읽힌다. */
+    expect(payer.classes()).toContain('bg-settlement')
+    expect(payer.classes()).not.toContain('bg-settlement/10')
+  })
+
+  it('keeps the payer selected when its chip is pressed', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    await wrapper.get('[data-participant-id="12"]').trigger('click')
+
+    expect(wrapper.get('[data-participant-id="12"]').attributes('aria-pressed')).toBe('true')
+  })
+
   it('always includes the candidate payer appointment member when creating an even split', async () => {
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)

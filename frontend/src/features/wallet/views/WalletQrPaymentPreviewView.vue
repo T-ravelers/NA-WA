@@ -17,9 +17,11 @@ import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
+import SelectChip from '@/shared/ui/SelectChip.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import { useRovingRadioGroup } from '@/shared/ui/useRovingRadioGroup'
 
 import { executeQrPayment, previewQrPayment } from '../api/qrPaymentApi'
 import { useWalletAppointmentIntegration } from '../model/appointmentIntegration'
@@ -55,6 +57,15 @@ const spendingCategory = ref<SpendingCategory>(DEFAULT_SPENDING_CATEGORY)
 
 const spendingCategoryOptions = computed(() =>
   SPENDING_CATEGORIES.map((value) => ({ value, label: t(spendingCategoryLabelKey(value)) })),
+)
+
+/* 칩 일곱 개가 전부 탭 스톱이면 결제 버튼까지 가는 데 탭을 일곱 번 더 눌러야 한다(#305). */
+const { onKeydown: onCategoryKeydown, tabindexFor: categoryTabindex } = useRovingRadioGroup(
+  () => SPENDING_CATEGORIES,
+  () => spendingCategory.value,
+  (value) => {
+    spendingCategory.value = value as SpendingCategory
+  },
 )
 
 const isSharedExpense = computed(() => spendingScope.value === 'shared')
@@ -427,24 +438,20 @@ const completePayment = (): void => {
           role="radiogroup"
           :aria-label="t('wallet.qrPayment.spendingCategory')"
           class="mt-4 flex flex-wrap gap-2"
+          @keydown="onCategoryKeydown"
         >
-          <button
+          <SelectChip
             v-for="option in spendingCategoryOptions"
             :key="option.value"
-            type="button"
+            interactive
+            :label="option.label"
+            :selected="option.value === spendingCategory"
             role="radio"
             :data-testid="`payment-category-${option.value}`"
             :aria-checked="option.value === spendingCategory"
-            class="h-9 rounded-pill px-3.5 text-caption transition-transform active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-            :class="
-              option.value === spendingCategory
-                ? 'bg-paper-fill text-on-paper'
-                : 'border border-hairline bg-transparent text-ink-2'
-            "
-            @click="spendingCategory = option.value"
-          >
-            {{ option.label }}
-          </button>
+            :tabindex="categoryTabindex(option.value)"
+            @toggle="spendingCategory = option.value"
+          />
         </div>
       </AppCard>
 
