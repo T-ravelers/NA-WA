@@ -357,9 +357,9 @@ async function confirmJourneyDate(date: string): Promise<void> {
 /**
  * 여정을 만들고 돌아온 진입. 하던 일을 그대로 이어 담기 시트를 다시 연다.
  *
- * 새 여정 id는 `journeyId` query로 실려 오고 `activeJourneyId`가 그것을 먼저 보므로
- * 시트는 그 여정이 골라진 채 열린다. 표시를 남겨 두면 새로고침이나 뒤로 가기에서도
- * 시트가 다시 열리므로 읽자마자 주소에서 지운다.
+ * `openJourneySelect` 표시를 남겨 두면 새로고침이나 뒤로 가기에서도 시트가 다시
+ * 열리므로 읽자마자 주소에서 지운다. 새 여정 id를 어떻게 받는지는 아래 블록 주석에
+ * 적었다.
  */
 onMounted(() => {
   if (route.query.openJourneySelect !== '1') return

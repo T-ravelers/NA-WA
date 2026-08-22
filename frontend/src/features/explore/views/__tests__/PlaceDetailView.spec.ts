@@ -11,6 +11,22 @@ const fetchPlaceDetail = vi.fn()
 const fetchJourneys = vi.fn()
 const addJourneyItem = vi.fn()
 
+/**
+ * 앱이 주입하는 `parseJourneyRouteQuery`와 같게 동작하는 스텁.
+ *
+ * journey feature를 직접 import할 수 없어(`architecture/no-cross-feature-imports`)
+ * 규칙만 여기에 옮겨 둔다. 예전처럼 `() => null`로 막아 두면 **복귀 진입이 새 여정
+ * id를 읽는 경로가 통째로 실행되지 않아**, 받는 쪽이 비어 있어도 테스트가 초록으로
+ * 남는다. 실제 구현(`journey/model/journeyRouteQuery`)이 바뀌면 여기도 맞춰야 한다.
+ */
+function parseJourneyRouteQuery(value: unknown): number | null {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null
+
+  const parsed = Number(raw)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 vi.mock('../../model/journeyIntegration', async () => {
   const { useQuery } = await import('@tanstack/vue-query')
   const { computed, toValue } = await import('vue')
@@ -18,7 +34,7 @@ vi.mock('../../model/journeyIntegration', async () => {
     useExploreJourneyIntegration: () => ({
       addJourneyItem: (journeyId: number, request: { itemId: number; visitDate: string }) =>
         addJourneyItem(journeyId, request),
-      parseJourneyRouteQuery: () => null,
+      parseJourneyRouteQuery,
       useJourneyListQuery: (enabled: import('vue').MaybeRefOrGetter<boolean>) =>
         useQuery({
           queryKey: ['journeys', 'review-test'],
@@ -389,10 +405,17 @@ describe('PlaceDetailView', () => {
     })
   })
 
-  it('여정을 만들고 돌아오면 담기 시트를 다시 연다', async () => {
-    const { wrapper, router } = await mountView('/explore/places/42?openJourneySelect=1')
+  it('여정을 만들고 돌아오면 그 여정이 골라진 채 시트가 열리고 규약 key가 지워진다', async () => {
+    const { wrapper, router } = await mountView('/explore/places/42?tripId=7&openJourneySelect=1')
 
     expect(wrapper.get('[role="dialog"]').text()).toContain('Choose a journey')
+
+    const pressed = wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.attributes('aria-pressed') === 'true')
+    expect(pressed?.text()).toContain('Seoul weekend')
+
     expect(router.currentRoute.value.query).toEqual({})
   })
 })

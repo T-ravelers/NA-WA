@@ -85,6 +85,22 @@ const journeys: ExploreJourneySummary[] = [
   },
 ]
 
+/**
+ * 앱이 주입하는 `parseJourneyRouteQuery`와 같게 동작하는 스텁.
+ *
+ * journey feature를 직접 import할 수 없어(`architecture/no-cross-feature-imports`)
+ * 규칙만 여기에 옮겨 둔다. 예전처럼 `() => null`로 막아 두면 **복귀 진입이 새 여정
+ * id를 읽는 경로가 통째로 실행되지 않아**, 받는 쪽이 비어 있어도 테스트가 초록으로
+ * 남는다. 실제 구현(`journey/model/journeyRouteQuery`)이 바뀌면 여기도 맞춰야 한다.
+ */
+function parseJourneyRouteQuery(value: unknown): number | null {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null
+
+  const parsed = Number(raw)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 function createJourneyIntegration(list: ExploreJourneySummary[]): ExploreJourneyIntegration {
   const query: ExploreJourneyListQuery = {
     data: ref<ExploreJourneySummary[] | undefined>(list),
@@ -94,7 +110,7 @@ function createJourneyIntegration(list: ExploreJourneySummary[]): ExploreJourney
 
   return {
     addJourneyItem,
-    parseJourneyRouteQuery: () => null,
+    parseJourneyRouteQuery,
     useJourneyListQuery: () => query,
   }
 }
@@ -455,14 +471,22 @@ describe('EventDetailView', () => {
    * 여정을 만들고 돌아온 진입. 하던 일이 그대로 이어져야 하고, 표시는 주소에서 지워야
    * 새로고침이나 뒤로 가기에서 시트가 되살아나지 않는다.
    */
-  it('여정을 만들고 돌아오면 담기 시트를 다시 열고 표시를 지운다', async () => {
-    const { wrapper, router } = await mountView(
-      '/explore/events/42?journeyId=7&openJourneySelect=1',
-    )
+  it('여정을 만들고 돌아오면 그 여정이 골라진 채 시트가 열리고 규약 key가 지워진다', async () => {
+    const { wrapper, router } = await mountView('/explore/events/42?tripId=7&openJourneySelect=1')
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
     expect(wrapper.get('[role="dialog"]').text()).toContain('Choose a journey')
-    expect(router.currentRoute.value.query).toEqual({ journeyId: '7' })
+
+    // 방금 만든 여정이 실제로 골라져 있어야 한다. 이 단언이 없으면 받는 쪽이 통째로
+    // 비어 있어도(=돌아와서 아무것도 골라지지 않아도) 테스트가 통과한다.
+    const pressed = wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.attributes('aria-pressed') === 'true')
+    expect(pressed?.text()).toContain('Seoul weekend')
+
+    // 남겨두면 시트를 다시 열 때마다 그 뒤에 고른 여정을 덮어쓴다.
+    expect(router.currentRoute.value.query).toEqual({})
   })
 
   it('표시가 없는 진입에서는 시트를 열지 않는다', async () => {
