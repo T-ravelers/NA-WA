@@ -1,9 +1,12 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+
+import { appointmentJourneyIntegrationKey } from '../../model/journeyIntegration'
 
 const fetchAppointments = vi.fn()
 
@@ -59,6 +62,16 @@ async function mountView() {
         name: 'explore-place-detail',
         component: { template: '<div>Place</div>' },
       },
+      {
+        path: '/journeys/new',
+        name: 'journey-create',
+        component: { template: '<div>Journey create</div>' },
+      },
+      {
+        path: '/wallet/top-up',
+        name: 'wallet-top-up',
+        component: { template: '<div>Top up</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -68,6 +81,24 @@ async function mountView() {
   const wrapper = mount(AppointmentListView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+      provide: {
+        // 카드의 Join이 여정 선택 시트를 연다. 약속 날짜(2026-08-08)를 담는 여정 하나.
+        [appointmentJourneyIntegrationKey as symbol]: {
+          useJourneyListQuery: () => ({
+            data: ref([
+              {
+                tripId: 7,
+                title: 'Seoul Foodie Week',
+                startDate: '2026-08-01',
+                endDate: '2026-08-31',
+              },
+            ]),
+            isPending: ref(false),
+            isError: ref(false),
+          }),
+          checkJourneyItemExists: vi.fn().mockResolvedValue(false),
+        },
+      },
     },
   })
   await flushPromises()
@@ -109,28 +140,52 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
   })
 
-  it('opens completed appointment details from the list', async () => {
-    fetchAppointments.mockResolvedValueOnce({
-      content: [{ ...appointment, appointmentStatus: 'COMPLETED' as const }],
+  // 끝난 약속은 참여할 수도, 새로 할 일도 없다. 목록에 남으면 지금 갈 수 있는 약속이
+  // 그만큼 밀린다.
+  it('hides completed appointments', async () => {
+    fetchAppointments.mockResolvedValue({
+      content: [
+        { ...appointment, appointmentStatus: 'COMPLETED' as const },
+        { ...appointment, appointmentId: 8, appointmentName: 'Hongdae Night Market' },
+      ],
       page: 0,
       size: 20,
-      totalElements: 1,
+      totalElements: 2,
       totalPages: 1,
       hasNext: false,
     })
 
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).not.toContain('Seongsu K-Beauty Tour')
+    expect(wrapper.text()).toContain('Hongdae Night Market')
+    // 개수도 걸러낸 뒤 기준이어야 한다. 서버가 센 값을 그대로 쓰면 보이는 카드와 다르다.
+    expect(wrapper.text()).toContain('1 appointments')
+  })
+
+  it('opens the detail when the card itself is pressed', async () => {
     const { wrapper, router } = await mountView()
-    const viewButton = wrapper.findAll('button').find((button) => button.text() === 'View')
-    const statusBadge = wrapper.findAll('span').find((element) => element.text() === 'Completed')
 
-    expect(viewButton?.attributes('disabled')).toBeUndefined()
-    expect(statusBadge?.classes()).toContain('border-hairline')
-
-    await viewButton?.trigger('click')
+    await wrapper.get('[role="link"]').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
+  })
+
+  // Join은 상세로 보내지 않는다. 목록에 선 채로 상세와 같은 참여 흐름을 연다.
+  it('opens the journey sheet from the card Join button, without leaving the list', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-list')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Seoul Foodie Week')
   })
 
   it('returns to the Event detail from the contextual list', async () => {
