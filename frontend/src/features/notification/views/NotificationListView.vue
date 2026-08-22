@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { IconX } from '@tabler/icons-vue'
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -33,60 +33,47 @@ const { t, locale } = i18n
 const router = useRouter()
 
 /*
- * 받아 온 쪽을 이어 붙인다.
+ * 목록은 화면이 따로 들고 있지 않고 캐시에서 그대로 읽는다.
  *
- * "더 보기"는 커서를 바꿔 다음 쪽을 부르고, 그 응답이 도착하면 여기에 덧붙는다. 앞 쪽을
- * 버리지 않는 것은 사용자가 이미 읽고 있던 자리를 잃지 않게 하기 위해서다.
+ * 눌린 카드를 지우고 되돌리는 일은 전부 뮤테이션 쪽 캐시에서 일어난다. 여기에 사본을 하나
+ * 더 두면 지우기가 실패해 캐시가 되돌아가도 그 사본은 그대로 남아, 눈앞의 목록과 실제가
+ * 어긋난 채 굳는다.
  */
-const cursor = ref<string | undefined>(undefined)
-const loaded = ref<AppNotification[]>([])
-
-const { notifications, nextCursor, isPending, isFetching, isError, error } =
-  useNotifications(cursor)
-
-watch(
-  notifications,
-  (page) => {
-    if (cursor.value === undefined) {
-      loaded.value = page
-      return
-    }
-    const known = new Set(loaded.value.map((notification) => notification.id))
-    loaded.value = [...loaded.value, ...page.filter((notification) => !known.has(notification.id))]
-  },
-  { immediate: true },
-)
+const { notifications, isPending, isError, error, hasNextPage, isFetchingNextPage, fetchNextPage } =
+  useNotifications()
 
 const readOne = useReadNotification()
 const readAll = useReadAllNotifications()
 const deleteOne = useDeleteNotification()
 const deleteAll = useDeleteAllNotifications()
 
-const hasUnread = computed(() => loaded.value.some((notification) => !notification.isRead))
-/* 커서를 되돌리면 첫 쪽부터 다시 받는다. 지우고 난 뒤 남은 것을 다시 세는 데도 쓴다. */
-function resetToFirstPage(): void {
-  cursor.value = undefined
-  loaded.value = []
-}
+const hasUnread = computed(() => notifications.value.some((notification) => !notification.isRead))
+
+/*
+ * 첫 쪽을 기다리는 동안에만 화면을 로딩·오류로 덮는다.
+ *
+ * 보여 줄 것이 이미 있는데 덮어 버리면, "더 보기"를 누른 순간 읽고 있던 목록이 통째로
+ * 사라졌다가 돌아온다. 다음 쪽이 실패했을 때도 마찬가지로 앞 쪽까지 잃는다.
+ */
+const isEmpty = computed(() => notifications.value.length === 0)
+const showLoading = computed(() => isPending.value && isEmpty.value)
+const showError = computed(() => isError.value && isEmpty.value)
 
 function loadMore(): void {
-  if (nextCursor.value === null || isFetching.value) return
-  cursor.value = nextCursor.value
+  if (!hasNextPage.value || isFetchingNextPage.value) return
+  void fetchNextPage()
 }
 
 function dismiss(notification: AppNotification): void {
-  loaded.value = loaded.value.filter((item) => item.id !== notification.id)
-  deleteOne.mutate(notification.id, { onError: () => resetToFirstPage() })
+  deleteOne.mutate(notification.id)
 }
 
 function markAllRead(): void {
-  loaded.value = loaded.value.map((notification) => ({ ...notification, isRead: true }))
-  readAll.mutate(undefined, { onError: () => resetToFirstPage() })
+  readAll.mutate()
 }
 
 function dismissAll(): void {
-  loaded.value = []
-  deleteAll.mutate(undefined, { onError: () => resetToFirstPage() })
+  deleteAll.mutate()
 }
 
 function messageFor(notification: AppNotification): string {
@@ -116,12 +103,7 @@ function timeFor(notification: AppNotification): string {
  * 홈으로 떨어져, 벨을 눌러 들어온 사용자가 지갑에서 두 화면이나 떨어진 곳에 서게 된다.
  */
 function openSettlement(notification: AppNotification): void {
-  if (!notification.isRead) {
-    readOne.mutate(notification.id)
-    loaded.value = loaded.value.map((item) =>
-      item.id === notification.id ? { ...item, isRead: true } : item,
-    )
-  }
+  if (!notification.isRead) readOne.mutate(notification.id)
 
   void router.push({
     name: 'settlement-detail',
@@ -165,7 +147,7 @@ function errorDescription(): string | undefined {
       세우면 셋 다 잘린다. 할 일이 없을 때는 아예 보이지 않게 해서 줄 자체가 사라진다.
     -->
     <div
-      v-if="loaded.length > 0"
+      v-if="!isEmpty"
       class="mt-3 flex items-center justify-end gap-1"
     >
       <AppButton
@@ -188,18 +170,18 @@ function errorDescription(): string | undefined {
     </div>
 
     <StateLoading
-      v-if="isPending"
+      v-if="showLoading"
       class="mt-8"
     />
 
     <StateError
-      v-else-if="isError"
+      v-else-if="showError"
       class="my-auto"
       :description="errorDescription()"
     />
 
     <StateEmpty
-      v-else-if="loaded.length === 0"
+      v-else-if="isEmpty"
       class="my-auto"
       :title="t('notification.empty.title')"
       :description="t('notification.empty.description')"
@@ -208,7 +190,7 @@ function errorDescription(): string | undefined {
     <template v-else>
       <ul class="mt-5 flex flex-col gap-2">
         <li
-          v-for="notification in loaded"
+          v-for="notification in notifications"
           :key="notification.id"
         >
           <AppCard>
@@ -270,16 +252,28 @@ function errorDescription(): string | undefined {
       </ul>
 
       <AppButton
-        v-if="nextCursor !== null"
+        v-if="hasNextPage"
         class="mt-4"
         block
         variant="secondary"
-        :disabled="isFetching"
+        :disabled="isFetchingNextPage"
         data-testid="notification-load-more"
         @click="loadMore"
       >
-        {{ isFetching ? t('notification.loadingMore') : t('notification.loadMore') }}
+        {{ isFetchingNextPage ? t('notification.loadingMore') : t('notification.loadMore') }}
       </AppButton>
+
+      <!--
+        다음 쪽만 실패한 경우다. 앞 쪽은 그대로 두고 여기서만 알린다 — 화면을 오류로 덮으면
+        이미 읽고 있던 목록까지 사라진다.
+      -->
+      <p
+        v-if="isError"
+        class="mt-3 text-center text-caption text-ink-3"
+        data-testid="notification-load-more-error"
+      >
+        {{ errorDescription() ?? t('error.unknown') }}
+      </p>
     </template>
   </main>
 </template>
