@@ -104,7 +104,15 @@ describe('appointmentApi', () => {
     const get = vi.spyOn(httpClient, 'get').mockResolvedValue({ data: [appointment] })
 
     await expect(fetchMyOngoingAppointments()).resolves.toEqual([appointment])
-    expect(get).toHaveBeenCalledWith('/api/v1/appointments/me')
+    // 기본 범위는 진행 중이다. 지갑 QR 결제가 이 계약 위에 있다.
+    expect(get).toHaveBeenCalledWith('/api/v1/appointments/me', {
+      params: { scope: 'ONGOING' },
+    })
+
+    await fetchMyOngoingAppointments('ALL')
+    expect(get).toHaveBeenLastCalledWith('/api/v1/appointments/me', {
+      params: { scope: 'ALL' },
+    })
 
     get.mockResolvedValue({ data: undefined })
     await expect(fetchMyOngoingAppointments()).resolves.toEqual([])

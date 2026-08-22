@@ -1,4 +1,4 @@
-import type { AppointmentListFilters } from '../api/appointmentApi'
+import type { AppointmentListFilters, MyAppointmentScope } from '../api/appointmentApi'
 
 export const appointmentKeys = {
   all: ['appointments'] as const,
@@ -12,5 +12,7 @@ export const appointmentKeys = {
     [...appointmentKeys.all, 'participation', appointmentId] as const,
   reviewStatus: (appointmentId: number | null) =>
     [...appointmentKeys.all, 'reviewStatus', appointmentId] as const,
+  /** 범위별 key의 접두사. 무효화는 이 key로 걸어 두 범위를 함께 지운다. */
   mine: () => [...appointmentKeys.all, 'mine'] as const,
+  myScope: (scope: MyAppointmentScope) => [...appointmentKeys.mine(), scope] as const,
 } as const

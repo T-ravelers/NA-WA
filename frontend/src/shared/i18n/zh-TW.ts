@@ -33,11 +33,11 @@ export default {
   },
   nav: {
     label: '主導覽',
-    home: '首頁',
-    report: '報告',
-    profile: '個人檔案',
-    wallet: '錢包',
     journey: '旅程',
+    explore: '探索',
+    wallet: '錢包',
+    report: '報告',
+    my: '我的',
     comingSoon: '即將推出',
   },
   calendar: {
