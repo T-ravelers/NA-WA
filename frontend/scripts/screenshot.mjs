@@ -104,11 +104,119 @@ function stubMemberProfile(page) {
           // (localeSync). 러너 로케일과 어긋나면 로그인 화면만 en으로 되돌아간다.
           preferredLanguage: LOCALE,
           preferredCurrencyCode: 'KRW',
+          nationalityCode: 'JP',
+          accountType: 'TRAVELER',
           onboardingRequired: false,
         },
       }),
     }),
   )
+}
+
+/**
+ * 프로필의 찜·약속 탭.
+ *
+ * 찜은 Discover 목록 조회를 `savedOnly`로 재사용하므로 목록 엔드포인트를 그대로 세운다.
+ * 두 응답 모두 `responseSchema`(zod)를 지나므로 요약 DTO의 필수 필드를 빠짐없이 채운다 —
+ * 하나라도 빠지면 검증이 실패해 화면이 오류 상태로 찍힌다.
+ */
+function stubProfileTabs(page) {
+  return Promise.all([
+    stubJson(page, '/api/v1/explore/events', {
+      content: [
+        {
+          itemId: 301,
+          eventKind: 'FESTIVAL',
+          status: 'SCHEDULED',
+          title: 'Seoul Lantern Festival',
+          subtitle: null,
+          thumbnailUrl: null,
+          region1: 'Seoul',
+          region2: 'Jongno-gu',
+          region3: null,
+          latitude: 37.5709,
+          longitude: 126.9925,
+          startDate: '2098-11-01',
+          endDate: '2098-11-17',
+          saved: true,
+        },
+        {
+          itemId: 302,
+          eventKind: 'EXHIBITION',
+          status: 'ONGOING',
+          title: 'Hanok Craft Week',
+          subtitle: null,
+          thumbnailUrl: null,
+          region1: 'Seoul',
+          region2: 'Jung-gu',
+          region3: null,
+          latitude: 37.5636,
+          longitude: 126.9976,
+          startDate: '2098-09-04',
+          endDate: '2098-09-20',
+          saved: true,
+        },
+      ],
+      page: 0,
+      size: 30,
+      totalElements: 2,
+      totalPages: 1,
+      hasNext: false,
+    }),
+    stubJson(page, '/api/v1/explore/places', {
+      content: [
+        {
+          itemId: 501,
+          name: 'Gwangjang Market',
+          brand: null,
+          branch: null,
+          placeKind: 'RESTAURANT',
+          thumbnailUrl: null,
+          imageUrls: [],
+          region1: 'Seoul',
+          region2: 'Jongno-gu',
+          region3: null,
+          addressRoad: '88 Changgyeonggung-ro',
+          addressDetail: null,
+          latitude: 37.5701,
+          longitude: 126.9997,
+          isActive: true,
+          viewCount: 0,
+          favoriteCount: 0,
+          saved: true,
+        },
+      ],
+      page: 0,
+      size: 30,
+      totalElements: 1,
+      totalPages: 1,
+      hasNext: false,
+    }),
+    stubJson(page, '/api/v1/appointments/me', [
+      {
+        appointmentId: 71,
+        appointmentName: 'Lantern night walk',
+        tripId: 42,
+        meetingPlace: 'Jongno 3-ga Exit 3',
+        activityStartAt: '2098-11-02T19:00:00',
+        activityEndAt: '2098-11-02T21:00:00',
+        itemId: 301,
+        itemType: 'EVENT',
+        appointmentStatus: 'RECRUITING',
+      },
+      {
+        appointmentId: 72,
+        appointmentName: 'Market food crawl',
+        tripId: 42,
+        meetingPlace: 'Gwangjang Market north gate',
+        activityStartAt: '2098-11-05T12:30:00',
+        activityEndAt: '2098-11-05T14:30:00',
+        itemId: 501,
+        itemType: 'PLACE',
+        appointmentStatus: 'IN_PROGRESS',
+      },
+    ]),
+  ])
 }
 
 function stubJourneyDetail(page) {
@@ -1164,17 +1272,26 @@ const SCREENS = [
   { name: '02-callback-failed', path: '/auth/callback?error=AUTH-014' },
   { name: '03-not-found', path: '/no-such-page' },
   {
-    name: '04-settings',
-    path: '/settings',
+    name: '04-profile',
+    path: '/profile',
     // 백엔드를 띄우지 않고 찍는다. 리뷰용 이미지지 통합 검증이 아니다.
-    setup: (page) => stubMemberProfile(page),
+    setup: (page) => Promise.all([stubMemberProfile(page), stubProfileTabs(page)]),
   },
   {
-    name: '05-settings-language',
-    path: '/settings',
-    setup: (page) => stubMemberProfile(page),
+    name: '04b-profile-appointments',
+    path: '/profile',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubProfileTabs(page)]),
     prepare: async (page) => {
-      await page.getByTestId('settings-language').click()
+      await page.getByTestId('segment-appointments').click()
+      await page.getByTestId('profile-list').getByRole('link').first().waitFor()
+    },
+  },
+  {
+    name: '05-profile-language',
+    path: '/profile',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubProfileTabs(page)]),
+    prepare: async (page) => {
+      await page.getByTestId('profile-language').click()
       await page.waitForSelector('[role="dialog"]')
     },
   },

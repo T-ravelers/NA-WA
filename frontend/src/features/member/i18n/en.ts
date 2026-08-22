@@ -5,14 +5,37 @@
  * 화면에 그대로 노출하지 않고 여기의 문구를 사용한다.
  *
  * MEMBER-005~008(국적·이름·이미지·온보딩)의 문구는 그 오류에 도달하는 화면이
- * 아직 없어 비어 있다 — 프로필 편집·온보딩 폼(#232)에서 함께 채운다.
+ * 아직 없어 비어 있다 — 프로필 편집·온보딩 폼(#232 ②)에서 함께 채운다.
  */
 export default {
   member: {
-    settings: {
-      title: 'Settings',
+    profile: {
+      title: 'Profile',
       account: 'Account',
       preferences: 'Preferences',
+      /** 이름 아래 한 줄. `{country}`는 국적 코드를 현재 언어의 나라 이름으로 옮긴 값이다. */
+      from: 'From {country}',
+      tabs: {
+        saved: 'Saved',
+        appointments: 'Appointments',
+      },
+      kinds: {
+        events: 'Events',
+        places: 'Places',
+      },
+      saved: {
+        emptyEvents: 'Nothing saved yet. Tap the heart on an event to keep it here.',
+        emptyPlaces: 'Nothing saved yet. Tap the heart on a place to keep it here.',
+      },
+      appointments: {
+        emptyEvents: 'No event appointments yet.',
+        emptyPlaces: 'No place appointments yet.',
+      },
+      currency: {
+        label: 'Currency',
+        /** 온보딩을 마치기 전에는 통화가 비어 있을 수 있다. */
+        notSet: 'Not set',
+      },
       language: {
         label: 'Screen language',
         /** 아이콘만 있는 행이 아니라 값이 보이는 행이므로 동작을 이름에 담는다. */

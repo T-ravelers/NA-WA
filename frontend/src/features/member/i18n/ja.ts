@@ -6,10 +6,31 @@
  */
 export default {
   member: {
-    settings: {
-      title: '設定',
+    profile: {
+      title: 'プロフィール',
       account: 'アカウント',
       preferences: '環境設定',
+      from: '{country}出身',
+      tabs: {
+        saved: 'お気に入り',
+        appointments: '約束',
+      },
+      kinds: {
+        events: 'イベント',
+        places: 'スポット',
+      },
+      saved: {
+        emptyEvents: 'まだお気に入りがありません。イベントのハートを押すとここに残ります。',
+        emptyPlaces: 'まだお気に入りがありません。スポットのハートを押すとここに残ります。',
+      },
+      appointments: {
+        emptyEvents: 'イベントの約束はまだありません。',
+        emptyPlaces: 'スポットの約束はまだありません。',
+      },
+      currency: {
+        label: '通貨',
+        notSet: '未設定',
+      },
       language: {
         label: '表示言語',
         change: '表示言語を変更',
