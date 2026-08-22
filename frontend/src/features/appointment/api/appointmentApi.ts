@@ -1,19 +1,10 @@
 import { httpClient } from '@/shared/api/httpClient'
+import type { AppointmentStatus } from '@/shared/lib/appointmentStatus'
 
 export const APPOINTMENT_LIST_PATH = '/api/v1/appointments'
 
 export type AppointmentItemType = 'EVENT' | 'PLACE'
 export type AppointmentLanguage = 'en' | 'ja' | 'zh-TW' | 'vi'
-export type AppointmentStatus =
-  | 'PAYMENT_PENDING'
-  | 'RECRUITING'
-  /** 정원이 모두 참. 시간으로 도달하는 경로는 없다. */
-  | 'FULL'
-  | 'IN_PROGRESS'
-  /** 활동이 끝났지만 방장이 아직 출석을 확정하지 않음. 서버 조회 응답에만 있는 표시 전용 값. */
-  | 'AWAITING_ATTENDANCE'
-  | 'COMPLETED'
-  | 'CANCELLED'
 /** Jackson LocalDateTime may be serialized as an ISO string or numeric components. */
 export type AppointmentDateTimeValue = string | readonly number[] | null
 
