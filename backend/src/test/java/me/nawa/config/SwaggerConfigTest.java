@@ -518,8 +518,8 @@ class SwaggerConfigTest {
         @Bean
         NotificationService notificationService() {
             return new NotificationService() {
-                @Override public java.util.List<me.nawa.notification.dto.response.NotificationResponse>
-                    getNotifications(Long memberId, Integer limit) {
+                @Override public me.nawa.notification.dto.response.NotificationListResponse
+                    getNotifications(Long memberId, Integer limit, String cursor) {
                     throw new UnsupportedOperationException();
                 }
 
@@ -528,8 +528,21 @@ class SwaggerConfigTest {
                     throw new UnsupportedOperationException();
                 }
 
+                @Override public void markRead(Long memberId, Long notificationId) {
+                    throw new UnsupportedOperationException();
+                }
+
                 @Override public me.nawa.notification.dto.response.NotificationReadAllResponse
                     readAll(Long memberId) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override public void delete(Long memberId, Long notificationId) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override public me.nawa.notification.dto.response.NotificationDeleteAllResponse
+                    deleteAll(Long memberId) {
                     throw new UnsupportedOperationException();
                 }
             };
