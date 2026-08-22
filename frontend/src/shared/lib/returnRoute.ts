@@ -1,4 +1,4 @@
-import type { LocationQuery } from 'vue-router'
+import type { LocationQuery, Router } from 'vue-router'
 
 /**
  * "여기로 돌아와 달라"며 보낼 때 쓰는 query 규약. 여정 생성과 충전이 받는 쪽이다.
@@ -17,9 +17,18 @@ function firstValue(value: unknown): string | null {
   return typeof raw === 'string' && raw !== '' ? raw : null
 }
 
-/** 돌아갈 route 이름. 없으면 호출자가 없는 것으로 친다. */
-export function readReturnRouteName(query: LocationQuery): string | null {
-  return firstValue(query[RETURN_ROUTE_NAME_KEY])
+/**
+ * 돌아갈 route 이름. 없으면 호출자가 없는 것으로 친다.
+ *
+ * **라우트 표에 있는 이름인지도 확인한다.** 이 값은 주소창에 그대로 노출돼 누구나 바꿔
+ * 넣을 수 있는데, 없는 이름을 그대로 넘기면 매칭에 실패해 복귀도 뒤로 가기도 동작하지
+ * 않고 사용자가 그 화면에 갇힌다. 호출자가 없는 것으로 치면 각 화면의 폴백(여정 목록·
+ * 지갑)으로 빠져나간다.
+ */
+export function readReturnRouteName(query: LocationQuery, router: Router): string | null {
+  const name = firstValue(query[RETURN_ROUTE_NAME_KEY])
+  if (name === null) return null
+  return router.hasRoute(name) ? name : null
 }
 
 /** 돌아갈 화면의 path param. 형식이 어긋난 조각은 조용히 버린다. */

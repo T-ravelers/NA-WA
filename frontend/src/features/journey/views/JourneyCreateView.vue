@@ -32,7 +32,7 @@ const hasMessage = (key: string): boolean => i18n.te(key)
  * 돌아가고, 새로 만든 tripId만 더한다.
  */
 function returnRouteName(): string | null {
-  return readReturnRouteName(route.query)
+  return readReturnRouteName(route.query, router)
 }
 
 function returnParams(): Record<string, string> {
