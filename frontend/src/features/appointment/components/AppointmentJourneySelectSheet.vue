@@ -16,6 +16,8 @@ interface Props {
    * 대신하지 않고 목록 위에 붙는다 — 다른 여정을 바로 고를 수 있어야 한다.
    */
   selectionError?: string | null
+  /** 고를 여정이 없을 때의 안내. 생성 흐름은 기본 문구를 그대로 쓴다. */
+  emptyMessage?: string | null
 }
 
 defineProps<Props>()
@@ -91,7 +93,7 @@ const { t } = useI18n()
         class="flex flex-col items-center gap-4 py-10 text-center"
       >
         <p class="text-body-sm text-ink-3">
-          {{ t('appointment.journeySelect.empty') }}
+          {{ emptyMessage ?? t('appointment.journeySelect.empty') }}
         </p>
         <AppButton
           type="button"
@@ -150,6 +152,21 @@ const { t } = useI18n()
           </span>
         </button>
       </div>
+      <!--
+        목록이 비어 있지 않아도 만들러 갈 통로를 남긴다. 이 시트는 담을 수 없는 여정도
+        감추지 않고 보여 주므로, 셋 다 날짜가 안 맞는 경우 안내만 세 번 보고 끝나는
+        막다른 길이 생긴다.
+      -->
+      <AppButton
+        v-if="!loading && !errorMessage && journeys.length > 0"
+        block
+        variant="secondary"
+        type="button"
+        class="mt-4 shrink-0"
+        @click="emit('createJourney')"
+      >
+        {{ t('appointment.journeySelect.createJourney') }}
+      </AppButton>
     </section>
   </div>
 </template>

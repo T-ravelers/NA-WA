@@ -400,6 +400,79 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.get('[role="dialog"]').text()).toContain('Seoul Foodie Week')
   })
 
+  it('keeps a way to create a journey even when the list is not empty', async () => {
+    // 담을 수 없는 여정도 감추지 않고 보여 주므로, 전부 날짜가 안 맞으면 안내만
+    // 반복해서 보고 끝나는 막다른 길이 생긴다. 목록이 있어도 만들 통로를 남긴다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+
+    const sheet = wrapper.get('[role="dialog"]')
+    expect(sheet.text()).toContain('Seoul Foodie Week')
+    expect(
+      sheet.findAll('button').find((button) => button.text() === 'Create a journey'),
+    ).toBeDefined()
+  })
+
+  it('names joining, not creating, when there is no journey to use', async () => {
+    // 참여하려는 사람에게 "이 약속을 만들기 전에"는 어긋난다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    const { wrapper } = await mountView({ journeys: [] })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('before joining this appointment')
+  })
+
+  it('marks its own entry with the chosen journey before leaving for top-up', async () => {
+    // 뒤로가기는 떠날 때의 URL로 되돌린다. 자기 자리에 표시를 안 남기면 충전을
+    // 포기했을 뿐인데 고른 여정이 사라져 처음부터 다시 골라야 한다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    joinAppointment.mockRejectedValue(
+      new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
+    )
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul Foodie Week'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Pay'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Top up')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('wallet-top-up')
+
+    // 충전을 포기하고 뒤로. 떠날 때의 자리에 고른 여정이 남아 있어야 한다.
+    router.back()
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
+    expect(router.currentRoute.value.query.tripId).toBe('7')
+  })
+
   it('sends the host to journey creation when nothing can hold the appointment', async () => {
     // 담을 여정이 하나도 없으면 만들러 보낸다. 자리를 내주고(replace) 보내면 여정
     // 생성이 그 자리를 돌려주므로, 돌아온 뒤 상세가 히스토리에 두 번 쌓이지 않는다.
@@ -508,8 +581,9 @@ describe('AppointmentDetailView', () => {
         .find((button) => button.text().includes('Seoul Foodie Week'))
         ?.attributes('aria-pressed'),
     ).toBe('true')
-    // 심었으면 지시는 소비된다. 남겨 두면 이 화면을 열 때마다 시트를 열라는 뜻이 된다.
-    expect(router.currentRoute.value.query.tripId).toBeUndefined()
+    // 아직 소비하지 않는다 — 충전으로 떠날 때 남겨 둔 표시가 바로 사라지면 안 된다.
+    // 사용자가 고르거나 닫으면 그때 지운다.
+    expect(router.currentRoute.value.query.tripId).toBe('7')
   })
 
   it('does not reopen the sheet after the join succeeds', async () => {
@@ -520,14 +594,17 @@ describe('AppointmentDetailView', () => {
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
     const { wrapper, router } = await mountView({ path: '/appointments/7?tripId=7' })
 
-    expect(router.currentRoute.value.query.tripId).toBeUndefined()
-
-    // 골라진 여정을 눌러 보증금 확인으로 넘어간 뒤 참여한다.
+    // 골라진 여정을 눌러 보증금 확인으로 넘어간 뒤 참여한다. 고르는 순간 지시가
+    // 소비되므로, 참여가 끝난 뒤 상세만 먼저 갱신돼도 시트가 다시 열리지 않는다.
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Seoul Foodie Week'))
       ?.trigger('click')
     await flushPromises()
+
+    // 고르는 순간 지시가 소비된다.
+    expect(router.currentRoute.value.query.tripId).toBeUndefined()
+
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Pay'))

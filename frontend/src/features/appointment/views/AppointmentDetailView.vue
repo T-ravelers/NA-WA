@@ -380,11 +380,13 @@ function readPositiveInteger(value: unknown): number | undefined {
 // 여정을 만들거나 충전하고 돌아온 경우(?tripId=). 참여를 다시 누르게 하지 않고 시트를
 // 열어, 그 여정을 골라 둔 채로 보여 준다 — 맞는지 확인하고 넘어간다.
 //
-// 이 값은 **한 번만 소비한다.** 심고 나면 URL에서 지운다. 남겨 두면 "이 화면을 열 때마다
-// 시트를 열라"는 상시 지시가 되어, 참여가 끝난 뒤 목록이 갱신되기만 해도(다른 사람이
-// 참여, 포커스 복귀 refetch) 시트가 혼자 다시 뜬다. 특히 참여 직후에는 상세와 참여
-// 정보를 함께 무효화하는데 상세가 먼저 도착하면 "아직 참여 안 함"으로 보여 가드를
-// 통과해버린다 — 응답 순서에 기대지 않으려면 지시 자체를 없애는 편이 확실하다.
+// 이 값은 **사용자가 시트에서 행동하면 소비한다**(고르거나 닫으면 URL에서 지운다).
+// 남겨 두면 "이 화면을 열 때마다 시트를 열라"는 상시 지시가 되어, 참여가 끝난 뒤
+// 목록이 갱신되기만 해도 시트가 혼자 다시 뜬다 — 참여 직후에는 상세와 참여 정보를
+// 함께 무효화하는데 상세가 먼저 도착하면 "아직 참여 안 함"으로 보여 가드를 통과한다.
+//
+// 심는 즉시 지우지는 않는다. 충전으로 떠날 때 자기 자리에 tripId를 남겨 두는데(뒤로
+// 가기로 돌아와도 이어지도록), 적용과 동시에 지우면 그 표시가 바로 사라진다.
 const createdTripId = computed(() => readPositiveInteger(route.query.tripId))
 
 function consumeCreatedTripId(): void {
@@ -398,21 +400,15 @@ watch(
   ([tripId, current, journeys]) => {
     if (tripId === undefined || current === undefined) return
     // 이미 참여했거나 참여할 수 없는 약속이면 열지 않는다. 버튼과 같은 기준이다.
-    if (joinBlockedReason.value !== undefined) {
-      consumeCreatedTripId()
-      return
-    }
+    if (joinBlockedReason.value !== undefined) return
     // 보증금 확인까지 넘어간 뒤에는 시트를 다시 열지 않는다.
     if (depositSheetOpen.value) return
 
     journeySelectOpen.value = true
-    // 목록이 오기 전에는 고를 수 없다. 오고 나서 그 여정이 실제로 있을 때만 고르고,
-    // 그 시점에 지시를 소비한다. 목록을 기다리는 동안 지우면 고를 값이 사라진다.
-    if (journeys === undefined) return
-    if (journeys.some((journey) => journey.tripId === tripId)) {
+    // 목록이 오기 전에는 고를 수 없다. 오고 나서 그 여정이 실제로 있을 때만 고른다.
+    if (journeys?.some((journey) => journey.tripId === tripId) === true) {
       selectedTripId.value = tripId
     }
-    consumeCreatedTripId()
   },
   { immediate: true },
 )
@@ -430,6 +426,7 @@ function openJourneySelect(): void {
 
 function closeJourneySelect(): void {
   journeySelectOpen.value = false
+  consumeCreatedTripId()
 }
 
 function selectJourney(tripId: number): void {
@@ -445,6 +442,7 @@ function selectJourney(tripId: number): void {
   selectedTripId.value = tripId
   journeySelectOpen.value = false
   depositSheetOpen.value = true
+  consumeCreatedTripId()
 }
 
 // 이 약속을 담을 여정이 없다. 자리를 내주고(replace) 보내면 여정 생성이 그 자리를
@@ -498,18 +496,31 @@ function closeTopupPrompt(): void {
 function goToTopup(): void {
   topupPromptOpen.value = false
   const amount = appointment.value?.depositAmount
-  const returnPath =
-    selectedTripId.value === null
-      ? route.path
-      : `${route.path}?tripId=${String(selectedTripId.value)}`
+  const tripId = selectedTripId.value
+  const returnPath = tripId === null ? route.path : `${route.path}?tripId=${String(tripId)}`
 
-  void router.push({
-    name: 'wallet-top-up',
-    query: {
-      ...(amount === undefined ? {} : { amount: String(amount) }),
-      returnRoutePath: returnPath,
-    },
-  })
+  const openTopup = () =>
+    router.push({
+      name: 'wallet-top-up',
+      query: {
+        ...(amount === undefined ? {} : { amount: String(amount) }),
+        returnRoutePath: returnPath,
+      },
+    })
+
+  if (tripId === null) {
+    void openTopup()
+    return
+  }
+
+  // 돌아오는 길이 둘인데 도착지가 다르다. 충전을 마치면 충전 화면이 returnRoutePath로
+  // 보내 주지만, 뒤로가기는 브라우저가 **떠날 때의 URL 그대로** 되돌린다. 그 자리에
+  // 고른 여정이 없으면 충전을 포기했을 뿐인데 처음부터 다시 골라야 한다. 떠나기 전에
+  // 지금 자리에도 tripId를 남겨 어느 길로 돌아오든 이어지게 한다.
+  // 표시를 먼저 남기고 떠난다. 순서가 뒤집히면 replace가 충전 화면 위에서 일어난다.
+  void router
+    .replace({ path: route.path, query: { ...route.query, tripId: String(tripId) } })
+    .then(openTopup)
 }
 </script>
 
@@ -682,6 +693,7 @@ function goToTopup(): void {
         :loading="journeyListQuery.isPending.value"
         :error-message="journeyListErrorMessage"
         :selection-error="journeySelectionError"
+        :empty-message="t('appointment.journeySelect.emptyForJoin')"
         @close="closeJourneySelect"
         @select="selectJourney"
         @create-journey="goToCreateJourney"

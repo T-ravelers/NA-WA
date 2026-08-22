@@ -117,6 +117,7 @@ export default {
       loading: '正在載入您的旅程…',
       error: '無法載入您的旅程，請再試一次。',
       empty: '請先建立旅程，再建立這個揪團。',
+      emptyForJoin: '請先建立旅程，再參加這個揪團。',
       createJourney: '建立旅程',
       dateOutOfRange: '這個旅程不包含揪團的日期，請選擇其他旅程。',
     },
