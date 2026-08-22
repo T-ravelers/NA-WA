@@ -4,8 +4,15 @@
 -- Flyway 밖에서 손으로 적용한다. 두 번 돌려도 결과가 같다 — 앞서 넣은 시드를 먼저 지운다.
 --
 --   docker compose exec -T mysql \
---     mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" \
+--     sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" "$MYSQL_DATABASE"' \
 --     < backend/docs/database/seed/report-demo.sql
+--
+-- 세 변수는 컨테이너 안에서 전개한다. compose가 .env를 컨테이너에만 넣어 주므로 실행하는
+-- 사람의 셸에는 값이 없고, 이렇게 하면 비밀번호가 셸 히스토리에도 남지 않는다.
+-- 비밀번호는 -p가 아니라 MYSQL_PWD로 넘긴다. -p로 넘기면 mysql이 실행할 때마다 경고 한 줄을
+-- 내고, 컨테이너 안에서 ps로 값이 보인다.
+-- --default-character-set=utf8mb4는 뺄 수 없다. 클라이언트 기본값 auto는 LANG이 비면 latin1이라
+-- 아래 메모의 '—'가 'â€”'로 들어간다(2026-08-22 로컬 실측).
 --
 -- 넣는 것: 시연 계정(@host)과 같은 약속에 참가한 동료 3명과 네 사람의 여정 기간 QR 결제,
 -- 같은 국적으로 리포트를 이미 만든 회원 2명. 호스트의 결제는 trip_expense_links에 걸지
@@ -18,11 +25,20 @@
 -- ★ 시연 계정의 member_id로 바꾼다.
 SET @host := 1;
 
+-- 전부 DML이라 한 트랜잭션으로 묶는다. 중간에서 실패해도 아래 정리 구간만 커밋된
+-- "반쯤 지워진" 상태가 남지 않는다.
+START TRANSACTION;
+
 -- ----------------------------------------------------------------------------
 -- 1. 이전 시드 제거 (FK 역순)
 -- ----------------------------------------------------------------------------
-DELETE le
-FROM wallet_ledger_entries le
+-- 호스트가 UI로 리포트를 만들면 시드 원장이 trip_expense_links에 걸린다. 그 링크를 먼저
+-- 끊지 않으면 원장 삭제가 FK(ON DELETE 절이 없어 RESTRICT)에 막혀 errno 1451로 죽는다.
+-- 여정 제목이 아니라 원장 쪽에서 거는 이유는, 호스트가 시드 결제를 다른 여정의 리포트에
+-- 넣었을 때 제목으로는 안 걸리기 때문이다.
+DELETE tel
+FROM trip_expense_links tel
+JOIN wallet_ledger_entries le ON le.ledger_entry_id = tel.ledger_entry_id
 JOIN wallet_transfers t ON t.transfer_id = le.transfer_id
 WHERE t.idempotency_key LIKE 'seed:report-demo:%';
 
@@ -30,6 +46,11 @@ DELETE tel
 FROM trip_expense_links tel
 JOIN trips tr ON tr.trip_id = tel.trip_id
 WHERE tr.title LIKE 'Seed Report %';
+
+DELETE le
+FROM wallet_ledger_entries le
+JOIN wallet_transfers t ON t.transfer_id = le.transfer_id
+WHERE t.idempotency_key LIKE 'seed:report-demo:%';
 
 DELETE FROM reports
 WHERE trip_id IN (SELECT trip_id FROM trips WHERE title LIKE 'Seed Report %');
@@ -222,7 +243,10 @@ VALUES
     ('KRW', @sora, 'TXN-SEED-RPT-S3', 'QR_PAYMENT', 'COMPLETED', 90000.0000,
      'seed:report-demo:sora:beauty', 'BEAUTY', 'Seed Report — nails', TIMESTAMP(@end, '14:00:00'));
 
-INSERT INTO wallet_ledger_entries (transfer_id, wallet_id, entry_type, amount, balance_after)
+-- created_at을 기본값(NOW())에 맡기면 지갑 거래내역 화면이 이 결제들을 "오늘"로 보여준다
+-- (WalletLedgerMapper가 e.created_at으로 정렬하고 기간까지 거른다). 결제 시각을 그대로 쓴다.
+INSERT INTO wallet_ledger_entries
+    (transfer_id, wallet_id, entry_type, amount, balance_after, created_at)
 SELECT t.transfer_id,
        CASE t.initiator_member_id
            WHEN @host THEN @host_wallet
@@ -232,7 +256,8 @@ SELECT t.transfer_id,
        END,
        'DEBIT',
        t.amount,
-       1000000.0000
+       1000000.0000,
+       t.completed_at
 FROM wallet_transfers t
 WHERE t.idempotency_key LIKE 'seed:report-demo:%';
 
@@ -276,6 +301,8 @@ VALUES (@yuki_trip, 'COMPLETED', 'en', JSON_OBJECT(
             JSON_OBJECT('category', 'FOOD', 'amount', 224000.0000, 'percentage', 20.00)),
         'dailyTrend', JSON_ARRAY())
 ), NOW());
+
+COMMIT;
 
 -- ----------------------------------------------------------------------------
 -- 7. 확인 — 시연 전에 눈으로 본다
