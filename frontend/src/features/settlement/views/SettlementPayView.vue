@@ -159,7 +159,6 @@ watchEffect(() => {
       <AppButton
         data-action="confirm-pay"
         block
-        variant="settle"
         @click="confirm"
         >{{
           t('settlement.detail.pay', { amount: points(awaitingConfirmation.viewer.payableAmount) })

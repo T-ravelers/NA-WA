@@ -13,8 +13,12 @@ import { hasViewerPaid, primaryAmount, type SettlementSide } from '../model/sett
 /**
  * 목록 카드.
  *
- * 낼 쪽은 내가 낼 금액을, 받을 쪽은 받을 금액을 가장 크게 보여준다. 완료 구획은
- * 훑어보는 용도라 한 줄로 접는다.
+ * 시안은 왼쪽에 무엇에 대한 정산인지를, 오른쪽에 금액과 상태를 모아 둔다. 목록을
+ * 훑을 때 눈이 오른쪽 한 줄만 따라가면 되도록 두 열을 나눈다.
+ *
+ * 시안의 아바타 원과 `Alex · Group division` 부제는 넣지 않았다. 목록 응답
+ * (`SettlementSummary`)에 상대 이름도 이니셜도 없어서, 넣으려면 서버가 필드를 더
+ * 내려줘야 한다.
  */
 interface Props {
   settlement: SettlementSummary
@@ -70,31 +74,29 @@ const showsPaidMark = computed(
     </template>
 
     <template v-else>
-      <span class="flex items-start justify-between gap-3">
-        <strong class="min-w-0 truncate text-title">{{ settlement.title }}</strong>
-        <AppBadge
-          :tone="showsPaidMark ? 'completed' : 'pending'"
-          :data-testid="showsPaidMark ? 'settlement-paid-mark' : undefined"
-        >
-          {{
-            showsPaidMark ? t('settlement.list.paid') : t(`settlement.status.${settlement.status}`)
-          }}
-        </AppBadge>
-      </span>
-      <span class="mt-4 flex items-end justify-between gap-3">
+      <span class="flex items-center justify-between gap-3">
         <span class="min-w-0">
-          <span class="block text-caption text-ink-3">
+          <strong class="block truncate text-title">{{ settlement.title }}</strong>
+          <span class="mt-1 block truncate text-caption text-ink-3">
             {{
               side === 'received' ? t('settlement.list.youPay') : t('settlement.list.youCollect')
             }}
+            · {{ t(`settlement.type.${settlement.type}`) }} · {{ t('settlement.total') }}
+            {{ points(settlement.totalAmount) }}
           </span>
-          <strong class="mt-1 block truncate text-data-lg">{{ amount }}</strong>
         </span>
-        <span class="shrink-0 text-right text-caption text-ink-3">
-          <span class="block">{{ t(`settlement.type.${settlement.type}`) }}</span>
-          <span class="mt-1 block">
-            {{ t('settlement.total') }} {{ points(settlement.totalAmount) }}
-          </span>
+        <span class="flex shrink-0 flex-col items-end gap-1.5">
+          <strong class="text-title">{{ amount }}</strong>
+          <AppBadge
+            :tone="showsPaidMark ? 'completed' : 'info'"
+            :data-testid="showsPaidMark ? 'settlement-paid-mark' : undefined"
+          >
+            {{
+              showsPaidMark
+                ? t('settlement.list.paid')
+                : t(`settlement.status.${settlement.status}`)
+            }}
+          </AppBadge>
         </span>
       </span>
     </template>
