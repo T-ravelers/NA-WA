@@ -13,13 +13,6 @@ import {
 } from '@tabler/icons-vue'
 
 import { formatCalendarDateString } from '@/shared/lib/datetime'
-import {
-  buildGoogleMapsSearchUrl,
-  buildGoogleMapsTransitRouteUrl,
-  buildNaverMapPlaceUrl,
-  buildNaverMapTransitRouteUrl,
-  openMapAppUrl,
-} from '@/shared/lib/mapLink'
 import { vFitTextGroup } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
@@ -34,6 +27,7 @@ import type { Category } from '@/shared/ui/category'
 import { useEventDetailQuery } from '../composables/useEventDetailQuery'
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
 import JourneySelectSheet from '../components/JourneySelectSheet.vue'
+import MapLinkButtons from '../components/MapLinkButtons.vue'
 import {
   resolveHomepageUrl,
   resolveReservationUrl,
@@ -135,23 +129,6 @@ const journeyDateRange = computed(() => {
   return journey === null ? null : intersectItemJourneyPeriod(itemPeriod.value, journey)
 })
 
-const mapSearchUrl = computed(() =>
-  buildGoogleMapsSearchUrl(event.value?.latitude, event.value?.longitude),
-)
-const mapTransitRouteUrl = computed(() =>
-  buildGoogleMapsTransitRouteUrl(event.value?.latitude, event.value?.longitude),
-)
-const naverPlaceUrl = computed(() =>
-  buildNaverMapPlaceUrl(event.value?.latitude, event.value?.longitude, event.value?.title ?? ''),
-)
-const naverRouteUrl = computed(() =>
-  buildNaverMapTransitRouteUrl(
-    event.value?.latitude,
-    event.value?.longitude,
-    event.value?.title ?? '',
-  ),
-)
-
 const hours = computed(() => (event.value ? toDetailEntries(event.value.operatingHours) : []))
 const openDays = computed(() => (event.value ? toStringList(event.value.openDays).join(', ') : ''))
 
@@ -247,10 +224,6 @@ async function shareEvent(): Promise<void> {
 
 function openReservation(): void {
   if (reservationUrl.value) window.open(reservationUrl.value, '_blank', 'noopener,noreferrer')
-}
-
-function openMapUrl(url: string | null): void {
-  if (url) window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function openAppointmentList(): void {
@@ -639,52 +612,11 @@ function retry(): void {
               aria-hidden="true"
             />
           </div>
-          <div
-            v-if="mapSearchUrl"
-            v-fit-text-group
-            class="grid min-w-0 grid-cols-2 gap-2"
-          >
-            <div class="min-w-0">
-              <AppButton
-                block
-                compact
-                variant="secondary"
-                @click="openMapUrl(mapSearchUrl)"
-              >
-                {{ t('explore.detail.openInGoogleMaps') }}
-              </AppButton>
-            </div>
-            <div class="min-w-0">
-              <AppButton
-                block
-                compact
-                variant="secondary"
-                @click="openMapUrl(mapTransitRouteUrl)"
-              >
-                {{ t('explore.detail.directions') }}
-              </AppButton>
-            </div>
-            <div class="min-w-0">
-              <AppButton
-                block
-                compact
-                variant="secondary"
-                @click="openMapAppUrl(naverPlaceUrl)"
-              >
-                {{ t('explore.detail.openInNaverMap') }}
-              </AppButton>
-            </div>
-            <div class="min-w-0">
-              <AppButton
-                block
-                compact
-                variant="secondary"
-                @click="openMapAppUrl(naverRouteUrl)"
-              >
-                {{ t('explore.detail.naverDirections') }}
-              </AppButton>
-            </div>
-          </div>
+          <MapLinkButtons
+            :latitude="event.latitude"
+            :longitude="event.longitude"
+            :name="event.title"
+          />
         </section>
 
         <a

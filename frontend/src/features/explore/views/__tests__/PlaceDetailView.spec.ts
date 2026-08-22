@@ -51,16 +51,8 @@ vi.mock('../../api/exploreApi', () => ({
     fetchPlaceDetail(placeId, language),
 }))
 
-const openMapAppUrl = vi.fn()
-
-// 앱 스킴 진입은 현재 문서를 이동시킨다. jsdom의 window.location을 직접 건드리면
-// navigation 경고가 다른 테스트로 새므로 이 함수만 부분 모킹한다.
-vi.mock('@/shared/lib/mapLink', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/shared/lib/mapLink')>()),
-  openMapAppUrl: (url: string | null) => openMapAppUrl(url),
-}))
-
 const PlaceDetailView = (await import('../PlaceDetailView.vue')).default
+const MapLinkButtons = (await import('../../components/MapLinkButtons.vue')).default
 
 const place = {
   placeId: 42,
@@ -151,7 +143,6 @@ describe('PlaceDetailView', () => {
       { tripId: 7, title: 'Seoul weekend', startDate: '2026-08-10', endDate: '2026-08-12' },
     ])
     addJourneyItem.mockResolvedValue({})
-    openMapAppUrl.mockReset()
     sessionStorage.clear()
   })
 
@@ -182,51 +173,17 @@ describe('PlaceDetailView', () => {
     ).toBeUndefined()
   })
 
-  it('opens Google Maps for the Place coordinates', async () => {
-    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+  // 버튼 네 개의 URL 단언은 `MapLinkButtons.spec.ts`가 소유한다. 여기서는 상세 화면이
+  // **어떤 값을 넘기는가**만 본다 — Event는 `title`, Place는 `name`으로 필드가 갈려서
+  // 잘못 넘겨도 URL 단언에는 걸리지 않는다.
+  it('passes the Place coordinates and name to the map buttons', async () => {
     const { wrapper } = await mountView()
 
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Google Maps')
-      ?.trigger('click')
-    expect(openSpy).toHaveBeenCalledWith(
-      'https://www.google.com/maps/search/?api=1&query=37.54%2C127.05',
-      '_blank',
-      'noopener,noreferrer',
-    )
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Google transit')
-      ?.trigger('click')
-    expect(openSpy).toHaveBeenCalledWith(
-      'https://www.google.com/maps/dir/?api=1&destination=37.54%2C127.05&travelmode=transit',
-      '_blank',
-      'noopener,noreferrer',
-    )
-
-    openSpy.mockRestore()
-  })
-
-  it('opens the Naver Map app scheme for the Place coordinates', async () => {
-    const { wrapper } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Naver Map')
-      ?.trigger('click')
-    expect(openMapAppUrl).toHaveBeenCalledWith(
-      'nmap://place?lat=37.54&lng=127.05&name=Seongsu%20Onsil&appname=NA-WA',
-    )
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Naver transit')
-      ?.trigger('click')
-    expect(openMapAppUrl).toHaveBeenCalledWith(
-      'nmap://route/public?dlat=37.54&dlng=127.05&dname=Seongsu%20Onsil&appname=NA-WA',
-    )
+    expect(wrapper.findComponent(MapLinkButtons).props()).toMatchObject({
+      latitude: 37.54,
+      longitude: 127.05,
+      name: 'Seongsu Onsil',
+    })
   })
 
   it('hides map buttons when the Place has no coordinates', async () => {
