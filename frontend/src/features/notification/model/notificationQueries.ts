@@ -1,5 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { computed, watch, type Ref } from 'vue'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+} from '@tanstack/vue-query'
+import { computed, watch } from 'vue'
 
 import {
   deleteAllNotifications,
@@ -28,10 +35,42 @@ export const UNREAD_COUNT_POLL_INTERVAL_MS = 15_000
 
 export const notificationKeys = {
   all: ['notifications'] as const,
-  /** 쪽 전체를 한 번에 지목할 때 쓴다. 개별 쪽 키는 이 뒤에 커서가 붙는다. */
-  lists: () => [...notificationKeys.all, 'list'] as const,
-  page: (cursor: string | undefined) => [...notificationKeys.lists(), cursor ?? 'first'] as const,
+  /** 받아 온 쪽 전부가 이 키 하나에 함께 들어 있다. */
+  list: () => [...notificationKeys.all, 'list'] as const,
   unreadCount: () => [...notificationKeys.all, 'unread-count'] as const,
+}
+
+/** 캐시에 들어 있는 알림 목록. 쪽이 여러 개여도 항목 하나다. */
+type CachedPages = InfiniteData<NotificationPageDto, string | undefined>
+
+/**
+ * 캐시에 쌓인 모든 쪽의 알림을 한 번에 고쳐 쓰고, 되돌릴 수 있게 원본을 돌려준다.
+ *
+ * 화면이 목록을 따로 베껴 두지 않고 이 캐시만 보기 때문에, 여기만 고치면 눈앞의 목록도
+ * 같이 바뀐다. 실패했을 때 돌려놓을 곳도 한 군데뿐이다.
+ */
+function patchCachedPages(
+  queryClient: QueryClient,
+  patch: (
+    notifications: NotificationPageDto['notifications'],
+  ) => NotificationPageDto['notifications'],
+): CachedPages | undefined {
+  const snapshot = queryClient.getQueryData<CachedPages>(notificationKeys.list())
+  if (snapshot === undefined) return undefined
+
+  queryClient.setQueryData<CachedPages>(notificationKeys.list(), {
+    ...snapshot,
+    pages: snapshot.pages.map((page) => ({
+      ...page,
+      notifications: patch(page.notifications),
+    })),
+  })
+
+  return snapshot
+}
+
+function restoreCachedPages(queryClient: QueryClient, snapshot: CachedPages | undefined): void {
+  if (snapshot !== undefined) queryClient.setQueryData(notificationKeys.list(), snapshot)
 }
 
 /**
@@ -68,34 +107,40 @@ export function useUnreadNotificationCount() {
 }
 
 /**
- * 알림 한 쪽. 화면에 들어갈 때, 그리고 "더 보기"를 누를 때 부른다.
+ * 알림 목록. 화면에 들어갈 때 첫 쪽을 받고, "더 보기"로 그 뒤를 이어 받는다.
  *
- * 쪽마다 캐시 키가 달라야 이미 본 쪽을 다시 받아 오지 않는다. 받은 쪽을 화면 쪽에서
- * 이어 붙이는 것은 지갑 거래 내역이 쓰는 방식과 같다 — 이 저장소에는 `useInfiniteQuery`
- * 선례가 없어 같은 모양을 따른다.
+ * 받아 온 쪽을 화면이 따로 베껴 두지 않고 **캐시 한 항목에 모아 둔다.** 화면 쪽에 목록을
+ * 하나 더 들고 있으면, 지우기가 실패해 캐시를 되돌려도 그 사본은 그대로 남아 눈앞의 목록과
+ * 실제가 어긋난다. 사본을 없애면 되돌리기가 곧 화면 복구가 된다.
  */
-export function useNotifications(cursor: Ref<string | undefined>) {
-  const query = useQuery({
-    queryKey: computed(() => notificationKeys.page(cursor.value)),
-    queryFn: () => fetchNotifications(undefined, cursor.value),
+export function useNotifications() {
+  const query = useInfiniteQuery({
+    queryKey: notificationKeys.list(),
+    queryFn: ({ pageParam }) => fetchNotifications(undefined, pageParam),
+    initialPageParam: undefined as string | undefined,
+    // null과 빈 문자열은 둘 다 "더 없다"는 뜻이다. undefined를 주면 hasNextPage가 false가 된다.
+    getNextPageParam: (lastPage) =>
+      lastPage.nextCursor === null ||
+      lastPage.nextCursor === undefined ||
+      lastPage.nextCursor === ''
+        ? undefined
+        : lastPage.nextCursor,
   })
 
   const notifications = computed<AppNotification[]>(() =>
-    (query.data.value?.notifications ?? []).map(toAppNotification),
+    (query.data.value?.pages ?? []).flatMap((page) => page.notifications.map(toAppNotification)),
   )
 
-  const nextCursor = computed<string | null>(() => query.data.value?.nextCursor ?? null)
-
-  return { ...query, notifications, nextCursor }
+  return { ...query, notifications }
 }
 
 /**
- * 캐시에 쌓인 알림 쪽을 전부 버린다.
+ * 캐시에 쌓인 알림을 전부 버리고 첫 쪽부터 다시 받는다.
  *
- * 읽음·지우기가 성공하면 화면은 이미 낙관적으로 고쳐져 있지만, 캐시에 남은 쪽들은 서버가
- * 바뀌기 전 모습이다. 다음에 목록을 열 때 지운 알림이 되살아나 보이지 않도록 함께 버린다.
+ * 일괄 동작이 끝난 뒤에 쓴다. 사용자가 스스로 누른 것이라 목록이 새로 그려져도 놀랄 일이
+ * 없고, 서버가 실제로 무엇을 바꿨는지 그대로 받아 오는 편이 맞다.
  */
-function invalidateAll(queryClient: ReturnType<typeof useQueryClient>): void {
+function invalidateAll(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: notificationKeys.all })
 }
 
@@ -113,42 +158,46 @@ export function useReadNotification() {
   return useMutation({
     mutationFn: (notificationId: string) => markNotificationRead(notificationId),
     onMutate: async (notificationId: string) => {
-      await queryClient.cancelQueries({ queryKey: notificationKeys.all })
-      const snapshot = queryClient.getQueriesData<NotificationPageDto>({
-        queryKey: notificationKeys.lists(),
-      })
+      await queryClient.cancelQueries({ queryKey: notificationKeys.list() })
+      const readAt = new Date().toISOString()
 
-      for (const [key, page] of snapshot) {
-        if (page === undefined) continue
-        queryClient.setQueryData<NotificationPageDto>(key, {
-          ...page,
-          notifications: page.notifications.map((notification) =>
+      return {
+        snapshot: patchCachedPages(queryClient, (notifications) =>
+          notifications.map((notification) =>
             String(notification.id) === notificationId && !notification.readAt
-              ? { ...notification, readAt: new Date().toISOString() }
+              ? { ...notification, readAt }
               : notification,
           ),
-        })
-      }
-
-      return { snapshot }
-    },
-    onError: (_error, _notificationId, context) => {
-      for (const [key, page] of context?.snapshot ?? []) {
-        queryClient.setQueryData(key, page)
+        ),
       }
     },
+    onError: (_error, _notificationId, context) =>
+      restoreCachedPages(queryClient, context?.snapshot),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() })
     },
   })
 }
 
-/** 목록 화면의 "모두 읽음". 목록과 벨 개수를 함께 다시 받는다. */
+/** 목록 화면의 "모두 읽음". 점을 먼저 지우고, 실패하면 되돌린다. */
 export function useReadAllNotifications() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: readAllNotifications,
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: notificationKeys.list() })
+      const readAt = new Date().toISOString()
+
+      return {
+        snapshot: patchCachedPages(queryClient, (notifications) =>
+          notifications.map((notification) =>
+            notification.readAt ? notification : { ...notification, readAt },
+          ),
+        ),
+      }
+    },
+    onError: (_error, _variables, context) => restoreCachedPages(queryClient, context?.snapshot),
     onSuccess: () => invalidateAll(queryClient),
   })
 }
@@ -167,40 +216,34 @@ export function useDeleteNotification() {
   return useMutation({
     mutationFn: (notificationId: string) => deleteNotification(notificationId),
     onMutate: async (notificationId: string) => {
-      await queryClient.cancelQueries({ queryKey: notificationKeys.all })
-      const snapshot = queryClient.getQueriesData<NotificationPageDto>({
-        queryKey: notificationKeys.lists(),
-      })
+      await queryClient.cancelQueries({ queryKey: notificationKeys.list() })
 
-      for (const [key, page] of snapshot) {
-        if (page === undefined) continue
-        queryClient.setQueryData<NotificationPageDto>(key, {
-          ...page,
-          notifications: page.notifications.filter(
-            (notification) => String(notification.id) !== notificationId,
-          ),
-        })
-      }
-
-      return { snapshot }
-    },
-    onError: (_error, _notificationId, context) => {
-      for (const [key, page] of context?.snapshot ?? []) {
-        queryClient.setQueryData(key, page)
+      return {
+        snapshot: patchCachedPages(queryClient, (notifications) =>
+          notifications.filter((notification) => String(notification.id) !== notificationId),
+        ),
       }
     },
+    onError: (_error, _notificationId, context) =>
+      restoreCachedPages(queryClient, context?.snapshot),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() })
     },
   })
 }
 
-/** 목록 화면의 "모두 지우기". */
+/** 목록 화면의 "모두 지우기". 목록을 먼저 비우고, 실패하면 되돌린다. */
 export function useDeleteAllNotifications() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: deleteAllNotifications,
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: notificationKeys.list() })
+
+      return { snapshot: patchCachedPages(queryClient, () => []) }
+    },
+    onError: (_error, _variables, context) => restoreCachedPages(queryClient, context?.snapshot),
     onSuccess: () => invalidateAll(queryClient),
   })
 }
