@@ -9,17 +9,26 @@ import { notificationSettlementIntegrationKey } from '../settlementIntegration'
 
 const fetchUnreadNotificationCount = vi.fn()
 const readAllNotifications = vi.fn()
+const markNotificationRead = vi.fn()
+const deleteNotification = vi.fn()
+const deleteAllNotifications = vi.fn()
 
 vi.mock('../../api/notificationApi', () => ({
   fetchUnreadNotificationCount: () => fetchUnreadNotificationCount(),
   fetchNotifications: vi.fn(),
   readAllNotifications: () => readAllNotifications(),
+  markNotificationRead: (id: string) => markNotificationRead(id),
+  deleteNotification: (id: string) => deleteNotification(id),
+  deleteAllNotifications: () => deleteAllNotifications(),
 }))
 
 const {
   UNREAD_COUNT_POLL_INTERVAL_MS,
   notificationKeys,
+  useDeleteAllNotifications,
+  useDeleteNotification,
   useReadAllNotifications,
+  useReadNotification,
   useUnreadNotificationCount,
 } = await import('../notificationQueries')
 
@@ -48,8 +57,47 @@ beforeEach(() => {
   fetchUnreadNotificationCount.mockReset()
   readAllNotifications.mockReset()
   readAllNotifications.mockResolvedValue({ updatedCount: 2 })
+  markNotificationRead.mockReset()
+  markNotificationRead.mockResolvedValue(undefined)
+  deleteNotification.mockReset()
+  deleteNotification.mockResolvedValue(undefined)
+  deleteAllNotifications.mockReset()
+  deleteAllNotifications.mockResolvedValue({ deletedCount: 2 })
   invalidateSettlements.mockReset()
 })
+
+/** 캐시에 들어 있는 알림 한 쪽. 서버 DTO 모양 그대로다. */
+function page(...ids: string[]) {
+  return {
+    notifications: ids.map((id) => ({
+      id,
+      type: 'SETTLEMENT_REQUESTED',
+      settlementId: '1',
+      actorName: 'Ari',
+      gatheringName: 'Dinner',
+      amount: 30,
+      currencyCode: 'KRW',
+      readAt: null,
+      createdAt: '2026-08-21T12:00:00',
+    })),
+    nextCursor: null,
+  }
+}
+
+/** 뮤테이션 하나를 부르고 정리까지 기다린다. */
+async function run(mutate: () => void) {
+  const wrapper = mount(
+    {
+      setup: () => {
+        mutate()
+        return () => ''
+      },
+    },
+    { global: { plugins: [[VueQueryPlugin, { queryClient }]] } },
+  )
+  await flushPromises()
+  wrapper.unmount()
+}
 
 afterEach(() => {
   vi.useRealTimers()
@@ -104,30 +152,91 @@ describe('useUnreadNotificationCount', () => {
   })
 })
 
-describe('useReadAllNotifications', () => {
+describe('useReadNotification', () => {
   /*
-   * 목록까지 무효화하면 방금 그린 화면을 곧바로 다시 받아 오는데, 그 응답은 전부 읽음
-   * 상태라 안 읽음 표시가 눈앞에서 지워진다. 사용자가 목록을 여는 이유가 바로 무엇이
-   * 새로 왔는지 보는 것이라, 요청 한 번을 더 쓰면서 화면은 더 나빠진다.
+   * 서버 응답을 기다렸다 점을 지우면 이미 정산 상세로 넘어간 뒤라 사용자는 아무 반응도
+   * 보지 못한다. 눌렀는데 아무 일도 없어 보이는 것이 이번에 고치는 문제의 출발점이다.
    */
-  it('벨 개수만 다시 받고 보고 있는 목록은 건드리지 않는다', async () => {
-    queryClient.setQueryData(notificationKeys.list(), [])
+  it('응답을 기다리지 않고 그 알림만 읽음으로 바꾼다', async () => {
+    queryClient.setQueryData(notificationKeys.page(undefined), page('1', '2'))
+
+    await run(() => useReadNotification().mutate('1'))
+
+    const cached = queryClient.getQueryData<ReturnType<typeof page>>(
+      notificationKeys.page(undefined),
+    )
+    expect(cached?.notifications[0]?.readAt).not.toBeNull()
+    // 누르지 않은 알림은 그대로 안 읽음이다.
+    expect(cached?.notifications[1]?.readAt).toBeNull()
+  })
+
+  it('안 읽은 알림이 하나 줄었으므로 벨 개수를 다시 받는다', async () => {
     queryClient.setQueryData(notificationKeys.unreadCount(), 2)
 
-    // defineComponent를 쓰지 않는 것은 한 파일에 컴포넌트를 둘 두지 않기 위해서다.
-    const wrapper = mount(
-      {
-        setup() {
-          useReadAllNotifications().mutate()
-          return () => ''
-        },
-      },
-      { global: { plugins: [[VueQueryPlugin, { queryClient }]] } },
-    )
-    await flushPromises()
+    await run(() => useReadNotification().mutate('1'))
 
-    expect(queryClient.getQueryState(notificationKeys.list())?.isInvalidated).toBe(false)
     expect(queryClient.getQueryState(notificationKeys.unreadCount())?.isInvalidated).toBe(true)
-    wrapper.unmount()
+  })
+})
+
+describe('useDeleteNotification', () => {
+  it('응답을 기다리지 않고 그 카드를 목록에서 뺀다', async () => {
+    queryClient.setQueryData(notificationKeys.page(undefined), page('1', '2'))
+
+    await run(() => useDeleteNotification().mutate('1'))
+
+    const cached = queryClient.getQueryData<ReturnType<typeof page>>(
+      notificationKeys.page(undefined),
+    )
+    expect(cached?.notifications.map((notification) => notification.id)).toEqual(['2'])
+  })
+
+  /* 낙관적으로 지웠는데 서버가 거절하면, 사용자는 사라진 알림을 되찾을 방법이 없다. */
+  it('실패하면 지웠던 카드를 되돌린다', async () => {
+    queryClient.setQueryData(notificationKeys.page(undefined), page('1', '2'))
+    deleteNotification.mockRejectedValueOnce(new Error('boom'))
+
+    await run(() => useDeleteNotification().mutate('1'))
+
+    const cached = queryClient.getQueryData<ReturnType<typeof page>>(
+      notificationKeys.page(undefined),
+    )
+    expect(cached?.notifications.map((notification) => notification.id)).toEqual(['1', '2'])
+  })
+
+  /* 안 읽은 알림을 지우면 그만큼 벨 숫자도 줄어야 한다. */
+  it('벨 개수를 다시 받는다', async () => {
+    queryClient.setQueryData(notificationKeys.unreadCount(), 2)
+
+    await run(() => useDeleteNotification().mutate('1'))
+
+    expect(queryClient.getQueryState(notificationKeys.unreadCount())?.isInvalidated).toBe(true)
+  })
+})
+
+/*
+ * 일괄 동작은 사용자가 스스로 누른 것이라, 목록이 눈앞에서 바뀌어도 놀랄 일이 없다.
+ * 그래서 개별 읽음과 달리 캐시에 쌓인 쪽을 통째로 버리고 새로 받는다 — 남겨 두면 다음에
+ * 목록을 열 때 지운 알림이 되살아나 보인다.
+ */
+describe('useReadAllNotifications · useDeleteAllNotifications', () => {
+  it('모두 읽음은 목록과 벨 개수를 함께 다시 받는다', async () => {
+    queryClient.setQueryData(notificationKeys.page(undefined), page('1'))
+    queryClient.setQueryData(notificationKeys.unreadCount(), 2)
+
+    await run(() => useReadAllNotifications().mutate())
+
+    expect(queryClient.getQueryState(notificationKeys.page(undefined))?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(notificationKeys.unreadCount())?.isInvalidated).toBe(true)
+  })
+
+  it('모두 지우기도 목록과 벨 개수를 함께 다시 받는다', async () => {
+    queryClient.setQueryData(notificationKeys.page(undefined), page('1'))
+    queryClient.setQueryData(notificationKeys.unreadCount(), 2)
+
+    await run(() => useDeleteAllNotifications().mutate())
+
+    expect(queryClient.getQueryState(notificationKeys.page(undefined))?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(notificationKeys.unreadCount())?.isInvalidated).toBe(true)
   })
 })

@@ -26,12 +26,20 @@ const notificationSchema = z
   .passthrough()
 
 /**
- * 알림 목록 응답.
+ * 알림 한 쪽.
  *
  * 이 응답을 런타임에서 확인하는 이유는, 모양이 어긋나도 오류 없이 빈 목록처럼 보이기
  * 때문이다. 사용자는 알림이 없는 것인지 화면이 못 읽은 것인지 구분할 수 없다.
+ *
+ * `nextCursor`는 없을 수도, `null`일 수도 있다. 둘 다 "더 볼 것이 없다"는 같은 뜻이라
+ * 굳이 갈라 받지 않는다.
  */
-export const notificationListResponseSchema = z.array(notificationSchema)
+export const notificationListResponseSchema = z
+  .object({
+    notifications: z.array(notificationSchema),
+    nextCursor: z.string().nullish(),
+  })
+  .passthrough()
 
 /** 벨 배지가 이 숫자 하나만 본다. 모양이 어긋나면 배지가 조용히 사라진다. */
 export const unreadNotificationCountResponseSchema = z

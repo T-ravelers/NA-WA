@@ -8,10 +8,16 @@ import { queryClient } from '@/app/query/client'
 
 const fetchNotifications = vi.fn()
 const readAllNotifications = vi.fn()
+const markNotificationRead = vi.fn()
+const deleteNotification = vi.fn()
+const deleteAllNotifications = vi.fn()
 
 vi.mock('../../api/notificationApi', () => ({
-  fetchNotifications: () => fetchNotifications(),
+  fetchNotifications: (limit?: number, cursor?: string) => fetchNotifications(limit, cursor),
   readAllNotifications: () => readAllNotifications(),
+  markNotificationRead: (id: string) => markNotificationRead(id),
+  deleteNotification: (id: string) => deleteNotification(id),
+  deleteAllNotifications: () => deleteAllNotifications(),
   fetchUnreadNotificationCount: vi.fn(),
 }))
 
@@ -29,11 +35,17 @@ const REQUESTED = {
   createdAt: '2026-08-21T12:00:00',
 }
 
+/** 서버가 내리는 한 쪽. 더 볼 것이 없으면 nextCursor가 비어 있다. */
+function page(notifications: unknown[], nextCursor: string | null = null) {
+  return { notifications, nextCursor }
+}
+
 function createTestRouter(): Router {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/notifications', name: 'notifications', component: { template: '<div />' } },
+      { path: '/settlements', name: 'settlements', component: { template: '<div />' } },
       {
         path: '/settlements/:settlementId',
         name: 'settlement-detail',
@@ -59,6 +71,12 @@ beforeEach(() => {
   fetchNotifications.mockReset()
   readAllNotifications.mockReset()
   readAllNotifications.mockResolvedValue({ updatedCount: 1 })
+  markNotificationRead.mockReset()
+  markNotificationRead.mockResolvedValue(undefined)
+  deleteNotification.mockReset()
+  deleteNotification.mockResolvedValue(undefined)
+  deleteAllNotifications.mockReset()
+  deleteAllNotifications.mockResolvedValue({ deletedCount: 1 })
 })
 
 describe('NotificationListView', () => {
@@ -67,7 +85,7 @@ describe('NotificationListView', () => {
    * 알림마다 똑같은 한 마디만 듣게 된다. 안의 글이 그대로 이름이 되어야 한다.
    */
   it('알림 문장이 버튼의 이름을 덮어쓰이지 않고 그대로 읽힌다', async () => {
-    fetchNotifications.mockResolvedValue([REQUESTED])
+    fetchNotifications.mockResolvedValue(page([REQUESTED]))
 
     const wrapper = await mountView()
     const button = wrapper.get('li button')
@@ -80,7 +98,7 @@ describe('NotificationListView', () => {
    * 안 읽음을 점 하나로만 말하면 화면을 못 보는 사람에게는 아무 말도 하지 않은 것과 같다.
    */
   it('안 읽은 알림은 눈에 보이지 않는 말로도 안 읽음을 알린다', async () => {
-    fetchNotifications.mockResolvedValue([REQUESTED])
+    fetchNotifications.mockResolvedValue(page([REQUESTED]))
 
     const wrapper = await mountView()
 
@@ -88,28 +106,25 @@ describe('NotificationListView', () => {
   })
 
   /*
-   * 들어오자마자 전부 읽음으로 바꾸기 때문에, 서버 응답을 그대로 따라가면 점이 찍히자마자
-   * 지워진다. 사용자가 목록을 여는 이유가 바로 무엇이 새로 왔는지 보는 것이다.
+   * 화면에 들어온 것만으로는 읽음이 아니다.
    *
-   * 그래서 목록을 다시 받아 와 전부 읽음으로 바뀌더라도 이번 방문의 표시는 유지되어야
-   * 한다. 두 번째 응답을 읽음 상태로 두어 그 상황을 그대로 만든다.
+   * 예전에는 진입할 때 전부 읽음 처리를 해 버려서, 무엇이 새로 왔는지를 지키려고 첫 응답의
+   * 안 읽음 상태를 따로 붙들어 둬야 했다. 진입 자체를 읽음으로 치지 않으면 그 우회가
+   * 필요 없고, 벨 숫자도 실제로 본 만큼만 줄어든다.
    */
-  it('읽음 처리 뒤 목록을 다시 받아도 이번 방문에서는 안 읽음 표시가 남는다', async () => {
-    fetchNotifications.mockResolvedValueOnce([REQUESTED])
-    fetchNotifications.mockResolvedValue([{ ...REQUESTED, readAt: '2026-08-21T12:05:00' }])
+  it('들어가는 것만으로는 읽음 처리를 부르지 않는다', async () => {
+    fetchNotifications.mockResolvedValue(page([REQUESTED]))
 
-    const wrapper = await mountView()
-    await queryClient.refetchQueries({ queryKey: ['notifications', 'list'] })
-    await flushPromises()
+    await mountView()
 
-    expect(wrapper.find('li button .sr-only').exists()).toBe(true)
+    expect(readAllNotifications).not.toHaveBeenCalled()
+    expect(markNotificationRead).not.toHaveBeenCalled()
   })
 
   it('알림 종류에 맞는 문장으로 그린다', async () => {
-    fetchNotifications.mockResolvedValue([
-      REQUESTED,
-      { ...REQUESTED, id: 2, type: 'SETTLEMENT_COMPLETED', amount: '100' },
-    ])
+    fetchNotifications.mockResolvedValue(
+      page([REQUESTED, { ...REQUESTED, id: 2, type: 'SETTLEMENT_COMPLETED', amount: '100' }]),
+    )
 
     const wrapper = await mountView()
 
@@ -118,68 +133,164 @@ describe('NotificationListView', () => {
     expect(wrapper.text()).toContain('Everyone has paid for Dinner')
   })
 
-  it('화면에 들어가면 읽음 처리를 한 번 부른다', async () => {
-    fetchNotifications.mockResolvedValue([REQUESTED])
-
-    await mountView()
-
-    expect(readAllNotifications).toHaveBeenCalledTimes(1)
-  })
-
-  /*
-   * 목록은 이미 보이고 있는데 읽음 처리만 실패한 상황이다. 배지가 잠시 남는 것은 알림을
-   * 아예 못 보는 것보다 가벼운 문제라, 화면을 오류로 덮지 않는다.
-   */
-  it('읽음 처리가 실패해도 목록은 그대로 보여준다', async () => {
-    fetchNotifications.mockResolvedValue([REQUESTED])
-    readAllNotifications.mockRejectedValue(new Error('read-all failed'))
-
-    const wrapper = await mountView()
-
-    expect(wrapper.text()).toContain('Ari asked you for')
-  })
-
   it('알림이 없으면 빈 상태를 보여준다', async () => {
-    fetchNotifications.mockResolvedValue([])
+    fetchNotifications.mockResolvedValue(page([]))
 
     const wrapper = await mountView()
 
     expect(wrapper.text()).toContain('No notifications yet')
   })
 
-  it('알림을 누르면 그 정산 상세로 간다', async () => {
-    fetchNotifications.mockResolvedValue([REQUESTED])
-    const router = createTestRouter()
+  describe('누르기', () => {
+    it('그 알림만 읽음으로 바꾸고 정산 상세로 간다', async () => {
+      fetchNotifications.mockResolvedValue(page([REQUESTED]))
+      const router = createTestRouter()
 
-    const wrapper = await mountView(router)
-    await wrapper.get('li button').trigger('click')
-    await flushPromises()
+      const wrapper = await mountView(router)
+      await wrapper.get('li button').trigger('click')
+      await flushPromises()
 
-    expect(router.currentRoute.value.name).toBe('settlement-detail')
-    expect(router.currentRoute.value.params.settlementId).toBe('90')
-    // 낼 정산이므로 뒤로 갔을 때 "To Pay" 쪽이 열려야 한다.
-    expect(router.currentRoute.value.query.side).toBe('received')
+      expect(markNotificationRead).toHaveBeenCalledWith('1')
+      expect(router.currentRoute.value.name).toBe('settlement-detail')
+      expect(router.currentRoute.value.params.settlementId).toBe('90')
+      // 낼 정산이므로 뒤로 갔을 때 "To Pay" 쪽이 열려야 한다.
+      expect(router.currentRoute.value.query.side).toBe('received')
+    })
+
+    /*
+     * 이 표시가 없으면 정산 상세는 뒤로 갈 때 정산 홈으로 보낸다. 벨은 지갑에만 있어서,
+     * 벨을 눌러 들어온 사용자가 지갑에서 두 화면이나 떨어진 곳에 서게 된다.
+     */
+    it('알림에서 왔다는 표시를 주소에 남긴다', async () => {
+      fetchNotifications.mockResolvedValue(page([REQUESTED]))
+      const router = createTestRouter()
+
+      const wrapper = await mountView(router)
+      await wrapper.get('li button').trigger('click')
+      await flushPromises()
+
+      expect(router.currentRoute.value.query.origin).toBe('notifications')
+    })
+
+    it('이미 읽은 알림은 다시 읽음 처리하지 않는다', async () => {
+      fetchNotifications.mockResolvedValue(page([{ ...REQUESTED, readAt: '2026-08-21T12:05:00' }]))
+
+      const wrapper = await mountView()
+      await wrapper.get('li button').trigger('click')
+      await flushPromises()
+
+      expect(markNotificationRead).not.toHaveBeenCalled()
+    })
+
+    it('받을 정산 알림은 받을 쪽 목록에서 들어온 것으로 넘긴다', async () => {
+      fetchNotifications.mockResolvedValue(page([{ ...REQUESTED, type: 'SETTLEMENT_PAID' }]))
+      const router = createTestRouter()
+
+      const wrapper = await mountView(router)
+      await wrapper.get('li button').trigger('click')
+      await flushPromises()
+
+      expect(router.currentRoute.value.query.side).toBe('sent')
+    })
+
+    it('완료 알림은 어느 쪽인지 알 수 없으므로 정산 상세의 기본값에 맡긴다', async () => {
+      fetchNotifications.mockResolvedValue(page([{ ...REQUESTED, type: 'SETTLEMENT_COMPLETED' }]))
+      const router = createTestRouter()
+
+      const wrapper = await mountView(router)
+      await wrapper.get('li button').trigger('click')
+      await flushPromises()
+
+      expect(router.currentRoute.value.query.side).toBeUndefined()
+    })
   })
 
-  it('받을 정산 알림은 받을 쪽 목록에서 들어온 것으로 넘긴다', async () => {
-    fetchNotifications.mockResolvedValue([{ ...REQUESTED, type: 'SETTLEMENT_PAID' }])
-    const router = createTestRouter()
+  describe('지우기', () => {
+    /* X는 아이콘뿐이라, 어느 알림을 지우는 버튼인지 이름으로 구분되어야 한다. */
+    it('카드마다 그 알림을 가리키는 이름의 X가 있다', async () => {
+      fetchNotifications.mockResolvedValue(page([REQUESTED]))
 
-    const wrapper = await mountView(router)
-    await wrapper.get('li button').trigger('click')
-    await flushPromises()
+      const wrapper = await mountView()
+      const dismiss = wrapper.get('[data-testid="notification-dismiss"]')
 
-    expect(router.currentRoute.value.query.side).toBe('sent')
+      expect(dismiss.attributes('aria-label')).toContain('Ari asked you for')
+    })
+
+    it('X를 누르면 그 카드가 바로 사라진다', async () => {
+      fetchNotifications.mockResolvedValue(page([REQUESTED, { ...REQUESTED, id: 2 }]))
+
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="notification-dismiss"]').trigger('click')
+      await flushPromises()
+
+      expect(deleteNotification).toHaveBeenCalledWith('1')
+      expect(wrapper.findAll('li')).toHaveLength(1)
+    })
+
+    it('모두 지우면 빈 상태가 된다', async () => {
+      fetchNotifications.mockResolvedValue(page([REQUESTED]))
+
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="notification-dismiss-all"]').trigger('click')
+      await flushPromises()
+
+      expect(deleteAllNotifications).toHaveBeenCalledTimes(1)
+      expect(wrapper.text()).toContain('No notifications yet')
+    })
+
+    /* 지울 것이 없으면 누를 것도 없어야 한다. */
+    it('목록이 비어 있으면 일괄 버튼을 내지 않는다', async () => {
+      fetchNotifications.mockResolvedValue(page([]))
+
+      const wrapper = await mountView()
+
+      expect(wrapper.find('[data-testid="notification-dismiss-all"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="notification-mark-all-read"]').exists()).toBe(false)
+    })
   })
 
-  it('완료 알림은 어느 쪽인지 알 수 없으므로 정산 상세의 기본값에 맡긴다', async () => {
-    fetchNotifications.mockResolvedValue([{ ...REQUESTED, type: 'SETTLEMENT_COMPLETED' }])
-    const router = createTestRouter()
+  describe('모두 읽음', () => {
+    it('안 읽은 것이 있을 때만 보이고, 누르면 점이 모두 사라진다', async () => {
+      fetchNotifications.mockResolvedValue(page([REQUESTED]))
 
-    const wrapper = await mountView(router)
-    await wrapper.get('li button').trigger('click')
-    await flushPromises()
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="notification-mark-all-read"]').trigger('click')
+      await flushPromises()
 
-    expect(router.currentRoute.value.query.side).toBeUndefined()
+      expect(readAllNotifications).toHaveBeenCalledTimes(1)
+      expect(wrapper.find('li button .sr-only').exists()).toBe(false)
+    })
+
+    it('전부 읽은 목록에는 버튼이 없다', async () => {
+      fetchNotifications.mockResolvedValue(page([{ ...REQUESTED, readAt: '2026-08-21T12:05:00' }]))
+
+      const wrapper = await mountView()
+
+      expect(wrapper.find('[data-testid="notification-mark-all-read"]').exists()).toBe(false)
+    })
+  })
+
+  describe('더 보기', () => {
+    it('다음 쪽이 있을 때만 버튼을 낸다', async () => {
+      fetchNotifications.mockResolvedValue(page([REQUESTED]))
+
+      const wrapper = await mountView()
+
+      expect(wrapper.find('[data-testid="notification-load-more"]').exists()).toBe(false)
+    })
+
+    it('누르면 커서를 실어 다음 쪽을 받아 이어 붙인다', async () => {
+      fetchNotifications.mockResolvedValueOnce(page([REQUESTED], '1'))
+      fetchNotifications.mockResolvedValueOnce(page([{ ...REQUESTED, id: 2 }]))
+
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="notification-load-more"]').trigger('click')
+      await flushPromises()
+
+      expect(fetchNotifications).toHaveBeenLastCalledWith(undefined, '1')
+      // 앞 쪽을 버리지 않는다. 읽고 있던 자리를 잃으면 안 된다.
+      expect(wrapper.findAll('li')).toHaveLength(2)
+      expect(wrapper.find('[data-testid="notification-load-more"]').exists()).toBe(false)
+    })
   })
 })

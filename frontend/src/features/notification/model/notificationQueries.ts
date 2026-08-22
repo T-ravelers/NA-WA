@@ -1,11 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { computed, watch } from 'vue'
+import { computed, watch, type Ref } from 'vue'
 
 import {
+  deleteAllNotifications,
+  deleteNotification,
   fetchNotifications,
   fetchUnreadNotificationCount,
+  markNotificationRead,
   readAllNotifications,
 } from '../api/notificationApi'
+import type { NotificationPageDto } from '../api/notificationApi.types'
 import { toAppNotification, type AppNotification } from './notification'
 import { useNotificationSettlementIntegration } from './settlementIntegration'
 
@@ -24,7 +28,9 @@ export const UNREAD_COUNT_POLL_INTERVAL_MS = 15_000
 
 export const notificationKeys = {
   all: ['notifications'] as const,
-  list: () => [...notificationKeys.all, 'list'] as const,
+  /** 쪽 전체를 한 번에 지목할 때 쓴다. 개별 쪽 키는 이 뒤에 커서가 붙는다. */
+  lists: () => [...notificationKeys.all, 'list'] as const,
+  page: (cursor: string | undefined) => [...notificationKeys.lists(), cursor ?? 'first'] as const,
   unreadCount: () => [...notificationKeys.all, 'unread-count'] as const,
 }
 
@@ -61,35 +67,140 @@ export function useUnreadNotificationCount() {
   return query
 }
 
-/** 알림 목록. 화면에 들어갈 때만 부른다. */
-export function useNotifications() {
+/**
+ * 알림 한 쪽. 화면에 들어갈 때, 그리고 "더 보기"를 누를 때 부른다.
+ *
+ * 쪽마다 캐시 키가 달라야 이미 본 쪽을 다시 받아 오지 않는다. 받은 쪽을 화면 쪽에서
+ * 이어 붙이는 것은 지갑 거래 내역이 쓰는 방식과 같다 — 이 저장소에는 `useInfiniteQuery`
+ * 선례가 없어 같은 모양을 따른다.
+ */
+export function useNotifications(cursor: Ref<string | undefined>) {
   const query = useQuery({
-    queryKey: notificationKeys.list(),
-    queryFn: () => fetchNotifications(),
+    queryKey: computed(() => notificationKeys.page(cursor.value)),
+    queryFn: () => fetchNotifications(undefined, cursor.value),
   })
 
   const notifications = computed<AppNotification[]>(() =>
-    (query.data.value ?? []).map(toAppNotification),
+    (query.data.value?.notifications ?? []).map(toAppNotification),
   )
 
-  return { ...query, notifications }
+  const nextCursor = computed<string | null>(() => query.data.value?.nextCursor ?? null)
+
+  return { ...query, notifications, nextCursor }
 }
 
 /**
- * 목록에 들어갈 때 전부 읽음으로 바꾼다.
+ * 캐시에 쌓인 알림 쪽을 전부 버린다.
  *
- * 벨 개수만 다시 받고 **목록은 건드리지 않는다.** 목록까지 무효화하면 방금 그린 화면을
- * 곧바로 다시 받아 오는데, 그 응답은 전부 읽음 상태라 안 읽음 표시가 눈앞에서 지워진다.
- * 사용자가 알림 목록을 여는 이유가 바로 "무엇이 새로 왔는지" 보는 것이라, 그걸 지워 버리면
- * 요청 한 번을 더 쓰고 화면은 더 나빠진다. 목록은 다음에 들어올 때 새로 받는다.
+ * 읽음·지우기가 성공하면 화면은 이미 낙관적으로 고쳐져 있지만, 캐시에 남은 쪽들은 서버가
+ * 바뀌기 전 모습이다. 다음에 목록을 열 때 지운 알림이 되살아나 보이지 않도록 함께 버린다.
  */
+function invalidateAll(queryClient: ReturnType<typeof useQueryClient>): void {
+  void queryClient.invalidateQueries({ queryKey: notificationKeys.all })
+}
+
+/**
+ * 알림 하나를 읽음으로 바꾼다.
+ *
+ * 눌린 카드의 점을 **먼저** 지우고 요청을 보낸다. 서버를 기다렸다 지우면 이미 정산 상세로
+ * 넘어간 뒤라 사용자는 아무 반응도 못 본다. 실패하면 되돌린다.
+ *
+ * 안 읽은 알림이 하나 줄었으므로 벨 개수도 함께 다시 받는다.
+ */
+export function useReadNotification() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (notificationId: string) => markNotificationRead(notificationId),
+    onMutate: async (notificationId: string) => {
+      await queryClient.cancelQueries({ queryKey: notificationKeys.all })
+      const snapshot = queryClient.getQueriesData<NotificationPageDto>({
+        queryKey: notificationKeys.lists(),
+      })
+
+      for (const [key, page] of snapshot) {
+        if (page === undefined) continue
+        queryClient.setQueryData<NotificationPageDto>(key, {
+          ...page,
+          notifications: page.notifications.map((notification) =>
+            String(notification.id) === notificationId && !notification.readAt
+              ? { ...notification, readAt: new Date().toISOString() }
+              : notification,
+          ),
+        })
+      }
+
+      return { snapshot }
+    },
+    onError: (_error, _notificationId, context) => {
+      for (const [key, page] of context?.snapshot ?? []) {
+        queryClient.setQueryData(key, page)
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() })
+    },
+  })
+}
+
+/** 목록 화면의 "모두 읽음". 목록과 벨 개수를 함께 다시 받는다. */
 export function useReadAllNotifications() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: readAllNotifications,
-    onSuccess: () => {
+    onSuccess: () => invalidateAll(queryClient),
+  })
+}
+
+/**
+ * 알림 하나를 지운다.
+ *
+ * 카드를 먼저 없애고 요청을 보낸다. 눌렀는데 아무 일도 일어나지 않는 것이 이번에 고치는
+ * 문제의 출발점이라, 여기서 서버를 기다리게 두면 같은 인상을 준다. 실패하면 되돌린다.
+ *
+ * 안 읽은 알림을 지웠다면 벨 숫자도 줄어야 하므로 개수를 함께 다시 받는다.
+ */
+export function useDeleteNotification() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (notificationId: string) => deleteNotification(notificationId),
+    onMutate: async (notificationId: string) => {
+      await queryClient.cancelQueries({ queryKey: notificationKeys.all })
+      const snapshot = queryClient.getQueriesData<NotificationPageDto>({
+        queryKey: notificationKeys.lists(),
+      })
+
+      for (const [key, page] of snapshot) {
+        if (page === undefined) continue
+        queryClient.setQueryData<NotificationPageDto>(key, {
+          ...page,
+          notifications: page.notifications.filter(
+            (notification) => String(notification.id) !== notificationId,
+          ),
+        })
+      }
+
+      return { snapshot }
+    },
+    onError: (_error, _notificationId, context) => {
+      for (const [key, page] of context?.snapshot ?? []) {
+        queryClient.setQueryData(key, page)
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() })
     },
+  })
+}
+
+/** 목록 화면의 "모두 지우기". */
+export function useDeleteAllNotifications() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: deleteAllNotifications,
+    onSuccess: () => invalidateAll(queryClient),
   })
 }
