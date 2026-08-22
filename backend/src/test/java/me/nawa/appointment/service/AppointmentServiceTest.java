@@ -109,6 +109,42 @@ class AppointmentServiceTest {
         verify(appointmentMapper).markMemberActive(20L);
     }
 
+    // 방장의 멤버십에 여정이 남지 않으면 진행 중인 약속 목록(am.trip_id IS NOT NULL로
+    // 거른다)에서 방장이 통째로 빠지고, QR 공동결제도 여행 미연결로 거절된다.
+    @Test
+    void createAppointment_linksHostMembershipToChosenJourney() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
+        stubInsertAppointment(10L);
+        stubInsertAppointmentMember(20L);
+        when(depositMapper.insert(any())).thenReturn(1);
+        when(walletTransferService.transferToSystemWallet(
+                eq(1L), eq(1L), eq(SystemWalletCode.DEPOSIT_POOL),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_HOLD.name()), anyString()
+        )).thenReturn(500L);
+        when(depositMapper.markHeld(any(), eq(500L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberActive(20L)).thenReturn(1);
+        when(appointmentMapper.updateAppointmentStatus(
+                10L, AppointmentStatus.PAYMENT_PENDING, AppointmentStatus.RECRUITING
+        )).thenReturn(1);
+
+        appointmentService.createAppointment(1L, request);
+
+        ArgumentCaptor<AppointmentMember> hostCaptor =
+                ArgumentCaptor.forClass(AppointmentMember.class);
+        verify(appointmentMapper).insertAppointmentMember(hostCaptor.capture());
+        assertEquals(1L, hostCaptor.getValue().getTripId());
+    }
+
     @Test
     void toCreatedResponse_includesActiveMembers() {
         Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);

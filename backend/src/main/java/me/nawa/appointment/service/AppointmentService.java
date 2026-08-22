@@ -105,9 +105,14 @@ public class AppointmentService {
         }
         confirmJourneyItem(appointment, request);
 
+        // 방장이 고른 여정을 멤버십에도 남긴다. trip_items 쪽만 연결하고 여기를 비우면
+        // 진행 중인 약속 목록(am.trip_id IS NOT NULL로 거른다)에서 방장이 통째로 빠지고,
+        // QR 공동결제도 여행이 연결되지 않았다며 거절한다. 값은 validateJourneyLink가
+        // 본인 여정인지·visitDate가 기간 안인지까지 이미 확인한 것이다.
         AppointmentMember host = AppointmentMember.builder()
                 .appointmentId(appointment.getAppointmentId())
                 .memberId(memberId)
+                .tripId(request.getTripId())
                 .membershipStatus(MembershipStatus.PENDING)
                 .attendanceStatus(AttendanceStatus.PENDING)
                 .build();
