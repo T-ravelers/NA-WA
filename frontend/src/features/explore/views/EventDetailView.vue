@@ -272,7 +272,7 @@ function toggleSaved(): void {
   likeMutation.mutate({ itemId: current.eventId, saved: !current.saved })
 }
 
-function openJourneyDateSheet(): void {
+function openJourneySelectSheet(): void {
   journeyAddError.value = null
   selectedJourneyId.value = activeJourneyId.value
   journeySelectSheetOpen.value = true
@@ -309,12 +309,21 @@ function goToCreateJourney(): void {
    * 이 화면은 route param을 쓰므로 `returnParams`로 함께 넘긴다. `openJourneySelect`는
    * 규약이 "나머지 query"로 그대로 돌려주므로, 돌아왔을 때 하던 일을 이어 갈 표시가 된다.
    */
+  /*
+   * 이벤트 기간을 함께 보낸다. 이 버튼을 누른 사람은 정의상 **겹치는 여정이 하나도
+   * 없는** 사람인데, 빈 폼에는 무엇과 겹쳐야 하는지가 없다. 안 겹치는 기간으로 또
+   * 만들고 돌아오면 없애려던 막다른 길이 한 바퀴 뒤로 옮겨질 뿐이다.
+   *
+   * 상시 이벤트는 상한이 없어 `endDate`를 싣지 않는다.
+   */
   void router.replace({
     name: 'journey-create',
     query: {
       returnRouteName: 'explore-event-detail',
       returnParams: `eventId:${eventId.value}`,
       openJourneySelect: '1',
+      ...(itemPeriod.value.startDate !== null ? { itemStartDate: itemPeriod.value.startDate } : {}),
+      ...(itemPeriod.value.endDate !== null ? { itemEndDate: itemPeriod.value.endDate } : {}),
     },
   })
 }
@@ -364,7 +373,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
 onMounted(() => {
   if (route.query.openJourneySelect !== '1') return
 
-  openJourneyDateSheet()
+  openJourneySelectSheet()
 
   /*
    * 규약이 정한 결과 key는 `tripId`다. 여기서 한 번 읽어 고른 여정으로 삼고 주소에서
@@ -379,6 +388,10 @@ onMounted(() => {
   const restQuery = { ...route.query }
   delete restQuery.openJourneySelect
   delete restQuery.tripId
+  // 규약이 나머지 query를 그대로 돌려주므로 보낼 때 실은 기간도 함께 돌아온다.
+  // 이 화면에서는 쓰이지 않으니 주소에 남기지 않는다.
+  delete restQuery.itemStartDate
+  delete restQuery.itemEndDate
   void router.replace({ query: restQuery })
 })
 
@@ -710,7 +723,7 @@ function retry(): void {
             block
             compact
             class="whitespace-nowrap text-on-paper"
-            @click="openJourneyDateSheet"
+            @click="openJourneySelectSheet"
           >
             {{
               journeyAdded ? t('explore.detail.addedToJourney') : t('explore.detail.addToJourney')

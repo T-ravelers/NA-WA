@@ -54,22 +54,45 @@ describe('JourneySelectSheet', () => {
     const button = journeyButton(wrapper)
 
     expect(button).toBeDefined()
-    expect(button?.attributes('disabled')).toBeDefined()
-    expect(button?.text()).toContain('Doesn’t overlap these dates')
+    expect(button?.attributes('aria-disabled')).toBe('true')
+    expect(button?.text()).toContain('Outside this event’s dates')
+  })
+
+  /*
+   * `disabled`를 쓰면 탭 순서에서 빠지고 스크린 리더가 건너뛴다 — 감추지 않기로 한
+   * 이유가 그들에게만 뒤집힌다. 포커스는 받되 선택만 막혀야 한다.
+   */
+  it('고를 수 없는 여정도 포커스를 받고, 눌러도 선택되지 않는다', async () => {
+    const wrapper = mountSheet({ itemStartDate: '2026-09-04', itemEndDate: '2026-09-06' })
+    const button = journeyButton(wrapper)
+
+    expect(button?.attributes('disabled')).toBeUndefined()
+
+    await button?.trigger('click')
+
+    expect(wrapper.emitted('select')).toBeUndefined()
   })
 
   it('겹치는 여정에는 사유를 붙이지 않는다', () => {
     const wrapper = mountSheet({})
     const button = journeyButton(wrapper)
 
-    expect(button?.attributes('disabled')).toBeUndefined()
-    expect(button?.text()).not.toContain('Doesn’t overlap these dates')
+    expect(button?.attributes('aria-disabled')).toBe('false')
+    expect(button?.text()).not.toContain('Outside this event’s dates')
+  })
+
+  it('고를 수 있는 여정은 눌리면 선택된다', async () => {
+    const wrapper = mountSheet({})
+
+    await journeyButton(wrapper)?.trigger('click')
+
+    expect(wrapper.emitted('select')).toHaveLength(1)
   })
 
   it('하루만 맞닿아도 고를 수 있다', () => {
     const wrapper = mountSheet({ itemStartDate: '2026-04-01', itemEndDate: '2026-04-30' })
 
-    expect(journeyButton(wrapper)?.attributes('disabled')).toBeUndefined()
+    expect(journeyButton(wrapper)?.attributes('aria-disabled')).toBe('false')
   })
 
   it('여정이 하나도 없으면 만들러 가는 버튼을 보인다', async () => {
@@ -91,7 +114,7 @@ describe('JourneySelectSheet', () => {
   it('겹치는 여정이 하나도 없어도 같은 자리에서 만들러 갈 수 있다', async () => {
     const wrapper = mountSheet({ itemStartDate: '2026-09-04', itemEndDate: '2026-09-06' })
 
-    expect(wrapper.text()).toContain('None of your journeys overlap these dates.')
+    expect(wrapper.text()).toContain('None of your journeys overlap this event’s dates.')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Create a journey')

@@ -270,7 +270,7 @@ function openAppointmentList(): void {
   })
 }
 
-function openJourneyDateSheet(): void {
+function openJourneySelectSheet(): void {
   journeyAddError.value = null
   selectedJourneyId.value = activeJourneyId.value
   journeySelectSheetOpen.value = true
@@ -359,7 +359,7 @@ async function confirmJourneyDate(date: string): Promise<void> {
 onMounted(() => {
   if (route.query.openJourneySelect !== '1') return
 
-  openJourneyDateSheet()
+  openJourneySelectSheet()
 
   /*
    * 규약이 정한 결과 key는 `tripId`다. 여기서 한 번 읽어 고른 여정으로 삼고 주소에서
@@ -648,7 +648,7 @@ onMounted(() => {
             block
             compact
             class="whitespace-nowrap text-on-paper"
-            @click="openJourneyDateSheet"
+            @click="openJourneySelectSheet"
           >
             {{
               journeyAdded

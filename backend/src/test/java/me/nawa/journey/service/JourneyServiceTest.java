@@ -575,11 +575,15 @@ class JourneyServiceTest {
     @Test
     void addJourneyItem_skipsItemPeriodCheck_whenItemIsPlace() {
         JourneyItemCreateRequest request = itemRequest();
+        // 방문 날짜(2026-04-01) 밖의 기간을 일부러 채운다. 비워 두면 기간 검사가 그냥
+        // 지나가므로, itemType 분기를 지우더라도 이 테스트가 통과해 버린다.
         stubSuccessfulItemInsert(
             request,
             JourneyExploreItem.builder()
                 .itemId(300L)
                 .itemType("PLACE")
+                .startDate(LocalDate.of(2026, 4, 2))
+                .endDate(LocalDate.of(2026, 4, 3))
                 .build(),
             "PLACE"
         );

@@ -460,10 +460,14 @@ describe('EventDetailView', () => {
     expect(router.currentRoute.value.name).toBe('journey-create')
     // 다른 화면에 들렀다 돌아오는 query 규약. 이 화면은 route param을 쓰므로
     // returnParams도 함께 싣는다. openJourneySelect는 그대로 돌아와 하던 일을 잇는다.
+    // 이벤트 기간도 함께 간다. 이 버튼을 누른 사람은 겹치는 여정이 하나도 없는
+    // 사람이라, 빈 폼으로 보내면 안 겹치는 기간으로 또 만들고 돌아온다.
     expect(router.currentRoute.value.query).toEqual({
       returnRouteName: 'explore-event-detail',
       returnParams: 'eventId:42',
       openJourneySelect: '1',
+      itemStartDate: '2026-08-10',
+      itemEndDate: '2026-08-12',
     })
   })
 

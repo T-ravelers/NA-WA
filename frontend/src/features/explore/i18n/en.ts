@@ -367,9 +367,13 @@ export default {
       /*
        * 겹치는 여정이 하나도 없을 때. 목록에서 감추지 않고 왜 못 고르는지 함께
        * 보여야 사용자가 자기 여정이 사라진 줄 알지 않는다.
+       *
+       * 여정 기간이 아니라 **이벤트 기간**을 가리킨다고 못박는다. 이 문구는 여정
+       * 카드의 기간 표시 바로 아래 붙어서, 그냥 "these dates"라고 하면 방금 위에 적힌
+       * 여정 기간으로 읽힌다. Place는 운영 기간이 없어 이 문구가 뜨지 않는다.
        */
-      noneAvailable: 'None of your journeys overlap these dates.',
-      outsideItemPeriod: 'Doesn’t overlap these dates',
+      noneAvailable: 'None of your journeys overlap this event’s dates.',
+      outsideItemPeriod: 'Outside this event’s dates',
       createJourney: 'Create a journey',
     },
   },

@@ -50,6 +50,16 @@ function returnParams(): Record<string, string> {
   return Object.fromEntries(entries)
 }
 
+/**
+ * 보낸 화면이 실어 준 항목 운영 기간. 폼의 기간 기본값이 된다.
+ *
+ * 형식이 어긋나면 그냥 무시하고 빈 폼으로 둔다 — 기본값일 뿐이라 막을 이유가 없다.
+ */
+function itemPeriodDate(key: 'itemStartDate' | 'itemEndDate'): string | undefined {
+  const value = route.query[key]
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined
+}
+
 /** 복귀 주소를 만들 때 규약 key는 돌려주지 않는다. 호출자 화면의 것이 아니다. */
 function restQueryWithoutContract() {
   const restQuery = { ...route.query }
@@ -155,6 +165,8 @@ function submit(input: JourneyCreateInput): void {
     <JourneyCreateForm
       :pending="createMutation.isPending.value"
       :error-message="errorMessage"
+      :initial-start-date="itemPeriodDate('itemStartDate')"
+      :initial-end-date="itemPeriodDate('itemEndDate')"
       @submit="submit"
     />
   </main>

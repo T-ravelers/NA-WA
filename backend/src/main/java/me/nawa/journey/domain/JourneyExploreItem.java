@@ -20,7 +20,7 @@ public class JourneyExploreItem {
     /*
      * 항목 자체의 운영 기간. EVENT 행에서만 채워진다.
      *
-     * place 테이블에는 기간 컬럼이 없어 PLACE 행은 LEFT JOIN 때문에 셋 다 null로 온다.
+     * place 테이블에는 기간 컬럼이 없어 PLACE 행은 LEFT JOIN 때문에 둘 다 null로 온다.
      * 기간 검사는 반드시 itemType으로 먼저 분기해야 한다.
      *
      * chk_event_period가 `is_permanent = TRUE ⟺ end_date IS NULL`을 보장하므로 상시

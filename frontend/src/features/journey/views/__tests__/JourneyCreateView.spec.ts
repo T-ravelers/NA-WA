@@ -257,6 +257,31 @@ describe('JourneyCreateView', () => {
     expect(router.currentRoute.value.name).toBe('appointment-create')
   })
 
+  /*
+   * 보낸 화면이 실어 준 항목 기간이 폼 기본값이 된다. 없으면 그 사람은 무엇과 겹쳐야
+   * 하는지 모른 채 폼을 채우고, 또 안 겹치는 여정을 만들어 같은 자리로 돌아온다.
+   */
+  it('보낸 화면이 실어 준 항목 기간이 폼 기본값이 된다', async () => {
+    const { wrapper } = await mountView(
+      '/journeys/new?returnRouteName=explore-event-detail&itemStartDate=2026-08-10&itemEndDate=2026-08-12',
+    )
+
+    const form = wrapper.findComponent(JourneyCreateForm)
+
+    expect(form.props('initialStartDate')).toBe('2026-08-10')
+    expect(form.props('initialEndDate')).toBe('2026-08-12')
+  })
+
+  it('형식이 어긋난 기간은 무시하고 빈 폼으로 둔다', async () => {
+    const { wrapper } = await mountView('/journeys/new?itemStartDate=2026-8-1&itemEndDate=nope')
+
+    const form = wrapper.findComponent(JourneyCreateForm)
+
+    // prop 기본값이 빈 문자열이라 폼이 빈 채로 열린다.
+    expect(form.props('initialStartDate')).toBe('')
+    expect(form.props('initialEndDate')).toBe('')
+  })
+
   it('shows the normalized creation error without navigating', async () => {
     const { NormalizedApiError } = await import('@/shared/api/apiError')
     createJourney.mockRejectedValue(new NormalizedApiError('JOURNEY-003', 400, 'invalid journey'))

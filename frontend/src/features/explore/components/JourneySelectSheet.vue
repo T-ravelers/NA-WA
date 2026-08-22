@@ -52,6 +52,20 @@ function isSelectable(journeyId: number): boolean {
 }
 
 /**
+ * 고를 수 없는 여정은 여기서 막는다.
+ *
+ * `disabled` 속성을 쓰지 않는 것은 의도한 것이다. `disabled` 버튼은 탭 순서에서 빠지고
+ * 스크린 리더가 목록을 훑을 때 건너뛰므로, **키보드·스크린 리더 사용자에게는 이 여정이
+ * 목록에서 통째로 사라진다.** 감추지 않기로 한 이유가 그들에게만 뒤집힌다.
+ * `aria-disabled`는 고를 수 없다는 것을 알리면서 포커스와 사유 문구는 남긴다.
+ */
+function selectJourney(journeyId: number): void {
+  if (!isSelectable(journeyId)) return
+
+  emit('select', journeyId)
+}
+
+/**
  * 목록이 비었을 때만이 아니라 **고를 수 있는 여정이 하나도 없을 때도** 여기서 나가야
  * 한다. 둘 다 사용자에게는 담을 여정이 없는 것으로 똑같다.
  */
@@ -110,38 +124,47 @@ const noJourneyAvailable = computed(
             :key="journey.tripId"
             type="button"
             class="flex items-center justify-between rounded-sm border px-4 py-3 text-left transition-colors"
-            :class="[
+            :class="
               selectedJourneyId === journey.tripId
                 ? 'border-paper-fill bg-paper-fill text-on-paper'
-                : 'border-hairline-2 bg-transparent text-ink',
-              !isSelectable(journey.tripId) && 'opacity-40',
-            ]"
-            :disabled="!isSelectable(journey.tripId)"
+                : 'border-hairline-2 bg-transparent text-ink'
+            "
+            :aria-disabled="!isSelectable(journey.tripId)"
             :aria-pressed="selectedJourneyId === journey.tripId"
-            @click="emit('select', journey.tripId)"
+            @click="selectJourney(journey.tripId)"
           >
             <span class="flex min-w-0 flex-col gap-1">
-              <strong class="truncate text-title-sm">{{ journey.title }}</strong>
+              <strong
+                class="truncate text-title-sm"
+                :class="!isSelectable(journey.tripId) && 'opacity-40'"
+              >
+                {{ journey.title }}
+              </strong>
               <span
                 class="text-caption"
-                :class="selectedJourneyId === journey.tripId ? 'text-on-paper/70' : 'text-ink-3'"
+                :class="[
+                  selectedJourneyId === journey.tripId ? 'text-on-paper/70' : 'text-ink-3',
+                  !isSelectable(journey.tripId) && 'opacity-40',
+                ]"
               >
                 {{ journey.startDate }} – {{ journey.endDate }}
               </span>
+              <!-- 왜 못 고르는지는 읽어야 하는 정보다. 흐리게 만들 대상이 아니다. -->
               <span
                 v-if="!isSelectable(journey.tripId)"
-                class="text-caption text-ink-3"
+                class="text-caption text-ink-2"
               >
                 {{ t('explore.journeySelect.outsideItemPeriod') }}
               </span>
             </span>
             <span
               class="flex size-6 shrink-0 items-center justify-center rounded-pill"
-              :class="
+              :class="[
                 selectedJourneyId === journey.tripId
                   ? 'bg-on-paper text-paper-fill'
-                  : 'border border-hairline-2'
-              "
+                  : 'border border-hairline-2',
+                !isSelectable(journey.tripId) && 'opacity-40',
+              ]"
             >
               <IconCheck
                 v-if="selectedJourneyId === journey.tripId"
