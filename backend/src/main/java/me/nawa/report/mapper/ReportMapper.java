@@ -1,7 +1,11 @@
 package me.nawa.report.mapper;
 
+import java.time.LocalDate;
 import java.util.List;
 import me.nawa.report.domain.Report;
+import me.nawa.report.domain.ReportCohortSnapshot;
+import me.nawa.report.domain.ReportComparisonMember;
+import me.nawa.report.domain.ReportComparisonSpending;
 import me.nawa.report.domain.ReportJourney;
 import me.nawa.report.domain.ReportTimelineItem;
 import me.nawa.report.domain.ReportExpense;
@@ -48,4 +52,23 @@ public interface ReportMapper {
     Report findReportById(@Param("reportId") Long reportId);
 
     List<Report> findReportsByMemberId(@Param("memberId") Long memberId);
+
+    ReportComparisonMember findComparisonMember(@Param("memberId") Long memberId);
+
+    List<ReportComparisonMember> findComparisonPeerMembers(
+        @Param("tripId") Long tripId,
+        @Param("memberId") Long memberId
+    );
+
+    List<ReportComparisonSpending> findComparisonSpending(
+        @Param("memberIds") List<Long> memberIds,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate
+    );
+
+    List<ReportCohortSnapshot> findSimilarCohortAnalytics(
+        @Param("nationalityCode") String nationalityCode,
+        @Param("memberId") Long memberId,
+        @Param("limit") int limit
+    );
 }

@@ -213,4 +213,125 @@
                  r.report_id DESC
     </select>
 
+    <!-- ── 비교(#398) ───────────────────────────────────────────────────── -->
+
+    <select id="findComparisonMember"
+            resultType="me.nawa.report.domain.ReportComparisonMember">
+        SELECT
+            member_id,
+            display_name,
+            profile_image_url,
+            nationality_code
+        FROM members
+        WHERE member_id = #{memberId}
+          AND deleted_at IS NULL
+    </select>
+
+    <!--
+      같은 약속 동료. 여정과 약속은 trip_items(CONFIRMED).appointment_id로 이어진다 —
+      appointment_members.trip_id는 운영 코드가 채우지 않으므로 장래 대비로 UNION만 한다.
+      호스트도 appointment_members 행을 가지므로 따로 더하지 않는다.
+    -->
+    <select id="findComparisonPeerMembers"
+            resultType="me.nawa.report.domain.ReportComparisonMember">
+        SELECT DISTINCT
+            m.member_id,
+            m.display_name,
+            m.profile_image_url,
+            m.nationality_code
+        FROM (
+            SELECT ti.appointment_id
+            FROM trip_items ti
+            WHERE ti.trip_id = #{tripId}
+              AND ti.trip_item_status = 'CONFIRMED'
+              AND ti.appointment_id IS NOT NULL
+              AND ti.deleted_at IS NULL
+            UNION
+            SELECT am.appointment_id
+            FROM appointment_members am
+            WHERE am.member_id = #{memberId}
+              AND am.trip_id = #{tripId}
+              AND am.deleted_at IS NULL
+        ) mine
+        JOIN appointments a ON a.appointment_id = mine.appointment_id
+            AND a.deleted_at IS NULL
+        JOIN appointment_members am2 ON am2.appointment_id = a.appointment_id
+            AND am2.member_id != #{memberId}
+            AND am2.membership_status = 'ACTIVE'
+            AND am2.deleted_at IS NULL
+        JOIN members m ON m.member_id = am2.member_id
+            AND m.deleted_at IS NULL
+        ORDER BY m.member_id ASC
+    </select>
+
+    <!--
+      비교용 지출 정의. findEligibleExpensesForUpdate와 같은 필터(결제자 본인 지갑의 DEBIT·
+      KRW·COMPLETED·QR/정산·여정 기간)에서 trip_expense_links 조건만 뺐다 — 동료는 내 여정에
+      지출을 연결할 수 없으므로 연결 여부로 거르면 동료 쪽이 항상 0이 된다. 나도 같은 정의로
+      합산한다. 정산(SETTLEMENT)은 카테고리가 없어 OTHER로 잡힌다(SPENDING_CATEGORY.md).
+    -->
+    <sql id="comparisonExpenseSource">
+        FROM wallet_ledger_entries le
+        JOIN wallet_transfers t ON t.transfer_id = le.transfer_id
+        JOIN wallets w ON w.wallet_id = le.wallet_id AND w.deleted_at IS NULL
+        JOIN wallet_owners wo ON wo.wallet_owner_id = w.wallet_owner_id
+            AND wo.member_id = t.initiator_member_id AND wo.deleted_at IS NULL
+        WHERE le.entry_type = 'DEBIT' AND le.deleted_at IS NULL
+          AND t.deleted_at IS NULL
+          AND t.currency_code = 'KRW' AND t.transfer_status = 'COMPLETED'
+          AND t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')
+          AND DATE(t.completed_at) BETWEEN #{startDate} AND #{endDate}
+    </sql>
+
+    <select id="findComparisonSpending"
+            resultType="me.nawa.report.domain.ReportComparisonSpending">
+        SELECT
+            t.initiator_member_id AS member_id,
+            COALESCE(NULLIF(t.spending_category, ''), 'OTHER') AS category,
+            SUM(le.amount) AS amount
+        <include refid="comparisonExpenseSource" />
+          AND t.initiator_member_id IN
+          <foreach collection="memberIds" item="id" open="(" separator="," close=")">
+              #{id}
+          </foreach>
+        GROUP BY t.initiator_member_id, COALESCE(NULLIF(t.spending_category, ''), 'OTHER')
+        ORDER BY t.initiator_member_id ASC, amount DESC, category ASC
+    </select>
+
+    <resultMap id="cohortSnapshotResultMap"
+               type="me.nawa.report.domain.ReportCohortSnapshot"
+               autoMapping="true">
+        <result property="analytics"
+                column="analytics"
+                typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
+    </resultMap>
+
+    <!-- 같은 국적 회원의 최신 COMPLETED 리포트 하나씩. analytics가 없는 옛 스냅샷은 null로 온다. -->
+    <select id="findSimilarCohortAnalytics"
+            resultMap="cohortSnapshotResultMap">
+        SELECT
+            ranked.member_id,
+            ranked.analytics
+        FROM (
+            SELECT
+                t.member_id,
+                JSON_EXTRACT(r.report_content, '$.analytics') AS analytics,
+                ROW_NUMBER() OVER (
+                    PARTITION BY t.member_id
+                    ORDER BY r.created_at DESC, r.report_id DESC
+                ) AS rn
+            FROM reports r
+            JOIN trips t ON t.trip_id = r.trip_id AND t.deleted_at IS NULL
+            JOIN members m ON m.member_id = t.member_id AND m.deleted_at IS NULL
+            WHERE r.generation_status = 'COMPLETED'
+              AND r.deleted_at IS NULL
+              AND m.nationality_code = #{nationalityCode}
+              AND m.member_id != #{memberId}
+              AND m.account_type = 'TRAVELER'
+        ) ranked
+        WHERE ranked.rn = 1
+        ORDER BY ranked.member_id ASC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

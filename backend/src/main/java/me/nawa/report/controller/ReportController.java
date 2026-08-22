@@ -5,7 +5,9 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
+import me.nawa.report.domain.ReportComparisonScope;
 import me.nawa.report.dto.request.ReportCreateRequest;
+import me.nawa.report.dto.response.ReportComparisonResponse;
 import me.nawa.report.dto.response.ReportDetailResponse;
 import me.nawa.report.dto.response.ReportExpenseCandidateResponse;
 import me.nawa.report.dto.response.ReportSummaryResponse;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -69,6 +72,19 @@ public class ReportController {
     ) {
         return ApiResponse.success(
             reportService.getReport(member.getMemberId(), reportId)
+        );
+    }
+
+    /** 잘못된 scope 값은 enum 바인딩 실패로 COMMON-001이 된다. */
+    @GetMapping("/reports/{reportId}/comparison")
+    @ApiOperation("Compare a Report with group members or similar travelers")
+    public ApiResponse<ReportComparisonResponse> getComparison(
+        @AuthenticationPrincipal AuthenticatedMember member,
+        @PathVariable Long reportId,
+        @RequestParam(defaultValue = "GROUP") ReportComparisonScope scope
+    ) {
+        return ApiResponse.success(
+            reportService.getComparison(member.getMemberId(), reportId, scope)
         );
     }
 }
