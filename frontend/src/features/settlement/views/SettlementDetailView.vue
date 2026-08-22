@@ -18,6 +18,7 @@ import { useSettlementReceiptViewer } from '../composables/useSettlementReceipt'
 import { resolveSettlementError } from '../model/settlementErrors'
 import { resolveSide } from '../model/settlementList'
 import { useSettlementDetail } from '../model/settlementQueries'
+import { resolveDetailBackTarget } from '../model/settlementReturn'
 
 /**
  * 정산 상세.
@@ -28,6 +29,9 @@ import { useSettlementDetail } from '../model/settlementQueries'
  *
  * 목록에서 어느 쪽 토글로 들어왔는지는 `query.side`로 받아 되돌려준다. 주소로 바로
  * 들어와 그 값이 없으면 요청자는 받을 목록, 참여자는 낼 목록으로 나간다.
+ *
+ * 전체 내역에서 들어온 경우에는 `query.origin`과 기간까지 함께 받아, 나갈 때 그 화면을
+ * 좁혀 보던 상태 그대로 되돌려 준다.
  */
 const route = useRoute()
 const router = useRouter()
@@ -92,8 +96,14 @@ const receiptEmptyLabel = computed(() =>
     : undefined,
 )
 
+/**
+ * 뒤로 간다.
+ *
+ * 전체 내역에서 들어왔으면 그 화면으로, 좁혀 보던 기간까지 그대로 되돌려 준다. 여기서
+ * 늘 정산 홈으로 보내면 사용자가 골라 둔 기간이 사라져 처음부터 다시 골라야 한다.
+ */
 function backToList(): void {
-  void router.push({ name: 'settlements', query: { side: side.value } })
+  void router.push(resolveDetailBackTarget(route.query, side.value))
 }
 
 /**

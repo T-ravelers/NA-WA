@@ -125,6 +125,23 @@ describe('SettlementHistoryView', () => {
     expect(router.currentRoute.value.query.side).toBe('sent')
   })
 
+  it('carries the period into the settlement it opens so the way back survives', async () => {
+    const { wrapper, router } = await mountHistory(
+      '/settlements/history?side=sent&from=2026-08-01&to=2026-08-31',
+    )
+
+    await wrapper.get('[data-settlement-id="2"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('settlement-detail')
+    expect(router.currentRoute.value.query).toMatchObject({
+      side: 'sent',
+      origin: 'history',
+      from: '2026-08-01',
+      to: '2026-08-31',
+    })
+  })
+
   it('shows the day each settlement was completed', async () => {
     const { wrapper } = await mountHistory()
 

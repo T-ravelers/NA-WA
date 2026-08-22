@@ -49,6 +49,11 @@ async function mountDetail(path = '/settlements/42') {
         name: 'settlement-pay',
         component: { template: '<div />' },
       },
+      {
+        path: '/settlements/history',
+        name: 'settlement-history',
+        component: { template: '<div />' },
+      },
       { path: '/settlements', name: 'settlements', component: { template: '<div />' } },
     ],
   })
@@ -150,6 +155,36 @@ describe('SettlementDetailView', () => {
 
     expect(router.currentRoute.value.name).toBe('settlements')
     expect(router.currentRoute.value.query.side).toBe('sent')
+  })
+
+  /*
+   * 전체 내역에서 기간을 좁혀 놓고 상세를 열었다가 돌아오는 길이다. 정산 홈으로 빠지면
+   * 사용자가 골라 둔 기간이 사라져 처음부터 다시 골라야 한다.
+   */
+  it('returns to the narrowed history it was opened from', async () => {
+    const { wrapper, router } = await mountDetail(
+      '/settlements/42?side=sent&origin=history&from=2026-07-01&to=2026-07-31',
+    )
+
+    await wrapper.get('header button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('settlement-history')
+    expect(router.currentRoute.value.query).toMatchObject({
+      side: 'sent',
+      from: '2026-07-01',
+      to: '2026-07-31',
+    })
+  })
+
+  it('returns to the whole history when it was opened without a period', async () => {
+    const { wrapper, router } = await mountDetail('/settlements/42?side=received&origin=history')
+
+    await wrapper.get('header button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('settlement-history')
+    expect(router.currentRoute.value.query.from).toBeUndefined()
   })
 
   it('shows the creator who has paid, how many are left, and no payment action', async () => {

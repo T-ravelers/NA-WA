@@ -20,6 +20,7 @@ import {
 } from '../model/settlementHistoryFilter'
 import { resolveSide, splitIntoSections, type SettlementSide } from '../model/settlementList'
 import { useSettlements } from '../model/settlementQueries'
+import { historyDetailQuery } from '../model/settlementReturn'
 
 /**
  * 완료된 정산 전체 내역.
@@ -72,11 +73,17 @@ function applyRange(next: SettlementDateRange | null): void {
   })
 }
 
+/**
+ * 상세를 연다.
+ *
+ * 보고 있던 쪽과 좁혀 보던 기간을 함께 실어 보낸다. 상세의 뒤로가기가 이 값을 읽고
+ * 이 화면으로 되돌려 준다 — 두고 가면 사용자는 정산 홈에서 기간을 다시 골라야 한다.
+ */
 function open(settlementId: string): void {
   void router.push({
     name: 'settlement-detail',
     params: { settlementId },
-    query: { side: side.value },
+    query: historyDetailQuery(side.value, range.value),
   })
 }
 </script>
