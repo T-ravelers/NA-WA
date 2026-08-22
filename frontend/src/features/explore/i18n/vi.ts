@@ -372,6 +372,9 @@ export default {
       loading: 'Đang tải hành trình của bạn',
       error: 'Chúng tôi không tải được hành trình của bạn. Vui lòng thử lại.',
       empty: 'Hãy tạo hành trình trước khi thêm sự kiện này.',
+      noneAvailable: 'Không có hành trình nào trùng với khoảng thời gian này.',
+      outsideItemPeriod: 'Không trùng với khoảng thời gian này',
+      createJourney: 'Tạo hành trình',
     },
   },
 }

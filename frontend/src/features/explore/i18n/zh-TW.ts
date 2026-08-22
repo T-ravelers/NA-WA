@@ -369,6 +369,9 @@ export default {
       loading: '正在載入您的旅程…',
       error: '無法載入您的旅程，請再試一次。',
       empty: '請先建立旅程，再加入這個活動。',
+      noneAvailable: '沒有旅程與這些日期重疊。',
+      outsideItemPeriod: '與這些日期不重疊',
+      createJourney: '建立旅程',
     },
   },
 }

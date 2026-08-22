@@ -372,6 +372,9 @@ export default {
       loading: '旅程を読み込んでいます',
       error: '旅程を読み込めませんでした。もう一度お試しください。',
       empty: 'このイベントを追加する前に、旅程を作成してください。',
+      noneAvailable: 'この日程と重なる旅程がありません。',
+      outsideItemPeriod: 'この日程と重なりません',
+      createJourney: '旅程を作成',
     },
   },
 }
