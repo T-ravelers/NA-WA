@@ -142,9 +142,17 @@ const isJoinAvailable = computed(() => appointment.value?.appointmentStatus === 
 //
 // 상태에서 그대로 끌어내므로 따로 지워 줄 자리가 없다. 누를 때 ref에 담아 두면
 // 이유가 해소된 뒤에도 남는다 — 나간 사람에게 "이미 참여했다"가 남던 식이다.
+//
+// 나간 사람과 참여 중인 사람을 가른다. 참여 조회는 LEFT가 된 참여에도
+// `joined: true`를 주므로, 그것만 보면 나간 사람에게 "이미 참여했다"고 말한다 —
+// 자기가 나갔다는 것을 아는 사람에게는 앞뒤가 맞지 않는 안내다.
 const joinBlockedReason = computed<string | undefined>(() => {
   if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
-  if (hasJoined.value) return t('appointment.detail.alreadyJoined')
+  if (hasJoined.value) {
+    return participationQuery.data.value?.membershipStatus === 'LEFT'
+      ? t('appointment.detail.alreadyLeft')
+      : t('appointment.detail.alreadyJoined')
+  }
   if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
   return undefined
 })

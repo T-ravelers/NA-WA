@@ -166,6 +166,7 @@ export default {
       join: 'Join appointment',
       joinUnavailable: 'This appointment is not open for joining.',
       alreadyJoined: 'You have already joined this appointment.',
+      alreadyLeft: 'You left this appointment, so you cannot join it again.',
       participationCheckFailed: 'We could not check your participation status. Please try again.',
       openMenu: 'Open appointment menu',
       menu: {
