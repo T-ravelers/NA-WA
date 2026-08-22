@@ -36,6 +36,17 @@ export default {
     detail: {
       title: 'Report',
       back: 'Back to reports',
+      sharing: {
+        report: 'Share report',
+        ticket: 'Share ticket',
+        confirm: 'Confirm & Share',
+        reportTitle: 'My travel report',
+        ticketTitle: 'My travel spending type',
+        summary: '{journey} ({period}) — {hashtag}. Total spent {total}, {share} on {category}.',
+        summaryPlain: '{journey} ({period}) — final travel report.',
+        copied: 'Report text copied to clipboard.',
+        unavailable: 'Sharing is not available on this device.',
+      },
       invalidTitle: 'Invalid report link',
       invalidDescription: 'The report number in this link is not valid.',
       forbiddenTitle: 'This report is private',

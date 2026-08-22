@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { IconShare2 } from '@tabler/icons-vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { vFitText } from '@/shared/lib/fitText'
+import AppButton from '@/shared/ui/AppButton.vue'
 import AppTicket from '@/shared/ui/AppTicket.vue'
 
 import type { ReportPersonaTicketProps } from './types'
@@ -10,8 +12,8 @@ import type { ReportPersonaTicketProps } from './types'
  * 소비 성향 칭호 티켓.
  *
  * 시안 R4의 `Your spending type` 블록이다. 섹션 제목 아래 티켓을 두고, 도넛 1위 조각과 같은
- * 색 위에 해시태그 칭호를 크게 찍고, 절취선 아래 stub에 비중 스탬프를 둔다. 조형은
- * `AppTicket`이 소유한다.
+ * 색 위에 해시태그 칭호를 크게 찍고, 절취선 아래 stub에 공유 버튼과 비중 스탬프를 둔다.
+ * 조형은 `AppTicket`이 소유한다.
  *
  * 세로형 티켓은 body 높이를 px로 받는다. 설명 문장이 로케일마다 길이가 달라 고정값으로는
  * 잘리므로, body 내용의 실제 높이를 재서 넘긴다. 측정 전(또는 jsdom)에는 시안 실측값을 쓴다.
@@ -25,8 +27,11 @@ const {
   description,
   stampValue,
   stampLabel,
+  shareLabel = undefined,
   tone = 'paper',
 } = defineProps<ReportPersonaTicketProps>()
+
+const emit = defineEmits<{ share: [] }>()
 
 /**
  * 스탬프 라벨 하한. 원의 곡선 안에 넣기 위한 값이다.
@@ -107,11 +112,27 @@ onBeforeUnmount(() => {
       </template>
 
       <template #stub>
-        <div class="flex min-h-20 items-center justify-end px-5 py-4">
+        <!-- 280px에서는 알약과 스탬프가 한 줄에 안 들어간다. 스탬프가 둘째 줄 오른쪽으로 내려간다. -->
+        <div class="flex min-h-20 flex-wrap items-center gap-3 px-5 py-4">
+          <AppButton
+            v-if="shareLabel !== undefined"
+            variant="on-ticket"
+            dense
+            @click="emit('share')"
+          >
+            <span class="inline-flex items-center gap-2">
+              <IconShare2
+                :size="18"
+                :stroke-width="2"
+                aria-hidden="true"
+              />
+              {{ shareLabel }}
+            </span>
+          </AppButton>
           <!-- 스탬프. 값은 본문 설명 문장에도 들어 있어 장식으로 둔다. -->
           <span
             aria-hidden="true"
-            class="flex size-16 -rotate-6 flex-col items-center justify-center rounded-pill border-2 border-current"
+            class="ml-auto flex size-16 -rotate-6 flex-col items-center justify-center rounded-pill border-2 border-current"
           >
             <span class="font-display text-title-sm font-bold tabular-nums">{{ stampValue }}</span>
             <!--

@@ -41,6 +41,17 @@ export default {
     detail: {
       title: '報告',
       back: '返回報告列表',
+      sharing: {
+        report: '分享報告',
+        ticket: '分享票券',
+        confirm: '確認並分享',
+        reportTitle: '我的旅行報告',
+        ticketTitle: '我的旅行消費類型',
+        summary: '{journey}（{period}）— {hashtag}。總支出 {total}，{category} 占 {share}。',
+        summaryPlain: '{journey}（{period}）— 旅行最終報告。',
+        copied: '已將報告文字複製到剪貼簿。',
+        unavailable: '此裝置無法分享。',
+      },
       invalidTitle: '報告連結無效',
       invalidDescription: '這個連結中的報告編號無效。',
       forbiddenTitle: '這份報告不公開',

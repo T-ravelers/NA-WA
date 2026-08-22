@@ -42,6 +42,17 @@ export default {
     detail: {
       title: 'Báo cáo',
       back: 'Về danh sách báo cáo',
+      sharing: {
+        report: 'Chia sẻ báo cáo',
+        ticket: 'Chia sẻ vé',
+        confirm: 'Xác nhận & chia sẻ',
+        reportTitle: 'Báo cáo chuyến đi của tôi',
+        ticketTitle: 'Kiểu chi tiêu du lịch của tôi',
+        summary: '{journey} ({period}) — {hashtag}. Tổng chi {total}, {share} cho {category}.',
+        summaryPlain: '{journey} ({period}) — báo cáo tổng kết chuyến đi.',
+        copied: 'Đã sao chép nội dung báo cáo vào bảng tạm.',
+        unavailable: 'Thiết bị này không hỗ trợ chia sẻ.',
+      },
       invalidTitle: 'Liên kết báo cáo không hợp lệ',
       invalidDescription: 'Số báo cáo trong liên kết này không hợp lệ.',
       forbiddenTitle: 'Báo cáo này ở chế độ riêng tư',

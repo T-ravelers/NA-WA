@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IconArrowLeft } from '@tabler/icons-vue'
+import { IconArrowLeft, IconChevronRight, IconShare2 } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -9,18 +9,20 @@ import {
   spendingCategoryLabelKey,
   toSpendingCategory,
 } from '@/shared/lib/spendingCategory'
+import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
+import { showToast } from '@/shared/ui/toast'
 
 import ReportCategoryBreakdown from '../components/presentation/ReportCategoryBreakdown.vue'
 import ReportComparisonBars from '../components/presentation/ReportComparisonBars.vue'
 import ReportDailyTrend from '../components/presentation/ReportDailyTrend.vue'
 import ReportRadarChart from '../components/presentation/ReportRadarChart.vue'
 import ReportRankTiles from '../components/presentation/ReportRankTiles.vue'
-import { formatPercent } from '../components/presentation/format'
+import { formatMoney, formatPercent } from '../components/presentation/format'
 import ReportKpiCard from '../components/presentation/ReportKpiCard.vue'
 import ReportPersonaTicket from '../components/presentation/ReportPersonaTicket.vue'
 import type {
@@ -217,6 +219,85 @@ function retryComparison(): void {
   void comparisonQuery.refetch()
 }
 
+/**
+ * 헤더 아이콘과 하단 `Confirm & Share`가 보내는 리포트 요약.
+ *
+ * 리포트 상세는 작성자만 열 수 있다. 링크를 보내면 받는 쪽은 아무것도 볼 수 없으므로
+ * 링크 대신 문장을 보낸다 — 여정·기간에 칭호·총지출·1위 비중을 붙인다. 칭호가 없는
+ * 리포트(지출 0원·구 리포트)는 여정과 기간만 보낸다.
+ */
+const shareSummary = computed<string | null>(() => {
+  const current = report.value
+
+  if (current === null) {
+    return null
+  }
+
+  const journey = current.reportContent.journey
+  const period = `${formatReportDate(journey.startDate)}–${formatReportDate(journey.endDate)}`
+  const persona = reportPersona.value
+  const kpi = reportKpi.value
+
+  if (persona === null || kpi === null) {
+    return t('report.detail.sharing.summaryPlain', { journey: journey.title, period })
+  }
+
+  return t('report.detail.sharing.summary', {
+    journey: journey.title,
+    period,
+    hashtag: persona.title,
+    total: formatMoney(kpi.totalSpent, i18n.locale.value),
+    share: persona.share,
+    category: persona.categoryLabel,
+  })
+})
+
+/**
+ * 공유 시트가 있으면 시트로, 없으면 클립보드로, 둘 다 없으면 안내만 한다.
+ * 시트를 닫아 취소한 것은 실패가 아니므로 조용히 넘어간다(Explore 상세와 같은 규칙).
+ */
+async function shareText(title: string, text: string): Promise<void> {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text })
+    } catch {
+      // 공유 시트를 닫은 것. 실패가 아니다.
+    }
+    return
+  }
+
+  if (!navigator.clipboard) {
+    showToast(t('report.detail.sharing.unavailable'))
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast(t('report.detail.sharing.copied'))
+  } catch {
+    showToast(t('report.detail.sharing.unavailable'))
+  }
+}
+
+function shareReport(): void {
+  const summary = shareSummary.value
+
+  if (summary !== null) {
+    void shareText(t('report.detail.sharing.reportTitle'), summary)
+  }
+}
+
+function shareTicket(): void {
+  const persona = reportPersona.value
+
+  if (persona !== null) {
+    void shareText(
+      t('report.detail.sharing.ticketTitle'),
+      `${persona.title}\n${persona.description}`,
+    )
+  }
+}
+
 function goBack(): void {
   void router.push({ name: 'report-list' })
 }
@@ -241,9 +322,22 @@ function retry(): void {
           aria-hidden="true"
         />
       </IconOrb>
-      <h1 class="font-display text-screen-title font-bold uppercase text-ink-display">
+      <h1 class="flex-1 font-display text-screen-title font-bold uppercase text-ink-display">
         {{ t('report.detail.title') }}
       </h1>
+      <IconOrb
+        v-if="shareSummary !== null"
+        :label="t('report.detail.sharing.report')"
+        size="md"
+        variant="surface"
+        @click="shareReport"
+      >
+        <IconShare2
+          :size="20"
+          :stroke-width="1.8"
+          aria-hidden="true"
+        />
+      </IconOrb>
     </header>
 
     <StateError
@@ -313,6 +407,8 @@ function retry(): void {
           :stamp-value="reportPersona.share"
           :stamp-label="reportPersona.categoryLabel"
           :tone="reportPersona.tone"
+          :share-label="t('report.detail.sharing.ticket')"
+          @share="shareTicket"
         />
 
         <ReportKpiCard
@@ -489,6 +585,20 @@ function retry(): void {
           </li>
         </ol>
       </section>
+
+      <AppButton
+        block
+        @click="shareReport"
+      >
+        <span class="inline-flex items-center gap-1">
+          {{ t('report.detail.sharing.confirm') }}
+          <IconChevronRight
+            :size="18"
+            :stroke-width="2"
+            aria-hidden="true"
+          />
+        </span>
+      </AppButton>
     </template>
   </main>
 </template>

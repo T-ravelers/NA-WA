@@ -9,9 +9,10 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import ReportPersonaTicket from '../../components/presentation/ReportPersonaTicket.vue'
 import { seriesInkClass } from '../../components/presentation/seriesPalette'
 
-const { fetchReport, fetchReportComparison } = vi.hoisted(() => ({
+const { fetchReport, fetchReportComparison, showToast } = vi.hoisted(() => ({
   fetchReport: vi.fn(),
   fetchReportComparison: vi.fn(),
+  showToast: vi.fn(),
 }))
 
 vi.mock('../../api/reportApi', async (importOriginal) => ({
@@ -19,6 +20,8 @@ vi.mock('../../api/reportApi', async (importOriginal) => ({
   fetchReport,
   fetchReportComparison,
 }))
+
+vi.mock('@/shared/ui/toast', () => ({ showToast }))
 
 const ReportDetailView = (await import('../ReportDetailView.vue')).default
 
@@ -139,11 +142,14 @@ describe('ReportDetailView', () => {
     fetchReport.mockResolvedValue(detail)
     fetchReportComparison.mockReset()
     fetchReportComparison.mockResolvedValue(emptyComparison)
+    showToast.mockReset()
   })
 
   afterEach(() => {
     mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
     queryClients.splice(0).forEach((client) => client.clear())
+    Reflect.deleteProperty(navigator, 'share')
+    Reflect.deleteProperty(navigator, 'clipboard')
   })
 
   it('renders the immutable snapshot and accessible dashboard analytics without excluded controls', async () => {
@@ -158,7 +164,7 @@ describe('ReportDetailView', () => {
     expect(wrapper.text()).toContain('0 P')
     expect(wrapper.find('polyline').exists()).toBe(true)
     expect(wrapper.findAll('table')).toHaveLength(0)
-    expect(wrapper.find('button[aria-label="Share"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Share report"]').exists()).toBe(true)
     expect(wrapper.findAll('button').some((button) => button.text() === 'Group')).toBe(false)
     expect(wrapper.text()).not.toContain('similar travelers')
     expect(wrapper.text()).toContain('Travel spending type')
@@ -420,5 +426,100 @@ describe('ReportDetailView', () => {
 
     expect(fetchReportComparison).not.toHaveBeenCalled()
     expect(wrapper.text()).not.toContain('Vs. group members')
+  })
+
+  // ── 공유(#417) — 시안 R4의 헤더 아이콘·티켓 `Share ticket`·하단 `Confirm & Share` ──
+  // jsdom에는 공유 시트도 클립보드도 없다. 기기별 분기를 그대로 흉내 낸다.
+  function stubNavigator(share: unknown, clipboard: unknown): void {
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true })
+    Object.defineProperty(navigator, 'clipboard', { value: clipboard, configurable: true })
+  }
+
+  function buttonByText(wrapper: VueWrapper, text: string) {
+    const button = wrapper.findAll('button').find((candidate) => candidate.text() === text)
+
+    if (button === undefined) {
+      throw new Error(`button "${text}" not found`)
+    }
+
+    return button
+  }
+
+  // 리포트 상세는 작성자만 열 수 있으므로 링크가 아니라 문장을 보낸다.
+  it('shares the ticket and the report summary as text, not as a link', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(share, undefined)
+    const { wrapper } = await mountView()
+
+    await buttonByText(wrapper, 'Share ticket').trigger('click')
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await buttonByText(wrapper, 'Confirm & Share').trigger('click')
+    await flushPromises()
+
+    expect(share).toHaveBeenCalledTimes(3)
+    expect(share.mock.calls[0]?.[0]).toEqual({
+      title: 'My travel spending type',
+      text: '#FLAVORSEEKER\nYou followed your appetite — 78% of this journey went to food.',
+    })
+    const summary = share.mock.calls[1]?.[0] as { title: string; text: string; url?: string }
+    expect(summary.title).toBe('My travel report')
+    expect(summary.text).toContain('Jeju Island')
+    expect(summary.text).toContain('#FLAVORSEEKER')
+    expect(summary.text).toContain('1,284,500 P')
+    expect(summary.text).toContain('78% on Food')
+    expect(summary.url).toBeUndefined()
+    expect(share.mock.calls[2]?.[0]).toEqual(summary)
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
+  it('copies the text and says so when there is no share sheet', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(undefined, { writeText })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledTimes(1)
+    expect(writeText.mock.calls[0]?.[0]).toContain('#FLAVORSEEKER')
+    expect(showToast).toHaveBeenCalledWith('Report text copied to clipboard.')
+  })
+
+  it('tells the user when neither the share sheet nor the clipboard exists', async () => {
+    stubNavigator(undefined, undefined)
+    const { wrapper } = await mountView()
+
+    await buttonByText(wrapper, 'Share ticket').trigger('click')
+    await flushPromises()
+
+    expect(showToast).toHaveBeenCalledWith('Sharing is not available on this device.')
+  })
+
+  // 시트를 닫아 취소한 것은 실패가 아니다. 안내가 뜨면 취소할 때마다 오류처럼 보인다.
+  it('stays quiet when the share sheet is dismissed', async () => {
+    stubNavigator(vi.fn().mockRejectedValue(new DOMException('dismissed', 'AbortError')), undefined)
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
+  // 칭호가 없으면 티켓도 없으니 티켓 공유도 없다. 리포트 요약은 여정과 기간만으로 보낸다.
+  it('keeps report sharing without the ticket button when there is no persona', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(share, undefined)
+    fetchReport.mockResolvedValueOnce({ ...detail, analytics: null })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Share ticket')).toBe(false)
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    const summary = share.mock.calls[0]?.[0] as { text: string }
+    expect(summary.text).toContain('Jeju Island')
+    expect(summary.text).toContain('final travel report')
+    expect(summary.text).not.toContain('#')
   })
 })

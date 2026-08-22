@@ -42,6 +42,17 @@ export default {
     detail: {
       title: 'レポート',
       back: 'レポート一覧へ戻る',
+      sharing: {
+        report: 'レポートを共有',
+        ticket: 'チケットを共有',
+        confirm: '確認して共有',
+        reportTitle: '私の旅行レポート',
+        ticketTitle: '私の旅行消費タイプ',
+        summary: '{journey}（{period}）— {hashtag}。総支出 {total}、{category} が {share}。',
+        summaryPlain: '{journey}（{period}）— 旅行の最終レポート。',
+        copied: 'レポートの文面をクリップボードにコピーしました。',
+        unavailable: 'この端末では共有できません。',
+      },
       invalidTitle: '無効なレポートリンク',
       invalidDescription: 'このリンクのレポート番号が無効です。',
       forbiddenTitle: 'このレポートは非公開です',
