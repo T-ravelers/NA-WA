@@ -155,12 +155,6 @@ export interface ReportComparison {
   ranks: ReportComparisonRank[]
 }
 
-interface ReportCategoryBreakdownWire {
-  category: string
-  amount: number
-  percentage: number
-}
-
 interface ReportComparisonMemberWire {
   memberId: number
   displayName: string
