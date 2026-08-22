@@ -1,8 +1,8 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { RouterView, createMemoryHistory, createRouter } from 'vue-router'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { RouterView, createMemoryHistory, createRouter, type RouteRecordRaw } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
@@ -20,6 +20,11 @@ vi.mock('../../api/exploreApi', () => ({
 
 const ExploreView = (await import('../ExploreView.vue')).default
 const { presetDateRange } = await import('../../model/datePresets')
+
+const Stub = { template: '<div />' }
+
+/** afterEach에서 정리하려고 마지막으로 띄운 화면을 들고 있는다. */
+let routedWrapper: ReturnType<typeof mount> | null = null
 
 const EMPTY_PAGE = {
   content: [],
@@ -468,8 +473,11 @@ async function mountRoutedView(path = '/explore') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      ...exploreRoutes,
-      { path: '/appointments', name: 'appointments', component: { template: '<div />' } },
+      /* 목록만 진짜로 띄운다. 상세는 이 스펙의 관심사가 아니고 API도 mock되어 있지 않다. */
+      ...exploreRoutes.map((route) =>
+        route.name === 'explore' ? route : ({ ...route, component: Stub } as RouteRecordRaw),
+      ),
+      { path: '/appointments', name: 'appointments', component: Stub },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -480,10 +488,23 @@ async function mountRoutedView(path = '/explore') {
   const wrapper = mount(RouterView, {
     global: { plugins: [i18n, router, pinia, [VueQueryPlugin, { queryClient }]] },
   })
+  routedWrapper = wrapper
 
   await flushPromises()
   return { wrapper, router }
 }
+
+/**
+ * 다음 테스트로 넘어가기 전에 반드시 unmount한다.
+ *
+ * `onBeforeRouteUpdate`로 등록한 가드는 unmount될 때 풀린다. 남겨두면 앞 테스트의 화면이
+ * 끝나지 않은 이동을 계속 들고 있다가, 다음 테스트의 pinia가 활성인 시점에 가드가 돌아
+ * 남의 기억을 덮어쓴다. 단독으로는 통과하고 같이 돌리면 깨지는 형태로 나타난다.
+ */
+afterEach(() => {
+  routedWrapper?.unmount()
+  routedWrapper = null
+})
 
 describe('ExploreView filter memory across entries', () => {
   beforeEach(() => {
@@ -509,6 +530,29 @@ describe('ExploreView filter memory across entries', () => {
 
     /* 필터는 남고 쪽 번호만 버린다. 새로 누른 사람은 목록을 처음부터 본다. */
     expect(router.currentRoute.value.query).toEqual({ eventKeyword: 'hongdae' })
+  })
+
+  it('keeps the Places tab and its filters when the bottom tab opens Discover again', async () => {
+    const { router } = await mountRoutedView('/explore?tab=places&placeKeyword=cafe&placePage=3')
+
+    await router.push('/explore')
+    await flushPromises()
+
+    /*
+     * 하단 탭이 보내는 주소에는 `tab`이 없어서 그냥 두면 Places를 보던 사람만 Events로
+     * 떨어진다. Events와 Places가 같은 규칙으로 남아야 한다.
+     */
+    expect(router.currentRoute.value.query).toEqual({ tab: 'places', placeKeyword: 'cafe' })
+  })
+
+  it('stays on the Places tab even when it has no filters to restore', async () => {
+    const { router } = await mountRoutedView('/explore?tab=places')
+
+    await router.push('/explore')
+    await flushPromises()
+
+    /* 되돌릴 필터가 없다는 이유로 탭까지 바뀌면 필터를 건 사람과 안 건 사람이 달라진다. */
+    expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
   })
 
   it('does not revive a filter value the screen dropped from the URL', async () => {
