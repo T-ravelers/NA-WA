@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -18,6 +19,11 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.report.domain.Report;
+import me.nawa.report.domain.ReportCohortSnapshot;
+import me.nawa.report.domain.ReportComparisonBasis;
+import me.nawa.report.domain.ReportComparisonMember;
+import me.nawa.report.domain.ReportComparisonScope;
+import me.nawa.report.domain.ReportComparisonSpending;
 import me.nawa.report.domain.ReportJourney;
 import me.nawa.report.domain.ReportTimelineItem;
 import me.nawa.report.domain.ReportExpense;
@@ -30,6 +36,10 @@ import me.nawa.report.dto.response.ReportDetailResponse;
 import me.nawa.report.dto.response.ReportSummaryResponse;
 import me.nawa.report.dto.response.ReportAnalyticsResponse;
 import me.nawa.report.dto.response.ReportCategoryBreakdownResponse;
+import me.nawa.report.dto.response.ReportComparisonCohortResponse;
+import me.nawa.report.dto.response.ReportComparisonMemberResponse;
+import me.nawa.report.dto.response.ReportComparisonRankResponse;
+import me.nawa.report.dto.response.ReportComparisonResponse;
 import me.nawa.report.dto.response.ReportDailyTrendResponse;
 import me.nawa.report.dto.response.ReportExpenseCandidateResponse;
 import me.nawa.report.exception.ReportErrorCode;
@@ -50,6 +60,11 @@ public class ReportService {
     );
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final BigDecimal ZERO = BigDecimal.ZERO;
+    /**
+     * 같은 국적 코호트 상한. 앱으로 넘어오는 행 수만 자른다 — ROW_NUMBER()는 같은 국적의
+     * 리포트를 모두 훑어 순위를 매긴 뒤이므로, 스캔 자체가 줄지는 않는다.
+     */
+    private static final int SIMILAR_COHORT_LIMIT = 200;
 
     private final ReportMapper reportMapper;
 
@@ -353,15 +368,7 @@ public class ReportService {
             categories.merge(category, expense.getAmount(), BigDecimal::add);
             daily.merge(expense.getOccurredOn(), expense.getAmount(), BigDecimal::add);
         }
-        List<ReportCategoryBreakdownResponse> breakdown = categories.entrySet().stream()
-            .map(entry -> ReportCategoryBreakdownResponse.builder()
-                .category(entry.getKey()).amount(entry.getValue())
-                .percentage(total.signum() == 0 ? ZERO : entry.getValue()
-                    .multiply(BigDecimal.valueOf(100)).divide(total, 2, RoundingMode.HALF_UP))
-                .build())
-            .sorted(Comparator.comparing(ReportCategoryBreakdownResponse::getAmount).reversed()
-                .thenComparing(ReportCategoryBreakdownResponse::getCategory))
-            .toList();
+        List<ReportCategoryBreakdownResponse> breakdown = buildBreakdown(categories, total);
         List<ReportDailyTrendResponse> trend = daily.entrySet().stream()
             .map(entry -> ReportDailyTrendResponse.builder().date(entry.getKey())
                 .amount(entry.getValue()).build()).toList();
@@ -414,6 +421,238 @@ public class ReportService {
             .categoryBreakdown(List.copyOf(breakdown))
             .dailyTrend(List.copyOf(trend))
             .build();
+    }
+
+    /** 카테고리별 금액을 비중과 함께 정렬한다 — 금액 내림차순, 같으면 카테고리 오름차순. */
+    private List<ReportCategoryBreakdownResponse> buildBreakdown(
+        Map<String, BigDecimal> categories, BigDecimal total
+    ) {
+        return categories.entrySet().stream()
+            .map(entry -> ReportCategoryBreakdownResponse.builder()
+                .category(entry.getKey()).amount(entry.getValue())
+                .percentage(total.signum() == 0 ? ZERO : entry.getValue()
+                    .multiply(BigDecimal.valueOf(100)).divide(total, 2, RoundingMode.HALF_UP))
+                .build())
+            .sorted(Comparator.comparing(ReportCategoryBreakdownResponse::getAmount).reversed()
+                .thenComparing(ReportCategoryBreakdownResponse::getCategory))
+            .toList();
+    }
+
+    // ── 비교 (#398) ──────────────────────────────────────────────────────
+
+    /**
+     * 내 리포트를 같은 약속 동료(GROUP) 또는 같은 국적 회원(SIMILAR)과 비교한다.
+     *
+     * <p>숫자만 내린다. 차이의 부호와 문구는 프론트엔드가 비중으로 계산한다.</p>
+     */
+    @Transactional(readOnly = true)
+    public ReportComparisonResponse getComparison(
+        Long memberId,
+        Long reportId,
+        ReportComparisonScope scope
+    ) {
+        validateMemberId(memberId);
+        validateResourceId(reportId);
+        if (scope == null) {
+            throw new BusinessException(ReportErrorCode.INVALID_REPORT_INPUT);
+        }
+
+        Report report = reportMapper.findReportById(reportId);
+        if (report == null) {
+            throw new BusinessException(ReportErrorCode.REPORT_NOT_FOUND);
+        }
+        if (!memberId.equals(report.getMemberId())) {
+            throw new BusinessException(ReportErrorCode.REPORT_JOURNEY_FORBIDDEN);
+        }
+        ReportComparisonMember me = reportMapper.findComparisonMember(memberId);
+        if (me == null) {
+            throw new IllegalStateException("Report owner could not be read");
+        }
+
+        long days = ChronoUnit.DAYS.between(report.getStartDate(), report.getEndDate()) + 1;
+        return scope == ReportComparisonScope.GROUP
+            ? compareWithGroup(report, me, days)
+            : compareWithSimilarTravelers(report, me, days);
+    }
+
+    /**
+     * 같은 약속 동료와 비교. 나와 동료 모두 여정 기간의 결제를 지금 다시 합산한다(LIVE).
+     * 저장된 스냅샷은 내가 고른 지출만 담고 있어 동료와 정의가 다르다 — 한쪽만 스냅샷을
+     * 쓰면 같은 잣대가 아니다.
+     */
+    private ReportComparisonResponse compareWithGroup(
+        Report report, ReportComparisonMember me, long days
+    ) {
+        List<ReportComparisonMember> peers = reportMapper.findComparisonPeerMembers(
+            report.getTripId(), me.getMemberId(),
+            report.getStartDate(), report.getEndDate()
+        );
+        List<Long> memberIds = new ArrayList<>();
+        memberIds.add(me.getMemberId());
+        peers.forEach(peer -> memberIds.add(peer.getMemberId()));
+
+        Map<Long, Map<String, BigDecimal>> amountsByMember = new LinkedHashMap<>();
+        for (ReportComparisonSpending row : reportMapper.findComparisonSpending(
+            memberIds, report.getStartDate(), report.getEndDate()
+        )) {
+            amountsByMember.computeIfAbsent(row.getMemberId(), id -> new LinkedHashMap<>())
+                .merge(normalizeCategory(row.getCategory()), row.getAmount(), BigDecimal::add);
+        }
+
+        Map<String, BigDecimal> myAmounts = amountsByMember.getOrDefault(me.getMemberId(), Map.of());
+        List<Map<String, BigDecimal>> peerAmounts = new ArrayList<>();
+        List<BigDecimal> peerDailyAverages = new ArrayList<>();
+        List<ReportComparisonMemberResponse> peerResponses = new ArrayList<>();
+        for (ReportComparisonMember peer : peers) {
+            Map<String, BigDecimal> amounts = amountsByMember.getOrDefault(peer.getMemberId(), Map.of());
+            ReportComparisonMemberResponse response = toComparisonMember(peer, amounts, days);
+            peerAmounts.add(amounts);
+            peerDailyAverages.add(response.getDailyAverage());
+            peerResponses.add(response);
+        }
+
+        return ReportComparisonResponse.builder()
+            .scope(ReportComparisonScope.GROUP)
+            .basis(ReportComparisonBasis.LIVE)
+            .me(toComparisonMember(me, myAmounts, days))
+            .peers(List.copyOf(peerResponses))
+            .cohort(toCohort(peerAmounts, peerDailyAverages))
+            .ranks(rankCategories(myAmounts, peerAmounts))
+            .build();
+    }
+
+    /**
+     * 같은 국적 회원과 비교. 양쪽 다 저장된 스냅샷을 읽는다(SNAPSHOT) — 남의 지출을 다시
+     * 합산하지 않고, 리포트를 만든 회원만 코호트에 들어간다. 동료 개인은 노출하지 않는다.
+     */
+    private ReportComparisonResponse compareWithSimilarTravelers(
+        Report report, ReportComparisonMember me, long days
+    ) {
+        ReportAnalyticsResponse mine = toAnalyticsResponse(
+            report.getReportContent() == null ? null : report.getReportContent().path("analytics")
+        );
+        Map<String, BigDecimal> myAmounts = amountsOf(mine);
+        ReportComparisonMemberResponse meResponse = mine == null
+            ? toComparisonMember(me, myAmounts, days)
+            : ReportComparisonMemberResponse.builder()
+                .memberId(me.getMemberId())
+                .displayName(me.getDisplayName())
+                .profileImageUrl(me.getProfileImageUrl())
+                .totalSpent(mine.getTotalSpent())
+                .dailyAverage(mine.getDailyAverage())
+                .categoryBreakdown(mine.getCategoryBreakdown())
+                .build();
+
+        List<Map<String, BigDecimal>> cohortAmounts = new ArrayList<>();
+        List<BigDecimal> cohortDailyAverages = new ArrayList<>();
+        String nationality = me.getNationalityCode();
+        if (nationality != null && !nationality.isBlank()) {
+            for (ReportCohortSnapshot snapshot : reportMapper.findSimilarCohortAnalytics(
+                nationality, me.getMemberId(), SIMILAR_COHORT_LIMIT
+            )) {
+                ReportAnalyticsResponse analytics = toAnalyticsResponse(snapshot.getAnalytics());
+                if (analytics == null) {
+                    continue;
+                }
+                cohortAmounts.add(amountsOf(analytics));
+                cohortDailyAverages.add(analytics.getDailyAverage());
+            }
+        }
+
+        return ReportComparisonResponse.builder()
+            .scope(ReportComparisonScope.SIMILAR)
+            .basis(ReportComparisonBasis.SNAPSHOT)
+            .me(meResponse)
+            .peers(List.of())
+            .cohort(toCohort(cohortAmounts, cohortDailyAverages))
+            .ranks(rankCategories(myAmounts, cohortAmounts))
+            .build();
+    }
+
+    private ReportComparisonMemberResponse toComparisonMember(
+        ReportComparisonMember member, Map<String, BigDecimal> amounts, long days
+    ) {
+        BigDecimal total = sumOf(amounts);
+        return ReportComparisonMemberResponse.builder()
+            .memberId(member.getMemberId())
+            .displayName(member.getDisplayName())
+            .profileImageUrl(member.getProfileImageUrl())
+            .totalSpent(total)
+            .dailyAverage(total.divide(BigDecimal.valueOf(days), 2, RoundingMode.HALF_UP))
+            .categoryBreakdown(buildBreakdown(amounts, total))
+            .build();
+    }
+
+    /** 코호트 평균. 인원이 0이면 0과 빈 목록이다 — 프론트가 빈 상태를 그린다. */
+    private ReportComparisonCohortResponse toCohort(
+        List<Map<String, BigDecimal>> amountsPerMember, List<BigDecimal> dailyAverages
+    ) {
+        int size = amountsPerMember.size();
+        if (size == 0) {
+            return ReportComparisonCohortResponse.builder()
+                .size(0).avgTotalSpent(ZERO).avgDailyAverage(ZERO)
+                .categoryBreakdown(List.of())
+                .build();
+        }
+        BigDecimal divisor = BigDecimal.valueOf(size);
+        Map<String, BigDecimal> summed = new LinkedHashMap<>();
+        BigDecimal summedTotal = ZERO;
+        for (Map<String, BigDecimal> amounts : amountsPerMember) {
+            amounts.forEach((category, amount) -> summed.merge(category, amount, BigDecimal::add));
+            summedTotal = summedTotal.add(sumOf(amounts));
+        }
+        Map<String, BigDecimal> averaged = new LinkedHashMap<>();
+        summed.forEach((category, amount) ->
+            averaged.put(category, amount.divide(divisor, 2, RoundingMode.HALF_UP)));
+        BigDecimal avgTotal = summedTotal.divide(divisor, 2, RoundingMode.HALF_UP);
+        BigDecimal avgDaily = dailyAverages.stream().reduce(ZERO, BigDecimal::add)
+            .divide(divisor, 2, RoundingMode.HALF_UP);
+        return ReportComparisonCohortResponse.builder()
+            .size(size)
+            .avgTotalSpent(avgTotal)
+            .avgDailyAverage(avgDaily)
+            .categoryBreakdown(buildBreakdown(averaged, avgTotal))
+            .build();
+    }
+
+    /**
+     * 내 카테고리마다 순위를 매긴다. 나보다 많이 쓴 사람 수 + 1이 순위이고, 비교할 사람이
+     * 없으면 순위도 없다. 순서는 내 비중 순(buildBreakdown)이다.
+     */
+    private List<ReportComparisonRankResponse> rankCategories(
+        Map<String, BigDecimal> myAmounts, List<Map<String, BigDecimal>> others
+    ) {
+        if (others.isEmpty()) {
+            return List.of();
+        }
+        List<ReportComparisonRankResponse> ranks = new ArrayList<>();
+        for (ReportCategoryBreakdownResponse mine : buildBreakdown(myAmounts, sumOf(myAmounts))) {
+            long ahead = others.stream()
+                .map(amounts -> amounts.getOrDefault(mine.getCategory(), ZERO))
+                .filter(amount -> amount.compareTo(mine.getAmount()) > 0)
+                .count();
+            ranks.add(ReportComparisonRankResponse.builder()
+                .category(mine.getCategory())
+                .rank((int) ahead + 1)
+                .of(others.size() + 1)
+                .build());
+        }
+        return List.copyOf(ranks);
+    }
+
+    private Map<String, BigDecimal> amountsOf(ReportAnalyticsResponse analytics) {
+        Map<String, BigDecimal> amounts = new LinkedHashMap<>();
+        if (analytics == null || analytics.getCategoryBreakdown() == null) {
+            return amounts;
+        }
+        for (ReportCategoryBreakdownResponse row : analytics.getCategoryBreakdown()) {
+            amounts.merge(normalizeCategory(row.getCategory()), row.getAmount(), BigDecimal::add);
+        }
+        return amounts;
+    }
+
+    private BigDecimal sumOf(Map<String, BigDecimal> amounts) {
+        return amounts.values().stream().reduce(ZERO, BigDecimal::add);
     }
 
     private String normalizeCategory(String category) {
