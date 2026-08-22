@@ -23,8 +23,15 @@ describe('AppButton', () => {
     ['primary', 'bg-paper-fill'],
     ['secondary', 'border-hairline-strong'],
     ['settle', 'bg-settlement'],
+    ['destructive', 'bg-danger'],
   ] as const)('draws the %s variant from tokens', (variant, expected) => {
     expect(mountButton({ variant }).get('button').classes()).toContain(expected)
+  })
+
+  it('uses readable dark text on the destructive surface', () => {
+    const classes = mountButton({ variant: 'destructive' }).get('button').classes()
+
+    expect(classes).toContain('text-on-category')
   })
 
   // paper 카드 위(밝은 바탕)의 보조 버튼은 secondary의 text-ink(밝은 캔버스 기준

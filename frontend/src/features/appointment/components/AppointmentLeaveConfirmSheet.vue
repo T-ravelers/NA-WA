@@ -74,7 +74,14 @@ function formatDeposit(value: string): string {
       <p class="mt-3 text-body-sm text-on-paper/70">
         {{ t('appointment.leave.description', { name: appointmentName }) }}
       </p>
-      <p class="mt-2 text-body-sm text-on-paper/70">
+      <p
+        class="mt-2 text-body-sm"
+        :class="
+          noShow
+            ? 'rounded-sm border border-danger/40 bg-danger/10 p-3 text-danger'
+            : 'text-on-paper/70'
+        "
+      >
         {{
           noShow
             ? t('appointment.leave.noShowForfeit', { amount: formatDeposit(depositAmount) })
@@ -100,11 +107,12 @@ function formatDeposit(value: string): string {
         </AppButton>
         <AppButton
           block
+          :variant="noShow ? 'destructive' : 'primary'"
           :loading="confirmDisabled"
           :disabled="confirmDisabled"
           @click="emit('confirm')"
         >
-          {{ t('appointment.leave.confirm') }}
+          {{ noShow ? t('appointment.leave.confirmNoShow') : t('appointment.leave.confirm') }}
         </AppButton>
       </div>
     </section>

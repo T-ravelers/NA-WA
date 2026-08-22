@@ -234,6 +234,7 @@ export default {
       noShowForfeit:
         'The activity has already started, so leaving now counts as a no-show. Your {amount} P deposit will not be refunded — it will be shared among the members who attended.',
       confirm: 'Leave group',
+      confirmNoShow: 'Leave and forfeit',
       cancel: 'Stay',
       done: 'You left this appointment.',
       doneRefunded: 'You left this appointment. {amount} P has been refunded to your wallet.',

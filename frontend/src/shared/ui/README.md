@@ -8,26 +8,26 @@
 
 ## 목록
 
-| 컴포넌트                                     | 용도                                                      |
-| -------------------------------------------- | --------------------------------------------------------- |
-| `AppButton`                                  | primary / secondary / tertiary / settle. 로딩·비활성 포함 |
-| `AppCard`                                    | `surface-1` r20 면. 절취선 없는 카드                      |
-| `AppTicket`                                  | **시그니처.** 노치 + 퍼포레이션 티켓                      |
-| `TicketStamp`                                | 티켓 우하단 원형 도장                                     |
-| `BrandWordmark`                              | `NAWA` 워드마크. Ria Sans 조판을 고정한 벡터 패스         |
-| `CategoryChip`                               | 소비영역 칩. 필터 토글 / 티켓 안 정적 라벨 겸용           |
-| `CategoryDot`                                | 소비영역 8px 점. 타임라인·범례                            |
-| `AppBadge`                                   | 진행중·예정·정산·동행 등 짧은 상태 표식                   |
-| `TextInput`                                  | 라벨·도움말·오류가 묶인 텍스트·날짜 입력                  |
-| `AmountInput`                                | 통화 접두·단위 접미 + 우측 정렬 금액 입력                 |
-| `SegmentedControl`                           | `Ongoing \| Past` 형태의 배타 선택                        |
-| `IconOrb`                                    | 44×44 기본·48×48 헤더용 원형 아이콘 버튼                  |
-| `GaugeBar`                                   | 예산·진행률 막대                                          |
-| `ImagePlaceholder`                           | 이미지 결측 대체 면                                       |
-| `BottomNav`                                  | 하단 탭. 2번째 탭은 Report(`/reports`)로 이동             |
-| `StateEmpty` / `StateError` / `StateLoading` | 빈·오류·로딩 상태                                         |
-| `LocaleSheet`                                | 로케일 선택 시트                                          |
-| `CalendarGrid`                               | 달 하나짜리 달력. 하루 선택·기간 선택 겸용                |
+| 컴포넌트                                     | 용도                                                                    |
+| -------------------------------------------- | ----------------------------------------------------------------------- |
+| `AppButton`                                  | primary / secondary / tertiary / settle / destructive. 로딩·비활성 포함 |
+| `AppCard`                                    | `surface-1` r20 면. 절취선 없는 카드                                    |
+| `AppTicket`                                  | **시그니처.** 노치 + 퍼포레이션 티켓                                    |
+| `TicketStamp`                                | 티켓 우하단 원형 도장                                                   |
+| `BrandWordmark`                              | `NAWA` 워드마크. Ria Sans 조판을 고정한 벡터 패스                       |
+| `CategoryChip`                               | 소비영역 칩. 필터 토글 / 티켓 안 정적 라벨 겸용                         |
+| `CategoryDot`                                | 소비영역 8px 점. 타임라인·범례                                          |
+| `AppBadge`                                   | 진행중·예정·정산·동행 등 짧은 상태 표식                                 |
+| `TextInput`                                  | 라벨·도움말·오류가 묶인 텍스트·날짜 입력                                |
+| `AmountInput`                                | 통화 접두·단위 접미 + 우측 정렬 금액 입력                               |
+| `SegmentedControl`                           | `Ongoing \| Past` 형태의 배타 선택                                      |
+| `IconOrb`                                    | 44×44 기본·48×48 헤더용 원형 아이콘 버튼                                |
+| `GaugeBar`                                   | 예산·진행률 막대                                                        |
+| `ImagePlaceholder`                           | 이미지 결측 대체 면                                                     |
+| `BottomNav`                                  | 하단 탭. 2번째 탭은 Report(`/reports`)로 이동                           |
+| `StateEmpty` / `StateError` / `StateLoading` | 빈·오류·로딩 상태                                                       |
+| `LocaleSheet`                                | 로케일 선택 시트                                                        |
+| `CalendarGrid`                               | 달 하나짜리 달력. 하루 선택·기간 선택 겸용                              |
 
 ## 지켜야 할 것
 

@@ -12,7 +12,8 @@ import { vFitText } from '@/shared/lib/fitText'
  *
  * 시안 실측: primary h52 · 나머지 h48 · 라운드 12.
  */
-type ButtonVariant = 'primary' | 'secondary' | 'secondary-on-paper' | 'tertiary' | 'settle'
+type ButtonVariant =
+  'primary' | 'secondary' | 'secondary-on-paper' | 'tertiary' | 'settle' | 'destructive'
 
 interface Props {
   variant?: ButtonVariant
@@ -61,6 +62,7 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
   'secondary-on-paper': 'rounded-sm border border-hairline-strong bg-transparent text-on-paper',
   tertiary: 'text-ink underline underline-offset-4',
   settle: 'rounded-sm bg-settlement text-on-paper',
+  destructive: 'rounded-sm bg-danger text-on-category',
 }
 
 const HEIGHT_CLASS: Record<ButtonVariant, string> = {
@@ -69,6 +71,7 @@ const HEIGHT_CLASS: Record<ButtonVariant, string> = {
   'secondary-on-paper': 'h-12',
   tertiary: 'h-11',
   settle: 'h-12',
+  destructive: 'h-12',
 }
 
 function handleClick(): void {

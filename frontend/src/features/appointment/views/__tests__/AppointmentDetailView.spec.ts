@@ -576,7 +576,7 @@ describe('AppointmentDetailView', () => {
 
     await wrapper
       .findAll('[role="dialog"] button')
-      .find((button) => button.text() === 'Leave group')
+      .find((button) => button.text() === 'Leave and forfeit')
       ?.trigger('click')
     await flushPromises()
 
