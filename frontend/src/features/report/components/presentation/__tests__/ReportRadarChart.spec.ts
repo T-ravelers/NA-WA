@@ -32,6 +32,23 @@ describe('ReportRadarChart', () => {
     expect(labels[0]?.attributes('style')).toContain('top: 6%')
   })
 
+  /**
+   * jsdom은 레이아웃을 계산하지 않아 라벨이 카드 밖으로 나가는지 잴 수 없다. 대신 라벨 좌표의
+   * 기준이 되는 상자가 좌우 여백 안에 있는지만 본다 — 여백을 지우면 280px에서 축이 4개일 때
+   * 3시 방향 라벨이 `AppCard`(`overflow-hidden`)에 잘린다.
+   */
+  it('insets the box that the axis labels are positioned against', () => {
+    const wrapper = mount(ReportRadarChart, { props: { axes: AXES, ...LABELS } })
+    const positioningBox = wrapper.find('span[aria-hidden="true"].absolute').element.parentElement
+    const outer = positioningBox?.parentElement
+
+    expect(positioningBox?.className).toContain('relative')
+    expect(positioningBox).toBe(wrapper.get('svg').element.parentElement)
+    // 여백은 바깥 상자가 갖는다. 안쪽에 주면 absolute 기준이 padding box라 효과가 없다.
+    expect(outer?.className).toContain('px-6')
+    expect(outer?.className).toContain('max-w-72')
+  })
+
   it('reads every value out loud for screen readers', () => {
     const wrapper = mount(ReportRadarChart, { props: { axes: AXES, ...LABELS } })
 

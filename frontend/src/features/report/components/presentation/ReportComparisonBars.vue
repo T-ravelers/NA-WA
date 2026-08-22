@@ -35,7 +35,11 @@ watch(
 
 /**
  * 칩 이니셜. `slice(0, 1)`은 UTF-16 코드 유닛 하나를 잘라 이모지로 시작하는 표시명을
- * 서로게이트 페어 절반으로 만든다. `AppointmentMemberList`와 같은 규칙을 쓴다.
+ * 서로게이트 페어 절반으로 만든다.
+ *
+ * 약속 쪽 네 곳(`AppointmentMemberList`·`AppointmentReviewCard`·`AppointmentAttendanceView`·
+ * `AppointmentMemberProfileView`)은 아직 `charAt(0)`이라 그 버그가 남아 있다. 자리는 같지만
+ * **규칙이 같지는 않다** — 통일은 #442.
  */
 function initials(label: string): string {
   return [...label.trim()][0]?.toUpperCase() ?? '?'
