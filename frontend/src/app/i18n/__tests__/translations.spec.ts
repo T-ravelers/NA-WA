@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { isSupportedLocale } from '@/shared/i18n/locales'
+import { SUPPORTED_LOCALES, isSupportedLocale } from '@/shared/i18n/locales'
 
 import type { MessageTree } from '../messages'
 
 /**
  * 번역 파일의 구조 검증.
  *
- * 부분 번역은 허용한다 — 없는 key는 `en`으로 폴백하는 것이 설계다. 그래서 key 개수가 같은지는
- * 보지 않는다. 대신 **있는 번역이 깨져 있지 않은지**를 본다.
- *
+ * - `en`의 key가 로케일 파일에 없으면 그 문구만 화면에 영어로 남는다. `UNTRANSLATED`에 적은
+ *   key만 예외로 둔다.
  * - `en`에 없는 key가 로케일 파일에 있으면 오타이거나 지워진 key의 잔재다. 화면에 절대 나오지 않는다.
  * - `{placeholder}`가 다르면 런타임에 값 대신 빈칸이 나온다.
  * - 복수형 `|` 분절 수가 다르면 `count`에 따라 엉뚱한 분절이 뽑힌다.
@@ -20,6 +19,19 @@ const messageModules = import.meta.glob<{ default: MessageTree }>(
   ['../../../shared/i18n/*.ts', '../../../features/*/i18n/*.ts'],
   { eager: true },
 )
+
+/**
+ * 의도적으로 번역하지 않는 key. `<group>/<locale>` → key 배열이며 `group`은 `shared/i18n`
+ * 또는 `features/<domain>/i18n`이다 — 아래 테스트 이름에 그대로 찍히는 값이다.
+ *
+ * 여기 적지 않은 key가 로케일 파일에서 빠지면 테스트가 실패한다. 비-`en`이 스텁이던 동안은
+ * 부분 번역을 허용하는 것이 설계였지만, #354가 세 로케일을 전량 채우면서 전제가 바뀌었다.
+ * 이제 `en`에 key를 더하면서 번역을 빠뜨린 PR은 아무 경고 없이 그 화면에 영어를 남긴다.
+ * 폴백은 그대로 살아 있으므로 화면이 깨지지는 않는다 — 이 검사는 빠뜨림을 드러내기 위한 것이다.
+ *
+ * 번역하지 않기로 정한 key를 넣을 때는 왜 그런지 한 줄로 적는다.
+ */
+const UNTRANSLATED: Record<string, readonly string[]> = {}
 
 type FlatMessages = Map<string, string>
 
@@ -81,10 +93,23 @@ describe('translation files follow en', () => {
       continue
     }
 
+    it(`${group} has a file for every supported locale`, () => {
+      const absent = SUPPORTED_LOCALES.filter((locale) => !locales.has(locale))
+
+      expect(absent).toEqual([])
+    })
+
     for (const [locale, messages] of locales) {
       if (locale === 'en') {
         continue
       }
+
+      it(`${group}/${locale} translates every en key`, () => {
+        const allowed = new Set(UNTRANSLATED[`${group}/${locale}`] ?? [])
+        const missing = [...source.keys()].filter((key) => !messages.has(key) && !allowed.has(key))
+
+        expect(missing).toEqual([])
+      })
 
       it(`${group}/${locale} has no key that en lacks`, () => {
         const orphans = [...messages.keys()].filter((key) => !source.has(key))
