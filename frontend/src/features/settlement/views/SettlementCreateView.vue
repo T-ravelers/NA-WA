@@ -280,6 +280,18 @@ function setType(nextType: SettlementType): void {
   validationMessage.value = null
 }
 
+/**
+ * 결제자인가.
+ *
+ * 결제자는 정산에서 뺄 수 없다. 그런데 칩은 평범한 버튼이라 눌러도 아무 일이 없고 왜
+ * 그런지 알 방법이 없었다(#382). 화면은 이 값으로 `aria-disabled`와 조형을 가른다 —
+ * 다른 선택 칩은 테두리와 10% 면이고 결제자만 꽉 찬 면이다. 「선택됨」이 아니라
+ * 「고정됨」으로 읽히게 한다.
+ */
+function isPayer(participantId: string): boolean {
+  return participantId === selectedCandidate.value?.payerAppointmentMemberId
+}
+
 function toggleParticipant(participantId: string): void {
   const candidate = selectedCandidate.value
   if (candidate === null || participantId === candidate.payerAppointmentMemberId) return
@@ -709,17 +721,20 @@ defineExpose({ back })
           type="button"
           :data-participant-id="participant.id"
           :aria-pressed="selectedIds.has(participant.id)"
+          :aria-disabled="isPayer(participant.id) || undefined"
           class="min-h-12 rounded-sm border px-3 text-left"
-          :class="
-            selectedIds.has(participant.id)
-              ? 'border-settlement bg-settlement/10 text-settlement'
-              : 'border-hairline-strong text-ink-2'
-          "
+          :class="[
+            isPayer(participant.id)
+              ? 'cursor-default border-settlement bg-settlement text-on-paper'
+              : selectedIds.has(participant.id)
+                ? 'border-settlement bg-settlement/10 text-settlement'
+                : 'border-hairline-strong text-ink-2',
+          ]"
           @click="toggleParticipant(participant.id)"
         >
           {{ participant.name
           }}<span
-            v-if="participant.id === selectedCandidate?.payerAppointmentMemberId"
+            v-if="isPayer(participant.id)"
             class="ml-1 text-caption"
             >{{ t('settlement.create.payer') }}</span
           >

@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import SegmentedControl from '../SegmentedControl.vue'
 
@@ -53,5 +53,62 @@ describe('SegmentedControl', () => {
     await wrapper.findAll('button')[0]?.trigger('click')
 
     expect(wrapper.emitted('update:modelValue')).toEqual([['ongoing']])
+  })
+
+  /*
+   * 라디오 그룹은 탭 스톱이 하나이고 안에서는 화살표로 옮겨 다닌다(#305). 선택지가 둘일
+   * 때는 비용이 드러나지 않지만, 같은 관행이 QR 결제의 칩 일곱 개로 번지면서 결제
+   * 버튼까지 탭을 일곱 번 더 눌러야 하는 상태가 됐다.
+   */
+  it('keeps only the selected option in the tab order', () => {
+    const buttons = mountControl('past').findAll('button')
+
+    expect(buttons.map((b) => b.attributes('tabindex'))).toEqual(['-1', '0'])
+  })
+
+  it.each([
+    ['ArrowRight', 'ongoing', 'past'],
+    ['ArrowDown', 'ongoing', 'past'],
+    ['ArrowLeft', 'past', 'ongoing'],
+    ['ArrowUp', 'past', 'ongoing'],
+    ['Home', 'past', 'ongoing'],
+    ['End', 'ongoing', 'past'],
+  ])('moves the selection with %s', async (key, from, expected) => {
+    const wrapper = mountControl(from)
+
+    await wrapper.get('[role="radiogroup"]').trigger('keydown', { key })
+
+    expect(wrapper.emitted('update:modelValue')).toEqual([[expected]])
+  })
+
+  it('wraps around at both ends', async () => {
+    const forward = mountControl('past')
+    await forward.get('[role="radiogroup"]').trigger('keydown', { key: 'ArrowRight' })
+    expect(forward.emitted('update:modelValue')).toEqual([['ongoing']])
+
+    const backward = mountControl('ongoing')
+    await backward.get('[role="radiogroup"]').trigger('keydown', { key: 'ArrowLeft' })
+    expect(backward.emitted('update:modelValue')).toEqual([['past']])
+  })
+
+  it('leaves other keys to the page', async () => {
+    const wrapper = mountControl('ongoing')
+
+    await wrapper.get('[role="radiogroup"]').trigger('keydown', { key: 'Tab' })
+    await wrapper.get('[role="radiogroup"]').trigger('keydown', { key: 'a' })
+
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  /* 화살표가 화면까지 스크롤하면 그룹 안에서 이동만 하려던 조작이 페이지를 흔든다. */
+  it('stops the arrow key from also scrolling the page', async () => {
+    const wrapper = mountControl('ongoing')
+    const preventDefault = vi.fn()
+
+    await wrapper
+      .get('[role="radiogroup"]')
+      .trigger('keydown', { key: 'ArrowRight', preventDefault })
+
+    expect(preventDefault).toHaveBeenCalled()
   })
 })

@@ -406,6 +406,40 @@ describe('WalletQrPaymentPreviewView', () => {
     expect(vi.mocked(previewQrPayment).mock.calls).toHaveLength(callsBefore)
   })
 
+  /*
+   * 칩 일곱 개가 전부 탭 스톱이면 키보드로 결제 버튼까지 가는 데 칩을 일곱 번 지나야
+   * 한다(#305). 라디오 그룹은 탭 스톱이 하나이고 안에서는 화살표로 옮겨 다닌다.
+   */
+  it('keeps one tab stop for the seven category chips', async () => {
+    const { wrapper } = await mountView()
+    setFixedAmountSession()
+    await flushPromises()
+
+    const chips = wrapper.findAll('[data-testid^="payment-category-"]')
+
+    expect(chips).toHaveLength(7)
+    expect(chips.filter((chip) => chip.attributes('tabindex') === '0')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="payment-category-OTHER"]').attributes('tabindex')).toBe('0')
+  })
+
+  it('moves the category selection with the arrow keys', async () => {
+    const { wrapper } = await mountView()
+    setFixedAmountSession()
+    await flushPromises()
+
+    const group = wrapper
+      .findAll('[role="radiogroup"]')
+      .find((candidate) => candidate.find('[data-testid^="payment-category-"]').exists())
+
+    await group?.trigger('keydown', { key: 'ArrowRight' })
+
+    const chips = wrapper.findAll('[data-testid^="payment-category-"]')
+    const checked = chips.filter((chip) => chip.attributes('aria-checked') === 'true')
+
+    expect(checked).toHaveLength(1)
+    expect(checked[0]?.attributes('data-testid')).not.toBe('payment-category-OTHER')
+  })
+
   it('executes a shared-expense payment with the selected appointment id', async () => {
     const { wrapper } = await mountView()
     setFixedAmountSession()

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SelectChip, { type SelectChipFill } from './SelectChip.vue'
 import type { Category } from './category'
 
 /**
@@ -12,6 +13,9 @@ import type { Category } from './category'
  *
  * 색만으로는 영역을 구분할 수 없으므로 칩에는 반드시 텍스트 라벨이 들어간다.
  * 색은 라벨을 보조할 뿐이다.
+ *
+ * 모양과 크기는 `SelectChip`이 소유한다. 여기서는 **소비영역을 색 이름으로 옮기는
+ * 일만** 한다 — `Category`를 늘려도 `SelectChip`은 그대로다.
  */
 interface Props {
   category: Category
@@ -29,38 +33,23 @@ const { category, label, interactive = false, selected = false, size = 'md' } = 
 
 const emit = defineEmits<{ toggle: [] }>()
 
-/* 코어색 면 위 텍스트는 `on-category`다. 종이톤 면 위의 `on-paper`와 다르다. */
-const FILLED_CLASS: Record<Category, string> = {
-  beauty: 'bg-beauty text-on-category',
-  shopping: 'bg-shopping text-on-category',
-  show: 'bg-show text-on-category',
-  food: 'bg-food text-on-category',
+/* 소비영역 4종은 칩 채움색과 이름이 같다. 늘어나면 여기서 컴파일이 깨진다. */
+const FILL: Record<Category, SelectChipFill> = {
+  beauty: 'beauty',
+  shopping: 'shopping',
+  show: 'show',
+  food: 'food',
 }
-
-const SIZE_CLASS: Record<NonNullable<Props['size']>, string> = {
-  sm: 'h-6 px-2.5',
-  md: 'h-9 px-3.5',
-}
-
-const UNSELECTED_CLASS = 'border border-hairline bg-transparent text-ink-2'
 </script>
 
 <template>
-  <button
-    v-if="interactive"
-    type="button"
-    :aria-pressed="selected"
-    class="inline-flex shrink-0 items-center rounded-pill text-caption transition-transform active:scale-[0.98]"
-    :class="[SIZE_CLASS[size], selected ? FILLED_CLASS[category] : UNSELECTED_CLASS]"
-    @click="emit('toggle')"
-  >
-    {{ label }}
-  </button>
-  <span
-    v-else
-    class="inline-flex shrink-0 items-center rounded-pill text-caption"
-    :class="[SIZE_CLASS[size], FILLED_CLASS[category]]"
-  >
-    {{ label }}
-  </span>
+  <SelectChip
+    :label="label"
+    :fill="FILL[category]"
+    :size="size"
+    :interactive="interactive"
+    :selected="selected"
+    :aria-pressed="interactive ? selected : undefined"
+    @toggle="emit('toggle')"
+  />
 </template>

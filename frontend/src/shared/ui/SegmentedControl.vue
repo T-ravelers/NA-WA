@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import SelectChip from './SelectChip.vue'
+import { useRovingRadioGroup } from './useRovingRadioGroup'
+
 /**
  * 두 개 이상의 배타 선택지를 고르는 pill 트랙.
  *
  * 시안에서 `Ongoing | Past`, `Itinerary | Spending`, `Group | Individual`에 6회 반복된다.
  *
  * 라디오 그룹으로 그린다. 탭이 아니다 — 선택이 콘텐츠 패널을 전환하는 것이 아니라
- * 같은 목록의 필터를 바꾸는 용도이기 때문이다.
+ * 같은 목록의 필터를 바꾸는 용도이기 때문이다. 화살표 키 이동과 그룹당 탭 스톱 하나는
+ * `useRovingRadioGroup`이 맡는다.
  */
 interface Option {
   value: string
@@ -22,6 +26,16 @@ interface Props {
 const { modelValue, options, label } = defineProps<Props>()
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+
+function select(value: string): void {
+  emit('update:modelValue', value)
+}
+
+const { onKeydown, tabindexFor } = useRovingRadioGroup(
+  () => options.map((option) => option.value),
+  () => modelValue,
+  select,
+)
 </script>
 
 <template>
@@ -29,21 +43,20 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
     role="radiogroup"
     :aria-label="label"
     class="flex h-11 rounded-pill bg-surface-2 p-1"
+    @keydown="onKeydown"
   >
-    <button
+    <SelectChip
       v-for="option in options"
       :key="option.value"
-      type="button"
+      interactive
+      size="segment"
+      :label="option.label"
+      :selected="option.value === modelValue"
       role="radio"
       :data-testid="`segment-${option.value}`"
       :aria-checked="option.value === modelValue"
-      class="flex-1 rounded-pill text-title-sm"
-      :class="
-        option.value === modelValue ? 'bg-paper-fill text-on-paper' : 'bg-transparent text-ink-2'
-      "
-      @click="emit('update:modelValue', option.value)"
-    >
-      {{ option.label }}
-    </button>
+      :tabindex="tabindexFor(option.value)"
+      @toggle="select(option.value)"
+    />
   </div>
 </template>
