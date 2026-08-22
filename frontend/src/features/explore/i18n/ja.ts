@@ -275,6 +275,13 @@ export default {
       kids: 'キッズ設備',
       restroom: 'トイレ',
     },
+    mapLinks: {
+      openInGoogleMaps: 'Google Maps',
+      // 대중교통 경로를 여는 버튼. 서비스명이 아니라 동작이라 '乗換案内'로 옮긴다.
+      directions: 'Google 乗換案内',
+      openInNaverMap: 'Naver Map',
+      naverDirections: 'Naver 乗換案内',
+    },
     placeDetail: {
       back: 'スポット一覧へ戻る',
       share: 'スポットを共有',
@@ -289,11 +296,6 @@ export default {
       phone: '電話',
       homepage: 'ホームページ',
       location: '場所',
-      openInGoogleMaps: 'Google Maps',
-      // 대중교통 경로를 여는 버튼. 서비스명이 아니라 동작이라 '乗換案内'로 옮긴다.
-      directions: 'Google 乗換案内',
-      openInNaverMap: 'Naver Map',
-      naverDirections: 'Naver 乗換案内',
       signatureMenu: '看板メニュー',
       options: {
         foreignLanguage: '外国語対応',
@@ -335,10 +337,6 @@ export default {
       activities: 'アクティビティ',
       description: 'イベントについて',
       program: 'プログラム',
-      openInGoogleMaps: 'Google Maps',
-      directions: 'Google 乗換案内',
-      openInNaverMap: 'Naver Map',
-      naverDirections: 'Naver 乗換案内',
       addToJourney: '旅程に追加',
       addedToJourney: '旅程に追加済み',
       findCompanions: '同行者を探す',
