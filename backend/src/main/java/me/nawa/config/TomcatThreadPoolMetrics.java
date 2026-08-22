@@ -27,10 +27,25 @@ public class TomcatThreadPoolMetrics implements MeterBinder {
 
     private static final String THREAD_POOL_PATTERN = "Catalina:type=ThreadPool,*";
 
+    private final MBeanServer server;
+
+    public TomcatThreadPoolMetrics() {
+        this(ManagementFactory.getPlatformMBeanServer());
+    }
+
+    /**
+     * 테스트가 격리된 MBeanServer를 넘기기 위한 생성자.
+     *
+     * 플랫폼 MBeanServer는 JVM 싱글턴이라 테스트끼리 서로의 등록 상태를 본다.
+     * "스레드풀이 없을 때"를 단정하는 테스트가 형제 테스트의 스텁 때문에 깨지는 것을
+     * 막으려면 서버를 갈아 끼울 수 있어야 한다.
+     */
+    TomcatThreadPoolMetrics(MBeanServer server) {
+        this.server = server;
+    }
+
     @Override
     public void bindTo(MeterRegistry registry) {
-        MBeanServer server = ManagementFactory.getPlatformMBeanServer();
-
         Set<ObjectName> pools;
         try {
             pools = server.queryNames(new ObjectName(THREAD_POOL_PATTERN), null);
@@ -48,18 +63,17 @@ public class TomcatThreadPoolMetrics implements MeterBinder {
         for (ObjectName pool : pools) {
             String name = pool.getKeyProperty("name");
 
-            registerGauge(registry, server, pool, name, "currentThreadsBusy",
+            registerGauge(registry, pool, name, "currentThreadsBusy",
                 "tomcat.threads.busy", "요청을 처리 중인 스레드 수");
-            registerGauge(registry, server, pool, name, "currentThreadCount",
+            registerGauge(registry, pool, name, "currentThreadCount",
                 "tomcat.threads.current", "현재 생성된 스레드 수");
-            registerGauge(registry, server, pool, name, "maxThreads",
+            registerGauge(registry, pool, name, "maxThreads",
                 "tomcat.threads.config.max", "스레드풀 상한");
         }
     }
 
     private void registerGauge(
             MeterRegistry registry,
-            MBeanServer server,
             ObjectName pool,
             String poolName,
             String attribute,

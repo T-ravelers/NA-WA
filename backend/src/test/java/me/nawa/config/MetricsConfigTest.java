@@ -4,22 +4,22 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import javax.management.Attribute;
+import javax.management.AttributeNotFoundException;
 import javax.management.AttributeList;
 import javax.management.DynamicMBean;
 import javax.management.MBeanAttributeInfo;
 import javax.management.MBeanInfo;
 import javax.management.MBeanServer;
+import javax.management.MBeanServerFactory;
 import javax.management.ObjectName;
-import java.lang.management.ManagementFactory;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -66,13 +66,16 @@ class MetricsConfigTest {
     }
 
     /**
-     * Tomcat MBean은 이 테스트가 도는 평범한 JVM에 없다. 없을 때 예외로 죽지 않고
-     * 조용히 건너뛰는 것이 이 바인더의 계약이다 — 지표가 없다고 서버가 못 뜨면 안 된다.
+     * Tomcat이 없는 환경에서도 레지스트리 배선이 끝까지 돈다.
+     *
+     * 바인더가 예외를 던지면 `meterRegistry()` 빈 생성이 실패해 컨텍스트가 통째로 안
+     * 뜬다 — 지표가 없다고 서버가 못 뜨면 안 된다. "없을 때 아무것도 등록하지 않는다"는
+     * 계약 자체는 격리된 MBeanServer를 쓰는 `registersNothingWhenNoThreadPoolExists`가
+     * 결정적으로 검증하고, 여기서는 config 경로가 무사한지만 본다.
      */
     @Test
-    void skipsTomcatMetricsWhenMBeansAbsent() {
+    void meterRegistryIsUsableWithoutTomcat() {
         assertNotNull(registry.scrape());
-        assertFalse(registry.scrape().contains("tomcat_threads_busy"));
     }
 
     /* ------------------------- Tomcat 스레드풀 ------------------------- */
@@ -88,15 +91,14 @@ class MetricsConfigTest {
     private static final String POOL_OBJECT_NAME =
         "Catalina:type=ThreadPool,name=\"http-nio-8080\"";
 
-    private ObjectName registeredPool;
-
-    @AfterEach
-    void unregisterStub() throws Exception {
-        if (registeredPool != null) {
-            ManagementFactory.getPlatformMBeanServer().unregisterMBean(registeredPool);
-            registeredPool = null;
-        }
-    }
+    /**
+     * 테스트마다 새 MBeanServer를 쓴다.
+     *
+     * 플랫폼 MBeanServer는 JVM 싱글턴이라 여기에 스텁을 올리면 "스레드풀이 없을 때"를
+     * 단정하는 형제 테스트가 그 스텁을 보게 된다. 지금은 순차 실행이라 정리로 넘어가지만
+     * 병렬화를 켜는 순간 깨진다. 아예 공유하지 않는 편이 낫다.
+     */
+    private final MBeanServer isolatedServer = MBeanServerFactory.newMBeanServer();
 
     @Test
     void bindsTomcatThreadPoolMetricsFromMBeans() throws Exception {
@@ -105,9 +107,7 @@ class MetricsConfigTest {
             "currentThreadCount", 12,
             "maxThreads", 200));
 
-        PrometheusMeterRegistry tomcatRegistry =
-            new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
-        new TomcatThreadPoolMetrics().bindTo(tomcatRegistry);
+        PrometheusMeterRegistry tomcatRegistry = bindTomcatMetrics();
 
         assertEquals(7.0, gauge(tomcatRegistry, "tomcat.threads.busy"));
         assertEquals(12.0, gauge(tomcatRegistry, "tomcat.threads.current"));
@@ -122,26 +122,43 @@ class MetricsConfigTest {
     void stripsQuotesFromPoolNameLabel() throws Exception {
         registerThreadPoolStub(Map.of("currentThreadsBusy", 1));
 
-        PrometheusMeterRegistry tomcatRegistry =
-            new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
-        new TomcatThreadPoolMetrics().bindTo(tomcatRegistry);
+        PrometheusMeterRegistry tomcatRegistry = bindTomcatMetrics();
 
         assertEquals(
             "http-nio-8080",
             tomcatRegistry.find("tomcat.threads.busy").gauge().getId().getTag("name"));
     }
 
-    /** 값을 못 읽을 때 0이면 "한가하다"로 오독된다. NaN이어야 한다. */
+    /**
+     * 값을 못 읽을 때 0이면 "한가하다"로 오독된다. NaN이어야 한다.
+     *
+     * 실제 MBean은 모르는 속성에 `AttributeNotFoundException`을 던지므로 스텁도 그렇게
+     * 둔다. `null` 반환 경로만 타면 예외 처리 분기가 검증되지 않는다.
+     */
     @Test
     void reportsNaNWhenAttributeIsUnreadable() throws Exception {
         registerThreadPoolStub(Map.of("currentThreadsBusy", 3));
 
+        PrometheusMeterRegistry tomcatRegistry = bindTomcatMetrics();
+
+        // 스텁이 maxThreads 를 모르므로 예외를 던진다.
+        assertTrue(Double.isNaN(gauge(tomcatRegistry, "tomcat.threads.config.max")));
+    }
+
+    /** 스레드풀 MBean이 하나도 없으면 지표를 등록하지 않는다. */
+    @Test
+    void registersNothingWhenNoThreadPoolExists() {
+        PrometheusMeterRegistry tomcatRegistry = bindTomcatMetrics();
+
+        assertNull(tomcatRegistry.find("tomcat.threads.busy").gauge());
+    }
+
+    private PrometheusMeterRegistry bindTomcatMetrics() {
         PrometheusMeterRegistry tomcatRegistry =
             new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
-        new TomcatThreadPoolMetrics().bindTo(tomcatRegistry);
+        new TomcatThreadPoolMetrics(isolatedServer).bindTo(tomcatRegistry);
 
-        // 스텁이 maxThreads 를 갖고 있지 않다.
-        assertTrue(Double.isNaN(gauge(tomcatRegistry, "tomcat.threads.config.max")));
+        return tomcatRegistry;
     }
 
     private double gauge(PrometheusMeterRegistry target, String name) {
@@ -152,9 +169,8 @@ class MetricsConfigTest {
     }
 
     private void registerThreadPoolStub(Map<String, Object> attributes) throws Exception {
-        MBeanServer server = ManagementFactory.getPlatformMBeanServer();
-        registeredPool = new ObjectName(POOL_OBJECT_NAME);
-        server.registerMBean(new ThreadPoolStub(attributes), registeredPool);
+        isolatedServer.registerMBean(
+            new ThreadPoolStub(attributes), new ObjectName(POOL_OBJECT_NAME));
     }
 
     /** Tomcat 커넥터 MBean 흉내. 속성명은 Tomcat과 같이 소문자로 시작한다. */
@@ -167,8 +183,14 @@ class MetricsConfigTest {
         }
 
         @Override
-        public Object getAttribute(String name) {
-            return attributes.get(name);
+        public Object getAttribute(String name) throws AttributeNotFoundException {
+            Object value = attributes.get(name);
+            if (value == null) {
+                // 실제 Tomcat MBean과 같은 동작. null 반환이 아니라 예외다.
+                throw new AttributeNotFoundException(name);
+            }
+
+            return value;
         }
 
         @Override

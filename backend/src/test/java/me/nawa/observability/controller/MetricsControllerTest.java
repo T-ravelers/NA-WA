@@ -5,6 +5,10 @@ import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -68,18 +72,38 @@ class MetricsControllerTest {
 
     /**
      * Spring 5의 `StringHttpMessageConverter` 기본 문자셋은 ISO-8859-1이다
-     * (UTF-8이 된 것은 Spring 6부터). `produces`에 charset을 적지 않으면 지표 설명의
-     * 한글이 전부 `?`로 바뀐다. 파싱은 통과해서 초록불로 넘어가는 종류의 결함이다.
+     * (UTF-8이 된 것은 Spring 6부터). charset을 못 박지 않으면 지표 설명의 한글이
+     * 전부 `?`로 바뀐다. 파싱은 통과해서 초록불로 넘어가는 종류의 결함이다.
+     *
+     * <p><b>Accept 헤더를 반드시 실제 값으로 보내야 한다.</b> 헤더 없이 부르면
+     * 콘텐츠 협상을 지나가지 않아 어떻게 고치든 통과한다. 실제 스크레이퍼는
+     * `text/plain;version=0.0.4`를 명시해서 보내고, 그때 Spring이 Accept 쪽을 고르면서
+     * charset이 떨어져 나간다.
      */
-    @Test
-    void servesUtf8SoKoreanDescriptionsSurvive() throws Exception {
+    @ParameterizedTest(name = "Accept: {0}")
+    @ValueSource(strings = {
+        // Prometheus가 실제로 보내는 헤더
+        "application/openmetrics-text;version=1.0.0,text/plain;version=0.0.4;q=0.5,*/*;q=0.1",
+        "text/plain;version=0.0.4",
+        "text/plain",
+        "*/*",
+        // OpenMetrics만 요청하도록 설정된 수집기
+        "application/openmetrics-text;version=1.0.0"
+    })
+    void servesUtf8ForEveryScraperAcceptHeader(String accept) throws Exception {
         Gauge.builder("nawa.test.gauge", () -> 1.0)
             .description("요청을 처리 중인 스레드 수")
             .register(registry);
 
-        var response = mockMvc.perform(get("/internal/metrics")).andReturn().getResponse();
+        MockHttpServletResponse response = mockMvc
+            .perform(get("/internal/metrics").header(HttpHeaders.ACCEPT, accept))
+            .andReturn()
+            .getResponse();
 
+        assertEquals(200, response.getStatus());
         assertEquals(StandardCharsets.UTF_8.name(), response.getCharacterEncoding());
-        assertTrue(response.getContentAsString().contains("요청을 처리 중인 스레드 수"));
+        assertTrue(
+            response.getContentAsString().contains("요청을 처리 중인 스레드 수"),
+            "한글 설명이 깨졌다: " + response.getContentType());
     }
 }
