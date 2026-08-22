@@ -85,17 +85,14 @@ GET /api/v1/reports/{reportId}/comparison?scope=GROUP
 
 ### `GROUP` — 같은 약속 동료
 
-- 동료 = 내 약속들의 **다른 ACTIVE 참가자**. 내 약속은 세 갈래로 모은다.
-  - 리포트 여정의 `trip_items`(CONFIRMED)가 가리키는 약속 — 내가 만든 약속만 여기 잡힌다.
-  - 내가 ACTIVE로 참여한 약속 중 **활동일이 여정 기간 안**인 것. 약속에 참여만 하면
-    `trip_items`도 `appointment_members.trip_id`도 생기지 않아, 이 갈래가 없으면 참가자에게는
-    `peers`가 항상 빈다.
-  - `appointment_members.trip_id` — 운영 코드가 아직 채우지 않는다. 장래 대비다.
+- 동료 = 내 약속들의 **다른 ACTIVE 참가자**. 내 약속은 두 갈래로 모은다 — 리포트 여정의
+  `trip_items`(CONFIRMED)가 가리키는 약속, 그리고 `appointment_members.trip_id`가 이 여정인 내 ACTIVE
+  참여. #407부터 만들 때도 참여할 때도 둘 다 채워지므로 방장·참가자가 같은 길로 잡힌다. 그 전에
+  참여한 약속(둘 다 비어 있음)은 잡히지 않는다.
 - **취소된 약속(`appointment_status = 'CANCELLED'`)은 제외한다.** 취소는 `deleted_at`을 남기지
   않고, 취소 약속은 방장 아닌 사람에게 목록에서 감춰지기 때문이다.
-- **알려진 한계**: 참가자 갈래에 여정 연결이 없어 활동일로 근사한다. 기간이 겹치는 여정을 여러 개
-  가지면 다른 여정의 약속 동료가 섞일 수 있다. `appointment_members.trip_id`를 채우기 시작하면
-  이 갈래를 뺀다.
+- 기간이 겹치는 여정을 여러 개 가져도 다른 여정의 약속 동료는 섞이지 않는다 — 활동일로 근사하던
+  갈래는 #415에서 뺐다.
 - 나와 동료 모두 **여정 기간 안의 완료된 QR 결제·정산**(결제자 본인 지갑의 DEBIT, KRW)을 지금 다시
   합산한다(`basis: LIVE`). 저장된 스냅샷은 내가 고른 지출만 담고 있어 동료와 정의가 다르다.
   그래서 `me.totalSpent`가 상세 화면의 `analytics.totalSpent`와 다를 수 있다.

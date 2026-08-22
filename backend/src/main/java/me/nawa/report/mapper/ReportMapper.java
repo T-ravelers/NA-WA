@@ -59,9 +59,7 @@ public interface ReportMapper {
     // 기간이 필요한 이유는 ReportMapper.xml의 (C) 갈래 주석에 있다.
     List<ReportComparisonMember> findComparisonPeerMembers(
         @Param("tripId") Long tripId,
-        @Param("memberId") Long memberId,
-        @Param("startDate") LocalDate startDate,
-        @Param("endDate") LocalDate endDate
+        @Param("memberId") Long memberId
     );
 
     List<ReportComparisonSpending> findComparisonSpending(
