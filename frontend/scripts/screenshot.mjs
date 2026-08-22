@@ -92,7 +92,7 @@ const FULL_PAGE = process.env.SCREENSHOT_FULL_PAGE === '1'
 /** @typedef {(page: import('@playwright/test').Page) => Promise<unknown>} Hook */
 
 /** 인증된 회원인 것처럼 프로필 응답을 세운다. 백엔드 `ApiResponse` 봉투를 그대로 흉내낸다. */
-function stubMemberProfile(page) {
+function stubMemberProfile(page, overrides = {}) {
   return page.route('**/api/v1/members/me', (route) =>
     route.fulfill({
       status: 200,
@@ -110,6 +110,7 @@ function stubMemberProfile(page) {
           nationalityCode: 'JP',
           accountType: 'TRAVELER',
           onboardingRequired: false,
+          ...overrides,
         },
       }),
     }),
@@ -1512,6 +1513,20 @@ const SCREENS = [
       await page.getByTestId('segment-appointments').click()
       await page.getByTestId('profile-list').getByRole('link').first().waitFor()
     },
+  },
+  {
+    name: '04c-profile-edit',
+    path: '/profile/edit',
+    setup: (page) => stubMemberProfile(page),
+  },
+  {
+    /*
+     * 온보딩은 guard가 보내 주는 화면이라 주소로 바로 들어가면 프로필이 이미 끝난 상태로
+     * 판정돼 홈으로 되돌려진다. 여기서만 온보딩이 남은 프로필을 세운다.
+     */
+    name: '04d-onboarding',
+    path: '/onboarding',
+    setup: (page) => stubMemberProfile(page, { onboardingRequired: true }),
   },
   {
     name: '05-profile-language',
