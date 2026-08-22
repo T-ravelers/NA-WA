@@ -27,6 +27,7 @@ GET /api/v1/reports/{reportId}/comparison?scope=GROUP
 ```
 
 `scope`는 `GROUP`(기본) 또는 `SIMILAR`다. 그 밖의 값은 enum 바인딩에 실패해 `COMMON-001`(400)이다.
+`?scope=`처럼 값을 비우면 기본값이 아니라 `null`로 바인딩되어 `REPORT-003`(400)이 된다.
 **숫자는 전부 0 이상이고 문구는 싣지 않는다.** 차이의 부호와 표현은 프론트엔드가 비중으로 계산한다.
 
 ### 응답

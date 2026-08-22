@@ -1,6 +1,8 @@
 package me.nawa.report.dto.response;
 
 import java.util.List;
+import me.nawa.report.domain.ReportComparisonBasis;
+import me.nawa.report.domain.ReportComparisonScope;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -15,8 +17,8 @@ import lombok.Getter;
 @Builder
 public class ReportComparisonResponse {
 
-    private String scope;
-    private String basis;
+    private ReportComparisonScope scope;
+    private ReportComparisonBasis basis;
     private ReportComparisonMemberResponse me;
     private List<ReportComparisonMemberResponse> peers;
     private ReportComparisonCohortResponse cohort;

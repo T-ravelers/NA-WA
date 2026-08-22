@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.List;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.GlobalExceptionHandler;
+import me.nawa.report.domain.ReportComparisonBasis;
 import me.nawa.report.domain.ReportComparisonScope;
 import me.nawa.report.dto.response.ReportCategoryBreakdownResponse;
 import me.nawa.report.dto.response.ReportComparisonCohortResponse;
@@ -114,8 +115,8 @@ class ReportComparisonControllerTest {
             .category("FOOD").amount(new BigDecimal("40000.0000"))
             .percentage(new BigDecimal("100.00")).build();
         return ReportComparisonResponse.builder()
-            .scope("GROUP")
-            .basis("LIVE")
+            .scope(ReportComparisonScope.GROUP)
+            .basis(ReportComparisonBasis.LIVE)
             .me(ReportComparisonMemberResponse.builder()
                 .memberId(1L).displayName("Me")
                 .totalSpent(new BigDecimal("40000.0000"))

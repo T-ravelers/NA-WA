@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.report.domain.Report;
 import me.nawa.report.domain.ReportCohortSnapshot;
+import me.nawa.report.domain.ReportComparisonBasis;
 import me.nawa.report.domain.ReportComparisonMember;
 import me.nawa.report.domain.ReportComparisonScope;
 import me.nawa.report.domain.ReportComparisonSpending;
@@ -59,7 +60,10 @@ public class ReportService {
     );
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final BigDecimal ZERO = BigDecimal.ZERO;
-    /** 같은 국적 코호트 상한. 시연 규모에서는 닿지 않고, 전체 스캔을 막는 안전장치다. */
+    /**
+     * 같은 국적 코호트 상한. 앱으로 넘어오는 행 수만 자른다 — ROW_NUMBER()는 같은 국적의
+     * 리포트를 모두 훑어 순위를 매긴 뒤이므로, 스캔 자체가 줄지는 않는다.
+     */
     private static final int SIMILAR_COHORT_LIMIT = 200;
 
     private final ReportMapper reportMapper;
@@ -508,8 +512,8 @@ public class ReportService {
         }
 
         return ReportComparisonResponse.builder()
-            .scope(ReportComparisonScope.GROUP.name())
-            .basis("LIVE")
+            .scope(ReportComparisonScope.GROUP)
+            .basis(ReportComparisonBasis.LIVE)
             .me(toComparisonMember(me, myAmounts, days))
             .peers(List.copyOf(peerResponses))
             .cohort(toCohort(peerAmounts, peerDailyAverages))
@@ -556,8 +560,8 @@ public class ReportService {
         }
 
         return ReportComparisonResponse.builder()
-            .scope(ReportComparisonScope.SIMILAR.name())
-            .basis("SNAPSHOT")
+            .scope(ReportComparisonScope.SIMILAR)
+            .basis(ReportComparisonBasis.SNAPSHOT)
             .me(meResponse)
             .peers(List.of())
             .cohort(toCohort(cohortAmounts, cohortDailyAverages))

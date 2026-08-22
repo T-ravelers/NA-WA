@@ -18,6 +18,7 @@ import java.util.List;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.report.domain.Report;
 import me.nawa.report.domain.ReportCohortSnapshot;
+import me.nawa.report.domain.ReportComparisonBasis;
 import me.nawa.report.domain.ReportComparisonMember;
 import me.nawa.report.domain.ReportComparisonScope;
 import me.nawa.report.domain.ReportComparisonSpending;
@@ -68,8 +69,8 @@ class ReportComparisonServiceTest {
             1L, 100L, ReportComparisonScope.GROUP
         );
 
-        assertEquals("GROUP", response.getScope());
-        assertEquals("LIVE", response.getBasis());
+        assertEquals(ReportComparisonScope.GROUP, response.getScope());
+        assertEquals(ReportComparisonBasis.LIVE, response.getBasis());
         assertEquals(new BigDecimal("40000.0000"), response.getMe().getTotalSpent());
         assertEquals(new BigDecimal("8000.00"), response.getMe().getDailyAverage());
         assertEquals("FOOD", response.getMe().getCategoryBreakdown().get(0).getCategory());
@@ -137,8 +138,8 @@ class ReportComparisonServiceTest {
             1L, 100L, ReportComparisonScope.SIMILAR
         );
 
-        assertEquals("SIMILAR", response.getScope());
-        assertEquals("SNAPSHOT", response.getBasis());
+        assertEquals(ReportComparisonScope.SIMILAR, response.getScope());
+        assertEquals(ReportComparisonBasis.SNAPSHOT, response.getBasis());
         // 스냅샷 숫자는 JSON에서 읽은 그대로라 자릿수가 다를 수 있다 — 값만 본다.
         assertEquals(0, new BigDecimal("1000").compareTo(response.getMe().getTotalSpent()));
         assertEquals(0, new BigDecimal("200").compareTo(response.getMe().getDailyAverage()));

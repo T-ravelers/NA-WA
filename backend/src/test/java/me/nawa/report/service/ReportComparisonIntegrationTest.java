@@ -13,6 +13,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.UUID;
 import me.nawa.config.MySqlSchemaExtension;
+import me.nawa.report.domain.ReportComparisonBasis;
 import me.nawa.report.domain.ReportComparisonScope;
 import me.nawa.report.dto.response.ReportComparisonResponse;
 import me.nawa.report.mapper.ReportMapper;
@@ -118,7 +119,7 @@ class ReportComparisonIntegrationTest {
             ReportComparisonResponse group = reportService.getComparison(
                 host, hostReport, ReportComparisonScope.GROUP
             );
-            assertEquals("LIVE", group.getBasis());
+            assertEquals(ReportComparisonBasis.LIVE, group.getBasis());
             assertEquals(new BigDecimal("12000.0000"), group.getMe().getTotalSpent());
             assertEquals(1, group.getPeers().size());
             assertEquals(peer, group.getPeers().get(0).getMemberId());
@@ -142,7 +143,7 @@ class ReportComparisonIntegrationTest {
             ReportComparisonResponse similar = reportService.getComparison(
                 host, hostReport, ReportComparisonScope.SIMILAR
             );
-            assertEquals("SNAPSHOT", similar.getBasis());
+            assertEquals(ReportComparisonBasis.SNAPSHOT, similar.getBasis());
             assertTrue(similar.getPeers().isEmpty());
             assertEquals(1, similar.getCohort().getSize());
             assertEquals(new BigDecimal("5000.00"), similar.getCohort().getAvgTotalSpent());
