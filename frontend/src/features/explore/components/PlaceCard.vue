@@ -75,12 +75,12 @@ function toggleSaved(): void {
 <template>
   <AppCard padding="none">
     <article
-      class="flex min-h-36 gap-0"
+      class="flex gap-0"
       role="article"
     >
       <button
         type="button"
-        class="w-28 shrink-0 p-3 text-left"
+        class="w-24 shrink-0 p-3 text-left"
         :aria-label="t('explore.openPlace', { name: place.name })"
         @click="openPlace"
       >
@@ -96,13 +96,15 @@ function toggleSaved(): void {
           class="relative flex aspect-square items-center justify-center overflow-hidden rounded-sm border border-dashed border-hairline-strong bg-surface-2"
         >
           <ImagePlaceholder :label="t('explore.imageUnavailable')" />
-          <span class="absolute inset-x-0 bottom-3 text-center text-caption text-ink-2">
+          <!-- 카드가 시안 밀도로 낮아지면서 자리표시가 72px가 됐다. 캡션을 더 내리고 한 단계
+               줄여야 가운데 아이콘과 겹치지 않는다. -->
+          <span class="absolute inset-x-0 bottom-1 text-center text-micro text-ink-2">
             {{ t('explore.placePhoto') }}
           </span>
         </div>
       </button>
 
-      <div class="flex min-w-0 flex-1 flex-col gap-2 p-4">
+      <div class="flex min-w-0 flex-1 flex-col gap-1 py-3 pr-3">
         <div class="flex items-center justify-between gap-2">
           <span
             class="flex min-w-0 items-center gap-1 truncate text-micro uppercase tracking-wide text-ink-2"
@@ -128,7 +130,7 @@ function toggleSaved(): void {
 
         <button
           type="button"
-          class="line-clamp-2 text-left text-title text-ink"
+          class="line-clamp-2 text-left text-title-sm text-ink"
           @click="openPlace"
         >
           {{ place.name }}
@@ -141,7 +143,7 @@ function toggleSaved(): void {
           {{ subtitle }}
         </p>
 
-        <div class="mt-auto flex flex-col gap-1 text-caption text-ink-3">
+        <div class="mt-1 flex flex-col gap-1 text-caption text-ink-3">
           <span v-if="regionLabel">{{ regionLabel }}</span>
           <div
             v-if="optionBadges.length > 0"
