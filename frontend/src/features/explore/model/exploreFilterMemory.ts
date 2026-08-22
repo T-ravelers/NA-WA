@@ -100,5 +100,15 @@ export const useExploreFilterMemoryStore = defineStore('explore-filter-memory', 
     return isSameQuery(restored, incoming) ? null : restored
   }
 
-  return { lastQuery, remember, resolveEntry }
+  /**
+   * 기억을 통째로 버린다. 계정이 바뀌는 자리에서 부른다.
+   *
+   * `eventSavedOnly`처럼 그 계정에서만 뜻이 있는 필터가 섞여 있다. 다음 사람이 이어받으면
+   * 자기가 고른 적 없는 조건으로 걸러진 목록을 보게 된다.
+   */
+  function clear(): void {
+    lastQuery.value = { events: null, places: null }
+  }
+
+  return { lastQuery, remember, resolveEntry, clear }
 })
