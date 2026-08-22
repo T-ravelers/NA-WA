@@ -1,4 +1,5 @@
 import { httpClient } from '@/shared/api/httpClient'
+import type { AppointmentStatus } from '@/shared/lib/appointmentStatus'
 
 export type CompanionPreference = '1' | '2-4' | '5+'
 export type JourneyItemType = 'EVENT' | 'PLACE'
@@ -84,7 +85,7 @@ export interface JourneyTimelineAppointment {
   appointmentId: number
   activityStartAt: string
   activityEndAt: string
-  appointmentStatus: string
+  appointmentStatus: AppointmentStatus
 }
 
 export interface JourneyTimelineEventDetail {

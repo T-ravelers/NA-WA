@@ -52,12 +52,17 @@ export function formatReportDate(value: string): string {
   return value.replace(/-/g, '.')
 }
 
-export function formatKrwAmount(value: string): string {
+/**
+ * 소비 금액을 P로 표시한다(#333). `shared/lib/money.ts`의 `formatPoints`는
+ * 정수로 반올림하지만, 리포트 금액은 영수증에서 온 소수 자릿수를 잃지 않아야 해서
+ * 그 함수를 그대로 쓰지 않고 자릿수 구분만 따로 한다.
+ */
+export function formatReportAmount(value: string): string {
   const [integer = '0', fraction = ''] = value.split('.')
   const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   const meaningfulFraction = fraction.replace(/0+$/, '')
 
-  return `₩${grouped}${meaningfulFraction === '' ? '' : `.${meaningfulFraction}`}`
+  return `${grouped}${meaningfulFraction === '' ? '' : `.${meaningfulFraction}`} P`
 }
 
 export function formatPercentage(value: string): string {

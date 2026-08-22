@@ -42,6 +42,7 @@ function open(settlementId: string): void {
 <template>
   <section class="flex min-h-dvh flex-col px-screen pt-8 pb-32">
     <SettlementPageHeader
+      :data-testid="`settlement-history-${side}`"
       :title="
         t(side === 'sent' ? 'settlement.history.titleCollect' : 'settlement.history.titlePay')
       "

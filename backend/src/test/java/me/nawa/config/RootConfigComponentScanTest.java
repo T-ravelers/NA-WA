@@ -6,6 +6,7 @@ import me.nawa.ingest.controller.IngestController;
 import me.nawa.ingest.mapper.IngestMapper;
 import me.nawa.ingest.service.IngestService;
 import me.nawa.member.service.MemberProfileServiceImpl;
+import me.nawa.observability.controller.MetricsController;
 import me.nawa.report.mapper.ReportMapper;
 import me.nawa.report.service.ReportService;
 import org.junit.jupiter.api.Test;
@@ -97,6 +98,18 @@ class RootConfigComponentScanTest {
 
         assertTrue(Arrays.asList(componentScan.basePackages()).contains(
                 IngestController.class.getPackageName()
+        ));
+    }
+
+    @Test
+    void observabilityController_isRegisteredInServletConfig() {
+        // 지표 엔드포인트가 스캔에서 빠지면 레지스트리는 멀쩡한데 수집만 조용히 끊긴다.
+        ComponentScan componentScan = ServletConfig.class.getAnnotation(
+                ComponentScan.class
+        );
+
+        assertTrue(Arrays.asList(componentScan.basePackages()).contains(
+                MetricsController.class.getPackageName()
         ));
     }
 

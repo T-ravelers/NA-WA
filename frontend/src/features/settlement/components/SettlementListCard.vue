@@ -54,7 +54,10 @@ const showsPaidMark = computed(
     <template v-else>
       <span class="flex items-start justify-between gap-3">
         <strong class="min-w-0 truncate text-title">{{ settlement.title }}</strong>
-        <AppBadge :tone="showsPaidMark ? 'completed' : 'pending'">
+        <AppBadge
+          :tone="showsPaidMark ? 'completed' : 'pending'"
+          :data-testid="showsPaidMark ? 'settlement-paid-mark' : undefined"
+        >
           {{
             showsPaidMark ? t('settlement.list.paid') : t(`settlement.status.${settlement.status}`)
           }}

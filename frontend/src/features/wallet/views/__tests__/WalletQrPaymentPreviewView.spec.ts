@@ -207,8 +207,8 @@ describe('WalletQrPaymentPreviewView', () => {
       appointmentId: null,
     })
     expect(wrapper.text()).toContain('Jieun')
-    expect(wrapper.text()).toContain('₩128,500')
-    expect(wrapper.text()).toContain('₩110,000')
+    expect(wrapper.text()).toContain('128,500 P')
+    expect(wrapper.text()).toContain('110,000 P')
     expect(
       wrapper
         .findAll('button')

@@ -1,11 +1,13 @@
 @import 'tailwindcss';
 @import './tokens.css';
+@import './fonts-cjk.css';
 
 /**
  * 폰트.
  *
- * 서브셋 범위는 Latin + Latin Extended + Vietnamese다. CJK 로케일(ja, zh-TW)
- * 폰트는 원본 합계가 39MB라 서브셋 후 로케일별 동적 로드로 별도 추가한다.
+ * `Noto Sans`는 Latin + Latin Extended + Vietnamese 서브셋이다. CJK 로케일(ja, zh-TW)의
+ * 글자는 `fonts-cjk.css`의 Noto Sans JP·TC unicode-range 슬라이스가 맡는다 — 화면에
+ * 실제로 나온 글자가 속한 슬라이스만 내려받는다.
  *
  * Service Worker precache는 vite.config.ts의 globPatterns가 js/css/html만 포함하므로
  * woff2는 사전 캐시되지 않는다. 폰트를 precache에 넣지 않는다.
@@ -46,6 +48,27 @@
   .font-display {
     font-stretch: 200%;
     font-variation-settings: 'wdth' 200;
+  }
+
+  /*
+   * ja와 zh-TW가 공유하는 한자는 자형이 다르다. JP·TC 슬라이스가 같은 코드포인트를 덮으므로
+   * 폴백 체인의 순서가 자형을 정한다. zh-TW에서는 TC를 앞세운다. `lang`은 `applyLocale`이
+   * `<html>`에 쓴다.
+   *
+   * 디스플레이는 Sztos(라틴만 있다) 바로 뒤에 로케일별 CJK 디스플레이 서체를 끼운다 — ja는
+   * M PLUS 1p, zh-TW는 Taipei Sans TC Beta. 둘 다 Light(300)·Bold(700) 두 벌이라 200·300은
+   * Light로, 700은 Bold로, 500은 CSS 매칭 규칙대로 Light로 떨어진다.
+   */
+  :root:lang(ja) {
+    --font-display:
+      'sztos-variable', 'M PLUS 1p', 'Noto Sans', 'Noto Sans JP', 'Noto Sans TC', sans-serif;
+  }
+
+  :root:lang(zh-TW) {
+    --font-display:
+      'sztos-variable', 'Taipei Sans TC Beta', 'Noto Sans', 'Noto Sans TC', 'Noto Sans JP',
+      sans-serif;
+    --font-body: 'Noto Sans', 'Noto Sans TC', 'Noto Sans JP', sans-serif;
   }
 
   html {

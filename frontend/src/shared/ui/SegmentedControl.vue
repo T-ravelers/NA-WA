@@ -35,6 +35,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
       :key="option.value"
       type="button"
       role="radio"
+      :data-testid="`segment-${option.value}`"
       :aria-checked="option.value === modelValue"
       class="flex-1 rounded-pill text-title-sm"
       :class="

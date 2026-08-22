@@ -20,7 +20,6 @@ function baseDraft(overrides: Partial<AppointmentFormDraft> = {}): AppointmentFo
     meetingPlace: 'Seongsu Beauty Lab',
     activityStartTime: '18:30',
     activityEndTime: '22:00',
-    joinDeadline: '2026-08-19T17:30',
     ...overrides,
   }
 }
@@ -66,30 +65,6 @@ describe('validateAppointmentSchedule', () => {
 
     expect(errors.activityEndTime).toBe('appointment.create.validation.endAfterStart')
   })
-
-  it('rejects a join deadline on or after the assembled activity start', () => {
-    const errors = validateAppointmentSchedule(
-      baseDraft({
-        visitDate: '2026-08-20',
-        activityStartTime: '18:30',
-        joinDeadline: '2026-08-20T19:00',
-      }),
-    )
-
-    expect(errors.joinDeadline).toBe('appointment.create.validation.deadlineBeforeStart')
-  })
-
-  it('accepts a join deadline before the assembled activity start', () => {
-    const errors = validateAppointmentSchedule(
-      baseDraft({
-        visitDate: '2026-08-20',
-        activityStartTime: '18:30',
-        joinDeadline: '2026-08-20T18:00',
-      }),
-    )
-
-    expect(errors.joinDeadline).toBeUndefined()
-  })
 })
 
 describe('toAppointmentCreateRequest', () => {
@@ -104,7 +79,6 @@ describe('toAppointmentCreateRequest', () => {
       languageCode: 'en',
       appointmentName: 'Seongsu K-Beauty Tour',
       maxMembers: 4,
-      joinDeadline: '2026-08-19T17:30:00',
       depositAmount: '10000',
       meetingPlace: 'Seongsu Beauty Lab',
       activityStartTime: '18:30:00',

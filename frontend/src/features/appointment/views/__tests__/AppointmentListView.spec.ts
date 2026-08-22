@@ -27,7 +27,6 @@ const appointment = {
   meetingPlace: 'Seongsu Beauty Lab',
   activityStartAt: '2026-08-08T18:30:00',
   activityEndAt: '2026-08-08T22:00:00',
-  joinDeadline: '2026-08-08T17:30:00',
   hostDisplayName: 'Mina Park',
 }
 
@@ -122,8 +121,10 @@ describe('AppointmentListView', () => {
 
     const { wrapper, router } = await mountView()
     const viewButton = wrapper.findAll('button').find((button) => button.text() === 'View')
+    const statusBadge = wrapper.findAll('span').find((element) => element.text() === 'Completed')
 
     expect(viewButton?.attributes('disabled')).toBeUndefined()
+    expect(statusBadge?.classes()).toContain('border-hairline')
 
     await viewButton?.trigger('click')
     await flushPromises()

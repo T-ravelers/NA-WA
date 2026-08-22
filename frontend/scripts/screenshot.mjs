@@ -978,6 +978,55 @@ function stubPlaceDetail(page) {
 }
 
 /**
+ * Event 상세의 여정 담기 시트에 쓸 여정 목록.
+ *
+ * `stubJourneyList`를 그대로 쓸 수 없다. 그쪽 날짜는 2098·2020이라 이벤트 301의
+ * 개최 기간(2026-08-10 ~ 2026-08-31)과 하나도 겹치지 않아, 시트가 전부 비활성으로만
+ * 나온다. 겹치는 여정과 겹치지 않는 여정을 섞어야 #357이 만든 두 상태가 한 장에 든다.
+ *
+ * `overlapping: false`면 겹치는 여정이 하나도 없어 "여정 만들기" 진입점이 드러난다.
+ */
+function stubJourneyListForEvent(page, { overlapping = true } = {}) {
+  const journeys = [
+    {
+      tripId: 51,
+      title: 'Seoul Lantern Trip',
+      startDate: '2026-08-14',
+      endDate: '2026-08-18',
+      eventCount: 3,
+      placeCount: 5,
+    },
+    {
+      tripId: 52,
+      title: 'Autumn in Gyeongju',
+      startDate: '2026-09-04',
+      endDate: '2026-09-08',
+      eventCount: 2,
+      placeCount: 4,
+    },
+    {
+      tripId: 53,
+      title: 'Spring Jeju Escape',
+      startDate: '2026-04-02',
+      endDate: '2026-04-06',
+      eventCount: 6,
+      placeCount: 2,
+    },
+  ]
+
+  return page.route('**/api/v1/journeys', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: overlapping ? journeys : journeys.slice(1),
+      }),
+    }),
+  )
+}
+
+/**
  * Event 상세 응답을 세운다. 좌표가 있는 상세와, 좌표가 NULL이라 지도 버튼이 숨는
  * 상세(#221 완료 기준)를 id로 나눠 찍는다.
  */
@@ -1066,7 +1115,7 @@ const SCREENS = [
     path: '/settings',
     setup: (page) => stubMemberProfile(page),
     prepare: async (page) => {
-      await page.getByLabel('Change screen language').click()
+      await page.getByTestId('settings-language').click()
       await page.waitForSelector('[role="dialog"]')
     },
   },
@@ -1090,8 +1139,8 @@ const SCREENS = [
       await page.locator('input[type="text"]').first().fill('Seoul Foodie Week')
       await page.locator('input[type="date"]').nth(0).fill('2026-08-10')
       await page.locator('input[type="date"]').nth(1).fill('2026-08-12')
-      await page.getByRole('button', { name: 'Next' }).click()
-      await page.getByText('Step 2 of 2').waitFor()
+      await page.getByTestId('journey-create-next').click()
+      await page.getByTestId('journey-create-step-2').waitFor()
     },
   },
   {
@@ -1111,7 +1160,7 @@ const SCREENS = [
     setup: (page) =>
       Promise.all([stubMemberProfile(page), stubJourneyDetail(page), stubEmptyReportList(page)]),
     prepare: async (page) => {
-      await page.getByRole('button', { name: 'Remove Seoul Night Market from itinerary' }).click()
+      await page.getByTestId('itinerary-remove-1').click()
       await page.getByRole('dialog').waitFor()
     },
   },
@@ -1156,7 +1205,7 @@ const SCREENS = [
       stubWalletApis(page)
     },
     prepare: async (page) => {
-      await page.getByLabel('Top-up amount').fill('50000')
+      await page.getByTestId('topup-amount').locator('input').fill('50000')
     },
   },
   {
@@ -1214,7 +1263,7 @@ const SCREENS = [
     prepare: async (page) => {
       await seedQrPaymentSession(page)
       // 소비 카테고리 칩이 그려질 때까지 기다린다. 세션이 없으면 빈 상태만 찍힌다.
-      await page.getByRole('radio', { name: 'Food' }).waitFor()
+      await page.getByTestId('payment-category-FOOD').waitFor()
     },
   },
   {
@@ -1233,7 +1282,7 @@ const SCREENS = [
       await stubMemberProfile(page)
       await stubEmptySettlementCandidates(page)
     },
-    prepare: (page) => page.getByText('No payments available', { exact: true }).waitFor(),
+    prepare: (page) => page.getByTestId('settlement-no-payments').waitFor(),
   },
   {
     name: '24-settlement-create-error',
@@ -1281,9 +1330,59 @@ const SCREENS = [
     },
     // 버튼이 없는 것을 보여줘야 하므로 위치 섹션 자체로 스크롤한다.
     prepare: async (page) => {
-      const locationHeading = page.getByRole('heading', { name: 'Location' })
+      const locationHeading = page.getByTestId('event-location')
       await locationHeading.waitFor()
       await locationHeading.scrollIntoViewIfNeeded()
+    },
+  },
+
+  {
+    // 기간이 겹치지 않는 여정은 감추지 않고 사유와 함께 비활성으로 둔다(#357).
+    name: '28-explore-event-journey-select',
+    path: '/explore/events/301',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEventDetail(page, { withCoordinates: true })
+      await stubJourneyListForEvent(page)
+    },
+    prepare: async (page) => {
+      const addButton = page.getByRole('button', { name: 'Add to journey' })
+      await addButton.waitFor()
+      await addButton.click()
+      await page.getByRole('dialog').getByText('Seoul Lantern Trip').waitFor()
+    },
+  },
+  {
+    // 겹치는 여정이 하나도 없을 때도 같은 자리에서 만들러 나갈 수 있어야 한다(#357).
+    name: '29-explore-event-journey-select-none',
+    path: '/explore/events/301',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEventDetail(page, { withCoordinates: true })
+      await stubJourneyListForEvent(page, { overlapping: false })
+    },
+    prepare: async (page) => {
+      const addButton = page.getByRole('button', { name: 'Add to journey' })
+      await addButton.waitFor()
+      await addButton.click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Create a journey' }).waitFor()
+    },
+  },
+  {
+    // 달력이 이벤트 기간과 여정 기간의 교집합(8/14~8/18)만 연다(#357).
+    name: '30-explore-event-journey-date',
+    path: '/explore/events/301',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubEventDetail(page, { withCoordinates: true })
+      await stubJourneyListForEvent(page)
+    },
+    prepare: async (page) => {
+      const addButton = page.getByRole('button', { name: 'Add to journey' })
+      await addButton.waitFor()
+      await addButton.click()
+      await page.getByRole('dialog').getByText('Seoul Lantern Trip').click()
+      await page.getByRole('dialog').getByText('Which day?').waitFor()
     },
   },
 
@@ -1355,8 +1454,8 @@ const FLOWS = [
       {
         name: '02-splits-to-pay',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Splits' }).click()
-          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+          await page.getByTestId('wallet-action-settlement').click()
+          await page.getByTestId('settlement-home').waitFor()
         },
       },
       {
@@ -1370,7 +1469,7 @@ const FLOWS = [
         name: '04-paying',
         act: async (page) => {
           await page.locator('[data-action="pay"]').click()
-          await page.getByText('Sending your payment').waitFor()
+          await page.getByTestId('settlement-status-processing').waitFor()
         },
       },
       {
@@ -1378,7 +1477,7 @@ const FLOWS = [
         name: '05-paid',
         act: async (page) => {
           payResponseGate.open()
-          await page.getByText('Payment sent').waitFor({ timeout: 10_000 })
+          await page.getByTestId('settlement-status-done').waitFor({ timeout: 10_000 })
         },
       },
       {
@@ -1391,10 +1490,10 @@ const FLOWS = [
       {
         name: '07-list-paid',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Back', exact: true }).click()
+          await page.getByTestId('settlement-back').click()
           await page
             .locator('[data-settlement-id="42"]')
-            .getByText('Paid', { exact: true })
+            .getByTestId('settlement-paid-mark')
             .waitFor()
         },
       },
@@ -1416,14 +1515,14 @@ const FLOWS = [
       {
         name: '02-splits',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Splits' }).click()
-          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+          await page.getByTestId('wallet-action-settlement').click()
+          await page.getByTestId('settlement-home').waitFor()
         },
       },
       {
         name: '03-journeys',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Start Split' }).click()
+          await page.getByTestId('settlement-start').click()
           await page.locator('[data-journey-key]').first().waitFor()
         },
       },
@@ -1476,7 +1575,7 @@ const FLOWS = [
         name: '10-requesting',
         act: async (page) => {
           await page.locator('[data-action="create"]').click()
-          await page.getByText('Sending your request').waitFor()
+          await page.getByTestId('settlement-status-processing').waitFor()
         },
       },
       {
@@ -1484,7 +1583,7 @@ const FLOWS = [
         name: '11-requested',
         act: async (page) => {
           createResponseGate.open()
-          await page.getByText('Request sent').waitFor({ timeout: 10_000 })
+          await page.getByTestId('settlement-status-done').waitFor({ timeout: 10_000 })
         },
       },
       {
@@ -1572,14 +1671,14 @@ const FLOWS = [
       {
         name: '02-splits-to-pay',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Splits' }).click()
-          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+          await page.getByTestId('wallet-action-settlement').click()
+          await page.getByTestId('settlement-home').waitFor()
         },
       },
       {
         name: '03-splits-to-collect',
         act: async (page) => {
-          await page.getByRole('radio', { name: 'To Collect', exact: true }).click()
+          await page.getByTestId('segment-sent').click()
           await page.locator('[data-settlement-id="50"]').waitFor()
         },
       },
@@ -1587,13 +1686,13 @@ const FLOWS = [
         name: '04-detail-creator',
         act: async (page) => {
           await page.locator('[data-settlement-id="50"]').click()
-          await page.getByText('Who has paid').waitFor()
+          await page.getByTestId('collection-summary').waitFor()
         },
       },
       {
         name: '05-back-to-collect',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Back to your requests' }).click()
+          await page.getByTestId('settlement-back-to-collect').click()
           await page.locator('[data-settlement-id="50"]').waitFor()
         },
       },
@@ -1614,15 +1713,15 @@ const FLOWS = [
       {
         name: '02-splits',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Splits' }).click()
-          await page.getByRole('heading', { level: 1, name: 'Splits' }).waitFor()
+          await page.getByTestId('wallet-action-settlement').click()
+          await page.getByTestId('settlement-home').waitFor()
         },
       },
       {
         name: '03-history-paid',
         act: async (page) => {
           await page.locator('[data-action="view-all"]').click()
-          await page.getByRole('heading', { level: 1, name: 'Paid splits' }).waitFor()
+          await page.getByTestId('settlement-history-received').waitFor()
         },
       },
       {
@@ -1638,10 +1737,10 @@ const FLOWS = [
       {
         name: '05-history-collected',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Back', exact: true }).click()
-          await page.getByRole('radio', { name: 'To Collect', exact: true }).click()
+          await page.getByTestId('settlement-back').click()
+          await page.getByTestId('segment-sent').click()
           await page.locator('[data-action="view-all"]').click()
-          await page.getByRole('heading', { level: 1, name: 'Collected splits' }).waitFor()
+          await page.getByTestId('settlement-history-sent').waitFor()
         },
       },
     ],
@@ -1704,7 +1803,9 @@ for (const screen of SCREENS) {
     await page.goto(`${BASE}/${screen.path.replace(/^\/+/, '')}`, { waitUntil: 'networkidle' })
     await screen.prepare?.(page)
 
-    // 웹폰트와 전환이 자리를 잡을 시간을 준다. 없으면 폴백 폰트가 찍히는 경우가 있다.
+    // 웹폰트가 도착한 뒤에 찍는다. 글자 폭에 맞춰 크기를 줄이는 제목·버튼(`v-fit-text`)은 폰트가
+    // 오면 다시 재므로, 도착 전에 찍으면 한 프레임 전 상태가 남는다. 전환이 자리 잡을 시간도 준다.
+    await page.evaluate(() => document.fonts.ready)
     await page.waitForTimeout(400)
     await page.screenshot({ path: `${OUT}/${screen.name}.png` })
 
@@ -1734,7 +1835,9 @@ for (const flow of FLOWS) {
         if (step.focus === undefined) await page.evaluate(() => window.scrollTo(0, 0))
         else await page.locator(step.focus).scrollIntoViewIfNeeded()
 
-        // 웹폰트와 전환이 자리를 잡을 시간을 준다. 없으면 폴백 폰트가 찍히는 경우가 있다.
+        // 웹폰트가 도착한 뒤에 찍는다. 글자 폭에 맞춰 크기를 줄이는 제목·버튼(`v-fit-text`)은 폰트가
+        // 오면 다시 재므로, 도착 전에 찍으면 한 프레임 전 상태가 남는다. 전환이 자리 잡을 시간도 준다.
+        await page.evaluate(() => document.fonts.ready)
         await page.waitForTimeout(400)
         await page.screenshot({ path: `${OUT}/${name}.png` })
 

@@ -19,9 +19,24 @@ import {
 interface Props {
   pending?: boolean
   errorMessage?: string
+  /**
+   * 여정 기간의 시작 기본값. 담으려던 항목의 운영 기간에서 온다.
+   *
+   * 다른 화면이 "여정이 없어서" 이 화면으로 보냈다면, 그 사람은 정의상 그 항목과
+   * 겹치는 여정이 하나도 없는 사람이다. 빈 폼에는 무엇과 겹쳐야 하는지가 없어서
+   * 또 안 겹치는 기간으로 만들고 돌아오기 쉽다.
+   */
+  initialStartDate?: string
+  /** 여정 기간의 종료 기본값. 상시 이벤트처럼 상한이 없으면 오지 않는다. */
+  initialEndDate?: string
 }
 
-const { pending = false, errorMessage = undefined } = defineProps<Props>()
+const {
+  pending = false,
+  errorMessage = undefined,
+  initialStartDate = '',
+  initialEndDate = '',
+} = defineProps<Props>()
 
 const emit = defineEmits<{ submit: [input: JourneyCreateInput] }>()
 
@@ -31,8 +46,8 @@ const step = ref<1 | 2>(1)
 const errors = ref<JourneyFormErrors>({})
 const draft = reactive<JourneyFormDraft>({
   title: '',
-  startDate: '',
-  endDate: '',
+  startDate: initialStartDate,
+  endDate: initialEndDate,
   budgetAmount: null,
   companionPreference: null,
 })
@@ -136,6 +151,7 @@ function submit(): void {
       <p
         class="ml-1.5 text-caption tabular-nums text-ink-3"
         aria-live="polite"
+        :data-testid="`journey-create-step-${step}`"
       >
         {{ t('journey.create.stepCount', { current: step }) }}
       </p>
@@ -185,6 +201,7 @@ function submit(): void {
 
         <AppButton
           block
+          data-testid="journey-create-next"
           @click="goToPreferences"
         >
           {{ t('journey.create.next') }}
@@ -194,6 +211,8 @@ function submit(): void {
       <template v-else>
         <AmountInput
           v-model="draft.budgetAmount"
+          currency-symbol="P"
+          symbol-position="suffix"
           :label="t('journey.create.budget')"
           :helper="t('journey.create.budgetHelper')"
           :error="translatedError(errors.budgetAmount)"

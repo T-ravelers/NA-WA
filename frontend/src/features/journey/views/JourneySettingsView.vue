@@ -305,6 +305,8 @@ function retryAll(): void {
           <AmountInput
             v-model="draft.budgetAmount"
             class="min-w-0"
+            currency-symbol="P"
+            symbol-position="suffix"
             :label="t('journey.settings.budget')"
             :helper="t('journey.settings.budgetHelper')"
             :error="

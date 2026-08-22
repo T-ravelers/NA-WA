@@ -22,7 +22,7 @@
   전환합니다.
 - 출석 확정이 성공하면 `DepositPayoutBatch`를 `PENDING`으로 생성하고, 60초 주기
   비동기 배치 처리가 실제 환급·노쇼 분배 지갑 이체를 실행합니다.
-- 참여를 취소(`LEFT`)한 회원도 참여 마감 시각 전이면 같은 약속에 다시 참여할 수
+- 참여를 취소(`LEFT`)한 회원도 활동 시작 시각 전이면 같은 약속에 다시 참여할 수
   있습니다. 기존 참여·보증금 행을 재사용합니다(자세한 내용은
   [APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
   3·5절 참고).
@@ -32,16 +32,17 @@
 상태 전이는 별도 API 없이 서버가 조건에 따라 자동으로 처리합니다. 방장의 확정
 버튼 같은 수동 액션은 없습니다.
 
-- `RECRUITING` → `CLOSED`: 정원 도달은 참여 성공 시점에 즉시, 참여 마감 시각
-  도달은 60초 주기 스케줄러가 전환합니다.
-- `CLOSED` → `RECRUITING`: 정원 도달로 `CLOSED`된 약속에서 참여 마감 시각 전에
-  참여 취소가 발생해 빈자리가 생기면 즉시 되돌아갑니다.
-- `CLOSED` → `IN_PROGRESS`: 활동 시작 시각이 되면 스케줄러가 전환합니다. 방장의
-  별도 확정 절차는 없습니다.
+- `RECRUITING` → `FULL`: 정원이 다 차면 참여 성공 시점에 즉시 전환합니다.
+  `FULL`은 정원 충족만을 뜻하며, 시간으로 도달하는 경로는 없습니다.
+- `FULL` → `RECRUITING`: 활동 시작 시각 전에 참여 취소가 발생해 빈자리가 생기면
+  즉시 되돌아갑니다.
+- `RECRUITING`·`FULL` → `IN_PROGRESS`: 활동 시작 시각이 되면 60초 주기 스케줄러가
+  전환합니다. 방장의 별도 확정 절차는 없습니다. 정원이 차지 않은 약속은 `FULL`을
+  거치지 않으므로 `RECRUITING`에서 곧바로 넘어갑니다.
 - `IN_PROGRESS` → `COMPLETED`: 방장이 모든 `ACTIVE` 회원의 출석을 확정한 경우
 
 목록·상세 조회 응답의 `appointmentStatus`는 스케줄러가 아직 못 따라잡았어도
-마감·시작·종료 시각 기준으로 즉시 계산한 값을 보여줍니다. 이 계산에는 DB에는
+정원과 시작·종료 시각 기준으로 즉시 계산한 값을 보여줍니다. 이 계산에는 DB에는
 저장되지 않는 **표시 전용 값 `AWAITING_ATTENDANCE`**가 하나 더 있습니다 —
 `activityEndAt`이 지났지만 방장이 아직 출석을 확정하지 않은 약속은 DB에
 `IN_PROGRESS`로 남아 있어도 응답에는 `AWAITING_ATTENDANCE`로 옵니다(활동
@@ -140,7 +141,6 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
   "languageCode": "en",
   "appointmentName": "Seongsu K-Beauty Tour",
   "maxMembers": 5,
-  "joinDeadline": "2026-08-20T18:00:00",
   "depositAmount": 10000,
   "meetingPlace": "Olive Young N Seongsu",
   "activityStartTime": "18:30:00",
@@ -157,9 +157,11 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 `tripId`는 요청 회원이 소유한 Journey여야 하고, `visitDate`는 그 Journey의
 `startDate`~`endDate` 안이어야 하며, 같은 `(tripId, itemId, visitDate)`
 조합의 활성 일정이 이미 있으면 안 됩니다 — 위반 시 각각 `JOURNEY-002`, `JOURNEY-007`,
-`JOURNEY-004`를 반환합니다([JOURNEY_API.md](./JOURNEY_API.md) 참고). 참여
-마감은 조립된 활동 시작 시각보다 늦을 수 없고, 활동 시작 시각은 종료 시각보다
-빨라야 하며 현재 시각 이후여야 합니다.
+`JOURNEY-004`를 반환합니다([JOURNEY_API.md](./JOURNEY_API.md) 참고). 이 경로는
+Journey 일정 추가와 달리 **항목 자체의 운영 기간(`JOURNEY-012`)은 보지 않습니다** —
+`validateJourneyLink`가 `addJourneyItem`과 별개의 검사를 갖고 있기 때문입니다. 활동
+시작 시각은 종료 시각보다 빨라야 하며 현재 시각 이후여야 합니다. 참여 마감 시각은
+따로 받지 않습니다 — 참여는 활동이 시작되기 전까지 열려 있습니다.
 
 성공하면 방장의 보증금을 즉시 예치(`DEPOSIT_HOLD`)하고 약속을 `RECRUITING`
 상태로 생성하는 것과 같은 트랜잭션에서, 해당 Journey 항목(`trip_items`)을
@@ -171,7 +173,7 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 - `POST /api/v1/appointments/{appointmentId}/members`
 - `DELETE /api/v1/appointments/{appointmentId}/members/me`
 
-참여 요청은 `RECRUITING` 상태, 참여 마감 전, 정원 미달 조건을 모두 만족해야
+참여 요청은 `RECRUITING` 상태, 활동 시작 전, 정원 미달 조건을 모두 만족해야
 하며, 성공하면 참여자의 보증금을 즉시 예치(`DEPOSIT_HOLD`)하고 `ACTIVE`로
 전환합니다.
 
@@ -180,9 +182,8 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 취소 결과는 시각에 따라 갈립니다.
 
 - **활동 시작 전**: `HELD` 보증금을 환급(`DEPOSIT_REFUND`)하고 참가 상태를
-  `LEFT`로 변경하는 걸 같은 트랜잭션에서 처리합니다. 참여 마감
-  (`joinDeadline`)이 지났어도 환급하며, 이 경우 빈자리가 생겨도 약속을
-  `RECRUITING`으로 되돌리지는 않습니다(마감 후에는 새로 참여할 수 없으므로).
+  `LEFT`로 변경하는 걸 같은 트랜잭션에서 처리합니다. 정원이 차서 `FULL`이던
+  약속이라면 빈자리가 생기므로 같은 트랜잭션에서 `RECRUITING`으로 되돌립니다.
 - **활동 시작 후 ~ 종료 전**: 취소는 되지만 **노쇼로 굳습니다**. 출석 상태를
   `NO_SHOW`로 확정하고 `LEFT`로 바꾸며, 보증금은 환급하지 않고 출석 확정 후
   정산 배치가 출석 회원에게 분배합니다.

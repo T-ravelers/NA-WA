@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatCurrency, formatGroupedDecimal, formatKrw, formatMoney, formatNumber } from './money'
+import {
+  formatCurrency,
+  formatGroupedDecimal,
+  formatMoney,
+  formatNumber,
+  formatPoints,
+} from './money'
 
 describe('money formatters', () => {
   it('preserves current locale-aware number and currency output', () => {
     expect(formatNumber(1234.5, 'en-US', { maximumFractionDigits: 2 })).toBe('1,234.5')
     expect(formatCurrency(1234, 'en-US', 'KRW', { maximumFractionDigits: 0 })).toBe('₩1,234')
-    expect(formatKrw(18_500)).toBe('₩18,500')
+    expect(formatPoints(18_500)).toBe('18,500 P')
   })
 
   it('returns an empty string for nullable or invalid values', () => {
@@ -14,7 +20,7 @@ describe('money formatters', () => {
     expect(formatMoney(undefined, 'en-US')).toBe('')
     expect(formatMoney('not-a-number', 'en-US')).toBe('')
     expect(formatMoney('not-a-number', 'en-US', { style: 'currency', currency: 'USD' })).toBe('')
-    expect(formatKrw(null)).toBe('')
+    expect(formatPoints(null)).toBe('')
   })
 
   it('applies signDisplay to exact decimal strings after rounding', () => {

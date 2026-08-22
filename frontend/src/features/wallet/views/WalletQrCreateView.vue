@@ -110,6 +110,8 @@ const createQr = (): void => {
           <AmountInput
             v-if="!payerEntersAmount"
             v-model="amount"
+            currency-symbol="P"
+            symbol-position="suffix"
             :label="t('wallet.qrCreate.amount')"
             :helper="t('wallet.qrCreate.amountHelper')"
             :placeholder="t('wallet.qrCreate.amountPlaceholder')"

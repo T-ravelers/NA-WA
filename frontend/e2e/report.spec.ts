@@ -161,8 +161,8 @@ test('selects expenses, prevents duplicate generation, and opens the final repor
   await expect(page.getByText('Future Journey')).toBeHidden()
 
   await page.getByRole('button', { name: 'Choose expenses' }).click()
-  await expect(page.getByLabel(/FOOD.*₩18,000/)).toBeChecked()
-  await page.getByLabel(/OTHER.*₩5,000/).check()
+  await expect(page.getByLabel(/FOOD.*18,000 P/)).toBeChecked()
+  await page.getByLabel(/OTHER.*5,000 P/).check()
 
   const generate = page.getByRole('button', { name: 'Generate final report' })
   await generate.click()
@@ -170,7 +170,7 @@ test('selects expenses, prevents duplicate generation, and opens the final repor
 
   await expect(page).toHaveURL(/\/reports\/101$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Report' })).toBeVisible()
-  await expect(page.getByText('₩23,000')).toBeVisible()
+  await expect(page.getByText('23,000 P')).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: 'By category' })).toBeVisible()
   // 범례는 분류명과 비율을 각각 다른 요소로 그린다. 한 문자열로 묶어 찾으면
   // 마크업이 조금만 바뀌어도 깨지므로 행 단위로 확인한다.

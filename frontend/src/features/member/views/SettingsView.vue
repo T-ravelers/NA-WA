@@ -132,6 +132,7 @@ function chooseLocale(next: AppLocale): void {
         type="button"
         class="mt-2 flex min-h-14 w-full items-center gap-3 rounded-sm bg-surface-2 px-3.5 text-left"
         :aria-label="t('member.settings.language.change')"
+        data-testid="settings-language"
         @click="isLocaleSheetOpen = true"
       >
         <span class="flex-1 text-body text-ink">{{ t('member.settings.language.label') }}</span>

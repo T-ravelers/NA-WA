@@ -13,6 +13,7 @@ const emit = defineEmits<{ back: [] }>()
   <header class="flex items-center gap-5">
     <button
       type="button"
+      data-testid="settlement-back"
       :aria-label="backLabel"
       class="flex size-11 shrink-0 items-center justify-start text-ink"
       @click="emit('back')"

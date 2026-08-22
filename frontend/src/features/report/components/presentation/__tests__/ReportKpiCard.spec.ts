@@ -19,10 +19,10 @@ describe('ReportKpiCard', () => {
     })
 
     expect(wrapper.text()).toContain('Total spent')
-    expect(wrapper.text()).toContain('₩1,284,500')
+    expect(wrapper.text()).toContain('1,284,500 P')
     expect(wrapper.findAll('dd')[0]?.classes()).toContain('text-data-lg')
     expect(wrapper.text()).toContain('Daily avg')
-    expect(wrapper.text()).toContain('₩142,700')
+    expect(wrapper.text()).toContain('142,700 P')
   })
 
   it('renders a zero journey without collapsing the layout', () => {
@@ -30,7 +30,7 @@ describe('ReportKpiCard', () => {
       props: { data: reportKpiZeroFixture, ...LABELS },
     })
 
-    expect(wrapper.findAll('dd').map((amount) => amount.text())).toEqual(['₩0', '₩0'])
+    expect(wrapper.findAll('dd').map((amount) => amount.text())).toEqual(['0 P', '0 P'])
   })
 
   it('renders the section heading only when one is passed', () => {
@@ -68,7 +68,7 @@ describe('ReportKpiCard', () => {
 
     const total = wrapper.findAll('dd')[0]
 
-    expect(total?.text()).toBe('₩9,999,999,999,999')
+    expect(total?.text()).toBe('9,999,999,999,999 P')
     expect(total?.classes()).toContain('break-all')
   })
 

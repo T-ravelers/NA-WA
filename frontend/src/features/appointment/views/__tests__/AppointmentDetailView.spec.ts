@@ -38,7 +38,6 @@ const appointment = {
   meetingPlace: 'Seongsu Beauty Lab',
   activityStartAt: '2099-08-08T18:30:00',
   activityEndAt: '2099-08-08T22:00:00',
-  joinDeadline: '2099-08-08T17:30:00',
   hostDisplayName: 'Mina Park',
   description: null,
   members: [],
@@ -178,6 +177,8 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.text()).not.toContain('Not attended')
     expect(wrapper.text()).toContain('Host')
     expect(wrapper.text()).not.toContain('Jamie Lee')
+    const statusBadge = wrapper.findAll('span').find((element) => element.text() === 'Recruiting')
+    expect(statusBadge?.classes()).toContain('bg-canvas/70')
     // 방장이라 모집 중에도 버거 버튼은 뜬다. 다만 시트 안의 항목은 아직 전부
     // 비활성이다.
     expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
@@ -231,10 +232,10 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
-  it('says up front that recruiting is over', async () => {
-    // 아직 참여하지 않은 사람이어야 모집 종료가 이유로 잡힌다. 이미 참여한
+  it('says up front that the appointment is full', async () => {
+    // 아직 참여하지 않은 사람이어야 정원 충족이 이유로 잡힌다. 이미 참여한
     // 사람에게는 "이미 참여 중"이 먼저 걸린다.
-    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'CLOSED' })
+    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'FULL' })
     fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
     const { wrapper } = await mountView()
     const joinButton = wrapper
@@ -247,7 +248,7 @@ describe('AppointmentDetailView', () => {
       .findAll('p')
       .find((p) => p.text() === 'This appointment is not open for joining.')
 
-    // 모집 종료는 사용자 잘못이 아닌 정상 상태라 경고색이 아니라 중립색이어야 한다.
+    // 정원 충족은 사용자 잘못이 아닌 정상 상태라 경고색이 아니라 중립색이어야 한다.
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(notice?.classes()).toContain('text-ink-3')
     expect(notice?.classes()).not.toContain('text-danger')
@@ -558,7 +559,6 @@ describe('AppointmentDetailView', () => {
     fetchAppointment.mockResolvedValueOnce({
       ...appointment,
       appointmentStatus: 'IN_PROGRESS',
-      joinDeadline: '2020-01-01T00:00:00',
     })
     fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
     cancelAppointmentParticipation.mockResolvedValue(undefined)
@@ -588,7 +588,6 @@ describe('AppointmentDetailView', () => {
     fetchAppointment.mockResolvedValueOnce({
       ...appointment,
       appointmentStatus: 'AWAITING_ATTENDANCE',
-      joinDeadline: '2020-01-01T00:00:00',
     })
     fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
     const { wrapper } = await mountView()
@@ -631,7 +630,7 @@ describe('AppointmentDetailView', () => {
     ['COMPLETED', false, 'ATTENDED'],
     ['IN_PROGRESS', true, 'PENDING'],
     ['AWAITING_ATTENDANCE', true, 'PENDING'],
-    ['CLOSED', true, 'PENDING'],
+    ['FULL', true, 'PENDING'],
     ['RECRUITING', false, 'PENDING'],
     ['CANCELLED', false, 'PENDING'],
   ] as const)(

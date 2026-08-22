@@ -40,7 +40,6 @@ erDiagram
         BIGINT host_member_id FK
         ENUM appointment_status
         INT max_members
-        DATETIME join_deadline
         DATETIME activity_start_at
         DATETIME activity_end_at
         DECIMAL deposit_amount

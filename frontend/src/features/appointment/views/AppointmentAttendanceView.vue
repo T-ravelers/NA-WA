@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -201,7 +202,10 @@ function retry(): void {
       >
         ‹
       </AppButton>
-      <h1 class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display">
+      <h1
+        v-fit-text
+        class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display"
+      >
         {{ t('appointment.attendance.title') }}
       </h1>
     </header>
@@ -266,7 +270,7 @@ function retry(): void {
             <AppCard padding="base">
               <div class="flex items-center gap-3">
                 <div
-                  class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-2 text-title text-ink"
+                  class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-3 text-title text-ink"
                   aria-hidden="true"
                 >
                   <img

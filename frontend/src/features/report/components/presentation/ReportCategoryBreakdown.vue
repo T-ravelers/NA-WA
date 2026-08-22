@@ -21,7 +21,6 @@ import type { ReportCategoryBreakdownProps } from './types'
  */
 const {
   items,
-  currency,
   heading = undefined,
   centerValue = undefined,
   centerLabel = undefined,
@@ -45,7 +44,7 @@ const rows = computed(() =>
     index,
     label: item.label,
     percentText: formatPercent(item.percentage, locale),
-    amountText: formatMoney(item.amount, currency, locale),
+    amountText: formatMoney(item.amount, locale),
   })),
 )
 

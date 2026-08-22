@@ -2,9 +2,10 @@
 import { useMutation, useQuery } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { IconCheck } from '@tabler/icons-vue'
 
+import { vFitText } from '@/shared/lib/fitText'
 import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -12,7 +13,7 @@ import AppCard from '@/shared/ui/AppCard.vue'
 import { createStripeIntent, getTopupMethods, previewTopup } from '../api/topupApi'
 import {
   DEFAULT_TOPUP_METHOD,
-  formatKrw,
+  formatPoints,
   getTopupMethodLabel,
   QUICK_TOPUP_AMOUNTS,
   TOPUP_CURRENCY,
@@ -28,9 +29,56 @@ type TopupStep = 'form' | 'preview' | 'payment' | 'complete'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
+
+/**
+ * 다른 화면이 "이만큼 부족하다"며 보낸 금액(`?amount=`). 약속 생성이 보증금을
+ * 예치할 잔액이 없을 때 그 보증금만큼 채워서 보낸다. 양의 정수가 아니면 무시한다.
+ */
+function requestedAmount(): number | null {
+  const raw = Array.isArray(route.query.amount) ? route.query.amount[0] : route.query.amount
+  const parsed = Number(raw)
+  return typeof raw === 'string' && Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+/**
+ * 다른 화면이 "충전이 끝나면 돌아와 달라"며 보낸 곳(`?returnRouteName=`). 여정 생성이
+ * 쓰는 것과 같은 규약이다. 나머지 query는 그 화면의 것이라 그대로 돌려주고, 이 화면의
+ * 금액과 이 키만 뺀다. `resume=1`을 붙여 그 화면이 저장해 둔 초안을 되살리게 한다.
+ */
+const returnTarget = computed<RouteLocationRaw | null>(() => {
+  const value = route.query.returnRouteName
+  if (typeof value !== 'string' || value === '') return null
+  const rest = { ...route.query }
+  delete rest.returnRouteName
+  delete rest.amount
+  return { name: value, query: { ...rest, resume: '1' } }
+})
+
+/**
+ * 이 화면을 떠나 왔던 자리로 돌아간다. **되감아서 이 화면의 히스토리 엔트리를
+ * 소비한다.** 충전으로 보낸 화면은 떠나기 전에 자기 엔트리를 돌아올 자리(`resume=1`)로
+ * 바꿔 두므로, 바로 아래 엔트리가 이미 목적지다. 여기서 목적지를 다시 `replace`하면
+ * 같은 화면이 히스토리에 두 번 쌓여, 돌아간 화면에서 뒤로 가기를 눌러도 흐름을 벗어나지
+ * 못하고 같은 라우트에 머문다 — 그 자리는 초안을 이미 지운 뒤라 빈 폼으로 열린다.
+ *
+ * 되감을 히스토리가 없을 때(딥링크·PWA 재진입)만 목적지를 만들어 보낸다. 보낸 화면이
+ * 있으면 그리로(`resume=1`), 없으면 지갑 탭이다.
+ */
+const leaveTopup = (): void => {
+  if (window.history.length > 1) {
+    void router.back()
+    return
+  }
+  if (returnTarget.value !== null) {
+    void router.replace(returnTarget.value)
+    return
+  }
+  void router.push({ name: 'wallet' })
+}
 
 // AmountInput의 계약이 number | null이다. null은 "아직 입력 전"이고 0과 구분된다.
-const amount = ref<number | null>(null)
+const amount = ref<number | null>(requestedAmount())
 const selectedMethod = ref(DEFAULT_TOPUP_METHOD)
 const step = ref<TopupStep>('form')
 const preview = ref<TopupPreviewResponse | null>(null)
@@ -120,11 +168,24 @@ const goBack = (): void => {
   }
 
   if (step.value === 'complete') {
-    void router.push({ name: 'wallet' })
+    // 끝난 충전 화면은 되돌아올 이유가 없으니 자리를 내준다. 지갑에서 들어왔으면
+    // 바로 아래 엔트리가 이미 지갑이라 되감고(지갑이 두 번 쌓이면 뒤로 가기가 한 번
+    // 헛돈다), 다른 화면이 보낸 경우에는 그 화면 위에 지갑을 얹는 대신 이 자리를
+    // 지갑으로 바꾼다 — 그래야 지갑에서 뒤로 갈 때 끝난 충전 화면이 다시 뜨지 않는다.
+    if (returnTarget.value === null && window.history.length > 1) {
+      void router.back()
+      return
+    }
+    void router.replace({ name: 'wallet' })
     return
   }
 
-  void router.push({ name: 'wallet' })
+  // 충전을 시작하지도 않고 나가는 길. 왔던 길을 되감는다 — 약속 생성처럼 흐름 도중에
+  // 들렀다면 지갑 탭으로 떨어지는 순간 작성하던 흐름이 끊기고, 저장해 둔 초안은 아무도
+  // 읽지 않는다. 모바일 PWA에는 브라우저 뒤로가기가 없어 이 버튼이 사실상 유일한
+  // 출구다. 완료 화면은 예외다 — 거기엔 "Continue where you left off"가 따로 있고,
+  // 이 버튼은 지갑으로 가는 쪽이 맞다.
+  leaveTopup()
 }
 
 const executeTopup = (): void => {
@@ -168,7 +229,10 @@ const handlePaymentError = (message: string): void => {
       >
         ‹
       </AppButton>
-      <h1 class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display">
+      <h1
+        v-fit-text
+        class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display"
+      >
         {{
           step === 'preview'
             ? t('wallet.topUp.previewTitle')
@@ -194,7 +258,11 @@ const handlePaymentError = (message: string): void => {
       <AppCard>
         <AmountInput
           v-model="amount"
+          currency-symbol="P"
+          symbol-position="suffix"
+          data-testid="topup-amount"
           :label="t('wallet.topUp.amountLabel')"
+          :helper="t('wallet.topUp.pointsRateNotice')"
         />
 
         <div class="mt-4 border-t border-hairline pt-4">
@@ -206,7 +274,7 @@ const handlePaymentError = (message: string): void => {
               class="h-10 rounded-pill border border-hairline-strong text-body-sm font-medium text-ink transition-colors hover:border-paper-fill focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
               @click="setAmount(quickAmount)"
             >
-              +{{ formatKrw(quickAmount) }}
+              +{{ formatPoints(quickAmount) }}
             </button>
           </div>
         </div>
@@ -326,11 +394,11 @@ const handlePaymentError = (message: string): void => {
         <dl class="mt-4 divide-y divide-hairline text-body">
           <div class="flex items-center justify-between py-3 first:pt-0">
             <dt class="text-ink-2">{{ t('wallet.topUp.amountLabel') }}</dt>
-            <dd class="font-semibold text-ink">{{ formatKrw(preview.amount) }}</dd>
+            <dd class="font-semibold text-ink">{{ formatPoints(preview.amount) }}</dd>
           </div>
           <div class="flex items-center justify-between py-3">
             <dt class="text-ink-2">{{ t('wallet.topUp.fee') }}</dt>
-            <dd class="font-semibold text-ink">{{ formatKrw(preview.fee) }}</dd>
+            <dd class="font-semibold text-ink">{{ formatPoints(preview.fee) }}</dd>
           </div>
           <div class="flex items-center justify-between py-3">
             <dt class="text-ink-2">{{ t('wallet.topUp.paymentMethod') }}</dt>
@@ -338,7 +406,9 @@ const handlePaymentError = (message: string): void => {
           </div>
           <div class="flex items-center justify-between pb-0 pt-3">
             <dt class="text-ink-2">{{ t('wallet.topUp.balanceAfter') }}</dt>
-            <dd class="font-semibold text-ink">{{ formatKrw(preview.expectedSandboxBalance) }}</dd>
+            <dd class="font-semibold text-ink">
+              {{ formatPoints(preview.expectedSandboxBalance) }}
+            </dd>
           </div>
         </dl>
       </AppCard>
@@ -428,18 +498,27 @@ const handlePaymentError = (message: string): void => {
       >
         {{ t('wallet.topUp.completeTitle') }}
       </h2>
-      <p class="mt-3 text-data-xl text-success">+{{ formatKrw(preview?.amount ?? 0) }}</p>
+      <p class="mt-3 text-data-xl text-success">+{{ formatPoints(preview?.amount ?? 0) }}</p>
       <p class="mt-2 text-body-sm text-ink-2">
-        {{ t('wallet.topUp.currentBalance', { balance: formatKrw(completedBalance) }) }}
+        {{ t('wallet.topUp.currentBalance', { balance: formatPoints(completedBalance) }) }}
       </p>
 
-      <AppButton
-        block
-        class="mt-auto"
-        @click="goBack"
-      >
-        {{ t('wallet.topUp.backToWallet') }}
-      </AppButton>
+      <div class="mt-auto flex w-full flex-col gap-2">
+        <AppButton
+          v-if="returnTarget !== null"
+          block
+          @click="leaveTopup"
+        >
+          {{ t('wallet.topUp.backToCaller') }}
+        </AppButton>
+        <AppButton
+          block
+          :variant="returnTarget === null ? 'primary' : 'secondary'"
+          @click="goBack"
+        >
+          {{ t('wallet.topUp.backToWallet') }}
+        </AppButton>
+      </div>
     </section>
   </main>
 </template>

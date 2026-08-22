@@ -83,6 +83,7 @@ function back(): void {
     <SettlementEmptyState
       v-else-if="!wizardOpened && candidatesQuery.data.value?.length === 0"
       class="flex-1"
+      data-testid="settlement-no-payments"
       :title="t('settlement.create.noPaymentsTitle')"
       :description="t('settlement.create.noPaymentsDescription')"
     />

@@ -9,7 +9,7 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import AppButton from '@/shared/ui/AppButton.vue'
 
 import { getQrPaymentStatus } from '../api/qrPaymentApi'
-import { formatKrw, qrPaymentKeys } from '../model/qrPayment'
+import { formatPoints, qrPaymentKeys } from '../model/qrPayment'
 
 const i18n = useI18n()
 const { t } = i18n
@@ -123,12 +123,12 @@ const backToWallet = (): void => {
             {{ t('wallet.qrPayment.completeTitle') }}
           </h1>
           <p class="mt-4 text-data-lg font-bold text-danger">
-            -{{ formatKrw(statusQuery.data.value.amount) }}
+            -{{ formatPoints(statusQuery.data.value.amount) }}
           </p>
           <p class="mt-3 text-body-sm text-ink-2">
             {{
               t('wallet.qrPayment.remainingBalance', {
-                amount: formatKrw(statusQuery.data.value.balanceAfter),
+                amount: formatPoints(statusQuery.data.value.balanceAfter),
               })
             }}
           </p>

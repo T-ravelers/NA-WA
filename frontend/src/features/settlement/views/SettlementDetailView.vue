@@ -263,6 +263,7 @@ function startPayment(): void {
           v-else-if="isCreator"
           block
           variant="secondary"
+          data-testid="settlement-back-to-collect"
           @click="backToList"
           >{{ t('settlement.detail.backToCollect') }}</AppButton
         >

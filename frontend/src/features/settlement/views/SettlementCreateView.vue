@@ -508,6 +508,7 @@ defineExpose({ back })
       <SettlementEmptyState
         v-if="candidates.length === 0"
         class="flex-1"
+        data-testid="settlement-no-payments"
         :title="t('settlement.create.noPaymentsTitle')"
         :description="t('settlement.create.noPaymentsDescription')"
       />
@@ -708,8 +709,12 @@ defineExpose({ back })
           type="button"
           :data-participant-id="participant.id"
           :aria-pressed="selectedIds.has(participant.id)"
-          class="min-h-12 rounded-sm px-3 text-left"
-          :class="selectedIds.has(participant.id) ? 'bg-surface-1' : 'bg-surface-2 text-ink-2'"
+          class="min-h-12 rounded-sm border px-3 text-left"
+          :class="
+            selectedIds.has(participant.id)
+              ? 'border-settlement bg-settlement/10 text-settlement'
+              : 'border-hairline-strong text-ink-2'
+          "
           @click="toggleParticipant(participant.id)"
         >
           {{ participant.name

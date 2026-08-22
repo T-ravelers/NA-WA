@@ -177,6 +177,70 @@ class JourneyMapperIntegrationTest {
         }
     }
 
+    /*
+     * 항목 운영 기간 검사(JOURNEY-012)가 읽는 값이다. 컬럼이 SELECT에서 빠지면 전부
+     * null로 와서 검사가 조용히 통과하므로, 매핑까지 실제로 확인한다.
+     */
+    @Test
+    void findAvailableExploreItemById_returnsEventPeriod() {
+        String marker = "j-period-" + UUID.randomUUID();
+        long memberId = insertMember(marker);
+        List<Long> eventItemIds = new ArrayList<>();
+        LocalDate today = jdbcTemplate.queryForObject(
+            "SELECT CURRENT_DATE()",
+            LocalDate.class
+        );
+
+        try {
+            long datedEventId = insertExploreItem(memberId, "EVENT");
+            eventItemIds.add(datedEventId);
+            insertEvent(
+                datedEventId,
+                marker + "-dated",
+                today,
+                today.plusDays(3),
+                "ONGOING"
+            );
+
+            long permanentEventId = insertExploreItem(memberId, "EVENT");
+            eventItemIds.add(permanentEventId);
+            insertPermanentEvent(
+                permanentEventId,
+                marker + "-permanent",
+                today.minusDays(5)
+            );
+
+            JourneyExploreItem dated = mapper.findAvailableExploreItemById(
+                datedEventId
+            );
+            assertNotNull(dated);
+            assertEquals(today, dated.getStartDate());
+            assertEquals(today.plusDays(3), dated.getEndDate());
+
+            JourneyExploreItem permanent = mapper.findAvailableExploreItemById(
+                permanentEventId
+            );
+            assertNotNull(permanent);
+            assertEquals(today.minusDays(5), permanent.getStartDate());
+            assertNull(permanent.getEndDate());
+        } finally {
+            for (Long eventItemId : eventItemIds) {
+                jdbcTemplate.update(
+                    "DELETE FROM event WHERE event_id = ?",
+                    eventItemId
+                );
+                jdbcTemplate.update(
+                    "DELETE FROM explore_items WHERE item_id = ?",
+                    eventItemId
+                );
+            }
+            jdbcTemplate.update(
+                "DELETE FROM members WHERE member_id = ?",
+                memberId
+            );
+        }
+    }
+
     @Test
     void findJourneysByMemberId_countsItemsUsingTimelineVisibilityRules() {
         String marker = "journey-cnt-" + UUID.randomUUID();
@@ -761,6 +825,25 @@ class JourneyMapperIntegrationTest {
         );
     }
 
+    /*
+     * 상시 이벤트. chk_event_period가 `is_permanent = TRUE ⟺ end_date IS NULL`을
+     * 강제하므로 end_date를 채우면 INSERT 자체가 거부된다.
+     */
+    private static void insertPermanentEvent(
+        long itemId,
+        String marker,
+        LocalDate startDate
+    ) {
+        jdbcTemplate.update(
+            "INSERT INTO event "
+                + "(event_id, title, start_date, end_date, is_permanent) "
+                + "VALUES (?, ?, ?, NULL, TRUE)",
+            itemId,
+            marker,
+            startDate
+        );
+    }
+
     private static void insertPlace(long itemId, String marker) {
         jdbcTemplate.update(
             "INSERT INTO place (place_id, name) VALUES (?, ?)",
@@ -806,17 +889,16 @@ class JourneyMapperIntegrationTest {
             PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO appointments "
                     + "(item_id, host_member_id, language_code, appointment_name, "
-                    + "max_members, join_deadline, deposit_amount, "
+                    + "max_members, deposit_amount, "
                     + "appointment_status, activity_start_at, activity_end_at) "
                     + "VALUES (?, ?, 'en', 'journey re-add integration', "
-                    + "5, ?, 10000, 'RECRUITING', ?, ?)",
+                    + "5, 10000, 'RECRUITING', ?, ?)",
                 Statement.RETURN_GENERATED_KEYS
             );
             statement.setLong(1, itemId);
             statement.setLong(2, hostMemberId);
-            statement.setObject(3, activityStartAt.minusDays(1));
-            statement.setObject(4, activityStartAt);
-            statement.setObject(5, activityStartAt.plusHours(2));
+            statement.setObject(3, activityStartAt);
+            statement.setObject(4, activityStartAt.plusHours(2));
             return statement;
         }, keyHolder);
         return keyHolder.getKey().longValue();

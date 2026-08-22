@@ -24,6 +24,32 @@ async function fillRequiredFields(wrapper: ReturnType<typeof mount>): Promise<vo
 }
 
 describe('JourneyCreateForm', () => {
+  /*
+   * 담을 항목의 운영 기간을 받아 기간 입력칸을 미리 채운다. prop을 받기만 하고 입력칸에
+   * 넣지 않으면, 그 사람은 무엇과 겹쳐야 하는지 모른 채 폼을 채우고 또 안 겹치는 여정을
+   * 만들어 같은 자리로 돌아온다.
+   */
+  it('넘겨받은 항목 기간으로 기간 입력칸이 채워진 채 열린다', () => {
+    const wrapper = mount(JourneyCreateForm, {
+      props: { initialStartDate: '2026-08-10', initialEndDate: '2026-08-12' },
+      global: { plugins: [i18n] },
+    })
+
+    const dateInputs = wrapper.findAll('input[type="date"]')
+
+    expect((dateInputs[0]?.element as HTMLInputElement).value).toBe('2026-08-10')
+    expect((dateInputs[1]?.element as HTMLInputElement).value).toBe('2026-08-12')
+  })
+
+  it('항목 기간이 없으면 기간 입력칸은 빈 채로 열린다', () => {
+    const wrapper = mount(JourneyCreateForm, { global: { plugins: [i18n] } })
+
+    const dateInputs = wrapper.findAll('input[type="date"]')
+
+    expect((dateInputs[0]?.element as HTMLInputElement).value).toBe('')
+    expect((dateInputs[1]?.element as HTMLInputElement).value).toBe('')
+  })
+
   it('keeps the user on step one and exposes validation errors', async () => {
     const wrapper = mount(JourneyCreateForm, { global: { plugins: [i18n] } })
 

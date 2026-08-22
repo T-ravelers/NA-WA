@@ -150,6 +150,7 @@ const errorDescription = computed(() => {
         <AppButton
           v-for="action in quickActions"
           :key="action.id"
+          :data-testid="`wallet-action-${action.id}`"
           :variant="action.variant"
           block
           compact
@@ -184,7 +185,7 @@ const errorDescription = computed(() => {
             <div class="flex items-center gap-3">
               <span
                 aria-hidden="true"
-                class="flex size-11 shrink-0 items-center justify-center rounded-pill bg-surface-2 text-ink-2"
+                class="flex size-11 shrink-0 items-center justify-center rounded-pill bg-surface-3 text-ink-2"
               >
                 <component
                   :is="ACTIVITY_ICON[activity.kind]"

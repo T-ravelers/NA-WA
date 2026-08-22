@@ -9,7 +9,15 @@
  * 라벨을 보조하는 장식으로만 붙는다.
  */
 type BadgeTone =
-  'ongoing' | 'scheduled' | 'pending' | 'completed' | 'settlement' | 'onPaper' | 'neutral'
+  | 'ongoing'
+  | 'scheduled'
+  | 'pending'
+  | 'completed'
+  | 'settlement'
+  | 'info'
+  | 'danger'
+  | 'onPaper'
+  | 'neutral'
 
 interface Props {
   tone?: BadgeTone
@@ -31,6 +39,8 @@ const TONE_CLASS: Record<BadgeTone, string> = {
   pending: 'border border-status-scheduled/40 bg-status-scheduled/10 text-status-scheduled',
   completed: 'border border-status-ongoing/40 bg-status-ongoing/10 text-status-ongoing',
   settlement: 'border border-settlement bg-transparent text-settlement',
+  info: 'border border-info/40 bg-info/10 text-ink',
+  danger: 'border border-danger/40 bg-danger/10 text-ink',
   onPaper: 'border border-on-paper/30 bg-transparent text-on-paper/75',
   neutral: 'border border-hairline bg-transparent text-ink-2',
 }
@@ -41,6 +51,8 @@ const DOT_CLASS: Record<BadgeTone, string> = {
   pending: 'bg-status-scheduled',
   completed: 'bg-status-ongoing',
   settlement: 'bg-settlement',
+  info: 'bg-info',
+  danger: 'bg-danger',
   onPaper: 'bg-on-paper/50',
   neutral: 'bg-ink-3',
 }

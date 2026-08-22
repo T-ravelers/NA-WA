@@ -34,9 +34,9 @@ describe('ReportCategoryBreakdown', () => {
     expect(rows).toHaveLength(4)
     expect(rows[0]?.text()).toContain('Food')
     expect(rows[0]?.text()).toContain('42%')
-    expect(rows[0]?.text()).toContain('₩539,500')
+    expect(rows[0]?.text()).toContain('539,500 P')
     expect(rows[3]?.text()).toContain('Beauty')
-    expect(rows[3]?.text()).toContain('₩128,400')
+    expect(rows[3]?.text()).toContain('128,400 P')
   })
 
   it('draws one arc per non-zero category on top of the track ring', () => {
@@ -58,7 +58,7 @@ describe('ReportCategoryBreakdown', () => {
     expect(wrapper.findAll('circle')).toHaveLength(1)
     expect(wrapper.findAll('li')).toHaveLength(3)
     expect(wrapper.text()).toContain('Uncategorized')
-    expect(wrapper.text()).toContain('₩0')
+    expect(wrapper.text()).toContain('0 P')
     expect(wrapper.text()).toContain('0%')
   })
 

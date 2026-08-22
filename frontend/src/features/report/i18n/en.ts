@@ -17,7 +17,7 @@ export default {
     },
     generate: {
       title: 'Choose report expenses',
-      description: 'Select completed KRW expenses to include in this immutable report snapshot.',
+      description: 'Select completed expenses to include in this immutable report snapshot.',
       loading: 'Loading eligible expenses',
       loadFailed: 'We could not load eligible expenses. Please try again.',
       emptyTitle: 'No eligible expenses',

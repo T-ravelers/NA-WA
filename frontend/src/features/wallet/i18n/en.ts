@@ -137,6 +137,7 @@ export default {
       previewTitle: 'TOP UP PREVIEW',
       back: 'Back',
       amountLabel: 'Top-up amount',
+      pointsRateNotice: '1 P = ₩1. Charged to your card in KRW.',
       paymentMethod: 'Payment method',
       cardDescription: 'Visa / Mastercard · Test Mode',
       paypalDescription: 'PayPal Sandbox · Coming soon',
@@ -165,6 +166,7 @@ export default {
       completeTitle: 'Top-up complete',
       currentBalance: 'Current balance {balance}',
       backToWallet: 'Back to wallet',
+      backToCaller: 'Continue where you left off',
     },
     qr: {
       title: 'QR PAYMENT',

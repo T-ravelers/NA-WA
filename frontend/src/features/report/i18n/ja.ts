@@ -1,0 +1,119 @@
+/**
+ * Report 도메인 문구 (ja).
+ *
+ * `en.ts`와 같은 구조를 유지한다. 새 키는 `en.ts`에 먼저 추가한 뒤 여기에 번역을 더한다.
+ * 여기 없는 key는 `en`으로 폴백한다.
+ */
+export default {
+  report: {
+    list: {
+      title: 'レポート',
+      description: '終了した旅程を選んで、最終レポートを作成または表示します。',
+      loadFailed: 'レポートを読み込めませんでした。もう一度お試しください。',
+      emptyTitle: '終了した旅程はまだありません',
+      emptyDescription: '最終レポートは旅程の終了後に作成できます。',
+      ended: '終了',
+      eventCount: 'イベント{count}件',
+      placeCount: 'スポット{count}件',
+      ready: '最終レポート作成済み',
+      notCreated: '最終レポート未作成',
+      view: '最終レポートを見る',
+      chooseExpenses: '支出を選ぶ',
+      choosingExpenses: '支出を選択中',
+    },
+    generate: {
+      title: 'レポートの支出を選択',
+      description: '後から変更できないレポートに含める、完了済みの支出を選んでください。',
+      loading: '対象の支出を読み込み中',
+      loadFailed: '対象の支出を読み込めませんでした。もう一度お試しください。',
+      emptyTitle: '対象の支出がありません',
+      emptyDescription: 'この旅程の支出ゼロのレポートは作成できます。',
+      selectionLabel: '対象の支出',
+      memoUnavailable: 'メモなし',
+      submit: '最終レポートを生成',
+      submitEmpty: '支出ゼロのレポートを生成',
+      pending: '最終レポートを生成中',
+      failed: 'レポートを生成できませんでした。選択内容を確認して、もう一度お試しください。',
+      conflictTitle: '最終レポートはすでに存在します',
+      conflictDescription:
+        'レポート一覧を更新して、既存のスナップショットを開いてください。レポートは再生成できません。',
+      refresh: 'レポートを更新',
+    },
+    detail: {
+      title: 'レポート',
+      back: 'レポート一覧へ戻る',
+      invalidTitle: '無効なレポートリンク',
+      invalidDescription: 'このリンクのレポート番号が無効です。',
+      forbiddenTitle: 'このレポートは非公開です',
+      forbiddenDescription: 'このレポートを表示する権限がありません。',
+      notFoundTitle: 'レポートが見つかりません',
+      notFoundDescription: 'このレポートは存在しないか、利用できなくなりました。',
+      loadFailed: 'このレポートを読み込めませんでした。もう一度お試しください。',
+      journeySnapshot: '旅程のスナップショット',
+      itinerary: '保存した日程',
+      itineraryEmpty: 'このレポートには保存された日程項目がありません。',
+      analysis: '分析',
+      totalSpent: '合計支出',
+      dailyAverage: '1日あたりの平均',
+      zeroTitle: '支出が選ばれていません',
+      zeroDescription: 'このレポートは支出を紐づけずに生成されました。',
+      legacyTitle: '支出分析は利用できません',
+      legacyDescription:
+        'このレポートは支出分析の提供前に作成されました。旅程のスナップショットは引き続き閲覧できます。',
+      persona: {
+        heading: '消費スタイル',
+        FOOD: {
+          title: '味の探求者',
+          description: '食欲のおもむくままに楽しんだ旅。この旅程の{share}がグルメに使われました。',
+        },
+        SHOPPING: {
+          title: 'おみやげハンター',
+          description: '旅を家に持ち帰りました。この旅程の{share}がショッピングに使われました。',
+        },
+        BEAUTY: {
+          title: '輝きの追求者',
+          description: '最高の自分で帰路へ。この旅程の{share}がビューティーに使われました。',
+        },
+        SHOW: {
+          title: '最前列の旅人',
+          description: 'その瞬間を求めて。この旅程の{share}がエンタメに使われました。',
+        },
+        TRANSPORT: {
+          title: '行動派の旅人',
+          description: '動き続けた旅。この旅程の{share}が移動に使われました。',
+        },
+        STAY: {
+          title: 'スローな旅人',
+          description: 'じっくり腰を据えた旅。この旅程の{share}が宿泊に使われました。',
+        },
+        OTHER: {
+          title: '自由な消費家',
+          description: 'ひとつの枠に収まらない支出。{share}が通常のカテゴリー以外に使われました。',
+        },
+      },
+      categoryTitle: 'カテゴリー別',
+      categoryEmpty: 'カテゴリー別の支出は記録されていません。',
+      categoryDescription: '金額と割合を添えて、カテゴリー別にまとめた支出です。',
+      category: 'カテゴリー',
+      amount: '金額',
+      share: '割合',
+      trendTitle: '支出の推移',
+      trendEmpty: '日別の支出は記録されていません。',
+      trendDescription: '旅程の期間中の日別支出です。',
+      date: '日付',
+      status: 'レポートの状態：{status}',
+    },
+    errorCode: {
+      'REPORT-001': 'このレポートが見つかりませんでした。',
+      'REPORT-002': 'このレポートを表示する権限がありません。',
+      'REPORT-003': 'レポートのリクエスト内容を確認して、もう一度お試しください。',
+      'REPORT-004': 'この旅程はまだ終了していません。',
+      'REPORT-005': 'この旅程の最終レポートはすでに存在します。',
+      'REPORT-006': 'この旅程が見つかりませんでした。',
+      'REPORT-007':
+        '選んだ支出のひとつを含められませんでした。一覧を更新して、選び直してください。',
+      'REPORT-008':
+        '選んだ支出のひとつは、すでに別の旅程に属しています。一覧を更新して、選び直してください。',
+    },
+  },
+}
