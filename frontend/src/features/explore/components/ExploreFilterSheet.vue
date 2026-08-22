@@ -230,13 +230,25 @@ function setDatePreset(value: string): void {
 
 function setCalendarDate(value: string): void {
   if (!isDateAllowed(value)) return
+
+  // 이번 탭이 달력의 첫 탭인지 먼저 붙잡는다. 아래 판정보다 늦게 읽으면 항상 거짓이다.
+  const firstTap = !calendarTouched.value
   calendarTouched.value = true
 
-  // 프리셋 범위 전체가 그대로 선택돼 있는 상태라면, 첫 탭은 범위를 닫는 게
-  // 아니라 그 안에서 새로 고르기 시작하는 것으로 본다.
+  /*
+   * 프리셋 범위 전체가 그대로 선택돼 있는 상태라면, 첫 탭은 범위를 닫는 게 아니라 그 안에서
+   * 새로 고르기 시작하는 것으로 본다.
+   *
+   * 값만으로는 부족하다. Opening soon은 상한이 없어 `max`가 `undefined`인데, 첫 탭을 마친
+   * 뒤의 `endDate`도 `undefined`다. 그래서 첫 탭이 하필 프리셋 시작일이면 두 상태가 똑같아
+   * 보이고, 두 번째 탭이 범위를 닫지 못한 채 시작일만 덮어쓴다. 첫 탭인지를 함께 본다.
+   */
   const presetRange = draft.datePreset ? presetDateRange(draft.datePreset) : null
   const presetPristine =
-    presetRange !== null && draft.startDate === presetRange.min && draft.endDate === presetRange.max
+    firstTap &&
+    presetRange !== null &&
+    draft.startDate === presetRange.min &&
+    draft.endDate === presetRange.max
 
   if (presetPristine || draft.startDate === undefined || draft.endDate !== undefined) {
     draft.startDate = value

@@ -99,6 +99,37 @@ describe('ExploreFilterSheet date presets', () => {
     })
   })
 
+  it('builds an Opening soon range from its first selectable day forward', async () => {
+    const wrapper = mountDateSheet()
+
+    await pressButton(wrapper, 'Opening soon')
+    /* 시작일을 먼저 누르는 순서. 끝날부터 누르는 순서만 되면 안 된다. */
+    await lastButton(wrapper, '21')?.trigger('click')
+    await lastButton(wrapper, '25')?.trigger('click')
+    await pressApply(wrapper)
+
+    expect(lastApplied(wrapper)).toMatchObject({
+      datePreset: 'OPENING_SOON',
+      startDate: '2026-08-21',
+      endDate: '2026-08-25',
+    })
+  })
+
+  it('builds the same Opening soon range when the later day is tapped first', async () => {
+    const wrapper = mountDateSheet()
+
+    await pressButton(wrapper, 'Opening soon')
+    await lastButton(wrapper, '25')?.trigger('click')
+    await lastButton(wrapper, '21')?.trigger('click')
+    await pressApply(wrapper)
+
+    expect(lastApplied(wrapper)).toMatchObject({
+      datePreset: 'OPENING_SOON',
+      startDate: '2026-08-21',
+      endDate: '2026-08-25',
+    })
+  })
+
   it('narrows dates inside the preset range instead of clearing the preset', async () => {
     const wrapper = mountDateSheet()
 
