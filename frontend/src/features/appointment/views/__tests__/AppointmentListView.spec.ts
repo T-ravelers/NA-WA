@@ -46,6 +46,8 @@ interface MountOptions {
    * 채워 두면 그 시차에서만 드러나는 문제를 테스트가 못 본다.
    */
   journeys?: Ref<AppointmentJourneySummary[] | undefined>
+  /** 캐시가 남은 재방문을 흉내낼 때 넘긴다. 앱은 QueryClient 하나를 공유한다. */
+  queryClient?: QueryClient
 }
 
 async function mountView(options: MountOptions = {}) {
@@ -100,7 +102,8 @@ async function mountView(options: MountOptions = {}) {
       },
     ],
   })
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient =
+    options.queryClient ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
   await router.push(options.path ?? '/appointments?itemId=42&itemType=EVENT')
   await router.isReady()
 
@@ -121,7 +124,16 @@ async function mountView(options: MountOptions = {}) {
     },
   })
   await flushPromises()
-  return { wrapper, router }
+  return { wrapper, router, queryClient }
+}
+
+const EMPTY_PAGE = {
+  content: [],
+  page: 0,
+  size: 20,
+  totalElements: 0,
+  totalPages: 0,
+  hasNext: false,
 }
 
 describe('AppointmentListView', () => {
@@ -144,7 +156,9 @@ describe('AppointmentListView', () => {
       itemId: 42,
       itemType: 'EVENT',
       keyword: undefined,
-      language: undefined,
+      // 기본 언어 칩은 회원이 고른 언어(테스트 로케일은 en)다. 목록 전체를 보여주면
+      // 대부분이 못 알아듣는 언어로 채워진다.
+      language: 'en',
       page: 0,
       size: 20,
     })
@@ -157,6 +171,99 @@ describe('AppointmentListView', () => {
 
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
+  })
+
+  it('starts from the member language again on the next visit', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Japanese')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'ja' }))
+
+    // 고른 칩은 그 화면에 머무는 동안만 유지된다. 다시 들어오면 회원 언어다.
+    const revisited = await mountView()
+    await flushPromises()
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'en' }))
+    expect(
+      revisited.wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'English')
+        ?.attributes('aria-pressed'),
+    ).toBe('true')
+  })
+
+  // 사용자가 고르지 않은 조건으로 빈 화면을 보여주면, 약속이 없는 것인지 걸러진
+  // 것인지 구분되지 않는다.
+  it('falls back to every language when the member language has no appointments', async () => {
+    fetchAppointments.mockResolvedValueOnce(EMPTY_PAGE)
+
+    const { wrapper } = await mountView()
+    await flushPromises()
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ language: undefined }),
+    )
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'All')
+        ?.attributes('aria-pressed'),
+    ).toBe('true')
+  })
+
+  // 되돌림은 watch가 값의 **변화**를 볼 때 돈다. 앱은 QueryClient 하나를 공유하므로
+  // 회원 언어로 건 0건 결과가 캐시에 남은 재방문에서는 마운트 시점에 이미
+  // isSuccess=true·count=0이라 값이 변하지 않는다 — watch가 한 번도 돌지 않는다.
+  // `{ immediate: true }`가 그 첫 판정을 대신한다. 목록 → 상세 → 뒤로가 바로 이 동선이다.
+  it('falls back to every language again when the empty result came from the cache', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    // 회원 언어(en)는 언제나 0건, 전체(language 없음)는 1건.
+    fetchAppointments.mockImplementation((filters: { language?: string }) =>
+      Promise.resolve(
+        filters.language === undefined
+          ? {
+              content: [appointment],
+              page: 0,
+              size: 20,
+              totalElements: 1,
+              totalPages: 1,
+              hasNext: false,
+            }
+          : EMPTY_PAGE,
+      ),
+    )
+
+    const first = await mountView({ queryClient })
+    first.wrapper.unmount()
+
+    const { wrapper } = await mountView({ queryClient })
+    await flushPromises()
+
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'All')
+        ?.attributes('aria-pressed'),
+    ).toBe('true')
+  })
+
+  // 직접 고른 조건을 화면이 임의로 풀면 방금 누른 칩과 목록이 어긋난다.
+  it('keeps a chosen language even when it has no appointments', async () => {
+    const { wrapper } = await mountView()
+    fetchAppointments.mockResolvedValue(EMPTY_PAGE)
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Japanese')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'ja' }))
   })
 
   // 끝난 약속을 빼는 것은 서버가 LIMIT 앞에서 한다(APPOINTMENT_API.md). 받은 쪽에서

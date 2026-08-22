@@ -15,7 +15,6 @@ import AppointmentJourneySelectSheet from '../components/AppointmentJourneySelec
 import AppointmentListCard from '../components/AppointmentListCard.vue'
 import {
   type AppointmentItemType,
-  type AppointmentLanguage,
   type AppointmentListFilters,
   type AppointmentSummary,
 } from '../api/appointmentApi'
@@ -24,13 +23,29 @@ import {
   useAppointmentJoinFlow,
   type AppointmentJoinTarget,
 } from '../composables/useAppointmentJoinFlow'
+import {
+  defaultListLanguage,
+  type AppointmentLanguageFilter,
+} from '../model/appointmentListLanguage'
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const { locale, t } = useI18n()
 
 const keyword = ref('')
-const selectedLanguage = ref<'ALL' | AppointmentLanguage>('ALL')
+// 기본은 회원이 고른 언어다. 방한 외국인이 알아들을 수 있는 약속이 먼저 보여야
+// 하는데, 목록 전체를 보여주면 대부분이 못 알아듣는 언어로 채워진다.
+//
+// 고른 칩은 저장하지 않는다. 들어올 때는 언제나 회원 언어에서 시작하고, 다른 언어를
+// 보는 것은 이 화면에 머무는 동안의 일이다. 다만 그동안은 자동 되돌림을 멈춰야 해서
+// (아래 watch) 직접 골랐는지만 화면 안에서 기억한다.
+const userChoseLanguage = ref(false)
+const selectedLanguage = ref<AppointmentLanguageFilter>(defaultListLanguage(locale.value))
+
+function chooseLanguage(next: AppointmentLanguageFilter): void {
+  selectedLanguage.value = next
+  userChoseLanguage.value = true
+}
 
 function readPositiveInteger(value: unknown): number | undefined {
   const raw = Array.isArray(value) ? value[0] : value
@@ -76,7 +91,7 @@ const title = computed(() =>
       : t('appointment.list.title'),
 )
 
-const languageOptions: Array<'ALL' | AppointmentLanguage> = ['ALL', 'en', 'ja', 'zh-TW', 'vi']
+const languageOptions: AppointmentLanguageFilter[] = ['ALL', 'en', 'ja', 'zh-TW', 'vi']
 
 function goBack(): void {
   if (itemId.value !== undefined && itemType.value === 'EVENT') {
@@ -128,6 +143,32 @@ const listQuery = computed(() => ({
   ...(itemId.value === undefined ? {} : { itemId: String(itemId.value) }),
   ...(itemType.value === undefined ? {} : { itemType: itemType.value }),
 }))
+
+/**
+ * 자동으로 채운 언어로 걸러 아무것도 없으면 전체로 되돌린다.
+ *
+ * 사용자가 고르지 않은 조건 때문에 빈 화면을 보여주면, 약속이 없는 것인지 걸러진
+ * 것인지 구분되지 않는다.
+ *
+ * 직접 고른 언어에서는 되돌리지 않는다. 고른 조건을 화면이 임의로 풀면 방금 누른
+ * 칩과 목록이 어긋난다. 검색어가 있을 때도 두는데, 그때 빈 결과의 이유는 검색어일
+ * 수 있어서다.
+ *
+ * `immediate`는 지울 수 없다. watch는 값이 **변할 때** 도는데, 앱이 QueryClient 하나를
+ * 공유하므로 회원 언어로 건 0건 결과가 캐시에 남은 재방문에서는 마운트 시점에 이미
+ * `isSuccess=true`·`count=0`이라 값이 변하지 않는다 — watch가 한 번도 돌지 않는다.
+ * 첫 실행에서 곧장 돌아 나오는 것은 **캐시가 빈 첫 방문에서만** 참이다.
+ */
+watch(
+  () => [appointmentQuery.isSuccess.value, appointments.value.length] as const,
+  ([isSuccess, count]) => {
+    if (userChoseLanguage.value || selectedLanguage.value === 'ALL') return
+    if (!isSuccess || count > 0 || keyword.value.trim() !== '') return
+
+    selectedLanguage.value = 'ALL'
+  },
+  { immediate: true },
+)
 
 const JOIN_TARGET_KEY = 'joinAppointmentId'
 
@@ -260,7 +301,7 @@ function selectJourney(tripId: number): void {
             : 'border-hairline-strong text-ink-2'
         "
         :aria-pressed="selectedLanguage === language"
-        @click="selectedLanguage = language"
+        @click="chooseLanguage(language)"
       >
         {{
           language === 'ALL'
