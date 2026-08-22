@@ -77,6 +77,7 @@ export default {
       meetingPlacePlaceholder: 'Please enter the location.',
       meetingPlaceLoading: 'Reading the activity location…',
       visitDateNote: 'This activity happens on {date}, based on the journey day you chose.',
+      activityTime: 'Activity time',
       startAt: 'Activity starts',
       endAt: 'Activity ends',
       submit: 'Create appointment',
@@ -90,6 +91,11 @@ export default {
         'Your appointment has not been created yet. If you leave now, this progress will be lost.',
       exitConfirmStay: 'Stay',
       exitConfirmLeave: 'Leave',
+      insufficientTitle: 'Not enough balance',
+      insufficientDescription:
+        'Your wallet balance is too low for the {amount} P deposit. Top up {amount} P to create this appointment?',
+      insufficientLater: 'Not now',
+      insufficientTopup: 'Top up',
       loadFailed: 'Appointment could not be created. Please try again.',
       validation: {
         itemContext: 'Open this form from an Event or Place.',

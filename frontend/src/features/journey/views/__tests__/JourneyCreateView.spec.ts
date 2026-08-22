@@ -32,6 +32,11 @@ async function mountView(initialPath = '/journeys/new') {
     routes: [
       { path: '/journeys/new', name: 'journey-create', component: JourneyCreateView },
       {
+        path: '/journeys',
+        name: 'journey-list',
+        component: { template: '<div>Journey list</div>' },
+      },
+      {
         path: '/journeys/:tripId',
         name: 'journey-detail',
         component: { template: '<div>Journey detail</div>' },
@@ -67,6 +72,8 @@ describe('JourneyCreateView', () => {
   it('creates a journey once and moves to the returned detail route', async () => {
     createJourney.mockResolvedValue({ ...input, tripId: 42 })
     const { wrapper, router, queryClient } = await mountView()
+    const replace = vi.spyOn(router, 'replace')
+    const push = vi.spyOn(router, 'push')
 
     wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
     await flushPromises()
@@ -75,6 +82,13 @@ describe('JourneyCreateView', () => {
     expect(createJourney).toHaveBeenCalledWith(input)
     expect(router.currentRoute.value.fullPath).toBe('/journeys/42')
     expect(queryClient.getQueryData(['journeys', 'detail', 42])).toMatchObject({ tripId: 42 })
+    // 제출이 끝난 폼은 히스토리에 남기지 않는다. push하면 상세에서 뒤로 갈 때 방금
+    // 제출한 폼이 다시 뜬다.
+    expect(replace).toHaveBeenCalledOnce()
+    expect(push).not.toHaveBeenCalled()
+
+    replace.mockRestore()
+    push.mockRestore()
   })
 
   it('invalidates the cached journey list so the new journey shows up elsewhere', async () => {
@@ -94,6 +108,8 @@ describe('JourneyCreateView', () => {
     const { wrapper, router } = await mountView(
       '/journeys/new?returnRouteName=appointment-create&itemId=100&itemType=EVENT',
     )
+    const replace = vi.spyOn(router, 'replace')
+    const push = vi.spyOn(router, 'push')
 
     wrapper.findComponent(JourneyCreateForm).vm.$emit('submit', input)
     await flushPromises()
@@ -104,6 +120,65 @@ describe('JourneyCreateView', () => {
       itemType: 'EVENT',
       tripId: '42',
     })
+    // 제출이 끝난 이 화면은 히스토리에 남기지 않는다. push로 돌아가면 돌아간
+    // 화면에서 흐름을 포기할 때 되감기가 이미 제출한 폼으로 다시 튄다.
+    expect(replace).toHaveBeenCalledOnce()
+    expect(push).not.toHaveBeenCalled()
+
+    replace.mockRestore()
+    push.mockRestore()
+  })
+
+  it('goes back the way you came when entered directly with history', async () => {
+    // 여정 목록에서 곧장 들어온 경우. 목적지를 push하면 이 화면이 히스토리에 남아,
+    // 돌아간 화면에서 뒤로 갈 때 이미 제출한 이 폼이 다시 튄다. 되감아야 빠진다.
+    const { wrapper, router } = await mountView()
+    const back = vi.spyOn(router, 'back').mockImplementation(() => {})
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(3)
+
+    await wrapper.get('button[aria-label="Go back"]').trigger('click')
+    await flushPromises()
+
+    expect(back).toHaveBeenCalledOnce()
+    expect(router.currentRoute.value.name).toBe('journey-create')
+
+    historyLength.mockRestore()
+    back.mockRestore()
+  })
+
+  it('falls back to the journey list when opened directly without history', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('button[aria-label="Go back"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-list')
+  })
+
+  it('gives the entry back to the caller instead of rewinding past the flow', async () => {
+    // 약속 생성은 자기 자리를 이 화면에 내주고 보냈다(replace로 진입). 그래서 되감으면
+    // 흐름 이전 화면까지 빠져 버린다 — 자리를 돌려주는 replace로 나간다. 되감을 히스토리가
+    // 있어도 마찬가지다. itemId·itemType은 그대로 들고 가되, 만든 여정이 없으니 tripId는
+    // 붙이지 않는다.
+    const { wrapper, router } = await mountView(
+      '/journeys/new?returnRouteName=appointment-create&itemId=100&itemType=EVENT',
+    )
+    const back = vi.spyOn(router, 'back')
+    const push = vi.spyOn(router, 'push')
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(3)
+
+    await wrapper.get('button[aria-label="Go back"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-create')
+    expect(router.currentRoute.value.query).toEqual({ itemId: '100', itemType: 'EVENT' })
+    expect(back).not.toHaveBeenCalled()
+    expect(push).not.toHaveBeenCalled()
+    expect(createJourney).not.toHaveBeenCalled()
+
+    historyLength.mockRestore()
+    push.mockRestore()
+    back.mockRestore()
   })
 
   it('shows the normalized creation error without navigating', async () => {

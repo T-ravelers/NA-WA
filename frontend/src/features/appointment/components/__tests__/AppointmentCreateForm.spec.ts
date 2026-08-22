@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
 
@@ -196,6 +196,25 @@ describe('AppointmentCreateForm', () => {
     expect(wrapper.find('input[placeholder="e.g. Seongsu K-Beauty Tour"]').exists()).toBe(true)
   })
 
+  it('lays the start and end times side by side with a range separator', async () => {
+    // "18:30 ~ 22:00"처럼 한 줄로 읽혀야 한다. 개별 라벨은 눈에 보이지 않지만
+    // 접근성 이름으로는 남는다.
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT' },
+      ...mountOptions,
+    })
+    await fillBasics(wrapper)
+
+    const range = wrapper.get('fieldset')
+    expect(range.text()).toContain('Activity time')
+    expect(range.findAll('input[type="time"]')).toHaveLength(2)
+    expect(range.text()).toContain('~')
+    expect(range.findAll('label.sr-only').map((label) => label.text())).toEqual([
+      'Activity starts',
+      'Activity ends',
+    ])
+  })
+
   it('emits a normalized request after confirming valid details', async () => {
     const wrapper = mount(AppointmentCreateForm, {
       props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
@@ -259,6 +278,41 @@ describe('AppointmentCreateForm', () => {
     expect(wrapper.text()).not.toContain('Choose a deposit between 5,000 P and 50,000 P.')
   })
 
+  it('shows a settings error as soon as the field is edited, without pressing Create', async () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
+      ...mountOptions,
+    })
+
+    await fillBasics(wrapper)
+    await wrapper.find('input[type="time"]').setValue('18:30')
+    await wrapper.findAll('input[type="time"]')[1]?.setValue('18:00')
+
+    expect(wrapper.text()).toContain('The end time must be after the start time.')
+
+    await wrapper.find('input[inputmode="numeric"]').setValue('100')
+
+    expect(wrapper.text()).toContain('Choose a deposit between 5,000 P and 50,000 P.')
+  })
+
+  it('does not flag untouched settings fields until the host tries to submit', async () => {
+    // 스텝에 들어오자마자 전부 빨간 화면은 틀렸다는 뜻이 아니라 아직 안 적었다는
+    // 뜻일 뿐이다. 손댄 칸만 즉시 보여주고, 제출을 시도한 뒤에 전부 보여준다.
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
+      ...mountOptions,
+    })
+
+    await fillBasics(wrapper)
+    expect(wrapper.text()).not.toContain('Choose a start time.')
+
+    await wrapper.find('input[type="time"]').setValue('18:30')
+    expect(wrapper.text()).not.toContain('Choose an end time.')
+
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.text()).toContain('Choose an end time.')
+  })
+
   it('clears a schedule validation error once the user starts fixing it', async () => {
     const wrapper = mount(AppointmentCreateForm, {
       props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
@@ -277,6 +331,49 @@ describe('AppointmentCreateForm', () => {
     await wrapper.findAll('input[type="time"]')[1]?.setValue('22:00')
 
     expect(wrapper.text()).not.toContain('The end time must be after the start time.')
+  })
+
+  it('starts the deposit at 10,000 so the host can keep it without typing', async () => {
+    const wrapper = mount(AppointmentCreateForm, {
+      props: { itemId: 42, itemType: 'EVENT', tripId: 7, visitDate: '2026-08-08' },
+      ...mountOptions,
+    })
+
+    await fillBasics(wrapper)
+
+    expect(wrapper.find<HTMLInputElement>('input[inputmode="numeric"]').element.value).toBe(
+      '10,000',
+    )
+
+    await wrapper.find('input[type="time"]').setValue('18:30')
+    await wrapper.findAll('input[type="time"]')[1]?.setValue('22:00')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.text()).not.toContain('Choose a deposit between 5,000 P and 50,000 P.')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('10,000')
+  })
+
+  it('snapshots what the host typed and restores it, step included', async () => {
+    // 충전하러 떠났다 돌아올 때 부모가 쓴다. 항목·여정·날짜는 부모가 props로 다시
+    // 주므로 여기서는 적은 값과 스텝만 오간다.
+    const props = { itemId: 42, itemType: 'EVENT' as const, tripId: 7, visitDate: '2026-08-08' }
+    const source = mount(AppointmentCreateForm, { props, ...mountOptions })
+    await fillBasics(source)
+    await source.find('input[type="time"]').setValue('18:30')
+    // 종료 시각은 일부러 비워 둔 채 떠난다 — 돌아온 뒤 미입력 칸이 바로 보이는지 본다.
+    const saved = (source.vm as unknown as { snapshot: () => unknown }).snapshot()
+
+    const target = mount(AppointmentCreateForm, { props, ...mountOptions })
+    ;(target.vm as unknown as { restore: (saved: unknown) => void }).restore(saved)
+    await flushPromises()
+
+    expect(target.text()).toContain('Set your appointment details')
+    expect(target.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
+    expect(target.findAll<HTMLInputElement>('input[type="time"]')[1]?.element.value).toBe('')
+    expect(target.find<HTMLInputElement>('input[inputmode="numeric"]').element.value).toBe('10,000')
+    // 제출까지 갔던 폼이라 돌아온 뒤에는 손대지 않은 칸의 누락도 바로 보인다.
+    expect(target.text()).toContain('Choose an end time.')
   })
 
   it('rejects a deposit outside the configured range', async () => {

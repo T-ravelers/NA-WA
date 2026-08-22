@@ -6,6 +6,8 @@ import type {
 
 export const MIN_APPOINTMENT_DEPOSIT = 5_000
 export const MAX_APPOINTMENT_DEPOSIT = 50_000
+/** 생성 폼이 처음 보여주는 보증금. 방장이 비워둔 채 넘어가지 않게 범위 안의 값으로 시작한다. */
+export const DEFAULT_APPOINTMENT_DEPOSIT = 10_000
 export const MAX_MEETING_PLACE_LENGTH = 200
 export const MIN_APPOINTMENT_MEMBERS = 2
 export const MAX_APPOINTMENT_MEMBERS = 10
@@ -34,6 +36,16 @@ export interface AppointmentFormDraft {
 }
 
 export type MeetingPlaceMode = 'ITEM' | 'CUSTOM'
+
+/**
+ * 화면을 떠났다 돌아올 때(예: 보증금 충전) 폼을 그대로 되살리기 위한 초안.
+ * 항목·여정·날짜는 부모가 다시 주므로, 사용자가 적은 값과 스텝만 담는다.
+ */
+export interface AppointmentFormSnapshot {
+  step: 1 | 2
+  draft: AppointmentFormDraft
+  customMeetingPlace: string
+}
 
 export interface AppointmentFormErrors {
   itemContext?: string
