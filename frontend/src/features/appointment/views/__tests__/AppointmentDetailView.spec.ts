@@ -81,7 +81,7 @@ const leftMember = {
   isHost: false,
 }
 
-async function mountView({ journeys: list = journeys } = {}) {
+async function mountView({ journeys: list = journeys, path = '/appointments/7' } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -118,7 +118,7 @@ async function mountView({ journeys: list = journeys } = {}) {
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  await router.push('/appointments/7')
+  await router.push(path)
   await router.isReady()
 
   const wrapper = mount(AppointmentDetailView, {
@@ -417,6 +417,36 @@ describe('AppointmentDetailView', () => {
       returnRouteName: 'appointment-detail',
       appointmentId: '7',
     })
+  })
+
+  it('reopens the journey sheet with the journey the host just created', async () => {
+    // 여정을 만들고 ?tripId=로 돌아온 길. 참여를 다시 누르게 하지 않고, 만든 여정을
+    // 골라 둔 채로 시트를 열어 확인하고 넘어가게 한다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    const { wrapper } = await mountView({ path: '/appointments/7?tripId=7' })
+
+    const sheet = wrapper.get('[role="dialog"]')
+    expect(sheet.text()).toContain('Choose a journey')
+    expect(
+      sheet
+        .findAll('button')
+        .find((button) => button.text().includes('Seoul Foodie Week'))
+        ?.attributes('aria-pressed'),
+    ).toBe('true')
+  })
+
+  it('does not reopen the sheet for a member who already joined', async () => {
+    // 이미 참여한 사람에게는 열지 않는다. 참여 버튼과 같은 기준이다.
+    fetchMyAppointmentParticipation.mockResolvedValue({
+      joined: true,
+      appointmentMemberId: 4,
+      membershipStatus: 'ACTIVE',
+      attendanceStatus: 'PENDING',
+      host: false,
+    })
+    const { wrapper } = await mountView({ path: '/appointments/7?tripId=7' })
+
+    expect(wrapper.text()).not.toContain('Choose a journey')
   })
 
   it('joins the appointment and closes the sheet once confirmed', async () => {

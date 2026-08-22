@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { IconMenu2 } from '@tabler/icons-vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -368,6 +368,34 @@ function coversActivityDate(journey: { startDate: string; endDate: string }): bo
   if (date === null) return true
   return journey.startDate <= date && date <= journey.endDate
 }
+
+function readPositiveInteger(value: unknown): number | undefined {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number(raw)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
+}
+
+// 여정을 만들고 돌아온 경우(?tripId=). 참여를 다시 누르게 하지 않고 시트를 열어,
+// 방금 만든 여정을 골라 둔 채로 보여 준다 — 만든 것이 맞는지 확인하고 넘어간다.
+const createdTripId = computed(() => readPositiveInteger(route.query.tripId))
+
+watch(
+  () => [createdTripId.value, appointment.value, journeyListQuery.data.value] as const,
+  ([tripId, current, journeys]) => {
+    if (tripId === undefined || current === undefined) return
+    // 이미 참여했거나 참여할 수 없는 약속이면 열지 않는다. 버튼과 같은 기준이다.
+    if (joinBlockedReason.value !== undefined) return
+    // 보증금 확인까지 넘어간 뒤에는 시트를 다시 열지 않는다.
+    if (depositSheetOpen.value) return
+
+    journeySelectOpen.value = true
+    // 목록이 오기 전에는 고를 수 없다. 오고 나서 그 여정이 실제로 있을 때만 고른다.
+    if (journeys?.some((journey) => journey.tripId === tripId) === true) {
+      selectedTripId.value = tripId
+    }
+  },
+  { immediate: true },
+)
 
 function openJourneySelect(): void {
   // 이유는 이미 버튼 위에 떠 있다. 여기서는 시트를 열지 않는 것으로 끝낸다. 이미
