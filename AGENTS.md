@@ -14,6 +14,7 @@
 | `docs/`      | 공통 기술 문서                        | —                                        |
 | `deploy/`    | EC2 배포 스크립트                     | —                                        |
 | `nginx/`     | 백엔드 리버스 프록시 설정             | —                                        |
+| `loadtest/`  | k6 부하 테스트 환경(시드·시나리오·관측 스택) | [loadtest/README.md](./loadtest/README.md) |
 
 프론트엔드 명령은 **저장소 루트**에서, 백엔드 명령은 `backend/`에서 실행합니다.
 

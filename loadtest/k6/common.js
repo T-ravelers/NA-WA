@@ -40,10 +40,16 @@ if (!LOGIN_SECRET) {
 }
 
 /**
- * 이 실행을 다른 실행과 구분하는 값.
+ * 멱등성 키에 섞는 부가 식별자.
  *
- * 멱등성 키에 섞는다. 없으면 어제 돌린 키와 겹쳐서, 서버가 결제를 다시 하지 않고
- * 저장해 둔 응답을 돌려준다. 그러면 빠른 응답이 나오지만 그건 결제 성능이 아니다.
+ * 없으면 어제 돌린 키와 겹쳐서, 서버가 결제를 다시 하지 않고 저장해 둔 응답을
+ * 돌려준다. 그러면 빠른 응답이 나오지만 그건 결제 성능이 아니다.
+ *
+ * k6는 init 컨텍스트를 VU마다 따로 실행하므로, 기본값(`Date.now()`)은 "이 실행
+ * 전체"가 아니라 VU마다 다른 값이다 — 같은 실행 안에서도 VU끼리 시각이 갈릴 수
+ * 있다. `idempotencyKey`가 `vu${__VU}`를 함께 섞어 충돌은 막지만, 여러 실행을
+ * 구분해야 할 때(같은 회차를 재실행해 비교하는 등)는 `-e RUN_ID`로 값을 직접
+ * 고정해야 한다.
  */
 const RUN_ID = __ENV.RUN_ID || `${Date.now()}`
 
@@ -66,9 +72,15 @@ export function runScopedBase(base) {
   return base + (RUN_INDEX - 1) * RUN_STRIDE
 }
 
-/** VU·iteration·실행을 모두 섞어 전역에서 겹치지 않는 키를 만든다. */
+/**
+ * VU·iteration·실행·회차를 모두 섞어 전역에서 겹치지 않는 키를 만든다.
+ *
+ * RUN_INDEX를 넣지 않으면 같은 RUN_ID로 두 회차(RUN_INDEX=1, 2 ...)를 돌릴 때
+ * 키가 겹친다 — README의 재실행 예시가 정확히 이 모양이다. 겹치면 서버가 실제
+ * 결제·정산 대신 저장해 둔 응답을 2xx로 그대로 돌려줘서 조용히 실패한다.
+ */
 export function idempotencyKey(label) {
-  return `${RUN_ID}-${label}-vu${__VU}-iter${__ITER}`
+  return `${RUN_ID}-run${RUN_INDEX}-${label}-vu${__VU}-iter${__ITER}`
 }
 
 /**

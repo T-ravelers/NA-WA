@@ -13,9 +13,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
@@ -110,14 +109,7 @@ public class SecurityConfig {
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .requestCache(requestCache -> requestCache.disable())
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                        // JWT는 매 요청에서 복원되므로 세션 인증 성공
-                        // 전략을 매번 실행하면 CsrfAuthenticationStrategy가
-                        // XSRF-TOKEN을 매번 회전시킨다. 상태 없는 API에서는
-                        // 세션 성공 전략 자체를 사용하지 않는다.
-                        .sessionAuthenticationStrategy(
-                                new NullAuthenticatedSessionStrategy()
-                        ))
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
@@ -160,10 +152,7 @@ public class SecurityConfig {
                         .anyRequest().permitAll())
                 .addFilterBefore(
                         jwtAuthenticationFilter,
-                        // CSRF가 요청을 검사할 때 이미 JWT 인증이 있어야 한다.
-                        // 뒤에 두면 매 요청을 새 로그인으로 판단해 성공 후
-                        // XSRF-TOKEN을 회전시키고, 다음 쓰기부터 AUTH-005가 난다.
-                        CsrfFilter.class
+                        UsernamePasswordAuthenticationFilter.class
                 )
                 .addFilterBefore(
                         originValidationFilter,

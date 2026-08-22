@@ -40,6 +40,8 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -162,9 +164,24 @@ class SecurityConfigTest {
         // 받는다 — 프런트엔드는 403 재시도로(`shared/api/csrf.ts`), 부하 스크립트는
         // 매 요청 전 쿠키 재조회로 이 회전을 흡수한다.
         // 회전을 없애는 방향으로 고치면 두 클라이언트의 전제가 함께 깨진다.
-        Cookie rotated = response.getCookie("XSRF-TOKEN");
-        assertNotNull(rotated);
-        assertNotEquals(csrfCredentials.cookie.getValue(), rotated.getValue());
+        //
+        // response.getCookie(name)은 같은 이름의 Set-Cookie 중 첫 번째만 돌려준다.
+        // 서버는 삭제(Max-Age=0, 빈 값) 한 줄과 재발급 한 줄을 같은 응답에 함께
+        // 보내므로, 그 첫 줄만 보면 재발급 여부와 무관하게 "원래 값과 다르다"가
+        // 항상 참이 된다(빈 문자열도 다르다). 두 줄을 모두 꺼내 각각 확인한다.
+        List<String> xsrfSetCookieHeaders = response.getHeaders("Set-Cookie").stream()
+                .filter(header -> header.startsWith("XSRF-TOKEN="))
+                .collect(Collectors.toList());
+        assertEquals(2, xsrfSetCookieHeaders.size());
+        assertTrue(xsrfSetCookieHeaders.get(0).contains("Max-Age=0"));
+
+        String reissuedHeader = xsrfSetCookieHeaders.get(1);
+        String reissuedValue = reissuedHeader.substring(
+                "XSRF-TOKEN=".length(),
+                reissuedHeader.indexOf(';')
+        );
+        assertFalse(reissuedValue.isEmpty());
+        assertNotEquals(csrfCredentials.cookie.getValue(), reissuedValue);
     }
 
     @Test

@@ -21,6 +21,10 @@ macOS 네이티브 (제한 없음)      k6 · InfluxDB · Prometheus · Grafana
 
 ## 최초 1회
 
+> `docker-compose.ec2-clone.yml`이 `ports: !override`를 씁니다. Docker Compose
+> **2.24 이상**이 필요합니다 — 구버전은 이 태그를 모르는 YAML로 보고 원인을 알기
+> 어려운 오류로 죽습니다. `docker compose version`으로 먼저 확인하세요.
+
 ```shell
 brew install k6 prometheus grafana influxdb@1
 
@@ -80,7 +84,9 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9080/api/v1/members/me
 curl -s http://127.0.0.1:9081/internal/metrics | head -3                           # 지표가 나와야 한다
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9080/internal/metrics    # 404 여야 한다
 
-# 3. 테스트 데이터 시딩 (Issue #396 범위 밖, 별도 이슈)
+# 3. 테스트 데이터 시딩 — 예약 ID 범위(900000~999999 등)가 비어 있어야 한다.
+#    이미 값이 있으면 seed.sh가 거절한다. README '정리'의 down -v로 볼륨부터 비운다.
+RUNS=3 VUS=8920 PAYEE_POOL_SIZE=100 ./loadtest/seed.sh
 
 # 4. 관측 스택 기동
 brew services start influxdb@1
@@ -169,8 +175,8 @@ RUN_INDEX=2:  VU 1~5 → 1010001   VU 6~10 → 1010002   ...
 
 특히 시나리오 2의 `SETTLEMENT_PARTICIPANT_MEMBER_ID_BASE + VU` 회원은 해당 VU가 만든
 공동지출 정산에 선택되는 약속 멤버여야 하고, 원결제자와 다른 회원이어야 합니다. 각 VU가
-조회할 리포트도 미리 존재해야 상세 조회 2건이 모두 실행됩니다. 이 관계를 만드는 SQL은
-Issue #396의 제외 범위인 시드 이슈에서 구현합니다.
+조회할 리포트도 미리 존재해야 상세 조회 2건이 모두 실행됩니다. 이 관계는 `loadtest/seed.sql`이
+만듭니다.
 
 ## 시드 전에는 연결 진단만 합니다
 
@@ -299,6 +305,34 @@ JSON은 커밋해 두지 않았습니다 — Grafana 인스턴스마다 새로 �
 k6는 외부 동의 화면을 통과하지 않고 `authorization`의 302까지만 확인한 뒤
 `test-login`으로 callback의 토큰 발급을 대신합니다. 백엔드 요청 수는 유지하지만 OAuth
 공급자 통신과 callback의 프로필 교환 비용은 재현하지 않습니다.
+
+**브라우저에서는 인증된 쓰기 1건이 실제로 요청 3건입니다.** `SessionCreationPolicy.STATELESS`
+아래서도 Spring Security 5.8의 세션 전략이 남아 있어, 쓰기뿐 아니라 **인증된 모든 요청**
+뒤에 `XSRF-TOKEN` 쿠키가 회전합니다. 이 저장소의 `csrfTokenRepository`는
+`httpOnly`라 브라우저 JS가 쿠키를 못 읽고, 프런트엔드(`shared/api/csrf.ts`)는 발급받은
+토큰을 모듈 변수로 캐시해 뒀다가 403을 받아야만 다시 조회합니다. 둘을 합치면 실제 SPA는
+
+```
+(그 사이 인증된 GET 아무거나) → 쿠키만 새 값으로 갈림, 캐시는 옛 값
+POST  (헤더 옛 값 / 쿠키 새 값)  → 403 AUTH-005
+GET   /api/v1/auth/csrf           → 최신 값 재발급
+POST  (헤더·쿠키 모두 최신 값)   → 200
+```
+
+로 흐릅니다. 사용자에게는 자동 재시도라 보이지 않지만 **요청 수는 3배**입니다.
+
+k6는 쿠키 자(jar)에서 `httpOnly` 쿠키를 그냥 읽을 수 있어(브라우저는 못 하는 일입니다)
+이 왕복을 재현하지 않습니다. 그래서 이 문서의 "654 TPS"·"595 TPS" 같은 목표 수치는
+**k6가 실제로 보내는 요청 수 기준**이고, 실제 브라우저 트래픽으로 환산하면
+
+- 시나리오 1: 쓰기 5건 → VU당 실제 요청은 22건이 아니라 **약 32건**
+- 시나리오 2: 쓰기 7건(주 세션 5 + 수취인 1 + 참여자 1) → 26건이 아니라 **약 36건**
+
+이 됩니다. 회전 자체를 없애는 건(예: `JwtAuthenticationFilter`가 공유
+`SecurityContextRepository`에 컨텍스트를 저장해 `SessionManagementFilter`가
+"새로 인증됨"으로 오판하지 않게 하는 방향) 이 PR의 범위를 벗어나 별도 이슈로 다룹니다.
+Grafana에서는 업무 API 태그와 `test-login`·`csrf` 태그를 분리해서 봐야 목표 TPS와
+보조 트래픽이 섞이지 않습니다.
 
 ## 정리
 

@@ -225,6 +225,13 @@ SELECT @hosted_base + (r - 1) * @run_stride + n, 500000, 900000 + n, 'en',
        CURRENT_TIMESTAMP - INTERVAL 2 DAY, CURRENT_TIMESTAMP - INTERVAL 1 DAY
 FROM run_seq CROSS JOIN seq;
 
+-- trip_id를 일부러 NULL로 둔다. 시나리오 2의 `GET /api/v1/appointments/me`가
+-- 공동지출(710000번대) 약속을 고르는 것은 목록의 첫 항목이라서가 아니라
+-- `AppointmentMapper.xml`의 `AND am.trip_id IS NOT NULL` 조건 덕분이다 — 이 약속과
+-- 출석용(hosted) 약속 둘 다 IN_PROGRESS라 이 조건이 유일한 구분자다. 나중에 이
+-- trip_id를 채우면 `ongoing[0]`이 hosted로 바뀌어 참여자가 1명뿐이라
+-- `participantIds.length < 2`로 4·5번 그룹(정산)이 조용히 return한다 — 체크는
+-- 전부 초록인데 정산 경로만 측정에서 빠진다.
 INSERT INTO appointment_members (
     appointment_id, member_id, trip_id, membership_status, attendance_status
 )

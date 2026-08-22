@@ -60,7 +60,7 @@ existing="$({
 })"
 if [[ ${existing} != "0" ]]; then
   echo "부하 테스트 예약 ID 범위에 이미 ${existing}개의 회원이 있습니다." >&2
-  echo "README의 '시드 재생성' 절차로 볼륨을 초기화한 뒤 다시 실행하세요." >&2
+  echo "README '정리' 절의 'down -v'로 볼륨을 초기화한 뒤 다시 실행하세요." >&2
   exit 1
 fi
 

@@ -41,8 +41,11 @@ export const options = {
     },
   },
   thresholds: {
-    checks: ['rate>0.99'],
-    http_req_failed: ['rate<0.01'],
+    // abortOnFail 없이 threshold만 적으면 k6는 끝날 때 실패로만 표시하고
+    // 실행은 끝까지 계속한다. delayAbortEval은 초반 표본 몇 개로 즉시
+    // 끊기지 않게 30초 유예를 준다.
+    checks: [{ threshold: 'rate>0.99', abortOnFail: true, delayAbortEval: '30s' }],
+    http_req_failed: [{ threshold: 'rate<0.01', abortOnFail: true, delayAbortEval: '30s' }],
     http_req_duration: ['p(95)<2000'],
   },
 }

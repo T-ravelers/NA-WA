@@ -36,8 +36,11 @@ export const options = {
   },
   thresholds: {
     // 에러가 나기 시작하면 그 뒤 수치는 해석할 값이 아니다. 일찍 끊는다.
-    checks: ['rate>0.99'],
-    http_req_failed: ['rate<0.01'],
+    // abortOnFail 없이 threshold만 적으면 k6는 끝날 때 실패로만 표시하고
+    // 실행은 끝까지 계속한다. delayAbortEval은 초반 표본 몇 개로 즉시
+    // 끊기지 않게 30초 유예를 준다.
+    checks: [{ threshold: 'rate>0.99', abortOnFail: true, delayAbortEval: '30s' }],
+    http_req_failed: [{ threshold: 'rate<0.01', abortOnFail: true, delayAbortEval: '30s' }],
     http_req_duration: ['p(95)<2000'],
   },
 }
@@ -91,6 +94,10 @@ export default function () {
 
   const jar = new http.CookieJar()
   const memberId = memberIdFor(__VU)
+  // iteration 안에서 한 번만 계산한다. 그룹마다 새로 계산하면 UTC 자정을 사이에
+  // 두고 두 값이 하루씩 갈릴 수 있고, 그러면 3번 그룹의 visitDate가 방금 2번
+  // 그룹에서 만든 여정 기간 밖으로 나가 JOURNEY-007이 난다.
+  const { startDate: journeyStartDate, endDate: journeyEndDate } = journeyDateRange()
 
   group('1. 소셜 로그인', () => {
     beginOAuthLogin(jar)
@@ -105,16 +112,14 @@ export default function () {
     // 쿠키에 XSRF-TOKEN 을 심는다. 이후 withCsrf 가 쿠키에서 최신 값을 읽는다.
     issueCsrfHeaders(jar)
 
-    const { startDate, endDate } = journeyDateRange()
-
     const created = dataOf(
       expectOk(
         http.post(
           `${BASE_URL}/api/v1/journeys`,
           JSON.stringify({
             title: `loadtest-journey-${__VU}-${__ITER}`,
-            startDate,
-            endDate,
+            startDate: journeyStartDate,
+            endDate: journeyEndDate,
           }),
           { headers: withCsrf(jar, true), jar },
         ),
@@ -148,7 +153,7 @@ export default function () {
     )
 
     const eventId = list && list.content && list.content.length > 0 ? list.content[0].itemId : null
-    const visitDate = journeyDateRange().startDate
+    const visitDate = journeyStartDate
 
     if (eventId && tripId) {
       expectOk(http.get(http.url`${BASE_URL}/api/v1/explore/events/${eventId}`, { headers: baseHeaders, jar }), 'event 상세')
