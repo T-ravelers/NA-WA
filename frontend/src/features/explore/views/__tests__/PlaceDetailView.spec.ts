@@ -224,6 +224,23 @@ describe('PlaceDetailView', () => {
     expect(wrapper.text()).not.toContain('<br>')
   })
 
+  // 수집한 대표 메뉴는 대부분 한 문자열에 '/'로 이어져 온다. 나누지 않으면
+  // 'A / B / C'가 칩 하나에 통째로 들어간다.
+  it('splits the signature menu into one chip per item', async () => {
+    fetchPlaceDetail.mockResolvedValue({
+      ...place,
+      menuSummary: '떡볶이 / 순대 / 김밥',
+    })
+
+    const { wrapper } = await mountView()
+
+    const chips = wrapper.findAll('span').map((chip) => chip.text())
+    expect(chips).toContain('떡볶이')
+    expect(chips).toContain('순대')
+    expect(chips).toContain('김밥')
+    expect(chips).not.toContain('떡볶이 / 순대 / 김밥')
+  })
+
   it('returns to the Place list from the detail screen', async () => {
     const { wrapper, router } = await mountView()
 
