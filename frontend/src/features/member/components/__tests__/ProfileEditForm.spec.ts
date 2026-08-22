@@ -43,7 +43,6 @@ describe('ProfileEditForm', () => {
 
     expect((await submitted(wrapper))?.[0]?.[0]).toEqual({
       displayName: 'Mina Park',
-      profileImageUrl: '',
       nationalityCode: 'JP',
     })
   })
@@ -69,25 +68,16 @@ describe('ProfileEditForm', () => {
     expect(wrapper.text()).toContain('50 characters or fewer')
   })
 
-  it('refuses a photo address that is not http or https', async () => {
-    const wrapper = mountForm()
-    const [, photo] = wrapper.findAll('input')
+  /*
+   * 사진은 소셜 로그인이 가입 시점에 넣어 준 값을 그대로 쓴다. 첨부 경로가 영수증 전용이라
+   * 주소를 붙여넣는 칸을 두지 않기로 했다(2026-08-22).
+   */
+  it('shows the photo but offers no way to change it', () => {
+    const wrapper = mountForm({ profileImageUrl: 'https://example.test/me.png' })
 
-    await photo?.setValue('javascript:alert(1)')
-
-    expect(await submitted(wrapper)).toBeUndefined()
-    expect(wrapper.text()).toContain('http:// or https://')
-  })
-
-  it('accepts an https photo address', async () => {
-    const wrapper = mountForm()
-    const [, photo] = wrapper.findAll('input')
-
-    await photo?.setValue('https://example.test/me.png')
-
-    expect((await submitted(wrapper))?.[0]?.[0]).toMatchObject({
-      profileImageUrl: 'https://example.test/me.png',
-    })
+    expect(wrapper.get('img').attributes('src')).toBe('https://example.test/me.png')
+    // 이름 한 칸뿐이다. 국적은 select다.
+    expect(wrapper.findAll('input')).toHaveLength(1)
   })
 
   it('asks for a country before anything is touched in onboarding', () => {

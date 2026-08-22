@@ -45,9 +45,7 @@ export default {
       onboardingLead: 'お名前と出身国を教えてください。あとから変更できます。',
       name: '名前',
       namePlaceholder: '他の旅行者に表示される名前',
-      photo: '写真のURL',
-      photoOptional: '任意です。ご自分の写真のリンクを貼ってください。',
-      photoHint: '写真は約束の画面で名前の横に表示されます。',
+      photoHint: '写真はログインに使ったアカウントから取得します。',
       nationality: '国籍',
       nationalityPlaceholder: '国を選んでください',
       save: '保存',
@@ -56,7 +54,6 @@ export default {
       error: {
         nameRequired: '名前を入力してください。',
         nameTooLong: '{max}文字以内で入力してください。',
-        imageScheme: 'URLは http:// または https:// で始まる必要があります。',
         countryRequired: '国を選んでください。',
         saveFailed: 'プロフィールを保存できませんでした。もう一度お試しください。',
       },

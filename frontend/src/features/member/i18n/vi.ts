@@ -46,9 +46,7 @@ export default {
       onboardingLead: 'Hãy cho chúng tôi biết tên và quốc gia của bạn. Bạn có thể đổi sau.',
       name: 'Tên',
       namePlaceholder: 'Tên mà những người khác sẽ thấy',
-      photo: 'Địa chỉ ảnh',
-      photoOptional: 'Không bắt buộc. Dán liên kết tới ảnh của bạn.',
-      photoHint: 'Ảnh của bạn hiện cạnh tên bạn trong các cuộc hẹn.',
+      photoHint: 'Ảnh của bạn lấy từ tài khoản bạn đã dùng để đăng nhập.',
       nationality: 'Quốc tịch',
       nationalityPlaceholder: 'Chọn một quốc gia',
       save: 'Lưu',
@@ -57,7 +55,6 @@ export default {
       error: {
         nameRequired: 'Hãy nhập tên.',
         nameTooLong: 'Hãy dùng tối đa {max} ký tự.',
-        imageScheme: 'Địa chỉ phải bắt đầu bằng http:// hoặc https://.',
         countryRequired: 'Hãy chọn một quốc gia.',
         saveFailed: 'Chúng tôi không lưu được hồ sơ của bạn. Vui lòng thử lại.',
       },

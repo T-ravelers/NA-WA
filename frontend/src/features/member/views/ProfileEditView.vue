@@ -44,22 +44,9 @@ const submitError = computed(() => {
     : t('member.form.error.saveFailed')
 })
 
-function submit(value: {
-  displayName: string
-  profileImageUrl: string
-  nationalityCode: string
-}): void {
-  // 사진을 지웠을 때 빈 문자열을 보내면 `MEMBER-007`이다. 그 칸은 빼고 보낸다.
-  const payload: UpdateMemberProfilePayload = {
-    displayName: value.displayName,
-    nationalityCode: value.nationalityCode,
-  }
-
-  if (value.profileImageUrl !== '') {
-    payload.profileImageUrl = value.profileImageUrl
-  }
-
-  save.mutate(payload)
+function submit(value: { displayName: string; nationalityCode: string }): void {
+  // 사진은 이 폼이 다루지 않으므로 요청에도 싣지 않는다. 서버는 보낸 칸만 바꾼다.
+  save.mutate({ displayName: value.displayName, nationalityCode: value.nationalityCode })
 }
 </script>
 

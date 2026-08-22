@@ -45,9 +45,7 @@ export default {
       onboardingLead: '請告訴我們您的名字和來自哪個國家，之後都可以修改。',
       name: '名字',
       namePlaceholder: '其他旅客會看到的名字',
-      photo: '照片網址',
-      photoOptional: '選填。貼上您照片的連結。',
-      photoHint: '照片會顯示在約會畫面中您的名字旁邊。',
+      photoHint: '照片來自您登入時使用的帳號。',
       nationality: '國籍',
       nationalityPlaceholder: '請選擇國家',
       save: '儲存',
@@ -56,7 +54,6 @@ export default {
       error: {
         nameRequired: '請輸入名字。',
         nameTooLong: '請輸入 {max} 個字以內。',
-        imageScheme: '網址必須以 http:// 或 https:// 開頭。',
         countryRequired: '請選擇國家。',
         saveFailed: '無法儲存您的個人檔案，請再試一次。',
       },

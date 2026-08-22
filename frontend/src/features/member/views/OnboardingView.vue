@@ -49,12 +49,8 @@ const submitError = computed(() => {
     : t('member.form.error.saveFailed')
 })
 
-function submit(value: {
-  displayName: string
-  profileImageUrl: string
-  nationalityCode: string
-}): void {
-  // 온보딩 요청에는 사진 칸이 없다. 사진은 마친 뒤 프로필 편집에서 붙인다.
+function submit(value: { displayName: string; nationalityCode: string }): void {
+  // 온보딩 요청에는 사진 칸이 없다. 사진은 소셜 로그인이 가입 시점에 넣어 준다.
   finish.mutate({
     displayName: value.displayName,
     nationalityCode: value.nationalityCode,
