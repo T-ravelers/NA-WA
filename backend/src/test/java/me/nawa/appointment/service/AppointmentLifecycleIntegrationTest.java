@@ -105,32 +105,24 @@ class AppointmentLifecycleIntegrationTest {
         }
     }
 
+    // 정원이 차지 않은 약속은 FULL을 거치지 않으므로 RECRUITING인 채로 활동
+    // 시작 시각을 맞는다. 이 배치가 RECRUITING을 대상에서 빼면 그런 약속은
+    // 활동이 시작돼도 모집 중으로 남는다.
     @Test
-    void closeExpiredRecruitingAppointments_onlyClosesAppointmentsPastDeadline() {
+    void startDueAppointments_startsRecruitingAndFullPastActivityStart() {
         long eventId = createApprovedEvent();
-        long expiredId = insertAppointment(eventId, "RECRUITING",
-                LocalDateTime.now().minusMinutes(1), LocalDateTime.now().plusDays(1));
+        long dueRecruitingId = insertAppointment(eventId, "RECRUITING",
+                LocalDateTime.now().minusMinutes(1));
+        long dueFullId = insertAppointment(eventId, "FULL",
+                LocalDateTime.now().minusMinutes(1));
         long notYetDueId = insertAppointment(eventId, "RECRUITING",
-                LocalDateTime.now().plusDays(1), LocalDateTime.now().plusDays(2));
+                LocalDateTime.now().plusDays(1));
 
-        appointmentMapper.closeExpiredRecruitingAppointments(LocalDateTime.now());
+        appointmentMapper.startDueAppointments(LocalDateTime.now());
 
-        assertEquals("CLOSED", appointmentStatus(expiredId));
+        assertEquals("IN_PROGRESS", appointmentStatus(dueRecruitingId));
+        assertEquals("IN_PROGRESS", appointmentStatus(dueFullId));
         assertEquals("RECRUITING", appointmentStatus(notYetDueId));
-    }
-
-    @Test
-    void startDueClosedAppointments_onlyStartsAppointmentsPastActivityStart() {
-        long eventId = createApprovedEvent();
-        long dueId = insertAppointment(eventId, "CLOSED",
-                LocalDateTime.now().minusDays(1), LocalDateTime.now().minusMinutes(1));
-        long notYetDueId = insertAppointment(eventId, "CLOSED",
-                LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1));
-
-        appointmentMapper.startDueClosedAppointments(LocalDateTime.now());
-
-        assertEquals("IN_PROGRESS", appointmentStatus(dueId));
-        assertEquals("CLOSED", appointmentStatus(notYetDueId));
     }
 
     private String appointmentStatus(long appointmentId) {
@@ -144,7 +136,6 @@ class AppointmentLifecycleIntegrationTest {
     private long insertAppointment(
             long eventId,
             String status,
-            LocalDateTime joinDeadline,
             LocalDateTime activityStartAt) {
         long hostMemberId = createMember("방장");
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -152,18 +143,17 @@ class AppointmentLifecycleIntegrationTest {
             PreparedStatement statement = connection.prepareStatement(
                     "INSERT INTO appointments "
                             + "(item_id, host_member_id, language_code, appointment_name, "
-                            + "max_members, join_deadline, deposit_amount, appointment_status, "
+                            + "max_members, deposit_amount, appointment_status, "
                             + "meeting_place, activity_start_at, activity_end_at) "
-                            + "VALUES (?, ?, 'en', 'Lifecycle Test Appointment', 5, ?, 10000, ?, "
+                            + "VALUES (?, ?, 'en', 'Lifecycle Test Appointment', 5, 10000, ?, "
                             + "'Test Meeting Place', ?, ?)",
                     Statement.RETURN_GENERATED_KEYS
             );
             statement.setLong(1, eventId);
             statement.setLong(2, hostMemberId);
-            statement.setObject(3, joinDeadline);
-            statement.setString(4, status);
-            statement.setObject(5, activityStartAt);
-            statement.setObject(6, activityStartAt.plusHours(2));
+            statement.setString(3, status);
+            statement.setObject(4, activityStartAt);
+            statement.setObject(5, activityStartAt.plusHours(2));
             return statement;
         }, keyHolder);
         long appointmentId = keyHolder.getKey().longValue();

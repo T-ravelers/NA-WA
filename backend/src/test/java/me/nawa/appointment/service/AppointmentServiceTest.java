@@ -259,7 +259,6 @@ class AppointmentServiceTest {
         request.setVisitDate(LocalDate.now());
         request.setActivityStartTime(LocalTime.now().minusMinutes(1));
         request.setActivityEndTime(LocalTime.now().plusHours(1));
-        request.setJoinDeadline(LocalDateTime.now().minusMinutes(2));
 
         assertThrows(
                 BusinessException.class,
@@ -352,9 +351,9 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void getAppointment_afterJoinDeadline_showsClosedBeforeSchedulerCatchesUp() {
+    void getAppointment_capacityReached_showsFullBeforeSchedulerCatchesUp() {
         Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
-        appointment.setJoinDeadline(LocalDateTime.now().minusMinutes(1));
+        appointment.setCurrentMemberCount(appointment.getMaxMembers());
         when(appointmentMapper.findAppointmentById(10L))
                 .thenReturn(appointment);
         when(appointmentMapper.findActiveMembersByAppointmentId(10L))
@@ -363,12 +362,29 @@ class AppointmentServiceTest {
         AppointmentDetailResponse result =
                 appointmentService.getAppointment(2L, 10L);
 
-        assertEquals(AppointmentStatus.CLOSED, result.getAppointmentStatus());
+        assertEquals(AppointmentStatus.FULL, result.getAppointmentStatus());
+    }
+
+    // 정원이 차지 않은 약속은 FULL을 거치지 않고 RECRUITING인 채로 활동 시작
+    // 시각을 맞는다. 표시 계산이 이 경로를 빼면 활동이 시작돼도 모집 중으로 보인다.
+    @Test
+    void getAppointment_recruitingAfterActivityStart_showsInProgress() {
+        Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
+        appointment.setActivityStartAt(LocalDateTime.now().minusMinutes(1));
+        when(appointmentMapper.findAppointmentById(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of());
+
+        AppointmentDetailResponse result =
+                appointmentService.getAppointment(2L, 10L);
+
+        assertEquals(AppointmentStatus.IN_PROGRESS, result.getAppointmentStatus());
     }
 
     @Test
     void getAppointment_afterActivityStart_showsInProgressBeforeSchedulerCatchesUp() {
-        Appointment appointment = appointment(10L, AppointmentStatus.CLOSED);
+        Appointment appointment = appointment(10L, AppointmentStatus.FULL);
         appointment.setActivityStartAt(LocalDateTime.now().minusMinutes(1));
         when(appointmentMapper.findAppointmentById(10L))
                 .thenReturn(appointment);
@@ -397,13 +413,13 @@ class AppointmentServiceTest {
                 result.getAppointmentStatus());
     }
 
-    // 스케줄러가 CLOSED → IN_PROGRESS를 아직 못 따라잡은 채 활동이 끝났어도,
-    // 표시 계산이 CLOSED → IN_PROGRESS → AWAITING_ATTENDANCE를 연쇄로 거쳐
+    // 스케줄러가 FULL → IN_PROGRESS를 아직 못 따라잡은 채 활동이 끝났어도,
+    // 표시 계산이 FULL → IN_PROGRESS → AWAITING_ATTENDANCE를 연쇄로 거쳐
     // 최종 표시 상태에 도달해야 한다.
     @Test
-    void getAppointment_closedInDbAfterActivityEnd_showsAwaitingAttendance() {
+    void getAppointment_fullInDbAfterActivityEnd_showsAwaitingAttendance() {
         Appointment appointment =
-                endedAppointment(10L, AppointmentStatus.CLOSED);
+                endedAppointment(10L, AppointmentStatus.FULL);
         when(appointmentMapper.findAppointmentById(10L))
                 .thenReturn(appointment);
         when(appointmentMapper.findActiveMembersByAppointmentId(10L))
@@ -486,7 +502,7 @@ class AppointmentServiceTest {
         when(depositMapper.markHeld(any(), eq(501L), any())).thenReturn(1);
         when(appointmentMapper.markMemberActive(30L)).thenReturn(1);
         when(appointmentMapper.updateAppointmentStatus(
-                10L, AppointmentStatus.RECRUITING, AppointmentStatus.CLOSED
+                10L, AppointmentStatus.RECRUITING, AppointmentStatus.FULL
         )).thenReturn(1);
         when(appointmentMapper.findMemberByIdForUpdate(10L, 30L))
                 .thenReturn(AppointmentMember.builder()
@@ -499,13 +515,13 @@ class AppointmentServiceTest {
         appointmentService.joinAppointment(2L, 10L);
 
         verify(appointmentMapper).updateAppointmentStatus(
-                10L, AppointmentStatus.RECRUITING, AppointmentStatus.CLOSED
+                10L, AppointmentStatus.RECRUITING, AppointmentStatus.FULL
         );
     }
 
     @Test
     void joinAppointment_notRecruiting_rejectsJoin() {
-        Appointment appointment = appointment(10L, AppointmentStatus.CLOSED);
+        Appointment appointment = appointment(10L, AppointmentStatus.FULL);
         when(appointmentMapper.findAppointmentByIdForUpdate(10L))
                 .thenReturn(appointment);
 
@@ -519,10 +535,12 @@ class AppointmentServiceTest {
         verify(appointmentMapper, never()).insertAppointmentMember(any());
     }
 
+    // 참여 마감 시각이 없어진 뒤로 참여를 막는 시간 경계는 활동 시작뿐이다.
+    // 스케줄러가 아직 IN_PROGRESS로 못 옮긴 RECRUITING 약속에도 적용된다.
     @Test
-    void joinAppointment_afterDeadline_rejectsJoin() {
+    void joinAppointment_afterActivityStart_rejectsJoin() {
         Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
-        appointment.setJoinDeadline(LocalDateTime.now().minusDays(1));
+        appointment.setActivityStartAt(LocalDateTime.now().minusMinutes(1));
         when(appointmentMapper.findAppointmentByIdForUpdate(10L))
                 .thenReturn(appointment);
 
@@ -726,10 +744,10 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void leaveAppointment_closedByCapacity_reopensRecruiting() {
+    void leaveAppointment_fullByCapacity_reopensRecruiting() {
         Appointment appointment = appointment(
                 10L,
-                AppointmentStatus.CLOSED
+                AppointmentStatus.FULL
         );
         AppointmentMember member = AppointmentMember.builder()
                 .appointmentMemberId(30L)
@@ -757,13 +775,13 @@ class AppointmentServiceTest {
         when(depositMapper.markRefunded(eq(40L), any())).thenReturn(1);
         when(appointmentMapper.markMemberLeft(30L)).thenReturn(1);
         when(appointmentMapper.updateAppointmentStatus(
-                10L, AppointmentStatus.CLOSED, AppointmentStatus.RECRUITING
+                10L, AppointmentStatus.FULL, AppointmentStatus.RECRUITING
         )).thenReturn(1);
 
         appointmentService.leaveAppointment(2L, 10L);
 
         verify(appointmentMapper).updateAppointmentStatus(
-                10L, AppointmentStatus.CLOSED, AppointmentStatus.RECRUITING
+                10L, AppointmentStatus.FULL, AppointmentStatus.RECRUITING
         );
     }
 
@@ -794,15 +812,17 @@ class AppointmentServiceTest {
         verify(appointmentMapper, never()).markMemberLeft(any());
     }
 
-    // 참여 마감이 지나도 활동 시작 전이면 환급 탈퇴가 된다. 단 마감 후에는
-    // 빈자리를 새로 채울 수 없으므로 CLOSED를 RECRUITING으로 되돌리지 않는다.
+    // 정원이 차서 FULL이던 약속이라도 활동이 시작된 뒤의 탈퇴는 노쇼로 굳는다.
+    // 스케줄러가 아직 IN_PROGRESS로 못 옮긴 상태에서도 마찬가지이고, 이때는
+    // 빈자리가 생겨도 새로 참여할 수 없으므로 RECRUITING으로 되돌리지 않는다.
     @Test
-    void leaveAppointment_afterJoinDeadlineBeforeStart_refundsWithoutReopening() {
+    void leaveAppointment_fullAfterActivityStart_marksNoShowWithoutReopening() {
         Appointment appointment = appointment(
                 10L,
-                AppointmentStatus.CLOSED
+                AppointmentStatus.FULL
         );
-        appointment.setJoinDeadline(LocalDateTime.now().minusDays(1));
+        appointment.setActivityStartAt(LocalDateTime.now().minusHours(1));
+        appointment.setActivityEndAt(LocalDateTime.now().plusHours(1));
         AppointmentMember member = AppointmentMember.builder()
                 .appointmentMemberId(30L)
                 .appointmentId(10L)
@@ -810,9 +830,6 @@ class AppointmentServiceTest {
                 .membershipStatus(MembershipStatus.ACTIVE)
                 .build();
         Deposit deposit = mock(Deposit.class);
-        when(deposit.getDepositId()).thenReturn(40L);
-        when(deposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
-        when(deposit.isPending()).thenReturn(false);
         when(deposit.isHeld()).thenReturn(true);
         when(appointmentMapper.findAppointmentByIdForUpdate(10L))
                 .thenReturn(appointment);
@@ -821,20 +838,18 @@ class AppointmentServiceTest {
         )).thenReturn(member);
         when(depositMapper.findByAppointmentMemberId(30L))
                 .thenReturn(deposit);
-        when(walletTransferService.transferFromSystemWallet(
-                eq(2L), eq(SystemWalletCode.DEPOSIT_POOL), eq(2L),
-                eq(BigDecimal.valueOf(10_000)),
-                eq(TransferType.DEPOSIT_REFUND.name()), anyString()
-        )).thenReturn(600L);
-        when(depositMapper.markRefunded(eq(40L), any())).thenReturn(1);
+        when(appointmentMapper.updateAttendance(
+                eq(30L), eq(AttendanceStatus.NO_SHOW), any()
+        )).thenReturn(1);
         when(appointmentMapper.markMemberLeft(30L)).thenReturn(1);
 
         appointmentService.leaveAppointment(2L, 10L);
 
-        verify(depositMapper).markRefunded(eq(40L), any());
+        verify(appointmentMapper).updateAttendance(
+                eq(30L), eq(AttendanceStatus.NO_SHOW), any()
+        );
         verify(appointmentMapper).markMemberLeft(30L);
-        verify(appointmentMapper, never())
-                .updateAttendance(any(), any(), any());
+        verify(depositMapper, never()).markRefunded(any(), any());
         verify(appointmentMapper, never())
                 .updateAppointmentStatus(any(), any(), any());
     }
@@ -1121,7 +1136,7 @@ class AppointmentServiceTest {
 
     @Test
     void confirmAttendance_notInProgress_rejects() {
-        Appointment appointment = appointment(10L, AppointmentStatus.CLOSED);
+        Appointment appointment = appointment(10L, AppointmentStatus.FULL);
         when(appointmentMapper.findAppointmentByIdForUpdate(10L))
                 .thenReturn(appointment);
 
@@ -1253,7 +1268,6 @@ class AppointmentServiceTest {
         request.setMaxMembers(5);
         request.setDepositAmount(BigDecimal.valueOf(10_000));
         request.setMeetingPlace("Olive Young N Seongsu");
-        request.setJoinDeadline(LocalDateTime.of(VISIT_DATE, LocalTime.of(17, 30)));
         request.setTripId(1L);
         request.setVisitDate(VISIT_DATE);
         request.setActivityStartTime(LocalTime.of(18, 30));
@@ -1279,7 +1293,6 @@ class AppointmentServiceTest {
                 .meetingPlace("Olive Young N Seongsu")
                 .activityStartAt(LocalDateTime.of(VISIT_DATE, LocalTime.of(18, 30)))
                 .activityEndAt(LocalDateTime.of(VISIT_DATE, LocalTime.of(22, 0)))
-                .joinDeadline(LocalDateTime.of(VISIT_DATE.minusDays(1), LocalTime.of(18, 0)))
                 .build();
     }
 

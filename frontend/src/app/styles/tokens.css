@@ -139,7 +139,8 @@
    * 자세한 내용은 `public/fonts/README.md`의 「Display 폰트」 절 참조. */
   --font-display: 'sztos-variable', 'Noto Sans', 'Noto Sans JP', 'Noto Sans TC', sans-serif;
   /* CJK 로케일은 `Noto Sans`에 없는 글자만 JP·TC 슬라이스에서 받는다(`fonts-cjk.css`).
-   * `zh-TW`는 `index.css`의 `:lang()` 규칙이 TC를 JP보다 앞세운다. */
+   * `zh-TW`는 `index.css`의 `:lang()` 규칙이 TC를 JP보다 앞세운다. 디스플레이는 같은 규칙이
+   * `ja`에 M PLUS 1p, `zh-TW`에 Taipei Sans TC Beta를 Sztos 바로 뒤에 끼운다. */
   --font-body: 'Noto Sans', 'Noto Sans JP', 'Noto Sans TC', sans-serif;
 
   /* ── 타이포 스케일 ──

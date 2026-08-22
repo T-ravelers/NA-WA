@@ -153,7 +153,6 @@ class AppointmentControllerTest {
                 + "\"maxMembers\":5,"
                 + "\"depositAmount\":10000,"
                 + "\"meetingPlace\":\"Seongsu\","
-                + "\"joinDeadline\":\"2026-08-20T18:00:00\","
                 + "\"activityStartAt\":\"2026-08-21T18:30:00\","
                 + "\"activityEndAt\":\"2026-08-21T22:00:00\"}"
                 ;
@@ -186,7 +185,6 @@ class AppointmentControllerTest {
                 + "\"maxMembers\":5,"
                 + "\"depositAmount\":10000,"
                 + "\"meetingPlace\":\"Seongsu\","
-                + "\"joinDeadline\":\"2026-08-20T18:00:00\","
                 + "\"activityStartAt\":\"2026-08-21T18:30:00\","
                 + "\"activityEndAt\":\"2026-08-21T22:00:00\"}"
                 ;
@@ -233,7 +231,6 @@ class AppointmentControllerTest {
                 .meetingPlace("Seongsu")
                 .activityStartAt(LocalDateTime.of(2026, 8, 21, 18, 30))
                 .activityEndAt(LocalDateTime.of(2026, 8, 21, 22, 0))
-                .joinDeadline(LocalDateTime.of(2026, 8, 20, 18, 0))
                 .hostDisplayName("Host")
                 .build();
     }
@@ -259,7 +256,6 @@ class AppointmentControllerTest {
                 .meetingPlace(summary.getMeetingPlace())
                 .activityStartAt(summary.getActivityStartAt())
                 .activityEndAt(summary.getActivityEndAt())
-                .joinDeadline(summary.getJoinDeadline())
                 .hostDisplayName(summary.getHostDisplayName())
                 .members(List.of(host))
                 .build();

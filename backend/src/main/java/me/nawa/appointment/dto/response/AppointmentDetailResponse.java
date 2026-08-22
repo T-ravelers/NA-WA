@@ -32,9 +32,6 @@ public class AppointmentDetailResponse {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private final LocalDateTime activityEndAt;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private final LocalDateTime joinDeadline;
-
     private final String hostDisplayName;
     private final List<AppointmentMemberResponse> members;
 }

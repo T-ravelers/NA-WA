@@ -806,17 +806,16 @@ class JourneyMapperIntegrationTest {
             PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO appointments "
                     + "(item_id, host_member_id, language_code, appointment_name, "
-                    + "max_members, join_deadline, deposit_amount, "
+                    + "max_members, deposit_amount, "
                     + "appointment_status, activity_start_at, activity_end_at) "
                     + "VALUES (?, ?, 'en', 'journey re-add integration', "
-                    + "5, ?, 10000, 'RECRUITING', ?, ?)",
+                    + "5, 10000, 'RECRUITING', ?, ?)",
                 Statement.RETURN_GENERATED_KEYS
             );
             statement.setLong(1, itemId);
             statement.setLong(2, hostMemberId);
-            statement.setObject(3, activityStartAt.minusDays(1));
-            statement.setObject(4, activityStartAt);
-            statement.setObject(5, activityStartAt.plusHours(2));
+            statement.setObject(3, activityStartAt);
+            statement.setObject(4, activityStartAt.plusHours(2));
             return statement;
         }, keyHolder);
         return keyHolder.getKey().longValue();

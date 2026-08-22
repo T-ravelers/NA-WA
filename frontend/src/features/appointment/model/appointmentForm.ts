@@ -31,7 +31,6 @@ export interface AppointmentFormDraft {
   /** `visitDate` 하루 안에서의 시각만(`HH:mm`). 날짜 입력은 없다. */
   activityStartTime: string
   activityEndTime: string
-  joinDeadline: string
 }
 
 export type MeetingPlaceMode = 'ITEM' | 'CUSTOM'
@@ -45,7 +44,6 @@ export interface AppointmentFormErrors {
   meetingPlace?: string
   activityStartTime?: string
   activityEndTime?: string
-  joinDeadline?: string
 }
 
 const APPOINTMENT_LANGUAGES: readonly AppointmentLanguage[] = ['en', 'ja', 'zh-TW', 'vi']
@@ -54,17 +52,8 @@ function isAppointmentLanguage(value: string): value is AppointmentLanguage {
   return APPOINTMENT_LANGUAGES.includes(value as AppointmentLanguage)
 }
 
-function toDateTimeRequest(value: string): string {
-  return value.length === 16 ? `${value}:00` : value
-}
-
 function toTimeRequest(value: string): string {
   return value.length === 5 ? `${value}:00` : value
-}
-
-/** `visitDate`(yyyy-MM-dd) + 시각(HH:mm)을 `joinDeadline`과 같은 형식으로 합친다. */
-function toLocalDateTimeString(visitDate: string, time: string): string {
-  return `${visitDate}T${time}`
 }
 
 function todayDateString(): string {
@@ -161,16 +150,6 @@ export function validateAppointmentSchedule(draft: AppointmentFormDraft): Appoin
     errors.activityEndTime = 'appointment.create.validation.endAfterStart'
   }
 
-  if (draft.joinDeadline === '') {
-    errors.joinDeadline = 'appointment.create.validation.deadlineRequired'
-  } else if (
-    draft.activityStartTime !== '' &&
-    draft.visitDate !== '' &&
-    draft.joinDeadline > toLocalDateTimeString(draft.visitDate, draft.activityStartTime)
-  ) {
-    errors.joinDeadline = 'appointment.create.validation.deadlineBeforeStart'
-  }
-
   return errors
 }
 
@@ -199,7 +178,6 @@ export function toAppointmentCreateRequest(draft: AppointmentFormDraft): Appoint
     languageCode: draft.languageCode,
     appointmentName: draft.appointmentName.trim(),
     maxMembers: draft.maxMembers,
-    joinDeadline: toDateTimeRequest(draft.joinDeadline),
     depositAmount: String(draft.depositAmount),
     meetingPlace: draft.meetingPlace.trim(),
     activityStartTime: toTimeRequest(draft.activityStartTime),

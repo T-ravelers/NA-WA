@@ -132,10 +132,10 @@ class ReviewMapperIntegrationTest {
         jdbcTemplate.update(
                 "INSERT INTO appointments "
                         + "(item_id, host_member_id, language_code, appointment_name, "
-                        + "max_members, join_deadline, deposit_amount, "
+                        + "max_members, deposit_amount, "
                         + "appointment_status, activity_start_at, activity_end_at) "
                         + "VALUES (?, ?, 'en', '후기 통합 테스트 약속', 5, "
-                        + "'2026-08-09 12:00:00', 10000, 'COMPLETED', "
+                        + "10000, 'COMPLETED', "
                         + "'2026-08-10 12:00:00', '2026-08-10 14:00:00')",
                 itemId, hostMemberId);
         return lastInsertId();
