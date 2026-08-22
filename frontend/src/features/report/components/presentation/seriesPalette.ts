@@ -1,18 +1,23 @@
+import type { SpendingCategory } from '@/shared/lib/spendingCategory'
+import { toSpendingCategory } from '@/shared/lib/spendingCategory'
+
 /**
  * Report 차트 계열 색.
  *
- * **`shared/ui`의 `CATEGORIES`·`CategoryDot`을 쓰지 않는다.** 그쪽 4종은 Explore의
- * 소비영역(beauty·shopping·show·food)을 뜻하는 고정 의미고, Report의 지출 카테고리는
- * Wallet `spendingCategory`에서 오는 임의 문자열이라 의미가 겹치지 않는다. 그래서 여기서는
- * 카테고리 이름이 아니라 **정렬된 순번**으로 색을 배정한다. 같은 목록을 다시 그리면 같은
- * 색이 나오지만, 특정 색이 특정 카테고리를 뜻하지는 않는다.
+ * **카테고리마다 색이 정해져 있다.** 같은 화면의 칭호 티켓이 1위 카테고리의 코어색을 쓰므로,
+ * 도넛이 순번으로 색을 배정하면 사용자가 한 화면에서 "쇼핑 = 파랑"을 읽고 조금 아래에서
+ * "쇼핑 = 주황"을 읽게 된다. 그래서 정렬 순번이 아니라 카테고리 이름으로 색을 정한다.
  *
- * 값은 전부 `app/styles/tokens.css`에 이미 있는 토큰이고 새 토큰을 만들지 않는다. 6번째
- * 이후는 앞에서부터 다시 돈다. 색이 겹쳐도 범례가 항상 라벨과 금액을 텍스트로 함께
- * 보여주므로 정보가 색에만 실리지 않는다.
+ * 앞의 네 카테고리는 Explore 소비영역과 같은 어휘를 쓰므로 그 코어색을 그대로 쓴다.
+ * 코어색이 없는 세 카테고리에는 **새 토큰을 만들지 않고** 이미 있는 토큰을 배정한다.
+ * `OTHER`가 흐린 회색인 것은 분류되지 않은 지출이라는 뜻과 맞다.
  *
- * Tailwind는 소스에 그대로 적힌 클래스 문자열만 수집하므로, 클래스는 조합하지 않고
- * 아래 두 표에 전부 적어 둔다.
+ * **색상각이 겹치지 않는 토큰을 고른다.** `gauge`(#5aa3dd)는 `shopping`(#318cd5)과 색상각이
+ * 207도로 같아 명도만 다른 같은 파랑이었다(서로 간 대비 1.32:1). 팔레트에서 비어 있던 녹색대를
+ * 써서 `TRANSPORT`를 `status-ongoing`(#3bbe7a, 149도)으로 둔다.
+ *
+ * 값은 전부 `app/styles/tokens.css`에 이미 있는 토큰이다. Tailwind는 소스에 그대로 적힌
+ * 클래스 문자열만 수집하므로, 클래스는 조합하지 않고 아래 두 표에 전부 적어 둔다.
  */
 export const REPORT_SERIES_TOKENS = [
   'food',
@@ -20,10 +25,22 @@ export const REPORT_SERIES_TOKENS = [
   'show',
   'beauty',
   'settlement',
-  'gauge',
+  'status-ongoing',
+  'ink-3',
 ] as const
 
 export type ReportSeriesToken = (typeof REPORT_SERIES_TOKENS)[number]
+
+/** 카테고리 → 계열 색. */
+const CATEGORY_TOKEN: Record<SpendingCategory, ReportSeriesToken> = {
+  FOOD: 'food',
+  SHOPPING: 'shopping',
+  BEAUTY: 'beauty',
+  SHOW: 'show',
+  TRANSPORT: 'status-ongoing',
+  STAY: 'settlement',
+  OTHER: 'ink-3',
+}
 
 /** 면을 채울 때(범례 표식). */
 const SERIES_SURFACE_CLASS: Record<ReportSeriesToken, string> = {
@@ -32,7 +49,8 @@ const SERIES_SURFACE_CLASS: Record<ReportSeriesToken, string> = {
   show: 'bg-show',
   beauty: 'bg-beauty',
   settlement: 'bg-settlement',
-  gauge: 'bg-gauge',
+  'status-ongoing': 'bg-status-ongoing',
+  'ink-3': 'bg-ink-3',
 }
 
 /**
@@ -45,20 +63,23 @@ const SERIES_INK_CLASS: Record<ReportSeriesToken, string> = {
   show: 'text-show',
   beauty: 'text-beauty',
   settlement: 'text-settlement',
-  gauge: 'text-gauge',
+  'status-ongoing': 'text-status-ongoing',
+  'ink-3': 'text-ink-3',
 }
 
-export function seriesTokenAt(index: number): ReportSeriesToken {
-  const token = REPORT_SERIES_TOKENS[index % REPORT_SERIES_TOKENS.length]
-
-  // 나머지 연산 결과는 항상 범위 안이지만, noUncheckedIndexedAccess에서는 좁혀지지 않는다.
-  return token ?? REPORT_SERIES_TOKENS[0]
+/**
+ * 카테고리의 계열 색.
+ *
+ * 값은 Wallet `spendingCategory`에서 오는 임의 문자열이라 좁히지 못한 값은 `OTHER`로 접힌다.
+ */
+export function seriesTokenOf(category: string): ReportSeriesToken {
+  return CATEGORY_TOKEN[toSpendingCategory(category)]
 }
 
-export function seriesSurfaceClass(index: number): string {
-  return SERIES_SURFACE_CLASS[seriesTokenAt(index)]
+export function seriesSurfaceClass(category: string): string {
+  return SERIES_SURFACE_CLASS[seriesTokenOf(category)]
 }
 
-export function seriesInkClass(index: number): string {
-  return SERIES_INK_CLASS[seriesTokenAt(index)]
+export function seriesInkClass(category: string): string {
+  return SERIES_INK_CLASS[seriesTokenOf(category)]
 }

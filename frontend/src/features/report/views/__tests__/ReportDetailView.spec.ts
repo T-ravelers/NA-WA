@@ -6,7 +6,8 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
-import { seriesTokenAt } from '../../components/presentation/seriesPalette'
+import ReportPersonaTicket from '../../components/presentation/ReportPersonaTicket.vue'
+import { seriesInkClass } from '../../components/presentation/seriesPalette'
 
 const { fetchReport } = vi.hoisted(() => ({ fetchReport: vi.fn() }))
 
@@ -204,12 +205,43 @@ describe('ReportDetailView', () => {
     expect(centre.text()).toBe('2events')
   })
 
-  // 티켓은 도넛 1위 조각과 같은 색이어야 한다(시안 R4). 1위는 언제나 정렬 순번 0이다.
-  it('paints the ticket in the colour the donut gives its leading slice', async () => {
+  // 티켓과 도넛이 같은 카테고리에 같은 색을 줘야 한다(시안 R4).
+  it('gives the ticket and the donut the same colour for the leading category', async () => {
+    fetchReport.mockResolvedValueOnce({
+      ...detail,
+      analytics: {
+        ...detail.analytics,
+        categoryBreakdown: [
+          { category: 'SHOPPING', amount: '900000.0000', percentage: '70.07' },
+          { category: 'FOOD', amount: '384500.0000', percentage: '29.93' },
+        ],
+      },
+    })
     const { wrapper } = await mountView()
 
-    expect(seriesTokenAt(0)).toBe('food')
-    expect(wrapper.find('.bg-food').exists()).toBe(true)
+    // 티켓 배경과 도넛 조각·범례 표식이 모두 shopping 색이다.
+    expect(wrapper.getComponent(ReportPersonaTicket).props('tone')).toBe('shopping')
+    expect(seriesInkClass('SHOPPING')).toBe('text-shopping')
+    expect(wrapper.findAll('.text-shopping').length).toBeGreaterThan(0)
+  })
+
+  // 코어색이 없는 세 카테고리는 티켓을 종이톤으로 둔다. 도넛에는 색이 있다.
+  it('falls back to the paper ticket when the leading category has no core colour', async () => {
+    fetchReport.mockResolvedValueOnce({
+      ...detail,
+      analytics: {
+        ...detail.analytics,
+        categoryBreakdown: [
+          { category: 'TRANSPORT', amount: '900000.0000', percentage: '70.07' },
+          { category: 'FOOD', amount: '384500.0000', percentage: '29.93' },
+        ],
+      },
+    })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.getComponent(ReportPersonaTicket).props('tone')).toBe('paper')
+    expect(seriesInkClass('TRANSPORT')).toBe('text-status-ongoing')
+    expect(wrapper.findAll('.text-status-ongoing').length).toBeGreaterThan(0)
   })
 
   it('names a spending persona from the top category and fills in its share', async () => {

@@ -4,7 +4,11 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import { spendingCategoryLabelKey, toSpendingCategory } from '@/shared/lib/spendingCategory'
+import {
+  type SpendingCategory,
+  spendingCategoryLabelKey,
+  toSpendingCategory,
+} from '@/shared/lib/spendingCategory'
 import AppCard from '@/shared/ui/AppCard.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateError from '@/shared/ui/StateError.vue'
@@ -67,14 +71,19 @@ const reportCategories = computed<ReportCategoryBreakdownItem[]>(() =>
 /**
  * 칭호 티켓 색.
  *
- * 시안 R4에서 티켓 배경은 도넛 1위 조각과 같은 색이다. 1위 카테고리는 언제나 정렬 순번 0이고
- * `seriesTokenAt(0)`이 `food`이므로, 티켓 색도 그 하나로 정해진다.
+ * 시안 R4에서 티켓 배경은 1위 카테고리의 색이고, 같은 화면의 도넛도 이제 같은 색을 쓴다
+ * (`seriesPalette`). 그래서 두 자리가 어긋나지 않는다.
  *
- * **카테고리 이름으로 색을 정하지 않는다.** `seriesPalette`가 "특정 색이 특정 카테고리를
- * 뜻하지는 않는다"고 못 박아 두었고, 카테고리마다 코어색을 주면 같은 화면의 도넛과 어긋난다.
- * 순번 0의 토큰이 바뀌면 `ReportDetailView.spec`이 잡는다.
+ * **Explore 소비영역과 같은 어휘를 쓰는 네 카테고리만 코어색이 있다.** 나머지 셋은
+ * `AppTicket`이 받는 톤에 없어 종이톤으로 둔다 — 임의 색을 만들지 않는다. 그 셋이 1위일 때
+ * 티켓은 무채색이 되고, 색으로 카테고리를 말하지 않는다.
  */
-const PERSONA_TONE: Category = 'food'
+const PERSONA_TONE: Partial<Record<SpendingCategory, Category>> = {
+  FOOD: 'food',
+  SHOPPING: 'shopping',
+  BEAUTY: 'beauty',
+  SHOW: 'show',
+}
 
 /**
  * 소비 성향 칭호.
@@ -108,7 +117,7 @@ const reportPersona = computed<{
     description: t(`report.detail.persona.${category}.description`, { share }),
     share,
     categoryLabel: top.label,
-    tone: PERSONA_TONE,
+    tone: PERSONA_TONE[category] ?? 'paper',
   }
 })
 /**
