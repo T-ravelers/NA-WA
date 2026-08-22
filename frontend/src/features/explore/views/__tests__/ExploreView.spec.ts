@@ -545,6 +545,53 @@ describe('ExploreView filter memory across entries', () => {
     expect(router.currentRoute.value.query).toEqual({ tab: 'places', placeKeyword: 'cafe' })
   })
 
+  it('goes back to the top when the bottom tab opens Discover again', async () => {
+    const { router } = await mountRoutedView('/explore?eventKeyword=hongdae&eventPage=3')
+    scrollToMock.mockClear()
+
+    await router.push('/explore')
+    await flushPromises()
+
+    /* 쪽 번호만 1쪽으로 떨어지고 스크롤이 그대로면 목록이 안 바뀐 것처럼 보인다. */
+    expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+  })
+
+  it('goes back to the top when Discover is entered from another screen', async () => {
+    const { router } = await mountRoutedView('/explore?eventKeyword=hongdae')
+
+    await router.push('/appointments')
+    scrollToMock.mockClear()
+    await router.push('/explore')
+    await flushPromises()
+
+    expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+  })
+
+  it('leaves the scroll alone when coming back from an item detail', async () => {
+    const { router } = await mountRoutedView('/explore?tab=places&placeKeyword=cafe')
+
+    await router.push('/explore/places/42')
+    scrollToMock.mockClear()
+    await router.push('/explore?tab=places')
+    await flushPromises()
+
+    /* 쪽 번호를 되돌려 놓고 스크롤만 위로 올리면 보던 자리와 어긋난다. */
+    expect(scrollToMock).not.toHaveBeenCalled()
+  })
+
+  it('leaves the scroll alone while the screen writes its own filters', async () => {
+    const { wrapper } = await mountRoutedView('/explore')
+    scrollToMock.mockClear()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Places')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(scrollToMock).not.toHaveBeenCalled()
+  })
+
   it('stays on the Places tab even when it has no filters to restore', async () => {
     const { router } = await mountRoutedView('/explore?tab=places')
 

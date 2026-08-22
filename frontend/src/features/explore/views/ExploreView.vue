@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { onBeforeRouteUpdate, useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { IconChevronDown, IconSearch } from '@tabler/icons-vue'
@@ -370,6 +370,32 @@ function buildPlaceQuery(next: PlaceSearchFilters): LocationQueryRaw {
   return query
 }
 
+function scrollToListTop(behavior: ScrollBehavior): void {
+  window.scrollTo({
+    top: 0,
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : behavior,
+  })
+}
+
+/**
+ * 화면이 스스로 주소를 고치는 중인 이동의 수.
+ *
+ * 하단 탭이 보내는 이동과 화면이 필터를 쓰는 이동은 둘 다 같은 route의 query 변경이라 주소
+ * 만으로 구별할 수 없다. 맨 위로 올리는 것은 앞의 것에서만 해야 한다. 겹쳐 도는 이동이
+ * 있으므로 켜고 끄는 대신 센다 — 먼저 끝난 하나가 아직 도는 다른 하나를 밖에서 온 것으로
+ * 만들면 목록이 제멋대로 위로 튄다.
+ */
+const selfNavigations = ref(0)
+
+function navigateSelf(navigate: () => Promise<unknown>): void {
+  selfNavigations.value += 1
+  void navigate()
+    .catch(() => undefined)
+    .finally(() => {
+      selfNavigations.value -= 1
+    })
+}
+
 watch(
   filters,
   (next) => {
@@ -377,7 +403,7 @@ watch(
 
     const query = buildEventQuery(next)
     filterMemory.remember(query)
-    router.replace({ query }).catch(() => undefined)
+    navigateSelf(() => router.replace({ query }))
   },
   { deep: true },
 )
@@ -389,7 +415,7 @@ watch(
 
     const query = buildPlaceQuery(next)
     filterMemory.remember(query)
-    router.replace({ query }).catch(() => undefined)
+    navigateSelf(() => router.replace({ query }))
   },
   { deep: true },
 )
@@ -408,7 +434,7 @@ watch(selectedTab, (next, previous) => {
    * 탭을 누르는 순간 걸린다. 옮겨 적은 뒤 상세를 열었다 뒤로 나와도 같은 목록으로 돌아온다.
    */
   filterMemory.remember(query)
-  router.push({ query }).catch(() => undefined)
+  navigateSelf(() => router.push({ query }))
 })
 
 /*
@@ -423,7 +449,28 @@ watch(selectedTab, (next, previous) => {
  * 그 순서가 깨지면 이 guard가 화면이 방금 지운 값으로 되돌리려 하고, 그 되돌린 주소가 곧
  * 현재 주소라서 router가 이동 자체를 중복으로 취소한다. 화면이 지운 값이 주소에 남는다.
  */
-onBeforeRouteUpdate((to) => resolveExploreFilterEntry(to.query, { keepPage: false }) ?? true)
+onBeforeRouteUpdate((to) => {
+  /*
+   * 하단 탭이 보낸 이동이면 목록을 맨 위로 올린다. 쪽 번호는 위에서 이미 1쪽으로 떨어지는데,
+   * 스크롤이 그대로면 1쪽의 한가운데를 보게 되어 목록이 안 바뀐 것처럼 보인다.
+   */
+  if (selfNavigations.value === 0) scrollToListTop('smooth')
+
+  return resolveExploreFilterEntry(to.query, { keepPage: false }) ?? true
+})
+
+/*
+ * 다른 화면을 보다가 하단 탭으로 들어온 진입도 맨 위에서 시작한다.
+ *
+ * 라우터에 `scrollBehavior`가 없어 이전 화면의 스크롤이 그대로 남는다. 그 진입은 기억까지
+ * 버리므로 목록이 통째로 바뀌는데, 중간부터 보이면 무엇이 바뀐 것인지 알 수 없다.
+ *
+ * 화면이 옮겨오는 것이라 애니메이션 없이 즉시 올린다. 항목 상세에서 뒤로 나온 진입은
+ * `startsOver`가 꺼져 있어 보던 자리에 그대로 남는다.
+ */
+onMounted(() => {
+  if (filterMemory.consumeStartsOver()) scrollToListTop('auto')
+})
 
 watch(
   () => route.query,
@@ -606,10 +653,7 @@ watch(placeKeywordInput, (value) => {
 })
 
 function changePage(target: 'events' | 'places', page: number): void {
-  window.scrollTo({
-    top: 0,
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-  })
+  scrollToListTop('smooth')
   if (target === 'events') selectedEventPage.value = page
   else selectedPlacePage.value = page
 }
@@ -835,7 +879,7 @@ function sanitizeExploreQuery(tab: ExploreTab): void {
   if (before !== JSON.stringify(query)) {
     // 화면이 걸러낸 값은 기억에서도 지운다. 남겨두면 다음 진입에서 그 값이 되살아난다.
     filterMemory.remember(query)
-    router.replace({ query }).catch(() => undefined)
+    navigateSelf(() => router.replace({ query }))
   }
 }
 

@@ -90,6 +90,15 @@ export const useExploreFilterMemoryStore = defineStore('explore-filter-memory', 
   const lastTab = ref<ExploreTab>('events')
 
   /**
+   * 다음 진입에서 목록을 처음부터 보여줘야 하는가. 화면이 한 번 가져가면 꺼진다.
+   *
+   * 기억을 버리는 진입이 곧 목록을 처음부터 보는 진입이라 같은 자리에서 켠다. 화면은 이걸
+   * 보고 맨 위로 올린다. 항목 상세에서 뒤로 나온 진입은 기억을 버리지 않으므로 보던 자리에
+   * 남는다 — 쪽 번호를 되돌려 놓고 스크롤만 위로 올리면 오히려 어긋난다.
+   */
+  const startsOver = ref(false)
+
+  /**
    * URL에 필터를 쓸 때마다 같은 값을 기억한다. 필터를 모두 지운 상태도 그대로 기억한다.
    *
    * 화면이 필터를 바꿀 때만이 아니라 진입 주소도 이리로 들어온다. 그래야 Journey에서
@@ -134,7 +143,16 @@ export const useExploreFilterMemoryStore = defineStore('explore-filter-memory', 
   function clear(): void {
     lastQuery.value = { events: null, places: null }
     lastTab.value = 'events'
+    startsOver.value = true
   }
 
-  return { lastQuery, lastTab, remember, resolveEntry, clear }
+  /** 처음부터 보여줄 진입인지 묻고 표시를 지운다. 진입 한 번에 한 번만 참이다. */
+  function consumeStartsOver(): boolean {
+    const value = startsOver.value
+    startsOver.value = false
+
+    return value
+  }
+
+  return { lastQuery, lastTab, remember, resolveEntry, clear, consumeStartsOver }
 })
