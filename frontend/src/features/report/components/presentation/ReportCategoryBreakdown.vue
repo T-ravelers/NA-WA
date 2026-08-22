@@ -41,7 +41,7 @@ interface DonutSegment {
 const rows = computed(() =>
   items.map((item, index) => ({
     key: `${item.category}-${String(index)}`,
-    index,
+    category: item.category,
     label: item.label,
     percentText: formatPercent(item.percentage, locale),
     amountText: formatMoney(item.amount, locale),
@@ -67,7 +67,7 @@ const segments = computed<DonutSegment[]>(() => {
         key: `${item.category}-${String(index)}`,
         dashArray: `${String(value)} ${String(100 - value)}`,
         dashOffset: offset,
-        inkClass: seriesInkClass(index),
+        inkClass: seriesInkClass(item.category),
       })
     }
 
@@ -154,7 +154,7 @@ const isEmpty = computed(() => items.length === 0)
             :key="row.key"
             class="flex items-center gap-2 text-caption tabular-nums"
           >
-            <ReportSeriesMarker :index="row.index" />
+            <ReportSeriesMarker :category="row.category" />
             <span class="flex min-w-0 flex-1 flex-col gap-0.5">
               <span class="truncate text-ink-2">{{ row.label }}</span>
               <span class="text-micro text-ink-3">{{ row.percentText }}</span>

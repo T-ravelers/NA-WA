@@ -6,6 +6,9 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
+import ReportPersonaTicket from '../../components/presentation/ReportPersonaTicket.vue'
+import { seriesInkClass } from '../../components/presentation/seriesPalette'
+
 const { fetchReport } = vi.hoisted(() => ({ fetchReport: vi.fn() }))
 
 vi.mock('../../api/reportApi', async (importOriginal) => ({
@@ -112,14 +115,18 @@ describe('ReportDetailView', () => {
     expect(wrapper.find('button[aria-label="Share"]').exists()).toBe(false)
     expect(wrapper.findAll('button').some((button) => button.text() === 'Group')).toBe(false)
     expect(wrapper.text()).not.toContain('similar travelers')
+    expect(wrapper.text()).toContain('Travel spending type')
+    expect(wrapper.text()).toContain('events')
     expect(wrapper.findAll('h2').map((heading) => heading.text())).toEqual([
+      'Your spending type',
       'Analysis',
-      'Flavor Seeker',
       'By category',
       'Spending trend',
       'Journey snapshot',
       'Saved itinerary',
     ])
+    // 칭호는 섹션 제목 아래에 놓인다. 제목만 훑는 사용자가 맥락 없이 해시태그부터 만나지 않는다.
+    expect(wrapper.findAll('h3').map((heading) => heading.text())).toContain('#FLAVORSEEKER')
     expect(wrapper.get('button[aria-label="Back to reports"]').text()).toBe('')
   })
 
@@ -151,13 +158,96 @@ describe('ReportDetailView', () => {
 
     expect(wrapper.text()).toContain('No spending selected')
     expect(wrapper.text()).toContain('No category spending was recorded.')
-    expect(wrapper.text()).not.toContain('Free Spender')
+    expect(wrapper.text()).not.toContain('#FREESPENDER')
+  })
+
+  // 목록 카드가 `5 events · 9 places`로 나눠 보여주므로, 상세가 합계를 세면 숫자가 어긋난다.
+  it('counts only events in the donut centre, not saved places', async () => {
+    fetchReport.mockResolvedValueOnce({
+      ...detail,
+      reportContent: {
+        ...detail.reportContent,
+        days: [
+          {
+            visitDate: '2026-07-18',
+            items: [
+              {
+                tripItemId: 1,
+                itemId: 101,
+                itemType: 'EVENT',
+                title: 'Night Market',
+                status: 'ADDED',
+              },
+              { tripItemId: 2, itemId: 102, itemType: 'PLACE', title: 'Seongsan', status: 'ADDED' },
+              { tripItemId: 3, itemId: 103, itemType: 'PLACE', title: 'Hallasan', status: 'ADDED' },
+            ],
+          },
+          {
+            visitDate: '2026-07-19',
+            items: [
+              {
+                tripItemId: 4,
+                itemId: 104,
+                itemType: 'EVENT',
+                title: 'Fireworks',
+                status: 'ADDED',
+              },
+            ],
+          },
+        ],
+      },
+    })
+    const { wrapper } = await mountView()
+
+    // 도넛 가운데 블록. 티켓 절취선도 `absolute`라 `inset-0`까지 짚는다.
+    const centre = wrapper.get('.absolute.inset-0')
+
+    expect(centre.text()).toBe('2events')
+  })
+
+  // 티켓과 도넛이 같은 카테고리에 같은 색을 줘야 한다(시안 R4).
+  it('gives the ticket and the donut the same colour for the leading category', async () => {
+    fetchReport.mockResolvedValueOnce({
+      ...detail,
+      analytics: {
+        ...detail.analytics,
+        categoryBreakdown: [
+          { category: 'SHOPPING', amount: '900000.0000', percentage: '70.07' },
+          { category: 'FOOD', amount: '384500.0000', percentage: '29.93' },
+        ],
+      },
+    })
+    const { wrapper } = await mountView()
+
+    // 티켓 배경과 도넛 조각·범례 표식이 모두 shopping 색이다.
+    expect(wrapper.getComponent(ReportPersonaTicket).props('tone')).toBe('shopping')
+    expect(seriesInkClass('SHOPPING')).toBe('text-shopping')
+    expect(wrapper.findAll('.text-shopping').length).toBeGreaterThan(0)
+  })
+
+  // 코어색이 없는 세 카테고리는 티켓을 종이톤으로 둔다. 도넛에는 색이 있다.
+  it('falls back to the paper ticket when the leading category has no core colour', async () => {
+    fetchReport.mockResolvedValueOnce({
+      ...detail,
+      analytics: {
+        ...detail.analytics,
+        categoryBreakdown: [
+          { category: 'TRANSPORT', amount: '900000.0000', percentage: '70.07' },
+          { category: 'FOOD', amount: '384500.0000', percentage: '29.93' },
+        ],
+      },
+    })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.getComponent(ReportPersonaTicket).props('tone')).toBe('paper')
+    expect(seriesInkClass('TRANSPORT')).toBe('text-status-ongoing')
+    expect(wrapper.findAll('.text-status-ongoing').length).toBeGreaterThan(0)
   })
 
   it('names a spending persona from the top category and fills in its share', async () => {
     const { wrapper } = await mountView()
 
-    expect(wrapper.text()).toContain('Flavor Seeker')
+    expect(wrapper.text()).toContain('#FLAVORSEEKER')
     expect(wrapper.text()).toContain(
       'You followed your appetite — 78% of this journey went to food.',
     )
@@ -177,8 +267,8 @@ describe('ReportDetailView', () => {
     })
     const { wrapper } = await mountView()
 
-    expect(wrapper.text()).toContain('Slow Traveler')
-    expect(wrapper.text()).not.toContain('Flavor Seeker')
+    expect(wrapper.text()).toContain('#SLOWTRAVELER')
+    expect(wrapper.text()).not.toContain('#FLAVORSEEKER')
   })
 
   it('translates category codes instead of printing them raw', async () => {

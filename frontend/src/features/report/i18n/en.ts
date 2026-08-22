@@ -48,47 +48,50 @@ export default {
       itineraryEmpty: 'No itinerary items were saved in this report.',
       analysis: 'Analysis',
       totalSpent: 'Total spent',
-      dailyAverage: 'Daily average',
+      dailyAverage: 'Daily avg',
       zeroTitle: 'No spending selected',
       zeroDescription: 'This report was generated without linked expenses.',
       legacyTitle: 'Spending analysis unavailable',
       legacyDescription:
         'This report was created before spending analytics were available. Its journey snapshot is still readable.',
       persona: {
-        heading: 'Spending style',
+        sectionTitle: 'Your spending type',
+        heading: 'Travel spending type',
         FOOD: {
-          title: 'Flavor Seeker',
+          title: '#FLAVORSEEKER',
           description: 'You followed your appetite — {share} of this journey went to food.',
         },
         SHOPPING: {
-          title: 'Souvenir Hunter',
+          title: '#SOUVENIRHUNTER',
           description: 'You brought the journey home — {share} of it went to shopping.',
         },
         BEAUTY: {
-          title: 'Glow Getter',
+          title: '#GLOWGETTER',
           description: 'You left looking your best — {share} of this journey went to beauty.',
         },
         SHOW: {
-          title: 'Front Row Traveler',
+          title: '#FRONTROWTRAVELER',
           description: 'You went for the moment — {share} of this journey went to shows.',
         },
         TRANSPORT: {
-          title: 'Ground Coverer',
+          title: '#GROUNDCOVERER',
           description: 'You kept moving — {share} of this journey went to getting around.',
         },
         STAY: {
-          title: 'Slow Traveler',
+          title: '#SLOWTRAVELER',
           description: 'You settled in — {share} of this journey went to your stay.',
         },
         OTHER: {
-          title: 'Free Spender',
+          title: '#FREESPENDER',
           description:
             'Your spending did not fit one box — {share} of it landed outside the usual categories.',
         },
       },
       categoryTitle: 'By category',
+      categoryCenterLabel: 'events',
       categoryEmpty: 'No category spending was recorded.',
-      categoryDescription: 'Spending grouped by category with amount and share.',
+      categoryDescription:
+        'Spending grouped by category with amount and share. The number in the middle is how many events this journey has.',
       category: 'Category',
       amount: 'Amount',
       share: 'Share',

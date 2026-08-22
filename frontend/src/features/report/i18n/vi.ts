@@ -61,42 +61,45 @@ export default {
       legacyDescription:
         'Báo cáo này được tạo trước khi có tính năng phân tích chi tiêu. Bạn vẫn xem được tóm tắt hành trình.',
       persona: {
-        heading: 'Phong cách chi tiêu',
+        sectionTitle: 'Kiểu chi tiêu của bạn',
+        heading: 'Kiểu chi tiêu du lịch',
         FOOD: {
-          title: 'Tín đồ ẩm thực',
+          title: '#FLAVORSEEKER',
           description:
             'Bạn đã đi theo tiếng gọi của vị giác — {share} của hành trình này dành cho ẩm thực.',
         },
         SHOPPING: {
-          title: 'Thợ săn quà lưu niệm',
+          title: '#SOUVENIRHUNTER',
           description: 'Bạn mang cả hành trình về nhà — {share} dành cho mua sắm.',
         },
         BEAUTY: {
-          title: 'Người tỏa sáng',
+          title: '#GLOWGETTER',
           description:
             'Bạn rời đi với diện mạo rạng rỡ nhất — {share} của hành trình này dành cho làm đẹp.',
         },
         SHOW: {
-          title: 'Du khách hàng ghế đầu',
+          title: '#FRONTROWTRAVELER',
           description: 'Bạn sống trọn khoảnh khắc — {share} của hành trình này dành cho biểu diễn.',
         },
         TRANSPORT: {
-          title: 'Người đi khắp nơi',
+          title: '#GROUNDCOVERER',
           description: 'Bạn luôn di chuyển — {share} của hành trình này dành cho đi lại.',
         },
         STAY: {
-          title: 'Du khách chậm rãi',
+          title: '#SLOWTRAVELER',
           description: 'Bạn tận hưởng nơi ở — {share} của hành trình này dành cho lưu trú.',
         },
         OTHER: {
-          title: 'Người chi tiêu tự do',
+          title: '#FREESPENDER',
           description:
             'Chi tiêu của bạn không gói gọn trong một ô — {share} nằm ngoài các danh mục thường gặp.',
         },
       },
       categoryTitle: 'Theo danh mục',
+      categoryCenterLabel: 'sự kiện',
       categoryEmpty: 'Không có chi tiêu theo danh mục được ghi nhận.',
-      categoryDescription: 'Chi tiêu gộp theo danh mục kèm số tiền và tỷ trọng.',
+      categoryDescription:
+        'Chi tiêu gộp theo danh mục kèm số tiền và tỷ trọng. Số ở giữa là số sự kiện của hành trình này.',
       category: 'Danh mục',
       amount: 'Số tiền',
       // 여기의 share는 정산의 몫이 아니라 비중(%)이다.
