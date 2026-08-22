@@ -39,6 +39,7 @@ export default {
     },
     status: {
       RECRUITING: 'Đang mở',
+      FULL: 'Đã đủ người',
       IN_PROGRESS: 'Đang diễn ra',
       AWAITING_ATTENDANCE: 'Chờ điểm danh',
       COMPLETED: 'Hoàn thành',
@@ -74,6 +75,7 @@ export default {
       meetingPlacePlaceholder: 'Vui lòng nhập địa điểm.',
       meetingPlaceLoading: 'Đang đọc vị trí hoạt động',
       visitDateNote: 'Hoạt động này diễn ra vào {date}, theo ngày hành trình bạn đã chọn.',
+      activityTime: 'Thời gian hoạt động',
       startAt: 'Hoạt động bắt đầu',
       endAt: 'Hoạt động kết thúc',
       submit: 'Tạo cuộc hẹn',
@@ -87,6 +89,11 @@ export default {
         'Cuộc hẹn của bạn chưa được tạo. Nếu rời đi bây giờ, tiến trình này sẽ bị mất.',
       exitConfirmStay: 'Ở lại',
       exitConfirmLeave: 'Rời đi',
+      insufficientTitle: 'Số dư không đủ',
+      insufficientDescription:
+        'Số dư ví không đủ cho khoản cọc {amount} P. Nạp {amount} P để tạo cuộc hẹn này?',
+      insufficientLater: 'Để sau',
+      insufficientTopup: 'Nạp tiền',
       loadFailed: 'Không tạo được cuộc hẹn. Vui lòng thử lại.',
       validation: {
         itemContext: 'Hãy mở biểu mẫu này từ một Sự kiện hoặc Địa điểm.',

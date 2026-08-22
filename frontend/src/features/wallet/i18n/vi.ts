@@ -150,6 +150,7 @@ export default {
       completeTitle: 'Nạp tiền hoàn tất',
       currentBalance: 'Số dư hiện tại {balance}',
       backToWallet: 'Về ví',
+      backToCaller: 'Tiếp tục việc đang làm',
     },
     qr: {
       title: 'THANH TOÁN QR',
@@ -182,8 +183,9 @@ export default {
       description: 'Đặt số tiền và ghi chú trước khi hiện mã QR thanh toán.',
       amount: 'Số tiền',
       amountHelper: 'Nhập số tiền cho yêu cầu thanh toán này.',
-      // 베트남어 천 단위 구분자는 마침표다.
-      amountPlaceholder: '18.500',
+      // 베트남어 천 단위 구분자는 마침표지만, 이 값을 받는 AmountInput이 화면 표시를
+      // en-US로 고정 포맷한다. 힌트와 입력 표기가 갈리지 않게 en과 같은 쉼표를 쓴다.
+      amountPlaceholder: '18,500',
       payerAmountTitle: 'Người trả sẽ nhập số tiền',
       payerAmountDescription: 'Người trả có thể chọn số tiền sau khi quét mã QR này.',
       payerEntersAmount: 'Để người trả nhập số tiền',

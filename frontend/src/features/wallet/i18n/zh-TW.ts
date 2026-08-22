@@ -149,6 +149,7 @@ export default {
       completeTitle: '儲值完成',
       currentBalance: '目前餘額 {balance}',
       backToWallet: '返回錢包',
+      backToCaller: '回到原本的畫面',
     },
     qr: {
       title: 'QR Code 付款',

@@ -38,6 +38,7 @@ export default {
     },
     status: {
       RECRUITING: '募集中',
+      FULL: '満員',
       IN_PROGRESS: '進行中',
       AWAITING_ATTENDANCE: '出席確認待ち',
       COMPLETED: '完了',
@@ -73,6 +74,7 @@ export default {
       meetingPlacePlaceholder: '場所を入力してください。',
       meetingPlaceLoading: 'アクティビティの場所を読み込んでいます',
       visitDateNote: '選んだ旅程の日付に基づき、このアクティビティは{date}に行われます。',
+      activityTime: 'アクティビティ時間',
       startAt: 'アクティビティ開始',
       endAt: 'アクティビティ終了',
       submit: '同行グループを作成',
@@ -86,6 +88,11 @@ export default {
         '同行グループはまだ作成されていません。今終了すると、入力した内容は失われます。',
       exitConfirmStay: '編集を続ける',
       exitConfirmLeave: '終了する',
+      insufficientTitle: '残高が足りません',
+      insufficientDescription:
+        'ウォレットの残高が{amount} Pのデポジットに足りません。{amount} Pをチャージしてこの同行グループを作成しますか？',
+      insufficientLater: '後で',
+      insufficientTopup: 'チャージ',
       loadFailed: '同行グループを作成できませんでした。もう一度お試しください。',
       validation: {
         itemContext: 'このフォームはイベントまたはスポットから開いてください。',

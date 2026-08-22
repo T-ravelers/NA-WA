@@ -151,6 +151,7 @@ export default {
       completeTitle: 'チャージ完了',
       currentBalance: '現在の残高 {balance}',
       backToWallet: 'ウォレットへ戻る',
+      backToCaller: '元の画面へ戻る',
     },
     qr: {
       title: 'QR決済',

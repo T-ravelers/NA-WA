@@ -37,6 +37,7 @@ export default {
     },
     status: {
       RECRUITING: '招募中',
+      FULL: '已額滿',
       IN_PROGRESS: '進行中',
       AWAITING_ATTENDANCE: '待確認出席',
       COMPLETED: '已完成',
@@ -72,6 +73,7 @@ export default {
       meetingPlacePlaceholder: '請輸入地點。',
       meetingPlaceLoading: '正在讀取活動地點…',
       visitDateNote: '依您選擇的旅程日期，這個活動會在 {date} 進行。',
+      activityTime: '活動時間',
       startAt: '活動開始',
       endAt: '活動結束',
       submit: '建立揪團',
@@ -84,6 +86,11 @@ export default {
       exitConfirmDescription: '揪團尚未建立。現在離開的話，目前填寫的內容將會遺失。',
       exitConfirmStay: '繼續編輯',
       exitConfirmLeave: '離開',
+      insufficientTitle: '餘額不足',
+      insufficientDescription:
+        '錢包餘額不足以支付 {amount} P 押金。要儲值 {amount} P 並建立這個揪團嗎？',
+      insufficientLater: '稍後再說',
+      insufficientTopup: '儲值',
       loadFailed: '無法建立揪團，請再試一次。',
       validation: {
         itemContext: '請從活動或地點頁面開啟這個表單。',
