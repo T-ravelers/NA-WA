@@ -5,6 +5,7 @@ import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 import { appointmentJourneyIntegrationKey } from '../../model/journeyIntegration'
 import { useToasts } from '@/shared/ui/toast'
@@ -114,6 +115,11 @@ async function mountView({ journeys: list = journeys, path = '/appointments/7' }
         path: '/journeys/new',
         name: 'journey-create',
         component: { template: '<div>Journey create</div>' },
+      },
+      {
+        path: '/wallet/top-up',
+        name: 'wallet-top-up',
+        component: { template: '<div>Top up</div>' },
       },
     ],
   })
@@ -417,6 +423,75 @@ describe('AppointmentDetailView', () => {
       returnRouteName: 'appointment-detail',
       appointmentId: '7',
     })
+  })
+
+  it('offers to top up when the deposit cannot be held', async () => {
+    // 빨간 한 줄 대신 "부족하다 + 그만큼 충전할까"를 한 번에 묻는다. 약속 생성과
+    // 같은 규칙이다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    joinAppointment.mockRejectedValue(
+      new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
+    )
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul Foodie Week'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Pay'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Not enough balance')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Top up')
+      ?.trigger('click')
+    await flushPromises()
+
+    // 돌아올 곳에 고른 여정을 실어 보낸다 — 돌아오면 그 여정이 골라진 채로 열린다.
+    expect(router.currentRoute.value.name).toBe('wallet-top-up')
+    expect(router.currentRoute.value.query).toMatchObject({
+      amount: '10000',
+      returnRoutePath: '/appointments/7?tripId=7',
+    })
+  })
+
+  it('explains a journey conflict instead of failing silently', async () => {
+    // 같은 여정·장소·날짜에 다른 약속이 이미 걸려 있으면 서버가 JOURNEY-004로
+    // 거절한다. 문구가 없으면 일반 오류로 떨어져 "아무 일도 안 난 것"처럼 보인다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    joinAppointment.mockRejectedValue(
+      new NormalizedApiError('JOURNEY-004', 409, 'duplicate journey item'),
+    )
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join appointment')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul Foodie Week'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Pay'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('already has that place on that date')
   })
 
   it('reopens the journey sheet with the journey the host just created', async () => {

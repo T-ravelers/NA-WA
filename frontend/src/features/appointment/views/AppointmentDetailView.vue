@@ -27,6 +27,8 @@ import {
   type AppointmentDateTimeValue,
 } from '../api/appointmentApi'
 import { appointmentKeys } from '../model/appointmentKeys'
+import { NormalizedApiError } from '@/shared/api/apiError'
+
 import { appointmentErrorMessageKey } from '../model/appointmentErrors'
 import { appointmentStatusTone } from '../model/appointmentStatusPresentation'
 import { useAppointmentJourneyIntegration } from '../model/journeyIntegration'
@@ -341,7 +343,7 @@ const leaveErrorMessage = computed(() =>
 )
 
 const joinErrorMessage = computed(() =>
-  joinMutation.error.value === null
+  joinMutation.error.value === null || topupPromptOpen.value
     ? undefined
     : t(appointmentErrorMessageKey(joinMutation.error.value, hasMessage)),
 )
@@ -444,6 +446,52 @@ function closeDepositSheet(): void {
 function confirmJoin(): void {
   if (joinMutation.isPending.value || selectedTripId.value === null) return
   joinMutation.mutate(selectedTripId.value)
+}
+
+// 보증금을 예치할 잔액이 없으면 서버가 WALLET-015로 거절한다. 빨간 한 줄 대신
+// 부족하다는 사실과 다음 행동(그만큼 충전)을 한 번에 묻는다 — 약속 생성과 같은 규칙이다.
+const INSUFFICIENT_BALANCE_CODE = 'WALLET-015'
+const topupPromptOpen = ref(false)
+
+watch(
+  () => joinMutation.error.value,
+  (error) => {
+    if (!(error instanceof NormalizedApiError)) return
+    if (error.code !== INSUFFICIENT_BALANCE_CODE) return
+    // 보증금 시트를 닫고 팝업만 남긴다. 두 겹으로 쌓이면 무엇을 눌러야 할지 흐려진다.
+    depositSheetOpen.value = false
+    topupPromptOpen.value = true
+  },
+)
+
+const formattedDepositAmount = computed(() =>
+  new Intl.NumberFormat('en-US').format(Number(appointment.value?.depositAmount ?? 0)),
+)
+
+function closeTopupPrompt(): void {
+  topupPromptOpen.value = false
+  // 팝업을 닫았으면 그 오류는 다 본 것이다. 남겨두면 일반 오류 문구로 다시 나타난다.
+  joinMutation.reset()
+}
+
+// 충전 화면으로 간다. 금액을 미리 채우고, 돌아올 곳으로 지금 고른 여정까지 실어
+// 보낸다 — 돌아오면 그 여정이 골라진 채로 참여 시트가 다시 열린다(?tripId=).
+// replace가 아니라 push다. 충전을 포기하고 뒤로 와도 이 화면으로 돌아와야 한다.
+function goToTopup(): void {
+  topupPromptOpen.value = false
+  const amount = appointment.value?.depositAmount
+  const returnPath =
+    selectedTripId.value === null
+      ? route.path
+      : `${route.path}?tripId=${String(selectedTripId.value)}`
+
+  void router.push({
+    name: 'wallet-top-up',
+    query: {
+      ...(amount === undefined ? {} : { amount: String(amount) }),
+      returnRoutePath: returnPath,
+    },
+  })
 }
 </script>
 
@@ -630,6 +678,42 @@ function confirmJoin(): void {
         @close="closeDepositSheet"
         @confirm="confirmJoin"
       />
+
+      <div
+        v-if="topupPromptOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-scrim/70 px-screen"
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('appointment.create.insufficientTitle')"
+          class="w-full max-w-[390px] rounded-card bg-surface-1 p-5 shadow-sheet"
+        >
+          <h2 class="text-title text-ink-display">
+            {{ t('appointment.create.insufficientTitle') }}
+          </h2>
+          <p class="mt-2 text-body-sm text-ink-3">
+            {{
+              t('appointment.create.insufficientDescription', { amount: formattedDepositAmount })
+            }}
+          </p>
+          <div class="mt-5 grid grid-cols-2 gap-3">
+            <AppButton
+              block
+              variant="secondary"
+              @click="closeTopupPrompt"
+            >
+              {{ t('appointment.create.insufficientLater') }}
+            </AppButton>
+            <AppButton
+              block
+              @click="goToTopup"
+            >
+              {{ t('appointment.create.insufficientTopup') }}
+            </AppButton>
+          </div>
+        </section>
+      </div>
 
       <AppointmentMenuSheet
         v-if="menuOpen"
