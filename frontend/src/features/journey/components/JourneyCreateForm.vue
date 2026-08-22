@@ -136,6 +136,7 @@ function submit(): void {
       <p
         class="ml-1.5 text-caption tabular-nums text-ink-3"
         aria-live="polite"
+        :data-testid="`journey-create-step-${step}`"
       >
         {{ t('journey.create.stepCount', { current: step }) }}
       </p>
@@ -185,6 +186,7 @@ function submit(): void {
 
         <AppButton
           block
+          data-testid="journey-create-next"
           @click="goToPreferences"
         >
           {{ t('journey.create.next') }}

@@ -505,7 +505,12 @@ function retry(): void {
         </section>
 
         <section class="flex flex-col gap-3">
-          <h2 class="text-section-header text-ink">{{ t('explore.detail.location') }}</h2>
+          <h2
+            class="text-section-header text-ink"
+            data-testid="event-location"
+          >
+            {{ t('explore.detail.location') }}
+          </h2>
           <div class="relative aspect-[1.8] overflow-hidden rounded-card bg-surface-1">
             <div
               class="pointer-events-none absolute inset-0 opacity-75"

@@ -260,6 +260,7 @@ const handlePaymentError = (message: string): void => {
           v-model="amount"
           currency-symbol="P"
           symbol-position="suffix"
+          data-testid="topup-amount"
           :label="t('wallet.topUp.amountLabel')"
           :helper="t('wallet.topUp.pointsRateNotice')"
         />
