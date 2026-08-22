@@ -241,6 +241,38 @@ function stubJourneyList(page) {
   )
 }
 
+/** 같은 국적 여행자 코호트(#421). 동료 없이 평균만 있고, 내 비중과 5%p 안팎으로 갈리게 둔다. */
+const REPORT_SIMILAR_COMPARISON = {
+  scope: 'SIMILAR',
+  basis: 'SNAPSHOT',
+  me: {
+    memberId: 1,
+    displayName: 'Me',
+    profileImageUrl: null,
+    totalSpent: 1284500,
+    dailyAverage: 128450,
+    categoryBreakdown: [
+      { category: 'FOOD', amount: 539500, percentage: 42 },
+      { category: 'SHOPPING', amount: 398200, percentage: 31 },
+      { category: 'SHOW', amount: 218400, percentage: 17 },
+      { category: 'BEAUTY', amount: 128400, percentage: 10 },
+    ],
+  },
+  peers: [],
+  cohort: {
+    size: 37,
+    avgTotalSpent: 1052000,
+    avgDailyAverage: 105200,
+    categoryBreakdown: [
+      { category: 'FOOD', amount: 315600, percentage: 30 },
+      { category: 'SHOPPING', amount: 263000, percentage: 25 },
+      { category: 'BEAUTY', amount: 263000, percentage: 25 },
+      { category: 'SHOW', amount: 210400, percentage: 20 },
+    ],
+  },
+  ranks: [],
+}
+
 function stubReportApis(page) {
   const detail = {
     reportId: 101,
@@ -345,88 +377,90 @@ function stubReportApis(page) {
         }),
       }),
     ),
-    // 동료 비교(#404). 쿼리(scope=)가 붙으므로 정규식으로 받는다.
+    // 동료 비교(#404). 쿼리(scope=)가 붙으므로 정규식으로 받고, SIMILAR는 코호트만 있는 응답을 준다(#421).
     page.route(/\/api\/v1\/reports\/101\/comparison(\?.*)?$/, (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
-          data: {
-            scope: 'GROUP',
-            basis: 'LIVE',
-            me: {
-              memberId: 1,
-              displayName: 'Me',
-              profileImageUrl: null,
-              // 스냅샷(analytics 1,284,500)과 일부러 어긋나게 둔다 — LIVE 재합산이라
-              // 두 숫자가 다를 수 있고, 같은 값이면 캡처에서 그 차이가 안 드러난다.
-              totalSpent: 1310000,
-              dailyAverage: 131000,
-              categoryBreakdown: [
-                { category: 'FOOD', amount: 539500, percentage: 42 },
-                { category: 'SHOPPING', amount: 398200, percentage: 31 },
-                { category: 'SHOW', amount: 218400, percentage: 17 },
-                { category: 'BEAUTY', amount: 128400, percentage: 10 },
-              ],
-            },
-            peers: [
-              {
-                memberId: 2,
-                displayName: 'Mina',
-                profileImageUrl: null,
-                totalSpent: 978400,
-                dailyAverage: 97840,
-                categoryBreakdown: [
-                  { category: 'FOOD', amount: 420000, percentage: 42.93 },
-                  { category: 'SHOPPING', amount: 310000, percentage: 31.68 },
-                  { category: 'BEAUTY', amount: 248400, percentage: 25.39 },
+          data: route.request().url().includes('scope=SIMILAR')
+            ? REPORT_SIMILAR_COMPARISON
+            : {
+                scope: 'GROUP',
+                basis: 'LIVE',
+                me: {
+                  memberId: 1,
+                  displayName: 'Me',
+                  profileImageUrl: null,
+                  // 스냅샷(analytics 1,284,500)과 일부러 어긋나게 둔다 — LIVE 재합산이라
+                  // 두 숫자가 다를 수 있고, 같은 값이면 캡처에서 그 차이가 안 드러난다.
+                  totalSpent: 1310000,
+                  dailyAverage: 131000,
+                  categoryBreakdown: [
+                    { category: 'FOOD', amount: 539500, percentage: 42 },
+                    { category: 'SHOPPING', amount: 398200, percentage: 31 },
+                    { category: 'SHOW', amount: 218400, percentage: 17 },
+                    { category: 'BEAUTY', amount: 128400, percentage: 10 },
+                  ],
+                },
+                peers: [
+                  {
+                    memberId: 2,
+                    displayName: 'Mina',
+                    profileImageUrl: null,
+                    totalSpent: 978400,
+                    dailyAverage: 97840,
+                    categoryBreakdown: [
+                      { category: 'FOOD', amount: 420000, percentage: 42.93 },
+                      { category: 'SHOPPING', amount: 310000, percentage: 31.68 },
+                      { category: 'BEAUTY', amount: 248400, percentage: 25.39 },
+                    ],
+                  },
+                  {
+                    memberId: 3,
+                    displayName: 'Jae',
+                    profileImageUrl: null,
+                    totalSpent: 510000,
+                    dailyAverage: 51000,
+                    categoryBreakdown: [
+                      { category: 'SHOW', amount: 300000, percentage: 58.82 },
+                      { category: 'FOOD', amount: 150000, percentage: 29.41 },
+                      { category: 'TRANSPORT', amount: 60000, percentage: 11.76 },
+                    ],
+                  },
+                  {
+                    memberId: 4,
+                    displayName: 'Sora',
+                    profileImageUrl: null,
+                    totalSpent: 740000,
+                    dailyAverage: 74000,
+                    categoryBreakdown: [
+                      { category: 'SHOPPING', amount: 520000, percentage: 70.27 },
+                      { category: 'FOOD', amount: 130000, percentage: 17.57 },
+                      { category: 'BEAUTY', amount: 90000, percentage: 12.16 },
+                    ],
+                  },
+                ],
+                cohort: {
+                  size: 3,
+                  avgTotalSpent: 742800,
+                  avgDailyAverage: 74280,
+                  categoryBreakdown: [
+                    { category: 'SHOPPING', amount: 276666.67, percentage: 37.25 },
+                    { category: 'FOOD', amount: 233333.33, percentage: 31.41 },
+                    { category: 'BEAUTY', amount: 112800, percentage: 15.19 },
+                    { category: 'SHOW', amount: 100000, percentage: 13.46 },
+                    { category: 'TRANSPORT', amount: 20000, percentage: 2.69 },
+                  ],
+                },
+                ranks: [
+                  { category: 'FOOD', rank: 1, of: 4 },
+                  { category: 'SHOPPING', rank: 2, of: 4 },
+                  { category: 'SHOW', rank: 2, of: 4 },
+                  { category: 'BEAUTY', rank: 2, of: 4 },
                 ],
               },
-              {
-                memberId: 3,
-                displayName: 'Jae',
-                profileImageUrl: null,
-                totalSpent: 510000,
-                dailyAverage: 51000,
-                categoryBreakdown: [
-                  { category: 'SHOW', amount: 300000, percentage: 58.82 },
-                  { category: 'FOOD', amount: 150000, percentage: 29.41 },
-                  { category: 'TRANSPORT', amount: 60000, percentage: 11.76 },
-                ],
-              },
-              {
-                memberId: 4,
-                displayName: 'Sora',
-                profileImageUrl: null,
-                totalSpent: 740000,
-                dailyAverage: 74000,
-                categoryBreakdown: [
-                  { category: 'SHOPPING', amount: 520000, percentage: 70.27 },
-                  { category: 'FOOD', amount: 130000, percentage: 17.57 },
-                  { category: 'BEAUTY', amount: 90000, percentage: 12.16 },
-                ],
-              },
-            ],
-            cohort: {
-              size: 3,
-              avgTotalSpent: 742800,
-              avgDailyAverage: 74280,
-              categoryBreakdown: [
-                { category: 'SHOPPING', amount: 276666.67, percentage: 37.25 },
-                { category: 'FOOD', amount: 233333.33, percentage: 31.41 },
-                { category: 'BEAUTY', amount: 112800, percentage: 15.19 },
-                { category: 'SHOW', amount: 100000, percentage: 13.46 },
-                { category: 'TRANSPORT', amount: 20000, percentage: 2.69 },
-              ],
-            },
-            ranks: [
-              { category: 'FOOD', rank: 1, of: 4 },
-              { category: 'SHOPPING', rank: 2, of: 4 },
-              { category: 'SHOW', rank: 2, of: 4 },
-              { category: 'BEAUTY', rank: 2, of: 4 },
-            ],
-          },
         }),
       }),
     ),
@@ -1586,6 +1620,21 @@ const createResponseGate = createGate()
 const itemizedCreateGate = createGate()
 
 const FLOWS = [
+  {
+    // 리포트 상세에서 Similar 탭으로 바꾼 화면(#421). 세그먼트 한 번이라 화면 목록이 아니라 흐름에 둔다.
+    name: '18-report-similar',
+    path: '/reports/101',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubReportApis(page)]),
+    steps: [
+      {
+        name: '01-similar',
+        act: async (page) => {
+          await page.getByTestId('segment-SIMILAR').click()
+          await page.getByText('Vs. similar travelers').waitFor()
+        },
+      },
+    ],
+  },
   {
     // 지갑에서 시작해 내 몫을 결제하기까지. 도중에 서버 상태가 바뀌는 유일한 흐름이다.
     name: '30-pay',

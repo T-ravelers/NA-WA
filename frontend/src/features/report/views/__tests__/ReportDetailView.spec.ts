@@ -108,6 +108,9 @@ const groupComparison = {
   ],
 }
 
+/** 동료 칩 라디오 그룹. 비교 범위 세그먼트도 라디오 그룹이라 이름으로 가른다. */
+const MEMBER_CHIPS = '[role="radiogroup"][aria-label="Group members"]'
+
 const mountedWrappers: VueWrapper[] = []
 const queryClients: QueryClient[] = []
 
@@ -159,8 +162,10 @@ describe('ReportDetailView', () => {
     expect(wrapper.find('polyline').exists()).toBe(true)
     expect(wrapper.findAll('table')).toHaveLength(0)
     expect(wrapper.find('button[aria-label="Share"]').exists()).toBe(false)
-    expect(wrapper.findAll('button').some((button) => button.text() === 'Group')).toBe(false)
-    expect(wrapper.text()).not.toContain('similar travelers')
+    // 비교 범위 세그먼트(#421). 기본은 Group이고 Similar는 탭으로만 들어간다.
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Group')).toBe(true)
+    expect(wrapper.find('[data-testid="segment-SIMILAR"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Vs. similar travelers')
     expect(wrapper.text()).toContain('Travel spending type')
     expect(wrapper.text()).toContain('events')
     expect(wrapper.findAll('h2').map((heading) => heading.text())).toEqual([
@@ -346,18 +351,21 @@ describe('ReportDetailView', () => {
     const missing = await mountView()
     expect(missing.wrapper.text()).toContain('Report not found')
   })
-  it('asks for the group comparison only when the snapshot has spending', async () => {
+  // SIMILAR는 인사이트 문장도 쓰므로 탭을 누르기 전에 같이 받는다.
+  it('asks for both comparison scopes when the snapshot has spending', async () => {
     await mountView()
 
     expect(fetchReportComparison).toHaveBeenCalledWith(100, 'GROUP')
-    expect(fetchReportComparison).toHaveBeenCalledTimes(1)
+    expect(fetchReportComparison).toHaveBeenCalledWith(100, 'SIMILAR')
+    expect(fetchReportComparison).toHaveBeenCalledTimes(2)
   })
 
   it('explains that there is nobody to compare with when the group is empty', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('No group members yet')
-    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false)
+    // 세그먼트도 라디오 그룹이라 동료 칩 그룹은 이름으로 고른다.
+    expect(wrapper.find(MEMBER_CHIPS).exists()).toBe(false)
   })
 
   it('compares total spend, category balance and ranks against group members', async () => {
@@ -365,7 +373,9 @@ describe('ReportDetailView', () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Total spend')
-    expect(wrapper.findAll('[role="radio"]').map((chip) => chip.text())).toEqual(['MMina'])
+    expect(wrapper.findAll(`${MEMBER_CHIPS} [role="radio"]`).map((chip) => chip.text())).toEqual([
+      'MMina',
+    ])
     expect(wrapper.text()).toContain('978,400 P')
     expect(wrapper.text()).toContain('Category balance')
     // 레이더 축: 내 FOOD·OTHER + 코호트 SHOPPING — 세 축
@@ -420,5 +430,108 @@ describe('ReportDetailView', () => {
 
     expect(fetchReportComparison).not.toHaveBeenCalled()
     expect(wrapper.text()).not.toContain('Vs. group members')
+  })
+
+  // ── Similar 탭 + 인사이트(#421) ──
+  const similarComparison = {
+    ...emptyComparison,
+    scope: 'SIMILAR' as const,
+    basis: 'SNAPSHOT' as const,
+    me: {
+      ...emptyComparison.me,
+      categoryBreakdown: [
+        { category: 'FOOD', amount: '770700', percentage: '60' },
+        { category: 'SHOPPING', amount: '513800', percentage: '40' },
+      ],
+    },
+    cohort: {
+      size: 12,
+      avgTotalSpent: '1052000',
+      avgDailyAverage: '105200',
+      categoryBreakdown: [
+        { category: 'FOOD', amount: '504960', percentage: '48' },
+        { category: 'SHOPPING', amount: '378720', percentage: '36' },
+        { category: 'SHOW', amount: '168320', percentage: '16' },
+      ],
+    },
+  }
+
+  function mockScopes(group: Record<string, unknown>, similar: Record<string, unknown>): void {
+    fetchReportComparison.mockImplementation((_reportId: number, scope: string) =>
+      Promise.resolve(scope === 'SIMILAR' ? similar : group),
+    )
+  }
+
+  function withCohortFood(percentage: string) {
+    return {
+      ...similarComparison,
+      cohort: {
+        ...similarComparison.cohort,
+        categoryBreakdown: [{ category: 'FOOD', amount: '1', percentage }],
+      },
+    }
+  }
+
+  it('switches to similar travelers: one average bar, signed share tiles, no member chips', async () => {
+    mockScopes(groupComparison, similarComparison)
+    const { wrapper } = await mountView()
+
+    await wrapper.get('[data-testid="segment-SIMILAR"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('h2').map((heading) => heading.text())).toContain(
+      'Vs. similar travelers',
+    )
+    expect(wrapper.find(MEMBER_CHIPS).exists()).toBe(false)
+    // KPI 카드도 dt를 쓰므로 막대 라벨만 본다. 48px 칸에 잘리지 않게 `AVG`로 적는다.
+    const barLabels = wrapper.findAll('dt').map((cell) => cell.text())
+    expect(barLabels).toContain('You')
+    expect(barLabels).toContain('AVG')
+    expect(barLabels).not.toContain('Travelers avg')
+    expect(wrapper.text()).toContain('1,052,000 P')
+    const radarList = wrapper
+      .findAll('ul.sr-only')
+      .find((list) => list.text().includes('Travelers avg'))
+    expect(radarList?.text()).toContain('Food: You 60%, Travelers avg 48%')
+    // 내 비중 − 코호트 비중: Food +12, Shopping +4(±5 안 → AVG), Shows −16
+    expect(wrapper.findAll('li.rounded-card').map((tile) => tile.text())).toEqual([
+      '# Food+12%',
+      '# ShoppingAVG',
+      '# Shows-16%',
+    ])
+  })
+
+  it('explains when there are no similar travelers yet', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper.get('[data-testid="segment-SIMILAR"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No similar travelers yet')
+    expect(wrapper.find('li.rounded-card').exists()).toBe(false)
+  })
+
+  // 칭호의 1위 카테고리(FOOD 78%)를 같은 국적 코호트와 견준다. 단어는 그 카테고리 색으로 강조한다.
+  it.each([
+    ['48', 'well above travelers like you (48%)'],
+    ['75', 'about the same as travelers like you (75%)'],
+    ['90', 'below travelers like you (90%)'],
+  ])(
+    'compares the persona category with similar travelers in one sentence (cohort %s%%)',
+    async (cohortShare, expected) => {
+      mockScopes(emptyComparison, withCohortFood(cohortShare))
+      const { wrapper } = await mountView()
+
+      expect(wrapper.text()).toContain(`You leaned into food — 78% of this journey, ${expected}.`)
+      expect(wrapper.get('p span.font-semibold').text()).toBe('food')
+      expect(wrapper.get('p span.font-semibold').classes()).toContain(seriesInkClass('FOOD'))
+    },
+  )
+
+  it('keeps the insight without a comparison when there are no similar travelers', async () => {
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('You leaned into food — 78% of this journey.')
+    expect(wrapper.text()).not.toContain('travelers like you')
   })
 })
