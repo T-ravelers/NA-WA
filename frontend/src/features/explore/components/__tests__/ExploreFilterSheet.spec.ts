@@ -283,6 +283,78 @@ describe('ExploreFilterSheet', () => {
     expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({ savedOnly: true })
   })
 
+  it('turns Saved off when a sort is picked', async () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'sort', filters: { sort: 'NEWEST', savedOnly: true }, resultCount: 3 },
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('Popular'))
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+
+    /* 네 항목은 배타적이다. 정렬을 고르면 Saved는 꺼진다. */
+    expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({
+      sort: 'POPULAR',
+      savedOnly: undefined,
+    })
+  })
+
+  it('keeps the current sort while Saved is the checked item', async () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'sort', filters: { sort: 'ENDING_SOON' }, resultCount: 3 },
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Saved')
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+
+    /* 체크만 Saved로 옮겨간다. 목록 순서는 직전 정렬을 그대로 쓴다. */
+    expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({
+      sort: 'ENDING_SOON',
+      savedOnly: true,
+    })
+  })
+
+  it('moves the single check onto Saved instead of leaving it on the sort', async () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'sort', filters: { sort: 'POPULAR' }, resultCount: 3 },
+    })
+
+    /** 그 이름의 줄에 체크가 붙어 있는가. 개수만 세면 체크가 엉뚱한 줄에 남아도 통과한다. */
+    const isChecked = (label: string) =>
+      wrapper
+        .findAll('button')
+        .find((button) => button.text().startsWith(label))
+        ?.find('svg.tabler-icon-check')
+        .exists() === true
+
+    expect(isChecked('Popular')).toBe(true)
+    expect(isChecked('Saved')).toBe(false)
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Saved')
+      ?.trigger('click')
+
+    /* 네 항목은 배타적이다. 체크는 정확히 Saved 하나에만 남는다. */
+    expect(isChecked('Saved')).toBe(true)
+    expect(isChecked('Popular')).toBe(false)
+    expect(wrapper.findAll('svg.tabler-icon-check')).toHaveLength(1)
+  })
+
   it('clears the Saved toggle when the sort sheet is reset', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },

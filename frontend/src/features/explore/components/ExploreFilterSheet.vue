@@ -265,6 +265,32 @@ function setCalendarDate(value: string): void {
   draft.endDate = value
 }
 
+/**
+ * 정렬 시트에서 지금 무엇이 골라져 있는가. 네 항목은 서로 배타적이라 택 1이다.
+ *
+ * `Saved`는 정렬이 아니라 필터라서 `sort`와 다른 곳에 담긴다. 그래서 화면에 체크를
+ * 그리려면 둘을 한 값으로 합쳐야 한다. `Saved`가 켜져 있으면 `sort`가 무엇이든 체크는
+ * `Saved`에만 붙는다 — 두 개가 동시에 체크된 것처럼 보이면 택 1이 아니게 된다.
+ */
+const sortSelection = computed<string>(() =>
+  draft.savedOnly === true ? 'SAVED' : (draft.sort ?? 'NEWEST'),
+)
+
+function selectSort(value: EventSearchFilters['sort']): void {
+  draft.sort = value
+  draft.savedOnly = undefined
+}
+
+/**
+ * 찜한 항목만 보기.
+ *
+ * 목록 순서는 직전 정렬을 그대로 쓴다 — `sort`를 건드리지 않는 이유다. 체크만 옮겨간다.
+ * 다시 끄려면 정렬 항목 중 하나를 고른다. 라디오와 같은 규칙이다.
+ */
+function selectSavedOnly(): void {
+  draft.savedOnly = true
+}
+
 function selectRegion(value: string): void {
   selectedRegion.value = value
   draft.region1 = [value]
@@ -630,11 +656,11 @@ function apply(): void {
               :key="sortOption.value"
               type="button"
               class="flex min-h-16 w-full items-center justify-between text-left"
-              @click="draft.sort = sortOption.value as EventSearchFilters['sort']"
+              @click="selectSort(sortOption.value as EventSearchFilters['sort'])"
             >
               <span
                 class="text-body"
-                :class="draft.sort === sortOption.value ? 'text-ink' : 'text-ink-2'"
+                :class="sortSelection === sortOption.value ? 'text-ink' : 'text-ink-2'"
               >
                 {{ t(sortOption.labelKey) }}
                 <span
@@ -647,13 +673,13 @@ function apply(): void {
               <span
                 class="flex size-6 items-center justify-center rounded-pill"
                 :class="
-                  draft.sort === sortOption.value
+                  sortSelection === sortOption.value
                     ? 'bg-paper-fill text-on-paper'
                     : 'border border-hairline-2'
                 "
               >
                 <IconCheck
-                  v-if="draft.sort === sortOption.value"
+                  v-if="sortSelection === sortOption.value"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"
@@ -663,22 +689,24 @@ function apply(): void {
             <button
               type="button"
               class="flex min-h-16 w-full items-center justify-between text-left"
-              @click="draft.savedOnly = draft.savedOnly === true ? undefined : true"
+              @click="selectSavedOnly"
             >
               <span
                 class="text-body"
-                :class="draft.savedOnly ? 'text-ink' : 'text-ink-2'"
+                :class="sortSelection === 'SAVED' ? 'text-ink' : 'text-ink-2'"
               >
                 {{ t('explore.sort.saved') }}
               </span>
               <span
                 class="flex size-6 items-center justify-center rounded-pill"
                 :class="
-                  draft.savedOnly ? 'bg-paper-fill text-on-paper' : 'border border-hairline-2'
+                  sortSelection === 'SAVED'
+                    ? 'bg-paper-fill text-on-paper'
+                    : 'border border-hairline-2'
                 "
               >
                 <IconCheck
-                  v-if="draft.savedOnly"
+                  v-if="sortSelection === 'SAVED'"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"

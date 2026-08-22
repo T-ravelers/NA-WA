@@ -219,6 +219,26 @@ function toggleOption(key: PlaceOptionKey): void {
   draft[key] = draft[key] === true ? undefined : true
 }
 
+/**
+ * 정렬 시트에서 지금 무엇이 골라져 있는가. 세 항목은 서로 배타적이라 택 1이다.
+ *
+ * `ExploreFilterSheet`와 같은 규칙이다 — `Saved`는 정렬이 아니라 필터라 다른 곳에
+ * 담기지만, 화면에는 하나만 체크돼야 하므로 한 값으로 합쳐서 본다.
+ */
+const sortSelection = computed<string>(() =>
+  draft.savedOnly === true ? 'SAVED' : (draft.sort ?? 'POPULAR'),
+)
+
+function selectSort(value: PlaceSort): void {
+  draft.sort = value
+  draft.savedOnly = undefined
+}
+
+/** 목록 순서는 직전 정렬을 그대로 쓴다. 다시 끄려면 정렬 항목 중 하나를 고른다. */
+function selectSavedOnly(): void {
+  draft.savedOnly = true
+}
+
 function resetSheet(): void {
   if (props.kind === 'region') {
     draft.region1 = [SEOUL_REGION1]
@@ -457,11 +477,11 @@ function apply(): void {
               :key="sortOption.value"
               type="button"
               class="flex min-h-16 w-full items-center justify-between text-left"
-              @click="draft.sort = sortOption.value as PlaceSort"
+              @click="selectSort(sortOption.value as PlaceSort)"
             >
               <span
                 class="text-body"
-                :class="draft.sort === sortOption.value ? 'text-ink' : 'text-ink-2'"
+                :class="sortSelection === sortOption.value ? 'text-ink' : 'text-ink-2'"
               >
                 {{ t(sortOption.labelKey) }}
                 <span
@@ -474,13 +494,13 @@ function apply(): void {
               <span
                 class="flex size-6 items-center justify-center rounded-pill"
                 :class="
-                  draft.sort === sortOption.value
+                  sortSelection === sortOption.value
                     ? 'bg-paper-fill text-on-paper'
                     : 'border border-hairline-2'
                 "
               >
                 <IconCheck
-                  v-if="draft.sort === sortOption.value"
+                  v-if="sortSelection === sortOption.value"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"
@@ -490,22 +510,24 @@ function apply(): void {
             <button
               type="button"
               class="flex min-h-16 w-full items-center justify-between text-left"
-              @click="draft.savedOnly = draft.savedOnly === true ? undefined : true"
+              @click="selectSavedOnly"
             >
               <span
                 class="text-body"
-                :class="draft.savedOnly ? 'text-ink' : 'text-ink-2'"
+                :class="sortSelection === 'SAVED' ? 'text-ink' : 'text-ink-2'"
               >
                 {{ t('explore.sort.saved') }}
               </span>
               <span
                 class="flex size-6 items-center justify-center rounded-pill"
                 :class="
-                  draft.savedOnly ? 'bg-paper-fill text-on-paper' : 'border border-hairline-2'
+                  sortSelection === 'SAVED'
+                    ? 'bg-paper-fill text-on-paper'
+                    : 'border border-hairline-2'
                 "
               >
                 <IconCheck
-                  v-if="draft.savedOnly"
+                  v-if="sortSelection === 'SAVED'"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"
