@@ -16,6 +16,7 @@ import me.nawa.member.dto.MemberAppointmentProfileResponse;
 import me.nawa.member.dto.MerchantRegisterRequest;
 import me.nawa.member.dto.OnboardingProfileRequest;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
+import me.nawa.member.mapper.MemberMapper;
 import me.nawa.member.service.MemberProfileService;
 import me.nawa.settlement.service.SettlementCreationService;
 import me.nawa.settlement.service.SettlementPaymentService;
@@ -78,6 +79,7 @@ import java.util.Base64;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
+import static org.mockito.Mockito.mock;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -106,6 +108,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SwaggerConfigTest.AppointmentTestConfig.class,
         SwaggerConfigTest.ReviewTestConfig.class,
         SwaggerConfigTest.MetricsTestConfig.class,
+        SwaggerConfigTest.LoadTestConfig.class,
         SwaggerConfigTest.TestController.class
 })
 class SwaggerConfigTest {
@@ -555,6 +558,20 @@ class SwaggerConfigTest {
         @Bean
         PrometheusMeterRegistry meterRegistry() {
             return new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+        }
+    }
+
+    /**
+     * `-Ploadtest` 빌드에서는 부하 테스트 컨트롤러도 서블릿 컨텍스트에 스캔되므로
+     * 그 의존성이 있어야 합니다. 플래그 없는 평소 빌드에서는 스캔될 클래스가 없어
+     * 이 빈들이 쓰이지 않습니다.
+     */
+    @Configuration
+    static class LoadTestConfig {
+
+        @Bean
+        MemberMapper memberMapper() {
+            return mock(MemberMapper.class);
         }
     }
 

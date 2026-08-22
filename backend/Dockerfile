@@ -10,8 +10,12 @@ RUN chmod +x gradlew
 
 COPY src src
 
+# 부하 테스트용 빌드에서만 `-Ploadtest`를 넘긴다. 기본값이 비어 있어 운영 빌드는
+# 그대로이며, CI(.github/workflows/deploy.yml)는 이 인자를 넘기지 않는다.
+ARG GRADLE_ARGS=""
+
 # 이미지 빌드 단계에서는 테스트를 생략 (테스트는 CI의 별도 job에서 이미 검증)
-RUN ./gradlew war --no-daemon -x test
+RUN ./gradlew war --no-daemon -x test ${GRADLE_ARGS}
 
 # ---- Runtime stage ----
 FROM tomcat:9.0-jre17-temurin

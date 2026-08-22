@@ -56,6 +56,13 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   쓰는 API 경로이고, 위 nginx 규칙은 최상위 `/internal/`만 매칭하므로 그쪽에는 닿지
   않습니다. 둘을 같은 규칙으로 읽지 마세요. 수집기처럼 **외부에 아예 노출하지 않을**
   경로를 새로 만들 때만 최상위 `/internal/`을 쓰면 차단 규칙을 늘리지 않아도 됩니다.
+- **부하 테스트 전용 코드는 `backend/src/loadtest/java`에 둡니다.** `build.gradle`이
+  `-Ploadtest`를 준 빌드에서만 컴파일 대상에 넣고, 배포 워크플로는 그 플래그를 넘기지
+  않습니다. 지금 여기 있는 로그인 경로(`/internal/loadtest/login`)는 공유 비밀만 맞으면
+  **임의 회원으로 로그인시켜 줍니다** — 운영에 들어가면 인증이 없는 것과 같습니다.
+  환경변수 게이트(`LOADTEST_LOGIN_SECRET`)는 두 번째 방어선일 뿐이니 둘 다 유지하세요.
+  이 격리는 조용히 깨집니다(클래스를 `src/main/java`로 옮겨도 빌드가 성공합니다).
+  `LoadTestSourceIsolationTest`가 플래그 상태와 클래스패스를 대조해 막습니다.
 - **시간대는 세 곳에서 따로 정해집니다.** 백엔드 컨테이너의 `TZ=Asia/Seoul`,
   `docker-compose.yml` `mysql`의 `--default-time-zone=+09:00`, `DATABASE_URL`의
   `serverTimezone`입니다. 마지막 것은 **드라이버 설정일 뿐이라 DB가 평가하는

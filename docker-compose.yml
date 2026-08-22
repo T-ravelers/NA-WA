@@ -59,6 +59,10 @@ services:
       # 비우면 /api/v1/auth/service-token 이 아무 요청도 받지 않는다.
       PIPELINE_SERVICE_SECRET: ${PIPELINE_SERVICE_SECRET:-}
       PIPELINE_MEMBER_ID: ${PIPELINE_MEMBER_ID:-1000000}
+      # 부하 테스트 로그인 공유 비밀. 운영에서는 반드시 비운다.
+      # 비어 있으면 해당 경로가 요청을 거부하며, 애초에 운영 이미지에는 그 경로를
+      # 처리할 컨트롤러가 없다(backend/src/loadtest/java, -Ploadtest 빌드 전용).
+      LOADTEST_LOGIN_SECRET: ${LOADTEST_LOGIN_SECRET:-}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
       GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI}
