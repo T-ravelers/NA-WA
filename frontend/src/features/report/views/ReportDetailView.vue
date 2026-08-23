@@ -25,7 +25,12 @@ import ReportDailyTrend from '../components/presentation/ReportDailyTrend.vue'
 import ReportRadarChart from '../components/presentation/ReportRadarChart.vue'
 import ReportRankTiles from '../components/presentation/ReportRankTiles.vue'
 import { seriesInkClass } from '../components/presentation/seriesPalette'
-import { formatMoney, formatPercent, formatSignedPercent } from '../components/presentation/format'
+import {
+  formatEnglishOrdinal,
+  formatMoney,
+  formatPercent,
+  formatSignedPercent,
+} from '../components/presentation/format'
 import ReportKpiCard from '../components/presentation/ReportKpiCard.vue'
 import ReportPersonaTicket from '../components/presentation/ReportPersonaTicket.vue'
 import type {
@@ -264,6 +269,10 @@ const comparisonAxes = computed<ReportRadarAxis[]>(() => {
 })
 
 function rankText(rank: number): string {
+  if (i18n.locale.value.toLowerCase().startsWith('en')) {
+    return formatEnglishOrdinal(rank)
+  }
+
   if (rank === 1) return t('report.detail.comparison.rankFirst')
   if (rank === 2) return t('report.detail.comparison.rankSecond')
   if (rank === 3) return t('report.detail.comparison.rankThird')
