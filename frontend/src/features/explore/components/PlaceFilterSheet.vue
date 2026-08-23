@@ -233,8 +233,9 @@ function toggleActivity(activityId: number): void {
 /**
  * 서버로 보낼 형태로 접는다. 소분류가 전부 켜진 대분류는 대분류 ID 하나로 바꾼다.
  *
- * 접지 않으면 대분류 조건과 소분류 조건이 함께 나가는데 서버는 그 둘을 AND로 묶는다.
- * 다른 대분류의 소분류를 섞어 고른 순간 조건이 무너지므로 지금까지 보내던 형태를 지킨다.
+ * 서버는 대분류 조건과 소분류 조건을 OR로 묶으므로 접지 않아도 결과는 같다. 그래도 접는
+ * 것은 주소가 짧아지고, 두 조건이 삭제된 활동을 다르게 다루는 차이(소분류 조건은
+ * `activity` 테이블을 join하지 않는다)에 덜 노출되기 때문이다.
  */
 function collapseCategorySelection(filters: PlaceSearchFilters): void {
   const values = new Set(checkedActivities.value)

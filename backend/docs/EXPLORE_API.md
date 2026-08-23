@@ -41,7 +41,11 @@ Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `
 ### 필터 결합
 
 - 같은 종류의 다중 값은 OR 조건으로 적용합니다.
-- 지역, Sector, Activity, 검색어, 옵션처럼 서로 다른 종류의 필터는 AND 조건으로 적용합니다.
+- 지역, 검색어, 옵션처럼 서로 다른 종류의 필터는 AND 조건으로 적용합니다.
+- Sector와 Activity는 예외로 **서로 OR**입니다. 둘을 함께 보내면 두 조건 중 하나라도
+  맞는 항목을 반환하고, 이 한 묶음이 나머지 필터와 AND로 결합합니다. AND로 묶으면 한
+  대분류를 통째로 고르고 다른 대분류의 소분류를 일부만 고른 조합에서 교집합이 비어
+  결과가 0건이 됩니다.
 - 여러 Activity에 연결된 Event도 목록에는 한 번만 반환합니다.
 - `APPROVED`·`VISIBLE`이며 삭제되지 않은 Event 중 `end_date`가 없거나 DB의 현재 날짜
   (`CURRENT_DATE()`) 이후인 데이터만 목록과 상세에 반환합니다. 종료일 당일은 공개합니다.
@@ -115,6 +119,7 @@ Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `
 ### 필터 및 데이터 공개 규칙
 
 - 같은 종류의 다중 값은 OR, 서로 다른 종류의 필터는 AND로 결합합니다.
+- Event 목록과 같이 **Sector와 Activity만 서로 OR**입니다(위 [필터 결합](#필터-결합)).
 - 여러 Activity에 연결된 Place도 목록에는 한 번만 반환합니다.
 - `APPROVED`·`VISIBLE`이며 삭제되지 않은 활성 Place만 목록과 상세에 반환합니다.
 - 저장 여부는 `explore_item_likes`의 삭제되지 않은 데이터로 판단합니다.
