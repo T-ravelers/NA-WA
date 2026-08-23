@@ -148,6 +148,7 @@ cd backend && ./gradlew build --no-daemon
 | Journey 설정 수정 API | [backend/docs/JOURNEY_API.md](./backend/docs/JOURNEY_API.md)                  |
 | 약속·보증금·후기 ENUM·상태 전이 | [backend/docs/APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./backend/docs/APPOINTMENT_DEPOSIT_STATE_MACHINE.md) |
 | 정산 API·상태·멱등성 | [backend/docs/SETTLEMENT.md](./backend/docs/SETTLEMENT.md)                  |
+| 알림 API·폴링 주기   | [backend/docs/NOTIFICATION_API.md](./backend/docs/NOTIFICATION_API.md)      |
 | QR 결제 API·상태·멱등성 | [backend/docs/QR_PAYMENT_API.md](./backend/docs/QR_PAYMENT_API.md)      |
 | 소비 카테고리 값 집합·칭호 | [backend/docs/SPENDING_CATEGORY.md](./backend/docs/SPENDING_CATEGORY.md) |
 | 리포트 스냅샷·비교 API | [backend/docs/REPORT_API.md](./backend/docs/REPORT_API.md)                  |

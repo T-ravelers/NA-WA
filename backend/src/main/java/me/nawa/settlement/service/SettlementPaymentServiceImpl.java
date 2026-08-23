@@ -7,9 +7,12 @@ import me.nawa.settlement.domain.Settlement;
 import me.nawa.settlement.domain.SettlementMember;
 import me.nawa.settlement.domain.SettlementViewerContext;
 import me.nawa.settlement.dto.response.SettlementMutationResponse;
+import me.nawa.settlement.event.SettlementCompletedEvent;
+import me.nawa.settlement.event.SettlementPaidEvent;
 import me.nawa.settlement.exception.SettlementErrorCode;
 import me.nawa.settlement.mapper.SettlementMapper;
 import me.nawa.wallet.service.WalletTransferService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +23,7 @@ public class SettlementPaymentServiceImpl implements SettlementPaymentService {
     private final SettlementMapper settlementMapper;
     private final WalletTransferService walletTransferService;
     private final SettlementViewerPolicy viewerPolicy;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override @Transactional
     public SettlementMutationResponse paySettlement(
@@ -53,7 +57,14 @@ public class SettlementPaymentServiceImpl implements SettlementPaymentService {
             payment.getSettlementMemberId(), transferId, normalizedKey
         ) != 1)
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_PAYMENT_NOT_ALLOWED);
-        settlementMapper.completeSettlementIfNoPendingPayments(settlementId, LocalDateTime.now());
+        eventPublisher.publishEvent(new SettlementPaidEvent(settlementId, memberId));
+        // 이 UPDATE는 아직 REQUESTED인 정산만 바꾼다. 마지막 지급이 동시에 여러 번 들어와도
+        // 한 번만 한 줄을 바꾸므로, 반환값이 1인 그 한 번이 곧 완료 알림 1회를 보장한다.
+        if (settlementMapper.completeSettlementIfNoPendingPayments(
+            settlementId, LocalDateTime.now()
+        ) == 1) {
+            eventPublisher.publishEvent(new SettlementCompletedEvent(settlementId));
+        }
         payment.setRequestStatus("PAID");
         payment.setPaidTransferId(transferId);
         payment.setPaymentIdempotencyKey(normalizedKey);

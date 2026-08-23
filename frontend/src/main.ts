@@ -28,9 +28,13 @@ import { useMemberAppointmentProfile } from '@/features/member/model/memberQueri
 import { useExploreItemLocationQuery } from '@/features/explore/model/appointmentIntegration'
 import { useSavedExploreItemsQuery } from '@/features/explore/model/memberIntegration'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
+import { useUnreadNotificationCount } from '@/features/notification/model/notificationQueries'
+import { notificationSettlementIntegrationKey } from '@/features/notification/model/settlementIntegration'
+import { settlementKeys } from '@/features/settlement/model/settlementQueries'
 import { journeyReportIntegrationKey } from '@/features/journey/model/reportIntegration'
 import { useReportSummariesQuery } from '@/features/report/composables/useReportQueries'
 import { walletAppointmentIntegrationKey } from '@/features/wallet/model/appointmentIntegration'
+import { walletNotificationIntegrationKey } from '@/features/wallet/model/notificationIntegration'
 import '@/app/styles/index.css'
 import { setSessionExpiredHandler } from '@/shared/api/sessionRecovery'
 import { setSignedOutHandler } from '@/shared/api/sessionSignOut'
@@ -75,6 +79,17 @@ app.provide(appointmentJourneyIntegrationKey, {
 })
 app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
 app.provide(walletAppointmentIntegrationKey, { useMyTodayAppointmentsQuery })
+app.provide(walletNotificationIntegrationKey, { useUnreadNotificationCount })
+/*
+ * 새 알림이 왔다는 것은 곧 정산 상태가 바뀌었다는 뜻이다. 벨 숫자만 올라가고 정산 화면이
+ * 옛날 값을 들고 있으면 사용자는 어느 쪽을 믿어야 할지 알 수 없다. 알림 feature가 정산
+ * feature를 직접 알지 않도록 무효화 한 줄만 여기서 건네준다.
+ */
+app.provide(notificationSettlementIntegrationKey, {
+  invalidateSettlements: () => {
+    void queryClient.invalidateQueries({ queryKey: settlementKeys.all })
+  },
+})
 app.provide(appointmentExploreIntegrationKey, { useItemLocation: useExploreItemLocationQuery })
 app.provide(memberExploreIntegrationKey, { useSavedItems: useSavedExploreItemsQuery })
 app.provide(memberAppointmentIntegrationKey, {

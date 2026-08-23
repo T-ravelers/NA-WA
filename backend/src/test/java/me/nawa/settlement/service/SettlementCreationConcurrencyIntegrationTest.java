@@ -390,8 +390,9 @@ class SettlementCreationConcurrencyIntegrationTest {
             SettlementMapper settlementMapper,
             List<SettlementCreationHandler> handlers
         ) {
+            // 이 테스트는 원거래 경쟁만 본다. 알림 발행은 대상이 아니라 이벤트를 버린다.
             return new SettlementCreationAttemptService(
-                settlementMapper, handlers, noOpReceiptService()
+                settlementMapper, handlers, noOpReceiptService(), event -> { }
             );
         }
 

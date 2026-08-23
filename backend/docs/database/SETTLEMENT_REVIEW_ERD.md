@@ -16,6 +16,8 @@ erDiagram
     SETTLEMENT_MEMBERS ||--o{ SETTLEMENT_ITEM_SHARES : owes
     SETTLEMENTS ||--o| SETTLEMENT_RECEIPTS : proves
     MEMBERS ||--o{ SETTLEMENT_RECEIPTS : uploads
+    SETTLEMENTS ||--o{ NOTIFICATIONS : announces
+    MEMBERS ||--o{ NOTIFICATIONS : receives
 
     APPOINTMENTS ||--o{ MEMBER_REVIEWS : reviews_after
     APPOINTMENT_MEMBERS ||--o{ MEMBER_REVIEWS : reviewer
@@ -90,6 +92,18 @@ erDiagram
         INT byte_size
     }
 
+    NOTIFICATIONS {
+        BIGINT notification_id PK
+        BIGINT recipient_member_id FK
+        BIGINT settlement_id FK
+        ENUM notification_type
+        VARCHAR actor_name
+        VARCHAR gathering_name
+        DECIMAL amount
+        CHAR currency_code
+        DATETIME read_at
+    }
+
     MEMBER_REVIEWS {
         BIGINT review_id PK
         BIGINT appointment_id FK
@@ -142,3 +156,20 @@ erDiagram
 
 `object_key`는 반드시 `receipts/`로 시작한다. IAM 정책이 이 접두사로 좁혀져 있어 벗어난
 키는 런타임에 접근이 거부된다.
+
+## 알림
+
+`notifications`는 정산에서 일어난 일을 받는 사람 앞으로 한 줄씩 쌓아 둔다. 정산에서 파생된
+표시용 데이터라 정산 상태의 정본이 아니다.
+
+`actor_name`·`gathering_name`·`amount`·`currency_code`는 **알림을 만들 때 복사해 둔 값**이다.
+매번 원본을 조인해 오지 않는 이유는, 상대가 이름을 바꾸거나 정산이 지워져도 그때 받은
+알림은 받았던 그 문장 그대로 남아야 하기 때문이다.
+
+`read_at`이 비어 있으면 아직 안 읽은 알림이다. 읽음 여부를 참/거짓으로 두지 않고 시각으로
+두면 언제 읽었는지까지 남는다.
+
+목록 조회도 미읽음 개수도 "내 알림을 최신순으로"만 묻는다. 두 질문이
+`(recipient_member_id, created_at DESC)` 인덱스 하나를 함께 쓴다.
+
+계약과 알림 종류별 수신자 규칙은 [알림 API 계약](../NOTIFICATION_API.md)에 있다.
