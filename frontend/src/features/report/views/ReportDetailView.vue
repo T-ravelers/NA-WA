@@ -1,33 +1,46 @@
 <script setup lang="ts">
-import { IconArrowLeft } from '@tabler/icons-vue'
+import { IconArrowLeft, IconChevronRight, IconShare } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
-  type SpendingCategory,
+  SPENDING_CATEGORIES,
   spendingCategoryLabelKey,
   toSpendingCategory,
 } from '@/shared/lib/spendingCategory'
+import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
+import { showToast } from '@/shared/ui/toast'
 
 import ReportCategoryBreakdown from '../components/presentation/ReportCategoryBreakdown.vue'
+import ReportComparisonBars from '../components/presentation/ReportComparisonBars.vue'
 import ReportDailyTrend from '../components/presentation/ReportDailyTrend.vue'
-import { formatPercent } from '../components/presentation/format'
+import ReportRadarChart from '../components/presentation/ReportRadarChart.vue'
+import ReportRankTiles from '../components/presentation/ReportRankTiles.vue'
+import { formatMoney, formatPercent } from '../components/presentation/format'
 import ReportKpiCard from '../components/presentation/ReportKpiCard.vue'
 import ReportPersonaTicket from '../components/presentation/ReportPersonaTicket.vue'
 import type {
   ReportCategoryBreakdownItem,
+  ReportComparisonBarRow,
   ReportDailyTrendPoint,
   ReportKpiData,
+  ReportRadarAxis,
+  ReportRankTile,
 } from '../components/presentation/types'
-import { useReportDetailQuery } from '../composables/useReportQueries'
+import { useReportComparisonQuery, useReportDetailQuery } from '../composables/useReportQueries'
 import { isReportForbidden, isReportNotFound, reportErrorMessageKey } from '../model/reportErrors'
-import { formatReportDate, isZeroAmount, parsePositiveRouteId } from '../model/reportModel'
+import {
+  formatReportDate,
+  isZeroAmount,
+  parsePositiveRouteId,
+  spendingCategoryTone,
+} from '../model/reportModel'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,23 +82,6 @@ const reportCategories = computed<ReportCategoryBreakdownItem[]>(() =>
 )
 
 /**
- * 칭호 티켓 색.
- *
- * 시안 R4에서 티켓 배경은 1위 카테고리의 색이고, 같은 화면의 도넛도 이제 같은 색을 쓴다
- * (`seriesPalette`). 그래서 두 자리가 어긋나지 않는다.
- *
- * **Explore 소비영역과 같은 어휘를 쓰는 네 카테고리만 코어색이 있다.** 나머지 셋은
- * `AppTicket`이 받는 톤에 없어 종이톤으로 둔다 — 임의 색을 만들지 않는다. 그 셋이 1위일 때
- * 티켓은 무채색이 되고, 색으로 카테고리를 말하지 않는다.
- */
-const PERSONA_TONE: Partial<Record<SpendingCategory, Category>> = {
-  FOOD: 'food',
-  SHOPPING: 'shopping',
-  BEAUTY: 'beauty',
-  SHOW: 'show',
-}
-
-/**
  * 소비 성향 칭호.
  *
  * 가장 많이 쓴 카테고리 하나로 정한다. 백엔드가 금액 내림차순으로 정렬해 내려주므로
@@ -117,7 +113,7 @@ const reportPersona = computed<{
     description: t(`report.detail.persona.${category}.description`, { share }),
     share,
     categoryLabel: top.label,
-    tone: PERSONA_TONE[category] ?? 'paper',
+    tone: spendingCategoryTone(category) ?? 'paper',
   }
 })
 /**
@@ -140,6 +136,187 @@ const reportTrend = computed<ReportDailyTrendPoint[]>(() =>
     amount: Number(row.amount),
   })),
 )
+
+/* ── 동료 비교 (#404) ──
+ * 스냅샷이 있고 지출이 0이 아닐 때만 부른다. 비교는 여정 기간의 결제를 다시 합산한 값이라
+ * 위 ANALYSIS(스냅샷)와 숫자가 다를 수 있다 — 백엔드 문서의 basis 설명. */
+const comparisonQuery = useReportComparisonQuery(
+  reportId,
+  'GROUP',
+  computed(
+    () =>
+      report.value?.analytics !== null &&
+      report.value?.analytics !== undefined &&
+      !isZeroSpending.value,
+  ),
+)
+const comparison = computed(() => comparisonQuery.data.value ?? null)
+const hasPeers = computed(() => (comparison.value?.peers.length ?? 0) > 0)
+/** `LIVE`는 여정 기간의 결제를 지금 다시 합산한 값이라 위 ANALYSIS(스냅샷)와 다를 수 있다. */
+const isLiveComparison = computed(() => comparison.value?.basis === 'LIVE')
+
+const comparisonMe = computed<ReportComparisonBarRow>(() => ({
+  id: comparison.value?.me.memberId ?? 0,
+  label: t('report.detail.comparison.you'),
+  amount: Number(comparison.value?.me.totalSpent ?? 0),
+}))
+const comparisonPeers = computed<ReportComparisonBarRow[]>(() =>
+  (comparison.value?.peers ?? []).map((peer) => ({
+    id: peer.memberId,
+    label: peer.displayName,
+    amount: Number(peer.totalSpent),
+  })),
+)
+
+/** 레이더 축 — 나와 코호트 중 한쪽이라도 쓴 카테고리, 내 비중 순. 3개가 안 되면 나머지 카테고리로 채운다. */
+const comparisonAxes = computed<ReportRadarAxis[]>(() => {
+  const current = comparison.value
+
+  if (current === null) {
+    return []
+  }
+
+  const mine = new Map(
+    current.me.categoryBreakdown.map((row) => [row.category, Number(row.percentage)]),
+  )
+  const cohort = new Map(
+    current.cohort.categoryBreakdown.map((row) => [row.category, Number(row.percentage)]),
+  )
+  const ordered = [...mine.keys(), ...cohort.keys(), ...SPENDING_CATEGORIES].filter(
+    (category, index, all) => all.indexOf(category) === index,
+  )
+  const used = ordered.filter(
+    (category) => (mine.get(category) ?? 0) > 0 || (cohort.get(category) ?? 0) > 0,
+  )
+  const axes = used.length >= 3 ? used : ordered.slice(0, 3)
+
+  return axes.slice(0, 6).map((category) => ({
+    key: category,
+    label: t(spendingCategoryLabelKey(category)),
+    mine: mine.get(category) ?? 0,
+    cohort: cohort.get(category) ?? 0,
+  }))
+})
+
+function rankText(rank: number): string {
+  if (rank === 1) return t('report.detail.comparison.rankFirst')
+  if (rank === 2) return t('report.detail.comparison.rankSecond')
+  if (rank === 3) return t('report.detail.comparison.rankThird')
+
+  return t('report.detail.comparison.rankNth', { rank })
+}
+
+const comparisonTiles = computed<ReportRankTile[]>(() =>
+  (comparison.value?.ranks ?? []).slice(0, 4).map((row) => ({
+    key: row.category,
+    label: t(spendingCategoryLabelKey(row.category)),
+    rankText: rankText(row.rank),
+    tone: spendingCategoryTone(row.category) ?? 'surface',
+  })),
+)
+
+function retryComparison(): void {
+  void comparisonQuery.refetch()
+}
+
+/**
+ * 헤더 아이콘과 하단 `Confirm & Share`가 보내는 리포트 요약.
+ *
+ * 리포트 상세는 작성자만 열 수 있다. 링크를 보내면 받는 쪽은 아무것도 볼 수 없으므로
+ * 링크 대신 문장을 보낸다 — 여정·기간에 칭호·총지출·1위 비중을 붙인다. 칭호가 없는
+ * 리포트(지출 0원·구 리포트)는 여정과 기간만 보낸다.
+ */
+const shareSummary = computed<string | null>(() => {
+  const current = report.value
+
+  if (current === null) {
+    return null
+  }
+
+  const journey = current.reportContent.journey
+  const period = `${formatReportDate(journey.startDate)}–${formatReportDate(journey.endDate)}`
+  const persona = reportPersona.value
+  const kpi = reportKpi.value
+
+  if (persona === null || kpi === null) {
+    return t('report.detail.sharing.summaryPlain', { journey: journey.title, period })
+  }
+
+  return t('report.detail.sharing.summary', {
+    journey: journey.title,
+    period,
+    hashtag: persona.title,
+    total: formatMoney(kpi.totalSpent, i18n.locale.value),
+    share: persona.share,
+    category: persona.categoryLabel,
+  })
+})
+
+/**
+ * 공유 시트가 있으면 시트로, 없으면 클립보드로, 둘 다 없으면 안내만 한다.
+ *
+ * 취소(`AbortError`)와 「시트가 이미 열려 있음」(`InvalidStateError`)만 조용히 넘어간다.
+ * 나머지 거절은 실패이므로 아래 클립보드 경로가 받는다 — `web-share` 권한이 없는 교차 출처
+ * iframe과 인앱 브라우저는 `navigator.share`가 있는데도 `NotAllowedError`로 거절한다. 이때
+ * 폴백까지 막으면 시트도 토스트도 없이 끝나 버튼이 고장 난 것처럼 보인다.
+ *
+ * 복사 완료 문구는 무엇을 복사했는지가 달라서 화면이 인자로 준다.
+ */
+async function shareText(title: string, text: string, copiedMessage: string): Promise<void> {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text })
+      return
+    } catch (error) {
+      const name = (error as { name?: unknown } | null)?.name
+
+      /*
+       * 이름만 본다. `instanceof`로는 판정할 수 없다 — jsdom에서 `DOMException`은 `Error`를
+       * 상속하지 않고, `navigator.share`를 JS 브리지로 얹는 인앱 브라우저는 `DOMException`이
+       * 아닌 값을 던질 수 있다. 어느 쪽이든 취소가 클립보드로 떨어져 「복사했다」가 뜬다.
+       */
+      if (name === 'AbortError' || name === 'InvalidStateError') {
+        return
+      }
+    }
+  }
+
+  if (!navigator.clipboard) {
+    showToast(t('report.detail.sharing.unavailable'))
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast(copiedMessage)
+  } catch {
+    showToast(t('report.detail.sharing.copyFailed'))
+  }
+}
+
+function shareReport(): void {
+  const summary = shareSummary.value
+
+  if (summary !== null) {
+    void shareText(
+      t('report.detail.sharing.reportTitle'),
+      summary,
+      t('report.detail.sharing.copiedReport'),
+    )
+  }
+}
+
+function shareTicket(): void {
+  const persona = reportPersona.value
+
+  if (persona !== null) {
+    void shareText(
+      t('report.detail.sharing.ticketTitle'),
+      `${persona.title}\n${persona.description}`,
+      t('report.detail.sharing.copiedTicket'),
+    )
+  }
+}
 
 function goBack(): void {
   void router.push({ name: 'report-list' })
@@ -165,9 +342,26 @@ function retry(): void {
           aria-hidden="true"
         />
       </IconOrb>
-      <h1 class="font-display text-screen-title font-bold uppercase text-ink-display">
+      <h1 class="flex-1 font-display text-screen-title font-bold uppercase text-ink-display">
         {{ t('report.detail.title') }}
       </h1>
+      <!--
+        캐시가 있는 재방문에서 재요청이 실패하면 `data`는 남고 `isError`만 켜진다.
+        그러면 본문은 `StateError`인데 헤더에는 공유 아이콘이 남으므로 함께 본다.
+      -->
+      <IconOrb
+        v-if="shareSummary !== null && !reportQuery.isError.value"
+        :label="t('report.detail.sharing.report')"
+        size="md"
+        variant="surface"
+        @click="shareReport"
+      >
+        <IconShare
+          :size="20"
+          :stroke-width="1.8"
+          aria-hidden="true"
+        />
+      </IconOrb>
     </header>
 
     <StateError
@@ -237,6 +431,8 @@ function retry(): void {
           :stamp-value="reportPersona.share"
           :stamp-label="reportPersona.categoryLabel"
           :tone="reportPersona.tone"
+          :share-label="t('report.detail.sharing.ticket')"
+          @share="shareTicket"
         />
 
         <ReportKpiCard
@@ -272,6 +468,74 @@ function retry(): void {
           :empty-title="t('report.detail.trendTitle')"
           :empty-description="t('report.detail.trendEmpty')"
         />
+
+        <section
+          v-if="!isZeroSpending"
+          class="flex flex-col gap-3"
+          aria-labelledby="report-comparison-title"
+        >
+          <h2
+            id="report-comparison-title"
+            class="font-display text-section-header uppercase text-ink"
+          >
+            {{ t('report.detail.comparison.heading') }}
+          </h2>
+
+          <StateLoading
+            v-if="comparisonQuery.isPending.value"
+            :label="t('report.detail.comparison.loading')"
+          />
+
+          <StateError
+            v-else-if="comparisonQuery.isError.value"
+            :title="t('report.detail.comparison.loadFailed')"
+            :description="t('report.detail.comparison.loadFailedDescription')"
+            :action-label="t('action.retry')"
+            @retry="retryComparison"
+          />
+
+          <AppCard v-else-if="!hasPeers">
+            <h3 class="text-title text-ink">{{ t('report.detail.comparison.emptyTitle') }}</h3>
+            <p class="mt-2 text-body-sm text-ink-3">
+              {{ t('report.detail.comparison.emptyDescription') }}
+            </p>
+          </AppCard>
+
+          <template v-else>
+            <AppCard padding="lg">
+              <div class="flex flex-col gap-6">
+                <div class="flex flex-col gap-2">
+                  <ReportComparisonBars
+                    :total-label="t('report.detail.comparison.totalSpend')"
+                    :chips-label="t('report.detail.comparison.members')"
+                    :me="comparisonMe"
+                    :peers="comparisonPeers"
+                    :locale="i18n.locale.value"
+                  />
+                  <p
+                    v-if="isLiveComparison"
+                    class="text-micro text-ink-3"
+                  >
+                    {{ t('report.detail.comparison.liveBasisNote') }}
+                  </p>
+                </div>
+                <div class="flex flex-col gap-3">
+                  <p class="text-micro uppercase text-ink-3">
+                    {{ t('report.detail.comparison.categoryBalance') }}
+                  </p>
+                  <ReportRadarChart
+                    :axes="comparisonAxes"
+                    :mine-label="t('report.detail.comparison.you')"
+                    :cohort-label="t('report.detail.comparison.groupAvg')"
+                    :description="t('report.detail.comparison.radarDescription')"
+                  />
+                </div>
+              </div>
+            </AppCard>
+
+            <ReportRankTiles :tiles="comparisonTiles" />
+          </template>
+        </section>
       </template>
 
       <section
@@ -345,6 +609,20 @@ function retry(): void {
           </li>
         </ol>
       </section>
+
+      <AppButton
+        block
+        @click="shareReport"
+      >
+        <span class="inline-flex items-center gap-1">
+          {{ t('report.detail.sharing.confirm') }}
+          <IconChevronRight
+            :size="18"
+            :stroke-width="2"
+            aria-hidden="true"
+          />
+        </span>
+      </AppButton>
     </template>
   </main>
 </template>

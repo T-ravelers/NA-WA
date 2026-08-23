@@ -80,6 +80,11 @@ export interface ReportPersonaTicketProps extends Headed {
   /** 스탬프 작은 라벨. 1위 카테고리 표시명. 예: `Food` */
   stampLabel: string
   /**
+   * stub 왼쪽 공유 버튼의 라벨. 예: `Share ticket`. 없으면 버튼을 그리지 않는다.
+   * 누르면 `share`를 emit한다 — 무엇을 어떻게 보낼지는 화면이 정한다.
+   */
+  shareLabel?: string
+  /**
    * 티켓 색. 시안 R4에서 티켓은 도넛 1위 조각과 같은 색이다.
    * 어느 색인지는 화면(#153)이 정한다 — 여기서 소비 카테고리 문자열을 알지 않는다.
    */
@@ -106,4 +111,52 @@ export interface ReportDailyTrendProps extends Headed, LocaleAware {
   description?: string
   emptyTitle: string
   emptyDescription: string
+}
+
+/* ── 비교(#404) ── */
+
+export interface ReportComparisonBarRow {
+  id: number
+  /** 표시명. 나는 화면이 번역한 `You`다. */
+  label: string
+  amount: MoneyValue
+}
+
+export interface ReportComparisonBarsProps extends LocaleAware {
+  /** 블록 라벨. 예: `Total spend` */
+  totalLabel: string
+  /** 동료 칩 라디오 그룹의 접근 가능한 이름. 예: `Group members` */
+  chipsLabel: string
+  me: ReportComparisonBarRow
+  peers: ReportComparisonBarRow[]
+}
+
+export interface ReportRadarAxis {
+  key: string
+  label: string
+  /** 0–100 비중. */
+  mine: number
+  /** 0–100 비중. */
+  cohort: number
+}
+
+export interface ReportRadarChartProps {
+  /** 받은 순서대로 12시부터 시계 방향. 3개 미만이면 그리지 않는다. */
+  axes: ReportRadarAxis[]
+  mineLabel: string
+  cohortLabel: string
+  /** 차트를 한 문장으로 설명한다. 화면에는 보이지 않고 스크린 리더만 읽는다. */
+  description?: string
+}
+
+export interface ReportRankTile {
+  key: string
+  label: string
+  /** 로케일에 맞춰 만든 순위 글자. 예: `1st` */
+  rankText: string
+  tone: Category | 'surface'
+}
+
+export interface ReportRankTilesProps {
+  tiles: ReportRankTile[]
 }

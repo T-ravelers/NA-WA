@@ -25,6 +25,8 @@
  *                     플로우는 `<flow>-<step>` 이름으로 고른다. 한 화면만 고치고 전량을
  *                     다시 찍지 않기 위한 것이고, PR 첨부용 기본 스냅샷은 여전히 전량
  *                     실행으로 만든다.
+ *   SCREENSHOT_FULL_PAGE 1이면 뷰포트가 아니라 페이지 전체를 찍는다. 스크롤이 긴 화면(리포트
+ *                     상세)의 아래쪽 섹션을 PR에 보일 때 쓴다. 기본 스냅샷은 뷰포트 그대로다.
  *
  * 출력물은 저장소에 커밋하지 않는다. `.gitignore`에 들어 있다.
  */
@@ -85,6 +87,7 @@ const ONLY = (process.env.SCREENSHOT_ONLY ?? '')
   .split(',')
   .map((part) => part.trim())
   .filter((part) => part.length > 0)
+const FULL_PAGE = process.env.SCREENSHOT_FULL_PAGE === '1'
 
 /** @typedef {(page: import('@playwright/test').Page) => Promise<unknown>} Hook */
 
@@ -104,11 +107,119 @@ function stubMemberProfile(page) {
           // (localeSync). 러너 로케일과 어긋나면 로그인 화면만 en으로 되돌아간다.
           preferredLanguage: LOCALE,
           preferredCurrencyCode: 'KRW',
+          nationalityCode: 'JP',
+          accountType: 'TRAVELER',
           onboardingRequired: false,
         },
       }),
     }),
   )
+}
+
+/**
+ * 프로필의 찜·약속 탭.
+ *
+ * 찜은 Discover 목록 조회를 `savedOnly`로 재사용하므로 목록 엔드포인트를 그대로 세운다.
+ * 두 응답 모두 `responseSchema`(zod)를 지나므로 요약 DTO의 필수 필드를 빠짐없이 채운다 —
+ * 하나라도 빠지면 검증이 실패해 화면이 오류 상태로 찍힌다.
+ */
+function stubProfileTabs(page) {
+  return Promise.all([
+    stubJson(page, '/api/v1/explore/events', {
+      content: [
+        {
+          itemId: 301,
+          eventKind: 'FESTIVAL',
+          status: 'SCHEDULED',
+          title: 'Seoul Lantern Festival',
+          subtitle: null,
+          thumbnailUrl: null,
+          region1: 'Seoul',
+          region2: 'Jongno-gu',
+          region3: null,
+          latitude: 37.5709,
+          longitude: 126.9925,
+          startDate: '2098-11-01',
+          endDate: '2098-11-17',
+          saved: true,
+        },
+        {
+          itemId: 302,
+          eventKind: 'EXHIBITION',
+          status: 'ONGOING',
+          title: 'Hanok Craft Week',
+          subtitle: null,
+          thumbnailUrl: null,
+          region1: 'Seoul',
+          region2: 'Jung-gu',
+          region3: null,
+          latitude: 37.5636,
+          longitude: 126.9976,
+          startDate: '2098-09-04',
+          endDate: '2098-09-20',
+          saved: true,
+        },
+      ],
+      page: 0,
+      size: 30,
+      totalElements: 2,
+      totalPages: 1,
+      hasNext: false,
+    }),
+    stubJson(page, '/api/v1/explore/places', {
+      content: [
+        {
+          itemId: 501,
+          name: 'Gwangjang Market',
+          brand: null,
+          branch: null,
+          placeKind: 'RESTAURANT',
+          thumbnailUrl: null,
+          imageUrls: [],
+          region1: 'Seoul',
+          region2: 'Jongno-gu',
+          region3: null,
+          addressRoad: '88 Changgyeonggung-ro',
+          addressDetail: null,
+          latitude: 37.5701,
+          longitude: 126.9997,
+          isActive: true,
+          viewCount: 0,
+          favoriteCount: 0,
+          saved: true,
+        },
+      ],
+      page: 0,
+      size: 30,
+      totalElements: 1,
+      totalPages: 1,
+      hasNext: false,
+    }),
+    stubJson(page, '/api/v1/appointments/me', [
+      {
+        appointmentId: 71,
+        appointmentName: 'Lantern night walk',
+        tripId: 42,
+        meetingPlace: 'Jongno 3-ga Exit 3',
+        activityStartAt: '2098-11-02T19:00:00',
+        activityEndAt: '2098-11-02T21:00:00',
+        itemId: 301,
+        itemType: 'EVENT',
+        appointmentStatus: 'RECRUITING',
+      },
+      {
+        appointmentId: 72,
+        appointmentName: 'Market food crawl',
+        tripId: 42,
+        meetingPlace: 'Gwangjang Market north gate',
+        activityStartAt: '2098-11-05T12:30:00',
+        activityEndAt: '2098-11-05T14:30:00',
+        itemId: 501,
+        itemType: 'PLACE',
+        appointmentStatus: 'IN_PROGRESS',
+      },
+    ]),
+  ])
 }
 
 function stubJourneyDetail(page) {
@@ -339,6 +450,91 @@ function stubReportApis(page) {
               createdAt: '2021-07-28T09:00:00',
             },
           ],
+        }),
+      }),
+    ),
+    // 동료 비교(#404). 쿼리(scope=)가 붙으므로 정규식으로 받는다.
+    page.route(/\/api\/v1\/reports\/101\/comparison(\?.*)?$/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            scope: 'GROUP',
+            basis: 'LIVE',
+            me: {
+              memberId: 1,
+              displayName: 'Me',
+              profileImageUrl: null,
+              // 스냅샷(analytics 1,284,500)과 일부러 어긋나게 둔다 — LIVE 재합산이라
+              // 두 숫자가 다를 수 있고, 같은 값이면 캡처에서 그 차이가 안 드러난다.
+              totalSpent: 1310000,
+              dailyAverage: 131000,
+              categoryBreakdown: [
+                { category: 'FOOD', amount: 539500, percentage: 42 },
+                { category: 'SHOPPING', amount: 398200, percentage: 31 },
+                { category: 'SHOW', amount: 218400, percentage: 17 },
+                { category: 'BEAUTY', amount: 128400, percentage: 10 },
+              ],
+            },
+            peers: [
+              {
+                memberId: 2,
+                displayName: 'Mina',
+                profileImageUrl: null,
+                totalSpent: 978400,
+                dailyAverage: 97840,
+                categoryBreakdown: [
+                  { category: 'FOOD', amount: 420000, percentage: 42.93 },
+                  { category: 'SHOPPING', amount: 310000, percentage: 31.68 },
+                  { category: 'BEAUTY', amount: 248400, percentage: 25.39 },
+                ],
+              },
+              {
+                memberId: 3,
+                displayName: 'Jae',
+                profileImageUrl: null,
+                totalSpent: 510000,
+                dailyAverage: 51000,
+                categoryBreakdown: [
+                  { category: 'SHOW', amount: 300000, percentage: 58.82 },
+                  { category: 'FOOD', amount: 150000, percentage: 29.41 },
+                  { category: 'TRANSPORT', amount: 60000, percentage: 11.76 },
+                ],
+              },
+              {
+                memberId: 4,
+                displayName: 'Sora',
+                profileImageUrl: null,
+                totalSpent: 740000,
+                dailyAverage: 74000,
+                categoryBreakdown: [
+                  { category: 'SHOPPING', amount: 520000, percentage: 70.27 },
+                  { category: 'FOOD', amount: 130000, percentage: 17.57 },
+                  { category: 'BEAUTY', amount: 90000, percentage: 12.16 },
+                ],
+              },
+            ],
+            cohort: {
+              size: 3,
+              avgTotalSpent: 742800,
+              avgDailyAverage: 74280,
+              categoryBreakdown: [
+                { category: 'SHOPPING', amount: 276666.67, percentage: 37.25 },
+                { category: 'FOOD', amount: 233333.33, percentage: 31.41 },
+                { category: 'BEAUTY', amount: 112800, percentage: 15.19 },
+                { category: 'SHOW', amount: 100000, percentage: 13.46 },
+                { category: 'TRANSPORT', amount: 20000, percentage: 2.69 },
+              ],
+            },
+            ranks: [
+              { category: 'FOOD', rank: 1, of: 4 },
+              { category: 'SHOPPING', rank: 2, of: 4 },
+              { category: 'SHOW', rank: 2, of: 4 },
+              { category: 'BEAUTY', rank: 2, of: 4 },
+            ],
+          },
         }),
       }),
     ),
@@ -1086,6 +1282,111 @@ function stubJourneyListForEvent(page, { overlapping = true } = {}) {
 }
 
 /**
+ * Discover 목록(Events 탭) 응답을 세운다.
+ *
+ * 목록 화면은 그동안 낱장으로 찍히지 않아 카드 조형·필터 칩·280px 폭을 눈으로 확인할
+ * 방법이 없었다. 사진은 외부 주소를 부르지 않도록 비워 `ImagePlaceholder`가 그려지게 한다.
+ *
+ * `eventKind`와 `status`는 `EVENT_KINDS`·`EVENT_STATUSES`에 있는 값만 쓴다. 다른 값을 쓰면
+ * `responseSchema`가 응답을 통째로 거절해 목록이 오류로 떨어진다.
+ */
+function stubExploreEventList(page) {
+  /**
+   * 사진 갈래도 한 장은 찍어야 한다. 자리표시만 나오면 `<img>` 쪽 회귀가 스냅샷에 잡히지
+   * 않는다. 외부 주소를 부르지 않도록 1x1 PNG를 data URI로 박아 둔다.
+   */
+  const PIXEL =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+  const event = (
+    itemId,
+    eventKind,
+    status,
+    title,
+    region2,
+    startDate,
+    endDate,
+    thumbnailUrl = null,
+  ) => ({
+    itemId,
+    eventKind,
+    status,
+    title,
+    subtitle: null,
+    thumbnailUrl,
+    region1: 'Seoul',
+    region2,
+    region3: null,
+    latitude: 37.5665,
+    longitude: 126.978,
+    startDate,
+    endDate,
+    saved: false,
+  })
+
+  return page.route('**/api/v1/explore/events?*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          content: [
+            event(
+              301,
+              'FESTIVAL',
+              'ONGOING',
+              'DDP Architecture Tour',
+              'Dongdaemun',
+              '2026-01-01',
+              '2026-12-31',
+              PIXEL,
+            ),
+            /*
+             * 세 상태가 한 화면에 모두 보이도록 순서를 잡았다. 러너는 뷰포트만 찍으므로
+             * 네 번째 카드는 스냅샷에 들어오지 않는다. 종료는 표현이 가장 약한 상태라
+             * 목록 아래로 밀어 두면 확인할 방법이 사라진다.
+             */
+            event(
+              304,
+              'EXHIBITION',
+              'ENDED',
+              'Hongdae Vintage Fashion Fair',
+              'Hongdae',
+              '2026-06-01',
+              '2026-06-30',
+            ),
+            event(
+              303,
+              'FESTIVAL',
+              'SCHEDULED',
+              'Han River Food Festival',
+              'Yeouido',
+              '2026-08-14',
+              '2026-08-23',
+            ),
+            event(
+              302,
+              'POPUP',
+              'ONGOING',
+              'Seongsu Character Goods Pop-up',
+              'Seongsu',
+              '2026-07-20',
+              '2026-08-17',
+            ),
+          ],
+          page: 0,
+          size: 20,
+          totalElements: 496,
+          totalPages: 25,
+          hasNext: true,
+        },
+      }),
+    }),
+  )
+}
+
+/**
  * Event 상세 응답을 세운다. 좌표가 있는 상세와, 좌표가 NULL이라 지도 버튼이 숨는
  * 상세(#221 완료 기준)를 id로 나눠 찍는다.
  */
@@ -1164,17 +1465,26 @@ const SCREENS = [
   { name: '02-callback-failed', path: '/auth/callback?error=AUTH-014' },
   { name: '03-not-found', path: '/no-such-page' },
   {
-    name: '04-settings',
-    path: '/settings',
+    name: '04-profile',
+    path: '/profile',
     // 백엔드를 띄우지 않고 찍는다. 리뷰용 이미지지 통합 검증이 아니다.
-    setup: (page) => stubMemberProfile(page),
+    setup: (page) => Promise.all([stubMemberProfile(page), stubProfileTabs(page)]),
   },
   {
-    name: '05-settings-language',
-    path: '/settings',
-    setup: (page) => stubMemberProfile(page),
+    name: '04b-profile-appointments',
+    path: '/profile',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubProfileTabs(page)]),
     prepare: async (page) => {
-      await page.getByTestId('settings-language').click()
+      await page.getByTestId('segment-appointments').click()
+      await page.getByTestId('profile-list').getByRole('link').first().waitFor()
+    },
+  },
+  {
+    name: '05-profile-language',
+    path: '/profile',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubProfileTabs(page)]),
+    prepare: async (page) => {
+      await page.getByTestId('profile-language').click()
       await page.waitForSelector('[role="dialog"]')
     },
   },
@@ -1351,6 +1661,12 @@ const SCREENS = [
       await stubSettlementCandidatesError(page)
     },
     prepare: (page) => page.getByRole('alert').waitFor({ timeout: 10_000 }),
+  },
+  {
+    // 목록은 상세와 달리 카드가 여러 장 쌓이는 화면이라 폭이 좁아질 때 먼저 무너진다.
+    name: '35-explore-discover',
+    path: '/explore',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubExploreEventList(page)]),
   },
   {
     name: '25-explore-place-detail',
@@ -1930,7 +2246,7 @@ for (const screen of selectedScreens) {
     // 오면 다시 재므로, 도착 전에 찍으면 한 프레임 전 상태가 남는다. 전환이 자리 잡을 시간도 준다.
     await page.evaluate(() => document.fonts.ready)
     await page.waitForTimeout(400)
-    await page.screenshot({ path: `${OUT}/${screen.name}.png` })
+    await page.screenshot({ path: `${OUT}/${screen.name}.png`, fullPage: FULL_PAGE })
 
     console.log(`  ✓ ${screen.name}.png  ← ${screen.path}`)
   } catch (error) {
@@ -1962,7 +2278,7 @@ for (const flow of selectedFlows) {
         // 오면 다시 재므로, 도착 전에 찍으면 한 프레임 전 상태가 남는다. 전환이 자리 잡을 시간도 준다.
         await page.evaluate(() => document.fonts.ready)
         await page.waitForTimeout(400)
-        await page.screenshot({ path: `${OUT}/${name}.png` })
+        await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: FULL_PAGE })
 
         console.log(`  ✓ ${name}.png`)
       } catch (error) {

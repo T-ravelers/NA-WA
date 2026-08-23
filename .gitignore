@@ -139,6 +139,8 @@ out/
 .env.*.local
 .env.*
 !.env.example
+# 부하 테스트 설정 예시. .env.* 규칙에 걸려 함께 무시되므로 예외를 둔다.
+!.env.loadtest.example
 
 # 에이전트 개인 로컬 컨텍스트. 공유 규칙은 AGENTS.md와 CLAUDE.md로 추적한다.
 CLAUDE.local.md

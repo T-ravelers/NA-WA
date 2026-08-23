@@ -33,11 +33,11 @@ export default {
   },
   nav: {
     label: 'メインナビゲーション',
-    home: 'ホーム',
-    report: 'レポート',
-    profile: 'プロフィール',
-    wallet: 'ウォレット',
     journey: '旅程',
+    explore: '探索',
+    wallet: 'ウォレット',
+    report: 'レポート',
+    my: 'マイページ',
     comingSoon: '近日公開',
   },
   calendar: {

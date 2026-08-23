@@ -9,12 +9,19 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import ReportPersonaTicket from '../../components/presentation/ReportPersonaTicket.vue'
 import { seriesInkClass } from '../../components/presentation/seriesPalette'
 
-const { fetchReport } = vi.hoisted(() => ({ fetchReport: vi.fn() }))
+const { fetchReport, fetchReportComparison, showToast } = vi.hoisted(() => ({
+  fetchReport: vi.fn(),
+  fetchReportComparison: vi.fn(),
+  showToast: vi.fn(),
+}))
 
 vi.mock('../../api/reportApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/reportApi')>()),
   fetchReport,
+  fetchReportComparison,
 }))
+
+vi.mock('@/shared/ui/toast', () => ({ showToast }))
 
 const ReportDetailView = (await import('../ReportDetailView.vue')).default
 
@@ -64,10 +71,50 @@ const detail = {
   },
 }
 
+const emptyComparison = {
+  scope: 'GROUP' as const,
+  basis: 'LIVE' as const,
+  me: {
+    memberId: 1,
+    displayName: 'Me',
+    profileImageUrl: null,
+    totalSpent: '1284500',
+    dailyAverage: '128450',
+    categoryBreakdown: [{ category: 'FOOD', amount: '1000000', percentage: '77.85' }],
+  },
+  peers: [],
+  cohort: { size: 0, avgTotalSpent: '0', avgDailyAverage: '0', categoryBreakdown: [] },
+  ranks: [],
+}
+
+const groupComparison = {
+  ...emptyComparison,
+  peers: [
+    {
+      memberId: 2,
+      displayName: 'Mina',
+      profileImageUrl: null,
+      totalSpent: '978400',
+      dailyAverage: '97840',
+      categoryBreakdown: [{ category: 'SHOPPING', amount: '978400', percentage: '100' }],
+    },
+  ],
+  cohort: {
+    size: 1,
+    avgTotalSpent: '978400',
+    avgDailyAverage: '97840',
+    categoryBreakdown: [{ category: 'SHOPPING', amount: '978400', percentage: '100' }],
+  },
+  ranks: [
+    { category: 'FOOD', rank: 1, of: 2 },
+    { category: 'OTHER', rank: 1, of: 2 },
+  ],
+}
+
 const mountedWrappers: VueWrapper[] = []
 const queryClients: QueryClient[] = []
 
-async function mountView(path = '/reports/100') {
+async function mountView(path = '/reports/100', reuseClient?: QueryClient) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -75,8 +122,13 @@ async function mountView(path = '/reports/100') {
       { path: '/reports/:reportId', name: 'report-detail', component: ReportDetailView },
     ],
   })
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  queryClients.push(queryClient)
+  const queryClient =
+    reuseClient ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+  if (reuseClient === undefined) {
+    queryClients.push(queryClient)
+  }
+
   await router.push(path)
   await router.isReady()
 
@@ -86,18 +138,23 @@ async function mountView(path = '/reports/100') {
   mountedWrappers.push(wrapper)
   await flushPromises()
 
-  return { router, wrapper }
+  return { router, wrapper, queryClient }
 }
 
 describe('ReportDetailView', () => {
   beforeEach(() => {
     fetchReport.mockReset()
     fetchReport.mockResolvedValue(detail)
+    fetchReportComparison.mockReset()
+    fetchReportComparison.mockResolvedValue(emptyComparison)
+    showToast.mockReset()
   })
 
   afterEach(() => {
     mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
     queryClients.splice(0).forEach((client) => client.clear())
+    Reflect.deleteProperty(navigator, 'share')
+    Reflect.deleteProperty(navigator, 'clipboard')
   })
 
   it('renders the immutable snapshot and accessible dashboard analytics without excluded controls', async () => {
@@ -112,7 +169,6 @@ describe('ReportDetailView', () => {
     expect(wrapper.text()).toContain('0 P')
     expect(wrapper.find('polyline').exists()).toBe(true)
     expect(wrapper.findAll('table')).toHaveLength(0)
-    expect(wrapper.find('button[aria-label="Share"]').exists()).toBe(false)
     expect(wrapper.findAll('button').some((button) => button.text() === 'Group')).toBe(false)
     expect(wrapper.text()).not.toContain('similar travelers')
     expect(wrapper.text()).toContain('Travel spending type')
@@ -122,6 +178,7 @@ describe('ReportDetailView', () => {
       'Analysis',
       'By category',
       'Spending trend',
+      'Vs. group members',
       'Journey snapshot',
       'Saved itinerary',
     ])
@@ -298,5 +355,266 @@ describe('ReportDetailView', () => {
     fetchReport.mockRejectedValueOnce(new NormalizedApiError('REPORT-001', 404, 'missing'))
     const missing = await mountView()
     expect(missing.wrapper.text()).toContain('Report not found')
+  })
+  it('asks for the group comparison only when the snapshot has spending', async () => {
+    await mountView()
+
+    expect(fetchReportComparison).toHaveBeenCalledWith(100, 'GROUP')
+    expect(fetchReportComparison).toHaveBeenCalledTimes(1)
+  })
+
+  it('explains that there is nobody to compare with when the group is empty', async () => {
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('No group members yet')
+    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false)
+  })
+
+  it('compares total spend, category balance and ranks against group members', async () => {
+    fetchReportComparison.mockResolvedValueOnce(groupComparison)
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Total spend')
+    expect(wrapper.findAll('[role="radio"]').map((chip) => chip.text())).toEqual(['MMina'])
+    expect(wrapper.text()).toContain('978,400 P')
+    expect(wrapper.text()).toContain('Category balance')
+    // 레이더 축: 내 FOOD·OTHER + 코호트 SHOPPING — 세 축
+    // 추이 차트도 sr-only 목록을 가지므로 레이더 것만 고른다.
+    const radarList = wrapper
+      .findAll('ul.sr-only')
+      .find((list) => list.text().includes('Group avg'))
+    expect(radarList?.text()).toContain('Food: You 78%, Group avg 0%')
+    expect(radarList?.text()).toContain('Shopping: You 0%, Group avg 100%')
+    expect(wrapper.findAll('li.rounded-card').map((tile) => tile.text())).toEqual([
+      '# Food1st',
+      '# Other1st',
+    ])
+  })
+
+  it('warns that the comparison total is recalculated, but only when the basis is live', async () => {
+    fetchReportComparison.mockResolvedValueOnce(groupComparison)
+    const live = await mountView()
+
+    expect(live.wrapper.text()).toContain('We recalculate this from the payments made')
+
+    fetchReportComparison.mockReset()
+    fetchReportComparison.mockResolvedValue({ ...groupComparison, basis: 'SNAPSHOT' as const })
+    const snapshot = await mountView()
+
+    expect(snapshot.wrapper.text()).not.toContain('We recalculate this from the payments made')
+  })
+
+  it('says only the comparison failed, not the whole screen', async () => {
+    fetchReportComparison.mockReset()
+    fetchReportComparison.mockRejectedValue(new NormalizedApiError('UNKNOWN', 500, 'boom'))
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('We could not load the comparison.')
+    expect(wrapper.text()).toContain('The rest of this report is unaffected.')
+    expect(wrapper.text()).not.toContain('We could not load this screen.')
+    // 나머지 리포트는 그대로 남는다.
+    expect(wrapper.text()).toContain('Jeju Night Market')
+  })
+
+  it('skips the comparison for zero-spending reports', async () => {
+    fetchReport.mockResolvedValueOnce({
+      ...detail,
+      analytics: {
+        totalSpent: '0.0000',
+        dailyAverage: '0.0000',
+        categoryBreakdown: [],
+        dailyTrend: [{ date: '2026-07-18', amount: '0.0000' }],
+      },
+    })
+    const { wrapper } = await mountView()
+
+    expect(fetchReportComparison).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Vs. group members')
+  })
+
+  // ── 공유(#417) — 시안 R4의 헤더 아이콘·티켓 `Share ticket`·하단 `Confirm & Share` ──
+  // jsdom에는 공유 시트도 클립보드도 없다. 기기별 분기를 그대로 흉내 낸다.
+  function stubNavigator(share: unknown, clipboard: unknown): void {
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true })
+    Object.defineProperty(navigator, 'clipboard', { value: clipboard, configurable: true })
+  }
+
+  function buttonByText(wrapper: VueWrapper, text: string) {
+    const button = wrapper.findAll('button').find((candidate) => candidate.text() === text)
+
+    if (button === undefined) {
+      throw new Error(`button "${text}" not found`)
+    }
+
+    return button
+  }
+
+  // 리포트 상세는 작성자만 열 수 있으므로 링크가 아니라 문장을 보낸다.
+  it('shares the ticket and the report summary as text, not as a link', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(share, undefined)
+    const { wrapper } = await mountView()
+
+    await buttonByText(wrapper, 'Share ticket').trigger('click')
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await buttonByText(wrapper, 'Confirm & Share').trigger('click')
+    await flushPromises()
+
+    expect(share).toHaveBeenCalledTimes(3)
+    expect(share.mock.calls[0]?.[0]).toEqual({
+      title: 'My travel spending type',
+      text: '#FLAVORSEEKER\nYou followed your appetite — 78% of this journey went to food.',
+    })
+    const summary = share.mock.calls[1]?.[0] as { title: string; text: string; url?: string }
+    expect(summary.title).toBe('My travel report')
+    expect(summary.text).toContain('Jeju Island')
+    expect(summary.text).toContain('#FLAVORSEEKER')
+    expect(summary.text).toContain('1,284,500 P')
+    expect(summary.text).toContain('78% on Food')
+    expect(summary.url).toBeUndefined()
+    expect(share.mock.calls[2]?.[0]).toEqual(summary)
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
+  it('copies the text and says so when there is no share sheet', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(undefined, { writeText })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledTimes(1)
+    expect(writeText.mock.calls[0]?.[0]).toContain('#FLAVORSEEKER')
+    expect(showToast).toHaveBeenCalledWith('Report text copied.')
+  })
+
+  // 복사한 것이 티켓이면 티켓이라고 말한다. 두 자리가 같은 문구를 쓰면 무엇을 복사했는지 어긋난다.
+  it('names the ticket when the ticket text is the thing copied', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(undefined, { writeText })
+    const { wrapper } = await mountView()
+
+    await buttonByText(wrapper, 'Share ticket').trigger('click')
+    await flushPromises()
+
+    expect(writeText.mock.calls[0]?.[0]).toBe(
+      '#FLAVORSEEKER\nYou followed your appetite — 78% of this journey went to food.',
+    )
+    expect(showToast).toHaveBeenCalledWith('Ticket text copied.')
+  })
+
+  // 취소가 아닌 거절은 실패다. `web-share` 권한이 없는 iframe과 인앱 브라우저가 여기에 걸린다.
+  // 이때 폴백까지 막으면 시트도 토스트도 없이 끝나 버튼이 고장 난 것처럼 보인다.
+  it('falls back to the clipboard when the share sheet rejects for a reason other than dismissal', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError')), {
+      writeText,
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledTimes(1)
+    expect(writeText.mock.calls[0]?.[0]).toContain('#FLAVORSEEKER')
+    expect(showToast).toHaveBeenCalledWith('Report text copied.')
+  })
+
+  // 시트가 거절되고 복사까지 실패하면 그때는 안내가 있어야 한다.
+  it('tells the user when both the share sheet and the clipboard fail', async () => {
+    stubNavigator(vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError')), {
+      writeText: vi.fn().mockRejectedValue(new Error('denied')),
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    // 기기가 못 하는 것이 아니라 쓰기가 실패한 것이므로 문구가 다르다.
+    expect(showToast).toHaveBeenCalledWith('We could not copy the text. Please try again.')
+  })
+
+  it('tells the user when neither the share sheet nor the clipboard exists', async () => {
+    stubNavigator(undefined, undefined)
+    const { wrapper } = await mountView()
+
+    await buttonByText(wrapper, 'Share ticket').trigger('click')
+    await flushPromises()
+
+    expect(showToast).toHaveBeenCalledWith('Sharing is not available on this device.')
+  })
+
+  // 시트를 닫아 취소한 것은 실패가 아니다. 안내가 뜨면 취소할 때마다 오류처럼 보인다.
+  it('stays quiet when the share sheet is dismissed', async () => {
+    stubNavigator(vi.fn().mockRejectedValue(new DOMException('dismissed', 'AbortError')), undefined)
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
+  // 시트가 이미 열려 있는데 한 번 더 누른 것도 실패가 아니다. 클립보드로 떨어지면 네이티브
+  // 시트 위에 「복사했다」 토스트가 겹치고, 누르지도 않은 복사가 끝나 있다.
+  it('stays quiet when the share sheet is already open', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(vi.fn().mockRejectedValue(new DOMException('in progress', 'InvalidStateError')), {
+      writeText,
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).not.toHaveBeenCalled()
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
+  // 취소를 `instanceof`로 판정하면 안 된다 — jsdom에서 `DOMException`은 `Error`를 상속하지
+  // 않고, `navigator.share`를 JS 브리지로 얹는 인앱 브라우저는 이름만 가진 값을 던진다.
+  it('treats a cancellation as a cancellation even when it is not a DOMException', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    const dismissed = new Error('user canceled')
+    dismissed.name = 'AbortError'
+    stubNavigator(vi.fn().mockRejectedValue(dismissed), { writeText })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).not.toHaveBeenCalled()
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
+  // 칭호가 없으면 티켓도 없으니 티켓 공유도 없다. 리포트 요약은 여정과 기간만으로 보낸다.
+  it('keeps report sharing without the ticket button when there is no persona', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(share, undefined)
+    fetchReport.mockResolvedValueOnce({ ...detail, analytics: null })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Share ticket')).toBe(false)
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    const summary = share.mock.calls[0]?.[0] as { text: string }
+    expect(summary.text).toContain('Jeju Island')
+    expect(summary.text).toContain('final travel report')
+    expect(summary.text).not.toContain('#')
+  })
+
+  // 캐시가 있는 재방문에서 재요청이 실패하면 `data`는 남고 `isError`만 켜진다. 본문이 오류
+  // 화면인데 헤더에 공유 아이콘만 남으면, 화면이 못 보여 준 리포트를 공유하게 된다.
+  it('hides the header share icon when a refetch fails on a cached report', async () => {
+    const { wrapper: cached, queryClient } = await mountView()
+    expect(cached.find('button[aria-label="Share report"]').exists()).toBe(true)
+
+    fetchReport.mockRejectedValue(new Error('network'))
+    const { wrapper } = await mountView('/reports/100', queryClient)
+
+    expect(wrapper.text()).toContain('We could not load this report.')
+    expect(wrapper.find('button[aria-label="Share report"]').exists()).toBe(false)
   })
 })

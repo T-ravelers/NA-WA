@@ -23,6 +23,7 @@ describe('AppButton', () => {
     ['primary', 'bg-paper-fill'],
     ['secondary', 'border-hairline-strong'],
     ['settle', 'bg-settlement'],
+    ['on-ticket', 'bg-canvas'],
     ['destructive', 'bg-danger'],
   ] as const)('draws the %s variant from tokens', (variant, expected) => {
     expect(mountButton({ variant }).get('button').classes()).toContain(expected)

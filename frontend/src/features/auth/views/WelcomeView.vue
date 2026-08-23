@@ -3,6 +3,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import { MERCHANT_HOME_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
+import { vFitText } from '@/shared/lib/fitText'
 import BrandWordmark from '@/shared/ui/BrandWordmark.vue'
 
 const { t } = useI18n()
@@ -40,17 +41,39 @@ const router = useRouter()
         aria-hidden="true"
         class="h-welcome-ticket-height relative flex -rotate-2 items-stretch rounded-md bg-food"
       >
-        <div class="flex flex-1 flex-col gap-0.5 px-4 py-3.5">
-          <span class="font-display text-caption tracking-wide text-on-category/65 uppercase">
+        <!--
+          `min-w-0`이 없으면 이 칸이 글자 길이만큼 벌어져 옆의 스텁을 화면 밖으로 밀어낸다.
+          280px에서 절취선과 스탬프가 통째로 사라지던 원인이다.
+        -->
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5 px-4 py-3.5">
+          <!--
+            라벨도 같이 줄인다. 280에서 칸이 142px인데 이 문구는 한 줄에 143.34px가 필요해
+            1.34px 차이로 두 줄이 되고, 그러면 라벨(12px)이 줄어든 제목(11.93px)보다 커져
+            위계가 뒤집힌다. 1.3%만 줄면 한 줄로 돌아온다.
+
+            `v-fit-text-group`은 쓰지 않는다. 묶음은 같은 비율을 공유하므로 라벨이 제목의
+            비율(0.54배)을 따라가 6.5px까지 내려간다.
+          -->
+          <span
+            v-fit-text
+            class="font-display text-caption tracking-wide truncate text-on-category/65 uppercase"
+          >
             {{ t('auth.welcome.passLabel') }}
           </span>
           <!--
             시안은 ExtraBold(800)이지만 Sztos Variable의 wght 축이 700에서 끝난다.
             시안에서도 이 제목은 티켓 폭을 꽉 채우는 한 줄이다(텍스트 257px / 프레임 250px).
-            줄바꿈을 허용하면 티켓 밖으로 흘러넘치므로 한 줄로 고정한다.
+
+            줄을 꺾으면 고정 높이 티켓 밖으로 흘러넘치므로 한 줄은 그대로 지키되, 잘라내지 않고
+            글자를 줄인다(#326 결정 11).
+
+            **390에서도 줄어든다.** 실측하면 이 문구가 262px인데 칸은 252px이라, 한 줄로
+            고정해 두면 390에서도 티켓이 9px 넘쳤다(`scrollWidth 359 / clientWidth 350`).
+            노치 원이 절취선에서 떨어져 나와 있던 것이 그 결과다.
           -->
           <span
-            class="font-display text-section-header whitespace-nowrap text-on-category uppercase"
+            v-fit-text
+            class="font-display text-section-header truncate text-on-category uppercase"
           >
             {{ t('auth.welcome.passTitle') }}
           </span>

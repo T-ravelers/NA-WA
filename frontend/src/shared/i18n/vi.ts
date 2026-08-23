@@ -33,11 +33,11 @@ export default {
   },
   nav: {
     label: 'Điều hướng chính',
-    home: 'Trang chủ',
-    report: 'Báo cáo',
-    profile: 'Hồ sơ',
-    wallet: 'Ví',
     journey: 'Hành trình',
+    explore: 'Khám phá',
+    wallet: 'Ví',
+    report: 'Báo cáo',
+    my: 'Của tôi',
     comingSoon: 'Sắp ra mắt',
   },
   calendar: {

@@ -24,7 +24,7 @@ const showBottomNav = computed(
 <template>
   <div
     class="mx-auto min-h-dvh w-full max-w-shell bg-canvas text-ink"
-    :class="showBottomNav ? 'pb-24' : ''"
+    :class="showBottomNav ? 'pb-[calc(6rem+env(safe-area-inset-bottom))]' : ''"
   >
     <RouterView />
     <BottomNav v-if="showBottomNav" />
