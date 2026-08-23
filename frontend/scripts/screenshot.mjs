@@ -1183,13 +1183,29 @@ function stubJourneyListForEvent(page, { overlapping = true } = {}) {
  * `responseSchema`가 응답을 통째로 거절해 목록이 오류로 떨어진다.
  */
 function stubExploreEventList(page) {
-  const event = (itemId, eventKind, status, title, region2, startDate, endDate) => ({
+  /**
+   * 사진 갈래도 한 장은 찍어야 한다. 자리표시만 나오면 `<img>` 쪽 회귀가 스냅샷에 잡히지
+   * 않는다. 외부 주소를 부르지 않도록 1x1 PNG를 data URI로 박아 둔다.
+   */
+  const PIXEL =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+  const event = (
+    itemId,
+    eventKind,
+    status,
+    title,
+    region2,
+    startDate,
+    endDate,
+    thumbnailUrl = null,
+  ) => ({
     itemId,
     eventKind,
     status,
     title,
     subtitle: null,
-    thumbnailUrl: null,
+    thumbnailUrl,
     region1: 'Seoul',
     region2,
     region3: null,
@@ -1216,15 +1232,21 @@ function stubExploreEventList(page) {
               'Dongdaemun',
               '2026-01-01',
               '2026-12-31',
+              PIXEL,
             ),
+            /*
+             * 세 상태가 한 화면에 모두 보이도록 순서를 잡았다. 러너는 뷰포트만 찍으므로
+             * 네 번째 카드는 스냅샷에 들어오지 않는다. 종료는 표현이 가장 약한 상태라
+             * 목록 아래로 밀어 두면 확인할 방법이 사라진다.
+             */
             event(
-              302,
-              'POPUP',
-              'ONGOING',
-              'Seongsu Character Goods Pop-up',
-              'Seongsu',
-              '2026-07-20',
-              '2026-08-17',
+              304,
+              'EXHIBITION',
+              'ENDED',
+              'Hongdae Vintage Fashion Fair',
+              'Hongdae',
+              '2026-06-01',
+              '2026-06-30',
             ),
             event(
               303,
@@ -1236,13 +1258,13 @@ function stubExploreEventList(page) {
               '2026-08-23',
             ),
             event(
-              304,
-              'EXHIBITION',
+              302,
+              'POPUP',
               'ONGOING',
-              'Hongdae Vintage Fashion Fair',
-              'Hongdae',
-              '2026-07-31',
-              '2026-08-30',
+              'Seongsu Character Goods Pop-up',
+              'Seongsu',
+              '2026-07-20',
+              '2026-08-17',
             ),
           ],
           page: 0,
@@ -1525,7 +1547,7 @@ const SCREENS = [
   },
   {
     // 목록은 상세와 달리 카드가 여러 장 쌓이는 화면이라 폭이 좁아질 때 먼저 무너진다.
-    name: '31-explore-discover',
+    name: '35-explore-discover',
     path: '/explore',
     setup: (page) => Promise.all([stubMemberProfile(page), stubExploreEventList(page)]),
   },

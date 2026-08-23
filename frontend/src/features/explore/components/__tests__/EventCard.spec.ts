@@ -58,6 +58,24 @@ describe('EventCard', () => {
     expect(wrapper.emitted('open')).toEqual([[42]])
   })
 
+  /*
+   * 상태를 칩에서 점 + 색 글자로 바꿨는데 이 자리를 보는 테스트가 없었다. 색은 상태마다
+   * 다르고 종료는 캡션과 섞이지 않도록 한 단계 밝게 뒀다 — 다음 사람이 이 표를 건드리면
+   * 여기서 걸린다.
+   */
+  it.each([
+    ['ONGOING', 'Ongoing', 'text-status-ongoing', 'bg-status-ongoing'],
+    ['SCHEDULED', 'Opening soon', 'text-status-scheduled', 'bg-status-scheduled'],
+    ['ENDED', 'Ended', 'text-ink-2', 'bg-ink-2'],
+  ])('marks a %s event with its own label and colour', (status, label, textClass, dotClass) => {
+    const wrapper = mountCard({ status })
+    const line = wrapper.get(`[data-testid="event-status"]`)
+
+    expect(line.text()).toBe(label)
+    expect(line.classes()).toContain(textClass)
+    expect(line.get('span').classes()).toContain(dotClass)
+  })
+
   it('renders the period when both dates are present', () => {
     const wrapper = mountCard()
 

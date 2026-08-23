@@ -80,15 +80,17 @@ function toggleSaved(): void {
     >
       <button
         type="button"
-        class="w-24 shrink-0 p-3 text-left"
+        class="w-24 shrink-0 self-start p-3 text-left"
         :aria-label="t('explore.openPlace', { name: place.name })"
         @click="openPlace"
       >
+        <!-- EventCard와 같은 이유다. 비율을 못박지 않으면 카드마다 사진 모양이 달라지고
+             자리표시 갈래(`aspect-square`)와도 어긋난다. -->
         <img
           v-if="place.thumbnailUrl"
           :src="place.thumbnailUrl"
           :alt="place.name"
-          class="size-full rounded-sm object-cover"
+          class="aspect-square w-full rounded-sm object-cover"
           loading="lazy"
         />
         <div
