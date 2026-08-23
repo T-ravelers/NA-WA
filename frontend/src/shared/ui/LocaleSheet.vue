@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { IconCheck } from '@tabler/icons-vue'
+import { useId } from 'vue'
 
 import { LOCALE_LABEL, SUPPORTED_LOCALES, type AppLocale } from '@/shared/i18n/locales'
 
@@ -25,6 +26,9 @@ const emit = defineEmits<{
   'update:modelValue': [locale: AppLocale]
   close: []
 }>()
+
+/** 라디오 그룹의 이름을 제목과 잇는다. 한 화면에 시트가 둘 이상 뜰 수 있어 id를 생성한다. */
+const titleId = useId()
 </script>
 
 <template>
@@ -56,34 +60,50 @@ const emit = defineEmits<{
         class="mb-2 h-1 w-10 self-center rounded-pill bg-hairline-2"
       />
 
-      <h2 class="mb-1 font-display text-section-header text-ink-display uppercase">{{ title }}</h2>
-
-      <button
-        v-for="locale in SUPPORTED_LOCALES"
-        :key="locale"
-        type="button"
-        role="radio"
-        :aria-checked="locale === modelValue"
-        class="flex min-h-14 items-center gap-3 rounded-sm bg-surface-1 px-3.5 text-left"
-        @click="emit('update:modelValue', locale)"
+      <h2
+        :id="titleId"
+        class="mb-1 font-display text-section-header text-ink-display uppercase"
       >
-        <span class="flex flex-1 flex-col gap-px">
-          <span class="text-title-sm text-ink-display">{{ LOCALE_LABEL[locale].native }}</span>
-          <span class="text-caption text-ink-3">{{ LOCALE_LABEL[locale].english }}</span>
-        </span>
-        <span
-          aria-hidden="true"
-          class="flex size-6 items-center justify-center rounded-pill"
-          :class="locale === modelValue ? 'bg-paper-fill' : 'border border-hairline-2'"
+        {{ title }}
+      </h2>
+
+      <!--
+        `role="radio"`는 `radiogroup` 안에 있어야 한다. 그러지 않으면 스크린 리더가 「4개 중
+        2번째」를 읽지 못한다. 행 배경을 통일해 선택 신호가 체크 원과 `aria-checked` 둘로
+        줄었으므로 더 그렇다.
+      -->
+      <div
+        role="radiogroup"
+        :aria-labelledby="titleId"
+        class="flex flex-col gap-2"
+      >
+        <button
+          v-for="locale in SUPPORTED_LOCALES"
+          :key="locale"
+          type="button"
+          role="radio"
+          :aria-checked="locale === modelValue"
+          class="flex min-h-14 items-center gap-3 rounded-sm bg-surface-1 px-3.5 text-left"
+          @click="emit('update:modelValue', locale)"
         >
-          <IconCheck
-            v-if="locale === modelValue"
-            :size="16"
-            :stroke-width="2.5"
-            class="text-on-paper"
-          />
-        </span>
-      </button>
+          <span class="flex flex-1 flex-col gap-px">
+            <span class="text-title-sm text-ink-display">{{ LOCALE_LABEL[locale].native }}</span>
+            <span class="text-caption text-ink-3">{{ LOCALE_LABEL[locale].english }}</span>
+          </span>
+          <span
+            aria-hidden="true"
+            class="flex size-6 items-center justify-center rounded-pill"
+            :class="locale === modelValue ? 'bg-paper-fill' : 'border border-hairline-2'"
+          >
+            <IconCheck
+              v-if="locale === modelValue"
+              :size="16"
+              :stroke-width="2.5"
+              class="text-on-paper"
+            />
+          </span>
+        </button>
+      </div>
 
       <p
         v-if="hint !== undefined"

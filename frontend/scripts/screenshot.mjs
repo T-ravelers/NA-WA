@@ -1823,16 +1823,18 @@ const SCREENS = [
     },
   },
 
-  // 조작이 필요한 상태는 이렇게 찍는다.
-  //
-  // {
-  //   name: '04-sign-in-language',
-  //   path: '/sign-in',
-  //   prepare: async (page) => {
-  //     await page.getByLabel('Change screen language').click()
-  //     await page.waitForSelector('[role="dialog"]')
-  //   },
-  // },
+  {
+    /*
+     * 같은 `LocaleSheet`를 프로필(`05-profile-language`)과 로그인 두 곳이 쓴다. 로그인 쪽은
+     * 로그인 전이라 배경이 달라, 시트 조형이 바뀌면 여기서만 드러나는 회귀가 있을 수 있다.
+     */
+    name: '04-sign-in-language',
+    path: '/sign-in',
+    prepare: async (page) => {
+      await page.getByLabel('Change screen language').click()
+      await page.waitForSelector('[role="dialog"]')
+    },
+  },
 ]
 
 /** 요청서 1단계를 여정 → 약속 → 거래 순으로 좁힌 뒤 2단계로 넘어간다. */
