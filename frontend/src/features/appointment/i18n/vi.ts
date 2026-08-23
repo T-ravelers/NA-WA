@@ -31,8 +31,8 @@ export default {
       // 목록 카드는 폴더블 커버(280px)에서 금액부터 잘리므로 짧게 쓴다.
       deposit: '{amount}P',
       view: 'Xem',
-      when: 'khi nào',
-      where: 'ở đâu',
+      when: 'Thời gian',
+      where: 'Địa điểm',
       join: 'Tham gia',
       create: 'Tạo cuộc hẹn',
       emptyTitle: 'Chưa có cuộc hẹn nào',

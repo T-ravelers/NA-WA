@@ -33,8 +33,8 @@ export default {
       // 금액부터 잘리므로, 환불 안내는 상세·결제 시트에 맡기고 여기서는 짧게 쓴다.
       deposit: '{amount}P',
       view: 'View',
-      when: 'when',
-      where: 'where',
+      when: 'When',
+      where: 'Where',
       join: 'Join',
       create: 'Create appointment',
       emptyTitle: 'No appointments yet',
