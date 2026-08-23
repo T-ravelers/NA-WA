@@ -385,14 +385,15 @@ export default {
 
 ## 화면 조형 맞추기
 
-새 화면을 만들 때 이웃 파일을 베끼지 말고 아래를 그대로 씁니다. 적용 대상은 라우트를 가진
-화면 **40개**입니다. `views/`에 있어도 `StripePaymentStep.vue`처럼 라우트 없이 다른 화면이
-렌더하는 조각은 화면이 아니므로 컨테이너 규격을 주지 않습니다.
+새 화면을 만들 때 이웃 파일을 베끼지 말고 아래를 그대로 씁니다. 적용 대상은 **라우트를 가진
+화면 전부**이며, 적용할 때 다시 셉니다. `views/`에 있어도 `StripePaymentStep.vue`처럼 라우트
+없이 다른 화면이 렌더하는 조각은 화면이 아니므로 컨테이너 규격을 주지 않습니다. 화면 개수는
+기능이 병합될 때마다 바뀌므로 정본에 고정하지 않습니다.
 
 ### 최상위 컨테이너
 
 ```html
-<main class="flex w-full flex-col gap-8 px-screen pt-6 pb-8">
+<main class="flex w-full flex-1 flex-col gap-8 px-screen pt-6 pb-8">
   <ScreenHeader
     variant="root"
     :title="t('...')"
@@ -401,16 +402,22 @@ export default {
 </main>
 ```
 
-- **`min-h-dvh`를 주지 않습니다.** `app/layouts/AppShell.vue`의 래퍼가 `min-h-dvh`와 배경을
-  이미 가집니다. 자식이 또 주면 탭이 보이는 화면에서 래퍼 높이가 `100dvh + 96px`가 되어
-  내용이 짧아도 항상 96px 스크롤이 생깁니다.
+- **높이는 `AppShell` 한 곳이 소유합니다.** `app/layouts/AppShell.vue`의 래퍼가
+  `flex min-h-dvh flex-col`을 갖고, 화면은 `flex flex-1 flex-col`로 남은 높이를 채웁니다.
+  화면에 `min-h-dvh`를 다시 주면 탭이 보이는 라우트에서 래퍼 높이가 `100dvh + 96px`가 되어
+  내용이 짧아도 항상 96px 스크롤이 생깁니다. 반대로 화면 높이를 내용만큼 줄이면
+  `my-auto`·`mt-auto`에 기대는 빈 상태, 오류 상태와 하단 CTA가 위로 붙으므로 `flex-1`도
+  빼지 않습니다.
 - 가로 여백은 `px-screen`(20px)입니다. **예외는 폭을 꽉 채워야 하는 화면뿐입니다** —
   `sticky` 반투명 띠가 있거나(`EventDetailView`·`PlaceDetailView`) 전체 화면 상태로 바뀌는
   화면(`SettlementRequestView`의 `submitting`)은 컨테이너 대신 안쪽 블록마다 겁니다.
   컨테이너로 올리면 좌우 20px에 흐림이 걸리지 않은 틈이 남습니다.
-- 위쪽 여백은 **`pt-6`(24px) 한 값**입니다. 예외는 둘입니다.
+- 위쪽 여백은 **`pt-6`(24px) 한 값**입니다. 예외는 셋입니다.
   - `WelcomeView` — `pt-welcome-top`(148px). 시안 A1의 좌표 실측값이라 내리면 무너집니다.
   - `NotFoundView` — 세로 가운데 정렬이라 위 여백을 쓰지 않습니다.
+  - `EventDetailView`·`PlaceDetailView` — 최상단 `sticky top-0` 반투명 띠 위에 여백을 두지
+    않습니다. `pt-6`을 주면 띠 위 24px은 흐림이 걸리지 않아 스크롤하는 본문이 그대로
+    비칩니다.
 
   헤더가 자체 세로 여백(`py-4`)을 갖는 화면도 지금은 위 여백이 없지만, 아래 헤더 규격을
   적용하면 그 여백이 사라지므로 함께 `pt-6`으로 옵니다.
@@ -443,8 +450,12 @@ export default {
 
 ### 헤더는 `ScreenHeader`로 씁니다
 
-**화면에서 `<header>`를 직접 쓰지 않습니다.** `shared/ui/ScreenHeader.vue` 한 곳이 조형을
-가집니다. 마크업을 베껴 쓰면 지금의 5종이 그대로 다시 자랍니다.
+제목을 가진 일반 화면에서는 `<header>`를 직접 쓰지 않습니다. `shared/ui/ScreenHeader.vue`
+한 곳이 조형을 가집니다. 마크업을 베껴 쓰면 지금의 5종이 그대로 다시 자랍니다.
+
+> **아직 구현 전입니다.** `ScreenHeader.vue`는 #482·#477 뒤 적용 PR에서 만들고, 같은 PR에서
+> `shared/ui/README.md` 목록에 등록합니다. 그 전에는 없는 컴포넌트를 새 화면에서 임의로
+> 만들지 말고 프론트엔드 리드와 적용 순서를 맞춥니다.
 
 ```html
 <!-- 뒤로가기가 있는 화면 -->
@@ -488,12 +499,24 @@ export default {
   폭이 좁아지므로 같습니다.
 - 헤더를 `border-b border-hairline`으로 본문과 나누지 않습니다.
 
-**아직 `ScreenHeader`가 덮지 않는 헤더가 둘 있습니다.** 그대로 두고, 흡수 여부는 따로
-정합니다.
+**`ScreenHeader`가 덮지 않는 헤더가 둘 있습니다.** 아래 둘은 `<header>` 직접 사용 금지의
+예외로 그대로 두고, 흡수 여부는 따로 정합니다.
 
 - `SettlementFlowHeader` — 제목 아래에 단계 눈금이 붙습니다.
 - `EventDetailView`·`PlaceDetailView`의 `sticky top-0` 띠 — 제목이 없고 뒤로가기와 공유
   아이콘만 있으며, 폭을 꽉 채우는 반투명 띠입니다.
+
+### 기존 화면에 적용할 때 함께 바꿀 것
+
+- `AppShell.vue` 래퍼를 `flex min-h-dvh flex-col`로 바꾸고, 라우트를 가진 화면은
+  `min-h-dvh` 대신 `flex-1`로 높이를 채웁니다.
+- `ScreenHeader.vue`를 만들고 `shared/ui/README.md` 목록에 등록합니다.
+- `ScreenHeader`가 덮는 화면의 직접 작성한 헤더를 교체하고, 컨테이너·하단 여백은 라우트를
+  가진 화면 전부를 다시 세어 적용합니다.
+- `SettlementPageHeader` 흡수 여부를 확인하고, `max-w-[390px]`는 `max-w-shell`로 바꾸며,
+  제목의 중복 `font-bold`를 제거하고 `ReportsView` 제목에는 `uppercase`를 적용합니다.
+- `AppShell`이 이미 가진 `bg-canvas text-ink`를 화면 컨테이너에서 반복한 곳도 함께
+  걷어냅니다.
 
 ## PWA 캐시 변경하기
 
