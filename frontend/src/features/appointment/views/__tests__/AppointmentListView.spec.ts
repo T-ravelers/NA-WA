@@ -159,9 +159,10 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
   })
 
-  // 끝난 약속은 참여할 수도, 새로 할 일도 없다. 목록에 남으면 지금 갈 수 있는 약속이
-  // 그만큼 밀린다.
-  it('hides completed appointments', async () => {
+  // 끝난 약속을 빼는 것은 서버가 LIMIT 앞에서 한다(APPOINTMENT_API.md). 받은 쪽에서
+  // 다시 거르면 정렬이 activity_start_at ASC라 지난 약속이 앞에 서고, 지난 약속이 한
+  // 페이지를 채우는 항목에서는 다음 페이지에 모집 중 약속이 있어도 화면이 0건이 된다.
+  it('shows every appointment the server returned, filtering none of them out', async () => {
     fetchAppointments.mockResolvedValue({
       content: [
         { ...appointment, appointmentStatus: 'COMPLETED' as const },
@@ -176,10 +177,26 @@ describe('AppointmentListView', () => {
 
     const { wrapper } = await mountView()
 
-    expect(wrapper.text()).not.toContain('Seongsu K-Beauty Tour')
+    expect(wrapper.text()).toContain('Seongsu K-Beauty Tour')
     expect(wrapper.text()).toContain('Hongdae Night Market')
-    // 개수도 걸러낸 뒤 기준이어야 한다. 서버가 센 값을 그대로 쓰면 보이는 카드와 다르다.
-    expect(wrapper.text()).toContain('1 appointments')
+    expect(wrapper.text()).toContain('2 appointments')
+  })
+
+  // 개수는 서버가 센 값이다. 받은 페이지의 길이를 세면 size에서 멈춰, 다음 페이지가
+  // 남아 있는 항목에서 "몇 개인지"를 잃는다.
+  it('shows the count the server reported, not the length of one page', async () => {
+    fetchAppointments.mockResolvedValue({
+      content: [appointment, { ...appointment, appointmentId: 8 }],
+      page: 0,
+      size: 20,
+      totalElements: 37,
+      totalPages: 2,
+      hasNext: true,
+    })
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('37 appointments')
   })
 
   it('opens the detail when the card itself is pressed', async () => {

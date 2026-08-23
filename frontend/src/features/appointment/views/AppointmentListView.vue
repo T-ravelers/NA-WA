@@ -58,14 +58,10 @@ const filters = computed<AppointmentListFilters>(() => ({
 }))
 
 const appointmentQuery = useAppointmentListQuery(filters)
-// 끝난 약속은 목록에서 뺀다. 참여할 수도, 새로 할 일도 없는 카드가 목록을 채우면
-// 지금 갈 수 있는 약속이 그만큼 밀린다. 서버 status 필터는 값 하나만 받아
-// "완료만 빼기"를 표현하지 못하므로 받은 쪽에서 거른다.
-const appointments = computed(() =>
-  (appointmentQuery.data.value?.content ?? []).filter(
-    (appointment) => appointment.appointmentStatus !== 'COMPLETED',
-  ),
-)
+// 끝난 약속은 서버가 LIMIT 앞에서 뺀다(APPOINTMENT_API.md). 받은 쪽에서 거르면
+// 정렬이 activity_start_at ASC라 지난 약속이 앞에 서고, 지난 약속이 한 페이지를 채우는
+// 항목에서는 다음 페이지에 모집 중 약속이 있어도 화면이 0건이 된다.
+const appointments = computed(() => appointmentQuery.data.value?.content ?? [])
 // 목록은 5초마다 다시 조회한다. 그 주기마다 실패할 기회도 함께 생기므로, 이미
 // 받아 둔 목록이 있으면 지우지 않고 그대로 둔다. 오류 화면은 보여줄 카드가 아예
 // 없을 때만 띄우고, 다음 조회가 성공하면 조용히 되돌아온다.
@@ -283,7 +279,16 @@ function selectJourney(tripId: number): void {
           id="appointment-list-heading"
           class="text-title text-ink"
         >
-          {{ t('appointment.list.resultCount', { count: appointments.length }) }}
+          <!--
+            서버가 센 값이다. 받은 페이지의 길이를 세면 size(20)에서 멈춰, 약속이 50개인
+            항목도 "20 appointments"가 된다. 완료 제외가 countAppointments에도 같이
+            걸려 있어(APPOINTMENT_API.md) 이 값은 보이는 카드와 같은 기준이다.
+          -->
+          {{
+            t('appointment.list.resultCount', {
+              count: appointmentQuery.data.value?.totalElements ?? 0,
+            })
+          }}
         </h2>
       </div>
 
