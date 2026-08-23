@@ -6,9 +6,11 @@ import me.nawa.common.exception.BusinessException;
 import me.nawa.settlement.domain.SettlementSource;
 import me.nawa.settlement.dto.request.CreateSettlementRequest;
 import me.nawa.settlement.dto.response.SettlementCreateResponse;
+import me.nawa.settlement.event.SettlementRequestedEvent;
 import me.nawa.settlement.exception.SettlementErrorCode;
 import me.nawa.settlement.mapper.SettlementMapper;
 import me.nawa.settlement.service.creation.SettlementCreationHandler;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,7 @@ public class SettlementCreationAttemptService {
     private final SettlementMapper settlementMapper;
     private final List<SettlementCreationHandler> handlers;
     private final SettlementReceiptService settlementReceiptService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public SettlementCreateResponse create(
@@ -51,6 +54,9 @@ public class SettlementCreationAttemptService {
         settlementReceiptService.linkToSettlement(
             memberId, created.getId(), request.getReceiptId()
         );
+        // 여기까지 온 요청만 정산을 새로 만든 것이다. 같은 멱등키로 다시 들어와 기존 정산을
+        // 그대로 돌려주는 경로는 이 메서드에 닿지 않으므로, 재시도로 알림이 겹치지 않는다.
+        eventPublisher.publishEvent(new SettlementRequestedEvent(created.getId()));
         return created;
     }
 }

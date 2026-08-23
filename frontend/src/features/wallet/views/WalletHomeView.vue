@@ -3,6 +3,7 @@ import {
   IconAlertTriangle,
   IconArrowBackUp,
   IconArrowsExchange,
+  IconBell,
   IconLock,
   IconPlus,
   IconQrcode,
@@ -19,10 +20,12 @@ import { formatNumber } from '@/shared/lib/money'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
+import { useWalletNotificationIntegration } from '../model/notificationIntegration'
 import { activityLabelKey, toWalletHomeData, type ActivityKind } from '../model/walletHome'
 import { useWalletHome } from '../model/walletQueries'
 
@@ -32,6 +35,28 @@ const router = useRouter()
 
 const walletQuery = useWalletHome()
 const { data, isPending } = walletQuery
+
+/*
+ * 벨 배지.
+ *
+ * 개수를 숫자로만 두면 읽어 줄 이름이 없다. 배지 자체는 장식으로 감추고, 개수를 벨 버튼의
+ * 이름에 실어 "3 unread"로 읽히게 한다. 색이나 점만으로 상태를 말하지 않는다는 규칙과 같다.
+ */
+const { useUnreadNotificationCount } = useWalletNotificationIntegration()
+const unreadCountQuery = useUnreadNotificationCount()
+const unreadCount = computed(() => unreadCountQuery.data.value ?? 0)
+const unreadBadgeText = computed(() =>
+  unreadCount.value > 9 ? t('notification.unreadBadgeOverflow') : String(unreadCount.value),
+)
+const bellLabel = computed(() =>
+  unreadCount.value > 0
+    ? t('notification.unreadBadge', { count: unreadCount.value })
+    : t('notification.bell'),
+)
+
+function openNotifications(): void {
+  void router.push({ name: 'notifications' })
+}
 
 const wallet = computed(() => (data.value === undefined ? null : toWalletHomeData(data.value)))
 
@@ -117,9 +142,28 @@ const errorDescription = computed(() => {
 
 <template>
   <section class="px-screen pt-14 pb-8">
-    <h1 class="font-display text-screen-title font-bold text-ink-display uppercase">
-      {{ t('wallet.home.title') }}
-    </h1>
+    <div class="flex items-center justify-between gap-3">
+      <h1 class="min-w-0 font-display text-screen-title font-bold text-ink-display uppercase">
+        {{ t('wallet.home.title') }}
+      </h1>
+
+      <div class="relative shrink-0">
+        <IconOrb
+          :label="bellLabel"
+          variant="surface"
+          @click="openNotifications"
+        >
+          <IconBell class="size-5" />
+        </IconOrb>
+        <span
+          v-if="unreadCount > 0"
+          aria-hidden="true"
+          class="absolute -top-0.5 -right-0.5 flex min-w-5 items-center justify-center rounded-pill bg-ink px-1.5 text-caption text-canvas"
+        >
+          {{ unreadBadgeText }}
+        </span>
+      </div>
+    </div>
 
     <StateLoading
       v-if="isPending"

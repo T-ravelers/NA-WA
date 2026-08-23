@@ -1,11 +1,14 @@
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { queryClient } from '@/app/query/client'
 import { NormalizedApiError } from '@/shared/api/apiError'
+
+import { walletNotificationIntegrationKey } from '../../model/notificationIntegration'
 
 import type { WalletHome } from '../../api/walletApi'
 
@@ -27,6 +30,7 @@ function createTestRouter(): Router {
         component: { template: '<div />' },
       },
       { path: '/settlements', name: 'settlements', component: { template: '<div />' } },
+      { path: '/notifications', name: 'notifications', component: { template: '<div />' } },
     ],
   })
 }
@@ -54,12 +58,25 @@ const WALLET: WalletHome = {
   ],
 }
 
+/*
+ * 벨은 알림 feature의 개수 조회를 주입받는다. 테스트는 그 자리에 고정값을 꽂아
+ * 지갑 화면만 따로 검증한다 — 폴링이나 서버 호출은 여기 관심사가 아니다.
+ */
+const unreadCount = ref<number | undefined>(0)
+
 async function mountView(router: Router = createTestRouter()) {
   await router.push('/wallet')
   await router.isReady()
 
   return mount(WalletHomeView, {
-    global: { plugins: [i18n, [VueQueryPlugin, { queryClient }], router] },
+    global: {
+      plugins: [i18n, [VueQueryPlugin, { queryClient }], router],
+      provide: {
+        [walletNotificationIntegrationKey as symbol]: {
+          useUnreadNotificationCount: () => ({ data: unreadCount }),
+        },
+      },
+    },
   })
 }
 
@@ -75,6 +92,7 @@ beforeEach(() => {
   queryClient.clear()
   fetchWalletHome.mockReset()
   fetchWalletHome.mockResolvedValue(WALLET)
+  unreadCount.value = 0
 })
 
 afterEach(() => {
@@ -253,5 +271,38 @@ describe('WalletHomeView', () => {
     // 문구는 computed로 다시 계산되고, 숫자는 vi 로케일의 자릿수 구분(.)을 따른다.
     expect(wrapper.text()).toContain('Nạp tiền')
     expect(wrapper.text()).toContain('84.500 P')
+  })
+
+  it('안 읽은 알림이 있으면 벨에 개수를 붙이고, 없으면 배지를 감춘다', async () => {
+    unreadCount.value = 3
+    const wrapper = await mountLoaded()
+
+    // get은 없으면 던지므로 이 줄이 곧 "개수가 이름에 실렸다"는 단정이다.
+    wrapper.get('button[aria-label="3 unread"]')
+    expect(wrapper.text()).toContain('3')
+
+    unreadCount.value = 0
+    await flushPromises()
+
+    // 배지가 사라져도 벨 자체는 남는다. 알림 화면으로 가는 길이 개수에 따라 없어지면 안 된다.
+    expect(wrapper.find('button[aria-label="Notifications"]').exists()).toBe(true)
+  })
+
+  it('개수가 아홉을 넘으면 배지를 9+로 줄이되 읽히는 이름에는 실제 개수를 남긴다', async () => {
+    unreadCount.value = 12
+    const wrapper = await mountLoaded()
+
+    expect(wrapper.text()).toContain('9+')
+    expect(wrapper.find('button[aria-label="12 unread"]').exists()).toBe(true)
+  })
+
+  it('벨을 누르면 알림 화면으로 간다', async () => {
+    const router = createTestRouter()
+    const wrapper = await mountLoaded(router)
+
+    await wrapper.get('button[aria-label="Notifications"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('notifications')
   })
 })
