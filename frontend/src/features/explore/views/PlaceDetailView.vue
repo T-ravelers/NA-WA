@@ -11,13 +11,6 @@ import {
   IconShare2,
 } from '@tabler/icons-vue'
 
-import {
-  buildGoogleMapsSearchUrl,
-  buildGoogleMapsTransitRouteUrl,
-  buildNaverMapPlaceUrl,
-  buildNaverMapTransitRouteUrl,
-  openMapAppUrl,
-} from '@/shared/lib/mapLink'
 import { vFitTextGroup } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
@@ -31,6 +24,7 @@ import type { Category } from '@/shared/ui/category'
 
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
 import JourneySelectSheet from '../components/JourneySelectSheet.vue'
+import MapLinkButtons from '../components/MapLinkButtons.vue'
 import { usePlaceDetailQuery } from '../composables/usePlaceDetailQuery'
 import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMutation'
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
@@ -104,23 +98,6 @@ const addressLabel = computed(() =>
 
 const locationLabel = computed(() =>
   [regionLabel.value, addressLabel.value].filter(Boolean).join(' · '),
-)
-
-const mapSearchUrl = computed(() =>
-  buildGoogleMapsSearchUrl(place.value?.latitude, place.value?.longitude),
-)
-const mapTransitRouteUrl = computed(() =>
-  buildGoogleMapsTransitRouteUrl(place.value?.latitude, place.value?.longitude),
-)
-const naverPlaceUrl = computed(() =>
-  buildNaverMapPlaceUrl(place.value?.latitude, place.value?.longitude, place.value?.name ?? ''),
-)
-const naverRouteUrl = computed(() =>
-  buildNaverMapTransitRouteUrl(
-    place.value?.latitude,
-    place.value?.longitude,
-    place.value?.name ?? '',
-  ),
 )
 
 const hours = computed(() => (place.value ? toDetailEntries(place.value.openingHours) : []))
@@ -247,10 +224,6 @@ async function sharePlace(): Promise<void> {
   } catch {
     // The native share sheet can be dismissed without completing the action.
   }
-}
-
-function openMapUrl(url: string | null): void {
-  if (url) window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function retry(): void {
@@ -560,52 +533,11 @@ onMounted(() => {
               aria-hidden="true"
             />
           </div>
-          <div
-            v-if="mapSearchUrl"
-            v-fit-text-group
-            class="grid min-w-0 grid-cols-2 gap-2"
-          >
-            <div class="min-w-0">
-              <AppButton
-                block
-                compact
-                variant="secondary"
-                @click="openMapUrl(mapSearchUrl)"
-              >
-                {{ t('explore.placeDetail.openInGoogleMaps') }}
-              </AppButton>
-            </div>
-            <div class="min-w-0">
-              <AppButton
-                block
-                compact
-                variant="secondary"
-                @click="openMapUrl(mapTransitRouteUrl)"
-              >
-                {{ t('explore.placeDetail.directions') }}
-              </AppButton>
-            </div>
-            <div class="min-w-0">
-              <AppButton
-                block
-                compact
-                variant="secondary"
-                @click="openMapAppUrl(naverPlaceUrl)"
-              >
-                {{ t('explore.placeDetail.openInNaverMap') }}
-              </AppButton>
-            </div>
-            <div class="min-w-0">
-              <AppButton
-                block
-                compact
-                variant="secondary"
-                @click="openMapAppUrl(naverRouteUrl)"
-              >
-                {{ t('explore.placeDetail.naverDirections') }}
-              </AppButton>
-            </div>
-          </div>
+          <MapLinkButtons
+            :latitude="place.latitude"
+            :longitude="place.longitude"
+            :name="place.name"
+          />
         </section>
 
         <section
