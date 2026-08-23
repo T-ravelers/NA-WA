@@ -52,8 +52,9 @@ interface Options {
 /**
  * 약속 참여 흐름. 여정을 고르고, 보증금을 확인하고, 참여를 요청한다.
  *
- * 목록 카드의 Join과 상세 화면의 참여 버튼이 같은 흐름을 쓴다. 두 화면이 각자 들고
- * 있으면 여정 날짜 검사나 잔액 부족 안내 같은 규칙이 한쪽만 고쳐진다.
+ * 지금 쓰는 곳은 약속 목록 카드의 Join 하나다. 한때 상세 화면에도 같은 흐름이
+ * 인라인으로 있었지만 그쪽 진입점을 걷어내면서(#485) 여기로 모였다. 참여 규칙
+ * (여정 날짜 검사, 잔액 부족 안내, 재개)을 두 곳에 두면 한쪽만 고쳐진다.
  */
 export function useAppointmentJoinFlow(options: Options) {
   const route = useRoute()
@@ -106,12 +107,36 @@ export function useAppointmentJoinFlow(options: Options) {
     ])
   }
 
+  /**
+   * 참여가 끝난 뒤에 쓸 값은 **요청에 실어 보낸다.** `target`은 지금 만지고 있는 약속을
+   * 가리키는 한 칸짜리 상태라 요청이 도는 동안 덮어써진다 — 보증금 시트는 요청 중에도
+   * 닫히고(확정 버튼만 비활성이다) 그 길로 다른 카드의 Join을 열 수 있다. 그때 응답이
+   * 도착해 `target`을 다시 읽으면, 7번에 참여하고 8번 상세로 가며 8번 캐시를 무효화한다.
+   */
+  interface JoinRequest {
+    appointmentId: number
+    tripId: number
+  }
+
   const joinMutation = useMutation({
-    mutationFn: (tripId: number) => joinAppointment(target.value?.appointmentId as number, tripId),
-    onSuccess: async () => {
-      const joined = target.value
-      depositSheetOpen.value = false
-      if (joined !== null) await invalidateParticipationScopes(joined.appointmentId)
+    mutationFn: ({ appointmentId, tripId }: JoinRequest) => joinAppointment(appointmentId, tripId),
+    // 참여가 끝나면 그 약속 상세로 데려간다. 시트만 조용히 닫으면 목록에 남는데,
+    // 바뀌는 것이 카드의 인원수 한 자리뿐이라 참여가 됐는지 확신할 수 없다 —
+    // 방금 든 약속의 일정·장소·회원을 바로 보여 주는 것이 대답이 된다.
+    //
+    // `push`다. 목록에서 상세로 들어가는 이동이라 뒤로 가면 목록으로 돌아와야 한다.
+    // 재개 표시(`?tripId=`·`joinAppointmentId`)는 여정을 고를 때 이미 정리되므로,
+    // 돌아온 목록에서 시트가 혼자 다시 열리지 않는다.
+    onSuccess: async (_data, { appointmentId }) => {
+      // 내가 연 시트만 닫는다. 응답이 늦게 오는 동안 사용자가 다른 약속의 시트를 열어
+      // 두었다면 그것은 남의 시트다 — 여기서 닫으면 보고 있던 화면이 이유 없이 접힌다.
+      if (target.value?.appointmentId === appointmentId) depositSheetOpen.value = false
+
+      await invalidateParticipationScopes(appointmentId)
+      void router.push({
+        name: 'appointment-detail',
+        params: { appointmentId: String(appointmentId) },
+      })
     },
   })
 
@@ -176,8 +201,11 @@ export function useAppointmentJoinFlow(options: Options) {
   }
 
   function confirmJoin(): void {
+    const appointmentId = target.value?.appointmentId
     if (joinMutation.isPending.value || selectedTripId.value === null) return
-    joinMutation.mutate(selectedTripId.value)
+    if (appointmentId === undefined) return
+
+    joinMutation.mutate({ appointmentId, tripId: selectedTripId.value })
   }
 
   function closeTopupPrompt(): void {
