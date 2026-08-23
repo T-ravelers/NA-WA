@@ -230,7 +230,7 @@ export default {
       selectAppointment: '請選擇揪團再繼續。',
       appointmentsLoading: '正在載入您的揪團…',
       appointmentsError: '無法載入您的揪團，請再試一次。',
-      appointmentsEmpty: '您沒有進行中的揪團可連結這筆花費。',
+      appointmentsEmpty: '您今天沒有揪團可連結這筆花費。',
       noSessionTitle: '尚未掃描 QR Code',
       noSessionDescription: '掃描收款 QR Code 後，詳情會顯示在這裡。',
       cancel: '取消',

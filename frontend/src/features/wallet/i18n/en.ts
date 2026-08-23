@@ -248,7 +248,7 @@ export default {
       selectAppointment: 'Select an appointment to continue.',
       appointmentsLoading: 'Loading your appointments...',
       appointmentsError: 'We could not load your appointments. Please try again.',
-      appointmentsEmpty: 'You have no ongoing appointments to link this expense to.',
+      appointmentsEmpty: 'You have no appointments today to link this expense to.',
       noSessionTitle: 'No QR code scanned yet',
       noSessionDescription: 'Scan a payment QR code to see its details here.',
       cancel: 'Cancel',

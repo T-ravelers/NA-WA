@@ -233,7 +233,7 @@ export default {
       selectAppointment: '続けるには同行グループを選んでください。',
       appointmentsLoading: '同行グループを読み込み中',
       appointmentsError: '同行グループを読み込めませんでした。もう一度お試しください。',
-      appointmentsEmpty: 'この支出を紐づけられる進行中の同行グループがありません。',
+      appointmentsEmpty: 'この支出を紐づけられる今日の同行グループがありません。',
       noSessionTitle: 'QRコードはまだ読み取られていません',
       noSessionDescription: '決済QRコードを読み取ると、ここに詳細が表示されます。',
       cancel: 'キャンセル',

@@ -38,7 +38,7 @@ const i18n = useI18n()
 const { t, locale } = i18n
 const router = useRouter()
 const qrPaymentSession = useQrPaymentSessionStore()
-const { useMyOngoingAppointmentsQuery } = useWalletAppointmentIntegration()
+const { useMyTodayAppointmentsQuery } = useWalletAppointmentIntegration()
 
 const session = computed(() => qrPaymentSession.session)
 
@@ -74,14 +74,14 @@ function isSelectedCategory(value: SpendingCategory): boolean {
 }
 
 const isSharedExpense = computed(() => spendingScope.value === 'shared')
-const ongoingAppointmentsQuery = useMyOngoingAppointmentsQuery(isSharedExpense)
+const todayAppointmentsQuery = useMyTodayAppointmentsQuery(isSharedExpense)
 
 const spendingOptions = computed(() => [
   { value: 'personal', label: t('wallet.qrPayment.personal') },
   { value: 'shared', label: t('wallet.qrPayment.shared') },
 ])
 const selectedAppointment = computed(() =>
-  ongoingAppointmentsQuery.data.value?.find(
+  todayAppointmentsQuery.data.value?.find(
     (appointment) => appointment.appointmentId === selectedAppointmentId.value,
   ),
 )
@@ -373,26 +373,26 @@ const completePayment = (): void => {
           </p>
 
           <StateLoading
-            v-if="ongoingAppointmentsQuery.isPending.value"
+            v-if="todayAppointmentsQuery.isPending.value"
             class="mt-3"
             :lines="2"
             :label="t('wallet.qrPayment.appointmentsLoading')"
           />
           <StateError
-            v-else-if="ongoingAppointmentsQuery.isError.value"
+            v-else-if="todayAppointmentsQuery.isError.value"
             class="mt-3"
             :description="t('wallet.qrPayment.appointmentsError')"
-            @retry="ongoingAppointmentsQuery.refetch"
+            @retry="todayAppointmentsQuery.refetch"
           />
           <StateEmpty
-            v-else-if="(ongoingAppointmentsQuery.data.value ?? []).length === 0"
+            v-else-if="(todayAppointmentsQuery.data.value ?? []).length === 0"
             class="mt-3"
             :description="t('wallet.qrPayment.appointmentsEmpty')"
           />
           <template v-else>
             <div class="mt-3 space-y-2">
               <label
-                v-for="appointment in ongoingAppointmentsQuery.data.value"
+                v-for="appointment in todayAppointmentsQuery.data.value"
                 :key="appointment.appointmentId"
                 class="block cursor-pointer rounded-sm border p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
                 :class="

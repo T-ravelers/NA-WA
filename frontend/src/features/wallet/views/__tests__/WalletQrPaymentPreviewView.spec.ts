@@ -10,7 +10,7 @@ import { i18n } from '@/app/i18n'
 import { executeQrPayment, previewQrPayment } from '../../api/qrPaymentApi'
 import {
   walletAppointmentIntegrationKey,
-  type WalletOngoingAppointment,
+  type WalletTodayAppointment,
 } from '../../model/appointmentIntegration'
 import { useQrPaymentSessionStore } from '../../model/qrPaymentSession'
 import WalletQrPaymentPreviewView from '../WalletQrPaymentPreviewView.vue'
@@ -44,7 +44,7 @@ const executeResponse = {
   completedAt: '2026-08-13T12:00:00',
 }
 
-const seoulNightTour: WalletOngoingAppointment = {
+const seoulNightTour: WalletTodayAppointment = {
   appointmentId: 42,
   appointmentName: 'Seoul Night Tour',
   activityStartAt: '2026-08-10T18:00:00',
@@ -71,16 +71,16 @@ function createTestRouter(): Router {
   })
 }
 
-interface OngoingAppointmentsQueryState {
-  data: Ref<WalletOngoingAppointment[] | undefined>
+interface TodayAppointmentsQueryState {
+  data: Ref<WalletTodayAppointment[] | undefined>
   isPending: Ref<boolean>
   isError: Ref<boolean>
   refetch: () => Promise<unknown>
 }
 
-function ongoingAppointmentsQueryState(
-  appointments: WalletOngoingAppointment[] = [seoulNightTour],
-): OngoingAppointmentsQueryState {
+function todayAppointmentsQueryState(
+  appointments: WalletTodayAppointment[] = [seoulNightTour],
+): TodayAppointmentsQueryState {
   return {
     data: ref(appointments),
     isPending: ref(false),
@@ -90,18 +90,18 @@ function ongoingAppointmentsQueryState(
 }
 
 async function mountView(
-  appointmentsQuery: OngoingAppointmentsQueryState = ongoingAppointmentsQueryState(),
+  appointmentsQuery: TodayAppointmentsQueryState = todayAppointmentsQueryState(),
 ): Promise<{
   router: Router
   wrapper: ReturnType<typeof mount>
-  useMyOngoingAppointmentsQuery: ReturnType<typeof vi.fn>
+  useMyTodayAppointmentsQuery: ReturnType<typeof vi.fn>
 }> {
   const router = createTestRouter()
   setActivePinia(createPinia())
   await router.push('/wallet/qr/payment/preview')
   await router.isReady()
 
-  const useMyOngoingAppointmentsQuery = vi.fn(() => appointmentsQuery)
+  const useMyTodayAppointmentsQuery = vi.fn(() => appointmentsQuery)
 
   const wrapper = mount(WalletQrPaymentPreviewView, {
     global: {
@@ -119,13 +119,13 @@ async function mountView(
       ],
       provide: {
         [walletAppointmentIntegrationKey as symbol]: {
-          useMyOngoingAppointmentsQuery,
+          useMyTodayAppointmentsQuery,
         },
       },
     },
   })
 
-  return { router, wrapper, useMyOngoingAppointmentsQuery }
+  return { router, wrapper, useMyTodayAppointmentsQuery }
 }
 
 function setFixedAmountSession(): void {
@@ -166,11 +166,11 @@ describe('WalletQrPaymentPreviewView', () => {
     vi.mocked(executeQrPayment).mockResolvedValue(executeResponse)
   })
 
-  it('only requests my ongoing appointments while shared is selected', async () => {
-    const { wrapper, useMyOngoingAppointmentsQuery } = await mountView()
+  it('only requests my appointments today while shared is selected', async () => {
+    const { wrapper, useMyTodayAppointmentsQuery } = await mountView()
     setFixedAmountSession()
     await flushPromises()
-    const enabledArg = useMyOngoingAppointmentsQuery.mock.calls[0]?.[0]
+    const enabledArg = useMyTodayAppointmentsQuery.mock.calls[0]?.[0]
 
     expect(toValue(enabledArg)).toBe(false)
 
@@ -265,15 +265,15 @@ describe('WalletQrPaymentPreviewView', () => {
     ).toBeDefined()
   })
 
-  it('shows an empty-state message when there are no ongoing appointments to link', async () => {
-    const { wrapper } = await mountView(ongoingAppointmentsQueryState([]))
+  it('shows an empty-state message when there are no appointments today to link', async () => {
+    const { wrapper } = await mountView(todayAppointmentsQueryState([]))
     setFixedAmountSession()
     await flushPromises()
 
     await selectSharedExpense(wrapper)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('You have no ongoing appointments to link this expense to.')
+    expect(wrapper.text()).toContain('You have no appointments today to link this expense to.')
   })
 
   it('requests a shared-expense preview with the selected appointment id and enables Pay', async () => {

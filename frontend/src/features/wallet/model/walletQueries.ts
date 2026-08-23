@@ -34,6 +34,8 @@ export function useWalletHome(): UseQueryReturnType<WalletHome, Error> {
     queryKey: walletKeys.home(),
     queryFn: fetchWalletHome,
     staleTime: 30_000,
+    // 결제·충전·정산을 마치고 돌아오면 fresh 캐시가 남아 있어도 최신 잔액을 읽는다.
+    refetchOnMount: 'always',
     retry: shouldRetry,
   })
 }
