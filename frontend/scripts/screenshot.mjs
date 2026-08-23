@@ -300,6 +300,14 @@ function stubEmptyReportList(page) {
   )
 }
 
+/**
+ * 여정 커버 자리에 넣는 1x1 PNG. 러너가 외부 주소를 부르지 않게 한다.
+ * 실제 커버는 수집 항목의 썸네일이라 여기서 재현할 수 없고, 확인하려는 것은
+ * 사진 갈래와 자리표시 갈래가 같은 칸을 채우는지다.
+ */
+const COVER_PIXEL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
 function stubJourneyList(page) {
   return page.route('**/api/v1/journeys', (route) =>
     route.fulfill({
@@ -311,6 +319,8 @@ function stubJourneyList(page) {
           // 목록은 가로 스냅 캐러셀이다. ongoing이 한 장뿐이면 스냅도 다음 카드
           // 엿보기도 화면에 나타나지 않아 캡처가 조형을 증명하지 못한다. 진행 중
           // 여정을 세 장 둔다.
+          // 커버는 사진이 있는 여정과 없는 여정이 한 화면에 섞인다(썸네일 결측
+          // 이벤트 약 33%·장소 약 44%). 두 갈래를 모두 찍는다.
           {
             tripId: 42,
             title: 'Seoul Foodie Week',
@@ -318,6 +328,7 @@ function stubJourneyList(page) {
             endDate: '2098-08-12',
             eventCount: 8,
             placeCount: 4,
+            coverImageUrl: COVER_PIXEL,
           },
           {
             tripId: 43,
@@ -326,6 +337,7 @@ function stubJourneyList(page) {
             endDate: '2098-09-07',
             eventCount: 5,
             placeCount: 9,
+            coverImageUrl: null,
           },
           {
             tripId: 44,
@@ -334,6 +346,7 @@ function stubJourneyList(page) {
             endDate: '2098-10-13',
             eventCount: 0,
             placeCount: 6,
+            coverImageUrl: COVER_PIXEL,
           },
           {
             tripId: 7,
@@ -342,6 +355,7 @@ function stubJourneyList(page) {
             endDate: '2020-08-12',
             eventCount: 4,
             placeCount: 2,
+            coverImageUrl: null,
           },
         ],
       }),

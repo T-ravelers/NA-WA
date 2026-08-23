@@ -91,7 +91,41 @@
                 WHERE ti.trip_id = trips.trip_id
                   AND ti.deleted_at IS NULL
                   AND ei.item_type = 'PLACE'
-            ) AS place_count
+            ) AS place_count,
+            (
+                /*
+                 * 커버 사진.
+                 *
+                 * 여정에 담긴 항목 가운데 타임라인에서 가장 먼저 나오는 것의 썸네일이다.
+                 * 순서는 상세 타임라인(findJourneyTimelineItems)과 같은
+                 * `visit_date -> display_order -> trip_item_id`를 쓴다. 두 화면이 다른
+                 * 항목을 첫 번째라고 부르면 목록의 사진과 상세의 첫 줄이 어긋난다.
+                 *
+                 * 썸네일이 없는 항목은 건너뛴다. 첫 항목에 사진이 없다고 커버를 비우면
+                 * 뒤에 사진이 있는데도 자리표시가 나온다. 수집 데이터의 썸네일 결측이
+                 * 이벤트 약 33%·장소 약 44%라 드문 일이 아니다.
+                 */
+                SELECT COALESCE(e.thumbnail_url, p.thumbnail_url)
+                FROM trip_items ti
+                JOIN explore_items ei
+                  ON ei.item_id = ti.item_id
+                 AND ei.deleted_at IS NULL
+                LEFT JOIN event e
+                  ON e.event_id = ei.item_id
+                 AND ei.item_type = 'EVENT'
+                 AND e.deleted_at IS NULL
+                LEFT JOIN place p
+                  ON p.place_id = ei.item_id
+                 AND ei.item_type = 'PLACE'
+                 AND p.deleted_at IS NULL
+                WHERE ti.trip_id = trips.trip_id
+                  AND ti.deleted_at IS NULL
+                  AND COALESCE(e.thumbnail_url, p.thumbnail_url) IS NOT NULL
+                ORDER BY ti.visit_date ASC,
+                         ti.display_order ASC,
+                         ti.trip_item_id ASC
+                LIMIT 1
+            ) AS cover_image_url
         FROM trips
         WHERE member_id = #{memberId}
           AND deleted_at IS NULL

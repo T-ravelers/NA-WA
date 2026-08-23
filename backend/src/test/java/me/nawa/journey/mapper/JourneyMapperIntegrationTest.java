@@ -363,6 +363,92 @@ class JourneyMapperIntegrationTest {
         }
     }
 
+    /*
+     * 커버 사진 선택 규칙을 실제 DB로 확인한다.
+     *
+     * 순서는 상세 타임라인과 같은 `visit_date -> display_order -> trip_item_id`여야 하고,
+     * 썸네일이 없는 항목은 건너뛰어야 한다. 둘 중 하나만 어긋나도 목록의 사진이 상세의
+     * 첫 줄과 달라지거나, 뒤에 사진이 있는데도 자리표시가 나온다.
+     */
+    @Test
+    void findJourneysByMemberId_picksCoverFromFirstTimelineItemWithThumbnail() {
+        String marker = "journey-cover-" + UUID.randomUUID();
+        long memberId = insertMember(marker);
+        List<Long> tripIds = new ArrayList<>();
+        List<Long> eventItemIds = new ArrayList<>();
+        List<Long> placeItemIds = new ArrayList<>();
+        LocalDate firstDay = LocalDate.of(2026, 8, 8);
+        LocalDate secondDay = LocalDate.of(2026, 8, 9);
+
+        try {
+            // 방문일이 앞선 항목이 이긴다. 담은 순서(trip_item_id)가 뒤여도 마찬가지다.
+            long byDateTripId = insertTrip(memberId, marker + "-by-date");
+            tripIds.add(byDateTripId);
+            long laterDayItem = insertExploreItem(memberId, "EVENT");
+            long earlierDayItem = insertExploreItem(memberId, "EVENT");
+            eventItemIds.add(laterDayItem);
+            eventItemIds.add(earlierDayItem);
+            insertEventWithThumbnail(laterDayItem, marker, "https://cdn.test/later.jpg");
+            insertEventWithThumbnail(earlierDayItem, marker, "https://cdn.test/earlier.jpg");
+            insertTripItem(byDateTripId, laterDayItem, secondDay, 0);
+            insertTripItem(byDateTripId, earlierDayItem, firstDay, 0);
+
+            // 같은 날이면 display_order가 작은 쪽이 이긴다.
+            long byOrderTripId = insertTrip(memberId, marker + "-by-order");
+            tripIds.add(byOrderTripId);
+            long secondSlotItem = insertExploreItem(memberId, "PLACE");
+            long firstSlotItem = insertExploreItem(memberId, "PLACE");
+            placeItemIds.add(secondSlotItem);
+            placeItemIds.add(firstSlotItem);
+            insertPlaceWithThumbnail(secondSlotItem, marker, "https://cdn.test/second.jpg");
+            insertPlaceWithThumbnail(firstSlotItem, marker, "https://cdn.test/first.jpg");
+            insertTripItem(byOrderTripId, secondSlotItem, firstDay, 1);
+            insertTripItem(byOrderTripId, firstSlotItem, firstDay, 0);
+
+            // 맨 앞 항목에 썸네일이 없으면 건너뛰고 다음 것을 쓴다.
+            long skipTripId = insertTrip(memberId, marker + "-skip");
+            tripIds.add(skipTripId);
+            long noThumbnailItem = insertExploreItem(memberId, "EVENT");
+            long withThumbnailItem = insertExploreItem(memberId, "PLACE");
+            eventItemIds.add(noThumbnailItem);
+            placeItemIds.add(withThumbnailItem);
+            insertEvent(noThumbnailItem, marker);
+            insertPlaceWithThumbnail(withThumbnailItem, marker, "https://cdn.test/third.jpg");
+            insertTripItem(skipTripId, noThumbnailItem, firstDay, 0);
+            insertTripItem(skipTripId, withThumbnailItem, firstDay, 1);
+
+            // 모두 썸네일이 없으면 null이다. 빈 문자열이 아니다.
+            long noneTripId = insertTrip(memberId, marker + "-none");
+            tripIds.add(noneTripId);
+            long plainItem = insertExploreItem(memberId, "EVENT");
+            eventItemIds.add(plainItem);
+            insertEvent(plainItem, marker);
+            insertTripItem(noneTripId, plainItem, firstDay, 0);
+
+            // 담긴 항목이 아예 없는 여정도 null이다.
+            long emptyTripId = insertTrip(memberId, marker + "-empty");
+            tripIds.add(emptyTripId);
+
+            List<Journey> journeys = mapper.findJourneysByMemberId(memberId);
+
+            assertEquals("https://cdn.test/earlier.jpg", coverOf(journeys, byDateTripId));
+            assertEquals("https://cdn.test/first.jpg", coverOf(journeys, byOrderTripId));
+            assertEquals("https://cdn.test/third.jpg", coverOf(journeys, skipTripId));
+            assertNull(coverOf(journeys, noneTripId));
+            assertNull(coverOf(journeys, emptyTripId));
+        } finally {
+            deleteCountFixture(memberId, tripIds, eventItemIds, placeItemIds);
+        }
+    }
+
+    private static String coverOf(List<Journey> journeys, long tripId) {
+        return journeys.stream()
+            .filter(candidate -> candidate.getTripId() == tripId)
+            .findFirst()
+            .orElseThrow()
+            .getCoverImageUrl();
+    }
+
     private static void assertJourneyCounts(
         List<Journey> journeys,
         long tripId,
@@ -850,6 +936,59 @@ class JourneyMapperIntegrationTest {
             itemId,
             marker
         );
+    }
+
+    private static void insertEventWithThumbnail(
+        long itemId,
+        String marker,
+        String thumbnailUrl
+    ) {
+        jdbcTemplate.update(
+            "INSERT INTO event "
+                + "(event_id, title, start_date, end_date, thumbnail_url) "
+                + "VALUES (?, ?, '2026-08-01', '2026-08-02', ?)",
+            itemId,
+            marker,
+            thumbnailUrl
+        );
+    }
+
+    private static void insertPlaceWithThumbnail(
+        long itemId,
+        String marker,
+        String thumbnailUrl
+    ) {
+        jdbcTemplate.update(
+            "INSERT INTO place (place_id, name, thumbnail_url) VALUES (?, ?, ?)",
+            itemId,
+            marker,
+            thumbnailUrl
+        );
+    }
+
+    /** 커버 선택은 방문일과 표시 순서에 달려 있어, 그 둘을 지정할 수 있어야 한다. */
+    private static long insertTripItem(
+        long tripId,
+        long itemId,
+        LocalDate visitDate,
+        int displayOrder
+    ) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO trip_items "
+                    + "(trip_id, item_id, appointment_id, visit_date, "
+                    + "trip_item_status, display_order, note, confirmed_at) "
+                    + "VALUES (?, ?, NULL, ?, 'ADDED', ?, NULL, NULL)",
+                Statement.RETURN_GENERATED_KEYS
+            );
+            statement.setLong(1, tripId);
+            statement.setLong(2, itemId);
+            statement.setObject(3, visitDate);
+            statement.setInt(4, displayOrder);
+            return statement;
+        }, keyHolder);
+        return keyHolder.getKey().longValue();
     }
 
     private static long insertTripItem(

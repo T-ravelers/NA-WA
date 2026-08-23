@@ -458,6 +458,7 @@ public class JourneyService {
                 .endDate(journey.getEndDate())
                 .eventCount(journey.getEventCount())
                 .placeCount(journey.getPlaceCount())
+                .coverImageUrl(journey.getCoverImageUrl())
                 .build())
             .toList();
     }

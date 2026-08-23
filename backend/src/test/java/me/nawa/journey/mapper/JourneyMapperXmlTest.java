@@ -103,6 +103,13 @@ class JourneyMapperXmlTest {
         assertTrue(journeysSql.contains("e.deleted_at IS NULL"));
         assertTrue(journeysSql.contains("p.deleted_at IS NULL"));
 
+        // 커버 사진은 타임라인과 같은 순서로 첫 항목을 고르고, 썸네일이 없는 항목은 건너뛴다.
+        assertTrue(journeysSql.contains("AS cover_image_url"));
+        assertTrue(journeysSql.contains("COALESCE(e.thumbnail_url, p.thumbnail_url)"));
+        assertTrue(journeysSql.contains(
+            "ORDER BY ti.visit_date ASC, ti.display_order ASC, ti.trip_item_id ASC LIMIT 1"
+        ));
+
         MappedStatement timelineStatement = configuration.getMappedStatement(
             namespace + "findTimelineItemsByTripId"
         );

@@ -40,8 +40,14 @@ const itemCounts = computed(() => {
   <li>
     <!--
       시안 J1의 여정 카드는 상단 커버 154px + 하단 종이 스텁으로 나뉜 티켓이다.
-      시안의 커버 사진·인원수·소비영역 칩·`View report`는 목록 API에 받쳐 줄 값이 없어
-      넣지 않고, 커버 자리만 `ImagePlaceholder`로 채운다.
+
+      커버는 목록 응답의 `coverImageUrl`을 쓴다(#424). 타임라인에서 가장 먼저 나오는,
+      썸네일이 있는 항목의 사진이다. 담긴 항목이 없거나 모두 썸네일이 없으면 `null`로
+      오고 그때만 `ImagePlaceholder`로 채운다 — 수집 데이터의 썸네일 결측이 이벤트 약
+      33%·장소 약 44%라 자리표시가 예외가 아니라 흔한 상태다.
+
+      시안의 인원수·소비영역 칩·`View report`는 아직 목록 API에 받쳐 줄 값이 없어 넣지
+      않는다.
 
       항목 수는 시안이 `12 events`로 통칭했지만 API가 EVENT와 PLACE를 따로 주므로
       분리해서 적는다. 0인 쪽은 숨긴다 — 장소만 담은 여정에 `0 events`가 붙으면
@@ -55,7 +61,18 @@ const itemCounts = computed(() => {
       tone="paper"
     >
       <template #body>
-        <ImagePlaceholder />
+        <!--
+          `size-full`로 칸을 채운다. 커버 칸은 `body-size`가 154px로 고정돼 있어 사진
+          비율이 카드마다 달라질 일이 없다.
+        -->
+        <img
+          v-if="journey.coverImageUrl !== null"
+          :src="journey.coverImageUrl"
+          alt=""
+          class="size-full object-cover"
+          loading="lazy"
+        />
+        <ImagePlaceholder v-else />
 
         <div class="absolute top-3 left-3">
           <AppBadge

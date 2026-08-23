@@ -1039,6 +1039,7 @@ class JourneyServiceTest {
                 .endDate(LocalDate.of(2026, 4, 1))
                 .eventCount(3L)
                 .placeCount(5L)
+                .coverImageUrl("https://cdn.example.com/events/301.jpg")
                 .build()
         ));
 
@@ -1050,6 +1051,34 @@ class JourneyServiceTest {
         assertEquals(LocalDate.of(2026, 3, 28), result.get(0).getStartDate());
         assertEquals(3L, result.get(0).getEventCount());
         assertEquals(5L, result.get(0).getPlaceCount());
+        assertEquals(
+            "https://cdn.example.com/events/301.jpg",
+            result.get(0).getCoverImageUrl()
+        );
+    }
+
+    /*
+     * 담긴 항목이 없거나 모두 썸네일이 없는 여정이 있다. 수집 데이터의 썸네일 결측이
+     * 이벤트 약 33%·장소 약 44%라 드문 경우가 아니다. 화면이 자리표시로 갈아탈 수 있도록
+     * 빈 문자열이 아니라 null로 내려간다.
+     */
+    @Test
+    void getJourneys_leavesCoverImageNull_whenNoItemHasThumbnail() {
+        when(journeyMapper.findJourneysByMemberId(1L)).thenReturn(List.of(
+            Journey.builder()
+                .tripId(21L)
+                .memberId(1L)
+                .title("Jeju Island")
+                .startDate(LocalDate.of(2026, 7, 18))
+                .endDate(LocalDate.of(2026, 7, 27))
+                .eventCount(0L)
+                .placeCount(0L)
+                .build()
+        ));
+
+        List<JourneySummaryResponse> result = journeyService.getJourneys(1L);
+
+        assertNull(result.get(0).getCoverImageUrl());
     }
 
     @Test
