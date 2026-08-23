@@ -24,7 +24,7 @@ export default {
       searchLabel: '同行グループを検索',
       searchPlaceholder: '同行グループを検索',
       languageLabel: '同行グループの言語',
-      resultCount: '{count}件の同行グループ',
+      resultCount: '{count}件の同行グループ | {count}件の同行グループ',
       memberCount: '{current}/{max}',
       scheduleUnavailable: '日時未定',
       placePending: '集合場所は未確定',

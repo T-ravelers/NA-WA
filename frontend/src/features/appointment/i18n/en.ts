@@ -25,7 +25,7 @@ export default {
       searchLabel: 'Search appointments',
       searchPlaceholder: 'Search appointments',
       languageLabel: 'Appointment language',
-      resultCount: '{count} appointments',
+      resultCount: '{count} appointment | {count} appointments',
       memberCount: '{current}/{max}',
       scheduleUnavailable: 'Schedule unavailable',
       placePending: 'Meeting place to be confirmed',
