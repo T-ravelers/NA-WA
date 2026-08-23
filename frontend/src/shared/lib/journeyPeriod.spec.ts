@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { intersectItemJourneyPeriod } from '../journeyPeriod'
+import { intersectItemJourneyPeriod } from './journeyPeriod'
 
 const AUGUST = { startDate: '2026-08-10', endDate: '2026-08-20' }
 

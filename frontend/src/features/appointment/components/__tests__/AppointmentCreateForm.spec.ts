@@ -8,14 +8,20 @@ import { appointmentExploreIntegrationKey } from '../../model/exploreIntegration
 import AppointmentCreateForm from '../AppointmentCreateForm.vue'
 
 /**
- * 항목 위치 조회는 explore feature가 제공한다. 폼은 연동으로만 받는다.
+ * 항목 상세 조회는 explore feature가 제공한다. 폼은 연동으로만 받고, 그중 위치만 쓴다
+ * (운영 기간은 날짜 선택 달력을 좁히는 화면 쪽에서 쓴다).
  *
  * 마운트마다 새 ref를 세워 테스트끼리 상태를 나눠 갖지 않게 한다 — 공유 ref를
  * 바꿨다 되돌리면 되돌린 값이 원본과 어긋나 뒤 테스트가 엉뚱한 이유로 깨진다.
  */
 function locationMountOptions(
   state: {
-    data?: { placeName: string | null; addressRoad: string | null }
+    data?: {
+      placeName: string | null
+      addressRoad: string | null
+      startDate: string | null
+      endDate: string | null
+    }
     isLoading?: boolean
     isError?: boolean
   } = {},
@@ -25,7 +31,7 @@ function locationMountOptions(
       plugins: [i18n],
       provide: {
         [appointmentExploreIntegrationKey as symbol]: {
-          useItemLocation: () => ({
+          useItemDetail: () => ({
             data: ref(state.data),
             isLoading: ref(state.isLoading ?? false),
             isError: ref(state.isError ?? false),
@@ -37,7 +43,12 @@ function locationMountOptions(
 }
 
 const mountOptions = locationMountOptions({
-  data: { placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' },
+  data: {
+    placeName: 'DDP Design Plaza',
+    addressRoad: '281 Eulji-ro, Jung-gu',
+    startDate: null,
+    endDate: null,
+  },
 })
 
 function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {

@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
 import { vFitText } from '@/shared/lib/fitText'
+import { intersectItemJourneyPeriod } from '@/shared/lib/journeyPeriod'
 import AppButton from '@/shared/ui/AppButton.vue'
 import InsufficientBalanceDialog from '@/shared/ui/InsufficientBalanceDialog.vue'
 
@@ -19,6 +20,7 @@ import AppointmentJourneyDateSheet from '../components/AppointmentJourneyDateShe
 import AppointmentJourneySelectSheet from '../components/AppointmentJourneySelectSheet.vue'
 import type { AppointmentFormSnapshot } from '../model/appointmentForm'
 import { appointmentKeys } from '../model/appointmentKeys'
+import { useAppointmentItemDetail } from '../model/exploreIntegration'
 import { useAppointmentJourneyIntegration } from '../model/journeyIntegration'
 
 const route = useRoute()
@@ -134,6 +136,9 @@ const selectedVisitDate = ref<string | null>(null)
 const exitConfirmOpen = ref(false)
 const dateCheckPending = ref(false)
 const dateCheckError = ref<string | undefined>(undefined)
+// 고른 여정이 이 항목을 담을 수 없을 때. 목록을 대신하지 않고 위에 붙어서, 다른
+// 여정을 바로 고를 수 있게 한다.
+const journeySelectionError = ref<string | null>(null)
 
 const journeyIntegration = useAppointmentJourneyIntegration()
 const journeyListQuery = journeyIntegration.useJourneyListQuery(true)
@@ -146,6 +151,47 @@ const selectedJourney = computed(
 const journeySelectErrorMessage = computed(() =>
   journeyListQuery.isError.value ? t('appointment.journeySelect.error') : null,
 )
+
+// 항목 운영 기간을 읽어 달력을 좁힌다. 폼이 만남 장소를 채울 때 쓰는 것과 같은
+// 조회라 한 번만 나간다(같은 queryKey).
+const itemDetailQuery = useAppointmentItemDetail(
+  computed(() => itemId.value ?? null),
+  computed(() => itemType.value ?? null),
+)
+
+/**
+ * 항목 운영 기간 ∩ 여정 기간. 겹치는 날이 하루도 없으면 `null`.
+ *
+ * 서버는 두 기간을 각각 `JOURNEY-012`·`JOURNEY-007`로 따로 보므로, 달력이 여정
+ * 기간만 열어 주면 사용자는 폼을 다 채우고 제출한 뒤에야 실패를 알게 된다.
+ *
+ * 항목 정보를 아직 읽지 못했으면 양쪽이 `null`이라 여정 기간이 그대로 나온다. 이때
+ * 잘못 고른 날짜는 서버가 `JOURNEY-012`로 막는다 — 달력이 앞서 나가 조용히 열어 주는
+ * 것보다, 읽는 중인 짧은 순간에 예전과 같이 동작하는 편이 낫다.
+ */
+const selectableDateRange = computed(() => {
+  const journey = selectedJourney.value
+  if (journey === null) return null
+
+  return intersectItemJourneyPeriod(
+    {
+      startDate: itemDetailQuery.data.value?.startDate ?? null,
+      endDate: itemDetailQuery.data.value?.endDate ?? null,
+    },
+    { startDate: journey.startDate, endDate: journey.endDate },
+  )
+})
+
+// 겹치는 날이 없으면 달력에 고를 날이 하나도 없다. 이유 없이 빈 달력을 보여 주지 않고
+// 여정 목록에 그대로 두어 다른 여정을 고르게 한다.
+const dateSheetErrorMessage = computed(
+  () =>
+    dateCheckError.value ?? (selectableDateRange.value === null ? outsideItemPeriod() : undefined),
+)
+
+function outsideItemPeriod(): string {
+  return t('appointment.journeySelect.outsideItemPeriod')
+}
 
 // 여정 생성 화면에서 이 화면으로 돌아온 경우(?tripId=…), 새로 만든 여정이 목록에
 // 보이는 즉시 그 여정을 선택한 채로 날짜 선택 시트로 바로 이어간다.
@@ -167,6 +213,17 @@ watch(
 function selectJourney(tripId: number): void {
   selectedTripId.value = tripId
   dateCheckError.value = undefined
+  journeySelectionError.value = null
+
+  // 항목 기간과 겹치는 날이 하루도 없는 여정이다. 날짜 시트로 보내 봐야 고를 날이
+  // 없으니 목록에 그대로 두고 이유만 알린다. 항목 정보를 아직 읽지 못했으면 기간을
+  // 모르는 것이라 막지 않는다 — 서버가 최종적으로 막는다.
+  if (itemDetailQuery.data.value !== undefined && selectableDateRange.value === null) {
+    selectedTripId.value = null
+    journeySelectionError.value = outsideItemPeriod()
+    return
+  }
+
   phase.value = 'journeyDate'
 }
 
@@ -432,6 +489,7 @@ function confirmExit(): void {
       :selected-journey-id="selectedTripId"
       :loading="journeyListQuery.isPending.value"
       :error-message="journeySelectErrorMessage"
+      :selection-error="journeySelectionError"
       @close="leaveFlow"
       @select="selectJourney"
       @create-journey="goToCreateJourney"
@@ -440,11 +498,11 @@ function confirmExit(): void {
     <AppointmentJourneyDateSheet
       v-if="phase === 'journeyDate' && selectedJourney"
       :journey-title="selectedJourney.title"
-      :start-date="selectedJourney.startDate"
-      :end-date="selectedJourney.endDate"
+      :start-date="selectableDateRange?.start ?? selectedJourney.startDate"
+      :end-date="selectableDateRange?.end ?? selectedJourney.endDate"
       :initial-date="selectedVisitDate"
       :loading="dateCheckPending"
-      :error-message="dateCheckError"
+      :error-message="dateSheetErrorMessage"
       @close="closeJourneyDate"
       @confirm="confirmDate"
     />
@@ -452,11 +510,11 @@ function confirmExit(): void {
     <AppointmentJourneyDateSheet
       v-if="dateConflictRetryOpen && selectedJourney"
       :journey-title="selectedJourney.title"
-      :start-date="selectedJourney.startDate"
-      :end-date="selectedJourney.endDate"
+      :start-date="selectableDateRange?.start ?? selectedJourney.startDate"
+      :end-date="selectableDateRange?.end ?? selectedJourney.endDate"
       :initial-date="selectedVisitDate"
       :loading="dateCheckPending"
-      :error-message="dateCheckError"
+      :error-message="dateSheetErrorMessage"
       @close="closeDateConflictRetry"
       @confirm="retryDate"
     />

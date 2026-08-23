@@ -129,6 +129,12 @@ export default {
       emptyForJoin: 'Create a journey before joining this appointment.',
       createJourney: 'Create a journey',
       dateOutOfRange: 'This journey does not cover the appointment date. Choose another one.',
+      /*
+       * 고른 여정과 이벤트 개최 기간이 하루도 겹치지 않을 때. 여정 기간이 아니라
+       * **이벤트 기간**을 가리킨다고 못박는다 — 바로 위 dateOutOfRange가 여정 기간을
+       * 말하고 있어, 뭉뚱그리면 둘을 구별할 수 없다. Place는 운영 기간이 없어 뜨지 않는다.
+       */
+      outsideItemPeriod: 'This journey has no day within this event’s dates. Choose another one.',
     },
     journeyDate: {
       close: 'Close date picker',

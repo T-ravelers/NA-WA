@@ -68,7 +68,13 @@ function createTestRouter() {
   })
 }
 
-function globalOptions(router: ReturnType<typeof createTestRouter>) {
+function globalOptions(
+  router: ReturnType<typeof createTestRouter>,
+  itemPeriod: { startDate: string | null; endDate: string | null } = {
+    startDate: null,
+    endDate: null,
+  },
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   // 튜플로 못박는다. 인라인이 아니면 [플러그인, 옵션]이 그냥 배열로 추론돼 어긋난다.
   const vueQuery: [typeof VueQueryPlugin, { queryClient: QueryClient }] = [
@@ -87,8 +93,12 @@ function globalOptions(router: ReturnType<typeof createTestRouter>) {
         checkAppointmentSlotTaken,
       },
       [appointmentExploreIntegrationKey as symbol]: {
-        useItemLocation: () => ({
-          data: ref({ placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' }),
+        useItemDetail: () => ({
+          data: ref({
+            placeName: 'DDP Design Plaza',
+            addressRoad: '281 Eulji-ro, Jung-gu',
+            ...itemPeriod,
+          }),
           isLoading: ref(false),
           isError: ref(false),
         }),
@@ -97,12 +107,17 @@ function globalOptions(router: ReturnType<typeof createTestRouter>) {
   }
 }
 
-async function mountView(query = '?itemId=42&itemType=EVENT') {
+async function mountView(
+  query = '?itemId=42&itemType=EVENT',
+  itemPeriod?: { startDate: string | null; endDate: string | null },
+) {
   const router = createTestRouter()
   await router.push(`/appointments/new${query}`)
   await router.isReady()
 
-  const wrapper = mount(AppointmentCreateView, { global: globalOptions(router) })
+  const wrapper = mount(AppointmentCreateView, {
+    global: globalOptions(router, itemPeriod),
+  })
   await flushPromises()
   return { wrapper, router }
 }
@@ -169,6 +184,41 @@ describe('AppointmentCreateView', () => {
 
     expect(checkAppointmentSlotTaken).toHaveBeenCalledWith(7, 42, expect.any(String))
     expect(wrapper.text()).toContain('Start with your appointment details')
+  })
+
+  // 서버가 JOURNEY-012로 막는 날짜다. 달력이 여정 기간만 보고 열어 주면 사용자는
+  // 폼을 다 채우고 제출한 뒤에야 실패를 알게 된다.
+  it('closes dates that fall outside the event’s run dates', async () => {
+    const { wrapper } = await mountView('?itemId=42&itemType=EVENT', {
+      startDate: '2026-08-01',
+      endDate: '2026-08-25',
+    })
+
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    await flushPromises()
+
+    // 8/31은 여정 기간(8/1~8/31) 안이지만 이벤트 기간(8/1~8/25) 밖이다.
+    expect(
+      wrapper.get('button[aria-label="Select August 31, 2026"]').attributes('disabled'),
+    ).toBeDefined()
+  })
+
+  // 겹치는 날이 하루도 없으면 날짜 시트로 보내 봐야 고를 날이 없다. 목록에 그대로
+  // 두고 이유만 알려, 다른 여정을 바로 고를 수 있게 한다.
+  it('keeps the journey list open when no day overlaps the event’s run dates', async () => {
+    const { wrapper } = await mountView('?itemId=42&itemType=EVENT', {
+      startDate: '2026-09-10',
+      endDate: '2026-09-20',
+    })
+
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(
+      'This journey has no day within this event’s dates. Choose another one.',
+    )
+    expect(wrapper.text()).toContain('Choose a journey')
+    expect(wrapper.text()).not.toContain('Which day?')
   })
 
   it('shows an error and keeps the date sheet open when another appointment holds the date', async () => {
@@ -248,7 +298,7 @@ describe('AppointmentCreateView', () => {
             checkAppointmentSlotTaken,
           },
           [appointmentExploreIntegrationKey as symbol]: {
-            useItemLocation: () => ({
+            useItemDetail: () => ({
               data: ref(undefined),
               isLoading: ref(false),
               isError: ref(false),
@@ -307,8 +357,14 @@ describe('AppointmentCreateView', () => {
               checkAppointmentSlotTaken,
             },
             [appointmentExploreIntegrationKey as symbol]: {
-              useItemLocation: () => ({
-                data: ref({ placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' }),
+              useItemDetail: () => ({
+                data: ref({
+                  placeName: 'DDP Design Plaza',
+                  addressRoad: '281 Eulji-ro, Jung-gu',
+                  // 기간을 두지 않은 항목이다. 달력은 여정 기간 그대로 열린다.
+                  startDate: null,
+                  endDate: null,
+                }),
                 isLoading: ref(false),
                 isError: ref(false),
               }),

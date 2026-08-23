@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 
-import { intersectItemJourneyPeriod } from '../model/journeyPeriod'
+import { intersectItemJourneyPeriod } from '@/shared/lib/journeyPeriod'
 import type { ExploreJourneySummary } from '../model/journeyIntegration'
 
 interface Props {

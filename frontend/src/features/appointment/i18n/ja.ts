@@ -126,6 +126,8 @@ export default {
       emptyForJoin: 'この同行グループに参加する前に、旅程を作成してください。',
       createJourney: '旅程を作成',
       dateOutOfRange: 'この旅程は同行グループの日付を含んでいません。別の旅程を選んでください。',
+      outsideItemPeriod:
+        'この旅程にはこのイベントの開催期間に入る日がありません。別の旅程を選んでください。',
     },
     journeyDate: {
       close: '日付の選択を閉じる',

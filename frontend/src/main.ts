@@ -25,7 +25,7 @@ import { parseJourneyRouteQuery } from '@/features/journey/model/journeyRouteQue
 import { memberAppointmentIntegrationKey } from '@/features/member/model/appointmentIntegration'
 import { memberExploreIntegrationKey } from '@/features/member/model/exploreIntegration'
 import { useMemberAppointmentProfile } from '@/features/member/model/memberQueries'
-import { useExploreItemLocationQuery } from '@/features/explore/model/appointmentIntegration'
+import { useExploreItemDetailQuery } from '@/features/explore/model/appointmentIntegration'
 import { useSavedExploreItemsQuery } from '@/features/explore/model/memberIntegration'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
 import { useUnreadNotificationCount } from '@/features/notification/model/notificationQueries'
@@ -93,7 +93,7 @@ app.provide(notificationSettlementIntegrationKey, {
     void queryClient.invalidateQueries({ queryKey: settlementKeys.all })
   },
 })
-app.provide(appointmentExploreIntegrationKey, { useItemLocation: useExploreItemLocationQuery })
+app.provide(appointmentExploreIntegrationKey, { useItemDetail: useExploreItemDetailQuery })
 app.provide(memberExploreIntegrationKey, { useSavedItems: useSavedExploreItemsQuery })
 app.provide(memberAppointmentIntegrationKey, {
   // 프로필의 약속 탭은 지난 약속까지 본다. 지갑 QR 결제가 쓰는 기본 범위와 다르다.
