@@ -103,13 +103,17 @@ useOverlayDismiss(dialog, () => emit('close'))
       <div class="mt-5 flex flex-col gap-2">
         <AppButton
           block
-          variant="secondary"
+          variant="secondary-on-paper"
           @click="emit('close')"
         >
           {{ t('appointment.attendance.confirmSheet.cancel') }}
         </AppButton>
+        <!-- 출석 확정은 보증금을 출석자에게 분배하는 확정이라, 돈이 오가는 확정에
+             써 온 노랑을 쓴다. primary(paper-fill)는 이 시트의 밝은 바탕과 대비가
+             1.02라 버튼이 배경에 묻힌다. -->
         <AppButton
           block
+          variant="settle"
           :loading="confirmDisabled"
           :disabled="confirmDisabled"
           @click="emit('confirm')"

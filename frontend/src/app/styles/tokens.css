@@ -78,6 +78,11 @@
   /* ── 기능색 ── */
   --color-matching: #097e56;
   --color-settlement: #ffb700;
+  /* settle 버튼 윤곽. 면(#ffb700)이 `paper`(#f1efe8) 카드 위에서 1.52:1이라 WCAG
+   * 1.4.11(비텍스트 3:1)에 못 미친다 — 밝은 카드에서 버튼의 경계가 배경과 구분되지
+   * 않는다. 면 색을 바꾸면 정산·보증금 17곳의 뜻이 함께 흔들리므로 테두리를 더한다.
+   * #a67400은 paper 위 3.57:1로, `destructive` 면이 같은 바탕에서 갖는 값과 같다. */
+  --color-settlement-edge: #a67400;
   --color-success: #097e56;
   --color-warning: #ffb700;
   --color-danger: #ed3423;

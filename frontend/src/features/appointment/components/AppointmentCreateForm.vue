@@ -24,6 +24,7 @@ import {
   type AppointmentFormErrors,
   type AppointmentFormSnapshot,
 } from '../model/appointmentForm'
+import { defaultCreateLanguage } from '../model/appointmentListLanguage'
 import { useAppointmentItemLocation } from '../model/exploreIntegration'
 
 interface Props {
@@ -46,7 +47,7 @@ const {
 } = defineProps<Props>()
 
 const emit = defineEmits<{ submit: [request: AppointmentCreateRequest] }>()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const step = ref<1 | 2>(1)
 const errors = ref<AppointmentFormErrors>({})
@@ -58,7 +59,7 @@ const draft = reactive<AppointmentFormDraft>({
   visitDate,
   appointmentName: '',
   maxMembers: 4,
-  languageCode: 'en',
+  languageCode: defaultCreateLanguage(locale.value),
   depositAmount: DEFAULT_APPOINTMENT_DEPOSIT,
   meetingPlaceMode: 'ITEM',
   meetingPlace: '',

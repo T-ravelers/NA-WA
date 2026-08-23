@@ -162,25 +162,6 @@ function goBack(): void {
           </div>
         </AppCard>
       </section>
-
-      <div class="grid grid-cols-2 gap-3">
-        <AppButton
-          block
-          variant="secondary"
-          disabled
-          :title="t('appointment.profile.actionsUnavailable')"
-        >
-          {{ t('appointment.profile.viewReviews') }}
-        </AppButton>
-        <AppButton
-          block
-          variant="secondary"
-          disabled
-          :title="t('appointment.profile.actionsUnavailable')"
-        >
-          {{ t('appointment.profile.report') }}
-        </AppButton>
-      </div>
     </template>
   </main>
 </template>
