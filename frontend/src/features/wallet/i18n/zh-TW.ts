@@ -223,7 +223,7 @@ export default {
       expenseTypeHint: '選擇分帳時要如何計入這筆付款。',
       personal: '個人',
       shared: '共同',
-      activeAppointments: '目前的揪團',
+      activeAppointments: '今天的揪團',
       activeAppointmentsHint: '選擇這筆花費所屬的揪團。',
       spendingCategory: '消費類別',
       spendingCategoryHint: '這會影響旅程報告中顯示的消費風格。',

@@ -178,6 +178,7 @@ describe('WalletQrPaymentPreviewView', () => {
     await flushPromises()
 
     expect(toValue(enabledArg)).toBe(true)
+    expect(wrapper.text()).toContain("Today's appointments")
   })
 
   it('shows an empty state when no QR has been scanned', async () => {

@@ -241,7 +241,7 @@ export default {
       expenseTypeHint: 'Choose how this payment should be included when you split it.',
       personal: 'Personal',
       shared: 'Shared',
-      activeAppointments: 'Current appointments',
+      activeAppointments: "Today's appointments",
       activeAppointmentsHint: 'Choose the appointment this expense belongs to.',
       spendingCategory: 'Spending category',
       spendingCategoryHint: 'This shapes the spending style shown in your journey report.',

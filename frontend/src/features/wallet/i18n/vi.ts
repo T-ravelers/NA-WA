@@ -227,7 +227,7 @@ export default {
       expenseTypeHint: 'Chọn cách đưa thanh toán này vào khi bạn chia tiền.',
       personal: 'Cá nhân',
       shared: 'Chung',
-      activeAppointments: 'Cuộc hẹn hiện tại',
+      activeAppointments: 'Cuộc hẹn hôm nay',
       activeAppointmentsHint: 'Chọn cuộc hẹn mà khoản chi này thuộc về.',
       spendingCategory: 'Danh mục chi tiêu',
       spendingCategoryHint:

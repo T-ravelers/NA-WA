@@ -226,7 +226,7 @@ export default {
       expenseTypeHint: '割り勘にするとき、この支払いをどう含めるか選んでください。',
       personal: '個人',
       shared: '共同',
-      activeAppointments: '現在の同行グループ',
+      activeAppointments: '今日の同行グループ',
       activeAppointmentsHint: 'この支出が属する同行グループを選んでください。',
       spendingCategory: '消費カテゴリー',
       spendingCategoryHint: '旅程レポートに表示される消費スタイルに反映されます。',
