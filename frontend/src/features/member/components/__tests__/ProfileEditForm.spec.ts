@@ -114,6 +114,19 @@ describe('ProfileEditForm', () => {
     expect(mountForm({ mode: 'onboarding' }).text()).not.toContain('Cancel')
   })
 
+  /*
+   * 버튼의 `:disabled` 하나에만 기대면 그 속성을 손대는 순간 이중 전송이 조용히 생긴다.
+   * 지금 사용자가 닿는 경로는 없지만 가드는 함수 안에도 둔다.
+   */
+  it('does not send twice while a save is already in flight', async () => {
+    const wrapper = mountForm({ submitting: true })
+
+    await wrapper.get('form').trigger('submit')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toBeUndefined()
+  })
+
   it('shows what the server said', () => {
     const wrapper = mountForm({ submitError: 'We do not support that country yet.' })
 

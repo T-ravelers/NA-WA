@@ -95,9 +95,13 @@ function submit(value: { displayName: string; nationalityCode: string }): void {
       @submit="submit"
     />
 
+    <!--
+      프로필을 못 불러온 상태에서도 남는다. 로그아웃은 프로필이 필요 없는데 로딩 성공에
+      묶어 두면, 가장 막막한 화면에서 출구만 사라진다.
+    -->
     <button
-      v-if="!isPending && !isError && profile !== undefined"
       type="button"
+      data-testid="onboarding-sign-out"
       class="mt-6 min-h-11 w-full text-body-sm text-ink-3 underline disabled:opacity-60"
       :disabled="signOut.isPending.value"
       @click="signOut.mutate()"

@@ -34,8 +34,12 @@ const PROFILE: MemberProfile = {
   onboardingRequired: true,
 }
 
-async function mountView(profile: MemberProfile = PROFILE) {
-  fetchMemberProfile.mockResolvedValue(profile)
+async function mountView(profile?: MemberProfile) {
+  // 기본 응답은 `beforeEach`가 세운다. 여기서 무조건 덮어쓰면 실패를 세워 둔 테스트가
+  // 성공 응답을 받아 오류 화면을 증명하지 못한다.
+  if (profile !== undefined) {
+    fetchMemberProfile.mockResolvedValue(profile)
+  }
 
   const router = createRouter({
     history: createMemoryHistory(),
@@ -58,6 +62,7 @@ async function mountView(profile: MemberProfile = PROFILE) {
 describe('OnboardingView', () => {
   beforeEach(() => {
     queryClient.setDefaultOptions({ queries: { retry: false } })
+    fetchMemberProfile.mockResolvedValue(PROFILE)
     completeOnboarding.mockResolvedValue({ ...PROFILE, onboardingRequired: false })
     requestSignOut.mockResolvedValue(undefined)
   })
@@ -81,7 +86,24 @@ describe('OnboardingView', () => {
   it('lets someone sign out instead of being trapped here', async () => {
     const { wrapper } = await mountView()
 
-    await wrapper.get('button[type="button"]').trigger('click')
+    await wrapper.get('[data-testid="onboarding-sign-out"]').trigger('click')
+    await flushPromises()
+
+    expect(requestSignOut).toHaveBeenCalledOnce()
+  })
+
+  /*
+   * 로그아웃은 프로필이 필요 없다. 로딩 성공에 묶어 두면 가장 막막한 화면에서 출구만
+   * 사라진다 — 401은 guard가 먼저 잡지만 일시적 네트워크 오류나 5xx가 여기에 닿는다.
+   */
+  it('keeps the way out even when the profile cannot be loaded', async () => {
+    fetchMemberProfile.mockRejectedValue(new Error('boom'))
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Sign out')
+
+    await wrapper.get('[data-testid="onboarding-sign-out"]').trigger('click')
     await flushPromises()
 
     expect(requestSignOut).toHaveBeenCalledOnce()

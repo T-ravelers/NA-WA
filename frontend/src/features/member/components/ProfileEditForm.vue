@@ -110,7 +110,9 @@ const canSubmit = computed(
 function handleSubmit(): void {
   touched.value = { name: true, country: true }
 
-  if (!canSubmit.value) {
+  // 전송 중 방어는 여기에도 둔다. 버튼의 `:disabled` 하나에만 기대면, 나중에 그 속성을
+  // 손대는 순간 이중 전송이 조용히 생긴다.
+  if (submitting || !canSubmit.value) {
     return
   }
 
