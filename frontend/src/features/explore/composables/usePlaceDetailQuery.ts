@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/vue-query'
-import { computed, toValue, type MaybeRefOrGetter } from 'vue'
+import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
 
 import { fetchPlaceDetail } from '../api/exploreApi'
 import { exploreKeys } from '../model/exploreKeys'
@@ -8,10 +8,25 @@ export function usePlaceDetailQuery(
   placeId: MaybeRefOrGetter<number | string | undefined>,
   language: MaybeRefOrGetter<string>,
 ) {
+  const countedItemId = ref<string | null>(null)
+
   return useQuery({
     queryKey: computed(() => exploreKeys.placeDetail(String(toValue(placeId)), toValue(language))),
-    queryFn: () =>
-      fetchPlaceDetail(toValue(placeId) as number | string, toValue(language), { countView: true }),
+    queryFn: async () => {
+      const id = toValue(placeId) as number | string
+      /*
+       * 조회수는 한 항목당 한 번만 센다. queryKey에 language가 들어 있어 언어를 바꾸면
+       * 새 요청이 나가는데, 같은 사람이 같은 화면을 계속 보고 있는 것이라 조회가 아니다.
+       *
+       * 화면을 떠나지 않고 다른 항목으로 넘어가는 길이 있어 boolean이 아니라 센 항목을
+       * 기억한다. 하나로 두면 두 번째 항목부터 영영 세지 않는다. 성공한 뒤에 기록해서
+       * 첫 호출이 실패하면 다시 시도할 때 세도록 한다.
+       */
+      const shouldCount = countedItemId.value !== String(id)
+      const detail = await fetchPlaceDetail(id, toValue(language), { countView: shouldCount })
+      if (shouldCount) countedItemId.value = String(id)
+      return detail
+    },
     enabled: computed(() => {
       const value = toValue(placeId)
       return value !== undefined && String(value).trim() !== ''
