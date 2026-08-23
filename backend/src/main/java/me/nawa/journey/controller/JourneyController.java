@@ -107,14 +107,12 @@ public class JourneyController {
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate visitDate
     ) {
         return ApiResponse.success(
-            JourneyItemExistsResponse.builder()
-                .exists(journeyService.existsJourneyItem(
-                    member.getMemberId(),
-                    tripId,
-                    itemId,
-                    visitDate
-                ))
-                .build()
+            journeyService.existsJourneyItem(
+                member.getMemberId(),
+                tripId,
+                itemId,
+                visitDate
+            )
         );
     }
 

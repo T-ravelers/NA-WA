@@ -243,8 +243,10 @@ class AppointmentServiceTest {
         verify(appointmentMapper, never()).insertAppointment(any());
     }
 
+    // "Add to journey"로 담아만 둔 자리다. 담아 뒀다는 이유로 약속 생성이 막히면
+    // 참여와 앞뒤가 맞지 않으므로, 새 행을 넣는 대신 그 행을 약속 항목으로 올린다.
     @Test
-    void createAppointment_journeyItemAlreadyExists_rejectsRequest() {
+    void createAppointment_journeyItemOnlyAdded_promotesItemInsteadOfRejecting() {
         AppointmentCreateRequest request = validRequest();
         when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
         when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
@@ -255,8 +257,59 @@ class AppointmentServiceTest {
                         .endDate(JOURNEY_END_DATE)
                         .build()
         );
-        when(journeyMapper.existsJourneyItem(1L, 100L, VISIT_DATE))
-                .thenReturn(true);
+        when(journeyMapper.findJourneyItemByItemAndDateForUpdate(1L, 100L, VISIT_DATE))
+                .thenReturn(JourneyItem.builder()
+                        .tripItemId(70L)
+                        .tripId(1L)
+                        .itemId(100L)
+                        .visitDate(VISIT_DATE)
+                        .tripItemStatus("ADDED")
+                        .build());
+        when(journeyMapper.promoteJourneyItemToAppointment(70L, 10L)).thenReturn(1);
+        stubInsertAppointment(10L);
+        stubInsertAppointmentMember(20L);
+        when(depositMapper.insert(any())).thenReturn(1);
+        when(walletTransferService.transferToSystemWallet(
+                eq(1L), eq(1L), eq(SystemWalletCode.DEPOSIT_POOL),
+                eq(BigDecimal.valueOf(10_000)),
+                eq(TransferType.DEPOSIT_HOLD.name()), anyString()
+        )).thenReturn(500L);
+        when(depositMapper.markHeld(any(), eq(500L), any())).thenReturn(1);
+        when(appointmentMapper.markMemberActive(20L)).thenReturn(1);
+        when(appointmentMapper.updateAppointmentStatus(
+                10L, AppointmentStatus.PAYMENT_PENDING, AppointmentStatus.RECRUITING
+        )).thenReturn(1);
+
+        Appointment result = appointmentService.createAppointment(1L, request);
+
+        assertEquals(AppointmentStatus.RECRUITING, result.getAppointmentStatus());
+        verify(journeyMapper).promoteJourneyItemToAppointment(70L, 10L);
+        verify(journeyMapper, never()).insertConfirmedJourneyItem(any());
+    }
+
+    // 그 자리에 다른 약속이 이미 걸려 있으면 승격할 수 없다. 약속 행을 만들기 전에
+    // 미리 거른다.
+    @Test
+    void createAppointment_journeyItemHasOtherAppointment_rejectsRequest() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
+        when(journeyMapper.findJourneyItemByItemAndDateForUpdate(1L, 100L, VISIT_DATE))
+                .thenReturn(JourneyItem.builder()
+                        .tripItemId(70L)
+                        .tripId(1L)
+                        .itemId(100L)
+                        .visitDate(VISIT_DATE)
+                        .tripItemStatus("CONFIRMED")
+                        .appointmentId(99L)
+                        .build());
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -265,6 +318,40 @@ class AppointmentServiceTest {
 
         assertEquals(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE, exception.getErrorCode());
         verify(appointmentMapper, never()).insertAppointment(any());
+    }
+
+    // 사전 검사와 승격 사이에 다른 세션이 같은 자리를 약속으로 차지하면 승격이 0을
+    // 돌려준다. 참여 경로와 같은 기준으로 중복 처리한다.
+    @Test
+    void createAppointment_journeyItemPromotionRace_rejectsRequestAfterInsert() {
+        AppointmentCreateRequest request = validRequest();
+        when(appointmentMapper.findAvailableItemType(100L)).thenReturn("EVENT");
+        when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
+                Journey.builder()
+                        .tripId(1L)
+                        .memberId(1L)
+                        .startDate(JOURNEY_START_DATE)
+                        .endDate(JOURNEY_END_DATE)
+                        .build()
+        );
+        when(journeyMapper.findJourneyItemByItemAndDateForUpdate(1L, 100L, VISIT_DATE))
+                .thenReturn(JourneyItem.builder()
+                        .tripItemId(70L)
+                        .tripId(1L)
+                        .itemId(100L)
+                        .visitDate(VISIT_DATE)
+                        .tripItemStatus("ADDED")
+                        .build());
+        stubInsertAppointment(10L);
+        when(journeyMapper.promoteJourneyItemToAppointment(70L, 10L)).thenReturn(0);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createAppointment(1L, request)
+        );
+
+        assertEquals(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE, exception.getErrorCode());
+        verify(appointmentMapper, never()).insertAppointmentMember(any());
     }
 
     @Test

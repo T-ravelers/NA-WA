@@ -31,6 +31,7 @@ import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
 import me.nawa.journey.dto.request.JourneyUpdateRequest;
+import me.nawa.journey.dto.response.JourneyItemExistsResponse;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineResponse;
@@ -1125,12 +1126,39 @@ class JourneyServiceTest {
         when(journeyMapper.findJourneyById(20L)).thenReturn(journey);
         when(journeyMapper.existsJourneyItem(20L, 100L, LocalDate.of(2026, 8, 21)))
             .thenReturn(true);
+        when(journeyMapper.existsAppointmentJourneyItem(
+            20L, 100L, LocalDate.of(2026, 8, 21)
+        )).thenReturn(true);
 
-        boolean result = journeyService.existsJourneyItem(
+        JourneyItemExistsResponse result = journeyService.existsJourneyItem(
             1L, 20L, 100L, LocalDate.of(2026, 8, 21)
         );
 
-        assertEquals(true, result);
+        assertEquals(true, result.isExists());
+        assertEquals(true, result.isAppointmentLinked());
+    }
+
+    // 담아만 둔 자리는 약속 항목으로 승격되므로 약속 생성을 막지 않는다. 두 값을
+    // 한 값으로 합치면 담아 둔 장소로는 약속을 만들 수 없게 된다.
+    @Test
+    void existsJourneyItem_reportsAppointmentLinkedFalse_whenItemIsOnlyAdded() {
+        Journey journey = Journey.builder()
+            .tripId(20L)
+            .memberId(1L)
+            .build();
+        when(journeyMapper.findJourneyById(20L)).thenReturn(journey);
+        when(journeyMapper.existsJourneyItem(20L, 100L, LocalDate.of(2026, 8, 21)))
+            .thenReturn(true);
+        when(journeyMapper.existsAppointmentJourneyItem(
+            20L, 100L, LocalDate.of(2026, 8, 21)
+        )).thenReturn(false);
+
+        JourneyItemExistsResponse result = journeyService.existsJourneyItem(
+            1L, 20L, 100L, LocalDate.of(2026, 8, 21)
+        );
+
+        assertEquals(true, result.isExists());
+        assertEquals(false, result.isAppointmentLinked());
     }
 
     @Test

@@ -11,7 +11,7 @@ import { appointmentExploreIntegrationKey } from '@/features/appointment/model/e
 import { appointmentJourneyIntegrationKey } from '../../model/journeyIntegration'
 
 const createAppointment = vi.fn()
-const checkJourneyItemExists = vi.fn()
+const checkAppointmentSlotTaken = vi.fn()
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
@@ -84,7 +84,7 @@ function globalOptions(router: ReturnType<typeof createTestRouter>) {
           isPending: ref(false),
           isError: ref(false),
         }),
-        checkJourneyItemExists,
+        checkAppointmentSlotTaken,
       },
       [appointmentExploreIntegrationKey as symbol]: {
         useItemLocation: () => ({
@@ -145,8 +145,8 @@ async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> 
 describe('AppointmentCreateView', () => {
   beforeEach(() => {
     createAppointment.mockReset()
-    checkJourneyItemExists.mockReset()
-    checkJourneyItemExists.mockResolvedValue(false)
+    checkAppointmentSlotTaken.mockReset()
+    checkAppointmentSlotTaken.mockResolvedValue(false)
     sessionStorage.clear()
   })
 
@@ -167,12 +167,12 @@ describe('AppointmentCreateView', () => {
     await buttonByText(wrapper, 'Continue with').trigger('click')
     await flushPromises()
 
-    expect(checkJourneyItemExists).toHaveBeenCalledWith(7, 42, expect.any(String))
+    expect(checkAppointmentSlotTaken).toHaveBeenCalledWith(7, 42, expect.any(String))
     expect(wrapper.text()).toContain('Start with your appointment details')
   })
 
-  it('shows an error and keeps the date sheet open when the combination already exists', async () => {
-    checkJourneyItemExists.mockResolvedValueOnce(true)
+  it('shows an error and keeps the date sheet open when another appointment holds the date', async () => {
+    checkAppointmentSlotTaken.mockResolvedValueOnce(true)
     const { wrapper } = await mountView()
 
     await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
@@ -197,7 +197,7 @@ describe('AppointmentCreateView', () => {
 
     expect(wrapper.text()).toContain('Open this form from an Event or Place.')
     expect(wrapper.find('form').exists()).toBe(false)
-    expect(checkJourneyItemExists).not.toHaveBeenCalled()
+    expect(checkAppointmentSlotTaken).not.toHaveBeenCalled()
   })
 
   it('returns to the journey select sheet when the date sheet is closed', async () => {
@@ -245,7 +245,7 @@ describe('AppointmentCreateView', () => {
               isPending: ref(false),
               isError: ref(false),
             }),
-            checkJourneyItemExists,
+            checkAppointmentSlotTaken,
           },
           [appointmentExploreIntegrationKey as symbol]: {
             useItemLocation: () => ({
@@ -304,7 +304,7 @@ describe('AppointmentCreateView', () => {
                 isPending: ref(false),
                 isError: ref(false),
               }),
-              checkJourneyItemExists,
+              checkAppointmentSlotTaken,
             },
             [appointmentExploreIntegrationKey as symbol]: {
               useItemLocation: () => ({
@@ -577,7 +577,7 @@ describe('AppointmentCreateView', () => {
     expect(wrapper.text()).toContain('Set your appointment details')
     expect(wrapper.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
 
-    checkJourneyItemExists.mockResolvedValueOnce(false)
+    checkAppointmentSlotTaken.mockResolvedValueOnce(false)
     await wrapper.get('button[aria-label="Select August 30, 2026"]').trigger('click')
     await buttonByText(wrapper, 'Continue with').trigger('click')
     await flushPromises()

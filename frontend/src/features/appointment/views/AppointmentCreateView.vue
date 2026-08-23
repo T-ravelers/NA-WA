@@ -59,8 +59,8 @@ const createMutation = useMutation({
   },
 })
 
-// 날짜 선택 시 미리 확인했더라도, 같은 계정의 다른 세션이 그 사이 먼저 같은
-// 조합을 확정해버리는 드문 경쟁 상태가 있을 수 있다(JOURNEY-004). 이 경우 폼
+// 날짜 선택 시 미리 확인했더라도, 같은 계정의 다른 세션이 그 사이 먼저 그 자리를
+// 약속으로 차지해버리는 드문 경쟁 상태가 있을 수 있다(JOURNEY-004). 이 경우 폼
 // 입력은 그대로 둔 채 날짜 선택 시트만 다시 띄운다.
 const JOURNEY_ITEM_DUPLICATE_CODE = 'JOURNEY-004'
 const dateConflictRetryOpen = ref(false)
@@ -209,12 +209,14 @@ async function confirmDate(date: string): Promise<void> {
   dateCheckError.value = undefined
 
   try {
-    const exists = await journeyIntegration.checkJourneyItemExists(
+    // 담아만 둔 자리는 막지 않는다 — 서버가 그 항목을 약속 항목으로 올린다. 여기서
+    // 거르는 것은 다른 약속이 이미 차지한 날짜뿐이고, 화면 문구도 그것을 말한다.
+    const taken = await journeyIntegration.checkAppointmentSlotTaken(
       selectedTripId.value,
       itemId.value,
       date,
     )
-    if (exists) {
+    if (taken) {
       dateCheckError.value = t('appointment.journeyDate.alreadyLinked')
       return
     }
@@ -243,12 +245,12 @@ async function retryDate(date: string): Promise<void> {
   dateCheckError.value = undefined
 
   try {
-    const exists = await journeyIntegration.checkJourneyItemExists(
+    const taken = await journeyIntegration.checkAppointmentSlotTaken(
       selectedTripId.value,
       itemId.value,
       date,
     )
-    if (exists) {
+    if (taken) {
       dateCheckError.value = t('appointment.journeyDate.alreadyLinked')
       return
     }
