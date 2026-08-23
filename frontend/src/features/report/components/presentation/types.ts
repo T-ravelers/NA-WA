@@ -129,6 +129,8 @@ export interface ReportComparisonBarsProps extends LocaleAware {
   chipsLabel: string
   me: ReportComparisonBarRow
   peers: ReportComparisonBarRow[]
+  /** 동료 칩을 그린다. 비교 상대가 평균 하나뿐인 SIMILAR에서는 끈다. 기본 `true`. */
+  chips?: boolean
 }
 
 export interface ReportRadarAxis {
@@ -152,11 +154,16 @@ export interface ReportRadarChartProps {
 export interface ReportRankTile {
   key: string
   label: string
-  /** 로케일에 맞춰 만든 순위 글자. 예: `1st` */
+  /** 로케일에 맞춰 만든 순위 글자, 또는 코호트 대비 비중 차이. 예: `1st`, `+12%`, `AVG` */
   rankText: string
   tone: Category | 'surface'
 }
 
 export interface ReportRankTilesProps {
   tiles: ReportRankTile[]
+  /**
+   * 목록의 접근 가능한 이름. 값이 순위인지 코호트 대비 비중인지는 scope가 정하므로
+   * 화면이 넘긴다 — `# Food +12%`만으로는 무엇 대비인지 읽히지 않는다.
+   */
+  label?: string
 }

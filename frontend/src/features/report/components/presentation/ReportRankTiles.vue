@@ -10,7 +10,7 @@ import type { ReportRankTile, ReportRankTilesProps } from './types'
  *
  * Tailwind가 소스에 적힌 클래스만 수집하므로 조합하지 않고 표로 둔다.
  */
-const { tiles } = defineProps<ReportRankTilesProps>()
+const { tiles, label = undefined } = defineProps<ReportRankTilesProps>()
 
 const TILE_CLASS: Record<ReportRankTile['tone'], string> = {
   food: 'bg-food text-on-category',
@@ -22,7 +22,10 @@ const TILE_CLASS: Record<ReportRankTile['tone'], string> = {
 </script>
 
 <template>
-  <ul class="grid grid-cols-2 gap-3">
+  <ul
+    class="grid grid-cols-2 gap-3"
+    :aria-label="label"
+  >
     <li
       v-for="tile in tiles"
       :key="tile.key"

@@ -141,6 +141,25 @@ export default {
         loadFailed: 'Không tải được phần so sánh.',
         loadFailedDescription: 'Các phần còn lại của báo cáo không bị ảnh hưởng. Vui lòng thử lại.',
         loading: 'Đang tải phần so sánh',
+        similarHeading: 'So với du khách tương tự',
+        scopeLabel: 'Nhóm so sánh',
+        scopeGroup: 'Nhóm',
+        scopeSimilar: 'Tương tự',
+        travelersAvg: 'TB du khách',
+        average: 'TB',
+        similarRadarDescription:
+          'Tỷ lệ chi tiêu của bạn theo từng danh mục so với trung bình của du khách giống bạn.',
+        similarEmptyTitle: 'Chưa có du khách tương tự',
+        similarEmptyDescription: 'Du khách cùng quốc tịch và đã có báo cáo tổng kết sẽ hiện ở đây.',
+        tilesLabel: 'Thứ hạng danh mục trong nhóm',
+        similarTilesLabel: 'Tỷ lệ danh mục của bạn so với du khách tương tự',
+      },
+      insight: {
+        above:
+          'Chuyến đi này nghiêng về {category} — {share} tổng chi, cao hơn hẳn những du khách giống bạn ({cohortShare}).',
+        same: 'Chuyến đi này nghiêng về {category} — {share} tổng chi, gần bằng những du khách giống bạn ({cohortShare}).',
+        below:
+          'Chuyến đi này nghiêng về {category} — {share} tổng chi, thấp hơn những du khách giống bạn ({cohortShare}).',
       },
       status: 'Trạng thái báo cáo: {status}',
     },
