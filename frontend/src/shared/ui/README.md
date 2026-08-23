@@ -29,6 +29,7 @@
 | `BottomNav`                                  | 하단 탭. 2번째 탭은 Report(`/reports`)로 이동                           |
 | `StateEmpty` / `StateError` / `StateLoading` | 빈·오류·로딩 상태                                                       |
 | `LocaleSheet`                                | 로케일 선택 시트                                                        |
+| `InsufficientBalanceDialog`                  | 잔액이 모자랄 때 충전으로 이어 주는 팝업                                |
 | `CalendarGrid`                               | 달 하나짜리 달력. 하루 선택·기간 선택 겸용                              |
 
 ## 지켜야 할 것
