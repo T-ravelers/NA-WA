@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatMoney, formatPercent, formatSignedPercent } from '../format'
+import { formatEnglishOrdinal, formatMoney, formatPercent, formatSignedPercent } from '../format'
 
 describe('report presentation format', () => {
   it('writes money in points with thousands separators', () => {
@@ -26,5 +26,46 @@ describe('report presentation format', () => {
   it('follows the locale it is given', () => {
     expect(formatMoney(1284500, 'ja')).toBe('1,284,500 P')
     expect(formatSignedPercent(-8, 'vi')).toBe('-8%')
+  })
+
+  it('formats English ordinal ranks from 1 through 30', () => {
+    const expected = [
+      '1st',
+      '2nd',
+      '3rd',
+      '4th',
+      '5th',
+      '6th',
+      '7th',
+      '8th',
+      '9th',
+      '10th',
+      '11th',
+      '12th',
+      '13th',
+      '14th',
+      '15th',
+      '16th',
+      '17th',
+      '18th',
+      '19th',
+      '20th',
+      '21st',
+      '22nd',
+      '23rd',
+      '24th',
+      '25th',
+      '26th',
+      '27th',
+      '28th',
+      '29th',
+      '30th',
+    ]
+
+    expect(expected.map((_, index) => formatEnglishOrdinal(index + 1))).toEqual(expected)
+  })
+
+  it('keeps 111, 112, and 113 in the th ordinal category', () => {
+    expect([111, 112, 113].map(formatEnglishOrdinal)).toEqual(['111th', '112th', '113th'])
   })
 })

@@ -27,3 +27,19 @@ export function formatSignedPercent(points: number, locale = 'en'): string {
     maximumFractionDigits: 0,
   }).format(points / 100)
 }
+
+/** 영어 순위를 서수로 표시한다. 11–13은 끝자리와 무관하게 `th`가 된다. */
+export function formatEnglishOrdinal(rank: number): string {
+  const category = new Intl.PluralRules('en', { type: 'ordinal' }).select(rank)
+
+  switch (category) {
+    case 'one':
+      return `${rank}st`
+    case 'two':
+      return `${rank}nd`
+    case 'few':
+      return `${rank}rd`
+    default:
+      return `${rank}th`
+  }
+}
