@@ -68,24 +68,21 @@ const depositLabel = computed(() => {
 
 const placeLabel = computed(() => appointment.meetingPlace ?? t('appointment.list.placePending'))
 
+/**
+ * 참여할 수 없는 약속이면 Join을 비활성으로 둔다. 상세의 `isJoinAvailable`과 같은
+ * 기준이다 — 서버가 정원이 찬 약속을 FULL로, 시작된 약속을 IN_PROGRESS로 계산해
+ * 내려주므로 RECRUITING이라는 값 자체가 "지금 참여할 수 있다"를 뜻한다.
+ *
+ * 이유는 바로 옆 상태 뱃지가 이미 말하고 있다. 목록은 "내가 이미 참여했는지"는
+ * 여전히 모르므로(응답에 없다) 그 갈래만 서버 판정에 맡긴다.
+ */
+const joinDisabled = computed(() => appointment.appointmentStatus !== 'RECRUITING')
+
 function openDetail(): void {
   void router.push({
     name: 'appointment-detail',
     params: { appointmentId: appointment.appointmentId },
   })
-}
-
-/**
- * 카드 어디를 눌러도 상세로 간다. View 버튼과 같은 동작이다.
- *
- * 버튼 두 개는 각자 감싼 요소에서 전파를 끊는다. AppButton은 payload 없이 click을
- * 내보내므로 `@click.stop`을 컴포넌트에 걸 수 없어, 네이티브 click이 카드까지
- * 올라오는 것을 감싼 요소에서 막는다.
- */
-function handleKeydown(event: KeyboardEvent): void {
-  if (event.key !== 'Enter' && event.key !== ' ') return
-  event.preventDefault()
-  openDetail()
 }
 
 function requestJoin(): void {
@@ -95,12 +92,16 @@ function requestJoin(): void {
 
 <template>
   <AppCard padding="lg">
+    <!--
+      카드 어디를 눌러도 상세로 간다. 다만 이것은 마우스·터치 전용 지름길이라 카드를
+      포커스 대상으로 만들지 않는다. `role="link"`를 걸면 스크린 리더가 카드 전체를
+      링크 하나로 읽어 안쪽 View·Join 버튼을 놓치고, 카드가 포커스를 받으면 버튼에서
+      누른 Enter·Space가 카드까지 올라와 참여 대신 상세로 넘어간다.
+      키보드로 상세에 가는 길은 View 버튼이 맡는다.
+    -->
     <article
       class="flex cursor-pointer flex-col gap-3"
-      role="link"
-      tabindex="0"
       @click="openDetail"
-      @keydown="handleKeydown"
     >
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
@@ -153,6 +154,11 @@ function requestJoin(): void {
         </div>
       </dl>
 
+      <!--
+        버튼 두 개는 각자 감싼 요소에서 전파를 끊는다. AppButton은 payload 없이 click을
+        내보내므로 `@click.stop`을 컴포넌트에 걸 수 없어, 네이티브 click이 카드까지
+        올라오는 것을 감싼 요소에서 막는다.
+      -->
       <div class="flex justify-end gap-2">
         <div
           class="w-24"
@@ -175,6 +181,7 @@ function requestJoin(): void {
             block
             compact
             dense
+            :disabled="joinDisabled"
             @click="requestJoin"
           >
             {{ t('appointment.list.join') }}

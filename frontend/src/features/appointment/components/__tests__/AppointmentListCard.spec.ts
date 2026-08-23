@@ -4,25 +4,26 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
+import type { AppointmentSummary } from '../../api/appointmentApi'
 import AppointmentListCard from '../AppointmentListCard.vue'
 
-const appointment = {
+const appointment: AppointmentSummary = {
   appointmentId: 7,
   itemId: 42,
-  itemType: 'EVENT' as const,
+  itemType: 'EVENT',
   appointmentName: 'Seongsu K-Beauty Tour',
-  languageCode: 'en' as const,
+  languageCode: 'en',
   maxMembers: 4,
   currentMemberCount: 2,
   depositAmount: '10000',
-  appointmentStatus: 'RECRUITING' as const,
+  appointmentStatus: 'RECRUITING',
   meetingPlace: 'Seongsu Beauty Lab',
   activityStartAt: '2026-08-08T18:30:00',
   activityEndAt: '2026-08-08T22:00:00',
   hostDisplayName: 'Mina Park',
 }
 
-async function mountCard(overrides: Partial<typeof appointment> = {}) {
+async function mountCard(overrides: Partial<AppointmentSummary> = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -74,10 +75,33 @@ describe('AppointmentListCard', () => {
   it('opens the detail when the card itself is pressed', async () => {
     const { wrapper, router } = await mountCard()
 
-    await wrapper.get('[role="link"]').trigger('click')
+    await wrapper.get('article').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('appointment-detail')
+  })
+
+  // 카드 탭은 마우스·터치 전용 지름길이다. 카드를 링크로 선언하면 스크린 리더가
+  // 카드 전체를 링크 하나로 읽어 안쪽 버튼 두 개를 놓친다.
+  it('leaves the card out of the tab order so the buttons stay reachable', async () => {
+    const { wrapper } = await mountCard()
+    const card = wrapper.get('article')
+
+    expect(card.attributes('role')).toBeUndefined()
+    expect(card.attributes('tabindex')).toBeUndefined()
+  })
+
+  // 카드가 키를 가로채면 Join에 포커스를 두고 누른 Enter가 카드까지 올라가고,
+  // preventDefault가 버튼의 click 생성을 취소해 참여 대신 상세로 넘어간다.
+  it('does not hijack keys pressed on the buttons inside it', async () => {
+    const { wrapper, router } = await mountCard()
+    const join = wrapper.findAll('button').find((button) => button.text() === 'Join')
+
+    await join?.trigger('keydown', { key: 'Enter' })
+    await join?.trigger('keydown', { key: ' ' })
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('home')
   })
 
   // Join은 카드를 여는 것이 아니라 참여를 시작한다. 버튼이 카드 클릭까지 함께
@@ -93,5 +117,19 @@ describe('AppointmentListCard', () => {
 
     expect(wrapper.emitted('join')?.length).toBe(1)
     expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  // 정원이 찼거나 이미 시작된 약속은 서버가 참여를 거절한다. 상세와 같은 기준으로
+  // 미리 막아, 여정을 고르고 보증금까지 확인한 뒤에야 거절을 보는 일이 없게 한다.
+  it('disables Join when the appointment is no longer recruiting', async () => {
+    const { wrapper } = await mountCard({ appointmentStatus: 'FULL' })
+    const join = wrapper.findAll('button').find((button) => button.text() === 'Join')
+
+    expect(join?.attributes('disabled')).toBeDefined()
+
+    await join?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.emitted('join')).toBeUndefined()
   })
 })
