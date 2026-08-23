@@ -88,8 +88,11 @@ const paymentMutation = useMutation({
 
 // 충전 팝업이 떠 있는 동안에는 오류 화면을 내지 않는다. 두 겹으로 쌓이면 무엇을
 // 눌러야 할지 흐려진다 — 보증금 흐름도 같은 규칙이다.
+//
+// 지급 실패만이 아니라 조회 실패까지 함께 가린다. 화면을 잠시 떠났다 돌아오면 상세를 다시
+// 읽는데, 그때 실패하면 팝업 뒤로 오류 화면이 깔려 두 겹이 된다. 팝업을 닫으면 드러난다.
 const failed = computed(
-  () => (paymentMutation.isError.value && !topupPromptOpen.value) || detailQuery.isError.value,
+  () => !topupPromptOpen.value && (paymentMutation.isError.value || detailQuery.isError.value),
 )
 /** 확인을 받아야 하는 동안에만 값이 있다. 확인 화면은 이 정산 정보를 그대로 보여준다. */
 const awaitingConfirmation = computed(() => {
