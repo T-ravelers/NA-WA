@@ -60,6 +60,63 @@ FROM trip_items ti
 JOIN trips tr ON tr.trip_id = ti.trip_id
 WHERE tr.title LIKE 'Seed Report %';
 
+-- 시드 약속 참가자를 가리키는 행은 참조 쪽이 시드 밖 여정·정산에 매달려 있어도
+-- 참가자보다 먼저 끊는다. 후기와 정산 분담에는 한 단계 아래 자식도 있어 FK 역순으로 지운다.
+DELETE mrks
+FROM member_review_keyword_selections mrks
+JOIN member_reviews mr ON mr.review_id = mrks.review_id
+JOIN appointments a ON a.appointment_id = mr.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE mrs
+FROM member_review_scores mrs
+JOIN member_reviews mr ON mr.review_id = mrs.review_id
+JOIN appointments a ON a.appointment_id = mr.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE mr
+FROM member_reviews mr
+JOIN appointments a ON a.appointment_id = mr.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE sis
+FROM settlement_item_shares sis
+JOIN settlement_members sm ON sm.settlement_member_id = sis.settlement_member_id
+JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+JOIN appointments a ON a.appointment_id = am.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE sm
+FROM settlement_members sm
+JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+JOIN appointments a ON a.appointment_id = am.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE dp
+FROM deposit_payouts dp
+LEFT JOIN deposits d ON d.deposit_id = dp.source_deposit_id
+LEFT JOIN appointment_members source_am
+    ON source_am.appointment_member_id = d.appointment_member_id
+LEFT JOIN appointments source_a ON source_a.appointment_id = source_am.appointment_id
+LEFT JOIN appointment_members recipient_am
+    ON recipient_am.appointment_member_id = dp.recipient_appointment_member_id
+LEFT JOIN appointments recipient_a
+    ON recipient_a.appointment_id = recipient_am.appointment_id
+WHERE source_a.appointment_name = 'Seed Report Appointment'
+   OR recipient_a.appointment_name = 'Seed Report Appointment';
+
+DELETE d
+FROM deposits d
+JOIN appointment_members am ON am.appointment_member_id = d.appointment_member_id
+JOIN appointments a ON a.appointment_id = am.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE tel
+FROM trip_expense_links tel
+JOIN appointment_members am ON am.appointment_member_id = tel.appointment_member_id
+JOIN appointments a ON a.appointment_id = am.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
 DELETE am
 FROM appointment_members am
 JOIN appointments a ON a.appointment_id = am.appointment_id
