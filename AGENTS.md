@@ -153,6 +153,7 @@ cd backend && ./gradlew build --no-daemon
 | 소비 카테고리 값 집합·칭호 | [backend/docs/SPENDING_CATEGORY.md](./backend/docs/SPENDING_CATEGORY.md) |
 | 리포트 스냅샷·비교 API | [backend/docs/REPORT_API.md](./backend/docs/REPORT_API.md)                  |
 | 소셜 로그인 운영     | [backend/docs/AUTHENTICATION.md](./backend/docs/AUTHENTICATION.md)          |
+| 아바타 S3 저장 계약  | [backend/docs/AVATAR_STORAGE.md](./backend/docs/AVATAR_STORAGE.md)          |
 | DB 지도·도메인 ERD   | [backend/docs/database/README.md](./backend/docs/database/README.md)         |
 
 문서와 코드가 어긋나면 **조용히 한쪽을 고르지 말고 보고합니다.** 우선순위는
