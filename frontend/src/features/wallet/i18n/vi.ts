@@ -58,8 +58,9 @@ export default {
       'WALLET-023': 'Ví của người nhận hiện không hoạt động.',
       'WALLET-024': 'Nhập số tiền để tiếp tục.',
       'WALLET-029': 'Số dư của bạn không đủ cho thanh toán này.',
+      'WALLET-014': 'Không gửi được giao dịch chuyển này. Hãy làm mới và thử lại.',
       'WALLET-015': 'Số dư ví của bạn quá thấp cho giao dịch chuyển này.',
-      'WALLET-016': 'Ví của bạn hiện không thể dùng cho giao dịch chuyển này.',
+      'WALLET-016': 'Một ví trong giao dịch chuyển này hiện không dùng được.',
     },
     transactions: {
       title: 'GIAO DỊCH',

@@ -74,8 +74,9 @@ export default {
       'WALLET-023': "The recipient's wallet is not active right now.",
       'WALLET-024': 'Enter an amount to continue.',
       'WALLET-029': "You don't have enough balance for this payment.",
+      'WALLET-014': 'This transfer could not be sent. Refresh and try again.',
       'WALLET-015': 'Your wallet balance is too low for this transfer.',
-      'WALLET-016': 'Your wallet cannot be used for this transfer right now.',
+      'WALLET-016': 'A wallet in this transfer cannot be used right now.',
     },
     transactions: {
       title: 'TRANSACTIONS',

@@ -1,4 +1,5 @@
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { resolveErrorMessageKey } from '@/shared/api/apiResponse'
 
 /**
  * `RETRY`는 같은 멱등성 키로 다시 보내 중복 처리를 막는다. 키 자체가 거부된 경우에만
@@ -14,17 +15,18 @@ export type SettlementRecovery =
   | 'RETRY_NEW_KEY'
   | 'RETAKE_PHOTO'
   | 'ENTER_MANUALLY'
+  | 'TOP_UP'
+  | 'GO_TO_WALLET'
 
 /*
  * RETAKE_PHOTO와 ENTER_MANUALLY를 보고 동작을 바꾸는 화면은 아직 없다.
  *
- * recovery를 읽는 곳은 SettlementCreateView와 SettlementPayView 둘뿐이고, 둘 다
- * BACK_TO_LIST·REFETCH_DETAIL·REFETCH_CANDIDATES만 본다. 지금 사용자 안내를 실제로
- * 갈라 주는 것은 이 값이 아니라 코드마다 다른 문구다.
+ * recovery를 읽는 곳은 SettlementCreateView와 SettlementPayView 둘뿐이다. 결제 화면은
+ * BACK_TO_LIST·REFETCH_DETAIL·REFETCH_CANDIDATES에 더해 TOP_UP·GO_TO_WALLET을 본다.
  *
- * 그래도 값을 두는 이유는 아래 전수 매핑이 "이 코드는 어느 쪽으로 이끄는가"를 한곳에
- * 적어 두기 때문이다. 화면이 사진 다시 찍기나 직접 입력으로 데려가는 버튼을 붙일 때
- * 판단 기준이 이미 서 있게 된다.
+ * 그래도 나머지 값을 두는 이유는 아래 전수 매핑이 "이 코드는 어느 쪽으로 이끄는가"를
+ * 한곳에 적어 두기 때문이다. 화면이 사진 다시 찍기나 직접 입력으로 데려가는 버튼을 붙일
+ * 때 판단 기준이 이미 서 있게 된다.
  */
 
 /**
@@ -58,6 +60,21 @@ const RECOVERY_BY_CODE: Record<string, SettlementRecovery> = {
   'SETTLEMENT-015': 'RETRY_NEW_KEY',
 
   /*
+   * 지급은 지갑 이체를 타므로 정산 코드만 오는 것이 아니다.
+   *
+   * 이 넷이 여기 없던 동안에는 전부 기본값(RETRY)으로 떨어졌고, 결제 화면의 재시도가
+   * 같은 요청을 그대로 다시 보냈다. 잔액도 지갑 상태도 그 사이에 변할 리 없으니 사용자는
+   * "Try again"만 무한히 누르게 된다. 새 지갑 코드가 생기면 여기에도 적는다.
+   *
+   * 지갑이 없거나 잠긴 것은 **상대(원결제자) 쪽일 수도 있다** — 이체는 양쪽 지갑을
+   * 확인한다. 그래서 이 둘은 "당신의 지갑" 대신 지갑 화면으로만 데려간다.
+   */
+  'WALLET-001': 'GO_TO_WALLET',
+  'WALLET-014': 'REFETCH_DETAIL',
+  'WALLET-015': 'TOP_UP',
+  'WALLET-016': 'GO_TO_WALLET',
+
+  /*
    * 영수증 관련 코드는 사용자가 다음에 할 일로 갈린다.
    *
    * 사진을 바꿔야 풀리는 것과, 다시 눌러 봐야 소용없어 직접 입력이 나은 것과, 그대로 다시
@@ -80,8 +97,19 @@ export function resolveSettlementError(error: unknown): {
   recovery: SettlementRecovery
 } {
   const code = error instanceof NormalizedApiError ? error.code : undefined
-  if (code !== undefined && RECOVERY_BY_CODE[code] !== undefined) {
-    return { messageKey: `settlement.errorCode.${code}`, recovery: RECOVERY_BY_CODE[code] }
+  const recovery = code === undefined ? undefined : RECOVERY_BY_CODE[code]
+  if (code === undefined || recovery === undefined) {
+    return { messageKey: 'settlement.errorCode.default', recovery: 'RETRY' }
   }
-  return { messageKey: 'settlement.errorCode.default', recovery: 'RETRY' }
+
+  /*
+   * 지갑 코드의 문구는 지갑이 이미 갖고 있다(`wallet.errorCode.WALLET-015` 등). 여기에
+   * 다시 적으면 같은 실패가 화면에 따라 다른 말을 하게 되고, 한쪽만 고쳐지는 순간
+   * 어긋난다. 코드 접두사로 키를 만드는 규칙은 공용 유틸 하나가 갖는다.
+   */
+  const messageKey = code.startsWith('SETTLEMENT-')
+    ? `settlement.errorCode.${code}`
+    : resolveErrorMessageKey(code)
+
+  return { messageKey, recovery }
 }

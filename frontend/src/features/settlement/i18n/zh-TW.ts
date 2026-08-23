@@ -182,6 +182,11 @@ export default {
       completeTitle: '付款已送出',
       completeDescription: '您在這個分帳的應付金額已結清。',
       backToDetail: '返回分帳',
+      insufficientTitle: '餘額不足',
+      insufficientDescription: '餘額不足以支付 {amount}。要儲值並支付您的應付金額嗎？',
+      insufficientLater: '稍後再說',
+      insufficientTopup: '儲值',
+      goToWallet: '前往錢包',
     },
     errorCode: {
       'SETTLEMENT-001': '找不到這個分帳，請返回分帳列表。',

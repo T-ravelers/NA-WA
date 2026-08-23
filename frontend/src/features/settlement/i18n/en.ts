@@ -192,6 +192,12 @@ export default {
       completeTitle: 'Payment sent',
       completeDescription: 'Your share of this split is settled.',
       backToDetail: 'Back to split',
+      insufficientTitle: 'Not enough balance',
+      insufficientDescription:
+        'Your balance is too low to send {amount}. Top up to pay your share?',
+      insufficientLater: 'Not now',
+      insufficientTopup: 'Top up',
+      goToWallet: 'Go to wallet',
     },
     errorCode: {
       'SETTLEMENT-001': 'We could not find this split. Return to the split list.',
