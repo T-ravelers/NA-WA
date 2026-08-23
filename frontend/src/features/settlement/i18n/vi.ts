@@ -11,6 +11,7 @@ export default {
     backToWallet: 'Về ví',
     backToList: 'Về danh sách chia tiền',
     points: '{amount} P',
+    state: 'Trạng thái',
     toPay: 'Cần trả',
     toCollect: 'Cần thu',
     start: 'Bắt đầu chia tiền',
@@ -24,6 +25,8 @@ export default {
     type: { EQUAL: 'Chia đều', ITEMIZED: 'Theo mặt hàng' },
     status: { REQUESTED: 'Đã yêu cầu', COMPLETED: 'Hoàn thành' },
     list: {
+      introPay: 'Xem các yêu cầu đang chờ bạn, rồi xem lại những khoản đã chia xong.',
+      introCollect: 'Theo dõi các yêu cầu bạn đã gửi, rồi xem lại những khoản đã chia xong.',
       loading: 'Đang tải danh sách chia tiền',
       retryHint: 'Kiểm tra kết nối và thử lại.',
       youPay: 'Bạn trả',
@@ -61,6 +64,8 @@ export default {
       noPaymentsTitle: 'Không có thanh toán khả dụng',
       noPaymentsDescription:
         'Chỉ các thanh toán đã hoàn tất của chính bạn và chưa được chia mới có thể bắt đầu chia tiền.',
+      stepPayment: 'Chọn khoản chi',
+      stepDetails: 'Nội dung yêu cầu',
       journeys: 'Hành trình',
       appointments: 'Cuộc hẹn',
       transactions: 'Giao dịch',
@@ -165,6 +170,7 @@ export default {
       paidBy: 'Người trả',
       transactionId: 'Giao dịch',
       yourShare: 'Phần của bạn',
+      amountToSettle: 'Số tiền cần chia',
       payableNow: 'Có thể trả ngay',
       yourItems: 'Mặt hàng của bạn',
       sendTo: 'Gửi đến',

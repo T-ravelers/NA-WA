@@ -159,7 +159,6 @@ onBeforeUnmount(() => {
           v-if="errorKey === null"
           data-action="receipt-camera-shoot"
           block
-          variant="settle"
           :disabled="busy"
           @click="shoot"
           >{{ t('settlement.receipt.camera.shutter') }}</AppButton

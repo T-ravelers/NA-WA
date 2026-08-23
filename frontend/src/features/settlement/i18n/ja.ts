@@ -11,6 +11,7 @@ export default {
     backToWallet: 'ウォレットへ戻る',
     backToList: '割り勘一覧へ戻る',
     points: '{amount} P',
+    state: '状態',
     toPay: '支払う',
     toCollect: '受け取る',
     start: '割り勘を始める',
@@ -24,6 +25,8 @@ export default {
     type: { EQUAL: '均等', ITEMIZED: '品目別' },
     status: { REQUESTED: 'リクエスト中', COMPLETED: '完了' },
     list: {
+      introPay: '対応待ちのリクエストを確認し、精算済みの分もあとから見返せます。',
+      introCollect: '自分が送ったリクエストの進み具合を確認し、精算済みの分もあとから見返せます。',
       loading: '割り勘を読み込み中',
       retryHint: '接続を確認して、もう一度お試しください。',
       youPay: '支払う額',
@@ -60,6 +63,8 @@ export default {
       noPaymentsTitle: '利用できる支払いがありません',
       noPaymentsDescription:
         '割り勘を始められるのは、まだ割り勘にしていない自分の完了済み支払いだけです。',
+      stepPayment: '支払いを選ぶ',
+      stepDetails: 'リクエストの内容',
       journeys: '旅程',
       appointments: '同行グループ',
       transactions: '取引',
@@ -165,6 +170,7 @@ export default {
       paidBy: '支払者',
       transactionId: '取引',
       yourShare: 'あなたの負担額',
+      amountToSettle: '精算する金額',
       payableNow: '今すぐ支払える額',
       yourItems: 'あなたの品目',
       sendTo: '送金先',

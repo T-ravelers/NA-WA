@@ -6,6 +6,7 @@ export default {
     backToList: 'Back to Splits',
     /** 금액과 단위를 한 문구로 묶는다. 단위 위치는 로케일마다 다르다. */
     points: '{amount} P',
+    state: 'State',
     toPay: 'To Pay',
     toCollect: 'To Collect',
     start: 'Start Split',
@@ -19,6 +20,8 @@ export default {
     type: { EQUAL: 'Even', ITEMIZED: 'Itemized' },
     status: { REQUESTED: 'Requested', COMPLETED: 'Completed' },
     list: {
+      introPay: 'Check the requests waiting on you, then look back over what is already settled.',
+      introCollect: 'Track the requests you sent, then look back over what is already settled.',
       loading: 'Loading splits',
       retryHint: 'Check your connection and try again.',
       youPay: 'You pay',
@@ -57,6 +60,8 @@ export default {
       noPaymentsTitle: 'No payments available',
       noPaymentsDescription:
         'Only your own completed payments that have not been split yet can start a split.',
+      stepPayment: 'Select payment',
+      stepDetails: 'Request details',
       journeys: 'Journey',
       appointments: 'Appointment',
       transactions: 'Transaction',
@@ -165,6 +170,7 @@ export default {
       paidBy: 'Paid by',
       transactionId: 'Transaction',
       yourShare: 'Your share',
+      amountToSettle: 'Amount to settle',
       payableNow: 'Payable now',
       yourItems: 'Your items',
       sendTo: 'Send to',
