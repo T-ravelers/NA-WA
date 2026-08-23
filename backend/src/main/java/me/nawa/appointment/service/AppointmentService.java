@@ -66,6 +66,8 @@ public class AppointmentService {
             AppointmentStatus.RECRUITING,
             AppointmentStatus.FULL,
             AppointmentStatus.IN_PROGRESS,
+            // DB에 저장되는 값이라 다른 상태와 똑같이 검색 조건이 될 수 있다.
+            AppointmentStatus.AWAITING_ATTENDANCE,
             AppointmentStatus.COMPLETED,
             AppointmentStatus.CANCELLED
     );
@@ -432,8 +434,11 @@ public class AppointmentService {
                     AppointmentErrorCode.APPOINTMENT_FORBIDDEN
             );
         }
-        if (appointment.getAppointmentStatus()
-                != AppointmentStatus.IN_PROGRESS) {
+        // 활동이 끝나면 스케줄러가 AWAITING_ATTENDANCE로 옮긴다. 옮기기 전 몇 초
+        // 사이에도 화면은 이미 출석 확정을 열어 주므로 두 상태를 다 받는다.
+        AppointmentStatus currentStatus = appointment.getAppointmentStatus();
+        if (currentStatus != AppointmentStatus.IN_PROGRESS
+                && currentStatus != AppointmentStatus.AWAITING_ATTENDANCE) {
             throw new BusinessException(
                     AppointmentErrorCode.INVALID_ATTENDANCE_CONFIRMATION
             );
@@ -515,7 +520,7 @@ public class AppointmentService {
 
         if (appointmentMapper.updateAppointmentStatus(
                 appointmentId,
-                AppointmentStatus.IN_PROGRESS,
+                currentStatus,
                 AppointmentStatus.COMPLETED
         ) != 1) {
             throw new BusinessException(
@@ -785,11 +790,11 @@ public class AppointmentService {
     }
 
     // 목록·상세 조회에서 실제로 보여줄 상태를 시간 기준으로 즉시 계산한다.
-    // 스케줄러(60초 주기)가 DB 컬럼을 아직 못 따라잡았어도, 사용자에게는 여기서
-    // 계산한 값을 곧바로 보여준다. DB의 실제 appointment_status는 스케줄러가
-    // 뒤에서 계속 따라잡으므로, 이 메서드는 화면 표시에만 쓰고 트립 연결·QR
-    // 공동결제처럼 실제 DB 상태 일관성이 중요한 로직(findMyOngoingAppointments
-    // 등)에는 쓰지 않는다.
+    // 스케줄러가 같은 규칙으로 DB 컬럼을 따라잡지만, 화면이 그 주기를 기다리지
+    // 않게 여기서 한 번 더 본다 — 스케줄러가 늦거나 멈춰도 화면은 정확하다.
+    //
+    // 이 값은 화면 표시에만 쓴다. 트립 연결·QR 공동결제처럼 저장된 값으로 걸러야
+    // 하는 로직(findMyOngoingAppointments 등)은 컬럼을 직접 본다.
     private static AppointmentStatus resolveDisplayStatus(
             Appointment appointment) {
         AppointmentStatus status = appointment.getAppointmentStatus();
@@ -807,11 +812,8 @@ public class AppointmentService {
                 && !now.isBefore(appointment.getActivityStartAt())) {
             status = AppointmentStatus.IN_PROGRESS;
         }
-        // 활동이 끝났는데 방장이 아직 출석을 확정하지 않은 약속. DB에는 확정
-        // 전까지 IN_PROGRESS로 남지만(스케줄러도 이 전이는 다루지 않는다 —
-        // COMPLETED는 출석 확정만이 만든다), 화면에는 "진행 중"이 아니라
-        // "출석 확정 대기"로 보여야 한다. AWAITING_ATTENDANCE는 이 메서드만
-        // 만들어내는 표시 전용 값이다.
+        // 활동이 끝났는데 방장이 아직 출석을 확정하지 않은 약속. 스케줄러가 같은
+        // 조건으로 DB도 옮기므로 여기까지 오는 것은 그 주기 안의 몇 초뿐이다.
         if (status == AppointmentStatus.IN_PROGRESS
                 && appointment.getActivityEndAt() != null
                 && !now.isBefore(appointment.getActivityEndAt())) {

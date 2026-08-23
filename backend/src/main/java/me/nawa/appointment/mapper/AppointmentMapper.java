@@ -46,6 +46,10 @@ public interface AppointmentMapper {
     // 실제보다 늦게(또는 빠르게) 일어난다.
     int startDueAppointments(@Param("now") LocalDateTime now);
 
+    // 활동 종료 시각이 지난 IN_PROGRESS 약속을 AWAITING_ATTENDANCE로 옮긴다.
+    // 시각 비교 기준을 애플리케이션에서 받는 이유는 위와 같다.
+    int endDueAppointments(@Param("now") LocalDateTime now);
+
     List<Appointment> searchAppointments(
             @Param("request") AppointmentSearchRequest request,
             @Param("offset") int offset
@@ -101,7 +105,7 @@ public interface AppointmentMapper {
     );
 
     // includeAll=true의 예정/지난 분류 기준도 DB의 NOW()가 아니라 애플리케이션이 넘긴
-    // now를 쓴다. 이유는 closeExpiredRecruitingAppointments와 같다 — activity_start_at은
+    // now를 쓴다. 이유는 startDueAppointments와 같다 — activity_start_at은
     // 애플리케이션의 LocalDateTime.now() 기준으로 저장되는데, DB 서버 컨테이너의 시간대가
     // 애플리케이션(TZ=Asia/Seoul)과 다르면 그 시차만큼 경계가 어긋나 지금 시각 근처의
     // 약속이 예정/지난 반대쪽으로 정렬된다.

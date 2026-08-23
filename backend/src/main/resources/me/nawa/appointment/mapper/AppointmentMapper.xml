@@ -88,6 +88,15 @@
           AND deleted_at IS NULL
     </update>
 
+    <update id="endDueAppointments">
+        UPDATE appointments
+        SET appointment_status = 'AWAITING_ATTENDANCE',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE appointment_status = 'IN_PROGRESS'
+          AND activity_end_at &lt;= #{now}
+          AND deleted_at IS NULL
+    </update>
+
     <update id="updateAttendance">
         UPDATE appointment_members
         SET attendance_status = #{attendanceStatus},
@@ -383,7 +392,8 @@
     </select>
 
     <!--
-        includeAll=false: 기존 계약 그대로 진행 중(IN_PROGRESS) 약속만, 다가오는 순.
+        includeAll=false: 활동이 시작됐고 아직 출석 확정 전인 약속만, 다가오는 순.
+        진행 중(IN_PROGRESS)과 확정 대기(AWAITING_ATTENDANCE) 둘 다 대상이다.
         includeAll=true: 취소를 제외한 전체. 예정 약속을 임박한 순으로 먼저,
         지난 약속을 최근 순으로 뒤에. 프로필의 약속 목록이 쓴다.
     -->
@@ -424,7 +434,11 @@
                          a.appointment_id DESC
             </when>
             <otherwise>
-                AND a.appointment_status = 'IN_PROGRESS'
+                <!--
+                    활동이 끝나도 출석 확정 전까지는 남긴다. 종료 시각은 방장이 적어 둔
+                    예정 시각이라 그 시각을 넘겨 공동결제하는 일이 흔하다.
+                -->
+                AND a.appointment_status IN ('IN_PROGRESS', 'AWAITING_ATTENDANCE')
                 ORDER BY a.activity_start_at ASC
             </otherwise>
         </choose>

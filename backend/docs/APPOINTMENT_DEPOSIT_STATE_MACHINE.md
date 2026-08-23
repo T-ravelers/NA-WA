@@ -35,7 +35,7 @@ DB 컬럼: `appointments.appointment_status`
 | `RECRUITING` | 방장 결제가 완료되어 참가자를 모집하는 상태 |
 | `FULL` | 정원이 모두 찬 상태. 시간으로 도달하는 경로는 없습니다 — 참여 마감 시각을 두지 않으므로 정원이 차지 않은 약속은 활동이 시작될 때까지 `RECRUITING`에 머뭅니다. |
 | `IN_PROGRESS` | 활동 시작 시각에 도달하여 약속이 진행 중인 상태 |
-| `AWAITING_ATTENDANCE` | 활동 종료 시각이 지났지만 방장이 아직 출석을 확정하지 않은 상태. **표시 전용** — DB에는 저장되지 않고 조회 응답이 `resolveDisplayStatus`에서 시간 기준으로 계산해 내보냅니다(15절). DB 컬럼은 출석 확정 전까지 `IN_PROGRESS`를 유지합니다. |
+| `AWAITING_ATTENDANCE` | 활동 종료 시각이 지났지만 방장이 아직 출석을 확정하지 않은 상태. 활동 종료 시각이 지난 `IN_PROGRESS` 약속을 스케줄러가 이 값으로 옮겨 DB에 저장합니다(15절). 조회 응답은 스케줄러가 아직 옮기지 못한 몇 초 동안에도 같은 규칙을 계산해 이 값으로 내보냅니다. |
 | `COMPLETED` | 출석 확정과 약속 진행이 모두 끝난 상태 |
 | `CANCELLED` | 코드에는 정의돼 있으나, 17절 정책에 따라 실제로 도달하는 경로가 없는 상태 |
 
@@ -56,6 +56,10 @@ DB 컬럼: `appointments.appointment_status`
     └─→ CANCELLED   # 17절 참고 — 현재 트리거 없음
 
     IN_PROGRESS
+    ├─→ AWAITING_ATTENDANCE # 활동 종료 시각 도달
+    └─→ COMPLETED           # 스케줄러가 옮기기 전에 방장이 출석을 확정한 경우
+
+    AWAITING_ATTENDANCE
     └─→ COMPLETED
 
     COMPLETED
@@ -72,7 +76,8 @@ DB 컬럼: `appointments.appointment_status`
 | `RECRUITING → FULL` | 정원 도달. `joinAppointment`가 참여 성공 트랜잭션 안에서 즉시 동기로 전환합니다. 시간 기반 트리거는 없습니다. |
 | `FULL → RECRUITING` | 활동 시작 시각 전에 참여 취소가 발생해 빈자리가 생기면 `leaveAppointment`가 같은 트랜잭션에서 즉시 되돌립니다. 활동이 시작된 뒤의 참여 취소(12절)에서는 빈자리가 생겨도 새로 참여할 수 없으므로 `FULL`을 유지합니다. |
 | `RECRUITING·FULL → IN_PROGRESS` | `activityStartAt` 도달. 방장의 별도 확정 액션 없이 스케줄러가 시간만 보고 전환(15절). 정원이 차지 않은 약속은 `FULL`을 거치지 않으므로 `RECRUITING`도 대상입니다 — 빼면 그런 약속이 활동 시작 뒤에도 모집 중으로 남습니다. |
-| `IN_PROGRESS → COMPLETED` | 방장이 모든 `ACTIVE` 회원의 출석을 확정. `activityEndAt`이 지난 뒤에만 받습니다(4절). |
+| `IN_PROGRESS → AWAITING_ATTENDANCE` | `activityEndAt` 도달. 방장의 별도 액션 없이 스케줄러가 시간만 보고 전환(15절). |
+| `IN_PROGRESS·AWAITING_ATTENDANCE → COMPLETED` | 방장이 모든 `ACTIVE` 회원의 출석을 확정. `activityEndAt`이 지난 뒤에만 받습니다(4절). 대부분 `AWAITING_ATTENDANCE`에서 오지만, 스케줄러가 종료 전이를 기록하기 전 몇 초 사이의 확정도 막지 않으려고 `IN_PROGRESS`도 함께 받습니다. |
 | `* → CANCELLED` | 코드에는 정의돼 있으나 17절 정책에 따라 트리거하는 API·스케줄러를 만들지 않습니다. |
 
 ## 3. 약속 회원 상태 `MembershipStatus`
@@ -417,11 +422,12 @@ DB 컬럼: `appointments.item_type`
 
 ## 15. 약속 lifecycle 전이 — 계산해서 표시 + 폴링 스케줄러로 뒷정리
 
-시간 기반 전이(`RECRUITING·FULL → IN_PROGRESS`)는 사용자 액션이 아니라 시간이
-조건입니다. `IN_PROGRESS → COMPLETED`는 방장의 출석 확정 액션이 트리거이므로
-아래 내용의 대상이 아닙니다. 정원이 차서 `FULL`이 되는 경우도 시간과 무관한
-이벤트라 스케줄러가 아니라 `joinAppointment`가 참여 성공 시점에 동기로
-처리합니다(2절).
+시간 기반 전이는 둘입니다. `RECRUITING·FULL → IN_PROGRESS`(활동 시작 시각 도달)와
+`IN_PROGRESS → AWAITING_ATTENDANCE`(활동 종료 시각 도달)이며, 둘 다 사용자 액션이
+아니라 시간이 조건이라 스케줄러가 DB에 기록합니다. `COMPLETED`는 방장의 출석 확정
+액션이 트리거이므로 아래 내용의 대상이 아닙니다. 정원이 차서 `FULL`이 되는 경우도
+시간과 무관한 이벤트라 스케줄러가 아니라 `joinAppointment`가 참여 성공 시점에
+동기로 처리합니다(2절).
 
 **화면에 보여주는 값과 DB에 저장된 값을 분리합니다.** 약속 목록·상세 조회
 (`AppointmentService.toSummaryResponse`/`toDetailResponse`가 호출하는
@@ -431,15 +437,12 @@ DB 컬럼: `appointments.item_type`
 `activityStartAt`이 이미 지났으면 응답은 `IN_PROGRESS`로 나갑니다.
 이러면 사용자는 스케줄러 주기와 무관하게 항상 정확한 상태를 봅니다.
 
-이 계산에는 DB에 존재하지 않는 **표시 전용 상태 `AWAITING_ATTENDANCE`**가 하나
-있습니다. `activityEndAt`이 지났지만 방장이 아직 출석을 확정하지 않은 약속은 DB
-컬럼상 `IN_PROGRESS`지만, 응답에는 `AWAITING_ATTENDANCE`로 나갑니다.
-`IN_PROGRESS → COMPLETED`가 출석 확정 액션으로만 일어나는 이상(2절) "활동이
-끝났는데 진행 중"으로 보이는 구간이 무한정 남는데, 그 구간을 화면이 클라이언트
-시계로 다시 재지 않고 서버 판정 하나로 알 수 있게 한 것입니다. 이 값은
-`resolveDisplayStatus`만 만들어내며 DB에 쓰이지 않고, `canTransitionTo()`에서도
-어떤 전이에도 등장하지 않습니다. 프론트엔드 출석 확정 화면 게이트가 이 값을
-사용합니다.
+`AWAITING_ATTENDANCE`도 같은 규칙으로 계산합니다. `activityEndAt`이 지났지만 방장이
+아직 출석을 확정하지 않은 약속이 여기 해당합니다. 한때 이 값은 DB에 저장되지 않는
+표시 전용이었고, 그래서 컬럼은 출석 확정 전까지 계속 `IN_PROGRESS`에 머물렀습니다.
+그 구간이 무한정 남는 바람에 **컬럼으로 거르는 코드와 화면이 서로 다른 말을 했고**,
+지금은 스케줄러가 이 전이도 DB에 기록합니다. 계산은 스케줄러가 아직 옮기지 못한
+주기 안의 몇 초를 메우는 보정으로 남습니다.
 
 이 라이브 계산은 **화면 표시에만** 적용합니다. `GET /appointments/me`(트립 연결·
 QR 공동결제 게이팅에 쓰이는 엔드포인트, `findMyOngoingAppointments`)는 라이브
@@ -447,10 +450,16 @@ QR 공동결제 게이팅에 쓰이는 엔드포인트, `findMyOngoingAppointmen
 값에 걸리는 다른 로직(트립 비용 연결 등)과의 일관성이 즉시 반영보다 더
 중요하다고 판단했습니다. 따라서 활동이 실제로 시작된 뒤에도 스케줄러가 아직
 `IN_PROGRESS`로 못 바꿨다면 최대 60초까지는 이 엔드포인트에 나타나지 않을 수
-있습니다.
+있습니다. 활동이 끝난 뒤에도 출석 확정 전까지는 계속 나타납니다 — 활동 종료
+시각은 방장이 적어 둔 예정 시각이라 그 시각을 넘겨 공동결제하는 일이 흔해서,
+`IN_PROGRESS`와 `AWAITING_ATTENDANCE`를 함께 대상으로 봅니다.
 
-DB 컬럼 값 자체는 스케줄러가 뒤에서 맞춥니다. 아무도 이 쓰기 작업의 결과를
-실시간으로 보고 있지 않으므로 주기가 길어도 됩니다.
+출석 확정은 두 상태 모두에서 받습니다. 스케줄러가 옮기기 전 몇 초 동안에도 화면은
+계산 결과로 이미 출석 확정을 열어 주기 때문에, 한쪽만 받으면 그 사이에 누른 방장이
+이유 없는 오류를 보게 됩니다.
+
+DB 컬럼 값 자체는 스케줄러가 뒤에서 맞춥니다. 화면은 이 주기를 기다리지 않으므로
+주기가 길어도 되지만, 컬럼으로 거르는 코드는 그만큼 늦게 따라잡습니다.
 
 - `RootConfig`에 `@EnableScheduling`이 이미 있어 별도 설정이 필요 없습니다.
 - `me.nawa.appointment.service.AppointmentLifecycleScheduler`가
@@ -460,12 +469,22 @@ DB 컬럼 값 자체는 스케줄러가 뒤에서 맞춥니다. 아무도 이 �
   더 줄일 이유는 없어 값은 코드에 고정해뒀습니다(설정 파일로 뺄 만큼의 실익이
   없음).
 - 전이는 약속마다 개별 트랜잭션으로 처리하지 않고, `AppointmentMapper`의 벌크
-  `UPDATE` 두 개(`closeExpiredRecruitingAppointments`,
-  `startDueClosedAppointments`)를 한 트랜잭션(`advanceLifecycle()`) 안에서
-  차례로 실행합니다. 각 `UPDATE`는 조건에 맞는 행을 한 번에 전환하는 단일
-  문장이라 그 자체로 원자적이고, 약속 수가 늘어나도 라운드트립이 늘지 않습니다.
-  `advanceLifecycle()`은 `@Scheduled` 메서드 자체가 직접 호출 가능한 public
-  메서드라 스케줄을 기다리지 않고 단위 테스트에서 바로 호출해 검증합니다.
+  `UPDATE` 두 개(`startDueAppointments`, `endDueAppointments`)를 한
+  트랜잭션(`advanceLifecycle()`) 안에서 차례로 실행합니다. **시작을 먼저
+  반영합니다** — 뒤집으면 스케줄러가 오래 멈춰 있던 사이에 활동이 통째로 지나간
+  약속이 한 주기에 종료까지 따라오지 못합니다. 각 `UPDATE`는 조건에 맞는 행을 한
+  번에 전환하는 단일 문장이라 그 자체로 원자적이고, 약속 수가 늘어나도
+  라운드트립이 늘지 않습니다. `advanceLifecycle()`은 `@Scheduled` 메서드 자체가
+  직접 호출 가능한 public 메서드라 스케줄을 기다리지 않고 테스트에서 바로 호출해
+  검증합니다.
+
+**되돌릴 때는 앱만 내리면 안 됩니다.** `V19`가 적용되고 스케줄러가 한 주기라도 돈
+뒤에 WAR만 이전 버전으로 내리면 `AWAITING_ATTENDANCE`로 옮겨진 행이 그대로
+남습니다. 옛 코드는 출석 확정을 `IN_PROGRESS`에서만 받고
+`findMyOngoingAppointments`도 `IN_PROGRESS`만 보므로, 그 행들은 출석 확정이 막히고
+QR 공동결제 대상 목록에서도 빠집니다 — 이 전이를 도입해 고친 증상이 반대 방향으로
+그대로 납니다. 롤백에는 해당 행을 `IN_PROGRESS`로 되돌리는 `UPDATE`가 함께
+필요합니다. ENUM 값 자체는 남겨 둬도 무해합니다.
 
 ## 16. 보증금 정산 — 비동기 배치
 

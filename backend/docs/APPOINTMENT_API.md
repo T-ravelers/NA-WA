@@ -39,15 +39,17 @@
 - `RECRUITING`·`FULL` → `IN_PROGRESS`: 활동 시작 시각이 되면 60초 주기 스케줄러가
   전환합니다. 방장의 별도 확정 절차는 없습니다. 정원이 차지 않은 약속은 `FULL`을
   거치지 않으므로 `RECRUITING`에서 곧바로 넘어갑니다.
-- `IN_PROGRESS` → `COMPLETED`: 방장이 모든 `ACTIVE` 회원의 출석을 확정한 경우
+- `IN_PROGRESS` → `AWAITING_ATTENDANCE`: 활동 종료 시각이 되면 같은 60초 주기
+  스케줄러가 전환합니다. 방장의 별도 확정 절차는 없습니다.
+- `IN_PROGRESS`·`AWAITING_ATTENDANCE` → `COMPLETED`: 방장이 모든 `ACTIVE` 회원의
+  출석을 확정한 경우. 대부분 `AWAITING_ATTENDANCE`에서 오지만, 스케줄러가 종료
+  전이를 기록하기 전 몇 초 사이의 확정도 막지 않으려고 `IN_PROGRESS`도 받습니다.
 
 목록·상세 조회 응답의 `appointmentStatus`는 스케줄러가 아직 못 따라잡았어도
-정원과 시작·종료 시각 기준으로 즉시 계산한 값을 보여줍니다. 이 계산에는 DB에는
-저장되지 않는 **표시 전용 값 `AWAITING_ATTENDANCE`**가 하나 더 있습니다 —
-`activityEndAt`이 지났지만 방장이 아직 출석을 확정하지 않은 약속은 DB에
-`IN_PROGRESS`로 남아 있어도 응답에는 `AWAITING_ATTENDANCE`로 옵니다(활동
-종료를 시간으로 완료 처리하는 전이는 없습니다 — `COMPLETED`는 출석 확정만이
-만듭니다). 단, `GET /appointments/me`는
+정원과 시작·종료 시각 기준으로 즉시 계산한 값을 보여줍니다. 시간 기반 전이 둘은
+스케줄러가 DB 컬럼에도 기록하므로, 이 계산은 그 주기 안의 몇 초를 메우는
+보정입니다(활동 종료를 시간으로 완료 처리하는 전이는 없습니다 — `COMPLETED`는
+출석 확정만이 만듭니다). 단, `GET /appointments/me`는
 DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초까지 지연될 수
 있습니다. 자세한 내용은
 [APPOINTMENT_DEPOSIT_STATE_MACHINE.md](./APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
@@ -103,7 +105,7 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 
 | scope | 범위 | 정렬 |
 | --- | --- | --- |
-| `ONGOING`(기본) | `IN_PROGRESS` 약속만 | `activityStartAt` 오름차순 — QR 공동 소비 결제가 쓰는 기존 계약 그대로 |
+| `ONGOING`(기본) | `IN_PROGRESS`·`AWAITING_ATTENDANCE` 약속만 | `activityStartAt` 오름차순 — QR 공동 소비 결제가 쓰는 기존 계약 그대로 |
 | `ALL` | `CANCELLED`를 제외한 전체 | 예정 약속을 임박한 순으로 먼저, 지난 약속을 최근 순으로 뒤에 — 프로필의 약속 목록이 사용 |
 
 `ALL`은 `PAYMENT_PENDING`을 포함합니다. `PAYMENT_PENDING`에 한해 상세 조회의
@@ -137,6 +139,10 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 15절). 그래서 활동 시작 시각이 지나도 스케줄러가 아직 상태를 못 바꿨다면,
 `scope=ONGOING`에서는 해당 약속이 최대 60초까지 배열에서 빠질 수 있고
 `scope=ALL`에서는 `appointmentStatus`가 그만큼 늦게 반영될 수 있습니다.
+
+활동 종료 시각이 지난 약속은 `scope=ONGOING`에서 빠지지 않고 출석 확정 전까지
+남습니다(`AWAITING_ATTENDANCE`). 종료 시각은 방장이 미리 적어 둔 예정 시각이라 그
+시각을 넘겨 QR 공동 소비 결제를 하는 일이 흔합니다.
 
 ## 약속 생성
 
@@ -248,18 +254,19 @@ visit_date)`가 살아 있는 행에 대해 UNIQUE라 새 행을 넣을 수 없�
 }
 ```
 
-- 방장만 `IN_PROGRESS` 상태에서 모든 `ACTIVE` 회원을 정확히 한 번씩 `ATTENDED`
-  또는 `NO_SHOW`로 확정할 수 있습니다. 방장이 아니면 `APPOINTMENT-004`, 약속이
-  `IN_PROGRESS`가 아니거나 출석자가 한 명도 없거나 요청이 활성 회원 전원을
-  정확히 한 번씩 포함하지 않으면 `APPOINTMENT-006`을 반환합니다.
-- **`IN_PROGRESS`인 것만으로는 부족합니다.** 이 상태는 활동 **시작** 시각에
-  스케줄러가 바꾸므로, 상태만 보면 활동이 진행되는 도중에도 확정이 통과합니다.
+- 방장만 `IN_PROGRESS`·`AWAITING_ATTENDANCE` 상태에서 모든 `ACTIVE` 회원을 정확히
+  한 번씩 `ATTENDED` 또는 `NO_SHOW`로 확정할 수 있습니다. 방장이 아니면
+  `APPOINTMENT-004`, 약속이 두 상태 중 어느 것도 아니거나 출석자가 한 명도 없거나
+  요청이 활성 회원 전원을 정확히 한 번씩 포함하지 않으면 `APPOINTMENT-006`을
+  반환합니다.
+- **상태만으로는 부족합니다.** `IN_PROGRESS`는 활동 **시작** 시각에 스케줄러가
+  바꾸므로, 상태만 보면 활동이 진행되는 도중에도 확정이 통과합니다.
   아직 오는 중인 참여자가 노쇼로 굳어 보증금을 잃고, 확정에는 되돌리는 상태
   전이가 없습니다. 그래서 `activityEndAt`이 지났는지 함께 보고, 지나지 않았거나
   값을 읽지 못하면 `APPOINTMENT-009`를 반환합니다. 화면은 이 조건을 직접 재지
-  않고, 조회 응답이 같은 판정을 담아 내려주는 표시 전용 상태
-  `AWAITING_ATTENDANCE`(위 "약속 상태 전이" 참고)로 진입을 엽니다 — 다만 화면
-  게이트가 무엇이든 화면을 거치지 않는 요청은 이 서버 검사가 막습니다.
+  않고, 조회 응답이 같은 판정을 담아 내려주는 `AWAITING_ATTENDANCE`(위 "약속 상태
+  전이" 참고)로 진입을 엽니다 — 다만 화면 게이트가 무엇이든 화면을 거치지 않는
+  요청은 이 서버 검사가 막습니다.
 - 성공하면 같은 트랜잭션에서 각 회원의 출석 상태를 반영하고 약속을 `COMPLETED`로
   전환한 뒤, 보증금 정산 배치(`DepositPayoutBatch`)를 `PENDING`으로 생성합니다.
   이 시점에는 아직 지갑 이체가 일어나지 않습니다 — 실제 환급(출석 회원 본인

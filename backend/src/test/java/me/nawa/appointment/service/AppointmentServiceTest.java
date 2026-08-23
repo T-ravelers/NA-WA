@@ -1201,6 +1201,60 @@ class AppointmentServiceTest {
                 .compareTo(batch.getTotalHeldAmount()));
     }
 
+    // 스케줄러가 활동 종료를 기록하고 나면 상태는 AWAITING_ATTENDANCE다. 출석
+    // 확정은 그 상태에서도 통해야 한다 — 실제 운영에서는 대부분 이쪽으로 온다.
+    @Test
+    void confirmAttendance_awaitingAttendance_completesAppointment() {
+        Appointment appointment = endedAppointment(
+                10L, AppointmentStatus.AWAITING_ATTENDANCE);
+        AppointmentMember host = AppointmentMember.builder()
+                .appointmentMemberId(20L)
+                .appointmentId(10L)
+                .memberId(1L)
+                .build();
+        AppointmentMember guest = AppointmentMember.builder()
+                .appointmentMemberId(21L)
+                .appointmentId(10L)
+                .memberId(2L)
+                .build();
+        Deposit hostDeposit = mock(Deposit.class);
+        when(hostDeposit.isHeld()).thenReturn(true);
+        when(hostDeposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        Deposit guestDeposit = mock(Deposit.class);
+        when(guestDeposit.isHeld()).thenReturn(true);
+        when(guestDeposit.getAmount()).thenReturn(BigDecimal.valueOf(10_000));
+        when(appointmentMapper.findAppointmentByIdForUpdate(10L))
+                .thenReturn(appointment);
+        when(appointmentMapper.findActiveMembersByAppointmentId(10L))
+                .thenReturn(List.of(host, guest));
+        when(appointmentMapper.updateAttendance(
+                eq(20L), eq(AttendanceStatus.ATTENDED), any()
+        )).thenReturn(1);
+        when(appointmentMapper.updateAttendance(
+                eq(21L), eq(AttendanceStatus.NO_SHOW), any()
+        )).thenReturn(1);
+        when(depositMapper.findByAppointmentMemberId(20L))
+                .thenReturn(hostDeposit);
+        when(depositMapper.findByAppointmentMemberId(21L))
+                .thenReturn(guestDeposit);
+        when(appointmentMapper.updateAppointmentStatus(
+                10L,
+                AppointmentStatus.AWAITING_ATTENDANCE,
+                AppointmentStatus.COMPLETED
+        )).thenReturn(1);
+        when(depositPayoutBatchMapper.insert(any())).thenReturn(1);
+
+        appointmentService.confirmAttendance(1L, 10L, attendanceRequest());
+
+        // 전이는 지금 상태에서 출발한다. IN_PROGRESS로 고정해 두면 스케줄러가
+        // 옮겨 놓은 뒤의 확정이 통째로 막힌다.
+        verify(appointmentMapper).updateAppointmentStatus(
+                10L,
+                AppointmentStatus.AWAITING_ATTENDANCE,
+                AppointmentStatus.COMPLETED
+        );
+    }
+
     // 활동 중에 나가 노쇼로 굳은 LEFT 회원의 보증금(HELD)도 이 배치가 분배할
     // 몫이므로 합산에 포함돼야 한다.
     @Test
