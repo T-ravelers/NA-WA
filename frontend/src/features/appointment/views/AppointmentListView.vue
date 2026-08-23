@@ -173,9 +173,26 @@ const resumeTripId = computed(() => readPositiveInteger(route.query.tripId))
 const resumeAppointmentId = computed(() => readPositiveInteger(route.query[JOIN_TARGET_KEY]))
 
 watch(
-  () => [resumeTripId.value, resumeAppointmentId.value, appointments.value] as const,
+  () =>
+    [
+      resumeTripId.value,
+      resumeAppointmentId.value,
+      appointments.value,
+      // 여정 목록도 소스다. 시트가 열려야 조회가 시작되므로(`useJourneyListQuery`는
+      // `journeySelectOpen`을 enabled로 받는다) `resume`이 불리는 그 시점에는 아직
+      // 목록이 없다. 이 소스가 빠지면 목록이 도착해도 watch를 다시 깨울 것이 없어
+      // "골라 둔 채로 보여 준다"가 빈 선택으로 끝난다. 상세와 같은 구성이다.
+      joinFlow.journeyListQuery.data.value,
+    ] as const,
   ([tripId, appointmentId, list]) => {
-    if (tripId === undefined || appointmentId === undefined) return
+    if (appointmentId === undefined) return
+    // 여정을 만들지 않고 뒤로 온 경우. 표시만 남고 이어서 열 것이 없으니 주소를
+    // 정리한다 — 남겨 두면 `consumeJoinMarker`가 영영 불리지 않아 계속 붙어 다닌다.
+    if (tripId === undefined) {
+      consumeJoinMarker()
+      return
+    }
+
     const found = list.find((appointment) => appointment.appointmentId === appointmentId)
     if (found === undefined) return
 
