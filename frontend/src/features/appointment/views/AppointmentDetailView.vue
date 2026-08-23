@@ -220,11 +220,16 @@ const reviewsDisabledReason = computed(() => {
   if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
   return t('appointment.detail.menu.reviewsNotAttended')
 })
-// 나가기 버튼을 눌렀는데 막혔을 때 모달이 말할 이유. 버튼이 그려졌다는 것 자체가
-// 내가 방장이 아닌 ACTIVE 회원이라는 뜻이므로(목록은 ACTIVE만 담고, 방장 본인 행은
-// 버튼 칸이 비어 있다) 남는 것은 활동이 끝났거나 약속이 취소된 경우다.
+// 나가기 버튼을 눌렀는데 막혔을 때 모달이 말할 이유.
+//
+// 회원 자격부터 가른다. 버튼이 그려지는 근거는 회원 목록의 ACTIVE 행이고, 막히는
+// 이유를 고르는 근거는 참여 조회다 — 출처가 둘이라 "버튼이 있으니 ACTIVE 회원"이
+// 성립하지 않는다. 두 응답의 도착 시점이 어긋나면 나간 사람에게 버튼이 남는데,
+// 이 갈래가 없으면 그 사람에게 시계 탓("활동이 끝났다")을 하게 된다 — 이 PR이
+// 참여 쪽에서 고친 것과 같은 종류의 거짓말이다.
 const leaveBlockedReason = computed(() => {
   if (canLeave.value) return undefined
+  if (!isActiveMember.value) return t('appointment.members.leaveNotMember')
   if (appointment.value?.appointmentStatus === 'CANCELLED') {
     return t('appointment.members.leaveCancelled')
   }

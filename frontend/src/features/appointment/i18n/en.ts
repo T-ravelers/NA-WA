@@ -207,6 +207,7 @@ export default {
       visit: 'Visit',
       leave: 'Leave',
       leaveBlockedTitle: "You can't leave this appointment",
+      leaveNotMember: 'You already left this appointment.',
       leaveCancelled: 'This appointment was canceled.',
       leaveEnded: 'The activity has ended, so you can no longer leave.',
       leaveCheckFailed:

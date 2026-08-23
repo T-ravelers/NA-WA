@@ -1075,6 +1075,25 @@ describe('AppointmentDetailView', () => {
     expect(cancelAppointmentParticipation).not.toHaveBeenCalled()
   })
 
+  it('blames neither the clock nor the cancellation when I am no longer a member', async () => {
+    // 버튼은 회원 목록(ACTIVE 행)에서 그려지고 이유는 참여 조회에서 고른다. 두
+    // 응답이 어긋나면 이미 나간 사람에게 버튼이 남는데, 그때 "활동이 끝났다"고
+    // 하면 이 PR이 참여 쪽에서 고친 것과 같은 거짓말이 나가기 쪽에 남는다.
+    fetchMyAppointmentParticipation.mockResolvedValue({
+      ...memberParticipation,
+      membershipStatus: 'LEFT' as const,
+    })
+    const { wrapper } = await mountView()
+
+    await leaveButton(wrapper)?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('You already left this appointment.')
+    expect(wrapper.text()).not.toContain('The activity has ended, so you can no longer leave.')
+    expect(wrapper.text()).not.toContain('This appointment was canceled.')
+    expect(cancelAppointmentParticipation).not.toHaveBeenCalled()
+  })
+
   it('blames the cancellation, not the clock, on a canceled appointment', async () => {
     fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'CANCELLED' })
     fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)

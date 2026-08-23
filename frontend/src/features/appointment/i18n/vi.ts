@@ -207,6 +207,7 @@ export default {
       visit: 'Xem',
       leave: 'Rời nhóm',
       leaveBlockedTitle: 'Bạn không thể rời khỏi cuộc hẹn này',
+      leaveNotMember: 'Bạn đã rời khỏi cuộc hẹn này rồi.',
       leaveCancelled: 'Cuộc hẹn này đã bị hủy.',
       leaveEnded: 'Hoạt động đã kết thúc nên bạn không thể rời khỏi nữa.',
       leaveCheckFailed:

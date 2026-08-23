@@ -204,6 +204,7 @@ export default {
       visit: 'プロフィール',
       leave: '退出',
       leaveBlockedTitle: '退出できません',
+      leaveNotMember: 'この同行グループからすでに退出しています。',
       leaveCancelled: 'この同行グループはキャンセルされました。',
       leaveEnded: '活動が終了したため、退出できません。',
       leaveCheckFailed: '参加状況を確認できなかったため、退出ボタンを表示できません。',
