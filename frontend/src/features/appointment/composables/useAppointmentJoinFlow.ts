@@ -52,8 +52,9 @@ interface Options {
 /**
  * 약속 참여 흐름. 여정을 고르고, 보증금을 확인하고, 참여를 요청한다.
  *
- * 목록 카드의 Join과 상세 화면의 참여 버튼이 같은 흐름을 쓴다. 두 화면이 각자 들고
- * 있으면 여정 날짜 검사나 잔액 부족 안내 같은 규칙이 한쪽만 고쳐진다.
+ * 지금 쓰는 곳은 약속 목록 카드의 Join 하나다. 한때 상세 화면에도 같은 흐름이
+ * 인라인으로 있었지만 그쪽 진입점을 걷어내면서(#485) 여기로 모였다. 참여 규칙
+ * (여정 날짜 검사, 잔액 부족 안내, 재개)을 두 곳에 두면 한쪽만 고쳐진다.
  */
 export function useAppointmentJoinFlow(options: Options) {
   const route = useRoute()
@@ -108,10 +109,23 @@ export function useAppointmentJoinFlow(options: Options) {
 
   const joinMutation = useMutation({
     mutationFn: (tripId: number) => joinAppointment(target.value?.appointmentId as number, tripId),
+    // 참여가 끝나면 그 약속 상세로 데려간다. 시트만 조용히 닫으면 목록에 남는데,
+    // 바뀌는 것이 카드의 인원수 한 자리뿐이라 참여가 됐는지 확신할 수 없다 —
+    // 방금 든 약속의 일정·장소·회원을 바로 보여 주는 것이 대답이 된다.
+    //
+    // `push`다. 목록에서 상세로 들어가는 이동이라 뒤로 가면 목록으로 돌아와야 한다.
+    // 재개 표시(`?tripId=`·`joinAppointmentId`)는 여정을 고를 때 이미 정리되므로,
+    // 돌아온 목록에서 시트가 혼자 다시 열리지 않는다.
     onSuccess: async () => {
       const joined = target.value
       depositSheetOpen.value = false
-      if (joined !== null) await invalidateParticipationScopes(joined.appointmentId)
+      if (joined === null) return
+
+      await invalidateParticipationScopes(joined.appointmentId)
+      void router.push({
+        name: 'appointment-detail',
+        params: { appointmentId: String(joined.appointmentId) },
+      })
     },
   })
 

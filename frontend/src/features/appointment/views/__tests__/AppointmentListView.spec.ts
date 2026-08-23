@@ -12,10 +12,13 @@ import {
 } from '../../model/journeyIntegration'
 
 const fetchAppointments = vi.fn()
+const joinAppointment = vi.fn()
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
   fetchAppointments: (filters: unknown) => fetchAppointments(filters),
+  joinAppointment: (appointmentId: number, tripId: number) =>
+    joinAppointment(appointmentId, tripId),
 }))
 
 const AppointmentListView = (await import('../AppointmentListView.vue')).default
@@ -139,6 +142,7 @@ const EMPTY_PAGE = {
 describe('AppointmentListView', () => {
   beforeEach(() => {
     fetchAppointments.mockReset()
+    joinAppointment.mockReset()
     fetchAppointments.mockResolvedValue({
       content: [appointment],
       page: 0,
@@ -316,7 +320,7 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
   })
 
-  // Join은 상세로 보내지 않는다. 목록에 선 채로 상세와 같은 참여 흐름을 연다.
+  // Join을 누르는 것만으로는 목록을 떠나지 않는다. 여정 선택 시트가 목록 위에 열린다.
   it('opens the journey sheet from the card Join button, without leaving the list', async () => {
     const { wrapper, router } = await mountView()
 
@@ -329,6 +333,36 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.name).toBe('appointment-list')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Seoul Foodie Week')
+  })
+
+  // 참여가 끝나면 그 약속 상세로 데려간다. 시트만 닫으면 목록에 남는데, 바뀌는 것이
+  // 카드의 인원수 한 자리뿐이라 참여가 됐는지 확신할 수 없다. push라 뒤로 가면 목록이다.
+  it('lands on the appointment detail once the deposit is confirmed', async () => {
+    joinAppointment.mockResolvedValue(undefined)
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join')
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul Foodie Week'))
+      ?.trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Pay'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(joinAppointment).toHaveBeenCalledWith(7, 7)
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
+    expect(router.currentRoute.value.params.appointmentId).toBe('7')
   })
 
   // 여정을 만들거나 충전하고 돌아오면 시트를 다시 열어 **그 여정을 골라 둔 채로**
