@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
+import { onBeforeRouteUpdate, useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { IconChevronDown, IconSearch } from '@tabler/icons-vue'
 
 import IconOrb from '@/shared/ui/IconOrb.vue'
@@ -26,6 +26,7 @@ import {
   type EventSearchFilters,
   type EventSort,
 } from '../model/eventExplore'
+import { resolveExploreFilterEntry } from '../model/exploreFilterEntry'
 import { useExploreFilterMemoryStore } from '../model/exploreFilterMemory'
 import {
   SEOUL_REGION1,
@@ -268,11 +269,17 @@ const activeFilters = computed(() => {
     ['opensLateOnly', opensLateOnly.value, t('explore.options.openLate')],
     ['preReservationOnly', preReservationOnly.value, t('explore.options.preReservation')],
     ['experienceOnly', experienceOnly.value, t('explore.options.experience')],
-    ['savedOnly', eventSavedOnly.value, t('explore.sort.saved')],
   ]
   options.forEach(([key, selected, label]) => {
     if (selected) values.push({ key: `option:${key}`, label })
   })
+
+  /*
+   * Saved는 Options 시트가 아니라 정렬 시트에 있다. `option:` 접두사를 쓰면 Options
+   * 버튼이 켜지는데 열어 보면 아무것도 체크돼 있지 않고 그 시트의 초기화로도 지워지지
+   * 않는다. 어느 시트의 것인지가 접두사로 갈리므로 정렬 쪽 접두사를 쓴다.
+   */
+  if (eventSavedOnly.value) values.push({ key: 'sort:savedOnly', label: t('explore.sort.saved') })
 
   return values
 })
@@ -313,11 +320,15 @@ const placeActiveFilters = computed(() => {
     ['smokeFree', selectedPlaceSmokeFree.value, t('explore.placeFilterOptions.smokeFree')],
     ['kidFacility', selectedPlaceKidFacility.value, t('explore.placeFilterOptions.kids')],
     ['hasRestroom', selectedPlaceRestroom.value, t('explore.placeFilterOptions.restroom')],
-    ['savedOnly', selectedPlaceSavedOnly.value, t('explore.sort.saved')],
   ]
   options.forEach(([key, selected, label]) => {
     if (selected) values.push({ key: `placeOption:${key}`, label })
   })
+
+  /* Event와 같은 이유로 정렬 쪽 접두사를 쓴다. */
+  if (selectedPlaceSavedOnly.value) {
+    values.push({ key: 'placeSort:savedOnly', label: t('explore.sort.saved') })
+  }
 
   return values
 })
@@ -369,6 +380,32 @@ function buildPlaceQuery(next: PlaceSearchFilters): LocationQueryRaw {
   return query
 }
 
+function scrollToListTop(behavior: ScrollBehavior): void {
+  window.scrollTo({
+    top: 0,
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : behavior,
+  })
+}
+
+/**
+ * 화면이 스스로 주소를 고치는 중인 이동의 수.
+ *
+ * 하단 탭이 보내는 이동과 화면이 필터를 쓰는 이동은 둘 다 같은 route의 query 변경이라 주소
+ * 만으로 구별할 수 없다. 맨 위로 올리는 것은 앞의 것에서만 해야 한다. 겹쳐 도는 이동이
+ * 있으므로 켜고 끄는 대신 센다 — 먼저 끝난 하나가 아직 도는 다른 하나를 밖에서 온 것으로
+ * 만들면 목록이 제멋대로 위로 튄다.
+ */
+const selfNavigations = ref(0)
+
+function navigateSelf(navigate: () => Promise<unknown>): void {
+  selfNavigations.value += 1
+  void navigate()
+    .catch(() => undefined)
+    .finally(() => {
+      selfNavigations.value -= 1
+    })
+}
+
 watch(
   filters,
   (next) => {
@@ -376,7 +413,7 @@ watch(
 
     const query = buildEventQuery(next)
     filterMemory.remember(query)
-    router.replace({ query }).catch(() => undefined)
+    navigateSelf(() => router.replace({ query }))
   },
   { deep: true },
 )
@@ -388,7 +425,7 @@ watch(
 
     const query = buildPlaceQuery(next)
     filterMemory.remember(query)
-    router.replace({ query }).catch(() => undefined)
+    navigateSelf(() => router.replace({ query }))
   },
   { deep: true },
 )
@@ -399,7 +436,55 @@ watch(selectedTab, (next, previous) => {
 
   const query =
     next === 'places' ? buildPlaceQuery(placeFilters.value) : buildEventQuery(filters.value)
-  router.push({ query }).catch(() => undefined)
+  /*
+   * 탭을 옮길 때 그 탭의 기억을 화면이 들고 있는 값으로 덮는다.
+   *
+   * 이 이동은 사용자가 보고 있던 목록을 그대로 옮겨 적는 것이지 새로 진입하는 것이 아니다.
+   * 덮지 않으면 아래 `onBeforeRouteUpdate`가 지난 방문의 필터를 되돌려, 화면에는 없던 조건이
+   * 탭을 누르는 순간 걸린다. 옮겨 적은 뒤 상세를 열었다 뒤로 나와도 같은 목록으로 돌아온다.
+   *
+   * `push`가 아니라 `replace`다. 탭은 이제 필터와 함께 기억하는 상태라 히스토리에 한 칸을
+   * 쓸 이유가 없고, 쓰면 뒤로 가기가 Discover 안에 갇힌다 — 되돌아간 자리는 필터가 빠진
+   * `/explore`라서 아래 guard가 하단 탭이 보낸 진입과 구별하지 못하고 방금 떠나온 탭으로
+   * 다시 보낸다. 사용자에게는 뒤로 가기가 아무 반응도 없는 것처럼 보인다.
+   */
+  filterMemory.remember(query)
+  navigateSelf(() => router.replace({ query }))
+})
+
+/*
+ * 하단 탭으로 Discover를 다시 눌러 필터가 빠진 주소로 오면 마지막 필터를 되돌린다.
+ *
+ * route의 `beforeEnter`는 record에 처음 들어올 때만 돌아서 이 이동을 잡지 못한다. 화면이 이미
+ * 떠 있고 query만 바뀌는 경우가 여기다. 쪽 번호는 되돌리지 않는다 — 상세에서 뒤로 나오는
+ * 길은 record가 바뀌므로 언제나 `beforeEnter`가 맡고, 여기로는 오지 않는다.
+ *
+ * 화면이 스스로 고친 주소에는 되돌릴 것이 없어야 한다. 필터 watcher·탭 전환·
+ * `sanitizeExploreQuery`가 주소를 쓰기 직전에 같은 값을 기억에도 쓰는 이유가 이것이다.
+ * 그 순서가 깨지면 이 guard가 화면이 방금 지운 값으로 되돌리려 하고, 그 되돌린 주소가 곧
+ * 현재 주소라서 router가 이동 자체를 중복으로 취소한다. 화면이 지운 값이 주소에 남는다.
+ */
+onBeforeRouteUpdate((to) => {
+  /*
+   * 하단 탭이 보낸 이동이면 목록을 맨 위로 올린다. 쪽 번호는 위에서 이미 1쪽으로 떨어지는데,
+   * 스크롤이 그대로면 1쪽의 한가운데를 보게 되어 목록이 안 바뀐 것처럼 보인다.
+   */
+  if (selfNavigations.value === 0) scrollToListTop('smooth')
+
+  return resolveExploreFilterEntry(to.query, { keepPage: false }) ?? true
+})
+
+/*
+ * 다른 화면을 보다가 하단 탭으로 들어온 진입도 맨 위에서 시작한다.
+ *
+ * 라우터에 `scrollBehavior`가 없어 이전 화면의 스크롤이 그대로 남는다. 그 진입은 기억까지
+ * 버리므로 목록이 통째로 바뀌는데, 중간부터 보이면 무엇이 바뀐 것인지 알 수 없다.
+ *
+ * 화면이 옮겨오는 것이라 애니메이션 없이 즉시 올린다. 항목 상세에서 뒤로 나온 진입은
+ * `startsOver`가 꺼져 있어 보던 자리에 그대로 남는다.
+ */
+onMounted(() => {
+  if (filterMemory.consumeStartsOver()) scrollToListTop('auto')
 })
 
 watch(
@@ -583,10 +668,7 @@ watch(placeKeywordInput, (value) => {
 })
 
 function changePage(target: 'events' | 'places', page: number): void {
-  window.scrollTo({
-    top: 0,
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-  })
+  scrollToListTop('smooth')
   if (target === 'events') selectedEventPage.value = page
   else selectedPlacePage.value = page
 }
@@ -681,7 +763,8 @@ function removeFilter(key: string): void {
     if (option === 'opensLateOnly') opensLateOnly.value = false
     if (option === 'preReservationOnly') preReservationOnly.value = false
     if (option === 'experienceOnly') experienceOnly.value = false
-    if (option === 'savedOnly') eventSavedOnly.value = false
+  } else if (key === 'sort:savedOnly') {
+    eventSavedOnly.value = false
   }
 }
 
@@ -736,7 +819,8 @@ function removePlaceFilter(key: string): void {
     if (option === 'smokeFree') selectedPlaceSmokeFree.value = false
     if (option === 'kidFacility') selectedPlaceKidFacility.value = false
     if (option === 'hasRestroom') selectedPlaceRestroom.value = false
-    if (option === 'savedOnly') selectedPlaceSavedOnly.value = false
+  } else if (key === 'placeSort:savedOnly') {
+    selectedPlaceSavedOnly.value = false
   }
 }
 
@@ -810,7 +894,9 @@ function sanitizeExploreQuery(tab: ExploreTab): void {
   }
 
   if (before !== JSON.stringify(query)) {
-    router.replace({ query }).catch(() => undefined)
+    // 화면이 걸러낸 값은 기억에서도 지운다. 남겨두면 다음 진입에서 그 값이 되살아난다.
+    filterMemory.remember(query)
+    navigateSelf(() => router.replace({ query }))
   }
 }
 

@@ -105,7 +105,8 @@ const PLACE_OPTIONS: Array<{ key: PlaceOptionKey; labelKey: string }> = [
 
 const draft = reactive<PlaceSearchFilters>(cloneFilters(props.filters))
 const selectedRegion = ref(SEOUL_REGION1)
-const expandedCategories = ref<string[]>(['explore.categories.beauty'])
+// 시트를 열면 전부 접어 둔다. 하나만 펼쳐 두면 그 대분류만 있는 것처럼 보인다.
+const expandedCategories = ref<string[]>([])
 
 watch(
   () => props.filters,
@@ -116,10 +117,16 @@ watch(
   { deep: true },
 )
 
-watch(draft, (filters) => emit('change', cloneFilters(filters)), { deep: true })
+watch(
+  draft,
+  (filters) => {
+    const changed = cloneFilters(filters)
+    collapseCategorySelection(changed)
+    emit('change', changed)
+  },
+  { deep: true },
+)
 
-const selectedSectors = computed(() => new Set(draft.sectorIds ?? []))
-const selectedActivities = computed(() => new Set(draft.activityIds ?? []))
 const currentRegion = computed(() => REGION_OPTIONS[0])
 const selectedAreas = computed(() => new Set(draft.region2 ?? []))
 
@@ -163,50 +170,86 @@ function isAreaSelected(value: string): boolean {
   return selectedAreas.value.has(value)
 }
 
-function isSectorSelected(sectorId: number): boolean {
-  return selectedSectors.value.has(sectorId)
-}
+/**
+ * 화면이 들고 있는 소분류 체크 상태. `ExploreFilterSheet`와 같은 규칙이다.
+ *
+ * 대분류 체크는 따로 저장하지 않고 "그 아래 소분류가 전부 체크됐는가"로만 판단한다.
+ * 주소에는 대분류가 ID 하나로 실려 오므로 여기서 소분류로 펼쳐 두고, 서버로 보낼 때
+ * `collapseCategorySelection`이 다시 접는다.
+ */
+const checkedActivities = computed<Set<number>>(() => {
+  const values = new Set(draft.activityIds ?? [])
+  ;(draft.sectorIds ?? []).forEach((sectorId) => {
+    PLACE_SECTOR_OPTIONS.find((sector) => sector.id === sectorId)?.activities.forEach((activity) =>
+      values.add(activity.id),
+    )
+  })
+
+  return values
+})
 
 function isActivitySelected(activityId: number): boolean {
-  return selectedActivities.value.has(activityId)
+  return checkedActivities.value.has(activityId)
 }
 
+/** 그 대분류에서 고른 소분류 개수. 접혀 있어도 무엇을 골랐는지 알 수 있게 헤더에 적는다. */
+function selectedActivityCount(sector: (typeof PLACE_SECTOR_OPTIONS)[number]): number {
+  return sector.activities.filter((activity) => checkedActivities.value.has(activity.id)).length
+}
+
+/** 대분류 체크는 그 아래 소분류가 전부 체크됐을 때만 켜진다. */
 function isSectorFullySelected(sector: (typeof PLACE_SECTOR_OPTIONS)[number]): boolean {
-  return (
-    isSectorSelected(sector.id) ||
-    sector.activities.every((activity) => selectedActivities.value.has(activity.id))
-  )
+  return sector.activities.every((activity) => checkedActivities.value.has(activity.id))
 }
 
+/** 화면 상태를 하나의 소분류 집합으로 확정한다. 대분류 칸은 늘 비운다. */
+function writeCheckedActivities(values: Set<number>): void {
+  draft.sectorIds = undefined
+  draft.activityIds = values.size > 0 ? [...values].sort((a, b) => a - b) : undefined
+}
+
+/** 대분류를 켜면 그 아래 소분류가 전부 켜지고, 끄면 전부 꺼진다. */
 function toggleSector(sector: (typeof PLACE_SECTOR_OPTIONS)[number]): void {
-  const sectorIds = new Set(draft.sectorIds ?? [])
-  const activityIds = new Set(draft.activityIds ?? [])
-  const selected = isSectorFullySelected(sector)
+  const values = new Set(checkedActivities.value)
+  const turningOff = isSectorFullySelected(sector)
 
-  sector.activities.forEach((activity) => activityIds.delete(activity.id))
-  if (selected) sectorIds.delete(sector.id)
-  else sectorIds.add(sector.id)
+  sector.activities.forEach((activity) => {
+    if (turningOff) values.delete(activity.id)
+    else values.add(activity.id)
+  })
 
-  draft.sectorIds = sectorIds.size > 0 ? [...sectorIds] : undefined
-  draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
+  writeCheckedActivities(values)
 }
 
-function toggleActivity(sectorId: number, activityId: number): void {
-  const sectorIds = new Set(draft.sectorIds ?? [])
-  const activityIds = new Set(draft.activityIds ?? [])
+/** 소분류 하나를 켜고 끈다. 대분류 체크는 소분류 상태에서 저절로 따라온다. */
+function toggleActivity(activityId: number): void {
+  const values = new Set(checkedActivities.value)
+  if (values.has(activityId)) values.delete(activityId)
+  else values.add(activityId)
 
-  if (activityIds.has(activityId)) activityIds.delete(activityId)
-  else activityIds.add(activityId)
-  sectorIds.delete(sectorId)
+  writeCheckedActivities(values)
+}
 
-  const sector = PLACE_SECTOR_OPTIONS.find((option) => option.id === sectorId)
-  if (sector?.activities.every((activity) => activityIds.has(activity.id))) {
-    sector.activities.forEach((activity) => activityIds.delete(activity.id))
-    sectorIds.add(sectorId)
-  }
+/**
+ * 서버로 보낼 형태로 접는다. 소분류가 전부 켜진 대분류는 대분류 ID 하나로 바꾼다.
+ *
+ * 서버는 대분류 조건과 소분류 조건을 OR로 묶으므로 접지 않아도 결과는 같다. 그래도 접는
+ * 것은 주소가 짧아지고, 두 조건이 삭제된 활동을 다르게 다루는 차이(소분류 조건은
+ * `activity` 테이블을 join하지 않는다)에 덜 노출되기 때문이다.
+ */
+function collapseCategorySelection(filters: PlaceSearchFilters): void {
+  const values = new Set(checkedActivities.value)
+  const sectorIds: number[] = []
 
-  draft.sectorIds = sectorIds.size > 0 ? [...sectorIds] : undefined
-  draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
+  PLACE_SECTOR_OPTIONS.forEach((sector) => {
+    if (!sector.activities.every((activity) => values.has(activity.id))) return
+
+    sector.activities.forEach((activity) => values.delete(activity.id))
+    sectorIds.push(sector.id)
+  })
+
+  filters.sectorIds = sectorIds.length > 0 ? sectorIds : undefined
+  filters.activityIds = values.size > 0 ? [...values].sort((a, b) => a - b) : undefined
 }
 
 function toggleExpandedCategory(label: string): void {
@@ -217,6 +260,27 @@ function toggleExpandedCategory(label: string): void {
 
 function toggleOption(key: PlaceOptionKey): void {
   draft[key] = draft[key] === true ? undefined : true
+}
+
+/**
+ * 정렬 시트에서 지금 무엇이 골라져 있는가. 세 항목은 서로 배타적이라 택 1이다.
+ *
+ * `ExploreFilterSheet`와 같은 규칙이다 — `Saved`는 정렬이 아니라 필터라 다른 곳에
+ * 담기지만, 화면에는 하나만 체크돼야 하므로 한 값으로 합쳐서 본다.
+ */
+const sortSelection = computed<string>(() =>
+  draft.savedOnly === true ? 'SAVED' : (draft.sort ?? 'POPULAR'),
+)
+
+function selectSort(value: PlaceSort): void {
+  draft.sort = value
+  draft.savedOnly = undefined
+}
+
+/** 목록 순서는 직전 정렬을 그대로 쓴다. Event 정렬 시트와 같은 규칙이다. */
+function selectSavedOnly(): void {
+  /* 다시 누르면 꺼진다 — 이 줄만 체크박스 모양이라 그렇게 읽힌다. */
+  draft.savedOnly = draft.savedOnly === true ? undefined : true
 }
 
 function resetSheet(): void {
@@ -237,7 +301,9 @@ function resetSheet(): void {
 }
 
 function apply(): void {
-  emit('apply', cloneFilters(draft))
+  const filters = cloneFilters(draft)
+  collapseCategorySelection(filters)
+  emit('apply', filters)
 }
 </script>
 
@@ -351,7 +417,15 @@ function apply(): void {
                 @click="toggleExpandedCategory(sector.labelKey)"
               >
                 <CategoryDot :category="sector.category" />
-                <span class="flex-1 text-title-sm text-ink">{{ t(sector.labelKey) }}</span>
+                <span class="flex-1 text-title-sm text-ink"
+                  >{{ t(sector.labelKey)
+                  }}<span
+                    v-if="selectedActivityCount(sector) > 0"
+                    class="text-caption text-ink-3"
+                  >
+                    · {{ selectedActivityCount(sector) }}</span
+                  ></span
+                >
                 <span
                   role="checkbox"
                   tabindex="0"
@@ -400,7 +474,7 @@ function apply(): void {
                       ? 'border-paper-fill bg-paper-fill text-on-paper'
                       : 'border-hairline text-ink-2'
                   "
-                  @click="toggleActivity(sector.id, activity.id)"
+                  @click="toggleActivity(activity.id)"
                 >
                   {{ t(activity.labelKey) }}
                 </button>
@@ -457,11 +531,11 @@ function apply(): void {
               :key="sortOption.value"
               type="button"
               class="flex min-h-16 w-full items-center justify-between text-left"
-              @click="draft.sort = sortOption.value as PlaceSort"
+              @click="selectSort(sortOption.value as PlaceSort)"
             >
               <span
                 class="text-body"
-                :class="draft.sort === sortOption.value ? 'text-ink' : 'text-ink-2'"
+                :class="sortSelection === sortOption.value ? 'text-ink' : 'text-ink-2'"
               >
                 {{ t(sortOption.labelKey) }}
                 <span
@@ -474,13 +548,13 @@ function apply(): void {
               <span
                 class="flex size-6 items-center justify-center rounded-pill"
                 :class="
-                  draft.sort === sortOption.value
+                  sortSelection === sortOption.value
                     ? 'bg-paper-fill text-on-paper'
                     : 'border border-hairline-2'
                 "
               >
                 <IconCheck
-                  v-if="draft.sort === sortOption.value"
+                  v-if="sortSelection === sortOption.value"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"
@@ -490,22 +564,24 @@ function apply(): void {
             <button
               type="button"
               class="flex min-h-16 w-full items-center justify-between text-left"
-              @click="draft.savedOnly = draft.savedOnly === true ? undefined : true"
+              @click="selectSavedOnly"
             >
               <span
                 class="text-body"
-                :class="draft.savedOnly ? 'text-ink' : 'text-ink-2'"
+                :class="sortSelection === 'SAVED' ? 'text-ink' : 'text-ink-2'"
               >
                 {{ t('explore.sort.saved') }}
               </span>
               <span
                 class="flex size-6 items-center justify-center rounded-pill"
                 :class="
-                  draft.savedOnly ? 'bg-paper-fill text-on-paper' : 'border border-hairline-2'
+                  sortSelection === 'SAVED'
+                    ? 'bg-paper-fill text-on-paper'
+                    : 'border border-hairline-2'
                 "
               >
                 <IconCheck
-                  v-if="draft.savedOnly"
+                  v-if="sortSelection === 'SAVED'"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"

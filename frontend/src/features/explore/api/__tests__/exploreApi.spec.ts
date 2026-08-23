@@ -133,6 +133,29 @@ describe('exploreApi', () => {
     })
   })
 
+  it('asks the server to count the view only when the detail screen opens it', async () => {
+    get.mockResolvedValueOnce({ data: { eventId: 42, title: 'Sample event' } })
+
+    await fetchEventDetail(42, 'en', { countView: true })
+
+    expect(get).toHaveBeenCalledWith('/api/v1/explore/events/42', {
+      params: { language: 'en', countView: true },
+      responseSchema: eventDetailResponseSchema,
+    })
+  })
+
+  it('does not ask the server to count the view for a Place value read', async () => {
+    get.mockResolvedValueOnce({ data: { placeId: 880001, itemId: 1, name: 'Sample' } })
+
+    /* 약속 생성 폼처럼 위치만 읽어 가는 호출은 조회수를 올리면 안 된다. */
+    await fetchPlaceDetail(880001, 'en')
+
+    expect(get).toHaveBeenCalledWith('/api/v1/explore/places/880001', {
+      params: { language: 'en' },
+      responseSchema: placeDetailResponseSchema,
+    })
+  })
+
   it('fetches and normalizes one Place detail with the requested language', async () => {
     get.mockResolvedValueOnce({
       data: {

@@ -43,8 +43,38 @@ describe('useExploreFilterMemoryStore', () => {
 
     /* Place 전용 키가 Events 진입에 섞이면 안 된다. Events는 아직 기억한 것이 없다. */
     expect(store.resolveEntry({ tab: 'events' })).toBeNull()
-    expect(store.resolveEntry({})).toBeNull()
     expect(store.resolveEntry({ tab: 'places' })).toEqual({ tab: 'places', placeKinds: 'CAFE' })
+  })
+
+  it('follows the tab that was last seen when the entry names none', () => {
+    const store = useExploreFilterMemoryStore()
+    store.remember({ tab: 'places', placeKinds: 'CAFE' })
+
+    /*
+     * 하단 탭이 보내는 `/explore`에는 `tab`이 없다. 그것을 Events로 읽으면 Places를 보던
+     * 사람만 탭과 필터를 함께 잃는다.
+     */
+    expect(store.resolveEntry({})).toEqual({ tab: 'places', placeKinds: 'CAFE' })
+  })
+
+  it('stays on the last seen tab even with nothing to restore', () => {
+    const store = useExploreFilterMemoryStore()
+    store.remember({ tab: 'places' })
+
+    /* 되돌릴 필터가 없다는 이유로 탭까지 바뀌면 안 된다. */
+    expect(store.resolveEntry({})).toEqual({ tab: 'places' })
+  })
+
+  it('forgets both tabs and the last seen tab at once', () => {
+    const store = useExploreFilterMemoryStore()
+    store.remember({ eventKeyword: 'hongdae' })
+    store.remember({ tab: 'places', placeKinds: 'CAFE' })
+
+    store.clear()
+
+    expect(store.resolveEntry({})).toBeNull()
+    expect(store.resolveEntry({ tab: 'events' })).toBeNull()
+    expect(store.resolveEntry({ tab: 'places' })).toBeNull()
   })
 
   it('remembers each tab on its own', () => {
@@ -52,7 +82,7 @@ describe('useExploreFilterMemoryStore', () => {
     store.remember({ eventKeyword: 'hongdae' })
     store.remember({ tab: 'places', placeKinds: 'CAFE' })
 
-    expect(store.resolveEntry({})).toEqual({ eventKeyword: 'hongdae' })
+    expect(store.resolveEntry({ tab: 'events' })).toEqual({ eventKeyword: 'hongdae' })
     expect(store.resolveEntry({ tab: 'places' })).toEqual({ tab: 'places', placeKinds: 'CAFE' })
   })
 
