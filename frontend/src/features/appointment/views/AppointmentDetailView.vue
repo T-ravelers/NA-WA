@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { IconMenu2 } from '@tabler/icons-vue'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -192,13 +192,12 @@ const showAttendanceItem = computed(() => isHost.value || participationCheckFail
 // 있는 동안 값이 뒤집힐 때 빈 시트가 남는다 — participation 조회는 retry 없이 5초마다
 // 폴링하므로 "확인 못 함 → 방장 아님"으로 넘어가는 순간이 실제로 있다. 그때 버튼도 함께
 // 사라져 닫고 다시 열 수도 없다.
+//
+// 열림 상태(`menuOpen`)를 따로 닫지는 않는다. 이 조건은 한 방향으로만 간다 —
+// `participationCheckFailed`는 응답이 한 번 오면 다시 참이 되지 않고(마지막 값을
+// 지우지 않는다), 방장이 바뀌는 경로는 저장소에 없다(`is_host`를 갱신하는 코드 0건).
+// 되살아날 수 없는 조건에 감시자를 달면 일어나지 않는 일을 막는 코드가 남는다.
 const canOpenMenu = computed(() => appointment.value !== undefined && showAttendanceItem.value)
-
-// 조건이 꺼지면 열림 상태까지 닫는다. `v-if`만으로는 `menuOpen`이 true로 남아, 다음
-// 폴링이 또 실패해 조건이 되살아나면 누르지 않은 시트가 혼자 열린다.
-watch(canOpenMenu, (open) => {
-  if (!open) menuOpen.value = false
-})
 
 /**
  * 일정은 날짜 한 줄과 시각 범위 한 줄로 나눠 적는다.
