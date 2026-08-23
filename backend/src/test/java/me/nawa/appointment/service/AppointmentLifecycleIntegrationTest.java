@@ -27,7 +27,8 @@ import org.springframework.jdbc.support.KeyHolder;
 
 /**
  * startDueAppointments·endDueAppointments가 실제 MySQL 위에서 시간 조건에 맞는
- * 약속만 정확히 골라 전환하는지 검증한다.
+ * 약속만 정확히 골라 전환하는지, 그리고 AppointmentLifecycleScheduler가 한 주기에
+ * 둘을 올바른 순서로 돌리는지 검증한다.
  *
  * QrPaymentConcurrencyIntegrationTest·AppointmentDepositIntegrationTest와 같은
  * 이유로, 여기서 만드는 AppointmentMapper는 Spring 컨테이너가 관리하는 빈이 아니라
@@ -142,15 +143,19 @@ class AppointmentLifecycleIntegrationTest {
 
     // 스케줄러가 오래 멈춰 있던 사이에 활동이 통째로 지나간 약속도 한 주기에
     // 끝까지 따라와야 한다. 시작을 먼저 반영하는 순서가 그것을 보장한다.
+    //
+    // 두 매퍼를 여기서 같은 순서로 다시 부르면 순서를 지키는 쪽이 테스트가 되어,
+    // advanceLifecycle()의 두 줄을 뒤집어도 통과한다. 그래서 스케줄러를 직접
+    // 만들어 한 주기를 돌린다 — 매퍼 하나만 받는 생성자라 배선이 더 필요 없다.
+    // Spring 프록시가 없어 @Transactional은 걸리지 않지만, 두 UPDATE가 각각
+    // 커밋돼도 결과는 같다.
     @Test
     void lifecycleTick_appointmentThatCameAndWent_reachesAwaitingAttendance() {
         long eventId = createApprovedEvent();
         long appointmentId = insertAppointment(eventId, "RECRUITING",
                 LocalDateTime.now().minusHours(3));
 
-        LocalDateTime now = LocalDateTime.now();
-        appointmentMapper.startDueAppointments(now);
-        appointmentMapper.endDueAppointments(now);
+        new AppointmentLifecycleScheduler(appointmentMapper).advanceLifecycle();
 
         assertEquals("AWAITING_ATTENDANCE", appointmentStatus(appointmentId));
     }
