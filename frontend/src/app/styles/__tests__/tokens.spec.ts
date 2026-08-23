@@ -7,6 +7,27 @@ import { describe, expect, it } from 'vitest'
 const CSS = readFileSync(join(process.cwd(), 'src/app/styles/tokens.css'), 'utf8')
 
 /**
+ * 하단 탭이 실제로 쓰는 유리 면을 컴포넌트에서 읽는다.
+ *
+ * 면 색과 알파를 이 파일에 복제하면 `BottomNav.vue`만 `bg-paper/90`이나 `bg-canvas/20`으로
+ * 되돌려도 테스트가 계속 초록이다. 값이 아니라 **실제 클래스**를 근거로 계산한다.
+ */
+const BOTTOM_NAV = readFileSync(join(process.cwd(), 'src/shared/ui/BottomNav.vue'), 'utf8')
+
+function bottomNavGlass(): { surface: string; alpha: number } {
+  // `reduce-transparency:bg-canvas`처럼 variant가 붙거나 알파가 없는 것은 걸리지 않는다.
+  const matches = [...BOTTOM_NAV.matchAll(/(?<![\w:-])bg-([a-z0-9-]+)\/(\d{1,3})(?![\w-])/g)]
+
+  if (matches.length !== 1) {
+    throw new Error(`BottomNav.vue의 반투명 배경 클래스는 하나여야 하는데 ${matches.length}개다`)
+  }
+
+  const [, surface, alpha] = matches[0] as unknown as [string, string, string]
+
+  return { surface, alpha: Number(alpha) / 100 }
+}
+
+/**
  * 토큰 쌍의 명암비를 값으로 고정한다(#443).
  *
  * 잉크 토큰은 전부 검정에 가까워 **눈으로는 미달을 잡을 수 없다.** `tokens.css`의 주석이
@@ -112,9 +133,6 @@ describe('tokens.css contrast', () => {
  * 무너졌다. 어두운 canvas를 90%로 깔아 그 의존을 끊었고, 여기서 값으로 고정한다.
  */
 describe('bottom nav glass contrast', () => {
-  /** `BottomNav.vue`의 `bg-canvas/90`. 저 값을 바꾸면 여기도 바꾼다. */
-  const GLASS_ALPHA = 0.9
-
   /** 탭 뒤로 지나갈 수 있는 면. 밝을수록 유리가 밝아져 잉크 대비가 낮아진다. */
   const BEHIND = [
     'canvas',
@@ -128,7 +146,8 @@ describe('bottom nav glass contrast', () => {
   ]
 
   it.each(BEHIND)('both tab inks clear AA on the glass over %s', (behind) => {
-    const glass = composite(token('canvas'), token(behind), GLASS_ALPHA)
+    const { surface, alpha } = bottomNavGlass()
+    const glass = composite(token(surface), token(behind), alpha)
 
     expect(contrast(glass, token('ink'))).toBeGreaterThanOrEqual(AA_TEXT)
     expect(contrast(glass, token('ink-2'))).toBeGreaterThanOrEqual(AA_TEXT)
