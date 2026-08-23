@@ -432,9 +432,14 @@ watch(selectedTab, (next, previous) => {
    * 이 이동은 사용자가 보고 있던 목록을 그대로 옮겨 적는 것이지 새로 진입하는 것이 아니다.
    * 덮지 않으면 아래 `onBeforeRouteUpdate`가 지난 방문의 필터를 되돌려, 화면에는 없던 조건이
    * 탭을 누르는 순간 걸린다. 옮겨 적은 뒤 상세를 열었다 뒤로 나와도 같은 목록으로 돌아온다.
+   *
+   * `push`가 아니라 `replace`다. 탭은 이제 필터와 함께 기억하는 상태라 히스토리에 한 칸을
+   * 쓸 이유가 없고, 쓰면 뒤로 가기가 Discover 안에 갇힌다 — 되돌아간 자리는 필터가 빠진
+   * `/explore`라서 아래 guard가 하단 탭이 보낸 진입과 구별하지 못하고 방금 떠나온 탭으로
+   * 다시 보낸다. 사용자에게는 뒤로 가기가 아무 반응도 없는 것처럼 보인다.
    */
   filterMemory.remember(query)
-  navigateSelf(() => router.push({ query }))
+  navigateSelf(() => router.replace({ query }))
 })
 
 /*

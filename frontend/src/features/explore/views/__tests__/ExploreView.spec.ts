@@ -136,21 +136,6 @@ describe('ExploreView Place branch', () => {
     expect(wrapper.get('[role="radio"][aria-checked="true"]').text()).toBe('Places')
   })
 
-  it('restores the Events tab when navigating back after switching tabs', async () => {
-    const { wrapper, router } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Places')
-      ?.trigger('click')
-    await flushPromises()
-    router.back()
-    await flushPromises()
-
-    expect(router.currentRoute.value.query.tab).toBeUndefined()
-    expect(wrapper.get('[role="radio"][aria-checked="true"]').text()).toBe('Events')
-  })
-
   it('requests the Event list with the NEWEST sort by default', async () => {
     await mountView()
 
@@ -600,6 +585,36 @@ describe('ExploreView filter memory across entries', () => {
 
     /* 되돌릴 필터가 없다는 이유로 탭까지 바뀌면 필터를 건 사람과 안 건 사람이 달라진다. */
     expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
+  })
+
+  /*
+   * 탭 전환이 히스토리를 늘리면 뒤로 가기가 Discover 안에 갇힌다. 되돌아간 자리는 필터가
+   * 빠진 `/explore`라서 필터를 되살리는 guard가 하단 탭이 보낸 진입과 구별하지 못하고,
+   * 방금 떠나온 탭으로 다시 보낸다 — 화면은 아무 반응도 없는 것처럼 보인다.
+   */
+  it('does not trap the back button inside Discover after a tab switch', async () => {
+    /* 다른 화면에서 Discover로 들어온다 — 뒤로 가기가 돌아갈 자리가 있어야 한다. */
+    const { wrapper, router } = await mountRoutedView('/appointments')
+    await router.push('/explore')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Places')
+      ?.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
+
+    router.back()
+    await flushPromises()
+    await flushPromises()
+
+    /*
+     * 뒤로 가기 한 번으로 Discover를 벗어난다. 탭 전환이 히스토리를 남기면 여기서
+     * 필터가 빠진 `/explore`에 닿는데, 필터를 되살리는 guard가 그것을 하단 탭이 보낸
+     * 진입과 구별하지 못하고 방금 떠나온 탭으로 다시 보낸다.
+     */
+    expect(router.currentRoute.value.path).toBe('/appointments')
   })
 
   it('does not revive a filter value the screen dropped from the URL', async () => {
