@@ -15,7 +15,10 @@ export const APPOINTMENT_STATUSES = [
   /** 정원이 모두 참. 시간으로 도달하는 경로는 없다. */
   'FULL',
   'IN_PROGRESS',
-  /** 활동이 끝났지만 방장이 아직 출석을 확정하지 않음. 서버 조회 응답에만 있는 표시 전용 값. */
+  /**
+   * 활동 종료 시각이 지났지만 방장이 아직 출석을 확정하지 않음. 다른 값과 똑같이
+   * DB에 저장된다 — 스케줄러가 이 전이를 기록한다.
+   */
   'AWAITING_ATTENDANCE',
   'COMPLETED',
   'CANCELLED',

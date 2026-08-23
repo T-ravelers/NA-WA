@@ -135,7 +135,7 @@ const isLeaveNoShow = computed(() => appointment.value?.appointmentStatus === 'I
 //
 // 출석 확정은 활동이 끝난 뒤에 연다. "끝났는가"는 클라이언트 시계로 다시
 // 계산하지 않는다 — 서버가 활동 종료 후 확정 전인 약속의 appointmentStatus를
-// 표시 전용 AWAITING_ATTENDANCE로 내려주므로 그 판정을 그대로 쓴다.
+// AWAITING_ATTENDANCE로 내려주므로 그 판정을 그대로 쓴다.
 const canOpenAttendance = computed(
   () => isHost.value && appointment.value?.appointmentStatus === 'AWAITING_ATTENDANCE',
 )

@@ -72,7 +72,7 @@ const myAppointmentMemberId = computed(
 const isHost = computed(() => participationQuery.data.value?.host === true)
 // 상세 화면의 시트와 같은 조건이다. 활동이 끝나기 전에 확정하면 늦게 온 사람이
 // 노쇼로 굳어 보증금을 잃는다. "끝났는가"는 클라이언트 시계로 계산하지 않고,
-// 서버가 활동 종료 후 확정 전 약속에 내려주는 표시 전용 상태를 그대로 쓴다.
+// 서버가 활동 종료 후 확정 전 약속에 내려주는 상태를 그대로 쓴다.
 const attendanceOpen = computed(
   () => detailQuery.data.value?.appointmentStatus === 'AWAITING_ATTENDANCE',
 )

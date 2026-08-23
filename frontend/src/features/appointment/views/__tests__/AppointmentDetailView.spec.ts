@@ -774,7 +774,7 @@ describe('AppointmentDetailView', () => {
 
   it('opens the attendance screen once the activity is over', async () => {
     // 활동 종료 판정은 서버 몫이다 — 종료 후 확정 전이면 appointmentStatus가
-    // 표시 전용 AWAITING_ATTENDANCE로 온다.
+    // AWAITING_ATTENDANCE로 온다.
     fetchAppointment.mockResolvedValueOnce({
       ...appointment,
       appointmentStatus: 'AWAITING_ATTENDANCE',
