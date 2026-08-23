@@ -18,9 +18,18 @@ function isFiniteCoordinate(value: MapCoordinate): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+/**
+ * 좌표 두 개가 모두 유효한 수인가.
+ *
+ * 네 빌더가 null을 돌려주는 조건과 버튼 묶음을 렌더링하지 않는 조건(#221)이 같은 검사를
+ * 써야 해서 내보낸다. 화면 쪽이 `Number.isFinite`를 다시 쓰면 규칙이 두 곳으로 갈린다.
+ */
+export function hasMapCoordinates(latitude: MapCoordinate, longitude: MapCoordinate): boolean {
+  return isFiniteCoordinate(latitude) && isFiniteCoordinate(longitude)
+}
+
 function toCoordinateQuery(latitude: MapCoordinate, longitude: MapCoordinate): string | null {
-  if (!isFiniteCoordinate(latitude)) return null
-  if (!isFiniteCoordinate(longitude)) return null
+  if (!hasMapCoordinates(latitude, longitude)) return null
 
   return encodeURIComponent(`${latitude},${longitude}`)
 }
@@ -88,7 +97,7 @@ export function buildNaverMapPlaceUrl(
   name: string,
   platform: MapPlatform = detectMapPlatform(),
 ): string | null {
-  if (!isFiniteCoordinate(latitude) || !isFiniteCoordinate(longitude)) return null
+  if (!hasMapCoordinates(latitude, longitude)) return null
 
   const query = `lat=${latitude}&lng=${longitude}&name=${encodeURIComponent(name)}&appname=${NAVER_APP_NAME}`
 
@@ -106,11 +115,21 @@ export function buildNaverMapTransitRouteUrl(
   name: string,
   platform: MapPlatform = detectMapPlatform(),
 ): string | null {
-  if (!isFiniteCoordinate(latitude) || !isFiniteCoordinate(longitude)) return null
+  if (!hasMapCoordinates(latitude, longitude)) return null
 
   const query = `dlat=${latitude}&dlng=${longitude}&dname=${encodeURIComponent(name)}&appname=${NAVER_APP_NAME}`
 
   return toNaverAppUrl('route/public', query, platform)
+}
+
+/**
+ * 웹 URL 전용 진입.
+ *
+ * 새 탭으로 열되 `noopener,noreferrer`를 붙여 열린 문서에 원본 창을 넘겨주지 않는다.
+ * 앱 스킴은 현재 문서를 옮기는 `openMapAppUrl`이 따로 맡는다.
+ */
+export function openMapWebUrl(url: string | null): void {
+  if (url) window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 /**

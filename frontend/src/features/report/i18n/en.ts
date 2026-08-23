@@ -99,6 +99,27 @@ export default {
       trendEmpty: 'No daily spending rows were recorded.',
       trendDescription: 'Daily spending across the journey dates.',
       date: 'Date',
+      comparison: {
+        heading: 'Vs. group members',
+        totalSpend: 'Total spend',
+        liveBasisNote:
+          'We recalculate this from the payments made during this journey, so it can differ from the analysis above.',
+        you: 'You',
+        groupAvg: 'Group avg',
+        categoryBalance: 'Category balance',
+        members: 'Group members',
+        radarDescription: 'Your spending share per category compared with the group average.',
+        rankFirst: '1st',
+        rankSecond: '2nd',
+        rankThird: '3rd',
+        rankNth: '{rank}th',
+        emptyTitle: 'No group members yet',
+        emptyDescription:
+          'Join an appointment during this journey and the comparison shows up here.',
+        loadFailed: 'We could not load the comparison.',
+        loadFailedDescription: 'The rest of this report is unaffected. Please try again.',
+        loading: 'Loading the comparison',
+      },
       status: 'Report status: {status}',
     },
     errorCode: {

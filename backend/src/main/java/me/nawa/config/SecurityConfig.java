@@ -100,6 +100,8 @@ public class SecurityConfig {
                             // 부하 도구가 부르는 경로다. 브라우저 세션이 없어 CSRF
                             // 토큰을 받아 올 방법이 없다. CSRF 검사는 permitAll 여부와
                             // 무관하게 모든 POST에 적용되므로 여기에도 등록해야 한다.
+                            // 운영 산출물에는 이 경로를 처리할 컨트롤러 자체가 없다
+                            // (src/loadtest/java 전용).
                             antMatcher("/internal/loadtest/login")))
                 .cors(cors -> cors
                         .configurationSource(corsConfigurationSource))

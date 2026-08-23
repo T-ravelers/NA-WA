@@ -5,7 +5,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import { formatServerDateTime, parseServerDateTime } from '@/shared/lib/datetime'
+import {
+  formatServerDateTime,
+  parseServerDateTime,
+  toServerCalendarDate,
+} from '@/shared/lib/datetime'
 import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import type { AppointmentStatus } from '@/shared/lib/appointmentStatus'
@@ -359,7 +363,16 @@ const journeyListQuery = journeyIntegration.useJourneyListQuery(journeySelectOpe
 // 약속 날짜는 이미 정해져 있다. 그 날짜를 품지 못하는 여정을 고르면 서버가
 // JOURNEY-007로 되돌려보내므로, 목록은 다 보여 주되 고르는 순간 이유를 알려 준다.
 // 걸러서 감추지 않는 것은 "내 여정이 왜 없지"로 읽히지 않게 하기 위해서다.
-const activityDate = computed(() => appointment.value?.activityStartAt?.slice(0, 10) ?? null)
+// 활동 날짜(YYYY-MM-DD). 문자열이라고 보고 자르면 안 된다 — 이 값은 Jackson이
+// 숫자 배열로도 보낼 수 있는 타입이고, 배열에 slice를 쓰면 **배열**이 나온다. 그러면
+// 아래 여정 기간 비교가 문자열 대 배열이 되어 조용히 전부 false가 되고, 모든 여정이
+// "날짜를 담지 못함"으로 보여 참여가 통째로 막힌다. tsc는 이 비교를 잡지 않는다.
+const activityDate = computed(() => {
+  // 읽을 수 없으면 빈 문자열이 온다. 날짜를 모르는 것과 구분해야 하므로 null로 바꾼다 —
+  // 아래 coversActivityDate가 null이면 거르지 않고 서버 판단에 맡긴다.
+  const date = toServerCalendarDate(appointment.value?.activityStartAt)
+  return date === '' ? null : date
+})
 const journeySelectionError = ref<string | null>(null)
 
 const journeyListErrorMessage = computed(() =>

@@ -99,9 +99,10 @@ const isEmpty = computed(() => items.length === 0)
         :description="emptyDescription"
       />
 
+      <!-- 좁은 폭(280)에서는 범례가 도넛 옆에 들어가지 않아 아래로 내려간다. -->
       <div
         v-else
-        class="flex min-h-full items-center gap-5"
+        class="flex min-h-full flex-wrap items-center gap-5"
       >
         <div class="relative size-33 shrink-0">
           <svg
@@ -148,7 +149,7 @@ const isEmpty = computed(() => items.length === 0)
           </div>
         </div>
 
-        <ul class="flex min-w-0 flex-1 flex-col gap-3">
+        <ul class="flex min-w-36 flex-1 flex-col gap-3">
           <li
             v-for="row in rows"
             :key="row.key"

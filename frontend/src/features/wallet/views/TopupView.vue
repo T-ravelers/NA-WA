@@ -52,7 +52,7 @@ function requestedAmount(): number | null {
  * 금액과 이 키만 뺀다. `resume=1`을 붙여 그 화면이 저장해 둔 초안을 되살리게 한다.
  */
 const returnTarget = computed<RouteLocationRaw | null>(() => {
-  const name = readReturnRouteName(route.query)
+  const name = readReturnRouteName(route.query, router)
   if (name === null) return null
   const rest = withoutReturnContract(route.query)
   delete rest.amount

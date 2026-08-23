@@ -1,0 +1,31 @@
+# 부하 테스트용 Prometheus 설정.
+#
+# Prometheus는 Docker 밖 macOS 네이티브로 돌고, 대상은 Docker 안에 있다.
+# 그래서 컨테이너 이름이 아니라 호스트에 공개된 127.0.0.1 포트로 긁는다
+# (포트 매핑은 docker-compose.ec2-clone.yml 참고).
+global:
+  # 기본 15초는 5분짜리 측정에 20포인트뿐이라 램프업 구간이 뭉개진다.
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # JVM 힙·GC·스레드, Tomcat 스레드풀, HikariCP 커넥션풀.
+  # 병목이 "어디"인지 가르는 유일한 지표라 셋 중 가장 중요하다.
+  - job_name: backend
+    metrics_path: /internal/metrics
+    static_configs:
+      - targets: ["127.0.0.1:9081"]
+        labels:
+          service: backend
+
+  # SUT 컨테이너별 CPU·메모리. 넷 중 누가 먼저 한계에 닿는지 본다.
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["127.0.0.1:9082"]
+
+  # Docker VM 전체. 2 CPU·2.25GiB 안에는 관측 컨테이너와 Docker 자체 오버헤드도
+  # 포함되므로 t3.small의 정확한 복제는 아니다. 여기가 포화되면 개별 컨테이너
+  # 수치를 해석하기 전에 로컬 VM 전체가 한계라는 뜻이다.
+  - job_name: node
+    static_configs:
+      - targets: ["127.0.0.1:9100"]
