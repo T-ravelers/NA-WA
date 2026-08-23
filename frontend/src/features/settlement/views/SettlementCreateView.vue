@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import { useRovingRadioGroup } from '@/shared/ui/useRovingRadioGroup'
 
 import { settlementGateway } from '../api/settlementGateway'
 import SettlementBottomSheet from '../components/SettlementBottomSheet.vue'
@@ -278,6 +279,31 @@ function setType(nextType: SettlementType): void {
   type.value = nextType
   ensureFirstItem()
   validationMessage.value = null
+}
+
+/** 정산 방식 선택지. 화살표 이동이 순서를 알아야 해서 템플릿의 리터럴을 여기로 올렸다. */
+const SETTLEMENT_TYPES: readonly SettlementType[] = ['EQUAL', 'ITEMIZED']
+
+/* 라디오 그룹이면 탭 스톱은 하나이고 안에서는 화살표로 옮긴다(#305). */
+const { onKeydown: onMethodKeydown, tabindexFor: methodTabindex } = useRovingRadioGroup(
+  SETTLEMENT_TYPES,
+  () => type.value,
+  setType,
+)
+
+/**
+ * 결제자인가.
+ *
+ * 결제자는 정산에서 뺄 수 없다. 그런데 칩은 평범한 버튼이라 눌러도 아무 일이 없고 왜
+ * 그런지 알 방법이 없었다(#382). 화면은 이 값으로 `aria-disabled`와 조형을 가른다.
+ *
+ * 고른 참여자와 **같은 밝은 면**을 쓰고 안쪽 링만 두른다. 결제자는 정산에 반드시
+ * 들어가므로 흐리게 만들면 그 사실이 같이 흐려진다 — 명도를 낮추는 대신 테두리로
+ * 「선택됨」과 「고정됨」을 가른다. V2 시안(#423)에 결제자 상태가 그려져 있지 않아
+ * 색을 새로 들이지 않고 조형만 더했다.
+ */
+function isPayer(participantId: string): boolean {
+  return participantId === selectedCandidate.value?.payerAppointmentMemberId
 }
 
 function toggleParticipant(participantId: string): void {
@@ -665,18 +691,26 @@ defineExpose({ back })
       <h3 class="mt-6 text-caption uppercase tracking-wider text-ink-3">
         {{ t('settlement.create.method') }}
       </h3>
+      <!--
+        조형은 `SelectChip`으로 옮기지 않았다. 이 칩은 #423이 시안에 맞춰 파란 면
+        (`bg-info`)·h44·`text-body-sm`으로 따로 정한 것이라, 공용 칩(밝은 면·h36·
+        `text-caption`)으로 바꾸면 방금 맞춘 시안이 어긋난다. **키보드 동작만** 공유한다.
+      -->
       <div
         class="mt-3 grid grid-cols-2 gap-2"
         role="radiogroup"
         :aria-label="t('settlement.create.method')"
+        @keydown="onMethodKeydown"
       >
         <button
-          v-for="option in ['EQUAL', 'ITEMIZED'] as SettlementType[]"
+          v-for="option in SETTLEMENT_TYPES"
           :key="option"
           type="button"
           role="radio"
           :data-type="option"
+          :data-value="option"
           :aria-checked="type === option"
+          :tabindex="methodTabindex(option)"
           class="min-h-11 rounded-pill px-3 text-body-sm"
           :class="type === option ? 'bg-info text-on-paper' : 'bg-surface-1 text-ink-2'"
           @click="setType(option)"
@@ -722,17 +756,20 @@ defineExpose({ back })
           type="button"
           :data-participant-id="participant.id"
           :aria-pressed="selectedIds.has(participant.id)"
+          :aria-disabled="isPayer(participant.id) || undefined"
           class="min-h-12 rounded-sm px-3 text-left"
           :class="
-            selectedIds.has(participant.id)
-              ? 'bg-paper-fill text-on-paper'
-              : 'bg-surface-1 text-ink-2'
+            isPayer(participant.id)
+              ? 'cursor-default bg-paper-fill text-on-paper ring-2 ring-inset ring-on-paper/30'
+              : selectedIds.has(participant.id)
+                ? 'bg-paper-fill text-on-paper'
+                : 'bg-surface-1 text-ink-2'
           "
           @click="toggleParticipant(participant.id)"
         >
           {{ participant.name
           }}<span
-            v-if="participant.id === selectedCandidate?.payerAppointmentMemberId"
+            v-if="isPayer(participant.id)"
             class="ml-1 text-caption"
             >{{ t('settlement.create.payer') }}</span
           >
