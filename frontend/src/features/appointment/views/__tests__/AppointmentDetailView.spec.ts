@@ -1015,7 +1015,9 @@ describe('AppointmentDetailView', () => {
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('You have already joined this appointment.')
-    expect(wrapper.text()).toContain('You left this appointment, so you cannot join it again.')
+    expect(wrapper.text()).toContain(
+      'You left this appointment. Joining again is not available here for now.',
+    )
   })
 
   it('lets a member leave during the activity, spelling out the no-show forfeit', async () => {

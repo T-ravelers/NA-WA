@@ -160,7 +160,7 @@ export default {
       join: '加入揪團',
       joinUnavailable: '這個揪團目前不開放加入。',
       alreadyJoined: '您已經加入這個揪團。',
-      alreadyLeft: '您已退出這個揪團，因此無法再次參加。',
+      alreadyLeft: '您已退出這個揪團，目前無法從這裡再次參加。',
       participationCheckFailed: '無法確認您的參加狀態，請再試一次。',
       openMenu: '開啟揪團選單',
       menu: {
