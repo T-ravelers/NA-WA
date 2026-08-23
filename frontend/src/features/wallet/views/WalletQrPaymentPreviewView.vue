@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '@tanstack/vue-query'
 import { IconChevronLeft } from '@tabler/icons-vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
 import { formatServerDateTime } from '@/shared/lib/datetime'
@@ -16,6 +16,7 @@ import {
 import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import InsufficientBalanceDialog from '@/shared/ui/InsufficientBalanceDialog.vue'
 import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
 import SelectChip from '@/shared/ui/SelectChip.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
@@ -36,6 +37,7 @@ import { useQrPaymentSessionStore } from '../model/qrPaymentSession'
 
 const i18n = useI18n()
 const { t, locale } = i18n
+const route = useRoute()
 const router = useRouter()
 const qrPaymentSession = useQrPaymentSessionStore()
 const { useMyTodayAppointmentsQuery } = useWalletAppointmentIntegration()
@@ -54,6 +56,44 @@ const enteredAmount = ref<number | null>(null)
  * 칭호를 만든다.
  */
 const spendingCategory = ref<SpendingCategory>(DEFAULT_SPENDING_CATEGORY)
+
+/**
+ * 충전하러 떠났다 돌아올 때 결제 조건(소비 범위·약속·입력 금액·소비 카테고리)을
+ * 되살리기 위한 임시 저장. qrToken은 세션 메모리에서만 도므로(`qrPaymentSession.ts`)
+ * 같은 탭 안에서 컴포넌트가 다시 마운트돼도 남아 있지만, 이 화면의 로컬 입력값은
+ * 마운트 시 초기값으로 돌아가 버린다. 다른 QR로 들어왔을 때 엉뚱한 값을 쓰지 않도록
+ * qrToken을 함께 적어 두고 돌아올 때 대조한다.
+ */
+const RESUME_STORAGE_KEY = 'wallet-qr-payment-preview:resume'
+interface QrPaymentResumeState {
+  qrToken: string
+  spendingScope: SpendingScope
+  selectedAppointmentId: number | null
+  enteredAmount: number | null
+  spendingCategory: SpendingCategory
+}
+
+function readResumeState(): QrPaymentResumeState | null {
+  if (route.query.resume !== '1') return null
+  try {
+    const raw = sessionStorage.getItem(RESUME_STORAGE_KEY)
+    if (raw === null) return null
+    const saved = JSON.parse(raw) as QrPaymentResumeState
+    if (saved.qrToken !== session.value?.qrToken) return null
+    return saved
+  } catch {
+    return null
+  }
+}
+
+const resumeState = readResumeState()
+if (resumeState !== null) {
+  spendingScope.value = resumeState.spendingScope
+  selectedAppointmentId.value = resumeState.selectedAppointmentId
+  enteredAmount.value = resumeState.enteredAmount
+  spendingCategory.value = resumeState.spendingCategory
+  sessionStorage.removeItem(RESUME_STORAGE_KEY)
+}
 
 const spendingCategoryOptions = computed(() =>
   SPENDING_CATEGORIES.map((value) => ({ value, label: t(spendingCategoryLabelKey(value)) })),
@@ -169,8 +209,14 @@ const executeErrorMessage = computed(() => {
   return t(error.messageKey)
 })
 
-const canPay = computed(
-  () => previewQuery.data.value?.canPay === true && !executeMutation.isPending.value,
+// 서버에게 미리 물어본 잔액 판정과 별개로, 버튼 자체는 결제 조건이 갖춰지고 미리보기가
+// 끝나면 눌린다 — 잔액이 모자란 경우까지 눌러야 충전으로 이어갈 수 있다(WALLET-029).
+const payButtonDisabled = computed(
+  () =>
+    !isPreviewReady.value ||
+    previewQuery.isPending.value ||
+    previewQuery.isError.value ||
+    executeMutation.isPending.value,
 )
 
 const goBack = (): void => {
@@ -194,8 +240,38 @@ watch(
   },
 )
 
+/**
+ * 잔액이 모자라 거절당했다(`WALLET-029`). 미리보기가 `canPay: false`로 미리 알려주는
+ * 경우가 대부분이지만, 미리보기와 결제 사이에 잔액이 바뀌는 드문 경합도 같은 코드로
+ * 온다 — 정산 결제와 같은 규칙이다(#452).
+ */
+const INSUFFICIENT_BALANCE_CODE = 'WALLET-029'
+const topupPromptOpen = ref(false)
+
+watch(
+  () => executeMutation.error.value,
+  (error) => {
+    if (!(error instanceof NormalizedApiError)) return
+    if (error.code !== INSUFFICIENT_BALANCE_CODE) return
+    topupPromptOpen.value = true
+  },
+)
+
+function closeTopupPrompt(): void {
+  topupPromptOpen.value = false
+  // 팝업을 닫았으면 그 오류는 다 본 것이다. 남겨두면 일반 오류 문구로 다시 나타난다.
+  executeMutation.reset()
+}
+
 const completePayment = (): void => {
-  if (!canPay.value || session.value === null || finalAmount.value === null) return
+  if (payButtonDisabled.value || session.value === null || finalAmount.value === null) return
+
+  // 서버가 이미 잔액 부족을 알려줬다(`canPay: false`). 보내 봐야 같은 답이 오므로
+  // 충전으로 안내한다.
+  if (previewQuery.data.value?.canPay !== true) {
+    topupPromptOpen.value = true
+    return
+  }
 
   idempotencyKey.value ??=
     globalThis.crypto?.randomUUID?.() ?? `qr-payment-${Date.now()}-${Math.random()}`
@@ -221,6 +297,41 @@ const completePayment = (): void => {
         })
       },
     },
+  )
+}
+
+/**
+ * 충전 화면으로 간다.
+ *
+ * 미리보기가 이미 현재 잔액을 알고 있으므로, 부담금 전액이 아니라 모자란 만큼만 채워
+ * 보낸다(정산·보증금은 서버가 잔액을 안 알려줘 전액을 채운다 — 이 화면은 다르다).
+ * 떠나기 전에 결제 조건을 저장해 두고 내 자리를 `resume=1`로 바꿔, 왕복이 히스토리
+ * 한 자리만 쓰고 돌아온 자리에서 그대로 이어 누르게 한다.
+ */
+function goToTopup(): void {
+  const data = previewQuery.data.value
+  const shortfall =
+    data === undefined ? Number.NaN : Math.ceil(Number(data.amount) - Number(data.currentBalance))
+  const amount =
+    Number.isSafeInteger(shortfall) && shortfall > 0 ? shortfall : (finalAmount.value ?? null)
+  const prefill = amount !== null && amount > 0 ? { amount: String(amount) } : {}
+
+  if (session.value !== null) {
+    const state: QrPaymentResumeState = {
+      qrToken: session.value.qrToken,
+      spendingScope: spendingScope.value,
+      selectedAppointmentId: selectedAppointmentId.value,
+      enteredAmount: enteredAmount.value,
+      spendingCategory: spendingCategory.value,
+    }
+    sessionStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(state))
+  }
+
+  void router.replace({ path: route.path, query: { ...route.query, resume: '1' } }).then(() =>
+    router.push({
+      name: 'wallet-top-up',
+      query: { ...prefill, returnRouteName: 'wallet-qr-payment-preview' },
+    }),
   )
 }
 </script>
@@ -462,7 +573,7 @@ const completePayment = (): void => {
       </AppCard>
 
       <p
-        v-if="executeMutation.isError.value"
+        v-if="executeMutation.isError.value && !topupPromptOpen"
         role="alert"
         class="rounded-sm bg-surface-3 px-3.5 py-3 text-body-sm text-ink-2"
       >
@@ -480,7 +591,7 @@ const completePayment = (): void => {
         <AppButton
           variant="primary"
           block
-          :disabled="!canPay"
+          :disabled="payButtonDisabled"
           @click="completePayment"
         >
           {{
@@ -491,5 +602,17 @@ const completePayment = (): void => {
         </AppButton>
       </div>
     </section>
+
+    <InsufficientBalanceDialog
+      v-if="topupPromptOpen"
+      :title="t('wallet.qrPayment.insufficientTitle')"
+      :description="
+        t('wallet.qrPayment.insufficientDescription', { amount: formatPoints(finalAmount ?? 0) })
+      "
+      :later-label="t('wallet.qrPayment.insufficientLater')"
+      :topup-label="t('wallet.qrPayment.insufficientTopup')"
+      @close="closeTopupPrompt"
+      @topup="goToTopup"
+    />
   </main>
 </template>
