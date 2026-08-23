@@ -44,6 +44,7 @@ function createTestRouter(): Router {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
+      { path: '/wallet', name: 'wallet', component: { template: '<div />' } },
       { path: '/notifications', name: 'notifications', component: { template: '<div />' } },
       { path: '/settlements', name: 'settlements', component: { template: '<div />' } },
       {
@@ -139,6 +140,27 @@ describe('NotificationListView', () => {
     const wrapper = await mountView()
 
     expect(wrapper.text()).toContain('No notifications yet')
+  })
+
+  /*
+   * 정산 상세는 뒤로 나올 때 이 화면을 새로 쌓는다. 그래서 뒤로 가기를 브라우저 이력에
+   * 맡기면 방금 빠져나온 정산 상세로 되돌아가고, 사용자는 두 화면 사이에 갇힌다.
+   */
+  it('뒤로 가기는 이력이 아니라 벨이 있는 지갑 홈으로 나간다', async () => {
+    fetchNotifications.mockResolvedValue(page([REQUESTED]))
+    const router = createTestRouter()
+
+    const wrapper = await mountView(router)
+    await wrapper.get('li button').trigger('click')
+    await flushPromises()
+    // 정산 상세에서 나온 것과 같은 상태 — 이 화면이 이력 맨 위에 다시 쌓인 뒤다.
+    await router.push({ name: 'notifications' })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="notification-back"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('wallet')
   })
 
   describe('누르기', () => {

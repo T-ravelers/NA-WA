@@ -59,6 +59,20 @@ const isEmpty = computed(() => notifications.value.length === 0)
 const showLoading = computed(() => isPending.value && isEmpty.value)
 const showError = computed(() => isError.value && isEmpty.value)
 
+/*
+ * 벨이 있는 지갑 홈으로 돌아간다.
+ *
+ * `router.back()`을 쓰지 않는다. 정산 상세에서 뒤로 나올 때 이 화면을 **새로 쌓기**
+ * 때문에, 그 다음 뒤로 가기는 방금 빠져나온 정산 상세로 되돌아간다. 사용자는 두 화면
+ * 사이를 오가며 지갑으로 나가지 못한다.
+ *
+ * 이 화면은 지갑 홈의 벨에서만 들어오므로 돌아갈 곳도 하나뿐이다. 정산 목록이 같은
+ * 이유로 지갑 홈을 직접 가리킨다.
+ */
+function goBack(): void {
+  void router.push({ name: 'wallet' })
+}
+
 function loadMore(): void {
   if (!hasNextPage.value || isFetchingNextPage.value) return
   void fetchNextPage()
@@ -131,7 +145,8 @@ function errorDescription(): string | undefined {
         compact
         variant="secondary"
         :aria-label="t('action.back')"
-        @click="router.back()"
+        data-testid="notification-back"
+        @click="goBack"
       >
         ‹
       </AppButton>
