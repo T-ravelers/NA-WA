@@ -153,3 +153,27 @@ describe('bottom nav glass contrast', () => {
     expect(contrast(glass, token('ink-2'))).toBeGreaterThanOrEqual(AA_TEXT)
   })
 })
+
+/**
+ * 진행·예정 배지 면 위 글자(#402).
+ *
+ * ongoing은 이미지 위에 놓이는 반투명 면이라 사진의 양 극단(검정·흰색)을 함께 잰다.
+ * scheduled는 불투명 상태색 면이라 뒤 배경과 무관하다. AppBadge.spec이 여기서 계산하는
+ * 토큰과 컴포넌트의 실제 클래스를 연결한다.
+ */
+describe('AppBadge status surface contrast', () => {
+  it.each([
+    ['canvas', token('canvas')],
+    ['surface-1', token('surface-1')],
+    ['black image', '#000000'],
+    ['white image', '#ffffff'],
+  ])('the ongoing label clears AA over %s', (_background, behind) => {
+    const surface = composite(token('canvas'), behind, 0.7)
+
+    expect(contrast(surface, token('ink'))).toBeGreaterThanOrEqual(AA_TEXT)
+  })
+
+  it('the scheduled label clears AA on its opaque status surface', () => {
+    expect(contrast(token('status-scheduled'), token('on-paper'))).toBeGreaterThanOrEqual(AA_TEXT)
+  })
+})
