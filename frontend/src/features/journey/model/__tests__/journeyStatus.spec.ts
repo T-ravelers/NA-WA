@@ -33,6 +33,7 @@ describe('journeyStatus', () => {
         endDate: '2026-08-08',
         eventCount: 2,
         placeCount: 1,
+        coverImageUrl: null,
       },
       {
         tripId: 2,
@@ -41,6 +42,7 @@ describe('journeyStatus', () => {
         endDate: '2026-08-09',
         eventCount: 0,
         placeCount: 0,
+        coverImageUrl: null,
       },
     ]
 
