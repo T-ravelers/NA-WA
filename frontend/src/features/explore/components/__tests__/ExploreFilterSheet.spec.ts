@@ -344,6 +344,31 @@ describe('ExploreFilterSheet', () => {
     expect(wrapper.emitted('apply')?.[0]?.[0]).toMatchObject({ savedOnly: true })
   })
 
+  it('turns Saved off when it is pressed again', async () => {
+    const wrapper = mount(ExploreFilterSheet, {
+      global: { plugins: [i18n] },
+      props: { kind: 'sort', filters: { sort: 'NEWEST', savedOnly: true }, resultCount: 3 },
+    })
+
+    /*
+     * 이 줄만 체크박스 모양이라 다시 누르면 꺼진다고 읽힌다. 끄는 길이 화면에 없으면
+     * 잘못 눌렀을 때 되돌릴 방법을 찾지 못한다.
+     */
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Saved')
+      ?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Apply'))
+      ?.trigger('click')
+
+    const applied = wrapper.emitted('apply')?.[0]?.[0] as Record<string, unknown>
+    expect(applied.savedOnly).toBeUndefined()
+    /* 순서는 건드리지 않는다. */
+    expect(applied.sort).toBe('NEWEST')
+  })
+
   it('turns Saved off when a sort is picked', async () => {
     const wrapper = mount(ExploreFilterSheet, {
       global: { plugins: [i18n] },

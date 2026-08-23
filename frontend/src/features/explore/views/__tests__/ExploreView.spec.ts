@@ -156,6 +156,20 @@ describe('ExploreView Place branch', () => {
     expect(fetchEventList).toHaveBeenCalledWith(expect.objectContaining({ savedOnly: true }))
   })
 
+  /*
+   * Saved는 Options 시트가 아니라 정렬 시트에 있다. Options 버튼이 켜지면 눌러 봐도
+   * 아무것도 체크돼 있지 않고 그 시트의 초기화로도 지워지지 않는다.
+   */
+  it('does not light up the Options button for the Saved sort', async () => {
+    const { wrapper } = await mountView('/explore?eventSavedOnly=true')
+
+    const optionsButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('Options'))
+
+    expect(optionsButton?.text()).toBe('Options')
+  })
+
   it('keeps the UI-only datePreset out of list query filters', async () => {
     await mountView('/explore?datePreset=THIS_WEEKEND')
 

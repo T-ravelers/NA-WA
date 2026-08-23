@@ -269,11 +269,17 @@ const activeFilters = computed(() => {
     ['opensLateOnly', opensLateOnly.value, t('explore.options.openLate')],
     ['preReservationOnly', preReservationOnly.value, t('explore.options.preReservation')],
     ['experienceOnly', experienceOnly.value, t('explore.options.experience')],
-    ['savedOnly', eventSavedOnly.value, t('explore.sort.saved')],
   ]
   options.forEach(([key, selected, label]) => {
     if (selected) values.push({ key: `option:${key}`, label })
   })
+
+  /*
+   * Saved는 Options 시트가 아니라 정렬 시트에 있다. `option:` 접두사를 쓰면 Options
+   * 버튼이 켜지는데 열어 보면 아무것도 체크돼 있지 않고 그 시트의 초기화로도 지워지지
+   * 않는다. 어느 시트의 것인지가 접두사로 갈리므로 정렬 쪽 접두사를 쓴다.
+   */
+  if (eventSavedOnly.value) values.push({ key: 'sort:savedOnly', label: t('explore.sort.saved') })
 
   return values
 })
@@ -314,11 +320,15 @@ const placeActiveFilters = computed(() => {
     ['smokeFree', selectedPlaceSmokeFree.value, t('explore.placeFilterOptions.smokeFree')],
     ['kidFacility', selectedPlaceKidFacility.value, t('explore.placeFilterOptions.kids')],
     ['hasRestroom', selectedPlaceRestroom.value, t('explore.placeFilterOptions.restroom')],
-    ['savedOnly', selectedPlaceSavedOnly.value, t('explore.sort.saved')],
   ]
   options.forEach(([key, selected, label]) => {
     if (selected) values.push({ key: `placeOption:${key}`, label })
   })
+
+  /* Event와 같은 이유로 정렬 쪽 접두사를 쓴다. */
+  if (selectedPlaceSavedOnly.value) {
+    values.push({ key: 'placeSort:savedOnly', label: t('explore.sort.saved') })
+  }
 
   return values
 })
@@ -753,7 +763,8 @@ function removeFilter(key: string): void {
     if (option === 'opensLateOnly') opensLateOnly.value = false
     if (option === 'preReservationOnly') preReservationOnly.value = false
     if (option === 'experienceOnly') experienceOnly.value = false
-    if (option === 'savedOnly') eventSavedOnly.value = false
+  } else if (key === 'sort:savedOnly') {
+    eventSavedOnly.value = false
   }
 }
 
@@ -808,7 +819,8 @@ function removePlaceFilter(key: string): void {
     if (option === 'smokeFree') selectedPlaceSmokeFree.value = false
     if (option === 'kidFacility') selectedPlaceKidFacility.value = false
     if (option === 'hasRestroom') selectedPlaceRestroom.value = false
-    if (option === 'savedOnly') selectedPlaceSavedOnly.value = false
+  } else if (key === 'placeSort:savedOnly') {
+    selectedPlaceSavedOnly.value = false
   }
 }
 

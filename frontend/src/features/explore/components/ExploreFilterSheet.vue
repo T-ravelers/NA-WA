@@ -286,10 +286,13 @@ function selectSort(value: EventSearchFilters['sort']): void {
  * 찜한 항목만 보기.
  *
  * 목록 순서는 직전 정렬을 그대로 쓴다 — `sort`를 건드리지 않는 이유다. 체크만 옮겨간다.
- * 다시 끄려면 정렬 항목 중 하나를 고른다. 라디오와 같은 규칙이다.
+ *
+ * 다시 누르면 꺼진다. 라디오라면 켠 것을 다시 눌러도 안 꺼지는 게 맞지만, 이 줄만
+ * 체크박스 모양이라 다시 누르면 꺼진다고 읽힌다. 끄는 길이 화면에 없으면 잘못 눌렀을 때
+ * 되돌릴 방법을 찾지 못한다 — 체크가 정렬 항목으로 돌아가고 순서도 그대로다.
  */
 function selectSavedOnly(): void {
-  draft.savedOnly = true
+  draft.savedOnly = draft.savedOnly === true ? undefined : true
 }
 
 function selectRegion(value: string): void {

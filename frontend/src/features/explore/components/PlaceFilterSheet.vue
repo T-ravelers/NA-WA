@@ -276,9 +276,10 @@ function selectSort(value: PlaceSort): void {
   draft.savedOnly = undefined
 }
 
-/** 목록 순서는 직전 정렬을 그대로 쓴다. 다시 끄려면 정렬 항목 중 하나를 고른다. */
+/** 목록 순서는 직전 정렬을 그대로 쓴다. Event 정렬 시트와 같은 규칙이다. */
 function selectSavedOnly(): void {
-  draft.savedOnly = true
+  /* 다시 누르면 꺼진다 — 이 줄만 체크박스 모양이라 그렇게 읽힌다. */
+  draft.savedOnly = draft.savedOnly === true ? undefined : true
 }
 
 function resetSheet(): void {
