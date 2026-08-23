@@ -417,6 +417,22 @@ class JourneyMapperIntegrationTest {
             insertTripItem(skipTripId, noThumbnailItem, firstDay, 0);
             insertTripItem(skipTripId, withThumbnailItem, firstDay, 1);
 
+            /*
+             * 방문일과 표시 순서가 모두 같으면 `trip_item_id`가 가른다. `display_order`는
+             * 유니크가 아니라 실제로 도달하는 상태이고, ORDER BY의 마지막 갈래가 상세
+             * 타임라인과 같아야 한다고 못 박은 지점이라 여기서 함께 잠근다.
+             */
+            long tieTripId = insertTrip(memberId, marker + "-tie");
+            tripIds.add(tieTripId);
+            long earlierRowItem = insertExploreItem(memberId, "EVENT");
+            long laterRowItem = insertExploreItem(memberId, "EVENT");
+            eventItemIds.add(earlierRowItem);
+            eventItemIds.add(laterRowItem);
+            insertEventWithThumbnail(earlierRowItem, marker, "https://cdn.test/earlier-row.jpg");
+            insertEventWithThumbnail(laterRowItem, marker, "https://cdn.test/later-row.jpg");
+            insertTripItem(tieTripId, earlierRowItem, firstDay, 0);
+            insertTripItem(tieTripId, laterRowItem, firstDay, 0);
+
             // 모두 썸네일이 없으면 null이다. 빈 문자열이 아니다.
             long noneTripId = insertTrip(memberId, marker + "-none");
             tripIds.add(noneTripId);
@@ -434,6 +450,7 @@ class JourneyMapperIntegrationTest {
             assertEquals("https://cdn.test/earlier.jpg", coverOf(journeys, byDateTripId));
             assertEquals("https://cdn.test/first.jpg", coverOf(journeys, byOrderTripId));
             assertEquals("https://cdn.test/third.jpg", coverOf(journeys, skipTripId));
+            assertEquals("https://cdn.test/earlier-row.jpg", coverOf(journeys, tieTripId));
             assertNull(coverOf(journeys, noneTripId));
             assertNull(coverOf(journeys, emptyTripId));
         } finally {
@@ -996,21 +1013,7 @@ class JourneyMapperIntegrationTest {
         long itemId,
         LocalDate visitDate
     ) {
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbcTemplate.update(connection -> {
-            PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO trip_items "
-                    + "(trip_id, item_id, appointment_id, visit_date, "
-                    + "trip_item_status, display_order, note, confirmed_at) "
-                    + "VALUES (?, ?, NULL, ?, 'ADDED', 0, NULL, NULL)",
-                Statement.RETURN_GENERATED_KEYS
-            );
-            statement.setLong(1, tripId);
-            statement.setLong(2, itemId);
-            statement.setObject(3, visitDate);
-            return statement;
-        }, keyHolder);
-        return keyHolder.getKey().longValue();
+        return insertTripItem(tripId, itemId, visitDate, 0);
     }
 
     private static void softDeleteTripItem(long tripItemId) {

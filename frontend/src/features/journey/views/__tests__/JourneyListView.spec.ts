@@ -23,6 +23,7 @@ const journeys = [
     endDate: '2098-08-12',
     eventCount: 8,
     placeCount: 4,
+    coverImageUrl: 'https://cdn.test/seoul.jpg',
   },
   {
     // 장소만 담은 여정. `0 events`가 붙지 않는지 확인하는 데 쓴다.
@@ -32,6 +33,7 @@ const journeys = [
     endDate: '2020-08-12',
     eventCount: 0,
     placeCount: 3,
+    coverImageUrl: null,
   },
 ]
 
@@ -278,6 +280,7 @@ describe('JourneyListView', () => {
         endDate: '2098-08-12',
         eventCount: 0,
         placeCount: 0,
+        coverImageUrl: null,
       },
     ])
     const { wrapper } = await mountView()

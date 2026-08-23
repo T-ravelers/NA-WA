@@ -43,8 +43,9 @@ const itemCounts = computed(() => {
 
       커버는 목록 응답의 `coverImageUrl`을 쓴다(#424). 타임라인에서 가장 먼저 나오는,
       썸네일이 있는 항목의 사진이다. 담긴 항목이 없거나 모두 썸네일이 없으면 `null`로
-      오고 그때만 `ImagePlaceholder`로 채운다 — 수집 데이터의 썸네일 결측이 이벤트 약
-      33%·장소 약 44%라 자리표시가 예외가 아니라 흔한 상태다.
+      오고 그때만 `ImagePlaceholder`로 채운다. 커버는 썸네일이 있는 항목까지 건너뛰며
+      찾으므로 자리표시가 자주 나오지는 않지만, 아직 아무것도 담지 않은 여정에서는
+      반드시 나온다.
 
       시안의 인원수·소비영역 칩·`View report`는 아직 목록 API에 받쳐 줄 값이 없어 넣지
       않는다.
@@ -64,9 +65,13 @@ const itemCounts = computed(() => {
         <!--
           `size-full`로 칸을 채운다. 커버 칸은 `body-size`가 154px로 고정돼 있어 사진
           비율이 카드마다 달라질 일이 없다.
+
+          조건은 `!== null`이 아니라 truthy다. 엄격 비교로 두면 빈 문자열과 `undefined`가
+          사진 갈래로 새어 들어가 `src` 없는 `<img>`가 그려지고, 자리표시로 떨어지지
+          않는다. 형제인 `EventCard`의 썸네일 조건과 같은 방식이다.
         -->
         <img
-          v-if="journey.coverImageUrl !== null"
+          v-if="journey.coverImageUrl"
           :src="journey.coverImageUrl"
           alt=""
           class="size-full object-cover"

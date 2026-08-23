@@ -33,8 +33,7 @@ export interface JourneySummary {
    * 커버 사진 주소.
    *
    * 타임라인에서 가장 먼저 나오는, 썸네일이 있는 항목의 사진이다. 담긴 항목이 없거나
-   * 모두 썸네일이 없으면 `null`이다 — 수집 데이터의 썸네일 결측이 이벤트 약 33%·장소
-   * 약 44%라 비는 쪽이 예외가 아니다.
+   * 모두 썸네일이 없으면 `null`이다.
    */
   coverImageUrl: string | null
 }
