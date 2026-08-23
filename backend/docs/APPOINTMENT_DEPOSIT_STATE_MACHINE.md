@@ -469,12 +469,22 @@ DB 컬럼 값 자체는 스케줄러가 뒤에서 맞춥니다. 화면은 이 �
   더 줄일 이유는 없어 값은 코드에 고정해뒀습니다(설정 파일로 뺄 만큼의 실익이
   없음).
 - 전이는 약속마다 개별 트랜잭션으로 처리하지 않고, `AppointmentMapper`의 벌크
-  `UPDATE` 두 개(`closeExpiredRecruitingAppointments`,
-  `startDueClosedAppointments`)를 한 트랜잭션(`advanceLifecycle()`) 안에서
-  차례로 실행합니다. 각 `UPDATE`는 조건에 맞는 행을 한 번에 전환하는 단일
-  문장이라 그 자체로 원자적이고, 약속 수가 늘어나도 라운드트립이 늘지 않습니다.
-  `advanceLifecycle()`은 `@Scheduled` 메서드 자체가 직접 호출 가능한 public
-  메서드라 스케줄을 기다리지 않고 단위 테스트에서 바로 호출해 검증합니다.
+  `UPDATE` 두 개(`startDueAppointments`, `endDueAppointments`)를 한
+  트랜잭션(`advanceLifecycle()`) 안에서 차례로 실행합니다. **시작을 먼저
+  반영합니다** — 뒤집으면 스케줄러가 오래 멈춰 있던 사이에 활동이 통째로 지나간
+  약속이 한 주기에 종료까지 따라오지 못합니다. 각 `UPDATE`는 조건에 맞는 행을 한
+  번에 전환하는 단일 문장이라 그 자체로 원자적이고, 약속 수가 늘어나도
+  라운드트립이 늘지 않습니다. `advanceLifecycle()`은 `@Scheduled` 메서드 자체가
+  직접 호출 가능한 public 메서드라 스케줄을 기다리지 않고 테스트에서 바로 호출해
+  검증합니다.
+
+**되돌릴 때는 앱만 내리면 안 됩니다.** `V19`가 적용되고 스케줄러가 한 주기라도 돈
+뒤에 WAR만 이전 버전으로 내리면 `AWAITING_ATTENDANCE`로 옮겨진 행이 그대로
+남습니다. 옛 코드는 출석 확정을 `IN_PROGRESS`에서만 받고
+`findMyOngoingAppointments`도 `IN_PROGRESS`만 보므로, 그 행들은 출석 확정이 막히고
+QR 공동결제 대상 목록에서도 빠집니다 — 이 전이를 도입해 고친 증상이 반대 방향으로
+그대로 납니다. 롤백에는 해당 행을 `IN_PROGRESS`로 되돌리는 `UPDATE`가 함께
+필요합니다. ENUM 값 자체는 남겨 둬도 무해합니다.
 
 ## 16. 보증금 정산 — 비동기 배치
 
