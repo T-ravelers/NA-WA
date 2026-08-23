@@ -162,10 +162,7 @@ export default {
       language: 'Ngôn ngữ',
       deposit: 'Tiền cọc hoàn lại',
       notProvided: 'Chưa cung cấp',
-      join: 'Tham gia cuộc hẹn',
-      joinUnavailable: 'Cuộc hẹn này không mở để tham gia.',
-      alreadyJoined: 'Bạn đã tham gia cuộc hẹn này rồi.',
-      alreadyLeft: 'Bạn đã rời khỏi cuộc hẹn này. Hiện chưa thể tham gia lại từ đây.',
+      goHome: 'Về trang chủ',
       participationCheckFailed:
         'Chúng tôi không kiểm tra được trạng thái tham gia của bạn. Vui lòng thử lại.',
       openMenu: 'Mở menu cuộc hẹn',

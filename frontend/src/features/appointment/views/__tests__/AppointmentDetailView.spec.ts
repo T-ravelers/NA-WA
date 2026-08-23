@@ -1,13 +1,10 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
-import { NormalizedApiError } from '@/shared/api/apiError'
 
-import { appointmentJourneyIntegrationKey } from '../../model/journeyIntegration'
 import { useToasts } from '@/shared/ui/toast'
 
 const fetchAppointment = vi.fn()
@@ -82,7 +79,7 @@ const leftMember = {
   isHost: false,
 }
 
-async function mountView({ journeys: list = journeys, path = '/appointments/7' } = {}) {
+async function mountView({ path = '/appointments/7' } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -112,14 +109,9 @@ async function mountView({ journeys: list = journeys, path = '/appointments/7' }
         component: { template: '<div>List</div>' },
       },
       {
-        path: '/journeys/new',
-        name: 'journey-create',
-        component: { template: '<div>Journey create</div>' },
-      },
-      {
-        path: '/wallet/top-up',
-        name: 'wallet-top-up',
-        component: { template: '<div>Top up</div>' },
+        path: '/explore',
+        name: 'explore',
+        component: { template: '<div>Explore</div>' },
       },
     ],
   })
@@ -130,29 +122,11 @@ async function mountView({ journeys: list = journeys, path = '/appointments/7' }
   const wrapper = mount(AppointmentDetailView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
-      provide: {
-        [appointmentJourneyIntegrationKey as symbol]: {
-          // 참여도 여정을 고른다. 약속 날짜(2026-08-31)를 품는 여정 하나를 둔다.
-          useJourneyListQuery: () => ({
-            data: ref(list),
-            isPending: ref(false),
-            isError: ref(false),
-          }),
-          checkJourneyItemExists: vi.fn().mockResolvedValue(false),
-        },
-      },
     },
   })
   await flushPromises()
   return { wrapper, router, queryClient }
 }
-
-// 약속의 활동 날짜는 2099-08-08이다. 담을 수 있는 여정과 없는 여정을 함께 둔다 —
-// 목록은 둘 다 보여 주고, 담을 수 없는 쪽을 고르면 이유를 알려 준다.
-const journeys = [
-  { tripId: 7, title: 'Seoul Foodie Week', startDate: '2099-08-01', endDate: '2099-08-31' },
-  { tripId: 8, title: 'Busan Winter', startDate: '2099-12-01', endDate: '2099-12-20' },
-]
 
 const notJoinedParticipation = {
   joined: false,
@@ -299,516 +273,33 @@ describe('AppointmentDetailView', () => {
     back.mockRestore()
   })
 
-  it('tells an existing member they are already in, instead of opening the deposit sheet', async () => {
-    const { wrapper } = await mountView()
-    const joinButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
+  it('leaves for Explore from the bottom action, without stacking the detail', async () => {
+    // 하단 CTA는 더 이상 참여가 아니다. 이 화면을 떠나는 동작이라 상세를 히스토리에
+    // 남기지 않는다(replace) — 남기면 탐색에서 뒤로 갔을 때 방금 떠난 약속으로 돌아온다.
+    const { wrapper, router } = await mountView()
+    const replace = vi.spyOn(router, 'replace')
 
-    // 사유는 누르기 전부터 버튼 위에 떠 있다. 눌러 봐야 아는 화면은 제일 큰 CTA를
-    // "눌리기는 하는데 아무 일도 없는 버튼"으로 만든다. 비활성으로 두지 않는 것은
-    // 모바일이라 hover가 없어 비활성 버튼이 이유를 말할 방법이 없어서다.
-    expect(joinButton?.attributes('disabled')).toBeUndefined()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Go home')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(replace).toHaveBeenCalledWith({ name: 'explore' })
+    expect(router.currentRoute.value.name).toBe('explore')
+  })
+
+  it('offers no way to join from the detail screen', async () => {
+    // 참여 진입점은 약속 목록 카드의 Join 하나다. 상세에 남아 있던 중복 흐름
+    // (여정 선택 시트·보증금 시트·충전 프롬프트)은 함께 걷어냈다.
+    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
+    const { wrapper } = await mountView()
+
     expect(
-      wrapper.findAll('p').find((p) => p.text() === 'You have already joined this appointment.'),
-    ).toBeDefined()
-
-    await joinButton?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-  })
-
-  it('says up front that the appointment is full', async () => {
-    // 아직 참여하지 않은 사람이어야 정원 충족이 이유로 잡힌다. 이미 참여한
-    // 사람에게는 "이미 참여 중"이 먼저 걸린다.
-    fetchAppointment.mockResolvedValueOnce({ ...appointment, appointmentStatus: 'FULL' })
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper } = await mountView()
-    const joinButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-
-    expect(joinButton?.attributes('disabled')).toBeUndefined()
-
-    const notice = wrapper
-      .findAll('p')
-      .find((p) => p.text() === 'This appointment is not open for joining.')
-
-    // 정원 충족은 사용자 잘못이 아닌 정상 상태라 경고색이 아니라 중립색이어야 한다.
-    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(notice?.classes()).toContain('text-ink-3')
-    expect(notice?.classes()).not.toContain('text-danger')
-  })
-
-  it('says up front that the participation check failed', async () => {
-    fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
-    const { wrapper } = await mountView()
-
-    expect(wrapper.text()).toContain(
-      'We could not check your participation status. Please try again.',
-    )
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-  })
-
-  it('shows no notice when joining is actually possible', async () => {
-    // 사유를 상시로 띄우는 만큼, 막힐 이유가 없을 때 아무 말도 하지 않는 것이
-    // 같은 규칙의 반대쪽이다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper } = await mountView()
-
-    expect(wrapper.text()).not.toContain('This appointment is not open for joining.')
-    expect(wrapper.text()).not.toContain('You have already joined this appointment.')
-    expect(wrapper.text()).not.toContain('We could not check your participation status.')
-  })
-
-  it('shows a neutral (not red) notice on a normally closed appointment', async () => {
-    // 모집 종료(COMPLETED 등)는 정상 상태지 오류가 아니다. 버튼 위에 이유는
-    // 적되 경고색이 아니라 중립색으로 보여준다.
-    fetchAppointment.mockResolvedValue({ ...appointment, appointmentStatus: 'COMPLETED' })
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper } = await mountView()
-
-    const notice = wrapper
-      .findAll('p')
-      .find((p) => p.text() === 'This appointment is not open for joining.')
-
-    expect(notice).toBeDefined()
-    expect(notice?.classes()).toContain('text-ink-3')
-    expect(notice?.classes()).not.toContain('text-danger')
-  })
-
-  it('opens the deposit sheet with an enabled confirm button for a member who has not joined', async () => {
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper } = await mountView()
-
-    // 참여도 방장처럼 여정을 먼저 고른다. 고른 뒤에 보증금 확인으로 넘어간다.
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Seoul Foodie Week'))
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Confirm participation')
-    expect(
-      wrapper
-        .get('[role="dialog"]')
-        .findAll('button')
-        .find((button) => button.text().includes('Pay'))
-        ?.attributes('disabled'),
+      wrapper.findAll('button').find((button) => button.text() === 'Join appointment'),
     ).toBeUndefined()
-  })
-
-  it('asks which journey to put the appointment in before taking the deposit', async () => {
-    // 참여도 방장처럼 여정을 고른다. 고르지 않으면 서버가 멤버십의 trip_id를 비워 둘
-    // 수 없어 참여 자체가 성립하지 않는다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Choose a journey')
-    expect(wrapper.text()).not.toContain('Confirm participation')
-  })
-
-  it('reads the activity date even when the server sends it as numbers', async () => {
-    // Jackson LocalDateTime은 숫자 배열로도 나갈 수 있는 형태다. 문자열이라고 보고
-    // slice로 자르면 배열이 나오고, 여정 기간 비교가 문자열 대 배열이 되어 조용히
-    // 전부 false가 된다 — 담을 수 있는 여정까지 "날짜를 담지 못함"으로 막힌다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    fetchAppointment.mockResolvedValue({
-      ...appointment,
-      activityStartAt: [2099, 8, 8, 18, 30],
-      activityEndAt: [2099, 8, 8, 22, 0],
-    })
-    const { wrapper } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-
-    // 2099-08-08을 담는 여정을 고르면 그대로 보증금 확인으로 넘어간다.
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Seoul Foodie Week'))
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).not.toContain('does not cover the appointment date')
-    expect(wrapper.text()).toContain('Confirm participation')
-  })
-
-  it('rejects a journey that misses the numeric activity date', async () => {
-    // 위 테스트만으로는 "배열을 2099-08-08로 읽었다"와 "못 읽어서 아무것도 안 걸렀다"가
-    // 구분되지 않는다 — coversActivityDate는 날짜를 모르면 true를 돌려주기 때문이다.
-    // 담지 못하는 여정이 실제로 거절되는지까지 봐야 날짜를 읽었다는 게 고정된다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    fetchAppointment.mockResolvedValue({
-      ...appointment,
-      activityStartAt: [2099, 8, 8, 18, 30],
-      activityEndAt: [2099, 8, 8, 22, 0],
-    })
-    const { wrapper } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-
-    // Busan Winter는 2099-12-01 – 2099-12-20이라 2099-08-08을 담지 못한다.
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Busan Winter'))
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('does not cover the appointment date')
-  })
-
-  it('does not filter journeys when the activity date is unknown', async () => {
-    // 날짜를 못 읽으면 빈 문자열이 온다. 그대로 두면 journey.startDate <= ''가 언제나
-    // false라 **모든 여정이** "날짜를 담지 못함"으로 거절되어 참여가 통째로 막힌다 —
-    // 이 PR이 없애려던 증상 그대로다. 모를 때는 거르지 않고 서버 판단에 맡긴다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    fetchAppointment.mockResolvedValue({ ...appointment, activityStartAt: null })
-    const { wrapper } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-
-    // 담지 못하는 여정(Busan Winter)조차 거절되지 않아야 한다.
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Busan Winter'))
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).not.toContain('does not cover the appointment date')
-    expect(wrapper.text()).toContain('Confirm participation')
-  })
-
-  it('explains why a journey that cannot hold the activity date was refused', async () => {
-    // 목록에서 감추지 않는다 — "내 여정이 왜 없지"로 읽힌다. 고르는 순간 이유를
-    // 알려 주고 시트는 열어 둬, 다른 여정을 바로 고를 수 있게 한다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Seoul Foodie Week')
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Busan Winter')
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Busan Winter'))
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.get('[role="alert"]').text()).toContain('does not cover the appointment date')
-    // 보증금 시트로 넘어가지 않고 목록이 그대로 남는다.
-    expect(wrapper.text()).not.toContain('Confirm participation')
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Seoul Foodie Week')
-  })
-
-  it('keeps a way to create a journey even when the list is not empty', async () => {
-    // 담을 수 없는 여정도 감추지 않고 보여 주므로, 전부 날짜가 안 맞으면 안내만
-    // 반복해서 보고 끝나는 막다른 길이 생긴다. 목록이 있어도 만들 통로를 남긴다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-
-    const sheet = wrapper.get('[role="dialog"]')
-    expect(sheet.text()).toContain('Seoul Foodie Week')
-    expect(
-      sheet.findAll('button').find((button) => button.text() === 'Create a journey'),
-    ).toBeDefined()
-  })
-
-  it('names joining, not creating, when there is no journey to use', async () => {
-    // 참여하려는 사람에게 "이 약속을 만들기 전에"는 어긋난다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper } = await mountView({ journeys: [] })
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.get('[role="dialog"]').text()).toContain('before joining this appointment')
-  })
-
-  it('marks its own entry with the chosen journey before leaving for top-up', async () => {
-    // 뒤로가기는 떠날 때의 URL로 되돌린다. 자기 자리에 표시를 안 남기면 충전을
-    // 포기했을 뿐인데 고른 여정이 사라져 처음부터 다시 골라야 한다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    joinAppointment.mockRejectedValue(
-      new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
-    )
-    const { wrapper, router } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Seoul Foodie Week'))
-      ?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Pay'))
-      ?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Top up')
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(router.currentRoute.value.name).toBe('wallet-top-up')
-
-    // 충전을 포기하고 뒤로. 떠날 때의 자리에 고른 여정이 남아 있어야 한다.
-    router.back()
-    await flushPromises()
-
-    expect(router.currentRoute.value.name).toBe('appointment-detail')
-    expect(router.currentRoute.value.query.tripId).toBe('7')
-  })
-
-  it('sends the host to journey creation when nothing can hold the appointment', async () => {
-    // 담을 여정이 하나도 없으면 만들러 보낸다. 자리를 내주고(replace) 보내면 여정
-    // 생성이 그 자리를 돌려주므로, 돌아온 뒤 상세가 히스토리에 두 번 쌓이지 않는다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper, router } = await mountView({ journeys: [] })
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Create a journey'))
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(router.currentRoute.value.name).toBe('journey-create')
-    // 이 화면은 param 라우트(/appointments/:appointmentId)라 이름만으로는 돌아올 수
-    // 없다. 여정 생성이 params로 풀 수 있게 returnParams로 싣는다.
-    expect(router.currentRoute.value.query).toMatchObject({
-      returnRouteName: 'appointment-detail',
-      returnParams: 'appointmentId:7',
-    })
-  })
-
-  it('offers to top up when the deposit cannot be held', async () => {
-    // 빨간 한 줄 대신 "부족하다 + 그만큼 충전할까"를 한 번에 묻는다. 약속 생성과
-    // 같은 규칙이다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    joinAppointment.mockRejectedValue(
-      new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
-    )
-    const { wrapper, router } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Seoul Foodie Week'))
-      ?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Pay'))
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Not enough balance')
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Top up')
-      ?.trigger('click')
-    await flushPromises()
-
-    // 돌아올 곳에 고른 여정을 실어 보낸다 — 돌아오면 그 여정이 골라진 채로 열린다.
-    expect(router.currentRoute.value.name).toBe('wallet-top-up')
-    expect(router.currentRoute.value.query).toMatchObject({
-      amount: '10000',
-      returnRouteName: 'appointment-detail',
-      returnParams: 'appointmentId:7',
-      tripId: '7',
-    })
-  })
-
-  it('explains a journey conflict instead of failing silently', async () => {
-    // 같은 여정·장소·날짜에 다른 약속이 이미 걸려 있으면 서버가 JOURNEY-004로
-    // 거절한다. 문구가 없으면 일반 오류로 떨어져 "아무 일도 안 난 것"처럼 보인다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    joinAppointment.mockRejectedValue(
-      new NormalizedApiError('JOURNEY-004', 409, 'duplicate journey item'),
-    )
-    const { wrapper } = await mountView()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Seoul Foodie Week'))
-      ?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Pay'))
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('already on that day of your journey')
-  })
-
-  it('reopens the journey sheet with the journey the host just created', async () => {
-    // 여정을 만들고 ?tripId=로 돌아온 길. 참여를 다시 누르게 하지 않고, 만든 여정을
-    // 골라 둔 채로 시트를 열어 확인하고 넘어가게 한다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper, router } = await mountView({ path: '/appointments/7?tripId=7' })
-
-    const sheet = wrapper.get('[role="dialog"]')
-    expect(sheet.text()).toContain('Choose a journey')
-    expect(
-      sheet
-        .findAll('button')
-        .find((button) => button.text().includes('Seoul Foodie Week'))
-        ?.attributes('aria-pressed'),
-    ).toBe('true')
-    // 아직 소비하지 않는다 — 충전으로 떠날 때 남겨 둔 표시가 바로 사라지면 안 된다.
-    // 사용자가 고르거나 닫으면 그때 지운다.
-    expect(router.currentRoute.value.query.tripId).toBe('7')
-  })
-
-  it('does not reopen the sheet after the join succeeds', async () => {
-    // 참여가 끝나면 상세와 참여 정보를 함께 무효화한다. 상세가 먼저 도착하면 그
-    // 순간에는 아직 "참여 안 함"으로 보이므로, ?tripId=가 URL에 남아 있으면 가드를
-    // 통과해 시트가 다시 열린다 — 참여는 끝났는데 "Choose a journey"가 뜨는 화면이
-    // 된다. 응답 순서에 기대지 않도록 지시를 한 번만 소비한다.
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    const { wrapper, router } = await mountView({ path: '/appointments/7?tripId=7' })
-
-    // 골라진 여정을 눌러 보증금 확인으로 넘어간 뒤 참여한다. 고르는 순간 지시가
-    // 소비되므로, 참여가 끝난 뒤 상세만 먼저 갱신돼도 시트가 다시 열리지 않는다.
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Seoul Foodie Week'))
-      ?.trigger('click')
-    await flushPromises()
-
-    // 고르는 순간 지시가 소비된다.
-    expect(router.currentRoute.value.query.tripId).toBeUndefined()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Pay'))
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(joinAppointment).toHaveBeenCalledWith(7, 7)
-
-    // 참여 성공 뒤 상세만 먼저 갱신된 상황을 만든다.
-    fetchAppointment.mockResolvedValue({ ...appointment, currentMemberCount: 3 })
-    await flushPromises()
-    await flushPromises()
-
-    expect(wrapper.text()).not.toContain('Choose a journey')
-  })
-
-  it('does not reopen the sheet for a member who already joined', async () => {
-    // 이미 참여한 사람에게는 열지 않는다. 참여 버튼과 같은 기준이다.
-    fetchMyAppointmentParticipation.mockResolvedValue({
-      joined: true,
-      appointmentMemberId: 4,
-      membershipStatus: 'ACTIVE',
-      attendanceStatus: 'PENDING',
-      host: false,
-    })
-    const { wrapper } = await mountView({ path: '/appointments/7?tripId=7' })
-
-    expect(wrapper.text()).not.toContain('Choose a journey')
-  })
-
-  it('joins the appointment and closes the sheet once confirmed', async () => {
-    fetchMyAppointmentParticipation.mockResolvedValue(notJoinedParticipation)
-    joinAppointment.mockResolvedValue({
-      appointmentMemberId: 4,
-      memberId: 99,
-      displayName: 'Jordan Lee',
-      profileImageUrl: null,
-      preferredLanguage: 'en',
-      membershipStatus: 'PENDING',
-      attendanceStatus: 'PENDING',
-      isHost: false,
-    })
-    const { wrapper } = await mountView()
-
-    // 참여도 방장처럼 여정을 먼저 고른다. 고른 뒤에 보증금 확인으로 넘어간다.
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Join appointment')
-      ?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('Seoul Foodie Week'))
-      ?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .get('[role="dialog"]')
-      .findAll('button')
-      .find((button) => button.text().includes('Pay'))
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(joinAppointment).toHaveBeenCalledWith(7, 7)
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(joinAppointment).not.toHaveBeenCalled()
   })
 
   it('renders the member cards directly without a View all action', async () => {
@@ -910,16 +401,16 @@ describe('AppointmentDetailView', () => {
     expect(item('Reviews')?.attributes('disabled')).toBeDefined()
   })
 
-  it('says the participation check failed once, not twice', async () => {
+  it('does not blame the participation check on the screen the user can act on', async () => {
     // 조회가 실패하면 목록에서 어느 행이 내 것인지 알 수 없어 나가기 버튼을 붙일
-    // 자리가 없다. 다만 그 이유는 하단 CTA 위에 이미 떠 있다 — 목록 위에 한 번 더
-    // 적으면 같은 화면이 같은 실패를 두 번 말한다. 게다가 목록 쪽 문구는 나가기를
-    // 지목해, 애초에 참여한 적 없는 사람에게 없던 버튼이 사라진 것처럼 들렸다.
+    // 자리가 없다. 그 사실을 화면 본문에서 말하지는 않는다 — 이제 하단 CTA는 참여가
+    // 아니라 이동이라 「참여 상태를 확인하지 못했다」를 걸어 둘 자리가 아니다.
+    // 그 사유가 필요한 곳은 버거 메뉴의 출석·후기 항목이고, 아래 테스트들이 맡는다.
     fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
     const { wrapper } = await mountView()
 
     expect(leaveButton(wrapper)).toBeUndefined()
-    expect(wrapper.text().split('We could not check your participation status.')).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('We could not check your participation status.')
     expect(wrapper.text()).not.toContain('the leave button is unavailable')
   })
 
@@ -1007,35 +498,6 @@ describe('AppointmentDetailView', () => {
     // 모달만 조용히 닫히면 나간 것인지, 보증금이 돌아왔는지 알 수 없다.
     expect(toasts.value[toasts.value.length - 1]?.message).toBe(
       'You left this appointment. 10,000 P has been refunded to your wallet.',
-    )
-  })
-
-  it('says you left instead of claiming you already joined', async () => {
-    // 서버는 나간 참여에도 joined: true를 준다. 그것만 보면 나간 사람에게
-    // "이미 참여했다"고 말해, 같은 화면에서 환급 토스트와 반대되는 안내가 된다.
-    fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
-    cancelAppointmentParticipation.mockImplementation(() => {
-      fetchMyAppointmentParticipation.mockResolvedValue({
-        ...memberParticipation,
-        membershipStatus: 'LEFT' as const,
-      })
-      return Promise.resolve()
-    })
-    const { wrapper } = await mountView()
-
-    expect(wrapper.text()).toContain('You have already joined this appointment.')
-
-    await leaveButton(wrapper)?.trigger('click')
-    await flushPromises()
-    await wrapper
-      .findAll('[role="dialog"] button')
-      .find((button) => button.text() === 'Leave group')
-      ?.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).not.toContain('You have already joined this appointment.')
-    expect(wrapper.text()).toContain(
-      'You left this appointment. Joining again is not available here for now.',
     )
   })
 
