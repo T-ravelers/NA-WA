@@ -111,8 +111,9 @@ public class NotificationServiceImpl implements NotificationService {
      * 커서를 숫자로 되돌린다.
      *
      * 커서는 우리가 직전 응답에 실어 보낸 값이지만 주소로 오는 값이라 무엇이든 올 수 있다.
-     * 숫자가 아니면 오류 대신 첫 쪽으로 떨어뜨린다 — limit과 같은 이유다. 없는 번호를 넣어도
-     * 비교할 짝이 없어 빈 쪽이 나오므로, 남의 번호를 넣어 남의 알림을 엿볼 방법은 없다.
+     * 숫자가 아니면 오류 대신 첫 쪽으로 떨어뜨린다 — limit과 같은 이유다. 숫자로 읽히는
+     * 값이어도 조회 SQL이 커서가 가리키는 행을 수신자로 좁혀 찾으므로, 남의 번호는 없는
+     * 번호와 똑같이 빈 쪽이 된다.
      */
     private static Long parseCursor(String cursor) {
         if (cursor == null || cursor.isBlank()) {

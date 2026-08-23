@@ -311,6 +311,59 @@ class NotificationMapperIntegrationTest {
         }
     }
 
+    /**
+     * 남의 알림 번호를 커서로 넣어도 아무것도 알아낼 수 없는지 본다.
+     *
+     * 커서는 주소로 오는 값이라 남의 번호를 적어 보낼 수 있다. 커서가 가리키는 행을
+     * 수신자로 좁혀 찾지 않으면, 그 남의 알림 시각을 기준으로 내 목록이 잘린다. 잘리는
+     * 모양만 보고도 그 알림이 언제쯤 생겼는지를 되짚을 수 있다.
+     */
+    @Test
+    void findByRecipient_othersCursorRevealsNothing() {
+        Fixture fixture = createFixture();
+        try {
+            LocalDateTime older = LocalDateTime.now().withNano(0).minusHours(1);
+            mapper.insertNotifications(List.of(
+                notification(fixture, "SETTLEMENT_REQUESTED", new BigDecimal("60"), older)
+            ));
+            mapper.insertNotifications(List.of(
+                notificationFor(
+                    fixture, fixture.payerMemberId(), "SETTLEMENT_PAID",
+                    new BigDecimal("30"), LocalDateTime.now().withNano(0)
+                )
+            ));
+            Long othersCursor = mapper
+                .findByRecipient(fixture.payerMemberId(), null, 10)
+                .get(0)
+                .getNotificationId();
+
+            // 좁히지 않으면 남의 알림보다 오래된 내 알림이 그대로 나와, 그 시각을 되짚을 수
+            // 있다. 없는 번호를 넣었을 때와 똑같이 빈 쪽이어야 한다.
+            assertEquals(
+                0,
+                mapper.findByRecipient(fixture.guestMemberId(), othersCursor, 10).size()
+            );
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
+    private static Notification notificationFor(
+        Fixture fixture, Long recipientMemberId, String type, BigDecimal amount,
+        LocalDateTime createdAt
+    ) {
+        return Notification.builder()
+            .recipientMemberId(recipientMemberId)
+            .notificationType(type)
+            .settlementId(fixture.settlementId())
+            .actorName(fixture.payerName())
+            .gatheringName(fixture.gatheringName())
+            .amount(amount)
+            .currencyCode("KRW")
+            .createdAt(createdAt)
+            .build();
+    }
+
     private static Notification notification(
         Fixture fixture, String type, BigDecimal amount, LocalDateTime createdAt
     ) {
