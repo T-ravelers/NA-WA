@@ -6,10 +6,31 @@
  */
 export default {
   member: {
-    settings: {
-      title: '設定',
+    profile: {
+      title: '個人檔案',
       account: '帳號',
       preferences: '偏好設定',
+      from: '來自{country}',
+      tabs: {
+        saved: '收藏',
+        appointments: '約會',
+      },
+      kinds: {
+        events: '活動',
+        places: '地點',
+      },
+      saved: {
+        emptyEvents: '還沒有收藏。點活動上的愛心就會留在這裡。',
+        emptyPlaces: '還沒有收藏。點地點上的愛心就會留在這裡。',
+      },
+      appointments: {
+        emptyEvents: '還沒有活動的約會。',
+        emptyPlaces: '還沒有地點的約會。',
+      },
+      currency: {
+        label: '幣別',
+        notSet: '尚未設定',
+      },
       language: {
         label: '畫面語言',
         change: '變更畫面語言',

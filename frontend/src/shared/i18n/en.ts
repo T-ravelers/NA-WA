@@ -33,11 +33,11 @@ export default {
   },
   nav: {
     label: 'Main navigation',
-    home: 'Home',
-    report: 'Report',
-    profile: 'Profile',
+    journey: 'Journey',
+    explore: 'Explore',
     wallet: 'Wallet',
-    journey: 'Journeys',
+    report: 'Report',
+    my: 'My',
     comingSoon: 'Coming soon',
   },
   /**

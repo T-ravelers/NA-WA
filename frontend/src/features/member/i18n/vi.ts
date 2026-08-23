@@ -6,10 +6,31 @@
  */
 export default {
   member: {
-    settings: {
-      title: 'Cài đặt',
+    profile: {
+      title: 'Hồ sơ',
       account: 'Tài khoản',
       preferences: 'Tùy chọn',
+      from: 'Đến từ {country}',
+      tabs: {
+        saved: 'Đã lưu',
+        appointments: 'Cuộc hẹn',
+      },
+      kinds: {
+        events: 'Sự kiện',
+        places: 'Địa điểm',
+      },
+      saved: {
+        emptyEvents: 'Chưa lưu gì. Chạm vào trái tim trên một sự kiện để giữ nó ở đây.',
+        emptyPlaces: 'Chưa lưu gì. Chạm vào trái tim trên một địa điểm để giữ nó ở đây.',
+      },
+      appointments: {
+        emptyEvents: 'Chưa có cuộc hẹn nào cho sự kiện.',
+        emptyPlaces: 'Chưa có cuộc hẹn nào cho địa điểm.',
+      },
+      currency: {
+        label: 'Tiền tệ',
+        notSet: 'Chưa đặt',
+      },
       language: {
         label: 'Ngôn ngữ màn hình',
         change: 'Đổi ngôn ngữ màn hình',

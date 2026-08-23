@@ -63,7 +63,7 @@ test('signs out, clears the pending return path, and protects browser history', 
   })
 
   await page.goto('/wallet')
-  await page.goto('/settings')
+  await page.goto('/profile')
   await expect(page.getByText('Mina')).toBeVisible()
   await page.evaluate(() => {
     localStorage.setItem('nawa.locale', 'en')
@@ -163,8 +163,8 @@ test('keeps an uncertain sign-out across tabs and reload, then signs out on retr
 
   const secondPage = await context.newPage()
 
-  await page.goto('/settings')
-  await secondPage.goto('/settings')
+  await page.goto('/profile')
+  await secondPage.goto('/profile')
   await expect(page.getByText('Mina')).toBeVisible()
   await expect(secondPage.getByText('Mina')).toBeVisible()
 
@@ -228,7 +228,7 @@ test('keeps the barrier after a failed callback and clears it after a successful
     await route.abort('connectionfailed')
   })
 
-  await page.goto('/settings')
+  await page.goto('/profile')
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page).toHaveURL(/\/sign-in$/)
 

@@ -109,9 +109,21 @@ export interface AppointmentParticipation {
 }
 
 /**
+ * `GET /api/v1/appointments/me`가 돌려줄 범위.
+ *
+ * `ONGOING`은 진행 중인 약속만 다가오는 순으로 준다(지갑 QR 결제가 쓰는 기존 계약).
+ * `ALL`은 취소를 뺀 전체를 예정(임박한 순) 먼저, 지난 약속(최근 순) 나중으로 준다 —
+ * 프로필의 약속 목록이 쓴다. 정렬은 서버가 하므로 화면에서 다시 세우지 않는다.
+ */
+export type MyAppointmentScope = 'ONGOING' | 'ALL'
+
+/**
  * `GET /api/v1/appointments/me` 응답 항목. 백엔드 `MyOngoingAppointmentResponse`와 1:1.
  * `activityStartAt`/`activityEndAt`은 `@JsonFormat(shape = STRING)`으로 고정돼 있어
  * 다른 약속 필드와 달리 배열 형태로 오지 않는다.
+ *
+ * `tripId`·`itemType`은 널이 아니다. 조회가 `am.trip_id IS NOT NULL`로 거르고
+ * `explore_items`를 조인해 종류를 가져온다.
  */
 export interface MyOngoingAppointment {
   appointmentId: number
@@ -120,6 +132,9 @@ export interface MyOngoingAppointment {
   meetingPlace: string | null
   activityStartAt: string
   activityEndAt: string
+  itemId: number
+  itemType: AppointmentItemType
+  appointmentStatus: AppointmentStatus
 }
 
 function normalizePageResponse(response: AppointmentListResponse): AppointmentListResponse {
@@ -196,8 +211,12 @@ export async function cancelAppointmentParticipation(appointmentId: number): Pro
   await httpClient.delete(`${APPOINTMENT_LIST_PATH}/${appointmentId}/members/me`)
 }
 
-export async function fetchMyOngoingAppointments(): Promise<MyOngoingAppointment[]> {
-  const response = await httpClient.get<MyOngoingAppointment[]>(`${APPOINTMENT_LIST_PATH}/me`)
+export async function fetchMyOngoingAppointments(
+  scope: MyAppointmentScope = 'ONGOING',
+): Promise<MyOngoingAppointment[]> {
+  const response = await httpClient.get<MyOngoingAppointment[]>(`${APPOINTMENT_LIST_PATH}/me`, {
+    params: { scope },
+  })
 
   return response.data ?? []
 }

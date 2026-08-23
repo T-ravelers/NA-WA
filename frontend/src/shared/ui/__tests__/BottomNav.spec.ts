@@ -13,7 +13,7 @@ async function mountAt(path: string) {
       { path: '/explore', component: { template: '<div />' } },
       { path: '/reports', component: { template: '<div />' } },
       { path: '/reports/:reportId', component: { template: '<div />' } },
-      { path: '/settings', component: { template: '<div />' } },
+      { path: '/profile', component: { template: '<div />' } },
       { path: '/wallet', component: { template: '<div />' } },
       { path: '/journeys', component: { template: '<div />' } },
     ],
@@ -26,13 +26,22 @@ async function mountAt(path: string) {
 }
 
 describe('BottomNav', () => {
-  it('renders five tabs with the Report tab second and linked to /reports', async () => {
+  it('orders the tabs as the V2 design does', async () => {
     const wrapper = await mountAt('/explore')
-    const links = wrapper.findAll('a')
 
-    expect(wrapper.findAll('li')).toHaveLength(5)
-    expect(links[1]?.attributes('href')).toBe('/reports')
-    expect(links[1]?.attributes('aria-label')).toBe('Report')
+    expect(wrapper.findAll('a').map((link) => link.attributes('href'))).toEqual([
+      '/journeys',
+      '/explore',
+      '/wallet',
+      '/reports',
+      '/profile',
+    ])
+  })
+
+  it('sends the last tab to the profile screen', async () => {
+    const wrapper = await mountAt('/explore')
+
+    expect(wrapper.get('a[href="/profile"]').text()).toBe('My')
   })
 
   it('marks the Report tab active on the report list and on a report detail route', async () => {
@@ -43,11 +52,13 @@ describe('BottomNav', () => {
     expect(onDetail.get('a[href="/reports"]').attributes('aria-current')).toBe('page')
   })
 
-  it('gives every tab an accessible name', async () => {
+  /** 라벨이 보이므로 이름은 글자가 맡는다. `aria-label`을 겹쳐 붙이면 두 번 읽힌다. */
+  it('names every tab with its visible label', async () => {
     const wrapper = await mountAt('/explore')
 
-    for (const control of wrapper.findAll('li > *')) {
-      expect(control.attributes('aria-label')).toBeTruthy()
+    for (const link of wrapper.findAll('li a')) {
+      expect(link.text()).not.toBe('')
+      expect(link.attributes('aria-label')).toBeUndefined()
     }
   })
 })

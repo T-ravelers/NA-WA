@@ -19,8 +19,11 @@ import { appointmentMemberIntegrationKey } from '@/features/appointment/model/me
 import { addJourneyItem, checkJourneyItemExists } from '@/features/journey/api/journeyApi'
 import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
 import { parseJourneyRouteQuery } from '@/features/journey/model/journeyRouteQuery'
+import { memberAppointmentIntegrationKey } from '@/features/member/model/appointmentIntegration'
+import { memberExploreIntegrationKey } from '@/features/member/model/exploreIntegration'
 import { useMemberAppointmentProfile } from '@/features/member/model/memberQueries'
 import { useExploreItemLocationQuery } from '@/features/explore/model/appointmentIntegration'
+import { useSavedExploreItemsQuery } from '@/features/explore/model/memberIntegration'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
 import { journeyReportIntegrationKey } from '@/features/journey/model/reportIntegration'
 import { useReportSummariesQuery } from '@/features/report/composables/useReportQueries'
@@ -70,5 +73,10 @@ app.provide(appointmentJourneyIntegrationKey, {
 app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
 app.provide(walletAppointmentIntegrationKey, { useMyOngoingAppointmentsQuery })
 app.provide(appointmentExploreIntegrationKey, { useItemLocation: useExploreItemLocationQuery })
+app.provide(memberExploreIntegrationKey, { useSavedItems: useSavedExploreItemsQuery })
+app.provide(memberAppointmentIntegrationKey, {
+  // 프로필의 약속 탭은 지난 약속까지 본다. 지갑 QR 결제가 쓰는 기본 범위와 다르다.
+  useMyAppointments: (enabled) => useMyOngoingAppointmentsQuery(enabled, 'ALL'),
+})
 
 app.mount('#app')

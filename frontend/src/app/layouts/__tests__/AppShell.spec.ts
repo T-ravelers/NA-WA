@@ -83,15 +83,16 @@ describe('AppShell', () => {
     expect(wrapper.find('nav').exists()).toBe(false)
   })
 
-  it('gives every icon-only navigation control an accessible name', async () => {
+  it('gives every navigation control an accessible name', async () => {
     const wrapper = await mountAt('/wallet')
 
     const controls = wrapper.findAll('nav li > *')
 
     expect(controls.length).toBe(5)
 
+    // 시안이 아이콘 아래에 라벨을 함께 그린다. 이름은 그 글자가 맡는다.
     for (const control of controls) {
-      expect(control.attributes('aria-label')).toBeTruthy()
+      expect(control.text()).not.toBe('')
     }
   })
 
@@ -99,7 +100,7 @@ describe('AppShell', () => {
     const wrapper = await mountAt('/journeys')
     const journeyLink = wrapper.get('a[href="/journeys"]')
 
-    expect(journeyLink.attributes('aria-label')).toBe('Journeys')
+    expect(journeyLink.text()).toBe('Journey')
     expect(journeyLink.attributes('aria-current')).toBe('page')
   })
 })
