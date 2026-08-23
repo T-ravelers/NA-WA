@@ -349,6 +349,57 @@ describe('PlaceDetailView', () => {
     expect(router.currentRoute.value.name).toBe('journey-detail')
   })
 
+  it('keeps the last journey selection instead of restoring the stale query', async () => {
+    fetchJourneys.mockResolvedValue([
+      {
+        tripId: 999,
+        title: 'Original journey',
+        startDate: '2026-08-10',
+        endDate: '2026-08-12',
+      },
+      { tripId: 7, title: 'Seoul weekend', startDate: '2026-08-10', endDate: '2026-08-12' },
+    ])
+    const { wrapper, router } = await mountView('/explore/places/42?journeyId=999')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get('[role="dialog"]')
+        .findAll('button')
+        .find((button) => button.attributes('aria-pressed') === 'true')
+        ?.text(),
+    ).toContain('Original journey')
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul weekend'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper.get('button[aria-label="Close date picker"]').trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get('[role="dialog"]')
+        .findAll('button')
+        .find((button) => button.attributes('aria-pressed') === 'true')
+        ?.text(),
+    ).toContain('Seoul weekend')
+    expect(router.currentRoute.value.query.journeyId).toBeUndefined()
+  })
+
   /*
    * Place는 운영 기간이 없다. 예전에는 그래서 날짜 시트에 isPermanent=true를 넘겨
    * **모든 날짜**를 열었고, 여정 기간 밖까지 열려 확정한 뒤에야 JOURNEY-007로 실패했다.

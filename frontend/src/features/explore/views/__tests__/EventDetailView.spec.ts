@@ -346,6 +346,58 @@ describe('EventDetailView', () => {
     expect(router.currentRoute.value.name).toBe('journey-detail')
   })
 
+  it('keeps the last journey selection instead of restoring the stale query', async () => {
+    const originalJourney: ExploreJourneySummary = {
+      tripId: 999,
+      title: 'Original journey',
+      startDate: '2026-08-10',
+      endDate: '2026-08-12',
+    }
+    const { wrapper, router } = await mountView('/explore/events/42?journeyId=999', [
+      originalJourney,
+      ...journeys,
+    ])
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get('[role="dialog"]')
+        .findAll('button')
+        .find((button) => button.attributes('aria-pressed') === 'true')
+        ?.text(),
+    ).toContain('Original journey')
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul weekend'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper.get('button[aria-label="Close date picker"]').trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get('[role="dialog"]')
+        .findAll('button')
+        .find((button) => button.attributes('aria-pressed') === 'true')
+        ?.text(),
+    ).toContain('Seoul weekend')
+    expect(router.currentRoute.value.query.journeyId).toBeUndefined()
+    expect(readReturnContext()).toEqual({ journeyId: 7, visitDate: null, returnTo: null })
+  })
+
   it('adds the Event on the date the Journey entry carried and returns there', async () => {
     seedReturnContext()
     const { wrapper, router } = await mountView()
