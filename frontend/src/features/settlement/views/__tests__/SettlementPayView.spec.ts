@@ -32,7 +32,7 @@ const detail = {
 }
 
 /** 기본값은 상세의 Pay 버튼으로 들어온 경우다. 주소로 열린 진입은 `confirmed: false`. */
-async function mountPay({ confirmed = true } = {}) {
+async function mountPay({ confirmed = true, query = '' } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -52,12 +52,19 @@ async function mountPay({ confirmed = true } = {}) {
         component: { template: '<div />' },
       },
       { path: '/settlements', name: 'settlements', component: { template: '<div />' } },
+      { path: '/wallet', name: 'wallet', component: { template: '<div />' } },
+      { path: '/wallet/top-up', name: 'wallet-top-up', component: { template: '<div />' } },
     ],
   })
   await router.push(
     confirmed
-      ? { name: 'settlement-pay', params: { settlementId: '42' }, state: { confirmed: true } }
-      : '/settlements/42/pay',
+      ? {
+          name: 'settlement-pay',
+          params: { settlementId: '42' },
+          query: Object.fromEntries(new URLSearchParams(query)),
+          state: { confirmed: true },
+        }
+      : `/settlements/42/pay${query === '' ? '' : `?${query}`}`,
   )
   await router.isReady()
   const wrapper = mount(SettlementPayView, {
@@ -158,5 +165,94 @@ describe('SettlementPayView', () => {
 
     expect(pay).toHaveBeenCalledTimes(1)
     expect(router.currentRoute.value.name).toBe('settlement-detail')
+  })
+
+  /*
+   * 잔액 부족은 다시 눌러도 잔액이 그대로다. 재시도 버튼만 주면 사용자가 그 화면에
+   * 갇힌다 — 약속 보증금처럼 충전으로 이어 준다(#452).
+   */
+  it('offers to top up instead of retrying when the balance is too low', async () => {
+    pay.mockRejectedValue(new NormalizedApiError('WALLET-015', 409, 'not enough'))
+    const { wrapper } = await mountPay()
+
+    const dialog = wrapper.get('[role="dialog"]')
+    expect(dialog.text()).toContain('Not enough balance')
+    expect(dialog.text()).toContain('12.50 P')
+    // 팝업과 오류 화면이 겹치면 무엇을 눌러야 할지 흐려진다.
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('carries the share and the way back into the top-up screen', async () => {
+    pay.mockRejectedValue(new NormalizedApiError('WALLET-015', 409, 'not enough'))
+    const { wrapper, router } = await mountPay({ query: 'side=sent' })
+
+    await wrapper.get('[role="dialog"]').findAll('button')[1]?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('wallet-top-up')
+    expect(router.currentRoute.value.query).toEqual({
+      // 12.50 P가 모자란다. 내림하면 채우고도 다시 모자라므로 올려서 채워 보낸다.
+      amount: '13',
+      returnRouteName: 'settlement-pay',
+      // 경로 변수를 쓰는 화면이라 이름만으로는 주소를 만들 수 없다.
+      returnParams: 'settlementId:42',
+      // 보고 있던 쪽을 놓치면 돌아온 뒤 뒤로 갈 때 반대편 목록으로 떨어진다.
+      side: 'sent',
+    })
+  })
+
+  it('marks its own entry so the way back is the confirmation step', async () => {
+    pay.mockRejectedValue(new NormalizedApiError('WALLET-015', 409, 'not enough'))
+    const { wrapper, router } = await mountPay()
+
+    await wrapper.get('[role="dialog"]').findAll('button')[1]?.trigger('click')
+    await flushPromises()
+    // 충전 화면은 일을 마치든 그냥 나가든 자기 엔트리를 되감아 소비한다.
+    router.back()
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('settlement-pay')
+    expect(router.currentRoute.value.query.resume).toBe('1')
+  })
+
+  it('waits for a tap after the top-up round trip instead of paying on arrival', async () => {
+    const { wrapper } = await mountPay({ query: 'resume=1' })
+
+    // 돌아오자마자 돈이 나가면 안 된다. 충전을 그만두고 뒤로 온 경우도 마찬가지다.
+    expect(pay).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-action="confirm-pay"]').text()).toBe('Pay 12.50 P')
+
+    await wrapper.get('[data-action="confirm-pay"]').trigger('click')
+    await flushPromises()
+
+    expect(pay).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves a usable confirmation screen when the top-up offer is declined', async () => {
+    pay.mockRejectedValue(new NormalizedApiError('WALLET-015', 409, 'not enough'))
+    const { wrapper } = await mountPay()
+
+    await wrapper.get('[role="dialog"]').findAll('button')[0]?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    // 오류를 지우지 않으면 같은 실패가 오류 화면으로 되살아난다.
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.get('[data-action="confirm-pay"]').text()).toBe('Pay 12.50 P')
+  })
+
+  it('sends a locked wallet to the wallet screen rather than a retry', async () => {
+    pay.mockRejectedValue(new NormalizedApiError('WALLET-016', 403, 'not active'))
+    const { wrapper, router } = await mountPay()
+
+    const action = wrapper.get('[role="alert"] button')
+    // 다시 눌러도 같은 답이 온다. 그 버튼에 "Try again"이라고 적혀 있으면 안 된다.
+    expect(action.text()).toBe('Go to wallet')
+
+    await action.trigger('click')
+    await flushPromises()
+
+    expect(pay).toHaveBeenCalledTimes(1)
+    expect(router.currentRoute.value.name).toBe('wallet')
   })
 })

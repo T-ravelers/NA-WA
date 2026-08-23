@@ -45,6 +45,37 @@ describe('settlement errors', () => {
     ).toBe(recovery)
   })
 
+  /*
+   * 지급은 지갑 이체를 타므로 WALLET-* 코드도 온다. 이것들이 매핑에 없으면 기본값
+   * RETRY로 떨어지고, 결제 화면이 같은 요청을 다시 보내 무한 재시도가 된다(#452).
+   */
+  it.each([
+    ['WALLET-001', 'GO_TO_WALLET'],
+    ['WALLET-014', 'REFETCH_DETAIL'],
+    ['WALLET-015', 'TOP_UP'],
+    ['WALLET-016', 'GO_TO_WALLET'],
+  ])('routes %s to its own recovery instead of retrying blindly', (code, recovery) => {
+    expect(resolveSettlementError(new NormalizedApiError(code, 409, 'server message'))).toEqual({
+      messageKey: `wallet.errorCode.${code}`,
+      recovery,
+    })
+  })
+
+  /** 잔액 부족은 다시 눌러도 잔액이 그대로다. 재시도로 분류되면 사용자가 갇힌다. */
+  it('never sends an insufficient balance back through a plain retry', () => {
+    expect(
+      resolveSettlementError(new NormalizedApiError('WALLET-015', 409, 'server message')).recovery,
+    ).not.toBe('RETRY')
+  })
+
+  /** 지갑 문구는 지갑이 갖는다. 정산 네임스페이스로 복제하면 두 곳이 어긋난다. */
+  it('borrows the wallet wording instead of copying it into the settlement namespace', () => {
+    expect(
+      resolveSettlementError(new NormalizedApiError('WALLET-015', 409, 'server message'))
+        .messageKey,
+    ).toBe('wallet.errorCode.WALLET-015')
+  })
+
   it('reuses the attempt for unknown failures so a retry cannot double-charge', () => {
     expect(resolveSettlementError(new Error('network down')).recovery).toBe('RETRY')
   })
