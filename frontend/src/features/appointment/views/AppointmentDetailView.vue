@@ -35,6 +35,7 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import { serializeReturnParams } from '@/shared/lib/returnRoute'
 
 import { appointmentErrorMessageKey } from '../model/appointmentErrors'
+import { APPOINTMENT_LIVE_REFETCH_INTERVAL_MS } from '../model/appointmentLiveRefresh'
 import { appointmentStatusTone } from '../model/appointmentStatusPresentation'
 import { useAppointmentJourneyIntegration } from '../model/journeyIntegration'
 import {
@@ -58,21 +59,28 @@ const appointmentId = computed(() => {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
 })
 
+// 세 쿼리 모두 주기적으로 다시 조회한다. 상태(detail), 회원 목록(members),
+// 그리고 버거 메뉴 항목의 활성 여부를 정하는 내 참여 정보(participation)가
+// 화면을 열어 둔 채로 따라와야 해서다. 폴링은 이 화면에서만 켠다 — 같은 쿼리
+// 옵션을 쓰는 출석 확정·후기 화면은 한 번 받은 값으로 끝나는 화면이다.
 const detailQuery = useQuery({
   ...appointmentDetailQueryOptions(appointmentId),
   enabled: computed(() => appointmentId.value !== null),
   retry: false,
+  refetchInterval: APPOINTMENT_LIVE_REFETCH_INTERVAL_MS,
 })
 
 const membersQuery = useQuery({
   ...appointmentMembersQueryOptions(appointmentId),
   enabled: computed(() => appointmentId.value !== null),
   retry: false,
+  refetchInterval: APPOINTMENT_LIVE_REFETCH_INTERVAL_MS,
 })
 const participationQuery = useQuery({
   ...appointmentParticipationQueryOptions(appointmentId),
   enabled: computed(() => appointmentId.value !== null),
   retry: false,
+  refetchInterval: APPOINTMENT_LIVE_REFETCH_INTERVAL_MS,
 })
 const appointment = computed(() => detailQuery.data.value)
 const members = computed(() =>
@@ -90,9 +98,25 @@ const hasJoined = computed(() => participationQuery.data.value?.joined === true)
 // 막아주니 데이터는 안전하지만, 그대로 두면 사용자가 결제 시트까지 갔다가
 // 거기서야 오류를 보게 된다. 조회 자체가 실패했을 때는 참여 여부를 확신할 수
 // 없다는 걸 버튼 단계에서 미리 알려준다.
-const participationCheckFailed = computed(() => participationQuery.isError.value)
+// 한 번이라도 받아 둔 참여 정보가 있으면 그 값을 계속 쓴다. 폴링은 5초마다
+// 실패할 기회를 주는데, 실패를 곧바로 "모른다"로 읽으면 신호가 잠깐 끊길 때마다
+// 메뉴 세 항목이 전부 "확인하지 못했다"로 바뀌었다가 돌아온다.
+const participationCheckFailed = computed(
+  () => participationQuery.isError.value && participationQuery.data.value === undefined,
+)
 
 const statusTone = computed(() => appointmentStatusTone(appointment.value?.appointmentStatus))
+
+// 폴링이 실패해도 이미 보고 있던 내용은 지우지 않는다. 오류 화면은 보여줄 것이
+// 아예 없을 때만 띄운다 — 그러지 않으면 지하철에서 신호가 한 번 끊기는 것만으로
+// 약속 상세가 통째로 오류 화면이 된다(이 쿼리들은 retry를 쓰지 않는다).
+// 다음 폴링이 성공하면 조용히 되돌아온다.
+const detailLoadFailed = computed(
+  () => detailQuery.isError.value && detailQuery.data.value === undefined,
+)
+const membersLoadFailed = computed(
+  () => membersQuery.isError.value && membersQuery.data.value === undefined,
+)
 
 // 참여 가능 여부를 클라이언트 시계로 다시 재지 않는다. 서버가 정원이 찬 약속을
 // FULL로, 활동이 시작된 약속을 IN_PROGRESS로 계산해 내려주므로 RECRUITING이라는
@@ -591,7 +615,7 @@ function goToTopup(): void {
     />
 
     <StateError
-      v-else-if="detailQuery.isError.value"
+      v-else-if="detailLoadFailed"
       :title="t('appointment.detail.loadFailed')"
       :description="t('appointment.detail.loadFailedDescription')"
       :action-label="t('action.retry')"
@@ -670,7 +694,7 @@ function goToTopup(): void {
           :lines="2"
         />
         <StateError
-          v-else-if="membersQuery.isError.value"
+          v-else-if="membersLoadFailed"
           :title="t('appointment.members.loadFailed')"
           :description="t('appointment.members.loadFailedDescription')"
           :action-label="t('action.retry')"

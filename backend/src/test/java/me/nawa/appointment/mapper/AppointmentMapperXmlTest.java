@@ -162,6 +162,53 @@ class AppointmentMapperXmlTest {
         assertFalse(sql.contains("a.appointment_status = ?"));
     }
 
+    // 끝난 약속 제외는 LIMIT 앞에 있어야 한다. 받은 쪽에서 거르면 정렬이
+    // activity_start_at ASC라 지난 약속이 앞에 서고, 지난 약속이 한 페이지를 채우는
+    // 항목에서는 다음 페이지에 모집 중 약속이 있어도 화면이 0건이 된다.
+    @Test
+    void appointmentList_withoutStatusFilter_excludesCompletedBeforeLimit()
+            throws Exception {
+        AppointmentSearchRequest request = new AppointmentSearchRequest();
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+        parameters.put("offset", 0);
+
+        String sql = boundSql("searchAppointments", parameters);
+
+        int excluded = sql.indexOf("a.appointment_status <> 'COMPLETED'");
+        assertTrue(excluded >= 0);
+        assertTrue(excluded < sql.indexOf("LIMIT"));
+    }
+
+    // 개수는 카드와 같은 조건에서 나와야 한다. 한쪽만 완료를 빼면 "N appointments"와
+    // 실제로 보이는 카드 수가 어긋난다.
+    @Test
+    void appointmentCount_withoutStatusFilter_excludesCompletedToo()
+            throws Exception {
+        AppointmentSearchRequest request = new AppointmentSearchRequest();
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+
+        String sql = boundSql("countAppointments", parameters);
+
+        assertTrue(sql.contains("a.appointment_status <> 'COMPLETED'"));
+    }
+
+    // 완료만 찾는 요청까지 막으면 상태 검색이 반쪽이 된다.
+    @Test
+    void appointmentList_withStatusFilter_looksAtThatStatusOnly() throws Exception {
+        AppointmentSearchRequest request = new AppointmentSearchRequest();
+        request.setStatus(me.nawa.appointment.domain.AppointmentStatus.COMPLETED);
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+        parameters.put("offset", 0);
+
+        String sql = boundSql("searchAppointments", parameters);
+
+        assertTrue(sql.contains("a.appointment_status = ?"));
+        assertFalse(sql.contains("a.appointment_status <> 'COMPLETED'"));
+    }
+
     @Test
     void activeMemberList_excludesPendingAndLeftMembers() throws Exception {
         String sql = boundSql(

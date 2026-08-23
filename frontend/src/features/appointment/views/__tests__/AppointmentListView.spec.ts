@@ -1,9 +1,15 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref, type Ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+
+import {
+  appointmentJourneyIntegrationKey,
+  type AppointmentJourneySummary,
+} from '../../model/journeyIntegration'
 
 const fetchAppointments = vi.fn()
 
@@ -30,7 +36,30 @@ const appointment = {
   hostDisplayName: 'Mina Park',
 }
 
-async function mountView() {
+interface MountOptions {
+  /** 진입 주소. 여정 생성·충전에서 돌아온 자리를 재현할 때 쓴다. */
+  path?: string
+  /**
+   * 여정 목록이 담길 ref. 넘기지 않으면 처음부터 채워져 있다.
+   *
+   * 실제로는 시트가 열려야 조회가 시작되므로 목록은 **늦게** 도착한다. 처음부터
+   * 채워 두면 그 시차에서만 드러나는 문제를 테스트가 못 본다.
+   */
+  journeys?: Ref<AppointmentJourneySummary[] | undefined>
+}
+
+async function mountView(options: MountOptions = {}) {
+  const journeys =
+    options.journeys ??
+    ref<AppointmentJourneySummary[] | undefined>([
+      {
+        tripId: 7,
+        title: 'Seoul Foodie Week',
+        startDate: '2026-08-01',
+        endDate: '2026-08-31',
+      },
+    ])
+
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -59,15 +88,36 @@ async function mountView() {
         name: 'explore-place-detail',
         component: { template: '<div>Place</div>' },
       },
+      {
+        path: '/journeys/new',
+        name: 'journey-create',
+        component: { template: '<div>Journey create</div>' },
+      },
+      {
+        path: '/wallet/top-up',
+        name: 'wallet-top-up',
+        component: { template: '<div>Top up</div>' },
+      },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  await router.push('/appointments?itemId=42&itemType=EVENT')
+  await router.push(options.path ?? '/appointments?itemId=42&itemType=EVENT')
   await router.isReady()
 
   const wrapper = mount(AppointmentListView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+      provide: {
+        // 카드의 Join이 여정 선택 시트를 연다. 약속 날짜(2026-08-08)를 담는 여정 하나.
+        [appointmentJourneyIntegrationKey as symbol]: {
+          useJourneyListQuery: () => ({
+            data: journeys,
+            isPending: ref(false),
+            isError: ref(false),
+          }),
+          checkJourneyItemExists: vi.fn().mockResolvedValue(false),
+        },
+      },
     },
   })
   await flushPromises()
@@ -109,28 +159,103 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
   })
 
-  it('opens completed appointment details from the list', async () => {
-    fetchAppointments.mockResolvedValueOnce({
-      content: [{ ...appointment, appointmentStatus: 'COMPLETED' as const }],
+  // 끝난 약속을 빼는 것은 서버가 LIMIT 앞에서 한다(APPOINTMENT_API.md). 받은 쪽에서
+  // 다시 거르면 정렬이 activity_start_at ASC라 지난 약속이 앞에 서고, 지난 약속이 한
+  // 페이지를 채우는 항목에서는 다음 페이지에 모집 중 약속이 있어도 화면이 0건이 된다.
+  it('shows every appointment the server returned, filtering none of them out', async () => {
+    fetchAppointments.mockResolvedValue({
+      content: [
+        { ...appointment, appointmentStatus: 'COMPLETED' as const },
+        { ...appointment, appointmentId: 8, appointmentName: 'Hongdae Night Market' },
+      ],
       page: 0,
       size: 20,
-      totalElements: 1,
+      totalElements: 2,
       totalPages: 1,
       hasNext: false,
     })
 
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Seongsu K-Beauty Tour')
+    expect(wrapper.text()).toContain('Hongdae Night Market')
+    expect(wrapper.text()).toContain('2 appointments')
+  })
+
+  // 개수는 서버가 센 값이다. 받은 페이지의 길이를 세면 size에서 멈춰, 다음 페이지가
+  // 남아 있는 항목에서 "몇 개인지"를 잃는다.
+  it('shows the count the server reported, not the length of one page', async () => {
+    fetchAppointments.mockResolvedValue({
+      content: [appointment, { ...appointment, appointmentId: 8 }],
+      page: 0,
+      size: 20,
+      totalElements: 37,
+      totalPages: 2,
+      hasNext: true,
+    })
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('37 appointments')
+  })
+
+  it('opens the detail when the card itself is pressed', async () => {
     const { wrapper, router } = await mountView()
-    const viewButton = wrapper.findAll('button').find((button) => button.text() === 'View')
-    const statusBadge = wrapper.findAll('span').find((element) => element.text() === 'Completed')
 
-    expect(viewButton?.attributes('disabled')).toBeUndefined()
-    expect(statusBadge?.classes()).toContain('border-hairline')
-
-    await viewButton?.trigger('click')
+    await wrapper.get('article').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
+  })
+
+  // Join은 상세로 보내지 않는다. 목록에 선 채로 상세와 같은 참여 흐름을 연다.
+  it('opens the journey sheet from the card Join button, without leaving the list', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-list')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Seoul Foodie Week')
+  })
+
+  // 여정을 만들거나 충전하고 돌아오면 시트를 다시 열어 **그 여정을 골라 둔 채로**
+  // 보여 준다. 여정 목록은 시트가 열려야 조회를 시작하므로 시트를 여는 시점에는
+  // 아직 없다 — 늦게 도착한 목록에서 그 여정을 집어내는 것까지가 이 흐름이다.
+  it('preselects the journey it came back with, even though the list arrives late', async () => {
+    const journeys = ref<AppointmentJourneySummary[] | undefined>(undefined)
+    const { wrapper } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&joinAppointmentId=7&tripId=7',
+      journeys,
+    })
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+
+    journeys.value = [
+      { tripId: 7, title: 'Seoul Foodie Week', startDate: '2026-08-01', endDate: '2026-08-31' },
+    ]
+    await flushPromises()
+
+    const selected = wrapper.get('[role="dialog"]').findAll('[aria-pressed="true"]')
+    expect(selected).toHaveLength(1)
+    expect(selected[0]?.text()).toContain('Seoul Foodie Week')
+  })
+
+  // 여정을 만들지 않고 뒤로 오면 tripId 없이 표시만 돌아온다. 이어서 열 것이 없으니
+  // 주소에 남겨 두지 않는다 — 남으면 resume 조건(둘 다 필요)에 걸려 영영 안 지워진다.
+  it('clears a join marker that came back without a journey', async () => {
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&joinAppointmentId=7',
+    })
+
+    expect(router.currentRoute.value.query.joinAppointmentId).toBeUndefined()
+    expect(router.currentRoute.value.query.itemId).toBe('42')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
   it('returns to the Event detail from the contextual list', async () => {
@@ -140,5 +265,57 @@ describe('AppointmentListView', () => {
 
     expect(router.currentRoute.value.name).toBe('explore-event-detail')
     expect(router.currentRoute.value.params.eventId).toBe('42')
+  })
+
+  // 폴링만 가짜 시계에 올린다. flushPromises는 setTimeout·setImmediate를 쓰므로
+  // 전부 가짜로 만들면 이 테스트가 영영 끝나지 않는다.
+  it('follows the server while the list stays open', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+
+    try {
+      const { wrapper } = await mountView()
+      expect(wrapper.text()).toContain('Recruiting')
+
+      fetchAppointments.mockResolvedValue({
+        content: [
+          { ...appointment, appointmentStatus: 'FULL' as const, currentMemberCount: 4 },
+          { ...appointment, appointmentId: 8, appointmentName: 'Hongdae Night Market' },
+        ],
+        page: 0,
+        size: 20,
+        totalElements: 2,
+        totalPages: 1,
+        hasNext: false,
+      })
+
+      vi.advanceTimersByTime(5_000)
+      await flushPromises()
+
+      expect(fetchAppointments).toHaveBeenCalledTimes(2)
+      // 새로 등록된 약속이 카드로 들어오고, 이미 있던 카드의 상태도 함께 바뀐다.
+      expect(wrapper.text()).toContain('Hongdae Night Market')
+      expect(wrapper.text()).toContain('Fully booked')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the cards on screen when a refresh fails', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+
+    try {
+      const { wrapper } = await mountView()
+      fetchAppointments.mockRejectedValue(new Error('offline'))
+
+      vi.advanceTimersByTime(5_000)
+      await flushPromises()
+
+      // 5초마다 조회하면 실패할 기회도 5초마다 생긴다. 신호가 한 번 끊겼다고
+      // 보고 있던 목록을 오류 화면으로 바꾸지 않는다.
+      expect(wrapper.text()).toContain('Seongsu K-Beauty Tour')
+      expect(wrapper.text()).not.toContain('Appointments could not be loaded')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
