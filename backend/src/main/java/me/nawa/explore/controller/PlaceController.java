@@ -43,8 +43,11 @@ public class PlaceController {
         @AuthenticationPrincipal AuthenticatedMember member
     ) {
         Long memberId = member == null ? null : member.getMemberId();
-        return ApiResponse.success(
-            placeService.getPlaceDetail(placeId, language, memberId, countView)
-        );
+        PlaceDetailResponse place = placeService.getPlaceDetail(placeId, language, memberId);
+        // EventController와 같다. 읽기 트랜잭션이 끝난 뒤에 센다.
+        if (countView) {
+            placeService.recordPlaceView(placeId);
+        }
+        return ApiResponse.success(place);
     }
 }

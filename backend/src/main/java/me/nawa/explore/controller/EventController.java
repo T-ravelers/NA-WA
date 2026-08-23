@@ -45,8 +45,12 @@ public class EventController {
         @AuthenticationPrincipal AuthenticatedMember member
     ) {
         Long memberId = member == null ? null : member.getMemberId();
-        return ApiResponse.success(
-            eventService.getEventDetail(eventId, language, memberId, countView)
-        );
+        EventDetailResponse event = eventService.getEventDetail(eventId, language, memberId);
+        // 상세를 다 읽은 뒤에 센다. 읽기 트랜잭션 안에서 집계하면 상세 요청 하나가
+        // 커넥션을 두 개 잡는다(EventService#recordEventView).
+        if (countView) {
+            eventService.recordEventView(eventId);
+        }
+        return ApiResponse.success(event);
     }
 }

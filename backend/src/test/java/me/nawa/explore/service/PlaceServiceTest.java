@@ -131,7 +131,7 @@ class PlaceServiceTest {
         when(placeMapper.findPlaceDetail(1L, null)).thenReturn(place);
         when(placeMapper.findPlaceActivities(1L, "en")).thenReturn(List.of());
 
-        PlaceDetailResponse result = placeService.getPlaceDetail(1L, "EN", null, false);
+        PlaceDetailResponse result = placeService.getPlaceDetail(1L, "EN", null);
 
         assertEquals("BEAUTY", result.getPlaceKind());
         assertEquals(List.of(), result.getActivities());
@@ -145,52 +145,39 @@ class PlaceServiceTest {
         when(placeMapper.findPlaceDetail(1L, 7L)).thenReturn(place);
         when(placeMapper.findPlaceActivities(1L, "en")).thenReturn(List.of());
 
-        placeService.getPlaceDetail(1L, "en", 7L, false);
+        placeService.getPlaceDetail(1L, "en", 7L);
 
         verify(placeMapper).findPlaceDetail(1L, 7L);
     }
 
+    /* EventService와 같다. 읽는 경로는 조회수를 세지 않는다. */
     @Test
-    void getPlaceDetail_countsTheViewOnlyWhenTheRequestAsksForIt() {
+    void getPlaceDetail_leavesTheViewCountAlone() {
         PlaceDetailResponse place = PlaceDetailResponse.builder()
             .placeId(1L).itemId(1L).name("테스트").placeKind("CAFE")
             .build();
         when(placeMapper.findPlaceDetail(1L, null)).thenReturn(place);
         when(placeMapper.findPlaceActivities(1L, "en")).thenReturn(List.of());
 
-        placeService.getPlaceDetail(1L, "en", null, true);
-
-        verify(viewCountRecorder).recordPlaceView(1L);
-    }
-
-    @Test
-    void getPlaceDetail_leavesTheViewCountAloneForCallersThatOnlyReadValues() {
-        PlaceDetailResponse place = PlaceDetailResponse.builder()
-            .placeId(1L).itemId(1L).name("테스트").placeKind("CAFE")
-            .build();
-        when(placeMapper.findPlaceDetail(1L, null)).thenReturn(place);
-        when(placeMapper.findPlaceActivities(1L, "en")).thenReturn(List.of());
-
-        /* 약속 생성 폼처럼 같은 API로 위치만 읽어 가는 호출은 조회가 아니다. */
-        placeService.getPlaceDetail(1L, "en", null, false);
+        placeService.getPlaceDetail(1L, "en", null);
 
         verifyNoInteractions(viewCountRecorder);
     }
 
     @Test
-    void getPlaceDetail_stillReturnsTheDetail_whenCountingTheViewFails() {
-        PlaceDetailResponse place = PlaceDetailResponse.builder()
-            .placeId(1L).itemId(1L).name("테스트").placeKind("CAFE")
-            .build();
-        when(placeMapper.findPlaceDetail(1L, null)).thenReturn(place);
-        when(placeMapper.findPlaceActivities(1L, "en")).thenReturn(List.of());
+    void recordPlaceView_countsTheView() {
+        placeService.recordPlaceView(1L);
+
+        verify(viewCountRecorder).recordPlaceView(1L);
+    }
+
+    @Test
+    void recordPlaceView_swallowsTheFailure() {
         doThrow(new IllegalStateException("boom"))
             .when(viewCountRecorder).recordPlaceView(1L);
 
-        PlaceDetailResponse result = placeService.getPlaceDetail(1L, "en", null, true);
-
         /* 조회수는 부가 정보다. 집계가 멈춰도 상세 화면은 열려야 한다. */
-        assertEquals("테스트", result.getName());
+        placeService.recordPlaceView(1L);
     }
 
     @Test
@@ -198,7 +185,7 @@ class PlaceServiceTest {
         when(placeMapper.findPlaceDetail(1L, null)).thenReturn(null);
         BusinessException exception = assertThrows(
             BusinessException.class,
-            () -> placeService.getPlaceDetail(1L, "en", null, false)
+            () -> placeService.getPlaceDetail(1L, "en", null)
         );
         assertEquals(ExploreErrorCode.PLACE_NOT_FOUND, exception.getErrorCode());
     }

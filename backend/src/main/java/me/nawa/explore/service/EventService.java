@@ -171,16 +171,14 @@ public class EventService {
     /**
      * Event 상세를 읽는다.
      *
-     * {@code countView}는 사용자가 상세 화면을 연 요청에서만 참이다. 약속 생성 폼처럼
-     * 같은 API로 위치만 읽어 가는 호출까지 세면 조회수가 부풀기 때문에, 셀지 말지를
-     * 요청이 알려준다. 기본값은 거짓이라 새 호출부가 모르고 조회수를 올리는 일이 없다.
+     * 조회수는 여기서 세지 않는다. 읽기 트랜잭션 안에서 집계하면 커넥션을 하나 더 잡으므로
+     * 호출부가 이 메서드를 마친 뒤 {@link #recordEventView(Long)}를 부른다.
      */
     @Transactional(readOnly = true)
     public EventDetailResponse getEventDetail(
         Long eventId,
         String language,
-        Long memberId,
-        boolean countView
+        Long memberId
     ) {
         if (eventId == null || eventId <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
@@ -210,10 +208,6 @@ public class EventService {
         normalizeJsonResponse(event);
         event.setReservationUrl(resolveReservationUrl(event));
 
-        if (countView) {
-            recordView(eventId);
-        }
-
         return event;
     }
 
@@ -222,8 +216,14 @@ public class EventService {
      *
      * 조회수는 부가 정보다. 집계가 실패했다고 상세 화면이 안 열리면 손해가 더 크다.
      * 조용히 넘기지 않고 로그는 남겨서 집계가 멈춘 것을 알 수 있게 한다.
+     *
+     * **읽기 트랜잭션이 끝난 뒤에 부른다.** 그 안에서 부르면 REQUIRES_NEW가 바깥
+     * 트랜잭션을 중단시키되 커넥션은 풀에 돌려주지 않아, 상세 요청 하나가 커넥션을 두 개
+     * 잡는다. 풀이 10개라 상세 요청 10개가 동시에 들어오면 서로의 두 번째 커넥션을
+     * 기다리다 connectionTimeout(30초)까지 아무도 진행하지 못한다. 그 예외는 여기서
+     * 삼켜지므로 500이 아니라 **상세 API가 통째로 30초씩 늦어지는 형태**로만 드러난다.
      */
-    private void recordView(Long eventId) {
+    public void recordEventView(Long eventId) {
         try {
             viewCountRecorder.recordEventView(eventId);
         } catch (RuntimeException exception) {

@@ -281,9 +281,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null,
-            false
-        );
+            null);
 
         assertEquals(990001L, result.getEventId());
         assertEquals("FESTIVAL", result.getEventKind());
@@ -293,55 +291,45 @@ class EventServiceTest {
         verify(eventMapper).findEventActivities(990001L, "ko");
     }
 
+    /*
+     * 상세를 읽는 경로는 조회수를 세지 않는다. 이 메서드는 읽기 트랜잭션 안에서 돌고,
+     * 그 안에서 집계하면 REQUIRES_NEW가 커넥션을 하나 더 잡는다. 세는 것은 트랜잭션이
+     * 끝난 뒤 호출부(컨트롤러)의 몫이다.
+     */
     @Test
-    void getEventDetail_countsTheViewOnlyWhenTheRequestAsksForIt() {
+    void getEventDetail_leavesTheViewCountAlone() {
         EventDetailResponse event = EventDetailResponse.builder()
             .eventId(990001L)
             .build();
         when(eventMapper.findEventDetail(990001L, "ko", null)).thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko")).thenReturn(List.of());
 
-        eventService.getEventDetail(990001L, "ko", null, true);
-
-        verify(viewCountRecorder).recordEventView(990001L);
-    }
-
-    @Test
-    void getEventDetail_leavesTheViewCountAloneForCallersThatOnlyReadValues() {
-        EventDetailResponse event = EventDetailResponse.builder()
-            .eventId(990001L)
-            .build();
-        when(eventMapper.findEventDetail(990001L, "ko", null)).thenReturn(event);
-        when(eventMapper.findEventActivities(990001L, "ko")).thenReturn(List.of());
-
-        /* 약속 생성 폼처럼 같은 API로 위치만 읽어 가는 호출은 조회가 아니다. */
-        eventService.getEventDetail(990001L, "ko", null, false);
+        eventService.getEventDetail(990001L, "ko", null);
 
         verifyNoInteractions(viewCountRecorder);
     }
 
     @Test
-    void getEventDetail_stillReturnsTheDetail_whenCountingTheViewFails() {
-        EventDetailResponse event = EventDetailResponse.builder()
-            .eventId(990001L)
-            .title("서울 야시장 푸드 팝업(테스트)")
-            .build();
-        when(eventMapper.findEventDetail(990001L, "ko", null)).thenReturn(event);
-        when(eventMapper.findEventActivities(990001L, "ko")).thenReturn(List.of());
+    void recordEventView_countsTheView() {
+        eventService.recordEventView(990001L);
+
+        verify(viewCountRecorder).recordEventView(990001L);
+    }
+
+    @Test
+    void recordEventView_swallowsTheFailure() {
         doThrow(new IllegalStateException("boom"))
             .when(viewCountRecorder).recordEventView(990001L);
 
-        EventDetailResponse result = eventService.getEventDetail(990001L, "ko", null, true);
-
         /* 조회수는 부가 정보다. 집계가 멈춰도 상세 화면은 열려야 한다. */
-        assertEquals("서울 야시장 푸드 팝업(테스트)", result.getTitle());
+        eventService.recordEventView(990001L);
     }
 
     @Test
     void getEventDetail_throwsInvalidInput_whenEventIdIsInvalid() {
         assertThrows(
             BusinessException.class,
-            () -> eventService.getEventDetail(0L, "ko", null, false)
+            () -> eventService.getEventDetail(0L, "ko", null)
         );
         verifyNoInteractions(eventMapper);
     }
@@ -353,7 +341,7 @@ class EventServiceTest {
 
         BusinessException exception = assertThrows(
             BusinessException.class,
-            () -> eventService.getEventDetail(990001L, "ko", null, false)
+            () -> eventService.getEventDetail(990001L, "ko", null)
         );
 
         assertEquals(
@@ -378,9 +366,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null,
-            false
-        );
+            null);
 
         assertEquals(List.of(), result.getActivities());
         verify(eventMapper).findEventActivities(990001L, "ko");
@@ -411,9 +397,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "en",
-            null,
-            false
-        );
+            null);
 
         assertEquals(
             "https://example.com",
@@ -455,9 +439,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null,
-            false
-        );
+            null);
 
         assertEquals(
             "https://example.com/pre-reservation",
@@ -483,9 +465,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null,
-            false
-        );
+            null);
 
         assertEquals(
             "https://example.com/reservation",
@@ -510,9 +490,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null,
-            false
-        );
+            null);
 
         assertEquals(
             "https://example.com/links-reservation",
@@ -531,7 +509,7 @@ class EventServiceTest {
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
 
-        eventService.getEventDetail(990001L, "ko", 7L, false);
+        eventService.getEventDetail(990001L, "ko", 7L);
 
         verify(eventMapper).findEventDetail(990001L, "ko", 7L);
     }
@@ -547,7 +525,7 @@ class EventServiceTest {
         when(eventMapper.findEventActivities(990001L, "en"))
             .thenReturn(List.of());
 
-        eventService.getEventDetail(990001L, null, null, false);
+        eventService.getEventDetail(990001L, null, null);
 
         verify(eventMapper).findEventDetail(990001L, "en", null);
         verify(eventMapper).findEventActivities(990001L, "en");

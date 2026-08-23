@@ -57,18 +57,17 @@ public class PlaceService {
         return createListResponse(content, total, request);
     }
 
-    @Transactional(readOnly = true)
     /**
      * Place 상세를 읽는다.
      *
-     * {@code countView}는 EventService.getEventDetail과 같은 뜻이다 — 사용자가 상세
-     * 화면을 연 요청에서만 참이고, 같은 API로 위치만 읽어 가는 호출은 세지 않는다.
+     * EventService.getEventDetail과 같다. 조회수는 여기서 세지 않고 호출부가 이 메서드를
+     * 마친 뒤 {@link #recordPlaceView(Long)}를 부른다.
      */
+    @Transactional(readOnly = true)
     public PlaceDetailResponse getPlaceDetail(
         Long placeId,
         String language,
-        Long memberId,
-        boolean countView
+        Long memberId
     ) {
         if (placeId == null || placeId <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
@@ -89,15 +88,15 @@ public class PlaceService {
         place.setOpeningHours(normalizeJsonKeys(place.getOpeningHours()));
         place.setClosedDays(normalizeJsonKeys(place.getClosedDays()));
 
-        if (countView) {
-            recordView(placeId);
-        }
-
         return place;
     }
 
-    /** 조회수 집계가 실패해도 상세 화면은 열려야 한다. 삼키되 로그는 남긴다. */
-    private void recordView(Long placeId) {
+    /**
+     * 조회수 집계가 실패해도 상세 화면은 열려야 한다. 삼키되 로그는 남긴다.
+     *
+     * EventService.recordEventView와 같은 이유로 **읽기 트랜잭션 밖에서** 부른다.
+     */
+    public void recordPlaceView(Long placeId) {
         try {
             viewCountRecorder.recordPlaceView(placeId);
         } catch (RuntimeException exception) {
