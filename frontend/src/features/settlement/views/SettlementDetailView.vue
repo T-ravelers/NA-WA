@@ -142,15 +142,45 @@ function startPayment(): void {
       @retry="detailQuery.refetch()"
     />
     <template v-else>
-      <!-- 약속 이름은 바로 아래 거래 카드가 이미 말한다. 여기서 한 번 더 쓰지 않는다. -->
-      <div class="mt-8">
-        <AppBadge :tone="detail.status === 'COMPLETED' ? 'completed' : 'pending'">
+      <!--
+        시안은 헤더 바로 아래에 내야 할 금액을 화면에서 가장 크게 둔다. 상세를 여는
+        이유가 그 숫자 하나라서다.
+
+        돈을 받을 사람에게는 두지 않는다. 받을 금액은 참여자마다 갈라져 있어 한 숫자로
+        말할 수 없고, 아래 납부 현황 카드가 그 자리를 이미 맡는다.
+
+        **낼 것이 남았을 때만 띄운다.** 서버는 `PAY`가 허용되지 않으면 `payableAmount`를
+        0으로 내려주므로(`SettlementViewerPolicy.resolve`), 이미 낸 사람이 상세를 다시 열면
+        이 자리가 34px짜리 `0 P`가 된다. 라벨이 "정산할 금액"이라 아직 낼 것이 남았다고
+        읽히기까지 한다. 그 화면에서는 아래 `Pay completed` 버튼이 상태를 이미 말한다.
+      -->
+      <div
+        v-if="!isCreator && canPay"
+        class="mt-10 text-center"
+      >
+        <p class="text-caption uppercase tracking-wider text-ink-3">
+          {{ t('settlement.detail.amountToSettle') }}
+        </p>
+        <p class="mt-2 text-data-xl">{{ points(detail.viewer.payableAmount) }}</p>
+      </div>
+      <!--
+        상태 칩은 돈을 받을 사람에게만 둔다. 낼 사람에게는 아래 CTA가 같은 말을 이미
+        하고 있어서(낼 수 있으면 "Pay …", 냈으면 "Pay completed") 시안도 이 자리를 비웠다.
+
+        약속 이름은 바로 아래 거래 카드가 이미 말한다. 여기서 한 번 더 쓰지 않는다.
+      -->
+      <div
+        v-if="isCreator"
+        class="mt-8"
+      >
+        <AppBadge :tone="detail.status === 'COMPLETED' ? 'completed' : 'info'">
           {{ t(`settlement.status.${detail.status}`) }}
         </AppBadge>
       </div>
 
+      <!-- 위에 상태 칩(요청자)도 금액 블록(낼 것이 남은 참여자)도 없는 화면에서만 여백을 스스로 챙긴다. -->
       <SettlementTransactionCard
-        class="mt-4"
+        :class="!isCreator && !canPay ? 'mt-8' : 'mt-4'"
         :gathering-name="detail.gatheringName"
         :amount="detail.totalAmount"
         :payer-name="detail.paidBy"
@@ -175,14 +205,19 @@ function startPayment(): void {
         <p class="text-caption text-ink-3">{{ t('settlement.detail.sendTo') }}</p>
         <p class="mt-1 text-title">{{ detail.requestedBy }}</p>
         <!--
-          크게 보여주는 값은 지금 내야 할 금액이다. 부담금을 그대로 두면 이미 낸 뒤에도
-          전액을 보내라고 말하게 되어 아래 "Pay completed" 버튼과 어긋난다.
+          지금 내야 할 금액은 화면 맨 위가 이미 크게 말한다. 여기서는 부담금과 나란히
+          한 줄로만 둔다. 부담금을 그대로 크게 두면 이미 낸 뒤에도 전액을 보내라고 말하게
+          되어 아래 "Pay completed" 버튼과 어긋난다.
         -->
-        <p class="mt-4 text-caption text-ink-3">{{ t('settlement.detail.payableNow') }}</p>
-        <p class="mt-1 text-data-xl">{{ points(detail.viewer.payableAmount) }}</p>
-        <dl class="mt-4 flex justify-between gap-3 text-body-sm">
-          <dt class="text-ink-3">{{ t('settlement.detail.yourShare') }}</dt>
-          <dd>{{ points(detail.viewer.shareAmount) }}</dd>
+        <dl class="mt-4 space-y-3 text-body-sm">
+          <div class="flex justify-between gap-3">
+            <dt class="text-ink-3">{{ t('settlement.detail.payableNow') }}</dt>
+            <dd class="text-title">{{ points(detail.viewer.payableAmount) }}</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-ink-3">{{ t('settlement.detail.yourShare') }}</dt>
+            <dd>{{ points(detail.viewer.shareAmount) }}</dd>
+          </div>
         </dl>
       </AppCard>
 
@@ -255,7 +290,6 @@ function startPayment(): void {
           v-if="canPay"
           data-action="pay"
           block
-          variant="settle"
           @click="startPayment"
           >{{
             t('settlement.detail.pay', { amount: points(detail.viewer.payableAmount) })

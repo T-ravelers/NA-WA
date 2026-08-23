@@ -2112,7 +2112,16 @@ const FLOWS = [
       {
         name: '05-history-collected',
         act: async (page) => {
+          /*
+           * 상세는 전체 내역에서 열었으므로 뒤로 가면 정산 홈이 아니라 전체 내역으로
+           * 돌아온다(`resolveDetailBackTarget`). 토글은 홈에만 있으니 한 번 더 나가야
+           * `segment-sent`가 있는 화면에 선다. 이 한 단계를 빼면 전체 내역 화면에서
+           * 없는 토글을 기다리다 30초 뒤에 끊긴다.
+           */
           await page.getByTestId('settlement-back').click()
+          await page.getByTestId('settlement-history-received').waitFor()
+          await page.getByTestId('settlement-back').click()
+          await page.getByTestId('settlement-home').waitFor()
           await page.getByTestId('segment-sent').click()
           await page.locator('[data-action="view-all"]').click()
           await page.getByTestId('settlement-history-sent').waitFor()
