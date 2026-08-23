@@ -74,12 +74,22 @@ describe('AppointmentMemberProfileView', () => {
     fetchAppointmentMembers.mockResolvedValue(members)
   })
 
-  it('renders the selected participant and their trust indicators', async () => {
+  it('renders the selected participant', async () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('Participant profile')
     expect(wrapper.text()).toContain('Mina Park')
-    expect(wrapper.text()).toContain('Trust indicators')
+  })
+
+  // 신뢰 지표는 집계가 발표 후 트랙이라 값이 비어 있고, 빈 값을 찍던 자리가
+  // 하드코딩 영어라 네 로케일 모두 영어로 보였다(#483). 화면에서 뺐다.
+  it('does not show trust indicators while the aggregate is unavailable', async () => {
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).not.toContain('Trust indicators')
+    expect(wrapper.text()).not.toContain('Unavailable')
+    expect(wrapper.text()).not.toContain('No ratings yet')
+    expect(wrapper.text()).not.toContain('reviews')
   })
 
   // 후기 보기·신고는 연결할 곳이 없어 비활성으로만 놓여 있었다. 누를 수 없는 버튼은
