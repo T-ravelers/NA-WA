@@ -556,6 +556,38 @@ describe('ReportDetailView', () => {
     expect(showToast).not.toHaveBeenCalled()
   })
 
+  // 시트가 이미 열려 있는데 한 번 더 누른 것도 실패가 아니다. 클립보드로 떨어지면 네이티브
+  // 시트 위에 「복사했다」 토스트가 겹치고, 누르지도 않은 복사가 끝나 있다.
+  it('stays quiet when the share sheet is already open', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    stubNavigator(vi.fn().mockRejectedValue(new DOMException('in progress', 'InvalidStateError')), {
+      writeText,
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).not.toHaveBeenCalled()
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
+  // 취소를 `instanceof`로 판정하면 안 된다 — jsdom에서 `DOMException`은 `Error`를 상속하지
+  // 않고, `navigator.share`를 JS 브리지로 얹는 인앱 브라우저는 이름만 가진 값을 던진다.
+  it('treats a cancellation as a cancellation even when it is not a DOMException', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    const dismissed = new Error('user canceled')
+    dismissed.name = 'AbortError'
+    stubNavigator(vi.fn().mockRejectedValue(dismissed), { writeText })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share report"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).not.toHaveBeenCalled()
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
   // 칭호가 없으면 티켓도 없으니 티켓 공유도 없다. 리포트 요약은 여정과 기간만으로 보낸다.
   it('keeps report sharing without the ticket button when there is no persona', async () => {
     const share = vi.fn().mockResolvedValue(undefined)

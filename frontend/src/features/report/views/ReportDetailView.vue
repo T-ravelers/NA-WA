@@ -255,10 +255,10 @@ const shareSummary = computed<string | null>(() => {
 /**
  * 공유 시트가 있으면 시트로, 없으면 클립보드로, 둘 다 없으면 안내만 한다.
  *
- * 시트를 닫아 취소한 것(`AbortError`)만 조용히 넘어간다. 취소가 아닌 거절은 실패이므로
- * 아래 클립보드 경로가 받는다 — `web-share` 권한이 없는 교차 출처 iframe과 인앱 브라우저는
- * `navigator.share`가 있는데도 `NotAllowedError`로 거절한다. 이때 폴백까지 막으면 시트도
- * 토스트도 없이 끝나 버튼이 고장 난 것처럼 보인다.
+ * 취소(`AbortError`)와 「시트가 이미 열려 있음」(`InvalidStateError`)만 조용히 넘어간다.
+ * 나머지 거절은 실패이므로 아래 클립보드 경로가 받는다 — `web-share` 권한이 없는 교차 출처
+ * iframe과 인앱 브라우저는 `navigator.share`가 있는데도 `NotAllowedError`로 거절한다. 이때
+ * 폴백까지 막으면 시트도 토스트도 없이 끝나 버튼이 고장 난 것처럼 보인다.
  *
  * 복사 완료 문구는 무엇을 복사했는지가 달라서 화면이 인자로 준다.
  */
@@ -268,7 +268,14 @@ async function shareText(title: string, text: string, copiedMessage: string): Pr
       await navigator.share({ title, text })
       return
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      const name = (error as { name?: unknown } | null)?.name
+
+      /*
+       * 이름만 본다. `instanceof`로는 판정할 수 없다 — jsdom에서 `DOMException`은 `Error`를
+       * 상속하지 않고, `navigator.share`를 JS 브리지로 얹는 인앱 브라우저는 `DOMException`이
+       * 아닌 값을 던질 수 있다. 어느 쪽이든 취소가 클립보드로 떨어져 「복사했다」가 뜬다.
+       */
+      if (name === 'AbortError' || name === 'InvalidStateError') {
         return
       }
     }
