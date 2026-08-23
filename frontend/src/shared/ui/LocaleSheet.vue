@@ -38,11 +38,18 @@ const emit = defineEmits<{
       @click="emit('close')"
     />
 
+    <!--
+      조형은 V2 `언어설정`(`2297:2022`)이다 — 시트 바탕은 `canvas`, **행은 선택 여부와 무관하게
+      모두 `surface-1` 카드**다. 고른 것은 면 색이 아니라 오른쪽 체크 원이 말한다.
+
+      시안의 로케일 목록(English·한국어·日本語)은 조형 예시로 본다. 서비스 로케일은
+      `SUPPORTED_LOCALES`가 정본이고 한국어는 거기 없다(2026-08-23 확정).
+    -->
     <div
       role="dialog"
       aria-modal="true"
       :aria-label="title"
-      class="absolute inset-x-0 bottom-0 z-10 mx-auto flex w-full max-w-[390px] flex-col gap-2 rounded-t-lg bg-surface-2 px-screen pt-3 pb-8 shadow-sheet"
+      class="absolute inset-x-0 bottom-0 z-10 mx-auto flex w-full max-w-shell flex-col gap-2 rounded-t-lg bg-canvas px-screen pt-3 pb-8 shadow-sheet"
     >
       <span
         aria-hidden="true"
@@ -57,8 +64,7 @@ const emit = defineEmits<{
         type="button"
         role="radio"
         :aria-checked="locale === modelValue"
-        class="flex min-h-14 items-center gap-3 rounded-sm px-3.5 text-left"
-        :class="locale === modelValue ? 'bg-surface-3' : 'bg-transparent'"
+        class="flex min-h-14 items-center gap-3 rounded-sm bg-surface-1 px-3.5 text-left"
         @click="emit('update:modelValue', locale)"
       >
         <span class="flex flex-1 flex-col gap-px">
