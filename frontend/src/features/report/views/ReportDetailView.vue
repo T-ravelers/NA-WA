@@ -9,6 +9,7 @@ import {
   spendingCategoryLabelKey,
   toSpendingCategory,
 } from '@/shared/lib/spendingCategory'
+import { shareWithFallback } from '@/shared/lib/share'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
@@ -25,7 +26,12 @@ import ReportDailyTrend from '../components/presentation/ReportDailyTrend.vue'
 import ReportRadarChart from '../components/presentation/ReportRadarChart.vue'
 import ReportRankTiles from '../components/presentation/ReportRankTiles.vue'
 import { seriesInkClass } from '../components/presentation/seriesPalette'
-import { formatMoney, formatPercent, formatSignedPercent } from '../components/presentation/format'
+import {
+  formatEnglishOrdinal,
+  formatMoney,
+  formatPercent,
+  formatSignedPercent,
+} from '../components/presentation/format'
 import ReportKpiCard from '../components/presentation/ReportKpiCard.vue'
 import ReportPersonaTicket from '../components/presentation/ReportPersonaTicket.vue'
 import type {
@@ -264,6 +270,10 @@ const comparisonAxes = computed<ReportRadarAxis[]>(() => {
 })
 
 function rankText(rank: number): string {
+  if (i18n.locale.value.toLowerCase().startsWith('en')) {
+    return formatEnglishOrdinal(rank)
+  }
+
   if (rank === 1) return t('report.detail.comparison.rankFirst')
   if (rank === 2) return t('report.detail.comparison.rankSecond')
   if (rank === 3) return t('report.detail.comparison.rankThird')
@@ -352,44 +362,14 @@ const shareSummary = computed<string | null>(() => {
   })
 })
 
-/**
- * 공유 시트가 있으면 시트로, 없으면 클립보드로, 둘 다 없으면 안내만 한다.
- *
- * 취소(`AbortError`)와 「시트가 이미 열려 있음」(`InvalidStateError`)만 조용히 넘어간다.
- * 나머지 거절은 실패이므로 아래 클립보드 경로가 받는다 — `web-share` 권한이 없는 교차 출처
- * iframe과 인앱 브라우저는 `navigator.share`가 있는데도 `NotAllowedError`로 거절한다. 이때
- * 폴백까지 막으면 시트도 토스트도 없이 끝나 버튼이 고장 난 것처럼 보인다.
- *
- * 복사 완료 문구는 무엇을 복사했는지가 달라서 화면이 인자로 준다.
- */
 async function shareText(title: string, text: string, copiedMessage: string): Promise<void> {
-  if (navigator.share) {
-    try {
-      await navigator.share({ title, text })
-      return
-    } catch (error) {
-      const name = (error as { name?: unknown } | null)?.name
+  const result = await shareWithFallback({ title, text }, text)
 
-      /*
-       * 이름만 본다. `instanceof`로는 판정할 수 없다 — jsdom에서 `DOMException`은 `Error`를
-       * 상속하지 않고, `navigator.share`를 JS 브리지로 얹는 인앱 브라우저는 `DOMException`이
-       * 아닌 값을 던질 수 있다. 어느 쪽이든 취소가 클립보드로 떨어져 「복사했다」가 뜬다.
-       */
-      if (name === 'AbortError' || name === 'InvalidStateError') {
-        return
-      }
-    }
-  }
-
-  if (!navigator.clipboard) {
-    showToast(t('report.detail.sharing.unavailable'))
-    return
-  }
-
-  try {
-    await navigator.clipboard.writeText(text)
+  if (result === 'copied') {
     showToast(copiedMessage)
-  } catch {
+  } else if (result === 'unavailable') {
+    showToast(t('report.detail.sharing.unavailable'))
+  } else if (result === 'failed') {
     showToast(t('report.detail.sharing.copyFailed'))
   }
 }
@@ -572,32 +552,38 @@ function retry(): void {
           @share="shareTicket"
         />
 
-        <AppCard v-if="reportInsight !== null">
-          <p class="flex items-start gap-2 text-body-sm text-ink-2">
-            <IconSparkles
-              :size="18"
-              :stroke-width="1.8"
-              aria-hidden="true"
-              class="mt-0.5 shrink-0"
-              :class="reportInsight.inkClass"
-            />
-            <i18n-t
-              :keypath="`report.detail.insight.${reportInsight.variant}`"
-              tag="span"
-              scope="global"
-            >
-              <template #category>
-                <span
-                  class="font-semibold"
-                  :class="reportInsight.inkClass"
-                  >{{ reportInsight.label }}</span
-                >
-              </template>
-              <template #share>{{ reportInsight.share }}</template>
-              <template #cohortShare>{{ reportInsight.cohortShare }}</template>
-            </i18n-t>
-          </p>
-        </AppCard>
+        <!--
+          계열색을 글자로 쓰므로 카드(`surface-1` #262626) 위에 두지 않는다. 그 면 위에서는
+          `text-shopping` 4.21 · `text-show` 4.21로 AA에 못 미친다(#476). canvas(#171717)
+          위에서는 4.99부터라 넷 다 통과한다. 시안도 이 문장을 페이지보다 어두운 면에 둔다.
+        -->
+        <p
+          v-if="reportInsight !== null"
+          class="flex items-start gap-2 px-1 text-body-sm text-ink-2"
+        >
+          <IconSparkles
+            :size="18"
+            :stroke-width="1.8"
+            aria-hidden="true"
+            class="mt-0.5 shrink-0"
+            :class="reportInsight.inkClass"
+          />
+          <i18n-t
+            :keypath="`report.detail.insight.${reportInsight.variant}`"
+            tag="span"
+            scope="global"
+          >
+            <template #category>
+              <span
+                class="font-semibold"
+                :class="reportInsight.inkClass"
+                >{{ reportInsight.label }}</span
+              >
+            </template>
+            <template #share>{{ reportInsight.share }}</template>
+            <template #cohortShare>{{ reportInsight.cohortShare }}</template>
+          </i18n-t>
+        </p>
 
         <ReportKpiCard
           :heading="t('report.detail.analysis')"
@@ -672,36 +658,40 @@ function retry(): void {
 
           <template v-else>
             <AppCard padding="lg">
-              <div class="flex flex-col gap-6">
-                <div class="flex flex-col gap-2">
-                  <ReportComparisonBars
-                    :total-label="t('report.detail.comparison.totalSpend')"
-                    :chips-label="t('report.detail.comparison.members')"
-                    :me="comparisonMe"
-                    :peers="comparisonPeers"
-                    :chips="!isSimilarScope"
-                    :locale="i18n.locale.value"
-                  />
-                  <p
-                    v-if="isLiveComparison"
-                    class="text-micro text-ink-3"
-                  >
-                    {{ t('report.detail.comparison.liveBasisNote') }}
-                  </p>
-                </div>
-                <div class="flex flex-col gap-3">
-                  <p class="text-micro uppercase text-ink-3">
-                    {{ t('report.detail.comparison.categoryBalance') }}
-                  </p>
-                  <ReportRadarChart
-                    :axes="comparisonAxes"
-                    :mine-label="t('report.detail.comparison.you')"
-                    :cohort-label="comparisonText.cohortLabel"
-                    :description="comparisonText.radarDescription"
-                  />
-                </div>
+              <div class="flex flex-col gap-2">
+                <ReportComparisonBars
+                  :total-label="t('report.detail.comparison.totalSpend')"
+                  :chips-label="t('report.detail.comparison.members')"
+                  :me="comparisonMe"
+                  :peers="comparisonPeers"
+                  :chips="!isSimilarScope"
+                  :locale="i18n.locale.value"
+                />
+                <p
+                  v-if="isLiveComparison"
+                  class="text-micro text-ink-3"
+                >
+                  {{ t('report.detail.comparison.liveBasisNote') }}
+                </p>
               </div>
             </AppCard>
+
+            <!--
+              레이더는 축 라벨을 계열색 글자로 쓴다. 카드(`surface-1` #262626) 위에서는
+              `text-shopping`·`text-show`가 4.21로 AA에 못 미치므로 canvas(#171717) 위에
+              둔다(#476). 시안도 이 차트를 페이지보다 어두운 면에 놓는다.
+            -->
+            <div class="flex flex-col gap-3 pt-2">
+              <p class="text-micro uppercase text-ink-3">
+                {{ t('report.detail.comparison.categoryBalance') }}
+              </p>
+              <ReportRadarChart
+                :axes="comparisonAxes"
+                :mine-label="t('report.detail.comparison.you')"
+                :cohort-label="comparisonText.cohortLabel"
+                :description="comparisonText.radarDescription"
+              />
+            </div>
 
             <ReportRankTiles
               :tiles="comparisonTiles"

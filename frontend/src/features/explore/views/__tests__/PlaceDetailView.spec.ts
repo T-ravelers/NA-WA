@@ -1,15 +1,20 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
-const fetchPlaceDetail = vi.fn()
-const fetchJourneys = vi.fn()
-const addJourneyItem = vi.fn()
+const { fetchPlaceDetail, fetchJourneys, addJourneyItem, showToast } = vi.hoisted(() => ({
+  fetchPlaceDetail: vi.fn(),
+  fetchJourneys: vi.fn(),
+  addJourneyItem: vi.fn(),
+  showToast: vi.fn(),
+}))
+
+vi.mock('@/shared/ui/toast', () => ({ showToast }))
 
 /**
  * 앱이 주입하는 `parseJourneyRouteQuery`와 같게 동작하는 스텁.
@@ -138,12 +143,18 @@ describe('PlaceDetailView', () => {
     fetchPlaceDetail.mockReset()
     fetchJourneys.mockReset()
     addJourneyItem.mockReset()
+    showToast.mockReset()
     fetchPlaceDetail.mockResolvedValue(place)
     fetchJourneys.mockResolvedValue([
       { tripId: 7, title: 'Seoul weekend', startDate: '2026-08-10', endDate: '2026-08-12' },
     ])
     addJourneyItem.mockResolvedValue({})
     sessionStorage.clear()
+  })
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'share')
+    Reflect.deleteProperty(navigator, 'clipboard')
   })
 
   it('renders Place details with enabled map buttons', async () => {
@@ -250,6 +261,36 @@ describe('PlaceDetailView', () => {
 
     expect(router.currentRoute.value.name).toBe('explore')
     expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
+  })
+
+  it('falls back to copying the Place link when native sharing is blocked', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', {
+      value: vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError')),
+      configurable: true,
+    })
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share place"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledWith(window.location.href)
+    expect(wrapper.text()).toContain('Place link copied.')
+  })
+
+  it('tells the user when Place sharing and copying are unavailable', async () => {
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share place"]').trigger('click')
+    await flushPromises()
+
+    expect(showToast).toHaveBeenCalledWith('We could not share this place. Please try again.')
   })
 
   it('opens the Place appointment list with the Place filter', async () => {
