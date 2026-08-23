@@ -226,6 +226,24 @@ describe('AppointmentDetailView', () => {
     expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(true)
   })
 
+  it('writes the date once, and both dates when the activity crosses midnight', async () => {
+    // 지금 서버는 활동을 visitDate 하루 위에서만 조립하므로 날짜는 하나다. 그래서
+    // 같은 날짜를 두 번 적지 않는다 — 반복되는 값이 정작 다른 값인 시각을 묻는다.
+    const sameDay = await mountView()
+    expect(sameDay.wrapper.text()).toContain('Aug 8, 2099')
+    expect(sameDay.wrapper.text()).not.toContain('Aug 8, 2099 ~ Aug 8, 2099')
+
+    // 그 전제가 깨지면 종료 날짜가 조용히 사라져서는 안 된다. 목록 카드와 같은 규칙이다.
+    fetchAppointment.mockResolvedValue({
+      ...appointment,
+      activityStartAt: '2099-08-08T22:00:00',
+      activityEndAt: '2099-08-09T02:00:00',
+    })
+    const overnight = await mountView()
+
+    expect(overnight.wrapper.text()).toContain('Aug 8, 2099 ~ Aug 9, 2099')
+  })
+
   it('orders members as host, me, then the order they joined', async () => {
     // 서버가 방장 먼저·참여 순으로 내려준다. 여기서 확인하는 것은 "나"가 방장
     // 바로 뒤로 올라오고 나머지 참여 순서는 서버 것 그대로 남는다는 것이다.

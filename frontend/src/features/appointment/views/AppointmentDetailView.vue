@@ -251,9 +251,12 @@ const canOpenMenu = computed(() => appointment.value !== undefined)
 /**
  * 일정은 날짜 한 줄과 시각 범위 한 줄로 나눠 적는다.
  *
- * 날짜를 시작·종료에 두 번 적으면 같은 날짜가 한 줄에서 반복돼, 정작 다른 값인
- * 시각이 묻힌다. 서버가 활동 시작·종료를 `visitDate` 하루 위에서만 조립하므로
+ * 날짜를 시작·종료에 늘 두 번 적으면 같은 날짜가 한 줄에서 반복돼, 정작 다른 값인
+ * 시각이 묻힌다. 지금 서버는 활동 시작·종료를 `visitDate` 하루 위에서만 조립하므로
  * (생성 검증도 시작 < 종료를 요구한다) 날짜는 언제나 하나다.
+ *
+ * 그래도 **두 날짜가 다르면 양쪽을 적는다.** 하나만 믿고 시작 날짜만 그리면 그 전제가
+ * 깨진 날 종료 날짜가 화면에서 조용히 사라진다 — 목록 카드도 같은 규칙이다.
  */
 function formatScheduleDate(value: AppointmentDateTimeValue): string | null {
   const parsed = value ? parseServerDateTime(value) : null
@@ -266,7 +269,14 @@ function formatScheduleTime(value: AppointmentDateTimeValue): string {
   return formatServerDateTime(parsed, locale.value, { timeStyle: 'short' })
 }
 
-const scheduleDate = computed(() => formatScheduleDate(appointment.value?.activityStartAt ?? null))
+const scheduleDate = computed(() => {
+  const start = formatScheduleDate(appointment.value?.activityStartAt ?? null)
+  const end = formatScheduleDate(appointment.value?.activityEndAt ?? null)
+
+  if (start === null) return end
+  if (end === null || start === end) return start
+  return `${start} ~ ${end}`
+})
 
 function formatDeposit(value: string): string {
   const amount = Number(value)
