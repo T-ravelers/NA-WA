@@ -8,8 +8,8 @@ export default {
       past: 'Past',
       ongoingTitle: 'Ongoing journeys',
       pastTitle: 'Past journeys',
-      eventCount: '{count} events',
-      placeCount: '{count} places',
+      eventCount: '{count} event | {count} events',
+      placeCount: '{count} place | {count} places',
       fullEmptyTitle: 'No journeys yet',
       fullEmptyDescription: 'Create your first journey to start planning.',
       tabEmptyTitle: 'No {status} journeys',
@@ -121,7 +121,7 @@ export default {
       title: 'Delete this journey?',
       description:
         'The journey and its saved itinerary will be removed. Events and places themselves will not be deleted.',
-      itemCount: '{count} itinerary items',
+      itemCount: '{count} itinerary item | {count} itinerary items',
       blockedTitle: 'Journey can’t be deleted',
       blockedDescription:
         'You’re hosting an upcoming or active appointment in this journey. Transfer or close it first.',

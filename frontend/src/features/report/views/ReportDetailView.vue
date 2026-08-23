@@ -618,7 +618,7 @@ function retry(): void {
           :items="reportCategories"
           currency="KRW"
           :center-value="String(reportEventCount)"
-          :center-label="t('report.detail.categoryCenterLabel')"
+          :center-label="t('report.detail.categoryCenterLabel', reportEventCount)"
           :description="t('report.detail.categoryDescription')"
           :empty-title="t('report.detail.categoryTitle')"
           :empty-description="t('report.detail.categoryEmpty')"

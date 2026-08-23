@@ -12,7 +12,7 @@ export default {
       places: 'スポット',
       label: '探索するコンテンツの種類',
     },
-    resultCount: 'イベント{count}件',
+    resultCount: 'イベント{count}件 | イベント{count}件',
     resultUnit: '件',
     eventKinds: {
       POPUP: 'ポップアップ',
@@ -252,7 +252,7 @@ export default {
     unsavePlace: 'スポットを保存から削除',
     saveFailed: '保存リストを更新できませんでした。もう一度お試しください。',
     saveRequiresLogin: '保存するにはログインしてください。',
-    placeResultCount: 'スポット{count}件',
+    placeResultCount: 'スポット{count}件 | スポット{count}件',
     pagination: {
       label: '探索結果のページ',
       previousPage: '前のページ',

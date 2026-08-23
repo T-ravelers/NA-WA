@@ -12,7 +12,7 @@ export default {
       places: '地點',
       label: '探索內容類型',
     },
-    resultCount: '{count} 個活動',
+    resultCount: '{count} 個活動 | {count} 個活動',
     resultUnit: '筆結果',
     eventKinds: {
       POPUP: '快閃活動',
@@ -251,7 +251,7 @@ export default {
     unsavePlace: '取消收藏地點',
     saveFailed: '無法更新您的收藏清單，請再試一次。',
     saveRequiresLogin: '請登入後再收藏。',
-    placeResultCount: '{count} 個地點',
+    placeResultCount: '{count} 個地點 | {count} 個地點',
     pagination: {
       label: '探索結果頁面',
       previousPage: '上一頁',

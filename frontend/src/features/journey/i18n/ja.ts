@@ -14,8 +14,8 @@ export default {
       past: '過去',
       ongoingTitle: '進行中の旅程',
       pastTitle: '過去の旅程',
-      eventCount: 'イベント{count}件',
-      placeCount: 'スポット{count}件',
+      eventCount: 'イベント{count}件 | イベント{count}件',
+      placeCount: 'スポット{count}件 | スポット{count}件',
       fullEmptyTitle: 'まだ旅程がありません',
       fullEmptyDescription: '最初の旅程を作成して、計画を始めましょう。',
       tabEmptyTitle: '{status}の旅程はありません',
@@ -125,7 +125,7 @@ export default {
     delete: {
       title: 'この旅程を削除しますか？',
       description: '旅程と保存した日程が削除されます。イベントやスポット自体は削除されません。',
-      itemCount: '日程項目{count}件',
+      itemCount: '日程項目{count}件 | 日程項目{count}件',
       blockedTitle: '旅程を削除できません',
       blockedDescription:
         'この旅程には、あなたが主催する開始前または進行中の同行グループがあります。先に譲渡するか終了してください。',
