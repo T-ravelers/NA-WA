@@ -16,6 +16,7 @@ export default {
         appointments: 'Cuộc hẹn',
       },
       kinds: {
+        label: 'Loại',
         events: 'Sự kiện',
         places: 'Địa điểm',
       },

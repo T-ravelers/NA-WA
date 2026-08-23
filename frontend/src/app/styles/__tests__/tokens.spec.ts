@@ -87,6 +87,21 @@ describe('tokens.css contrast', () => {
     expect(contrast(token('canvas'), token('ink'))).toBeGreaterThanOrEqual(AA_TEXT)
     expect(contrast(token('paper'), token('on-paper'))).toBeGreaterThanOrEqual(AA_TEXT)
   })
+
+  /*
+   * 계열색을 **글자로** 쓰는 자리(#476). 리포트 레이더 축 라벨과 인사이트 문장의 카테고리
+   * 단어가 여기 해당한다. 방향이 위 블록과 반대다 — 저쪽은 계열색이 면이고 잉크가 글자다.
+   *
+   * 기준 면은 canvas다. `surface-1`(#262626) 위에서는 shopping·show가 4.21로 미달이라
+   * 두 자리를 카드 밖으로 옮겼다. 카드 위로 되돌리면 여기서는 잡히지 않으므로,
+   * `ReportDetailView.spec`이 두 블록이 AppCard 밖에 있는지를 함께 지킨다.
+   */
+  it.each(['food', 'shopping', 'show', 'beauty', 'settlement', 'status-ongoing', 'ink-3'])(
+    'the %s series colour clears AA as text on the canvas',
+    (series) => {
+      expect(contrast(token('canvas'), token(series))).toBeGreaterThanOrEqual(AA_TEXT)
+    },
+  )
 })
 
 /**

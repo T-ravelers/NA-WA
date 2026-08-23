@@ -6,6 +6,9 @@ import me.nawa.ingest.controller.IngestController;
 import me.nawa.ingest.mapper.IngestMapper;
 import me.nawa.ingest.service.IngestService;
 import me.nawa.member.service.MemberProfileServiceImpl;
+import me.nawa.notification.controller.NotificationController;
+import me.nawa.notification.mapper.NotificationMapper;
+import me.nawa.notification.service.NotificationService;
 import me.nawa.observability.controller.MetricsController;
 import me.nawa.report.mapper.ReportMapper;
 import me.nawa.report.service.ReportService;
@@ -138,6 +141,40 @@ class RootConfigComponentScanTest {
 
         assertTrue(Arrays.asList(componentScan.basePackages()).contains(
                 "me.nawa.loadtest.stripe"
+        ));
+    }
+
+    @Test
+    void componentScan_includesNotificationServicePackage() {
+        ComponentScan componentScan = RootConfig.class.getAnnotation(
+                ComponentScan.class
+        );
+
+        assertTrue(Arrays.asList(componentScan.basePackages()).contains(
+                NotificationService.class.getPackageName()
+        ));
+    }
+
+    @Test
+    void mapperScan_includesNotificationMapperPackage() {
+        MapperScan mapperScan = RootConfig.class.getAnnotation(
+                MapperScan.class
+        );
+
+        assertTrue(Arrays.asList(mapperScan.basePackages()).contains(
+                NotificationMapper.class.getPackageName()
+        ));
+    }
+
+    @Test
+    void notificationController_isRegisteredInServletConfig() {
+        // 컨트롤러는 서블릿 컨텍스트에서 스캔한다. RootConfig 와 별개다.
+        ComponentScan componentScan = ServletConfig.class.getAnnotation(
+                ComponentScan.class
+        );
+
+        assertTrue(Arrays.asList(componentScan.basePackages()).contains(
+                NotificationController.class.getPackageName()
         ));
     }
 }

@@ -116,7 +116,7 @@ function requestJoin(): void {
           <p class="mt-2 text-title text-ink-display">{{ depositLabel }}</p>
         </div>
 
-        <div class="flex shrink-0 flex-col items-end gap-1">
+        <div class="flex shrink-0 flex-col items-end gap-2">
           <p class="text-data-lg text-ink-display">{{ memberLabel }}</p>
           <AppBadge
             :tone="appointmentStatusTone(appointment.appointmentStatus)"

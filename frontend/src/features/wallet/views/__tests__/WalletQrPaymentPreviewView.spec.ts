@@ -6,6 +6,7 @@ import { ref, toValue, type Ref } from 'vue'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 import { executeQrPayment, previewQrPayment } from '../../api/qrPaymentApi'
 import {
@@ -67,6 +68,7 @@ function createTestRouter(): Router {
         name: 'wallet-qr-payment-complete',
         component: { template: '<div />' },
       },
+      { path: '/wallet/top-up', name: 'wallet-top-up', component: { template: '<div />' } },
     ],
   })
 }
@@ -91,6 +93,10 @@ function todayAppointmentsQueryState(
 
 async function mountView(
   appointmentsQuery: TodayAppointmentsQueryState = todayAppointmentsQueryState(),
+  options: {
+    initialPath?: string | { path: string; query: Record<string, string> }
+    beforeMount?: () => void
+  } = {},
 ): Promise<{
   router: Router
   wrapper: ReturnType<typeof mount>
@@ -98,8 +104,9 @@ async function mountView(
 }> {
   const router = createTestRouter()
   setActivePinia(createPinia())
-  await router.push('/wallet/qr/payment/preview')
+  await router.push(options.initialPath ?? '/wallet/qr/payment/preview')
   await router.isReady()
+  options.beforeMount?.()
 
   const useMyTodayAppointmentsQuery = vi.fn(() => appointmentsQuery)
 
@@ -484,5 +491,93 @@ describe('WalletQrPaymentPreviewView', () => {
       expect.objectContaining({ name: 'wallet-qr-payment-complete' }),
     )
     expect(useQrPaymentSessionStore().session).not.toBeNull()
+  })
+
+  it('opens a top-up prompt instead of paying when the preview says the balance is too low', async () => {
+    vi.mocked(previewQrPayment).mockResolvedValue({
+      ...previewResponse,
+      amount: 18_500,
+      currentBalance: 10_000,
+      balanceAfter: -8_500,
+      canPay: false,
+    })
+
+    const { router, wrapper } = await mountView()
+    setFixedAmountSession()
+    await flushPromises()
+    const pushSpy = vi.spyOn(router, 'push')
+    const replaceSpy = vi.spyOn(router, 'replace')
+
+    const payButton = wrapper.findAll('button').find((button) => button.text() === 'Pay')
+    expect(payButton?.attributes('disabled')).toBeUndefined()
+
+    await payButton?.trigger('click')
+    await flushPromises()
+
+    expect(executeQrPayment).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Not enough balance')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Top up')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(replaceSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ resume: '1' }) }),
+    )
+    expect(pushSpy).toHaveBeenCalledWith({
+      name: 'wallet-top-up',
+      query: { amount: '8500', returnRouteName: 'wallet-qr-payment-preview' },
+    })
+  })
+
+  it('opens a top-up prompt when execution fails with a race-condition insufficient balance', async () => {
+    vi.mocked(executeQrPayment).mockRejectedValue(
+      new NormalizedApiError('WALLET-029', 409, 'insufficient balance'),
+    )
+
+    const { wrapper } = await mountView()
+    setFixedAmountSession()
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Pay')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Not enough balance')
+    expect(wrapper.text()).not.toContain('We could not complete this payment')
+  })
+
+  it('restores the payment selections after returning from top-up', async () => {
+    sessionStorage.setItem(
+      'wallet-qr-payment-preview:resume',
+      JSON.stringify({
+        qrToken: 'tok-abc',
+        spendingScope: 'shared',
+        selectedAppointmentId: 42,
+        enteredAmount: null,
+        spendingCategory: 'FOOD',
+      }),
+    )
+
+    const { wrapper } = await mountView(undefined, {
+      initialPath: { path: '/wallet/qr/payment/preview', query: { resume: '1' } },
+      beforeMount: () => setFixedAmountSession(),
+    })
+    await flushPromises()
+
+    expect(vi.mocked(previewQrPayment).mock.calls[0]?.[0]).toEqual({
+      qrToken: 'tok-abc',
+      amount: 18_500,
+      spendingScope: 'SHARED',
+      appointmentId: 42,
+    })
+    expect(wrapper.get('[data-testid="payment-category-FOOD"]').attributes('aria-checked')).toBe(
+      'true',
+    )
+    expect(sessionStorage.getItem('wallet-qr-payment-preview:resume')).toBeNull()
   })
 })

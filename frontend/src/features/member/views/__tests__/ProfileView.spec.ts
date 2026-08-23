@@ -217,11 +217,28 @@ describe('ProfileView', () => {
   it('switches the saved list to places', async () => {
     const { wrapper } = await mounted()
 
-    await wrapper.get('[data-testid="segment-PLACE"]').trigger('click')
+    await wrapper.get('[data-testid="profile-kind-PLACE"]').trigger('click')
 
     const list = wrapper.get('[data-testid="profile-list"]')
     expect(list.text()).toContain('Gwangjang Market')
     expect(list.get('a').attributes('href')).toBe('/explore/places/22')
+  })
+
+  it('keeps one primary segment and names the kind chips independently of the tab', async () => {
+    const { wrapper } = await mounted()
+
+    expect(wrapper.findAll('[role="radiogroup"]')).toHaveLength(1)
+    expect(wrapper.get('[role="group"]').attributes('aria-label')).toBe('Type')
+    expect(wrapper.get('[data-testid="profile-kind-EVENT"]').attributes('aria-pressed')).toBe(
+      'true',
+    )
+
+    await wrapper.get('[data-testid="segment-appointments"]').trigger('click')
+
+    expect(wrapper.get('[role="group"]').attributes('aria-label')).toBe('Type')
+    expect(wrapper.get('[data-testid="profile-kind-EVENT"]').attributes('aria-pressed')).toBe(
+      'true',
+    )
   })
 
   it('offers a retry when the saved list fails', async () => {
@@ -251,7 +268,7 @@ describe('ProfileView', () => {
     expect(list.text()).toContain('Exit 3')
     expect(list.get('a').attributes('href')).toBe('/appointments/71')
 
-    await wrapper.get('[data-testid="segment-PLACE"]').trigger('click')
+    await wrapper.get('[data-testid="profile-kind-PLACE"]').trigger('click')
     expect(wrapper.get('[data-testid="profile-list"]').text()).toContain('Market food crawl')
   })
 

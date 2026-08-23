@@ -752,6 +752,47 @@ describe('ReportDetailView', () => {
     },
   )
 
+  /*
+   * 계열색을 글자로 쓰는 두 자리는 카드 위에 두지 않는다(#476).
+   *
+   * `AppCard`의 면은 `surface-1`(#262626)이고 그 위에서 `text-shopping`·`text-show`가
+   * 4.21:1로 AA에 못 미친다. canvas(#171717) 위에서는 4.99부터라 통과한다. 값 자체는
+   * `app/styles/__tests__/tokens.spec.ts`가 지키고, **어느 면 위에 놓였는지는 여기서**
+   * 지킨다 — 카드로 되돌리면 토큰 테스트는 초록인 채 대비만 무너진다.
+   */
+  function hasCardAncestor(element: Element): boolean {
+    for (let node = element.parentElement; node !== null; node = node.parentElement) {
+      if (node.classList.contains('bg-surface-1')) return true
+    }
+
+    return false
+  }
+
+  it('keeps the insight sentence off the card surface', async () => {
+    mockScopes(emptyComparison, withCohortFood('48'))
+    const { wrapper } = await mountView()
+
+    const category = wrapper.get('p span.font-semibold')
+
+    expect(category.classes()).toContain(seriesInkClass('FOOD'))
+    expect(hasCardAncestor(category.element)).toBe(false)
+  })
+
+  it('keeps the radar axis labels off the card surface', async () => {
+    // 레이더는 비교할 동료가 있을 때만 그려진다.
+    fetchReportComparison.mockResolvedValueOnce(groupComparison)
+    const { wrapper } = await mountView()
+
+    const labels = wrapper
+      .findAll('span')
+      .filter((node) => node.classes().includes(seriesInkClass('FOOD')) && node.text() === 'Food')
+
+    expect(labels.length).toBeGreaterThan(0)
+    labels.forEach((label) => {
+      expect(hasCardAncestor(label.element)).toBe(false)
+    })
+  })
+
   // 비교 없는 문장은 바로 위 칭호 티켓의 되풀이라 카드를 그리지 않는다. 질의가 실패해도 같다 —
   // 「비교할 사람이 없다」로 읽히면 안 된다.
   it.each([

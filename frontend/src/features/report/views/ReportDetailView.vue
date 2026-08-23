@@ -572,32 +572,38 @@ function retry(): void {
           @share="shareTicket"
         />
 
-        <AppCard v-if="reportInsight !== null">
-          <p class="flex items-start gap-2 text-body-sm text-ink-2">
-            <IconSparkles
-              :size="18"
-              :stroke-width="1.8"
-              aria-hidden="true"
-              class="mt-0.5 shrink-0"
-              :class="reportInsight.inkClass"
-            />
-            <i18n-t
-              :keypath="`report.detail.insight.${reportInsight.variant}`"
-              tag="span"
-              scope="global"
-            >
-              <template #category>
-                <span
-                  class="font-semibold"
-                  :class="reportInsight.inkClass"
-                  >{{ reportInsight.label }}</span
-                >
-              </template>
-              <template #share>{{ reportInsight.share }}</template>
-              <template #cohortShare>{{ reportInsight.cohortShare }}</template>
-            </i18n-t>
-          </p>
-        </AppCard>
+        <!--
+          계열색을 글자로 쓰므로 카드(`surface-1` #262626) 위에 두지 않는다. 그 면 위에서는
+          `text-shopping` 4.21 · `text-show` 4.21로 AA에 못 미친다(#476). canvas(#171717)
+          위에서는 4.99부터라 넷 다 통과한다. 시안도 이 문장을 페이지보다 어두운 면에 둔다.
+        -->
+        <p
+          v-if="reportInsight !== null"
+          class="flex items-start gap-2 px-1 text-body-sm text-ink-2"
+        >
+          <IconSparkles
+            :size="18"
+            :stroke-width="1.8"
+            aria-hidden="true"
+            class="mt-0.5 shrink-0"
+            :class="reportInsight.inkClass"
+          />
+          <i18n-t
+            :keypath="`report.detail.insight.${reportInsight.variant}`"
+            tag="span"
+            scope="global"
+          >
+            <template #category>
+              <span
+                class="font-semibold"
+                :class="reportInsight.inkClass"
+                >{{ reportInsight.label }}</span
+              >
+            </template>
+            <template #share>{{ reportInsight.share }}</template>
+            <template #cohortShare>{{ reportInsight.cohortShare }}</template>
+          </i18n-t>
+        </p>
 
         <ReportKpiCard
           :heading="t('report.detail.analysis')"
@@ -672,36 +678,40 @@ function retry(): void {
 
           <template v-else>
             <AppCard padding="lg">
-              <div class="flex flex-col gap-6">
-                <div class="flex flex-col gap-2">
-                  <ReportComparisonBars
-                    :total-label="t('report.detail.comparison.totalSpend')"
-                    :chips-label="t('report.detail.comparison.members')"
-                    :me="comparisonMe"
-                    :peers="comparisonPeers"
-                    :chips="!isSimilarScope"
-                    :locale="i18n.locale.value"
-                  />
-                  <p
-                    v-if="isLiveComparison"
-                    class="text-micro text-ink-3"
-                  >
-                    {{ t('report.detail.comparison.liveBasisNote') }}
-                  </p>
-                </div>
-                <div class="flex flex-col gap-3">
-                  <p class="text-micro uppercase text-ink-3">
-                    {{ t('report.detail.comparison.categoryBalance') }}
-                  </p>
-                  <ReportRadarChart
-                    :axes="comparisonAxes"
-                    :mine-label="t('report.detail.comparison.you')"
-                    :cohort-label="comparisonText.cohortLabel"
-                    :description="comparisonText.radarDescription"
-                  />
-                </div>
+              <div class="flex flex-col gap-2">
+                <ReportComparisonBars
+                  :total-label="t('report.detail.comparison.totalSpend')"
+                  :chips-label="t('report.detail.comparison.members')"
+                  :me="comparisonMe"
+                  :peers="comparisonPeers"
+                  :chips="!isSimilarScope"
+                  :locale="i18n.locale.value"
+                />
+                <p
+                  v-if="isLiveComparison"
+                  class="text-micro text-ink-3"
+                >
+                  {{ t('report.detail.comparison.liveBasisNote') }}
+                </p>
               </div>
             </AppCard>
+
+            <!--
+              레이더는 축 라벨을 계열색 글자로 쓴다. 카드(`surface-1` #262626) 위에서는
+              `text-shopping`·`text-show`가 4.21로 AA에 못 미치므로 canvas(#171717) 위에
+              둔다(#476). 시안도 이 차트를 페이지보다 어두운 면에 놓는다.
+            -->
+            <div class="flex flex-col gap-3 pt-2">
+              <p class="text-micro uppercase text-ink-3">
+                {{ t('report.detail.comparison.categoryBalance') }}
+              </p>
+              <ReportRadarChart
+                :axes="comparisonAxes"
+                :mine-label="t('report.detail.comparison.you')"
+                :cohort-label="comparisonText.cohortLabel"
+                :description="comparisonText.radarDescription"
+              />
+            </div>
 
             <ReportRankTiles
               :tiles="comparisonTiles"

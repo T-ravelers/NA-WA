@@ -16,6 +16,7 @@ export default {
         appointments: '約會',
       },
       kinds: {
+        label: '類型',
         events: '活動',
         places: '地點',
       },
