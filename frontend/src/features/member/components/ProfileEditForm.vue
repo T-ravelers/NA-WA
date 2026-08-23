@@ -61,7 +61,13 @@ watch(
 
 const countries = computed(() => nationalityOptions(locale.value))
 
-/** 사용자가 아직 그 칸을 만지지 않았으면 오류를 띄우지 않는다. */
+/**
+ * 오류를 언제 보여 줄지.
+ *
+ * 사용자가 그 칸을 만졌거나 한 번 보내려고 했을 때만 띄운다. 온보딩이라고 해서 먼저
+ * 띄우지 않는다 — 서비스에서 처음 만나는 「Welcome」 화면이 아무것도 하지 않았는데
+ * 빨간 글씨부터 보여 주게 된다.
+ */
 const touched = ref({ name: false, country: false })
 
 /**
@@ -76,9 +82,7 @@ const nameError = computed(() => {
   const value = name.value.trim()
 
   if (value === '') {
-    return mode === 'onboarding' || touched.value.name
-      ? t('member.form.error.nameRequired')
-      : undefined
+    return touched.value.name ? t('member.form.error.nameRequired') : undefined
   }
 
   return [...value].length > DISPLAY_NAME_MAX_LENGTH
@@ -87,17 +91,20 @@ const nameError = computed(() => {
 })
 
 const countryError = computed(() =>
-  country.value === '' && (mode === 'onboarding' || touched.value.country)
+  country.value === '' && touched.value.country
     ? t('member.form.error.countryRequired')
     : undefined,
 )
 
+/**
+ * 보낼 수 있는 상태인가. **버튼을 잠그는 데 쓰지 않는다.**
+ *
+ * 비활성 버튼과 「만지기 전에는 조용히」를 같이 두면 무엇이 빠졌는지 말해 줄 계기가
+ * 사라진다 — 사용자는 눌리지 않는 버튼만 보고 이유를 모른다. 그래서 버튼은 열어 두고,
+ * 누르는 순간 빠진 칸을 짚어 준다.
+ */
 const canSubmit = computed(
-  () =>
-    !submitting &&
-    name.value.trim() !== '' &&
-    country.value !== '' &&
-    nameError.value === undefined,
+  () => name.value.trim() !== '' && country.value !== '' && nameError.value === undefined,
 )
 
 function handleSubmit(): void {
@@ -190,7 +197,7 @@ function handleSubmit(): void {
     <AppButton
       type="submit"
       block
-      :disabled="!canSubmit"
+      :disabled="submitting"
       :loading="submitting"
       >{{ mode === 'onboarding' ? t('member.form.start') : t('member.form.save') }}</AppButton
     >

@@ -80,18 +80,33 @@ describe('ProfileEditForm', () => {
     expect(wrapper.findAll('input')).toHaveLength(1)
   })
 
-  it('asks for a country before anything is touched in onboarding', () => {
+  /*
+   * 서비스에서 처음 만나는 「Welcome」 화면이 아무것도 하지 않았는데 빨간 글씨부터 보여
+   * 주지 않는다. 온보딩도 편집과 같은 시점에 오류를 띄운다.
+   */
+  it('stays quiet on arrival even when onboarding has nothing filled in', () => {
     const wrapper = mountForm({ mode: 'onboarding', nationalityCode: null, displayName: '' })
 
-    expect(wrapper.text()).toContain('Choose a country')
-    expect(wrapper.text()).toContain('Enter a name')
+    expect(wrapper.text()).not.toContain('Choose a country.')
+    expect(wrapper.text()).not.toContain('Enter a name.')
   })
 
-  /* 편집은 바꾸고 싶은 것만 바꾼다. 열자마자 빨간 글씨를 띄우지 않는다. */
   it('stays quiet in edit mode until a field is touched', () => {
     const wrapper = mountForm({ displayName: '', nationalityCode: null })
 
     expect(wrapper.text()).not.toContain('Enter a name.')
+  })
+
+  /*
+   * 버튼을 잠가 두면 무엇이 빠졌는지 말해 줄 계기가 사라진다. 열어 두고 누르는 순간 짚어 준다.
+   */
+  it('names what is missing when the first attempt is made', async () => {
+    const wrapper = mountForm({ mode: 'onboarding', nationalityCode: null, displayName: '' })
+
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
+    expect(await submitted(wrapper)).toBeUndefined()
+    expect(wrapper.text()).toContain('Choose a country.')
+    expect(wrapper.text()).toContain('Enter a name.')
   })
 
   it('offers a way out only when editing', () => {

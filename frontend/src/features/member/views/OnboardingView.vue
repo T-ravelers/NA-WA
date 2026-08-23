@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { requestSignOut } from '@/shared/api/sessionSignOut'
 import { AUTHENTICATED_HOME_PATH } from '@/shared/config/routePaths'
 import type { AppLocale } from '@/shared/i18n/locales'
 import StateError from '@/shared/ui/StateError.vue'
@@ -36,6 +37,15 @@ const finish = useMutation({
     void router.replace(AUTHENTICATED_HOME_PATH)
   },
 })
+
+/**
+ * 온보딩을 마치기 전에는 계정을 빠져나갈 곳이 없다.
+ *
+ * `/profile`은 게이트가 막고, `/sign-in`은 `guestOnly`라 인증된 사용자를 `/explore`로
+ * 되돌린 뒤 다시 여기로 온다. 잘못된 계정으로 로그인했거나 마음을 바꾼 사용자를 가두지
+ * 않도록 이 화면에도 출구를 둔다.
+ */
+const signOut = useMutation({ mutationFn: requestSignOut })
 
 const submitError = computed(() => {
   const error = finish.error.value
@@ -84,5 +94,15 @@ function submit(value: { displayName: string; nationalityCode: string }): void {
       :submitting="finish.isPending.value"
       @submit="submit"
     />
+
+    <button
+      v-if="!isPending && !isError && profile !== undefined"
+      type="button"
+      class="mt-6 min-h-11 w-full text-body-sm text-ink-3 underline disabled:opacity-60"
+      :disabled="signOut.isPending.value"
+      @click="signOut.mutate()"
+    >
+      {{ t('auth.signOut') }}
+    </button>
   </section>
 </template>
