@@ -26,6 +26,7 @@ const COUNTED = [
   ['journey.delete.itemCount', '1 itinerary item', '2 itinerary items', '0 itinerary items'],
   ['explore.resultCount', '1 event', '2 events', '0 events'],
   ['explore.placeResultCount', '1 place', '2 places', '0 places'],
+  ['appointment.list.resultCount', '1 appointment', '2 appointments', '0 appointments'],
 ] as const
 
 describe('counted messages', () => {

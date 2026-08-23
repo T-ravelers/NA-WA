@@ -23,7 +23,7 @@ export default {
       searchLabel: '搜尋揪團',
       searchPlaceholder: '搜尋揪團',
       languageLabel: '揪團語言',
-      resultCount: '{count} 個揪團',
+      resultCount: '{count} 個揪團 | {count} 個揪團',
       memberCount: '{current}/{max}',
       scheduleUnavailable: '時間未定',
       placePending: '集合地點待確認',

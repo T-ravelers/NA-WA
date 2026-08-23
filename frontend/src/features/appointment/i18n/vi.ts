@@ -24,7 +24,7 @@ export default {
       searchLabel: 'Tìm cuộc hẹn',
       searchPlaceholder: 'Tìm cuộc hẹn',
       languageLabel: 'Ngôn ngữ cuộc hẹn',
-      resultCount: '{count} cuộc hẹn',
+      resultCount: '{count} cuộc hẹn | {count} cuộc hẹn',
       memberCount: '{current}/{max}',
       scheduleUnavailable: 'Chưa có thời gian',
       placePending: 'Điểm hẹn sẽ được xác nhận sau',
