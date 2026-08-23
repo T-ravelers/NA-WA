@@ -470,7 +470,7 @@ function apply(): void {
       role="dialog"
       aria-modal="true"
       :aria-label="t(SHEET_TITLES[kind])"
-      class="absolute inset-x-0 bottom-0 z-10 mx-auto flex max-h-[88dvh] w-full max-w-[390px] flex-col rounded-t-lg bg-surface-1 px-screen pt-3 pb-6 shadow-sheet"
+      class="absolute inset-x-0 bottom-0 z-10 mx-auto flex max-h-[88dvh] w-full max-w-[390px] flex-col rounded-t-lg bg-canvas px-screen pt-3 pb-6 shadow-sheet"
     >
       <span
         aria-hidden="true"
