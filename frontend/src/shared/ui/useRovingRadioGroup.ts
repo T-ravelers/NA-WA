@@ -47,6 +47,15 @@ export function useRovingRadioGroup(
   select: (value: string) => void,
 ): RovingRadioGroup {
   function onKeydown(event: KeyboardEvent): void {
+    /*
+     * 수식 키가 붙은 화살표는 그룹의 것이 아니다.
+     *
+     * macOS `Cmd + ←`와 Windows·Linux `Alt + ←`는 브라우저 뒤로 가기다. 칩에 초점이
+     * 있을 때 이것을 가로채면 아래 `preventDefault()`가 뒤로 가기를 막고 엉뚱하게
+     * 선택만 바뀐다. APG 구현들이 수식 키가 붙은 이벤트를 흘려보내는 이유가 이것이다.
+     */
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
+
     const list = toValue(values)
     if (list.length === 0) return
 

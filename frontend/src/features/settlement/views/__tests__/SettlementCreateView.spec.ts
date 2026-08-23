@@ -185,22 +185,49 @@ describe('SettlementCreateView', () => {
 
   /*
    * 결제자는 정산에서 뺄 수 없다. 그런데 칩이 평범한 버튼이라 눌러도 아무 일이 없고 왜
-   * 그런지 알 수 없었다 — 보조기술은 누를 수 있는 버튼으로 읽었고, #380이 선택 상태를
-   * 또렷하게 만들면서 다른 선택 칩과 완전히 같아 보이게 됐다(#382).
+   * 그런지 알 수 없었다 — 보조기술은 누를 수 있는 버튼으로 읽었고, #423이 고른 칩을
+   * 밝은 면으로 뒤집으면서 결제자 칩과 완전히 같아 보이게 됐다(#382).
    */
-  it('marks the payer chip as disabled and gives it its own fill', async () => {
+  it('marks the payer chip as disabled and sets it apart from a chosen one', async () => {
     const wrapper = mountCreate()
     await drillDownToTransaction(wrapper)
 
+    await wrapper.get('[data-participant-id="19"]').trigger('click')
+
     const payer = wrapper.get('[data-participant-id="12"]')
-    const other = wrapper.get('[data-participant-id="19"]')
+    const chosen = wrapper.get('[data-participant-id="19"]')
 
     expect(payer.attributes('aria-disabled')).toBe('true')
-    expect(other.attributes('aria-disabled')).toBeUndefined()
+    expect(chosen.attributes('aria-disabled')).toBeUndefined()
 
-    /* 꽉 찬 면 = 고정됨. 다른 선택 칩은 10% 면이라 「골랐다」로 읽힌다. */
-    expect(payer.classes()).toContain('bg-settlement')
-    expect(payer.classes()).not.toContain('bg-settlement/10')
+    /*
+     * 둘 다 밝은 면이다 — 결제자는 정산에 반드시 들어가므로 흐리게 만들면 그 사실이 같이
+     * 흐려진다. 가르는 것은 명도가 아니라 안쪽 링이다.
+     */
+    expect(payer.classes()).toContain('bg-paper-fill')
+    expect(chosen.classes()).toContain('bg-paper-fill')
+    expect(payer.classes()).toContain('ring-2')
+    expect(chosen.classes()).not.toContain('ring-2')
+  })
+
+  /*
+   * 정산 방식도 같은 화면의 라디오 그룹이다. 탭 스톱이 선택지 수만큼 있고 화살표 이동이
+   * 없던 것은 참여자 칩과 같은 문제였다(#305 리뷰).
+   */
+  it('keeps one tab stop for the settlement method and moves it with the arrow keys', async () => {
+    const wrapper = mountCreate()
+    await drillDownToTransaction(wrapper)
+
+    const methods = wrapper.findAll('[data-type]')
+    expect(methods.map((option) => option.attributes('tabindex'))).toEqual(['0', '-1'])
+
+    const methodGroup = wrapper
+      .findAll('[role="radiogroup"]')
+      .find((group) => group.find('[data-type]').exists())
+
+    await methodGroup?.trigger('keydown', { key: 'ArrowRight' })
+
+    expect(wrapper.get('[data-type="ITEMIZED"]').attributes('aria-checked')).toBe('true')
   })
 
   it('keeps the payer selected when its chip is pressed', async () => {

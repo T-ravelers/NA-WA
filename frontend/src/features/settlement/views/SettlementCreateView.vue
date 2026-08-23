@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import { useRovingRadioGroup } from '@/shared/ui/useRovingRadioGroup'
 
 import { settlementGateway } from '../api/settlementGateway'
 import SettlementBottomSheet from '../components/SettlementBottomSheet.vue'
@@ -279,6 +280,16 @@ function setType(nextType: SettlementType): void {
   ensureFirstItem()
   validationMessage.value = null
 }
+
+/** 정산 방식 선택지. 화살표 이동이 순서를 알아야 해서 템플릿의 리터럴을 여기로 올렸다. */
+const SETTLEMENT_TYPES: readonly SettlementType[] = ['EQUAL', 'ITEMIZED']
+
+/* 라디오 그룹이면 탭 스톱은 하나이고 안에서는 화살표로 옮긴다(#305). */
+const { onKeydown: onMethodKeydown, tabindexFor: methodTabindex } = useRovingRadioGroup(
+  SETTLEMENT_TYPES,
+  () => type.value,
+  (value) => setType(value as SettlementType),
+)
 
 /**
  * 결제자인가.
@@ -680,18 +691,25 @@ defineExpose({ back })
       <h3 class="mt-6 text-caption uppercase tracking-wider text-ink-3">
         {{ t('settlement.create.method') }}
       </h3>
+      <!--
+        조형은 `SelectChip`으로 옮기지 않았다. 이 칩은 #423이 시안에 맞춰 파란 면
+        (`bg-info`)·h44·`text-body-sm`으로 따로 정한 것이라, 공용 칩(밝은 면·h36·
+        `text-caption`)으로 바꾸면 방금 맞춘 시안이 어긋난다. **키보드 동작만** 공유한다.
+      -->
       <div
         class="mt-3 grid grid-cols-2 gap-2"
         role="radiogroup"
         :aria-label="t('settlement.create.method')"
+        @keydown="onMethodKeydown"
       >
         <button
-          v-for="option in ['EQUAL', 'ITEMIZED'] as SettlementType[]"
+          v-for="option in SETTLEMENT_TYPES"
           :key="option"
           type="button"
           role="radio"
           :data-type="option"
           :aria-checked="type === option"
+          :tabindex="methodTabindex(option)"
           class="min-h-11 rounded-pill px-3 text-body-sm"
           :class="type === option ? 'bg-info text-on-paper' : 'bg-surface-1 text-ink-2'"
           @click="setType(option)"

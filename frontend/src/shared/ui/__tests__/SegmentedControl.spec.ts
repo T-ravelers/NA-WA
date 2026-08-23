@@ -100,6 +100,25 @@ describe('SegmentedControl', () => {
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
+  /*
+   * `Cmd + ←`(macOS)·`Alt + ←`(Windows·Linux)는 브라우저 뒤로 가기다. 그룹이 가로채면
+   * 뒤로 가기가 막히고 대신 선택이 바뀐다 — 누른 사람이 의도한 것과 정반대다.
+   */
+  it.each([['metaKey'], ['ctrlKey'], ['altKey'], ['shiftKey']])(
+    'leaves %s + arrow to the browser',
+    async (modifier) => {
+      const wrapper = mountControl('ongoing')
+      const preventDefault = vi.fn()
+
+      await wrapper
+        .get('[role="radiogroup"]')
+        .trigger('keydown', { key: 'ArrowLeft', [modifier]: true, preventDefault })
+
+      expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+      expect(preventDefault).not.toHaveBeenCalled()
+    },
+  )
+
   /* 화살표가 화면까지 스크롤하면 그룹 안에서 이동만 하려던 조작이 페이지를 흔든다. */
   it('stops the arrow key from also scrolling the page', async () => {
     const wrapper = mountControl('ongoing')
