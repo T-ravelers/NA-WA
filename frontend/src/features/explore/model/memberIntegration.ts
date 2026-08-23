@@ -37,6 +37,9 @@ export function useSavedExploreItemsQuery(kind: Ref<'EVENT' | 'PLACE'>, enabled:
   const regionLabel = useRegionLabel()
 
   const query = useQuery({
+    // 캐시에는 서버가 준 지역 코드를 그대로 둔다. 번역한 문자열을 넣으면 언어를 바꾼
+    // 뒤에도 이전 언어가 남는다 — 이 응답은 언어와 무관하므로 로케일을 key에 넣어
+    // 같은 목록을 로케일마다 다시 받아 오는 대신, 표시할 때 번역한다.
     queryKey: computed(() => ['explore', 'saved', kind.value] as const),
     queryFn: async () => {
       if (kind.value === 'EVENT') {
@@ -44,7 +47,7 @@ export function useSavedExploreItemsQuery(kind: Ref<'EVENT' | 'PLACE'>, enabled:
         return page.content.map((event) => ({
           itemId: event.itemId,
           title: event.title,
-          subtitle: regionLabel([event.region1, event.region2, event.region3]),
+          regionParts: [event.region1, event.region2, event.region3],
           thumbnailUrl: event.thumbnailUrl,
         }))
       }
@@ -53,7 +56,7 @@ export function useSavedExploreItemsQuery(kind: Ref<'EVENT' | 'PLACE'>, enabled:
       return page.content.map((place) => ({
         itemId: place.itemId,
         title: place.name,
-        subtitle: regionLabel([place.region1, place.region2, place.region3]),
+        regionParts: [place.region1, place.region2, place.region3],
         thumbnailUrl: place.thumbnailUrl,
       }))
     },
@@ -61,8 +64,16 @@ export function useSavedExploreItemsQuery(kind: Ref<'EVENT' | 'PLACE'>, enabled:
     staleTime: 30_000,
   })
 
+  // `t()`를 computed 안에서 부르므로 로케일이 바뀌면 지역명도 다시 계산된다.
+  const data = computed(() =>
+    query.data.value?.map(({ regionParts, ...item }) => ({
+      ...item,
+      subtitle: regionLabel(regionParts),
+    })),
+  )
+
   return {
-    data: query.data,
+    data,
     isPending: query.isPending,
     isError: query.isError,
     refetch: () => void query.refetch(),
