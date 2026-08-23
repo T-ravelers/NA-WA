@@ -92,6 +92,15 @@ const RECOVERY_BY_CODE: Record<string, SettlementRecovery> = {
   'SETTLEMENT-025': 'ENTER_MANUALLY',
 }
 
+/**
+ * 위 매핑에 적힌 코드 전부.
+ *
+ * 지갑 코드는 문구를 지갑 feature가 갖는다. 코드만 늘리고 그쪽 문구를 빠뜨리면 화면에 키가
+ * 그대로 나오는데, 두 feature에 걸쳐 있어 눈으로는 잘 드러나지 않는다. 시험이 이 목록을
+ * 훑어 잡는다 — 영수증 코드 목록을 따로 둔 것과 같은 이유다.
+ */
+export const SETTLEMENT_MAPPED_ERROR_CODES = Object.keys(RECOVERY_BY_CODE)
+
 export function resolveSettlementError(error: unknown): {
   messageKey: string
   recovery: SettlementRecovery

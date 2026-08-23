@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
+import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
-import { SETTLEMENT_RECEIPT_ERROR_CODES, resolveSettlementError } from '../settlementErrors'
+import {
+  SETTLEMENT_MAPPED_ERROR_CODES,
+  SETTLEMENT_RECEIPT_ERROR_CODES,
+  resolveSettlementError,
+} from '../settlementErrors'
 
 describe('settlement errors', () => {
   it.each([
@@ -74,6 +79,18 @@ describe('settlement errors', () => {
       resolveSettlementError(new NormalizedApiError('WALLET-015', 409, 'server message'))
         .messageKey,
     ).toBe('wallet.errorCode.WALLET-015')
+  })
+
+  /*
+   * 문구가 없으면 화면에 키가 그대로 나온다. 지갑 코드는 문구를 지갑 feature가 갖고 있어
+   * 코드만 늘리고 그쪽을 빠뜨리기 쉬운데, 두 feature에 걸쳐 있어 눈으로는 잘 안 보인다.
+   */
+  it.each(SETTLEMENT_MAPPED_ERROR_CODES)('has wording for %s wherever it lives', (code) => {
+    const { messageKey } = resolveSettlementError(
+      new NormalizedApiError(code, 409, 'server message'),
+    )
+
+    expect(i18n.global.te(messageKey)).toBe(true)
   })
 
   it('reuses the attempt for unknown failures so a retry cannot double-charge', () => {
