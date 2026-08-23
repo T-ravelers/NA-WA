@@ -686,6 +686,33 @@ describe('AppointmentDetailView', () => {
     }
   })
 
+  // 시트가 열려 있는 동안 조건이 뒤집히는 경우. participation 조회는 retry를 쓰지 않고
+  // 5초마다 폴링하므로, 한 번 끊겼다가 다음 폴링에서 "방장 아님"으로 돌아오면
+  // `showAttendanceItem`이 true → false가 된다. 그때 시트에 담을 항목이 사라진다.
+  it('does not leave an empty sheet behind when the host check resolves to false', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+
+    try {
+      fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
+      const { wrapper } = await mountView()
+
+      // 조회 실패라 방장 여부를 모른다 — 감추지 않고 이유와 함께 연다.
+      await wrapper.get('button[aria-label="Open appointment menu"]').trigger('click')
+      expect(menuItem(wrapper)('Attendance')).toBeDefined()
+
+      fetchMyAppointmentParticipation.mockResolvedValue(memberParticipation)
+      vi.advanceTimersByTime(5_000)
+      await flushPromises()
+
+      // 방장이 아닌 것이 확인됐다. 담을 항목이 없으므로 시트가 남아 있으면 안 된다 —
+      // 버거 버튼도 함께 사라지므로 열린 채 남으면 닫고 다시 열 방법이 없다.
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Open appointment menu"]').exists()).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps the detail on screen when a refresh fails', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
 

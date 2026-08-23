@@ -11,9 +11,10 @@ import { useOverlayDismiss } from '../composables/useOverlayDismiss'
  * 출석 확정은 활동이 끝난 뒤에 열리므로, 조건에 맞을 때만 넣으면 시트가 열 때마다
  * 다른 모양이 되고 사용자는 그 기능이 있다는 것조차 알 수 없다.
  *
- * 예외는 영영 켜질 수 없는 항목이다. 출석 확정은 방장만 할 수 있어 방장에게만
- * 넣는다. 그래서 방장이 아니면 시트에 남는 항목이 없고, 상세 화면이 버거 버튼
- * 자체를 그리지 않는다.
+ * **시트는 비어 있지 않다.** 출석 확정은 방장만 할 수 있어(APPOINTMENT-004) 방장이
+ * 아니면 담을 항목이 없는데, 그 판정은 이 시트가 아니라 **호출부가 한 곳에서** 한다 —
+ * 버거 버튼과 시트가 같은 조건을 쓴다. 여기에 `v-if`를 하나 더 두면 조건이 두 군데로
+ * 갈라져, 열려 있는 동안 값이 뒤집힐 때 빈 시트가 남는다(#483 리뷰에서 실제로 났다).
  *
  * 나가기는 여기 있다가 회원 목록의 내 행으로 옮겼다. 이 시트는 "약속"을 대상으로
  * 하는 자리라 자기 참여를 취소하는 것인지 약속을 없애는 것인지 구분되지 않았다.
@@ -21,15 +22,10 @@ import { useOverlayDismiss } from '../composables/useOverlayDismiss'
 interface Props {
   appointmentName: string
   /** 방장에게만 넣는다. */
-  showAttendance: boolean
   attendanceDisabledReason?: string
 }
 
-const {
-  appointmentName,
-  showAttendance,
-  attendanceDisabledReason = undefined,
-} = defineProps<Props>()
+const { appointmentName, attendanceDisabledReason = undefined } = defineProps<Props>()
 
 const emit = defineEmits<{
   close: []
@@ -65,7 +61,6 @@ const title = computed(() => t('appointment.detail.menu.title'))
       <p class="mb-3 truncate text-body-sm text-ink-3">{{ appointmentName }}</p>
 
       <button
-        v-if="showAttendance"
         type="button"
         class="flex min-h-14 flex-col justify-center rounded-sm px-1 py-3 text-left active:bg-surface-3 disabled:active:bg-transparent"
         :disabled="attendanceDisabledReason !== undefined"

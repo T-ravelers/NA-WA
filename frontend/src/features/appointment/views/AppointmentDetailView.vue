@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { IconMenu2 } from '@tabler/icons-vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -185,12 +185,20 @@ const leaveBlockedReason = computed(() => {
 // isHost가 false로 남아 정작 방장에게서 출석 확정이 통째로 사라진다. 모를 때는
 // 감추지 말고 이유로 "확인하지 못했다"를 적는다.
 const showAttendanceItem = computed(() => isHost.value || participationCheckFailed.value)
-// 시트는 상세를 다 받은 뒤에만 렌더되므로(약속 이름과 보증금이 필요하다) 버튼도
-// 같은 조건을 쓴다. 버튼만 헤더에서 먼저 뜨면 눌러도 아무것도 열리지 않는다.
+// 버거 버튼과 시트가 **같은 조건 하나**를 쓴다.
 //
-// 남은 항목이 출석 확정 하나뿐이라 방장이 아니면 시트가 비어 버린다. 빈 시트를
-// 여는 버튼은 눌러도 아무것도 열리지 않는 것과 같으므로 버튼째 감춘다.
+// 시트는 상세를 다 받아야 렌더된다(약속 이름과 보증금이 필요하다). 그리고 남은 항목이
+// 출석 확정 하나뿐이라 방장이 아니면 담을 것이 없다. 조건을 버튼에만 걸면, 시트가 열려
+// 있는 동안 값이 뒤집힐 때 빈 시트가 남는다 — participation 조회는 retry 없이 5초마다
+// 폴링하므로 "확인 못 함 → 방장 아님"으로 넘어가는 순간이 실제로 있다. 그때 버튼도 함께
+// 사라져 닫고 다시 열 수도 없다.
 const canOpenMenu = computed(() => appointment.value !== undefined && showAttendanceItem.value)
+
+// 조건이 꺼지면 열림 상태까지 닫는다. `v-if`만으로는 `menuOpen`이 true로 남아, 다음
+// 폴링이 또 실패해 조건이 되살아나면 누르지 않은 시트가 혼자 열린다.
+watch(canOpenMenu, (open) => {
+  if (!open) menuOpen.value = false
+})
 
 /**
  * 일정은 날짜 한 줄과 시각 범위 한 줄로 나눠 적는다.
@@ -521,9 +529,8 @@ function goHome(): void {
       </div>
 
       <AppointmentMenuSheet
-        v-if="menuOpen"
+        v-if="menuOpen && canOpenMenu"
         :appointment-name="appointment.appointmentName"
-        :show-attendance="showAttendanceItem"
         :attendance-disabled-reason="attendanceDisabledReason"
         @close="menuOpen = false"
         @attendance="openAttendance"

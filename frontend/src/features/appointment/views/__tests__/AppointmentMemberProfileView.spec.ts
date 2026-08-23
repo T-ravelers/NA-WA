@@ -48,6 +48,12 @@ async function mountView() {
   const wrapper = mount(AppointmentMemberProfileView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+      /*
+       * 화면은 더는 이 주입을 쓰지 않는다(#483). 그래도 남기는 이유는 둘이다 —
+       * 되살릴 때 그대로 쓰고, **`reviewCount`가 0이 아니어야 아래 뮤테이션이 잡힌다.**
+       * 0으로 두면 후기 수 한 줄을 되돌려도 옛 코드가 `ratingUnavailable` 가지를 타서
+       * `reviews`라는 글자가 아예 안 나온다(실측: 뮤테이션 3건 전부 통과).
+       */
       provide: {
         [appointmentMemberIntegrationKey as symbol]: {
           useMemberStats: () => ({
@@ -55,7 +61,7 @@ async function mountView() {
               completionRate: null,
               noShowCount: 0,
               averageRating: null,
-              reviewCount: 0,
+              reviewCount: 3,
             }),
             isPending: ref(false),
             isError: ref(false),
