@@ -41,7 +41,7 @@ function initials(displayName: string): string {
 
 function isCurrentMember(member: AppointmentMember): boolean {
   // 참여 조회가 실패하면 currentAppointmentMemberId가 null이라 어느 행도 내 것이
-  // 아니게 된다. 그때는 목록이 아니라 목록 위 안내가 이유를 말한다.
+  // 아니게 된다. 그때는 목록이 아니라 하단 CTA 위 문구가 이유를 말한다.
   return (
     currentAppointmentMemberId !== null && member.appointmentMemberId === currentAppointmentMemberId
   )
