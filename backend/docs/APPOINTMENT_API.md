@@ -174,10 +174,20 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 `startDate`~`endDate` 안이어야 하며, 같은 `(tripId, itemId, visitDate)` 자리에
 **다른 약속이** 이미 걸려 있으면 안 됩니다 — 위반 시 각각 `JOURNEY-002`,
 `JOURNEY-007`, `JOURNEY-004`를 반환합니다([JOURNEY_API.md](./JOURNEY_API.md) 참고).
-`Add to journey`로 담아만 둔 자리는 막지 않습니다(아래 참고). 이 경로는
-Journey 일정 추가와 달리 **항목 자체의 운영 기간(`JOURNEY-012`)은 보지 않습니다** —
-`validateJourneyLink`가 `addJourneyItem`과 별개의 검사를 갖고 있기 때문입니다. 활동
-시작 시각은 종료 시각보다 빨라야 하며 현재 시각 이후여야 합니다. 참여 마감 시각은
+`Add to journey`로 담아만 둔 자리는 막지 않습니다(아래 참고).
+
+`visitDate`는 **항목 자체의 운영 기간** 안이기도 해야 하며, 벗어나면 `JOURNEY-012`
+입니다. 이 규칙은 Journey 일정 추가와 완전히 같고 같은 코드
+(`JourneyExploreItem.coversVisitDate`)를 씁니다 — 예전에는 약속 생성 경로에만 이
+검사가 없어서, 여정에 담는 것은 막히는 날짜로도 약속이 만들어졌습니다. PLACE는 운영
+기간이 없어 이 검사를 받지 않고, 상시 이벤트는 `end_date`가 `NULL`이라 상한만
+없습니다(시작일 이전은 여전히 거절).
+
+다만 **항목의 가용성 판정 기준은 두 경로가 다릅니다.** 약속 생성은
+`event.status IN ('SCHEDULED','ONGOING')`으로 거르고, Journey 일정 추가는
+`end_date >= CURRENT_DATE()`로 거릅니다. 일부러 갈라 둔 것이라 합치지 않습니다.
+
+활동 시작 시각은 종료 시각보다 빨라야 하며 현재 시각 이후여야 합니다. 참여 마감 시각은
 따로 받지 않습니다 — 참여는 활동이 시작되기 전까지 열려 있습니다.
 
 성공하면 방장의 보증금을 즉시 예치(`DEPOSIT_HOLD`)하고 약속을 `RECRUITING`

@@ -26,6 +26,7 @@ import me.nawa.deposit.domain.ResolutionReason;
 import me.nawa.deposit.mapper.DepositMapper;
 import me.nawa.deposit.mapper.DepositPayoutBatchMapper;
 import me.nawa.journey.domain.Journey;
+import me.nawa.journey.domain.JourneyExploreItem;
 import me.nawa.journey.domain.JourneyItem;
 import me.nawa.journey.exception.JourneyErrorCode;
 import me.nawa.journey.mapper.JourneyMapper;
@@ -889,10 +890,19 @@ public class AppointmentService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        if (!request.getItemType().equals(
-                appointmentMapper.findAvailableItemType(request.getItemId())
-        )) {
+        JourneyExploreItem exploreItem = appointmentMapper.findAvailableItem(
+                request.getItemId()
+        );
+        if (exploreItem == null
+                || !request.getItemType().equals(exploreItem.getItemType())) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        // 여정 담기와 같은 규칙을 쓴다. 예전에는 이 검사가 없어서, 여정에 담는 것은
+        // 막히는 날짜로도 약속은 만들어졌다.
+        if (!exploreItem.coversVisitDate(request.getVisitDate())) {
+            throw new BusinessException(
+                    JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD
+            );
         }
     }
 

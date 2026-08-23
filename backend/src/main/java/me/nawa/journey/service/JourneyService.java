@@ -659,24 +659,12 @@ public class JourneyService {
      * 그래서 EVENT일 때만 보고, 값이 비어 있으면 막지 않는다 — 없는 근거로 거절하면
      * 사용자는 고칠 방법이 없다.
      */
+    // 규칙 자체는 JourneyExploreItem이 갖고 있다. 약속 생성도 같은 것을 쓴다.
     private void validateVisitDateWithinItemPeriod(
         JourneyExploreItem exploreItem,
         LocalDate visitDate
     ) {
-        if (!"EVENT".equals(exploreItem.getItemType())) {
-            return;
-        }
-
-        LocalDate startDate = exploreItem.getStartDate();
-        if (startDate != null && visitDate.isBefore(startDate)) {
-            throw new BusinessException(
-                JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD
-            );
-        }
-
-        // 상시 이벤트는 end_date가 NULL이라 상한이 없다. 하한은 위에서 이미 봤다.
-        LocalDate endDate = exploreItem.getEndDate();
-        if (endDate != null && visitDate.isAfter(endDate)) {
+        if (!exploreItem.coversVisitDate(visitDate)) {
             throw new BusinessException(
                 JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD
             );

@@ -5,8 +5,19 @@
 
 <mapper namespace="me.nawa.appointment.mapper.AppointmentMapper">
 
-    <select id="findAvailableItemType" resultType="string">
-        SELECT ei.item_type
+    <!--
+        가용성 조건은 여정 담기(JourneyMapper.findAvailableExploreItemById)와 다르다.
+        약속은 event.status로 거르고 여정은 end_date로 거른다 — 일부러 갈라 둔 것이라
+        여기서 합치지 않는다. 방문 날짜가 운영 기간 안인지는 두 경로 모두
+        JourneyExploreItem.coversVisitDate로 따로 본다.
+    -->
+    <select id="findAvailableItem"
+            resultType="me.nawa.journey.domain.JourneyExploreItem">
+        SELECT
+            ei.item_id,
+            ei.item_type,
+            e.start_date,
+            e.end_date
         FROM explore_items ei
         LEFT JOIN event e
           ON e.event_id = ei.item_id

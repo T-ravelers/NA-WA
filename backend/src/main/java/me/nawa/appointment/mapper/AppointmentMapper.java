@@ -5,6 +5,7 @@ import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.domain.AppointmentStatus;
 import me.nawa.appointment.domain.MyOngoingAppointment;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
+import me.nawa.journey.domain.JourneyExploreItem;
 import me.nawa.deposit.domain.AttendanceStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -15,7 +16,9 @@ import java.util.List;
 @Mapper
 public interface AppointmentMapper {
 
-    String findAvailableItemType(@Param("itemId") Long itemId);
+    // 항목 타입과 운영 기간을 함께 읽는다. 타입만 읽던 시절에는 약속 생성이 이벤트
+    // 운영 기간을 볼 방법이 없어, 끝난 축제 날짜로도 약속이 만들어졌다.
+    JourneyExploreItem findAvailableItem(@Param("itemId") Long itemId);
 
     int insertAppointment(Appointment appointment);
 
