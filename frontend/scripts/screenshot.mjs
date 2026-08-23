@@ -1228,6 +1228,31 @@ function stubSettlementCandidatesError(page) {
   )
 }
 
+/**
+ * 잔액이 모자라 지급이 거절되는 상태.
+ *
+ * 지갑 이체가 내는 `WALLET-015`는 정산 코드가 아니라서, 이 갈래가 없던 동안에는 일반
+ * 오류 문구와 "Try again" 버튼만 떴다. 잔액은 다시 눌러도 그대로라 사용자가 그 화면에
+ * 갇힌다 — 그래서 찍어 두는 것은 충전으로 이어 주는 팝업이다(#452).
+ */
+function stubInsufficientSettlementPayment(page) {
+  return Promise.all([
+    stubJson(page, '/api/v1/settlements/42', PAYABLE_SETTLEMENT_DETAIL),
+    page.route(
+      (url) => url.pathname === '/api/v1/settlements/42/members/me/pay',
+      (route) =>
+        route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: false,
+            error: { code: 'WALLET-015', message: 'Wallet balance is too low' },
+          }),
+        }),
+    ),
+  ])
+}
+
 /** Place 상세 응답을 세운다. 좌표가 있어 지도 버튼 두 개가 함께 찍힌다(#221). */
 function stubPlaceDetail(page) {
   // 상세 API는 `?language=` 쿼리를 붙이므로 패턴이 쿼리까지 매칭해야 한다.
@@ -1820,6 +1845,20 @@ const SCREENS = [
       await addButton.click()
       await page.getByRole('dialog').getByText('Seoul Lantern Trip').click()
       await page.getByRole('dialog').getByText('Which day?').waitFor()
+    },
+  },
+  {
+    // 주소로 열면 확인을 한 번 받으므로, 그 버튼을 눌러 잔액 부족 거절까지 간다.
+    name: '31-settlement-topup-prompt',
+    path: '/settlements/42/pay',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      await stubCsrf(page)
+      await stubInsufficientSettlementPayment(page)
+    },
+    prepare: async (page) => {
+      await page.locator('[data-action="confirm-pay"]').click()
+      await page.getByRole('dialog').waitFor({ timeout: 10_000 })
     },
   },
 
