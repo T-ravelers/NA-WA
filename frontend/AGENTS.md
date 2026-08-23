@@ -76,6 +76,89 @@ API mock 또는 Playwright route stub을 사용합니다.
 > `main`에 HEX 직접 사용이 아직 남아 있습니다. **기존 위반을 근거로 따라 하지 마세요.**
 > 정리는 별도 작업으로 진행합니다.
 
+## 화면 조형 — 컨테이너와 헤더는 한 규격을 따른다
+
+새 화면을 만들 때 이웃 파일을 베끼지 말고 아래를 그대로 씁니다.
+
+### 최상위 컨테이너
+
+```html
+<main class="flex min-h-dvh w-full flex-col gap-8 px-screen pt-6 pb-8">
+  <header class="flex items-center gap-3">…</header>
+  <section>…</section>
+</main>
+```
+
+- 가로 여백은 `px-screen`(20px)입니다. 예외를 두지 않습니다.
+- 위쪽 여백은 화면 안에 `<header>`가 있으면 `pt-6`(24px), 없으면 `pt-14`(56px)입니다.
+  헤더가 없는 화면은 본문이 상태바에 붙으므로 더 띄웁니다.
+- 아래쪽 여백은 `pb-8`(32px)입니다.
+- 섹션 사이 간격은 컨테이너의 `gap-8`(32px)로 줍니다. 자식마다 `mt-*`를 붙이지 않습니다.
+
+### 하단 탭 몫 여백은 `AppShell`이 단독으로 책임집니다
+
+`app/layouts/AppShell.vue`가 탭이 보이는 화면에 `pb-[calc(6rem+env(safe-area-inset-bottom))]`을
+줍니다. **뷰가 탭 몫을 다시 더하지 않습니다.** 더하면 본문 아래가 200px 넘게 빕니다.
+
+`pb-8`보다 큰 아래 여백은 **`fixed inset-x-0 bottom-0` CTA가 있는 화면에서만** 씁니다
+(`pb-28`). `sticky bottom-0` CTA는 흐름 안에 있어 자기 높이만큼 이미 자리를 차지하므로
+부모 여백을 늘리지 않습니다 — 늘리면 스크롤 끝에서 CTA가 화면 바닥에서 떠 버립니다.
+
+### 헤더는 두 종류입니다
+
+**뒤로가기가 있는 화면**
+
+```html
+<header class="flex items-center gap-3">
+  <IconOrb
+    :label="t('action.back')"
+    @click="goBack"
+  >
+    <IconArrowLeft
+      :size="24"
+      :stroke-width="1.75"
+      aria-hidden="true"
+    />
+  </IconOrb>
+  <h1
+    v-fit-text
+    class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display"
+  >
+    {{ t('...') }}
+  </h1>
+  <!-- 오른쪽 액션이 필요하면 IconOrb를 하나 더 둡니다. -->
+</header>
+```
+
+**뒤로가기가 없는 루트 화면**
+
+```html
+<header class="flex items-center justify-between gap-4">
+  <h1 class="font-display text-screen-title uppercase text-ink-display">{{ t('...') }}</h1>
+  <IconOrb
+    size="lg"
+    variant="surface"
+    :label="t('...')"
+  >
+    <IconPlus
+      :size="24"
+      aria-hidden="true"
+    />
+  </IconOrb>
+</header>
+```
+
+- 뒤로가기는 `IconOrb` + `IconArrowLeft`만 씁니다. `‹` 문자, `IconChevronLeft`, 맨손 `<button>`을
+  쓰지 않습니다. `IconOrb`가 44px 터치 타깃과 접근 가능한 이름을 함께 보장합니다.
+- 제목은 `font-display text-screen-title uppercase text-ink-display` 한 벌입니다.
+  `text-section-header`나 `text-title`로 낮추지 않고, 중앙정렬하지 않습니다.
+- 뒤로가기가 있으면 제목에 `v-fit-text`와 `min-w-0 flex-1 truncate`를 함께 줍니다.
+  좁은 폭에서 글자를 줄이고, 50%에 닿으면 말줄임으로 넘깁니다(#361).
+- 헤더를 `border-b border-hairline`으로 본문과 나누지 않습니다.
+
+> 2026-08-23 실측에서 뒤로가기가 5종, 제목이 3종, 컨테이너 위 여백이 4종이었습니다(#489).
+> **기존 위반을 근거로 따라 하지 마세요.**
+
 ## 서버가 보내는 시각은 문자열이 아닐 수 있다
 
 백엔드 DTO에 `@JsonFormat`이 없으면 `LocalDateTime`이 `[2026, 7, 25, 12, 0]` 형태의
