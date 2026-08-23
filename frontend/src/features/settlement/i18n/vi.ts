@@ -25,7 +25,8 @@ export default {
     type: { EQUAL: 'Chia đều', ITEMIZED: 'Theo mặt hàng' },
     status: { REQUESTED: 'Đã yêu cầu', COMPLETED: 'Hoàn thành' },
     list: {
-      intro: 'Xem các yêu cầu đang chờ bạn, rồi xem lại những khoản đã chia xong.',
+      introPay: 'Xem các yêu cầu đang chờ bạn, rồi xem lại những khoản đã chia xong.',
+      introCollect: 'Theo dõi các yêu cầu bạn đã gửi, rồi xem lại những khoản đã chia xong.',
       loading: 'Đang tải danh sách chia tiền',
       retryHint: 'Kiểm tra kết nối và thử lại.',
       youPay: 'Bạn trả',

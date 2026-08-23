@@ -68,8 +68,16 @@ function open(settlementId: string): void {
       ]"
       @update:model-value="selectSide($event as SettlementSide)"
     />
-    <!-- 시안은 세그먼트 바로 아래에서 이 화면으로 무엇을 하는지 한 문장으로 말한다. -->
-    <p class="mt-6 text-body-sm text-ink-2">{{ t('settlement.list.intro') }}</p>
+    <!--
+      시안은 세그먼트 바로 아래에서 이 화면으로 무엇을 하는지 한 문장으로 말한다.
+
+      토글에 따라 문장이 갈린다. 받을 쪽에 놓이는 것은 내가 남에게 보낸 요청이라,
+      "당신을 기다리는 요청"이라고 말하면 그 카드 바로 위에서 뜻이 뒤집힌다. 시안에는
+      세그먼트 전환이 없어 문장이 하나뿐이지만 그대로 옮길 자리가 아니다.
+    -->
+    <p class="mt-6 text-body-sm text-ink-2">
+      {{ t(paying ? 'settlement.list.introPay' : 'settlement.list.introCollect') }}
+    </p>
 
     <SettlementInlineLoading
       v-if="settlementQuery.isPending.value"

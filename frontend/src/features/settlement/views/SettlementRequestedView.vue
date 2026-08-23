@@ -86,9 +86,12 @@ watchEffect(() => {
           <div class="flex items-center justify-between gap-3">
             <dt class="text-ink-3">{{ t('settlement.state') }}</dt>
             <dd>
-              <AppBadge tone="info">{{
-                t(`settlement.status.${detailQuery.data.value.status}`)
-              }}</AppBadge>
+              <!-- 라벨이 상태를 따라가므로 색도 같이 따라가야 한다. 고정해 두면 나중에 이
+                   주소로 다시 들어와 COMPLETED가 왔을 때 여기서만 파랗게 나온다. -->
+              <AppBadge
+                :tone="detailQuery.data.value.status === 'COMPLETED' ? 'completed' : 'info'"
+                >{{ t(`settlement.status.${detailQuery.data.value.status}`) }}</AppBadge
+              >
             </dd>
           </div>
           <div class="flex items-center justify-between gap-3">

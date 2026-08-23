@@ -20,7 +20,8 @@ export default {
     type: { EQUAL: 'Even', ITEMIZED: 'Itemized' },
     status: { REQUESTED: 'Requested', COMPLETED: 'Completed' },
     list: {
-      intro: 'Check the requests waiting on you, then look back over what is already settled.',
+      introPay: 'Check the requests waiting on you, then look back over what is already settled.',
+      introCollect: 'Track the requests you sent, then look back over what is already settled.',
       loading: 'Loading splits',
       retryHint: 'Check your connection and try again.',
       youPay: 'You pay',

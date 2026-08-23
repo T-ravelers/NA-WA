@@ -25,7 +25,8 @@ export default {
     type: { EQUAL: '均等', ITEMIZED: '品目別' },
     status: { REQUESTED: 'リクエスト中', COMPLETED: '完了' },
     list: {
-      intro: '対応待ちのリクエストを確認し、精算済みの分もあとから見返せます。',
+      introPay: '対応待ちのリクエストを確認し、精算済みの分もあとから見返せます。',
+      introCollect: '自分が送ったリクエストの進み具合を確認し、精算済みの分もあとから見返せます。',
       loading: '割り勘を読み込み中',
       retryHint: '接続を確認して、もう一度お試しください。',
       youPay: '支払う額',

@@ -77,12 +77,17 @@ const showsPaidMark = computed(
       <span class="flex items-center justify-between gap-3">
         <span class="min-w-0">
           <strong class="block truncate text-title">{{ settlement.title }}</strong>
+          <!--
+            부제에 합계까지 이어 붙이지 않는다. 한 줄 `truncate`라 좁아지면 맨 뒤부터
+            사라지는데, 280px에서는 합계가 통째로 없어지면서도 잘렸다는 표시가 남지
+            않았다. 시안 부제도 `Alex · Group division`(주체 · 방식)까지다. 합계는
+            상세에서 본다.
+          -->
           <span class="mt-1 block truncate text-caption text-ink-3">
             {{
               side === 'received' ? t('settlement.list.youPay') : t('settlement.list.youCollect')
             }}
-            · {{ t(`settlement.type.${settlement.type}`) }} · {{ t('settlement.total') }}
-            {{ points(settlement.totalAmount) }}
+            · {{ t(`settlement.type.${settlement.type}`) }}
           </span>
         </span>
         <span class="flex shrink-0 flex-col items-end gap-1.5">

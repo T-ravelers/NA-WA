@@ -148,9 +148,14 @@ function startPayment(): void {
 
         돈을 받을 사람에게는 두지 않는다. 받을 금액은 참여자마다 갈라져 있어 한 숫자로
         말할 수 없고, 아래 납부 현황 카드가 그 자리를 이미 맡는다.
+
+        **낼 것이 남았을 때만 띄운다.** 서버는 `PAY`가 허용되지 않으면 `payableAmount`를
+        0으로 내려주므로(`SettlementViewerPolicy.resolve`), 이미 낸 사람이 상세를 다시 열면
+        이 자리가 34px짜리 `0 P`가 된다. 라벨이 "정산할 금액"이라 아직 낼 것이 남았다고
+        읽히기까지 한다. 그 화면에서는 아래 `Pay completed` 버튼이 상태를 이미 말한다.
       -->
       <div
-        v-if="!isCreator"
+        v-if="!isCreator && canPay"
         class="mt-10 text-center"
       >
         <p class="text-caption uppercase tracking-wider text-ink-3">
@@ -173,8 +178,9 @@ function startPayment(): void {
         </AppBadge>
       </div>
 
+      <!-- 위에 상태 칩(요청자)도 금액 블록(낼 것이 남은 참여자)도 없는 화면에서만 여백을 스스로 챙긴다. -->
       <SettlementTransactionCard
-        :class="isCreator ? 'mt-4' : 'mt-8'"
+        :class="!isCreator && !canPay ? 'mt-8' : 'mt-4'"
         :gathering-name="detail.gatheringName"
         :amount="detail.totalAmount"
         :payer-name="detail.paidBy"

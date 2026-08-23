@@ -25,7 +25,8 @@ export default {
     type: { EQUAL: '均分', ITEMIZED: '依品項' },
     status: { REQUESTED: '請求中', COMPLETED: '已完成' },
     list: {
-      intro: '查看待處理的請求，並回顧已完成的分帳。',
+      introPay: '查看待處理的請求，並回顧已完成的分帳。',
+      introCollect: '追蹤你送出的請求，並回顧已完成的分帳。',
       loading: '正在載入分帳',
       retryHint: '請檢查網路連線後再試一次。',
       youPay: '您應付',
