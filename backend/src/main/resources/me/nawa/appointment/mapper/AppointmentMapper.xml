@@ -147,9 +147,26 @@
                 OR a.meeting_place LIKE CONCAT('%', #{request.keyword}, '%')
             )
         </if>
-        <if test="request.status != null">
-            AND a.appointment_status = #{request.status}
-        </if>
+        <choose>
+            <when test="request.status != null">
+                AND a.appointment_status = #{request.status}
+            </when>
+            <otherwise>
+                <!--
+                    끝난 약속은 목록에서 뺀다. 참여할 수도, 새로 할 일도 없는 카드가
+                    목록을 채우면 지금 갈 수 있는 약속이 그만큼 밀린다.
+
+                    LIMIT 앞에서 빼야 한다. 받은 쪽에서 거르면 정렬이
+                    activity_start_at ASC라 지난 약속이 앞에 서고, 지난 약속이 한 페이지를
+                    채우는 항목에서는 다음 페이지에 모집 중 약속이 있어도 화면이 0건이 된다.
+                    countAppointments도 이 조건을 함께 쓰므로 개수와 카드가 어긋나지 않는다.
+
+                    status를 명시한 검색은 그 값 그대로 본다 — COMPLETED만 찾는 요청까지
+                    막으면 상태 검색이 반쪽이 된다.
+                -->
+                AND a.appointment_status &lt;&gt; 'COMPLETED'
+            </otherwise>
+        </choose>
     </sql>
 
     <select id="searchAppointments"

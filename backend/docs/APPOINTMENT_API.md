@@ -63,12 +63,22 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 | `itemType` | string | N | `EVENT`, `PLACE` |
 | `language` | string | N | 약속 언어 |
 | `keyword` | string | N | 약속명·설명·만남 장소 검색어 |
-| `status` | string | N | 약속 상태 |
+| `status` | string | N | 약속 상태. 주면 그 상태만 봅니다 |
 | `page` | number | N | 0부터 시작, 기본값 0 |
 | `size` | number | N | 기본값 20, 최대 100 |
 
-`PAYMENT_PENDING` 약속은 공개 목록에서 제외합니다. 응답은 `content`, `page`,
-`size`, `totalElements`, `totalPages`, `hasNext`를 포함합니다.
+`PAYMENT_PENDING` 약속은 공개 목록에서 제외합니다. **`status`를 주지 않으면
+`COMPLETED`도 함께 제외합니다** — 끝난 약속은 참여할 수도, 새로 할 일도 없는데
+정렬이 `activityStartAt` 오름차순이라 그대로 두면 목록 앞자리를 지난 약속이
+차지합니다. `status`를 명시한 검색은 그 값 그대로 보므로 `status=COMPLETED`로
+끝난 약속만 찾을 수 있습니다.
+
+이 제외는 **`LIMIT` 앞의 검색 조건**이고 `totalElements`를 세는 조건도 같습니다.
+받은 쪽에서 거르면 지난 약속이 한 페이지를 채우는 항목에서 다음 페이지에 모집 중
+약속이 있어도 화면이 0건이 됩니다.
+
+응답은 `content`, `page`, `size`, `totalElements`, `totalPages`, `hasNext`를
+포함합니다.
 
 ## 약속 상세 및 회원 조회
 
