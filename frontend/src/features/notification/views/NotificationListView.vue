@@ -56,8 +56,21 @@ const hasUnread = computed(() => notifications.value.some((notification) => !not
  * 사라졌다가 돌아온다. 다음 쪽이 실패했을 때도 마찬가지로 앞 쪽까지 잃는다.
  */
 const isEmpty = computed(() => notifications.value.length === 0)
+
+/*
+ * 화면이 비었다고 알림이 없는 것은 아니다.
+ *
+ * X로 지우는 것은 지금 받아 온 쪽에서만 카드를 빼는 일이라, 다음 쪽은 서버에 그대로
+ * 남아 있다. 그런데 "알림이 없습니다"로 덮어 버리면 그 안에 있던 더 보기 버튼까지 같이
+ * 사라져서, 남은 알림에는 다시 닿을 길이 없어진다. 31건 중 앞의 30건을 하나씩 지우면
+ * 31번째가 영영 보이지 않던 것이 이 경우다.
+ *
+ * 그래서 "더 받을 것이 없다"까지 확인됐을 때만 빈 상태로 넘어간다. 전체 오류도 같다 —
+ * 이미 받아 둔 쪽이 있으면 그건 다음 쪽만 실패한 것이라 그 자리에서만 알려야 한다.
+ */
+const nothingLeft = computed(() => isEmpty.value && !hasNextPage.value)
 const showLoading = computed(() => isPending.value && isEmpty.value)
-const showError = computed(() => isError.value && isEmpty.value)
+const showError = computed(() => isError.value && nothingLeft.value)
 
 /*
  * 벨이 있는 지갑 홈으로 돌아간다.
@@ -196,7 +209,7 @@ function errorDescription(): string | undefined {
     />
 
     <StateEmpty
-      v-else-if="isEmpty"
+      v-else-if="nothingLeft"
       class="my-auto"
       :title="t('notification.empty.title')"
       :description="t('notification.empty.description')"

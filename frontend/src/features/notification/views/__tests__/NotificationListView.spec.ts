@@ -293,6 +293,29 @@ describe('NotificationListView', () => {
       expect(wrapper.findAll('li')).toHaveLength(2)
     })
 
+    /*
+     * X는 지금 받아 온 쪽에서만 카드를 뺀다. 다음 쪽은 서버에 그대로 남아 있는데도 빈
+     * 목록을 "알림 없음"으로 덮으면 그 안의 더 보기 버튼까지 사라져, 남은 알림에 다시
+     * 닿을 길이 없어진다. 31건 중 앞의 30건을 지웠을 때 31번째가 영영 안 보이던 경우다.
+     */
+    it('지금 쪽을 다 지워도 다음 쪽에는 계속 닿을 수 있다', async () => {
+      fetchNotifications.mockResolvedValueOnce(page([REQUESTED], '1'))
+
+      const wrapper = await mountView()
+      await wrapper.get('[data-testid="notification-dismiss"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.findAll('li')).toHaveLength(0)
+      expect(wrapper.text()).not.toContain('No notifications yet')
+
+      fetchNotifications.mockResolvedValueOnce(page([{ ...REQUESTED, id: 2 }]))
+      await wrapper.get('[data-testid="notification-load-more"]').trigger('click')
+      await flushPromises()
+
+      expect(fetchNotifications).toHaveBeenLastCalledWith(undefined, '1')
+      expect(wrapper.findAll('li')).toHaveLength(1)
+    })
+
     /* 지울 것이 없으면 누를 것도 없어야 한다. */
     it('목록이 비어 있으면 일괄 버튼을 내지 않는다', async () => {
       fetchNotifications.mockResolvedValue(page([]))
