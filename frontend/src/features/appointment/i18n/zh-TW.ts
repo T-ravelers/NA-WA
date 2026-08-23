@@ -204,7 +204,6 @@ export default {
       leaveNotMember: '您已經退出這個揪團。',
       leaveCancelled: '這個揪團已取消。',
       leaveEnded: '活動已結束，無法再退出。',
-      leaveCheckFailed: '無法確認您的參加狀態，因此無法顯示退出按鈕。',
       attendance: '出席',
       reviews: '評價',
     },

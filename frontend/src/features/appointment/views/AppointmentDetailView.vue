@@ -733,16 +733,6 @@ function goToTopup(): void {
           {{ t('appointment.members.title') }}
         </h2>
 
-        <!-- 참여 조회가 실패하면 어느 행이 내 것인지 알 수 없어 나가기 버튼을
-             어디에도 붙일 수 없다. 버튼이 사라진 이유를 목록 위에서 말한다. -->
-        <p
-          v-if="participationCheckFailed"
-          role="status"
-          class="-mt-2 text-caption text-ink-3"
-        >
-          {{ t('appointment.members.leaveCheckFailed') }}
-        </p>
-
         <StateLoading
           v-if="membersQuery.isPending.value"
           :label="t('appointment.members.loading')"

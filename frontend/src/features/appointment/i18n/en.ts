@@ -210,8 +210,6 @@ export default {
       leaveNotMember: 'You already left this appointment.',
       leaveCancelled: 'This appointment was canceled.',
       leaveEnded: 'The activity has ended, so you can no longer leave.',
-      leaveCheckFailed:
-        'We could not check your participation status, so the leave button is unavailable.',
       attendance: 'Attendance',
       reviews: 'Reviews',
     },

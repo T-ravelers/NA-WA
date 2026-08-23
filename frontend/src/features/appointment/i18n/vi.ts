@@ -210,8 +210,6 @@ export default {
       leaveNotMember: 'Bạn đã rời khỏi cuộc hẹn này rồi.',
       leaveCancelled: 'Cuộc hẹn này đã bị hủy.',
       leaveEnded: 'Hoạt động đã kết thúc nên bạn không thể rời khỏi nữa.',
-      leaveCheckFailed:
-        'Không thể kiểm tra trạng thái tham gia của bạn nên không thể hiển thị nút rời nhóm.',
       attendance: 'Điểm danh',
       reviews: 'Đánh giá',
     },

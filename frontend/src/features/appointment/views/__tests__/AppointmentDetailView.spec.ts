@@ -892,16 +892,17 @@ describe('AppointmentDetailView', () => {
     expect(item('Reviews')?.attributes('disabled')).toBeDefined()
   })
 
-  it('says why leaving is unavailable when the participation check failed', async () => {
+  it('says the participation check failed once, not twice', async () => {
     // 조회가 실패하면 목록에서 어느 행이 내 것인지 알 수 없어 나가기 버튼을 붙일
-    // 자리가 없다. 버튼만 조용히 빠지면 기능이 사라진 것처럼 보인다.
+    // 자리가 없다. 다만 그 이유는 하단 CTA 위에 이미 떠 있다 — 목록 위에 한 번 더
+    // 적으면 같은 화면이 같은 실패를 두 번 말한다. 게다가 목록 쪽 문구는 나가기를
+    // 지목해, 애초에 참여한 적 없는 사람에게 없던 버튼이 사라진 것처럼 들렸다.
     fetchMyAppointmentParticipation.mockRejectedValue(new Error('network error'))
     const { wrapper } = await mountView()
 
     expect(leaveButton(wrapper)).toBeUndefined()
-    expect(wrapper.text()).toContain(
-      'We could not check your participation status, so the leave button is unavailable.',
-    )
+    expect(wrapper.text().split('We could not check your participation status.')).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('the leave button is unavailable')
   })
 
   it('does not claim you were absent when the participation check failed', async () => {
