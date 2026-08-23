@@ -262,6 +262,34 @@ describe('ReportDetailView', () => {
     expect(centre.text()).toBe('2events')
   })
 
+  // 도넛 가운데 라벨은 숫자와 따로 그려서 개수를 받지 못하면 늘 복수였다(#412).
+  it('writes the donut centre label in the singular when the journey has one event', async () => {
+    fetchReport.mockResolvedValueOnce({
+      ...detail,
+      reportContent: {
+        ...detail.reportContent,
+        days: [
+          {
+            visitDate: '2026-07-18',
+            items: [
+              {
+                tripItemId: 1,
+                itemId: 101,
+                itemType: 'EVENT',
+                title: 'Night Market',
+                status: 'ADDED',
+              },
+              { tripItemId: 2, itemId: 102, itemType: 'PLACE', title: 'Seongsan', status: 'ADDED' },
+            ],
+          },
+        ],
+      },
+    })
+    const { wrapper } = await mountView()
+
+    expect(wrapper.get('.absolute.inset-0').text()).toBe('1event')
+  })
+
   // 티켓과 도넛이 같은 카테고리에 같은 색을 줘야 한다(시안 R4).
   it('gives the ticket and the donut the same colour for the leading category', async () => {
     fetchReport.mockResolvedValueOnce({

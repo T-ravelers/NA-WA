@@ -12,7 +12,7 @@ export default {
       places: 'Địa điểm',
       label: 'Loại nội dung khám phá',
     },
-    resultCount: '{count} sự kiện',
+    resultCount: '{count} sự kiện | {count} sự kiện',
     resultUnit: 'kết quả',
     eventKinds: {
       POPUP: 'Pop-up',
@@ -253,7 +253,7 @@ export default {
     unsavePlace: 'Bỏ lưu địa điểm',
     saveFailed: 'Chúng tôi không cập nhật được danh sách đã lưu. Vui lòng thử lại.',
     saveRequiresLogin: 'Đăng nhập để lưu mục này.',
-    placeResultCount: '{count} địa điểm',
+    placeResultCount: '{count} địa điểm | {count} địa điểm',
     pagination: {
       label: 'Các trang kết quả khám phá',
       previousPage: 'Trang trước',

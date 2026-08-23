@@ -14,8 +14,8 @@ export default {
       past: 'Đã qua',
       ongoingTitle: 'Hành trình đang diễn ra',
       pastTitle: 'Hành trình đã qua',
-      eventCount: '{count} sự kiện',
-      placeCount: '{count} địa điểm',
+      eventCount: '{count} sự kiện | {count} sự kiện',
+      placeCount: '{count} địa điểm | {count} địa điểm',
       fullEmptyTitle: 'Chưa có hành trình nào',
       fullEmptyDescription: 'Tạo hành trình đầu tiên để bắt đầu lên kế hoạch.',
       tabEmptyTitle: 'Không có hành trình {status}',
@@ -129,7 +129,7 @@ export default {
       title: 'Xóa hành trình này?',
       description:
         'Hành trình và lịch trình đã lưu sẽ bị xóa. Bản thân các sự kiện và địa điểm sẽ không bị xóa.',
-      itemCount: '{count} mục lịch trình',
+      itemCount: '{count} mục lịch trình | {count} mục lịch trình',
       blockedTitle: 'Không thể xóa hành trình',
       blockedDescription:
         'Bạn đang là chủ nhóm của một cuộc hẹn sắp tới hoặc đang diễn ra trong hành trình này. Hãy chuyển giao hoặc đóng cuộc hẹn trước.',
