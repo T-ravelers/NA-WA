@@ -181,6 +181,27 @@ function setComparisonScope(value: string): void {
   comparisonScope.value = value === 'SIMILAR' ? 'SIMILAR' : 'GROUP'
 }
 
+/** scope에 따라 갈리는 문구는 여기서 한 번만 고른다 — 템플릿에 삼항이 다섯 번 흩어지지 않게. */
+const comparisonText = computed(() =>
+  isSimilarScope.value
+    ? {
+        heading: t('report.detail.comparison.similarHeading'),
+        emptyTitle: t('report.detail.comparison.similarEmptyTitle'),
+        emptyDescription: t('report.detail.comparison.similarEmptyDescription'),
+        cohortLabel: t('report.detail.comparison.travelersAvg'),
+        radarDescription: t('report.detail.comparison.similarRadarDescription'),
+        tilesLabel: t('report.detail.comparison.similarTilesLabel'),
+      }
+    : {
+        heading: t('report.detail.comparison.heading'),
+        emptyTitle: t('report.detail.comparison.emptyTitle'),
+        emptyDescription: t('report.detail.comparison.emptyDescription'),
+        cohortLabel: t('report.detail.comparison.groupAvg'),
+        radarDescription: t('report.detail.comparison.radarDescription'),
+        tilesLabel: t('report.detail.comparison.tilesLabel'),
+      },
+)
+
 const comparisonMe = computed<ReportComparisonBarRow>(() => ({
   id: comparison.value?.me.memberId ?? 0,
   label: t('report.detail.comparison.you'),
@@ -256,6 +277,14 @@ function rankText(rank: number): string {
  */
 const AVG_BAND_POINTS = 5
 
+/**
+ * 보이는 두 숫자의 차이(%p). 화면은 비중을 정수로 반올림해 찍으므로 판정도 반올림 뒤에 한다 —
+ * 그러지 않으면 50.4 대 45.0이 `+5%`로 찍혀서, 차이가 꼭 5.0인 옆 타일의 `AVG`와 나란히 선다.
+ */
+function shareDiffPoints(mine: number, cohort: number): number {
+  return Math.round(mine) - Math.round(cohort)
+}
+
 function shareDiffText(points: number): string {
   return Math.abs(points) <= AVG_BAND_POINTS
     ? t('report.detail.comparison.average')
@@ -265,12 +294,17 @@ function shareDiffText(points: number): string {
 /** 타일 — GROUP은 카테고리별 순위, SIMILAR는 레이더 축 순서대로 코호트 대비 비중 차이. */
 const comparisonTiles = computed<ReportRankTile[]>(() => {
   if (isSimilarScope.value) {
-    return comparisonAxes.value.slice(0, 4).map((axis) => ({
-      key: axis.key,
-      label: axis.label,
-      rankText: shareDiffText(axis.mine - axis.cohort),
-      tone: spendingCategoryTone(axis.key) ?? 'surface',
-    }))
+    // 레이더는 다각형을 만들려고 축을 셋까지 채우지만(`comparisonAxes`), 타일에 그 패딩이 오면
+    // 나도 0·코호트도 0이라 차이가 0이 되어, 아무도 쓰지 않은 카테고리에 `AVG`가 찍힌다.
+    return comparisonAxes.value
+      .filter((axis) => axis.mine > 0 || axis.cohort > 0)
+      .slice(0, 4)
+      .map((axis) => ({
+        key: axis.key,
+        label: axis.label,
+        rankText: shareDiffText(shareDiffPoints(axis.mine, axis.cohort)),
+        tone: spendingCategoryTone(axis.key) ?? 'surface',
+      }))
   }
 
   return (comparison.value?.ranks ?? []).slice(0, 4).map((row) => ({
@@ -385,10 +419,11 @@ function shareTicket(): void {
 }
 
 /* ── 인사이트 한 줄 (#421) ──
- * 칭호의 1위 카테고리 비중을 같은 국적 여행자 평균과 견준다. 코호트가 없거나 아직 못 받았으면
- * 비교 없이 비중만 말한다 — 비교 부분이 늦게 붙더라도 문장은 처음부터 있다.
+ * 칭호의 1위 카테고리 비중을 같은 국적 여행자 평균과 견준다. 코호트를 아직 못 받았거나, 질의가
+ * 실패했거나, 같은 국적 여행자가 없으면 **카드를 그리지 않는다** — 비교 없는 문장은 바로 위
+ * 칭호 티켓을 되풀이할 뿐이고, 질의 실패까지 「비교할 사람이 없다」로 읽히게 만든다.
  * 카테고리 단어는 그 카테고리 색으로 강조하므로 문장은 `<i18n-t>`로 조립한다. */
-type InsightVariant = 'above' | 'same' | 'below' | 'alone'
+type InsightVariant = 'above' | 'same' | 'below'
 
 const reportInsight = computed<{
   variant: InsightVariant
@@ -399,31 +434,25 @@ const reportInsight = computed<{
 } | null>(() => {
   const top = reportCategories.value[0]
   const persona = reportPersona.value
+  const cohort = similarCohort.value
 
-  if (top === undefined || persona === null) {
+  if (top === undefined || persona === null || cohort === null) {
     return null
   }
 
   const locale = i18n.locale.value
-  const base = {
-    label: top.label.toLocaleLowerCase(locale),
-    share: persona.share,
-    inkClass: seriesInkClass(top.category),
-  }
-  const cohort = similarCohort.value
-
-  if (cohort === null) {
-    return { ...base, variant: 'alone', cohortShare: '' }
-  }
-
   const cohortShare = Number(
     cohort.categoryBreakdown.find((row) => row.category === top.category)?.percentage ?? 0,
   )
-  const diff = top.percentage - cohortShare
-  const variant: InsightVariant =
-    diff > AVG_BAND_POINTS ? 'above' : diff < -AVG_BAND_POINTS ? 'below' : 'same'
+  const diff = shareDiffPoints(top.percentage, cohortShare)
 
-  return { ...base, variant, cohortShare: formatPercent(cohortShare, locale) }
+  return {
+    variant: diff > AVG_BAND_POINTS ? 'above' : diff < -AVG_BAND_POINTS ? 'below' : 'same',
+    label: top.label.toLocaleLowerCase(locale),
+    share: persona.share,
+    cohortShare: formatPercent(cohortShare, locale),
+    inkClass: seriesInkClass(top.category),
+  }
 })
 
 function goBack(): void {
@@ -613,13 +642,7 @@ function retry(): void {
             id="report-comparison-title"
             class="font-display text-section-header uppercase text-ink"
           >
-            {{
-              t(
-                isSimilarScope
-                  ? 'report.detail.comparison.similarHeading'
-                  : 'report.detail.comparison.heading',
-              )
-            }}
+            {{ comparisonText.heading }}
           </h2>
 
           <SegmentedControl
@@ -643,24 +666,8 @@ function retry(): void {
           />
 
           <AppCard v-else-if="!hasPeers">
-            <h3 class="text-title text-ink">
-              {{
-                t(
-                  isSimilarScope
-                    ? 'report.detail.comparison.similarEmptyTitle'
-                    : 'report.detail.comparison.emptyTitle',
-                )
-              }}
-            </h3>
-            <p class="mt-2 text-body-sm text-ink-3">
-              {{
-                t(
-                  isSimilarScope
-                    ? 'report.detail.comparison.similarEmptyDescription'
-                    : 'report.detail.comparison.emptyDescription',
-                )
-              }}
-            </p>
+            <h3 class="text-title text-ink">{{ comparisonText.emptyTitle }}</h3>
+            <p class="mt-2 text-body-sm text-ink-3">{{ comparisonText.emptyDescription }}</p>
           </AppCard>
 
           <template v-else>
@@ -689,26 +696,17 @@ function retry(): void {
                   <ReportRadarChart
                     :axes="comparisonAxes"
                     :mine-label="t('report.detail.comparison.you')"
-                    :cohort-label="
-                      t(
-                        isSimilarScope
-                          ? 'report.detail.comparison.travelersAvg'
-                          : 'report.detail.comparison.groupAvg',
-                      )
-                    "
-                    :description="
-                      t(
-                        isSimilarScope
-                          ? 'report.detail.comparison.similarRadarDescription'
-                          : 'report.detail.comparison.radarDescription',
-                      )
-                    "
+                    :cohort-label="comparisonText.cohortLabel"
+                    :description="comparisonText.radarDescription"
                   />
                 </div>
               </div>
             </AppCard>
 
-            <ReportRankTiles :tiles="comparisonTiles" />
+            <ReportRankTiles
+              :tiles="comparisonTiles"
+              :label="comparisonText.tilesLabel"
+            />
           </template>
         </section>
       </template>

@@ -145,6 +145,8 @@ export default {
           'カテゴリーごとの支出比率を、あなたに似た旅行者の平均と比べたものです。',
         similarEmptyTitle: 'まだ似た旅行者がいません',
         similarEmptyDescription: '同じ国籍で最終レポートを持つ旅行者がここに表示されます。',
+        tilesLabel: 'グループ内でのカテゴリー順位',
+        similarTilesLabel: '似た旅行者と比べたカテゴリー比率',
       },
       insight: {
         above:
@@ -152,7 +154,6 @@ export default {
         same: '{category} に寄った旅でした — 旅全体の {share}。あなたに似た旅行者（{cohortShare}）とほぼ同じです。',
         below:
           '{category} に寄った旅でした — 旅全体の {share}。あなたに似た旅行者（{cohortShare}）を下回ります。',
-        alone: '{category} に寄った旅でした — 旅全体の {share}。',
       },
       status: 'レポートの状態：{status}',
     },

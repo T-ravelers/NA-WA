@@ -143,6 +143,8 @@ export default {
         similarEmptyTitle: 'No similar travelers yet',
         similarEmptyDescription:
           'Travelers with the same nationality and a final report show up here.',
+        tilesLabel: 'Category rank among group members',
+        similarTilesLabel: 'Your category share compared with travelers like you',
       },
       insight: {
         above:
@@ -150,7 +152,6 @@ export default {
         same: 'You leaned into {category} — {share} of this journey, about the same as travelers like you ({cohortShare}).',
         below:
           'You leaned into {category} — {share} of this journey, below travelers like you ({cohortShare}).',
-        alone: 'You leaned into {category} — {share} of this journey.',
       },
       status: 'Report status: {status}',
     },

@@ -724,10 +724,74 @@ describe('ReportDetailView', () => {
     },
   )
 
-  it('keeps the insight without a comparison when there are no similar travelers', async () => {
+  // 비교 없는 문장은 바로 위 칭호 티켓의 되풀이라 카드를 그리지 않는다. 질의가 실패해도 같다 —
+  // 「비교할 사람이 없다」로 읽히면 안 된다.
+  it.each([
+    ['코호트가 비었을 때', () => mockScopes(emptyComparison, emptyComparison)],
+    [
+      'SIMILAR 질의가 실패했을 때',
+      () =>
+        fetchReportComparison.mockImplementation((_reportId: number, scope: string) =>
+          scope === 'SIMILAR'
+            ? Promise.reject(new NormalizedApiError('UNKNOWN', 500, 'boom'))
+            : Promise.resolve(groupComparison),
+        ),
+    ],
+  ])('hides the insight card — %s', async (_name, arrange) => {
+    arrange()
     const { wrapper } = await mountView()
 
-    expect(wrapper.text()).toContain('You leaned into food — 78% of this journey.')
-    expect(wrapper.text()).not.toContain('travelers like you')
+    expect(wrapper.text()).not.toContain('You leaned into')
+    // 나머지 리포트와 GROUP 비교는 그대로 남는다.
+    expect(wrapper.text()).toContain('Travel spending type')
+  })
+
+  // 화면은 비중을 정수로 반올림해 찍는다. 판정도 반올림 뒤에 해야 보이는 숫자와 말이 맞는다.
+  it('judges the insight on the rounded shares, not the raw ones', async () => {
+    // 78% 대 73%(원값 77.85 대 72.6) — 보이는 차이는 5라 `about the same`이다.
+    mockScopes(emptyComparison, withCohortFood('72.6'))
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('about the same as travelers like you (73%)')
+    expect(wrapper.text()).not.toContain('well above')
+  })
+
+  // 레이더는 다각형을 만들려고 축을 셋까지 채운다. 그 패딩이 타일로 오면 안 쓴 카테고리에 `AVG`가 찍힌다.
+  it('keeps radar padding axes out of the similar tiles', async () => {
+    const onlyFood = {
+      ...similarComparison,
+      me: {
+        ...similarComparison.me,
+        categoryBreakdown: [{ category: 'FOOD', amount: '1284500', percentage: '100' }],
+      },
+      cohort: {
+        ...similarComparison.cohort,
+        categoryBreakdown: [{ category: 'FOOD', amount: '1052000', percentage: '100' }],
+      },
+    }
+    mockScopes(groupComparison, onlyFood)
+    const { wrapper } = await mountView()
+
+    await wrapper.get('[data-testid="segment-SIMILAR"]').trigger('click')
+    await flushPromises()
+
+    // 레이더는 세 축을 그대로 쓰고, 타일만 실제로 쓴 카테고리 하나로 줄어든다.
+    expect(wrapper.findAll('li.rounded-card').map((tile) => tile.text())).toEqual(['# FoodAVG'])
+  })
+
+  it('says what the tiles are measured against, per scope', async () => {
+    mockScopes(groupComparison, similarComparison)
+    const { wrapper } = await mountView()
+
+    expect(wrapper.get('ul.grid').attributes('aria-label')).toBe(
+      'Category rank among group members',
+    )
+
+    await wrapper.get('[data-testid="segment-SIMILAR"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('ul.grid').attributes('aria-label')).toBe(
+      'Your category share compared with travelers like you',
+    )
   })
 })

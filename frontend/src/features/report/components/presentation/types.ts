@@ -161,4 +161,9 @@ export interface ReportRankTile {
 
 export interface ReportRankTilesProps {
   tiles: ReportRankTile[]
+  /**
+   * 목록의 접근 가능한 이름. 값이 순위인지 코호트 대비 비중인지는 scope가 정하므로
+   * 화면이 넘긴다 — `# Food +12%`만으로는 무엇 대비인지 읽히지 않는다.
+   */
+  label?: string
 }

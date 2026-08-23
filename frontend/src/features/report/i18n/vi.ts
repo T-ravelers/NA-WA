@@ -151,6 +151,8 @@ export default {
           'Tỷ lệ chi tiêu của bạn theo từng danh mục so với trung bình của du khách giống bạn.',
         similarEmptyTitle: 'Chưa có du khách tương tự',
         similarEmptyDescription: 'Du khách cùng quốc tịch và đã có báo cáo tổng kết sẽ hiện ở đây.',
+        tilesLabel: 'Thứ hạng danh mục trong nhóm',
+        similarTilesLabel: 'Tỷ lệ danh mục của bạn so với du khách tương tự',
       },
       insight: {
         above:
@@ -158,7 +160,6 @@ export default {
         same: 'Chuyến đi này nghiêng về {category} — {share} tổng chi, gần bằng những du khách giống bạn ({cohortShare}).',
         below:
           'Chuyến đi này nghiêng về {category} — {share} tổng chi, thấp hơn những du khách giống bạn ({cohortShare}).',
-        alone: 'Chuyến đi này nghiêng về {category} — {share} tổng chi.',
       },
       status: 'Trạng thái báo cáo: {status}',
     },

@@ -28,4 +28,18 @@ describe('ReportRankTiles', () => {
 
     expect(wrapper.findAll('li')).toHaveLength(0)
   })
+
+  // 값이 순위인지 코호트 대비 비중인지는 화면이 안다. `# Food +12%`만으로는 무엇 대비인지 읽히지 않는다.
+  it('names the list when the screen gives it a label, and stays unnamed otherwise', () => {
+    const tiles = [{ key: 'FOOD', label: 'Food', rankText: '+12%', tone: 'food' as const }]
+
+    expect(
+      mount(ReportRankTiles, { props: { tiles, label: 'Share vs travelers like you' } })
+        .get('ul')
+        .attributes('aria-label'),
+    ).toBe('Share vs travelers like you')
+    expect(mount(ReportRankTiles, { props: { tiles } }).get('ul').attributes('aria-label')).toBe(
+      undefined,
+    )
+  })
 })
