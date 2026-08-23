@@ -23,6 +23,13 @@ export const AUTH_CALLBACK_PATH = '/auth/callback'
 export const AUTHENTICATED_HOME_PATH = '/explore'
 
 /**
+ * 온보딩을 마치지 않은 사용자가 갇히는 화면.
+ *
+ * router guard가 이 경로 밖으로 나가지 못하게 막으므로 shared에 둔다.
+ */
+export const ONBOARDING_PATH = '/onboarding'
+
+/**
  * 가맹점 계정의 유일한 화면.
  *
  * 가맹점은 QR 생성과 매출 조회만 하므로 손님용 화면에 들어갈 일이 없다. router guard가

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { IconCheck } from '@tabler/icons-vue'
 
-import { SUPPORTED_LOCALES, type AppLocale } from '@/shared/i18n/locales'
+import { LOCALE_LABEL, SUPPORTED_LOCALES, type AppLocale } from '@/shared/i18n/locales'
 
 /**
  * 화면 언어를 고르는 바텀시트.
  *
- * 언어 이름은 번역하지 않고 각 언어 자신의 표기로 적는다. 영어로만 적으면 정작 그 언어
- * 사용자가 자기 언어를 찾지 못한다. 영문 표기는 보조로 함께 둔다.
+ * 언어 이름 표는 `shared/i18n/locales.ts`의 `LOCALE_LABEL`이 정본이다. 로그인 화면·프로필도
+ * 같은 표를 쓴다.
  *
  * 로그인 이전에도 열려야 하므로 서버 상태에 의존하지 않는다.
  */
@@ -25,13 +25,6 @@ const emit = defineEmits<{
   'update:modelValue': [locale: AppLocale]
   close: []
 }>()
-
-const LOCALE_LABEL: Record<AppLocale, { native: string; english: string }> = {
-  en: { native: 'English', english: 'English' },
-  ja: { native: '日本語', english: 'Japanese' },
-  'zh-TW': { native: '繁體中文', english: 'Chinese (Traditional)' },
-  vi: { native: 'Tiếng Việt', english: 'Vietnamese' },
-}
 </script>
 
 <template>

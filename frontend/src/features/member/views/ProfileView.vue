@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { applyLocale } from '@/app/i18n/applyLocale'
 import { NormalizedApiError } from '@/shared/api/apiError'
 import { requestSignOut } from '@/shared/api/sessionSignOut'
-import type { AppLocale } from '@/shared/i18n/locales'
+import { nativeLocaleLabel, type AppLocale } from '@/shared/i18n/locales'
 import { formatServerDateTime } from '@/shared/lib/datetime'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import LocaleSheet from '@/shared/ui/LocaleSheet.vue'
@@ -18,6 +18,7 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import { updateMemberProfile } from '../api/memberApi'
 import { useMyAppointments } from '../model/appointmentIntegration'
+import { nationalityName } from '../model/nationalities'
 import { useSavedExploreItems } from '../model/exploreIntegration'
 import { setMemberProfile, useMemberProfile } from '../model/memberQueries'
 
@@ -42,34 +43,10 @@ const kind = ref<'EVENT' | 'PLACE'>('EVENT')
  */
 const currentLocale = computed(() => locale.value as AppLocale)
 
-const NATIVE_LABEL: Record<AppLocale, string> = {
-  en: 'English',
-  ja: '日本語',
-  'zh-TW': '繁體中文',
-  vi: 'Tiếng Việt',
-}
-
-/**
- * 국적 코드를 현재 언어의 나라 이름으로 옮긴다.
- *
- * 나라 이름 목록을 따로 두지 않는다 — `Intl.DisplayNames`가 로케일 4종을 모두 알고 있다.
- * 모르는 코드는 `of()`가 코드를 그대로 돌려주고, 형식이 어긋나면 예외를 던지므로
- * 둘 다 국적 줄을 생략하는 쪽으로 모은다.
- */
-const nationalityName = computed(() => {
-  const code = profile.value?.nationalityCode
-
-  if (code === null || code === undefined || code === '') {
-    return null
-  }
-
-  try {
-    const name = new Intl.DisplayNames([locale.value], { type: 'region' }).of(code)
-    return name === undefined || name === code ? null : name
-  } catch {
-    return null
-  }
-})
+/** 국적 줄. 이름을 모르는 코드면 줄을 그리지 않는다. */
+const nationalityLabel = computed(() =>
+  nationalityName(profile.value?.nationalityCode, locale.value),
+)
 
 const savedQuery = useSavedExploreItems(
   kind,
@@ -151,7 +128,11 @@ function chooseLocale(next: AppLocale): void {
     />
 
     <template v-else>
-      <div class="mt-6 flex items-center gap-3.5 rounded-sm bg-surface-2 px-3.5 py-3.5">
+      <RouterLink
+        to="/profile/edit"
+        class="mt-6 flex items-center gap-3.5 rounded-sm bg-surface-2 px-3.5 py-3.5"
+        :aria-label="t('member.form.editTitle')"
+      >
         <span class="size-14 shrink-0 overflow-hidden rounded-pill">
           <img
             v-if="profile.profileImageUrl !== null"
@@ -161,15 +142,21 @@ function chooseLocale(next: AppLocale): void {
           />
           <ImagePlaceholder v-else />
         </span>
-        <span class="flex min-w-0 flex-col gap-0.5">
+        <span class="flex min-w-0 flex-1 flex-col gap-0.5">
           <span class="truncate text-title text-ink-display">{{ profile.displayName }}</span>
           <span
-            v-if="nationalityName !== null"
+            v-if="nationalityLabel !== null"
             class="text-body-sm text-ink-2"
-            >{{ t('member.profile.from', { country: nationalityName }) }}</span
+            >{{ t('member.profile.from', { country: nationalityLabel }) }}</span
           >
         </span>
-      </div>
+        <IconChevronRight
+          :size="18"
+          :stroke-width="1.75"
+          class="shrink-0 text-icon-muted"
+          aria-hidden="true"
+        />
+      </RouterLink>
 
       <SegmentedControl
         v-model="tab"
@@ -305,7 +292,7 @@ function chooseLocale(next: AppLocale): void {
         @click="isLocaleSheetOpen = true"
       >
         <span class="flex-1 text-body text-ink">{{ t('member.profile.language.label') }}</span>
-        <span class="text-body text-ink-2">{{ NATIVE_LABEL[currentLocale] }}</span>
+        <span class="text-body text-ink-2">{{ nativeLocaleLabel(currentLocale) }}</span>
         <IconChevronRight
           :size="18"
           :stroke-width="1.75"

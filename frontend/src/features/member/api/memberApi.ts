@@ -75,3 +75,24 @@ export async function updateMemberProfile(
 
   return response.data
 }
+
+/**
+ * 온보딩 요청. **네 필드 모두 필수다.**
+ *
+ * 서버가 부분 저장을 허용하지 않는다 — 하나라도 비면 `MEMBER-008`이다. 그래서
+ * `UpdateMemberProfilePayload`처럼 선택 필드로 두지 않는다.
+ */
+export interface CompleteOnboardingPayload {
+  displayName: string
+  nationalityCode: string
+  preferredLanguage: AppLocale
+  preferredCurrencyCode: string
+}
+
+export async function completeOnboarding(
+  payload: CompleteOnboardingPayload,
+): Promise<MemberProfile> {
+  const response = await httpClient.patch<MemberProfile>('/api/v1/members/me/onboarding', payload)
+
+  return response.data
+}
