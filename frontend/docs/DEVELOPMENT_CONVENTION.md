@@ -383,6 +383,118 @@ export default {
 - Modal과 BottomSheet의 focus 이동, Escape 또는 뒤로가기, 배경 스크롤 잠금은 공통
   컴포넌트에서 처리합니다.
 
+## 화면 조형 맞추기
+
+새 화면을 만들 때 이웃 파일을 베끼지 말고 아래를 그대로 씁니다. 적용 대상은 라우트를 가진
+화면 **40개**입니다. `views/`에 있어도 `StripePaymentStep.vue`처럼 라우트 없이 다른 화면이
+렌더하는 조각은 화면이 아니므로 컨테이너 규격을 주지 않습니다.
+
+### 최상위 컨테이너
+
+```html
+<main class="flex w-full flex-col gap-8 px-screen pt-6 pb-8">
+  <ScreenHeader
+    variant="root"
+    :title="t('...')"
+  />
+  <section>…</section>
+</main>
+```
+
+- **`min-h-dvh`를 주지 않습니다.** `app/layouts/AppShell.vue`의 래퍼가 `min-h-dvh`와 배경을
+  이미 가집니다. 자식이 또 주면 탭이 보이는 화면에서 래퍼 높이가 `100dvh + 96px`가 되어
+  내용이 짧아도 항상 96px 스크롤이 생깁니다.
+- 가로 여백은 `px-screen`(20px)입니다. **예외는 폭을 꽉 채워야 하는 화면뿐입니다** —
+  `sticky` 반투명 띠가 있거나(`EventDetailView`·`PlaceDetailView`) 전체 화면 상태로 바뀌는
+  화면(`SettlementRequestView`의 `submitting`)은 컨테이너 대신 안쪽 블록마다 겁니다.
+  컨테이너로 올리면 좌우 20px에 흐림이 걸리지 않은 틈이 남습니다.
+- 위쪽 여백은 **`pt-6`(24px) 한 값**입니다. 예외는 둘입니다.
+  - `WelcomeView` — `pt-welcome-top`(148px). 시안 A1의 좌표 실측값이라 내리면 무너집니다.
+  - `NotFoundView` — 세로 가운데 정렬이라 위 여백을 쓰지 않습니다.
+
+  헤더가 자체 세로 여백(`py-4`)을 갖는 화면도 지금은 위 여백이 없지만, 아래 헤더 규격을
+  적용하면 그 여백이 사라지므로 함께 `pt-6`으로 옵니다.
+
+- 아래쪽 여백은 `pb-8`(32px)입니다.
+- 섹션 사이 간격은 컨테이너의 `gap-8`(32px)로 줍니다. 자식마다 `mt-*`를 붙이지 않습니다.
+
+### 하단 탭 몫 여백은 `AppShell`이 단독으로 책임집니다
+
+`AppShell.vue`가 탭이 보이는 화면에 `pb-[calc(6rem+env(safe-area-inset-bottom))]`을 줍니다.
+**뷰가 탭 몫을 다시 더하지 않습니다.** 더하면 본문 아래가 200px 넘게 빕니다.
+
+`pb-8`보다 큰 아래 여백은 **`fixed inset-x-0 bottom-0` CTA가 있는 화면에서만** 씁니다
+(`pb-28`). 그 CTA를 **자식 컴포넌트가 그리는 경우도 포함합니다** —
+`AppointmentCreateView`의 CTA는 `AppointmentCreateForm.vue`에 있습니다.
+
+`sticky bottom-0` CTA는 부모 여백을 늘리지 않습니다. `sticky`는 흐름 안에 있어 자기 높이만큼
+이미 자리를 차지하고, 그 containing block이 부모의 **content box**라 패딩 영역으로 내려가지
+못합니다. 부모에 `pb-28`을 주면 스크롤 끝에서 CTA가 화면 바닥에서 그만큼 떠오릅니다.
+
+고정 CTA의 조형은 한 벌입니다.
+
+```html
+<div
+  class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-shell bg-canvas/95 px-screen py-3 backdrop-blur"
+></div>
+```
+
+`max-w-[390px]` 직접 표기 대신 `max-w-shell` 토큰을 씁니다.
+
+### 헤더는 `ScreenHeader`로 씁니다
+
+**화면에서 `<header>`를 직접 쓰지 않습니다.** `shared/ui/ScreenHeader.vue` 한 곳이 조형을
+가집니다. 마크업을 베껴 쓰면 지금의 5종이 그대로 다시 자랍니다.
+
+```html
+<!-- 뒤로가기가 있는 화면 -->
+<ScreenHeader
+  variant="back"
+  :title="t('...')"
+  :back-label="t('action.back')"
+  @back="goBack"
+/>
+
+<!-- 뒤로가기가 없는 루트 화면. 오른쪽 액션은 slot으로 받습니다 -->
+<ScreenHeader
+  variant="root"
+  :title="t('...')"
+>
+  <template #action>
+    <IconOrb
+      size="lg"
+      variant="surface"
+      :label="t('...')"
+    >
+      <IconPlus
+        :size="24"
+        aria-hidden="true"
+      />
+    </IconOrb>
+  </template>
+</ScreenHeader>
+```
+
+`ScreenHeader`가 보장하는 것은 다음과 같습니다.
+
+- 뒤로가기는 `IconOrb` + `IconArrowLeft` 한 조형입니다. `‹` 문자, `IconChevronLeft`,
+  맨손 `<button>`을 쓰지 않습니다. `IconOrb`가 44px 터치 타깃과 접근 가능한 이름을 함께
+  보장합니다.
+- 제목은 `font-display text-screen-title uppercase text-ink-display` 한 벌입니다.
+  `text-section-header`나 `text-title`로 낮추지 않고, 중앙정렬하지 않습니다.
+  `--text-screen-title--font-weight`가 이미 700이므로 `font-bold`를 따로 붙이지 않습니다.
+- 제목은 두 variant 모두 `v-fit-text`와 `min-w-0 flex-1 truncate`를 받습니다. 좁은 폭에서
+  글자를 줄이고, 50%에 닿으면 말줄임으로 넘깁니다(#361). 루트 헤더도 오른쪽 액션 때문에
+  폭이 좁아지므로 같습니다.
+- 헤더를 `border-b border-hairline`으로 본문과 나누지 않습니다.
+
+**아직 `ScreenHeader`가 덮지 않는 헤더가 둘 있습니다.** 그대로 두고, 흡수 여부는 따로
+정합니다.
+
+- `SettlementFlowHeader` — 제목 아래에 단계 눈금이 붙습니다.
+- `EventDetailView`·`PlaceDetailView`의 `sticky top-0` 띠 — 제목이 없고 뒤로가기와 공유
+  아이콘만 있으며, 폭을 꽉 채우는 반투명 띠입니다.
+
 ## PWA 캐시 변경하기
 
 - 서비스 워커는 앱 셸과 정적 자원만 사전 캐시합니다.
