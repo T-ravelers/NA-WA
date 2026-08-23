@@ -4,6 +4,8 @@ import { useId } from 'vue'
 
 import { LOCALE_LABEL, SUPPORTED_LOCALES, type AppLocale } from '@/shared/i18n/locales'
 
+import { useRovingRadioGroup } from './useRovingRadioGroup'
+
 /**
  * 화면 언어를 고르는 바텀시트.
  *
@@ -29,6 +31,20 @@ const emit = defineEmits<{
 
 /** 라디오 그룹의 이름을 제목과 잇는다. 한 화면에 시트가 둘 이상 뜰 수 있어 id를 생성한다. */
 const titleId = useId()
+
+/*
+ * 화살표 키 이동과 그룹당 탭 스톱 하나는 `useRovingRadioGroup`이 맡는다(#305/#433).
+ * 그러지 않으면 선택지 네 개가 전부 탭 순서에 들어가, 시트를 지나 다음 요소로 가는 데
+ * 탭을 세 번 더 눌러야 한다 — `SegmentedControl`과 같은 규약을 쓴다.
+ *
+ * 이 시트는 **고르는 즉시 적용하고 닫히므로** 화살표 한 번이 곧 선택이다(클릭과 같다).
+ * 옮겨 다니다 나중에 확정하는 그룹이 아니라, 얻는 것은 탭 스톱이 하나로 줄어드는 쪽이다.
+ */
+const { onKeydown, tabindexFor } = useRovingRadioGroup(
+  SUPPORTED_LOCALES,
+  () => modelValue,
+  (locale) => emit('update:modelValue', locale),
+)
 </script>
 
 <template>
@@ -76,13 +92,16 @@ const titleId = useId()
         role="radiogroup"
         :aria-labelledby="titleId"
         class="flex flex-col gap-2"
+        @keydown="onKeydown"
       >
         <button
           v-for="locale in SUPPORTED_LOCALES"
           :key="locale"
           type="button"
           role="radio"
+          :data-value="locale"
           :aria-checked="locale === modelValue"
+          :tabindex="tabindexFor(locale)"
           class="flex min-h-14 items-center gap-3 rounded-sm bg-surface-1 px-3.5 text-left"
           @click="emit('update:modelValue', locale)"
         >

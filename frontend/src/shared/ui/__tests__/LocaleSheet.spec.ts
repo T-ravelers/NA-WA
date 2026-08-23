@@ -66,6 +66,25 @@ describe('LocaleSheet', () => {
     )
   })
 
+  /*
+   * 라디오 그룹은 탭 스톱이 그룹당 하나이고 화살표로 옮겨 다니는 것이 전제다(#305/#433).
+   * 그러지 않으면 선택지 네 개가 전부 탭 순서에 들어가, 시트를 지나가는 데 탭을 세 번 더
+   * 눌러야 한다. `SegmentedControl`과 같은 `useRovingRadioGroup` 규약을 쓴다.
+   */
+  it('keeps one tab stop and moves with the arrow keys', async () => {
+    const wrapper = mountSheet('ja')
+    const tabindexes = wrapper
+      .findAll('[role="radio"]')
+      .map((option) => option.attributes('tabindex'))
+
+    expect(tabindexes.filter((value) => value === '0')).toHaveLength(1)
+    expect(tabindexes[SUPPORTED_LOCALES.indexOf('ja')]).toBe('0')
+
+    await wrapper.get('[role="radiogroup"]').trigger('keydown', { key: 'ArrowDown' })
+
+    expect(wrapper.emitted('update:modelValue')).toEqual([[SUPPORTED_LOCALES[2]]])
+  })
+
   it('is announced as a modal dialog with a name', () => {
     const dialog = mountSheet().get('[role="dialog"]')
 
