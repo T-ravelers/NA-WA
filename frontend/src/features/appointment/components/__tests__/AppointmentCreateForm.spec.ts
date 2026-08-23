@@ -70,6 +70,30 @@ describe('AppointmentCreateForm', () => {
     expect(wrapper.text()).not.toContain('Chinese (Simplified)')
   })
 
+  it('starts the language chip on the member language, not always English', async () => {
+    // 목록은 회원 언어로 걸러 시작한다. 폼이 en에 머물면 일본어 회원이 그대로 만든
+    // 약속이 en으로 잡혀, 돌아온 ja 목록에서 자기 약속이 보이지 않는다.
+    const previous = i18n.global.locale.value
+    i18n.global.locale.value = 'ja'
+
+    try {
+      const wrapper = mount(AppointmentCreateForm, {
+        props: { itemId: 42, itemType: 'EVENT' },
+        ...mountOptions,
+      })
+      await flushPromises()
+
+      const pressed = wrapper
+        .findAll('button[aria-pressed]')
+        .filter((button) => button.attributes('aria-pressed') === 'true')
+
+      expect(pressed).toHaveLength(1)
+      expect(pressed[0]?.text()).toBe('日本語')
+    } finally {
+      i18n.global.locale.value = previous
+    }
+  })
+
   it('shows validation errors before opening confirmation', async () => {
     const wrapper = mount(AppointmentCreateForm, {
       props: { itemId: 42, itemType: 'EVENT' },
