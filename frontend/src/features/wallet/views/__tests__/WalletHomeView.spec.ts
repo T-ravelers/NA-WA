@@ -223,7 +223,7 @@ describe('WalletHomeView', () => {
     await flushPromises()
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('We could not find your wallet.')
+    expect(wrapper.text()).toContain('A wallet needed for this could not be found.')
   })
 
   /*

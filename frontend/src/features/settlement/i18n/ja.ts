@@ -191,6 +191,12 @@ export default {
       completeTitle: '支払いを送信しました',
       completeDescription: 'この割り勘のあなたの負担額は精算済みです。',
       backToDetail: '割り勘へ戻る',
+      insufficientTitle: '残高が足りません',
+      insufficientDescription:
+        '残高が{amount}の支払いに足りません。チャージして負担額を支払いますか？',
+      insufficientLater: '後で',
+      insufficientTopup: 'チャージ',
+      goToWallet: 'ウォレットへ',
     },
     errorCode: {
       'SETTLEMENT-001': 'この割り勘が見つかりませんでした。割り勘一覧に戻ってください。',

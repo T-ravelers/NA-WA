@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { NormalizedApiError } from '@/shared/api/apiError'
 import { vFitText } from '@/shared/lib/fitText'
 import AppButton from '@/shared/ui/AppButton.vue'
+import InsufficientBalanceDialog from '@/shared/ui/InsufficientBalanceDialog.vue'
 
 import {
   createAppointment,
@@ -491,40 +492,17 @@ function confirmExit(): void {
       </section>
     </div>
 
-    <div
+    <InsufficientBalanceDialog
       v-if="topupPromptOpen"
-      class="fixed inset-0 z-50 flex items-end justify-center bg-scrim/70 px-screen pb-6"
-      role="presentation"
-      @click.self="closeTopupPrompt"
-    >
-      <section
-        role="dialog"
-        aria-modal="true"
-        :aria-label="t('appointment.create.insufficientTitle')"
-        class="w-full max-w-[390px] rounded-card bg-surface-1 p-5 shadow-sheet"
-      >
-        <h2 class="text-title text-ink-display">
-          {{ t('appointment.create.insufficientTitle') }}
-        </h2>
-        <p class="mt-2 text-body-sm text-ink-3">
-          {{ t('appointment.create.insufficientDescription', { amount: formattedDepositAmount }) }}
-        </p>
-        <div class="mt-5 grid grid-cols-2 gap-3">
-          <AppButton
-            block
-            variant="secondary"
-            @click="closeTopupPrompt"
-          >
-            {{ t('appointment.create.insufficientLater') }}
-          </AppButton>
-          <AppButton
-            block
-            @click="goToTopup"
-          >
-            {{ t('appointment.create.insufficientTopup') }}
-          </AppButton>
-        </div>
-      </section>
-    </div>
+      placement="bottom"
+      :title="t('appointment.create.insufficientTitle')"
+      :description="
+        t('appointment.create.insufficientDescription', { amount: formattedDepositAmount })
+      "
+      :later-label="t('appointment.create.insufficientLater')"
+      :topup-label="t('appointment.create.insufficientTopup')"
+      @close="closeTopupPrompt"
+      @topup="goToTopup"
+    />
   </main>
 </template>

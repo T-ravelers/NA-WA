@@ -191,6 +191,12 @@ export default {
       completeTitle: 'Đã gửi thanh toán',
       completeDescription: 'Phần của bạn trong khoản chia này đã được thanh toán.',
       backToDetail: 'Về khoản chia tiền',
+      insufficientTitle: 'Số dư không đủ',
+      insufficientDescription:
+        'Số dư của bạn không đủ để gửi {amount}. Nạp tiền để thanh toán phần của bạn?',
+      insufficientLater: 'Để sau',
+      insufficientTopup: 'Nạp tiền',
+      goToWallet: 'Tới ví',
     },
     errorCode: {
       'SETTLEMENT-001':

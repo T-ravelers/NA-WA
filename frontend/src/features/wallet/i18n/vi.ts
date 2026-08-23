@@ -46,7 +46,7 @@ export default {
       },
     },
     errorCode: {
-      'WALLET-001': 'Chúng tôi không tìm thấy ví của bạn.',
+      'WALLET-001': 'Không tìm thấy ví cần thiết cho thao tác này.',
       'WALLET-005': 'Chúng tôi không tìm thấy giao dịch đó.',
       'WALLET-006': 'Bạn chỉ có thể xem giao dịch của chính mình.',
       'WALLET-008': 'Ví của bạn hiện không hoạt động.',
@@ -58,8 +58,9 @@ export default {
       'WALLET-023': 'Ví của người nhận hiện không hoạt động.',
       'WALLET-024': 'Nhập số tiền để tiếp tục.',
       'WALLET-029': 'Số dư của bạn không đủ cho thanh toán này.',
+      'WALLET-014': 'Không gửi được giao dịch chuyển này. Hãy làm mới và thử lại.',
       'WALLET-015': 'Số dư ví của bạn quá thấp cho giao dịch chuyển này.',
-      'WALLET-016': 'Ví của bạn hiện không thể dùng cho giao dịch chuyển này.',
+      'WALLET-016': 'Một ví trong giao dịch chuyển này hiện không dùng được.',
     },
     transactions: {
       title: 'GIAO DỊCH',
