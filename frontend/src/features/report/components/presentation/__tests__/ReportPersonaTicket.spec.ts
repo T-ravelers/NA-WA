@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
+import { i18n } from '@/app/i18n'
 import AppTicket from '@/shared/ui/AppTicket.vue'
 
 import ReportPersonaTicket from '../ReportPersonaTicket.vue'
@@ -59,5 +60,25 @@ describe('ReportPersonaTicket', () => {
 
     expect(wrapper.getComponent(AppTicket).props('orientation')).toBe('vertical')
     expect(wrapper.getComponent(AppTicket).props('bodySize')).toBeGreaterThan(0)
+  })
+
+  // 시안 R4의 stub 왼쪽 `Share ticket`. 무엇을 보낼지는 화면이 정하므로 여기서는 emit만 본다.
+  // 버튼은 공용 `AppButton`이라 로딩 라벨 때문에 i18n 플러그인이 필요하다 — 티켓 자신은 여전히 props만 쓴다.
+  it('draws the share button from its label and emits share when it is pressed', async () => {
+    const wrapper = mount(ReportPersonaTicket, {
+      props: { ...PROPS, shareLabel: 'Share ticket' },
+      global: { plugins: [i18n] },
+    })
+    const button = wrapper.get('button')
+
+    expect(button.text()).toBe('Share ticket')
+    await button.trigger('click')
+    expect(wrapper.emitted('share')).toHaveLength(1)
+  })
+
+  it('omits the share button when the screen passes no label', () => {
+    const wrapper = mount(ReportPersonaTicket, { props: PROPS })
+
+    expect(wrapper.find('button').exists()).toBe(false)
   })
 })

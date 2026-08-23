@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IconArrowLeft } from '@tabler/icons-vue'
+import { IconArrowLeft, IconChevronRight, IconShare } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -9,18 +9,20 @@ import {
   spendingCategoryLabelKey,
   toSpendingCategory,
 } from '@/shared/lib/spendingCategory'
+import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
+import { showToast } from '@/shared/ui/toast'
 
 import ReportCategoryBreakdown from '../components/presentation/ReportCategoryBreakdown.vue'
 import ReportComparisonBars from '../components/presentation/ReportComparisonBars.vue'
 import ReportDailyTrend from '../components/presentation/ReportDailyTrend.vue'
 import ReportRadarChart from '../components/presentation/ReportRadarChart.vue'
 import ReportRankTiles from '../components/presentation/ReportRankTiles.vue'
-import { formatPercent } from '../components/presentation/format'
+import { formatMoney, formatPercent } from '../components/presentation/format'
 import ReportKpiCard from '../components/presentation/ReportKpiCard.vue'
 import ReportPersonaTicket from '../components/presentation/ReportPersonaTicket.vue'
 import type {
@@ -217,6 +219,105 @@ function retryComparison(): void {
   void comparisonQuery.refetch()
 }
 
+/**
+ * 헤더 아이콘과 하단 `Confirm & Share`가 보내는 리포트 요약.
+ *
+ * 리포트 상세는 작성자만 열 수 있다. 링크를 보내면 받는 쪽은 아무것도 볼 수 없으므로
+ * 링크 대신 문장을 보낸다 — 여정·기간에 칭호·총지출·1위 비중을 붙인다. 칭호가 없는
+ * 리포트(지출 0원·구 리포트)는 여정과 기간만 보낸다.
+ */
+const shareSummary = computed<string | null>(() => {
+  const current = report.value
+
+  if (current === null) {
+    return null
+  }
+
+  const journey = current.reportContent.journey
+  const period = `${formatReportDate(journey.startDate)}–${formatReportDate(journey.endDate)}`
+  const persona = reportPersona.value
+  const kpi = reportKpi.value
+
+  if (persona === null || kpi === null) {
+    return t('report.detail.sharing.summaryPlain', { journey: journey.title, period })
+  }
+
+  return t('report.detail.sharing.summary', {
+    journey: journey.title,
+    period,
+    hashtag: persona.title,
+    total: formatMoney(kpi.totalSpent, i18n.locale.value),
+    share: persona.share,
+    category: persona.categoryLabel,
+  })
+})
+
+/**
+ * 공유 시트가 있으면 시트로, 없으면 클립보드로, 둘 다 없으면 안내만 한다.
+ *
+ * 취소(`AbortError`)와 「시트가 이미 열려 있음」(`InvalidStateError`)만 조용히 넘어간다.
+ * 나머지 거절은 실패이므로 아래 클립보드 경로가 받는다 — `web-share` 권한이 없는 교차 출처
+ * iframe과 인앱 브라우저는 `navigator.share`가 있는데도 `NotAllowedError`로 거절한다. 이때
+ * 폴백까지 막으면 시트도 토스트도 없이 끝나 버튼이 고장 난 것처럼 보인다.
+ *
+ * 복사 완료 문구는 무엇을 복사했는지가 달라서 화면이 인자로 준다.
+ */
+async function shareText(title: string, text: string, copiedMessage: string): Promise<void> {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text })
+      return
+    } catch (error) {
+      const name = (error as { name?: unknown } | null)?.name
+
+      /*
+       * 이름만 본다. `instanceof`로는 판정할 수 없다 — jsdom에서 `DOMException`은 `Error`를
+       * 상속하지 않고, `navigator.share`를 JS 브리지로 얹는 인앱 브라우저는 `DOMException`이
+       * 아닌 값을 던질 수 있다. 어느 쪽이든 취소가 클립보드로 떨어져 「복사했다」가 뜬다.
+       */
+      if (name === 'AbortError' || name === 'InvalidStateError') {
+        return
+      }
+    }
+  }
+
+  if (!navigator.clipboard) {
+    showToast(t('report.detail.sharing.unavailable'))
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast(copiedMessage)
+  } catch {
+    showToast(t('report.detail.sharing.copyFailed'))
+  }
+}
+
+function shareReport(): void {
+  const summary = shareSummary.value
+
+  if (summary !== null) {
+    void shareText(
+      t('report.detail.sharing.reportTitle'),
+      summary,
+      t('report.detail.sharing.copiedReport'),
+    )
+  }
+}
+
+function shareTicket(): void {
+  const persona = reportPersona.value
+
+  if (persona !== null) {
+    void shareText(
+      t('report.detail.sharing.ticketTitle'),
+      `${persona.title}\n${persona.description}`,
+      t('report.detail.sharing.copiedTicket'),
+    )
+  }
+}
+
 function goBack(): void {
   void router.push({ name: 'report-list' })
 }
@@ -241,9 +342,26 @@ function retry(): void {
           aria-hidden="true"
         />
       </IconOrb>
-      <h1 class="font-display text-screen-title font-bold uppercase text-ink-display">
+      <h1 class="flex-1 font-display text-screen-title font-bold uppercase text-ink-display">
         {{ t('report.detail.title') }}
       </h1>
+      <!--
+        캐시가 있는 재방문에서 재요청이 실패하면 `data`는 남고 `isError`만 켜진다.
+        그러면 본문은 `StateError`인데 헤더에는 공유 아이콘이 남으므로 함께 본다.
+      -->
+      <IconOrb
+        v-if="shareSummary !== null && !reportQuery.isError.value"
+        :label="t('report.detail.sharing.report')"
+        size="md"
+        variant="surface"
+        @click="shareReport"
+      >
+        <IconShare
+          :size="20"
+          :stroke-width="1.8"
+          aria-hidden="true"
+        />
+      </IconOrb>
     </header>
 
     <StateError
@@ -313,6 +431,8 @@ function retry(): void {
           :stamp-value="reportPersona.share"
           :stamp-label="reportPersona.categoryLabel"
           :tone="reportPersona.tone"
+          :share-label="t('report.detail.sharing.ticket')"
+          @share="shareTicket"
         />
 
         <ReportKpiCard
@@ -489,6 +609,20 @@ function retry(): void {
           </li>
         </ol>
       </section>
+
+      <AppButton
+        block
+        @click="shareReport"
+      >
+        <span class="inline-flex items-center gap-1">
+          {{ t('report.detail.sharing.confirm') }}
+          <IconChevronRight
+            :size="18"
+            :stroke-width="2"
+            aria-hidden="true"
+          />
+        </span>
+      </AppButton>
     </template>
   </main>
 </template>
