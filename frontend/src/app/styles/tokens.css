@@ -100,10 +100,6 @@
   /* 예산 게이지 진행. 트랙은 hairline-strong. */
   --color-gauge: #5aa3dd;
 
-  /* 하단 탭 컨테이너. V2(`2360:4325`)에서 떠 있는 반투명 알약이 화면 폭을 채우는
-   * 불투명 종이 면(bg/interactive/primary)으로 바뀌었다. */
-  --color-nav-surface: #f4f2ed;
-
   /* 모달 백드롭. 60% 불투명도로 쓴다. */
   --color-scrim: #000000;
 

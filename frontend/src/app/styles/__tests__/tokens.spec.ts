@@ -45,6 +45,25 @@ function contrast(a: string, b: string): number {
 
 const AA_TEXT = 4.5
 
+/**
+ * 반투명 면을 뒤 색 위에 합성한다.
+ *
+ * `bg-canvas/90` 같은 유리 면은 뒤 색이 비쳐 실제 면 색이 화면마다 다르다. 뒤에 무엇이
+ * 오든 잉크가 AA를 넘는지 보려면 합성한 색으로 계산해야 한다. 흐림(`backdrop-blur`)은
+ * 뒤 색을 평균낼 뿐 극단값을 없애지 못하므로 계산에 넣지 않는다 — 흐림 없이 통과하면
+ * 흐림이 있을 때도 통과한다.
+ */
+function composite(over: string, under: string, alpha: number): string {
+  const mixed = [1, 3, 5].map((index) => {
+    const o = Number.parseInt(over.slice(index, index + 2), 16)
+    const u = Number.parseInt(under.slice(index, index + 2), 16)
+
+    return Math.round(alpha * o + (1 - alpha) * u)
+  })
+
+  return `#${mixed.map((value) => value.toString(16).padStart(2, '0')).join('')}`
+}
+
 describe('tokens.css contrast', () => {
   // 코어색 면 위 텍스트. `show`가 4.37:1이라 잉크를 순검정으로 옮겼다(#443).
   it.each(['beauty', 'shopping', 'show', 'food'])(
@@ -67,5 +86,36 @@ describe('tokens.css contrast', () => {
   it('the primary inks clear AA on their own surfaces', () => {
     expect(contrast(token('canvas'), token('ink'))).toBeGreaterThanOrEqual(AA_TEXT)
     expect(contrast(token('paper'), token('on-paper'))).toBeGreaterThanOrEqual(AA_TEXT)
+  })
+})
+
+/**
+ * 하단 탭 유리 면 위 잉크(#496).
+ *
+ * 탭은 화면 위에 떠 있어 **뒤로 무엇이든 지나간다** — 어두운 캔버스도, 밝은 종이 카드도,
+ * 코어색 티켓도. 옛 구현은 `rgb(217 217 217 / 0.2)`라 밝은 면 위에서 대비가 1.15:1까지
+ * 무너졌다. 어두운 canvas를 90%로 깔아 그 의존을 끊었고, 여기서 값으로 고정한다.
+ */
+describe('bottom nav glass contrast', () => {
+  /** `BottomNav.vue`의 `bg-canvas/90`. 저 값을 바꾸면 여기도 바꾼다. */
+  const GLASS_ALPHA = 0.9
+
+  /** 탭 뒤로 지나갈 수 있는 면. 밝을수록 유리가 밝아져 잉크 대비가 낮아진다. */
+  const BEHIND = [
+    'canvas',
+    'surface-1',
+    'paper',
+    'paper-fill',
+    'food',
+    'show',
+    'shopping',
+    'beauty',
+  ]
+
+  it.each(BEHIND)('both tab inks clear AA on the glass over %s', (behind) => {
+    const glass = composite(token('canvas'), token(behind), GLASS_ALPHA)
+
+    expect(contrast(glass, token('ink'))).toBeGreaterThanOrEqual(AA_TEXT)
+    expect(contrast(glass, token('ink-2'))).toBeGreaterThanOrEqual(AA_TEXT)
   })
 })
