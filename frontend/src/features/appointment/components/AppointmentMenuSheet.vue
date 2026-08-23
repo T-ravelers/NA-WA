@@ -21,7 +21,7 @@ import { useOverlayDismiss } from '../composables/useOverlayDismiss'
  */
 interface Props {
   appointmentName: string
-  /** 방장에게만 넣는다. */
+  /** 출석 확정을 비활성화할 사유. 없으면 활성화한다. */
   attendanceDisabledReason?: string
 }
 
