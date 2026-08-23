@@ -46,7 +46,7 @@ export default {
       },
     },
     errorCode: {
-      'WALLET-001': 'Chúng tôi không tìm thấy ví của bạn.',
+      'WALLET-001': 'Không tìm thấy ví cần thiết cho thao tác này.',
       'WALLET-005': 'Chúng tôi không tìm thấy giao dịch đó.',
       'WALLET-006': 'Bạn chỉ có thể xem giao dịch của chính mình.',
       'WALLET-008': 'Ví của bạn hiện không hoạt động.',

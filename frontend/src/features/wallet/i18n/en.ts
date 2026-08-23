@@ -62,7 +62,15 @@ export default {
       },
     },
     errorCode: {
-      'WALLET-001': 'We could not find your wallet.',
+      /*
+       * 누구의 지갑인지 말하지 않는다.
+       *
+       * 정산 지급은 낸 사람과 받을 사람 양쪽 지갑을 모두 확인하고, 어느 쪽이 없어도 같은
+       * 코드가 온다(`WalletTransferService.transfer`). "당신의 지갑"이라고 단정하면 자기
+       * 지갑이 멀쩡한 사용자가 자기 지갑 화면만 들여다보며 원인을 찾지 못한다.
+       * 같은 이유로 중립 문구인 WALLET-016과 짝이다.
+       */
+      'WALLET-001': 'A wallet needed for this could not be found.',
       'WALLET-005': 'We could not find that transaction.',
       'WALLET-006': 'You can only view your own transactions.',
       'WALLET-008': 'Your wallet is not active right now.',

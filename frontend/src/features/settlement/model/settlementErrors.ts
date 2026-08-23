@@ -101,6 +101,19 @@ const RECOVERY_BY_CODE: Record<string, SettlementRecovery> = {
  */
 export const SETTLEMENT_MAPPED_ERROR_CODES = Object.keys(RECOVERY_BY_CODE)
 
+/**
+ * 어느 쪽 지갑 때문인지 알 수 없는 코드.
+ *
+ * 지갑 이체는 낸 사람과 받을 사람 **양쪽 지갑을 모두** 확인하고, 어느 쪽이 걸려도 같은
+ * 코드를 돌려준다(`WalletTransferService.transfer`). 그래서 이 둘의 문구는 "당신의 지갑"
+ * 이라고 단정하면 안 된다 — 원결제자 쪽 지갑이 원인일 때, 자기 지갑이 멀쩡한 사용자가
+ * 자기 지갑 화면만 들여다보며 원인을 찾지 못한다.
+ *
+ * 회복 동작을 `GO_TO_WALLET`으로 둔 것도 같은 이유다. 확인할 곳을 알려 줄 뿐 원인을
+ * 단정하지는 않는다. 문구는 시험이 로케일마다 훑어 소유격이 다시 들어오는 것을 막는다.
+ */
+export const WALLET_CODES_WITHOUT_A_KNOWN_SIDE = ['WALLET-001', 'WALLET-016'] as const
+
 export function resolveSettlementError(error: unknown): {
   messageKey: string
   recovery: SettlementRecovery
