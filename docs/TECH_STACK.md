@@ -107,7 +107,8 @@ test와 build를 실행합니다. Vercel은 프론트엔드 배포를 담당하�
 품질 검증을 담당합니다. 같은 프론트엔드 배포를 두 시스템에서 중복 실행하지
 마세요.
 
-운영 백엔드는 `https://api.clearpng.cloud`이고 TLS는 nginx가 443에서 종료합니다.
+운영 프론트엔드는 `https://na-wa.cloud`, 백엔드는 `https://api.na-wa.cloud`입니다.
+백엔드 TLS는 nginx가 443에서 종료합니다.
 인증서는 Let's Encrypt에서 발급받아 `certbot_conf` 볼륨으로 nginx와 공유하며, 80은
 `/.well-known/acme-challenge/`(갱신 검증 경로)만 직접 응답하고 나머지는 `308`로
 https에 넘깁니다. ALB 도입 준비로 `X-Forwarded-Proto`가 붙은 요청과 헬스 체크용

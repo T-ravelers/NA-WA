@@ -98,7 +98,8 @@ docker compose up
   `docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d <도메인> ...`로
   1회 실행하고, 갱신과 nginx reload는 `.github/workflows/renew-cert.yml`이 매일
   자동으로 수행합니다.
-- 운영 백엔드는 `https://api.clearpng.cloud`입니다. nginx가 443에서 TLS를 종료하고,
+- 운영 프론트엔드는 `https://na-wa.cloud`, 백엔드는 `https://api.na-wa.cloud`입니다.
+  nginx가 443에서 TLS를 종료하고,
   80으로 온 요청은 `/.well-known/acme-challenge/`(인증서 갱신용)만 직접 응답한 뒤
   나머지는 `308`로 https에 넘깁니다. ALB 도입 준비로 `X-Forwarded-Proto`가 붙은
   요청과 헬스 체크용 `/alb-health`만 `308` 대신 백엔드로 프록시합니다.
