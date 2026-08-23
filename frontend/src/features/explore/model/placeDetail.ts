@@ -88,8 +88,11 @@ export function toDetailEntries(value: unknown): DetailEntry[] {
 
 export function toClosedDays(value: unknown): string {
   if (Array.isArray(value)) {
+    // 휴무일도 같은 크롤러에서 와서 `<br>`이 섞인다(2,211행 중 16행). 영업시간과
+    // 달리 한 줄로 이어 적는 자리라 줄바꿈 대신 구분자로 바꾼다.
     return value
       .filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+      .map((item) => unescapeLineBreaks(item).split('\n').join(', '))
       .join(', ')
   }
 

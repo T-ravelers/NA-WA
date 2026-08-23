@@ -68,4 +68,10 @@ describe('placeDetail model helpers', () => {
       { label: 'hours', value: '12:00~22:00\n13:00~14:00' },
     ])
   })
+
+  // 휴무일도 같은 크롤러에서 온다(2,211행 중 16행에 <br>이 있다). 여기는 한 줄로
+  // 이어 적는 자리라 줄바꿈이 아니라 구분자로 바꾼다.
+  it('strips the crawled <br> tags out of closed days too', () => {
+    expect(toClosedDays(['매주 월요일<br>설·추석 당일'])).toBe('매주 월요일, 설·추석 당일')
+  })
 })
