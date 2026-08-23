@@ -7,6 +7,27 @@ import { describe, expect, it } from 'vitest'
 const CSS = readFileSync(join(process.cwd(), 'src/app/styles/tokens.css'), 'utf8')
 
 /**
+ * 하단 탭이 실제로 쓰는 유리 면을 컴포넌트에서 읽는다.
+ *
+ * 면 색과 알파를 이 파일에 복제하면 `BottomNav.vue`만 `bg-paper/90`이나 `bg-canvas/20`으로
+ * 되돌려도 테스트가 계속 초록이다. 값이 아니라 **실제 클래스**를 근거로 계산한다.
+ */
+const BOTTOM_NAV = readFileSync(join(process.cwd(), 'src/shared/ui/BottomNav.vue'), 'utf8')
+
+function bottomNavGlass(): { surface: string; alpha: number } {
+  // `reduce-transparency:bg-canvas`처럼 variant가 붙거나 알파가 없는 것은 걸리지 않는다.
+  const matches = [...BOTTOM_NAV.matchAll(/(?<![\w:-])bg-([a-z0-9-]+)\/(\d{1,3})(?![\w-])/g)]
+
+  if (matches.length !== 1) {
+    throw new Error(`BottomNav.vue의 반투명 배경 클래스는 하나여야 하는데 ${matches.length}개다`)
+  }
+
+  const [, surface, alpha] = matches[0] as unknown as [string, string, string]
+
+  return { surface, alpha: Number(alpha) / 100 }
+}
+
+/**
  * 토큰 쌍의 명암비를 값으로 고정한다(#443).
  *
  * 잉크 토큰은 전부 검정에 가까워 **눈으로는 미달을 잡을 수 없다.** `tokens.css`의 주석이
@@ -44,6 +65,25 @@ function contrast(a: string, b: string): number {
 }
 
 const AA_TEXT = 4.5
+
+/**
+ * 반투명 면을 뒤 색 위에 합성한다.
+ *
+ * `bg-canvas/90` 같은 유리 면은 뒤 색이 비쳐 실제 면 색이 화면마다 다르다. 뒤에 무엇이
+ * 오든 잉크가 AA를 넘는지 보려면 합성한 색으로 계산해야 한다. 흐림(`backdrop-blur`)은
+ * 뒤 색을 평균낼 뿐 극단값을 없애지 못하므로 계산에 넣지 않는다 — 흐림 없이 통과하면
+ * 흐림이 있을 때도 통과한다.
+ */
+function composite(over: string, under: string, alpha: number): string {
+  const mixed = [1, 3, 5].map((index) => {
+    const o = Number.parseInt(over.slice(index, index + 2), 16)
+    const u = Number.parseInt(under.slice(index, index + 2), 16)
+
+    return Math.round(alpha * o + (1 - alpha) * u)
+  })
+
+  return `#${mixed.map((value) => value.toString(16).padStart(2, '0')).join('')}`
+}
 
 describe('tokens.css contrast', () => {
   // 코어색 면 위 텍스트. `show`가 4.37:1이라 잉크를 순검정으로 옮겼다(#443).
@@ -83,4 +123,33 @@ describe('tokens.css contrast', () => {
       expect(contrast(token('canvas'), token(series))).toBeGreaterThanOrEqual(AA_TEXT)
     },
   )
+})
+
+/**
+ * 하단 탭 유리 면 위 잉크(#496).
+ *
+ * 탭은 화면 위에 떠 있어 **뒤로 무엇이든 지나간다** — 어두운 캔버스도, 밝은 종이 카드도,
+ * 코어색 티켓도. 옛 구현은 `rgb(217 217 217 / 0.2)`라 밝은 면 위에서 대비가 1.15:1까지
+ * 무너졌다. 어두운 canvas를 90%로 깔아 그 의존을 끊었고, 여기서 값으로 고정한다.
+ */
+describe('bottom nav glass contrast', () => {
+  /** 탭 뒤로 지나갈 수 있는 면. 밝을수록 유리가 밝아져 잉크 대비가 낮아진다. */
+  const BEHIND = [
+    'canvas',
+    'surface-1',
+    'paper',
+    'paper-fill',
+    'food',
+    'show',
+    'shopping',
+    'beauty',
+  ]
+
+  it.each(BEHIND)('both tab inks clear AA on the glass over %s', (behind) => {
+    const { surface, alpha } = bottomNavGlass()
+    const glass = composite(token(surface), token(behind), alpha)
+
+    expect(contrast(glass, token('ink'))).toBeGreaterThanOrEqual(AA_TEXT)
+    expect(contrast(glass, token('ink-2'))).toBeGreaterThanOrEqual(AA_TEXT)
+  })
 })
