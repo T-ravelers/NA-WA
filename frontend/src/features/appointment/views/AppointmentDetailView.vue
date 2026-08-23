@@ -1,15 +1,11 @@
 <script setup lang="ts">
 import { IconMenu2 } from '@tabler/icons-vue'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import {
-  formatServerDateTime,
-  parseServerDateTime,
-  toServerCalendarDate,
-} from '@/shared/lib/datetime'
+import { formatServerDateTime, parseServerDateTime } from '@/shared/lib/datetime'
 import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import type { AppointmentStatus } from '@/shared/lib/appointmentStatus'
@@ -21,25 +17,19 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 import { showToast } from '@/shared/ui/toast'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
-import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
-import AppointmentJourneySelectSheet from '../components/AppointmentJourneySelectSheet.vue'
 import AppointmentLeaveBlockedDialog from '../components/AppointmentLeaveBlockedDialog.vue'
 import AppointmentLeaveConfirmSheet from '../components/AppointmentLeaveConfirmSheet.vue'
 import AppointmentMenuSheet from '../components/AppointmentMenuSheet.vue'
 import {
   cancelAppointmentParticipation,
-  joinAppointment,
   type AppointmentDateTimeValue,
   type AppointmentMember,
 } from '../api/appointmentApi'
 import { appointmentKeys } from '../model/appointmentKeys'
-import { NormalizedApiError } from '@/shared/api/apiError'
-import { serializeReturnParams } from '@/shared/lib/returnRoute'
 
 import { appointmentErrorMessageKey } from '../model/appointmentErrors'
 import { APPOINTMENT_LIVE_REFETCH_INTERVAL_MS } from '../model/appointmentLiveRefresh'
 import { appointmentStatusTone } from '../model/appointmentStatusPresentation'
-import { useAppointmentJourneyIntegration } from '../model/journeyIntegration'
 import {
   appointmentDetailQueryOptions,
   appointmentMembersQueryOptions,
@@ -101,16 +91,9 @@ const members = computed(() => {
     .sort((left, right) => rank(left) - rank(right))
 })
 
-const journeyIntegration = useAppointmentJourneyIntegration()
-const depositSheetOpen = ref(false)
 const menuOpen = ref(false)
 const leaveConfirmOpen = ref(false)
 const leaveBlockedOpen = ref(false)
-const hasJoined = computed(() => participationQuery.data.value?.joined === true)
-// 조회 실패 시 hasJoined는 false로 남는다. 서버가 최종적으로 중복 참여를
-// 막아주니 데이터는 안전하지만, 그대로 두면 사용자가 결제 시트까지 갔다가
-// 거기서야 오류를 보게 된다. 조회 자체가 실패했을 때는 참여 여부를 확신할 수
-// 없다는 걸 버튼 단계에서 미리 알려준다.
 // 한 번이라도 받아 둔 참여 정보가 있으면 그 값을 계속 쓴다. 폴링은 5초마다
 // 실패할 기회를 주는데, 실패를 곧바로 "모른다"로 읽으면 신호가 잠깐 끊길 때마다
 // 메뉴 세 항목이 전부 "확인하지 못했다"로 바뀌었다가 돌아온다.
@@ -131,31 +114,6 @@ const membersLoadFailed = computed(
   () => membersQuery.isError.value && membersQuery.data.value === undefined,
 )
 
-// 참여 가능 여부를 클라이언트 시계로 다시 재지 않는다. 서버가 정원이 찬 약속을
-// FULL로, 활동이 시작된 약속을 IN_PROGRESS로 계산해 내려주므로 RECRUITING이라는
-// 값 자체가 "지금 참여할 수 있다"를 뜻한다 — 나가기·출석 확정과 같은 근거다.
-const isJoinAvailable = computed(() => appointment.value?.appointmentStatus === 'RECRUITING')
-// 참여 버튼은 어떤 경우에도 눌린다. 비활성 버튼은 왜 안 되는지 말해 줄 방법이
-// 마땅치 않아서다(모바일이라 hover도 없다). 대신 막히는 이유는 누르기 전부터
-// 버튼 위에 한 줄로 떠 있는다. 눌러 봐야 아는 화면은 제일 큰 CTA를 "눌리기는
-// 하는데 아무 일도 없는 버튼"으로 만든다.
-//
-// 상태에서 그대로 끌어내므로 따로 지워 줄 자리가 없다. 누를 때 ref에 담아 두면
-// 이유가 해소된 뒤에도 남는다 — 나간 사람에게 "이미 참여했다"가 남던 식이다.
-//
-// 나간 사람과 참여 중인 사람을 가른다. 참여 조회는 LEFT가 된 참여에도
-// `joined: true`를 주므로, 그것만 보면 나간 사람에게 "이미 참여했다"고 말한다 —
-// 자기가 나갔다는 것을 아는 사람에게는 앞뒤가 맞지 않는 안내다.
-const joinBlockedReason = computed<string | undefined>(() => {
-  if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
-  if (hasJoined.value) {
-    return participationQuery.data.value?.membershipStatus === 'LEFT'
-      ? t('appointment.detail.alreadyLeft')
-      : t('appointment.detail.alreadyJoined')
-  }
-  if (!isJoinAvailable.value) return t('appointment.detail.joinUnavailable')
-  return undefined
-})
 // 방장 여부·참여 상태는 members 목록에서 추리지 않고 participation 응답을 쓴다.
 // 목록은 ACTIVE만 담고 있어 LEFT가 된 내 참여를 구분하지 못하고, 목록 조회가
 // 실패하면 내 권한까지 함께 사라진다.
@@ -388,14 +346,6 @@ async function invalidateParticipationScopes(): Promise<void> {
   ])
 }
 
-const joinMutation = useMutation({
-  mutationFn: (tripId: number) => joinAppointment(appointmentId.value as number, tripId),
-  onSuccess: async () => {
-    depositSheetOpen.value = false
-    await invalidateParticipationScopes()
-  },
-})
-
 const leaveMutation = useMutation({
   mutationFn: () => cancelAppointmentParticipation(appointmentId.value as number),
   onSuccess: async () => {
@@ -423,201 +373,15 @@ const leaveErrorMessage = computed(() =>
     : t(appointmentErrorMessageKey(leaveMutation.error.value, hasMessage)),
 )
 
-const joinErrorMessage = computed(() =>
-  joinMutation.error.value === null || topupPromptOpen.value
-    ? undefined
-    : t(appointmentErrorMessageKey(joinMutation.error.value, hasMessage)),
-)
-
-// 참여도 방장처럼 여정을 고른다. 서버가 멤버십의 trip_id와 여정 항목을 함께 걸어
-// 두므로, 고르지 않으면 참여한 약속이 진행 중 목록과 QR 공동결제에서 빠진다.
-// 여정을 먼저 고르고 보증금 확인으로 넘어간다 — 보증금 시트가 마지막 확인이다.
-const journeySelectOpen = ref(false)
-const selectedTripId = ref<number | null>(null)
-const journeyListQuery = journeyIntegration.useJourneyListQuery(journeySelectOpen)
-
-// 약속 날짜는 이미 정해져 있다. 그 날짜를 품지 못하는 여정을 고르면 서버가
-// JOURNEY-007로 되돌려보내므로, 목록은 다 보여 주되 고르는 순간 이유를 알려 준다.
-// 걸러서 감추지 않는 것은 "내 여정이 왜 없지"로 읽히지 않게 하기 위해서다.
-// 활동 날짜(YYYY-MM-DD). 문자열이라고 보고 자르면 안 된다 — 이 값은 Jackson이
-// 숫자 배열로도 보낼 수 있는 타입이고, 배열에 slice를 쓰면 **배열**이 나온다. 그러면
-// 아래 여정 기간 비교가 문자열 대 배열이 되어 조용히 전부 false가 되고, 모든 여정이
-// "날짜를 담지 못함"으로 보여 참여가 통째로 막힌다. tsc는 이 비교를 잡지 않는다.
-const activityDate = computed(() => {
-  // 읽을 수 없으면 빈 문자열이 온다. 날짜를 모르는 것과 구분해야 하므로 null로 바꾼다 —
-  // 아래 coversActivityDate가 null이면 거르지 않고 서버 판단에 맡긴다.
-  const date = toServerCalendarDate(appointment.value?.activityStartAt)
-  return date === '' ? null : date
-})
-const journeySelectionError = ref<string | null>(null)
-
-const journeyListErrorMessage = computed(() =>
-  journeyListQuery.isError.value ? t('appointment.journeySelect.error') : null,
-)
-
-function coversActivityDate(journey: { startDate: string; endDate: string }): boolean {
-  const date = activityDate.value
-  if (date === null) return true
-  return journey.startDate <= date && date <= journey.endDate
-}
-
-function readPositiveInteger(value: unknown): number | undefined {
-  const raw = Array.isArray(value) ? value[0] : value
-  const parsed = Number(raw)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
-}
-
-// 여정을 만들거나 충전하고 돌아온 경우(?tripId=). 참여를 다시 누르게 하지 않고 시트를
-// 열어, 그 여정을 골라 둔 채로 보여 준다 — 맞는지 확인하고 넘어간다.
-//
-// 이 값은 **사용자가 시트에서 행동하면 소비한다**(고르거나 닫으면 URL에서 지운다).
-// 남겨 두면 "이 화면을 열 때마다 시트를 열라"는 상시 지시가 되어, 참여가 끝난 뒤
-// 목록이 갱신되기만 해도 시트가 혼자 다시 뜬다 — 참여 직후에는 상세와 참여 정보를
-// 함께 무효화하는데 상세가 먼저 도착하면 "아직 참여 안 함"으로 보여 가드를 통과한다.
-//
-// 심는 즉시 지우지는 않는다. 충전으로 떠날 때 자기 자리에 tripId를 남겨 두는데(뒤로
-// 가기로 돌아와도 이어지도록), 적용과 동시에 지우면 그 표시가 바로 사라진다.
-const createdTripId = computed(() => readPositiveInteger(route.query.tripId))
-
-function consumeCreatedTripId(): void {
-  const rest = { ...route.query }
-  delete rest.tripId
-  void router.replace({ path: route.path, query: rest })
-}
-
-watch(
-  () => [createdTripId.value, appointment.value, journeyListQuery.data.value] as const,
-  ([tripId, current, journeys]) => {
-    if (tripId === undefined || current === undefined) return
-    // 이미 참여했거나 참여할 수 없는 약속이면 열지 않는다. 버튼과 같은 기준이다.
-    if (joinBlockedReason.value !== undefined) return
-    // 보증금 확인까지 넘어간 뒤에는 시트를 다시 열지 않는다.
-    if (depositSheetOpen.value) return
-
-    journeySelectOpen.value = true
-    // 목록이 오기 전에는 고를 수 없다. 오고 나서 그 여정이 실제로 있을 때만 고른다.
-    if (journeys?.some((journey) => journey.tripId === tripId) === true) {
-      selectedTripId.value = tripId
-    }
-  },
-  { immediate: true },
-)
-
-function openJourneySelect(): void {
-  // 이유는 이미 버튼 위에 떠 있다. 여기서는 시트를 열지 않는 것으로 끝낸다. 이미
-  // 참여한 사람은 서버도 APPOINTMENT-003으로 막으므로 미리 알려 주는 셈이다.
-  if (joinBlockedReason.value !== undefined) return
-
-  joinMutation.reset()
-  selectedTripId.value = null
-  journeySelectionError.value = null
-  journeySelectOpen.value = true
-}
-
-function closeJourneySelect(): void {
-  journeySelectOpen.value = false
-  consumeCreatedTripId()
-}
-
-function selectJourney(tripId: number): void {
-  const journey = journeyListQuery.data.value?.find((candidate) => candidate.tripId === tripId)
-  if (journey !== undefined && !coversActivityDate(journey)) {
-    // 시트를 닫지 않는다 — 다른 여정을 바로 고를 수 있어야 한다.
-    journeySelectionError.value = t('appointment.journeySelect.dateOutOfRange')
-    selectedTripId.value = null
-    return
-  }
-
-  journeySelectionError.value = null
-  selectedTripId.value = tripId
-  journeySelectOpen.value = false
-  depositSheetOpen.value = true
-  consumeCreatedTripId()
-}
-
-// 이 약속을 담을 여정이 없다. 자리를 내주고(replace) 보내면 여정 생성이 그 자리를
-// 돌려주므로, 돌아온 뒤 상세가 히스토리에 두 번 쌓이지 않는다.
-// 이 약속을 담을 여정이 없다. 자리를 내주고(replace) 보내면 여정 생성이 그 자리를
-// 돌려주므로, 돌아온 뒤 상세가 히스토리에 두 번 쌓이지 않는다. 이 화면은 param
-// 라우트라 이름만으로는 돌아올 수 없어 returnParams도 함께 싣는다.
-function goToCreateJourney(): void {
-  journeySelectOpen.value = false
-  void router.replace({
-    name: 'journey-create',
-    query: {
-      returnRouteName: 'appointment-detail',
-      returnParams: serializeReturnParams({ appointmentId: appointmentId.value ?? '' }),
-    },
-  })
-}
-
-function closeDepositSheet(): void {
-  depositSheetOpen.value = false
-}
-
-function confirmJoin(): void {
-  if (joinMutation.isPending.value || selectedTripId.value === null) return
-  joinMutation.mutate(selectedTripId.value)
-}
-
-// 보증금을 예치할 잔액이 없으면 서버가 WALLET-015로 거절한다. 빨간 한 줄 대신
-// 부족하다는 사실과 다음 행동(그만큼 충전)을 한 번에 묻는다 — 약속 생성과 같은 규칙이다.
-const INSUFFICIENT_BALANCE_CODE = 'WALLET-015'
-const topupPromptOpen = ref(false)
-
-watch(
-  () => joinMutation.error.value,
-  (error) => {
-    if (!(error instanceof NormalizedApiError)) return
-    if (error.code !== INSUFFICIENT_BALANCE_CODE) return
-    // 보증금 시트를 닫고 팝업만 남긴다. 두 겹으로 쌓이면 무엇을 눌러야 할지 흐려진다.
-    depositSheetOpen.value = false
-    topupPromptOpen.value = true
-  },
-)
-
-const formattedDepositAmount = computed(() =>
-  new Intl.NumberFormat('en-US').format(Number(appointment.value?.depositAmount ?? 0)),
-)
-
-function closeTopupPrompt(): void {
-  topupPromptOpen.value = false
-  // 팝업을 닫았으면 그 오류는 다 본 것이다. 남겨두면 일반 오류 문구로 다시 나타난다.
-  joinMutation.reset()
-}
-
-// 충전 화면으로 간다. 금액을 미리 채우고, 돌아올 곳으로 지금 고른 여정까지 실어
-// 보낸다 — 돌아오면 그 여정이 골라진 채로 참여 시트가 다시 열린다(?tripId=).
-// replace가 아니라 push다. 충전을 포기하고 뒤로 와도 이 화면으로 돌아와야 한다.
-function goToTopup(): void {
-  topupPromptOpen.value = false
-  const amount = appointment.value?.depositAmount
-  const tripId = selectedTripId.value
-
-  const openTopup = () =>
-    router.push({
-      name: 'wallet-top-up',
-      query: {
-        ...(amount === undefined ? {} : { amount: String(amount) }),
-        returnRouteName: 'appointment-detail',
-        returnParams: serializeReturnParams({ appointmentId: appointmentId.value ?? '' }),
-        ...(tripId === null ? {} : { tripId: String(tripId) }),
-      },
-    })
-
-  if (tripId === null) {
-    void openTopup()
-    return
-  }
-
-  // 돌아오는 길이 둘인데 도착지가 다르다. 충전을 마치면 충전 화면이 규약대로
-  // 보내 주지만, 뒤로가기는 브라우저가 **떠날 때의 URL 그대로** 되돌린다. 그 자리에
-  // 고른 여정이 없으면 충전을 포기했을 뿐인데 처음부터 다시 골라야 한다. 떠나기 전에
-  // 지금 자리에도 tripId를 남겨 어느 길로 돌아오든 이어지게 한다.
-  // 표시를 먼저 남기고 떠난다. 순서가 뒤집히면 replace가 충전 화면 위에서 일어난다.
-  void router
-    .replace({ path: route.path, query: { ...route.query, tripId: String(tripId) } })
-    .then(openTopup)
+/**
+ * 하단 CTA. 이 약속을 떠나 탐색 화면으로 간다.
+ *
+ * `push`가 아니라 `replace`다. 「이 화면을 떠난다」는 동작이라 상세를 히스토리에 남기지
+ * 않는다 — 남기면 탐색에서 뒤로 갔을 때 방금 떠난 약속으로 되돌아온다. 왔던 길로
+ * 돌아가는 것은 헤더의 뒤로가기가 맡는다.
+ */
+function goHome(): void {
+  void router.replace({ name: 'explore' })
 }
 </script>
 
@@ -772,78 +536,12 @@ function goToTopup(): void {
       <div
         class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
       >
-        <p
-          v-if="joinBlockedReason !== undefined"
-          role="status"
-          class="mb-2 text-center text-body-sm text-ink-3"
-        >
-          {{ joinBlockedReason }}
-        </p>
         <AppButton
           block
-          @click="openJourneySelect"
+          @click="goHome"
         >
-          {{ t('appointment.detail.join') }}
+          {{ t('appointment.detail.goHome') }}
         </AppButton>
-      </div>
-
-      <AppointmentJourneySelectSheet
-        v-if="journeySelectOpen"
-        :journeys="journeyListQuery.data.value ?? []"
-        :selected-journey-id="selectedTripId"
-        :loading="journeyListQuery.isPending.value"
-        :error-message="journeyListErrorMessage"
-        :selection-error="journeySelectionError"
-        :empty-message="t('appointment.journeySelect.emptyForJoin')"
-        @close="closeJourneySelect"
-        @select="selectJourney"
-        @create-journey="goToCreateJourney"
-      />
-
-      <AppointmentDepositSheet
-        v-if="depositSheetOpen"
-        :appointment-name="appointment.appointmentName"
-        :deposit-amount="appointment.depositAmount"
-        :confirm-disabled="joinMutation.isPending.value"
-        :error-message="joinErrorMessage"
-        @close="closeDepositSheet"
-        @confirm="confirmJoin"
-      />
-
-      <div
-        v-if="topupPromptOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-scrim/70 px-screen"
-      >
-        <section
-          role="dialog"
-          aria-modal="true"
-          :aria-label="t('appointment.create.insufficientTitle')"
-          class="w-full max-w-[390px] rounded-card bg-surface-1 p-5 shadow-sheet"
-        >
-          <h2 class="text-title text-ink-display">
-            {{ t('appointment.create.insufficientTitle') }}
-          </h2>
-          <p class="mt-2 text-body-sm text-ink-3">
-            {{
-              t('appointment.create.insufficientDescription', { amount: formattedDepositAmount })
-            }}
-          </p>
-          <div class="mt-5 grid grid-cols-2 gap-3">
-            <AppButton
-              block
-              variant="secondary"
-              @click="closeTopupPrompt"
-            >
-              {{ t('appointment.create.insufficientLater') }}
-            </AppButton>
-            <AppButton
-              block
-              @click="goToTopup"
-            >
-              {{ t('appointment.create.insufficientTopup') }}
-            </AppButton>
-          </div>
-        </section>
       </div>
 
       <AppointmentMenuSheet
