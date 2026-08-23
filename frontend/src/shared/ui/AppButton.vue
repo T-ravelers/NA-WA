@@ -67,7 +67,9 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
   // `text-ink`는 어두운 캔버스 기준 흰 글자라 밝은 카드 위에서는 거의 안 보인다.
   'secondary-on-paper': 'rounded-sm border border-hairline-strong bg-transparent text-on-paper',
   tertiary: 'text-ink underline underline-offset-4',
-  settle: 'rounded-sm bg-settlement text-on-paper',
+  // 면만으로는 밝은 `paper` 카드 위에서 윤곽이 서지 않는다(1.52:1 < 3:1). 테두리가
+  // 그 경계를 대신 그린다 — `secondary` 계열과 같은 방식이다.
+  settle: 'rounded-sm border border-settlement-edge bg-settlement text-on-paper',
   destructive: 'rounded-sm bg-danger text-on-category',
   // 티켓(paper·소비 카테고리 코어색) 면 위의 짧은 동작 버튼. 시안 R4의 `Share ticket`.
   // 캔버스색 알약이라 어느 티켓 색 위에서도 ink 글자가 기본 대비(ink/canvas)를 그대로 갖는다.

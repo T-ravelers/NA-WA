@@ -29,6 +29,14 @@ describe('AppButton', () => {
     expect(mountButton({ variant }).get('button').classes()).toContain(expected)
   })
 
+  it('gives the settle surface an outline the light card cannot swallow', () => {
+    // 면(#ffb700)은 `paper`(#f1efe8) 카드 위에서 1.52:1이라 버튼 윤곽이 배경에
+    // 묻힌다. 테두리가 WCAG 1.4.11(3:1)을 대신 채운다.
+    expect(mountButton({ variant: 'settle' }).get('button').classes()).toContain(
+      'border-settlement-edge',
+    )
+  })
+
   it('uses readable dark text on the destructive surface', () => {
     const classes = mountButton({ variant: 'destructive' }).get('button').classes()
 
