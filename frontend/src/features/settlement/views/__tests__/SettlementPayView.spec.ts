@@ -241,6 +241,22 @@ describe('SettlementPayView', () => {
     expect(wrapper.get('[data-action="confirm-pay"]').text()).toBe('Pay 12.50 P')
   })
 
+  /*
+   * 지갑이 없다는 실패는 **원결제자 쪽 지갑 때문일 수도 있다.** 이체가 양쪽 지갑을 모두
+   * 확인하기 때문이다(`WalletTransferService.transfer`). 이 화면이 그 문장을 그대로
+   * 내보내므로, "your wallet"이라고 단정하면 자기 지갑이 멀쩡한 사용자가 자기 지갑
+   * 화면만 들여다보며 원인을 찾지 못한다.
+   */
+  it('does not blame the reader when a wallet is missing on either side', async () => {
+    pay.mockRejectedValue(new NormalizedApiError('WALLET-001', 404, 'not found'))
+    const { wrapper } = await mountPay()
+
+    // StateError의 첫 문단이 오류 코드 문구다. 아래 안내문·버튼 라벨은 이 검사 대상이 아니다.
+    const message = wrapper.get('[role="alert"] p').text()
+    expect(message).toBe('A wallet needed for this could not be found.')
+    expect(message).not.toMatch(/\byour\b/i)
+  })
+
   it('sends a locked wallet to the wallet screen rather than a retry', async () => {
     pay.mockRejectedValue(new NormalizedApiError('WALLET-016', 403, 'not active'))
     const { wrapper, router } = await mountPay()
