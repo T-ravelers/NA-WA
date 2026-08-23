@@ -41,11 +41,21 @@ function isActive(item: NavItem): boolean {
 
 <template>
   <!--
-    시안의 탭 바는 화면 폭을 꽉 채우고 아래로 붙는다. 안쪽 목록만 셸 폭으로 좁혀
-    넓은 뷰포트에서도 아이콘이 본문과 같은 폭 안에 남게 한다.
+    탭 바는 화면 폭을 꽉 채우고 아래로 붙는다. 안쪽 목록만 셸 폭으로 좁혀 넓은 뷰포트에서도
+    아이콘이 본문과 같은 폭 안에 남게 한다.
+
+    바닥을 canvas로 깐 유리다. 반투명만으로는 뒤에 오는 것에 따라 대비가 무너지므로,
+    어두운 면을 90%로 깔고 그 위에 흐림을 얹는다. 같은 어휘가 `EventDetailView`·
+    `PlaceDetailView`의 sticky 헤더에 이미 있다.
+
+    🔴 **V2 시안 이탈이다.** 시안(`2360:4325`)의 탭은 불투명 종이 면(`#f4f2ed`)이고 PR #429가
+    그것을 따랐다. 콘텐츠가 탭 아래로 이어지는 것이 보이지 않아 유리로 바꿨다 — 근거는
+    #496과 #326 코멘트에 있다.
+
+    투명도를 줄이도록 설정한 사용자에게는 배경을 불투명하게 하고 흐림을 끈다.
   -->
   <nav
-    class="fixed inset-x-0 bottom-0 z-10 bg-nav-surface pb-[calc(1rem+env(safe-area-inset-bottom))]"
+    class="fixed inset-x-0 bottom-0 z-10 border-t border-hairline-2 bg-canvas/90 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-xl reduce-transparency:bg-canvas reduce-transparency:backdrop-blur-none"
     :aria-label="t('nav.label')"
   >
     <!--
@@ -71,13 +81,13 @@ function isActive(item: NavItem): boolean {
             :is="item.icon"
             :size="24"
             :stroke-width="1.75"
-            :class="isActive(item) ? 'text-on-paper' : 'text-on-paper-2'"
+            :class="isActive(item) ? 'text-ink' : 'text-ink-2'"
             aria-hidden="true"
           />
           <span
             v-fit-text="0.8"
             class="max-w-full truncate text-micro"
-            :class="isActive(item) ? 'text-on-paper' : 'font-normal text-on-paper-2'"
+            :class="isActive(item) ? 'text-ink' : 'text-ink-2'"
             >{{ t(item.labelKey) }}</span
           >
         </RouterLink>
@@ -91,12 +101,12 @@ function isActive(item: NavItem): boolean {
             :is="item.icon"
             :size="24"
             :stroke-width="1.75"
-            class="text-on-paper-2"
+            class="text-ink-2"
             aria-hidden="true"
           />
           <span
             v-fit-text="0.8"
-            class="max-w-full truncate text-micro font-normal text-on-paper-2"
+            class="max-w-full truncate text-micro text-ink-2"
             >{{ t(item.labelKey) }}</span
           >
         </span>
