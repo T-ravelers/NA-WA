@@ -12,8 +12,10 @@ import { toValue, type MaybeRefOrGetter } from 'vue'
  * 화살표로 옮기면 **초점과 선택이 함께** 움직인다(WAI-ARIA radio group 패턴).
  * 끝에서는 반대쪽 끝으로 돌아간다.
  *
- * 초점 이동은 그룹 안에서 `[role="radio"]`를 순서대로 찾아 옮긴다. 컴포넌트마다 ref
- * 배열을 따로 들고 다니면 `v-for`가 바뀔 때 어긋나므로 DOM을 그대로 읽는다.
+ * 초점은 그룹 안에서 **`data-value`가 맞는 칩**을 찾아 옮긴다. 순서로 찾으면 「DOM 순서 =
+ * `values` 순서」가 조용한 전제가 되어, 옵션에 `v-if`가 붙는 순간 선택은 맞는 값으로 가고
+ * 초점만 다른 칩으로 간다. 컴포넌트마다 ref 배열을 들고 다니지 않으려고 DOM을 읽되,
+ * **무엇을 읽는지는 값으로 못 박는다.** 부르는 쪽은 각 칩에 `:data-value`를 준다.
  */
 
 /** 다음 초점으로 옮길지, 옮긴다면 몇 번째로 옮길지. */
@@ -34,18 +36,23 @@ function nextIndex(key: string, current: number, count: number): number | null {
   }
 }
 
-interface RovingRadioGroup {
+interface RovingRadioGroup<T extends string> {
   /** 그룹 컨테이너의 `keydown`에 건다. */
   onKeydown: (event: KeyboardEvent) => void
   /** 선택된 것만 탭 스톱으로 남긴다. */
-  tabindexFor: (value: string) => 0 | -1
+  tabindexFor: (value: T) => 0 | -1
 }
 
-export function useRovingRadioGroup(
-  values: MaybeRefOrGetter<readonly string[]>,
-  selected: MaybeRefOrGetter<string>,
-  select: (value: string) => void,
-): RovingRadioGroup {
+/**
+ * `T`로 열어 두면 호출부가 자기 유니온(`SpendingCategory`·`SettlementType`)을 그대로
+ * 넘기고 돌려받는다. `string`으로 좁혀 두면 돌려받은 값을 매번 캐스트해야 하고, 목록에
+ * 없는 값을 넣어도 컴파일이 잡아 주지 못한다.
+ */
+export function useRovingRadioGroup<T extends string>(
+  values: MaybeRefOrGetter<readonly T[]>,
+  selected: MaybeRefOrGetter<T>,
+  select: (value: T) => void,
+): RovingRadioGroup<T> {
   function onKeydown(event: KeyboardEvent): void {
     /*
      * 수식 키가 붙은 화살표는 그룹의 것이 아니다.
@@ -74,11 +81,17 @@ export function useRovingRadioGroup(
     const container = event.currentTarget
     if (!(container instanceof HTMLElement)) return
 
+    /*
+     * 선택자에 값을 끼워 넣지 않는다. 이스케이프가 필요해지고(`CSS.escape`는 jsdom에
+     * 없다) 값에 따옴표가 들어가면 조용히 아무것도 못 찾는다. 읽어서 비교한다.
+     */
     const radios = container.querySelectorAll<HTMLElement>('[role="radio"]')
-    radios.item(target)?.focus()
+    Array.from(radios)
+      .find((radio) => radio.dataset.value === nextValue)
+      ?.focus()
   }
 
-  function tabindexFor(value: string): 0 | -1 {
+  function tabindexFor(value: T): 0 | -1 {
     const list = toValue(values)
     const current = toValue(selected)
 

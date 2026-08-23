@@ -201,6 +201,14 @@ describe('SettlementCreateView', () => {
     expect(chosen.attributes('aria-disabled')).toBeUndefined()
 
     /*
+     * 네이티브 `disabled`는 붙이지 않는다. 붙이면 칩이 탭 순서에서 통째로 빠진다 —
+     * 결제자 칩은 「누를 수 없는 버튼」이 아니라 **닿을 수 있어야 하는 정보**다.
+     * 누가 `disabled`를 지우는 게 아니라 **덧붙이면** 위 단언들은 전부 통과하면서
+     * 키보드 도달성만 조용히 사라지므로, 그 판단을 여기서 못 박는다(#382 · #305 리뷰).
+     */
+    expect(payer.attributes('disabled')).toBeUndefined()
+
+    /*
      * 둘 다 밝은 면이다 — 결제자는 정산에 반드시 들어가므로 흐리게 만들면 그 사실이 같이
      * 흐려진다. 가르는 것은 명도가 아니라 안쪽 링이다.
      */

@@ -31,6 +31,16 @@ function select(value: string): void {
   emit('update:modelValue', value)
 }
 
+/**
+ * 조형과 접근성 트리가 같은 판정을 쓰게 묶는다.
+ *
+ * `selected`와 `aria-checked`에 같은 식을 두 번 적으면 한쪽만 고쳐도 아무도 못 잡는다 —
+ * 화면은 골라진 것으로 그려지는데 보조기술은 아니라고 읽는 상태가 조용히 만들어진다.
+ */
+function isSelected(value: string): boolean {
+  return value === modelValue
+}
+
 const { onKeydown, tabindexFor } = useRovingRadioGroup(
   () => options.map((option) => option.value),
   () => modelValue,
@@ -51,10 +61,11 @@ const { onKeydown, tabindexFor } = useRovingRadioGroup(
       interactive
       size="segment"
       :label="option.label"
-      :selected="option.value === modelValue"
+      :selected="isSelected(option.value)"
       role="radio"
       :data-testid="`segment-${option.value}`"
-      :aria-checked="option.value === modelValue"
+      :data-value="option.value"
+      :aria-checked="isSelected(option.value)"
       :tabindex="tabindexFor(option.value)"
       @toggle="select(option.value)"
     />

@@ -64,9 +64,14 @@ const { onKeydown: onCategoryKeydown, tabindexFor: categoryTabindex } = useRovin
   () => SPENDING_CATEGORIES,
   () => spendingCategory.value,
   (value) => {
-    spendingCategory.value = value as SpendingCategory
+    spendingCategory.value = value
   },
 )
+
+/** 조형과 접근성 트리가 같은 판정을 쓰게 묶는다. 둘이 어긋나면 아무도 못 잡는다. */
+function isSelectedCategory(value: SpendingCategory): boolean {
+  return value === spendingCategory.value
+}
 
 const isSharedExpense = computed(() => spendingScope.value === 'shared')
 const ongoingAppointmentsQuery = useMyOngoingAppointmentsQuery(isSharedExpense)
@@ -445,10 +450,11 @@ const completePayment = (): void => {
             :key="option.value"
             interactive
             :label="option.label"
-            :selected="option.value === spendingCategory"
+            :selected="isSelectedCategory(option.value)"
             role="radio"
             :data-testid="`payment-category-${option.value}`"
-            :aria-checked="option.value === spendingCategory"
+            :data-value="option.value"
+            :aria-checked="isSelectedCategory(option.value)"
             :tabindex="categoryTabindex(option.value)"
             @toggle="spendingCategory = option.value"
           />

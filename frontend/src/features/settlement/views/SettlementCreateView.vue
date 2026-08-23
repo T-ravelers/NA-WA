@@ -288,7 +288,7 @@ const SETTLEMENT_TYPES: readonly SettlementType[] = ['EQUAL', 'ITEMIZED']
 const { onKeydown: onMethodKeydown, tabindexFor: methodTabindex } = useRovingRadioGroup(
   SETTLEMENT_TYPES,
   () => type.value,
-  (value) => setType(value as SettlementType),
+  setType,
 )
 
 /**
@@ -708,6 +708,7 @@ defineExpose({ back })
           type="button"
           role="radio"
           :data-type="option"
+          :data-value="option"
           :aria-checked="type === option"
           :tabindex="methodTabindex(option)"
           class="min-h-11 rounded-pill px-3 text-body-sm"
@@ -757,13 +758,13 @@ defineExpose({ back })
           :aria-pressed="selectedIds.has(participant.id)"
           :aria-disabled="isPayer(participant.id) || undefined"
           class="min-h-12 rounded-sm px-3 text-left"
-          :class="[
+          :class="
             isPayer(participant.id)
               ? 'cursor-default bg-paper-fill text-on-paper ring-2 ring-inset ring-on-paper/30'
               : selectedIds.has(participant.id)
                 ? 'bg-paper-fill text-on-paper'
-                : 'bg-surface-1 text-ink-2',
-          ]"
+                : 'bg-surface-1 text-ink-2'
+          "
           @click="toggleParticipant(participant.id)"
         >
           {{ participant.name

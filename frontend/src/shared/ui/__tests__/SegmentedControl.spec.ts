@@ -119,6 +119,26 @@ describe('SegmentedControl', () => {
     },
   )
 
+  /*
+   * 초점이 **선택과 함께** 움직여야 라디오 그룹이다. 선택만 바뀌고 초점이 남으면 다음
+   * 화살표가 엉뚱한 자리에서 출발한다.
+   *
+   * 이 단언이 없으면 초점 이동이 통째로 깨져도 조용하다 — 실제로 `CSS.escape`가 jsdom에
+   * 없어 핸들러가 터졌는데, 선택은 이미 바뀐 뒤라 다른 단언은 전부 통과했다.
+   */
+  it('moves focus onto the newly selected option', async () => {
+    const wrapper = mount(SegmentedControl, {
+      props: { modelValue: 'ongoing', options: OPTIONS, label: 'Journey filter' },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('[role="radiogroup"]').trigger('keydown', { key: 'ArrowRight' })
+
+    expect(document.activeElement).toBe(wrapper.get('[data-value="past"]').element)
+
+    wrapper.unmount()
+  })
+
   /* 화살표가 화면까지 스크롤하면 그룹 안에서 이동만 하려던 조작이 페이지를 흔든다. */
   it('stops the arrow key from also scrolling the page', async () => {
     const wrapper = mountControl('ongoing')
