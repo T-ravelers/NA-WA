@@ -1174,6 +1174,111 @@ function stubJourneyListForEvent(page, { overlapping = true } = {}) {
 }
 
 /**
+ * Discover 목록(Events 탭) 응답을 세운다.
+ *
+ * 목록 화면은 그동안 낱장으로 찍히지 않아 카드 조형·필터 칩·280px 폭을 눈으로 확인할
+ * 방법이 없었다. 사진은 외부 주소를 부르지 않도록 비워 `ImagePlaceholder`가 그려지게 한다.
+ *
+ * `eventKind`와 `status`는 `EVENT_KINDS`·`EVENT_STATUSES`에 있는 값만 쓴다. 다른 값을 쓰면
+ * `responseSchema`가 응답을 통째로 거절해 목록이 오류로 떨어진다.
+ */
+function stubExploreEventList(page) {
+  /**
+   * 사진 갈래도 한 장은 찍어야 한다. 자리표시만 나오면 `<img>` 쪽 회귀가 스냅샷에 잡히지
+   * 않는다. 외부 주소를 부르지 않도록 1x1 PNG를 data URI로 박아 둔다.
+   */
+  const PIXEL =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+  const event = (
+    itemId,
+    eventKind,
+    status,
+    title,
+    region2,
+    startDate,
+    endDate,
+    thumbnailUrl = null,
+  ) => ({
+    itemId,
+    eventKind,
+    status,
+    title,
+    subtitle: null,
+    thumbnailUrl,
+    region1: 'Seoul',
+    region2,
+    region3: null,
+    latitude: 37.5665,
+    longitude: 126.978,
+    startDate,
+    endDate,
+    saved: false,
+  })
+
+  return page.route('**/api/v1/explore/events?*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          content: [
+            event(
+              301,
+              'FESTIVAL',
+              'ONGOING',
+              'DDP Architecture Tour',
+              'Dongdaemun',
+              '2026-01-01',
+              '2026-12-31',
+              PIXEL,
+            ),
+            /*
+             * 세 상태가 한 화면에 모두 보이도록 순서를 잡았다. 러너는 뷰포트만 찍으므로
+             * 네 번째 카드는 스냅샷에 들어오지 않는다. 종료는 표현이 가장 약한 상태라
+             * 목록 아래로 밀어 두면 확인할 방법이 사라진다.
+             */
+            event(
+              304,
+              'EXHIBITION',
+              'ENDED',
+              'Hongdae Vintage Fashion Fair',
+              'Hongdae',
+              '2026-06-01',
+              '2026-06-30',
+            ),
+            event(
+              303,
+              'FESTIVAL',
+              'SCHEDULED',
+              'Han River Food Festival',
+              'Yeouido',
+              '2026-08-14',
+              '2026-08-23',
+            ),
+            event(
+              302,
+              'POPUP',
+              'ONGOING',
+              'Seongsu Character Goods Pop-up',
+              'Seongsu',
+              '2026-07-20',
+              '2026-08-17',
+            ),
+          ],
+          page: 0,
+          size: 20,
+          totalElements: 496,
+          totalPages: 25,
+          hasNext: true,
+        },
+      }),
+    }),
+  )
+}
+
+/**
  * Event 상세 응답을 세운다. 좌표가 있는 상세와, 좌표가 NULL이라 지도 버튼이 숨는
  * 상세(#221 완료 기준)를 id로 나눠 찍는다.
  */
@@ -1439,6 +1544,12 @@ const SCREENS = [
       await stubSettlementCandidatesError(page)
     },
     prepare: (page) => page.getByRole('alert').waitFor({ timeout: 10_000 }),
+  },
+  {
+    // 목록은 상세와 달리 카드가 여러 장 쌓이는 화면이라 폭이 좁아질 때 먼저 무너진다.
+    name: '35-explore-discover',
+    path: '/explore',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubExploreEventList(page)]),
   },
   {
     name: '25-explore-place-detail',
