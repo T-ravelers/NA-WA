@@ -4,6 +4,7 @@ const clearQueries = vi.fn()
 const clearMemberProfile = vi.fn()
 const clearReturnPath = vi.fn()
 const clearCsrfToken = vi.fn()
+const clearExploreFilterMemory = vi.fn()
 const replace = vi.fn()
 const currentRoute = { value: { path: '/wallet', fullPath: '/wallet?tab=history' } }
 
@@ -17,6 +18,10 @@ vi.mock('@/app/router', () => ({
 
 vi.mock('@/features/auth/model/returnPath', () => ({
   clearReturnPath: () => clearReturnPath(),
+}))
+
+vi.mock('@/features/explore/model/exploreFilterMemory', () => ({
+  useExploreFilterMemoryStore: () => ({ clear: () => clearExploreFilterMemory() }),
 }))
 
 vi.mock('@/features/member/model/memberQueries', () => ({
@@ -42,6 +47,7 @@ describe('sessionHandlers', () => {
     expect(clearMemberProfile).toHaveBeenCalledOnce()
     expect(clearQueries).toHaveBeenCalledOnce()
     expect(clearCsrfToken).toHaveBeenCalledOnce()
+    expect(clearExploreFilterMemory).toHaveBeenCalledOnce()
     expect(replace).toHaveBeenCalledWith({
       path: '/sign-in',
       query: { returnPath: '/wallet?tab=history' },
@@ -63,6 +69,7 @@ describe('sessionHandlers', () => {
     expect(clearMemberProfile).toHaveBeenCalledOnce()
     expect(clearQueries).toHaveBeenCalledOnce()
     expect(clearCsrfToken).toHaveBeenCalledOnce()
+    expect(clearExploreFilterMemory).toHaveBeenCalledOnce()
     expect(clearReturnPath).toHaveBeenCalledOnce()
     expect(replace).toHaveBeenCalledWith({ path: '/sign-in' })
   })
@@ -73,6 +80,7 @@ describe('sessionHandlers', () => {
     expect(clearMemberProfile).toHaveBeenCalledOnce()
     expect(clearQueries).toHaveBeenCalledOnce()
     expect(clearCsrfToken).toHaveBeenCalledOnce()
+    expect(clearExploreFilterMemory).toHaveBeenCalledOnce()
     expect(clearReturnPath).toHaveBeenCalledOnce()
     expect(replace).toHaveBeenCalledWith({ path: '/sign-in' })
   })

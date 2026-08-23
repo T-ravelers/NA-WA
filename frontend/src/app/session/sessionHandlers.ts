@@ -1,6 +1,7 @@
 import { queryClient } from '@/app/query/client'
 import { router } from '@/app/router'
 import { clearReturnPath } from '@/features/auth/model/returnPath'
+import { useExploreFilterMemoryStore } from '@/features/explore/model/exploreFilterMemory'
 import { clearMemberProfile } from '@/features/member/model/memberQueries'
 import { clearCsrfToken } from '@/shared/api/csrf'
 import { AUTH_CALLBACK_PATH, SIGN_IN_PATH } from '@/shared/config/routePaths'
@@ -13,6 +14,8 @@ function clearSessionData(): void {
   clearMemberProfile()
   queryClient.clear()
   clearCsrfToken()
+  // Vue Query 밖에 있어 위 캐시 비우기가 닿지 않는다. 찜 필터가 다음 계정으로 넘어간다.
+  useExploreFilterMemoryStore().clear()
 }
 
 /** 세션 만료는 사용자가 보던 보호 경로를 로그인 뒤 복원한다. */

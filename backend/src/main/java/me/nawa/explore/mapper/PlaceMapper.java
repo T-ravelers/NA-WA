@@ -32,4 +32,6 @@ public interface PlaceMapper {
         @Param("placeId") Long placeId,
         @Param("language") String language
     );
+
+    int increasePlaceViewCount(@Param("placeId") Long placeId);
 }

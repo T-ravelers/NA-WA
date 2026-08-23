@@ -39,11 +39,18 @@ public class EventController {
         @PathVariable Long eventId,
         // TODO(국제화 후속 이슈): 크롤링 원본 국제화 전까지 en을 기본 언어로 사용한다.
         @RequestParam(name = "language", defaultValue = "en") String language,
+        // 상세 화면을 연 요청만 조회수를 올린다. 기본값을 거짓으로 둬서 이 API로 값만
+        // 읽어 가는 호출부가 모르고 조회수를 부풀리지 않게 한다.
+        @RequestParam(name = "countView", defaultValue = "false") boolean countView,
         @AuthenticationPrincipal AuthenticatedMember member
     ) {
         Long memberId = member == null ? null : member.getMemberId();
-        return ApiResponse.success(
-            eventService.getEventDetail(eventId, language, memberId)
-        );
+        EventDetailResponse event = eventService.getEventDetail(eventId, language, memberId);
+        // 상세를 다 읽은 뒤에 센다. 읽기 트랜잭션 안에서 집계하면 상세 요청 하나가
+        // 커넥션을 두 개 잡는다(EventService#recordEventView).
+        if (countView) {
+            eventService.recordEventView(eventId);
+        }
+        return ApiResponse.success(event);
     }
 }

@@ -1,5 +1,6 @@
 package me.nawa.explore.mapper;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
@@ -34,6 +35,51 @@ class PlaceMapperXmlTest {
         assertTrue(configuration.hasStatement(
             "me.nawa.explore.mapper.PlaceMapper.findPlaceActivities"
         ));
+    }
+
+    @Test
+    void categoryFilters_joinTheSectorAndActivityConditionsWithOr() throws Exception {
+        Configuration configuration = configuration();
+
+        PlaceSearchRequest request = new PlaceSearchRequest();
+        request.setSectorIds(List.of(2L));
+        request.setActivityIds(List.of(2L));
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+        parameters.put("offset", 0);
+        parameters.put("limit", 20);
+        parameters.put("memberId", null);
+
+        MappedStatement statement = configuration.getMappedStatement(
+            "me.nawa.explore.mapper.PlaceMapper.searchPlaces"
+        );
+        String sql = statement.getBoundSql(parameters).getSql().replaceAll("\\s+", " ");
+
+        assertTrue(sql.contains(") OR EXISTS ("));
+    }
+
+    @Test
+    void categoryFilters_leaveNoDanglingOr_whenOnlyActivitiesAreGiven() throws Exception {
+        Configuration configuration = configuration();
+
+        PlaceSearchRequest request = new PlaceSearchRequest();
+        request.setActivityIds(List.of(9L));
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+        parameters.put("offset", 0);
+        parameters.put("limit", 20);
+        parameters.put("memberId", null);
+
+        MappedStatement statement = configuration.getMappedStatement(
+            "me.nawa.explore.mapper.PlaceMapper.searchPlaces"
+        );
+        String sql = statement.getBoundSql(parameters).getSql().replaceAll("\\s+", " ");
+
+        /* 대분류가 없으면 앞의 OR가 남아 문법이 깨진다. trim이 지워야 한다. */
+        assertFalse(sql.contains("AND ( OR EXISTS"));
+        assertTrue(sql.contains("filter_pa.activity_id IN"));
     }
 
     @Test

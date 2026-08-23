@@ -156,7 +156,8 @@ const DATE_PRESETS = [
 
 const draft = reactive<EventSearchFilters>(cloneFilters(props.filters))
 const selectedRegion = ref(SEOUL_REGION1)
-const expandedCategories = ref<string[]>(['explore.categories.beauty'])
+// 시트를 열면 전부 접어 둔다. 하나만 펼쳐 두면 그 대분류만 있는 것처럼 보인다.
+const expandedCategories = ref<string[]>([])
 
 watch(
   () => props.filters,
@@ -171,13 +172,13 @@ watch(
 watch(
   draft,
   (filters) => {
-    emit('change', cloneFilters(filters))
+    const changed = cloneFilters(filters)
+    collapseCategorySelection(changed)
+    emit('change', changed)
   },
   { deep: true },
 )
 
-const selectedSectors = computed(() => new Set(draft.sectorIds ?? []))
-const selectedActivities = computed(() => new Set(draft.activityIds ?? []))
 const currentRegion = computed(
   () => REGION_OPTIONS.find((region) => region.value === selectedRegion.value) ?? REGION_OPTIONS[0],
 )
@@ -230,13 +231,25 @@ function setDatePreset(value: string): void {
 
 function setCalendarDate(value: string): void {
   if (!isDateAllowed(value)) return
+
+  // 이번 탭이 달력의 첫 탭인지 먼저 붙잡는다. 아래 판정보다 늦게 읽으면 항상 거짓이다.
+  const firstTap = !calendarTouched.value
   calendarTouched.value = true
 
-  // 프리셋 범위 전체가 그대로 선택돼 있는 상태라면, 첫 탭은 범위를 닫는 게
-  // 아니라 그 안에서 새로 고르기 시작하는 것으로 본다.
+  /*
+   * 프리셋 범위 전체가 그대로 선택돼 있는 상태라면, 첫 탭은 범위를 닫는 게 아니라 그 안에서
+   * 새로 고르기 시작하는 것으로 본다.
+   *
+   * 값만으로는 부족하다. Opening soon은 상한이 없어 `max`가 `undefined`인데, 첫 탭을 마친
+   * 뒤의 `endDate`도 `undefined`다. 그래서 첫 탭이 하필 프리셋 시작일이면 두 상태가 똑같아
+   * 보이고, 두 번째 탭이 범위를 닫지 못한 채 시작일만 덮어쓴다. 첫 탭인지를 함께 본다.
+   */
   const presetRange = draft.datePreset ? presetDateRange(draft.datePreset) : null
   const presetPristine =
-    presetRange !== null && draft.startDate === presetRange.min && draft.endDate === presetRange.max
+    firstTap &&
+    presetRange !== null &&
+    draft.startDate === presetRange.min &&
+    draft.endDate === presetRange.max
 
   if (presetPristine || draft.startDate === undefined || draft.endDate !== undefined) {
     draft.startDate = value
@@ -251,6 +264,35 @@ function setCalendarDate(value: string): void {
   }
 
   draft.endDate = value
+}
+
+/**
+ * 정렬 시트에서 지금 무엇이 골라져 있는가. 네 항목은 서로 배타적이라 택 1이다.
+ *
+ * `Saved`는 정렬이 아니라 필터라서 `sort`와 다른 곳에 담긴다. 그래서 화면에 체크를
+ * 그리려면 둘을 한 값으로 합쳐야 한다. `Saved`가 켜져 있으면 `sort`가 무엇이든 체크는
+ * `Saved`에만 붙는다 — 두 개가 동시에 체크된 것처럼 보이면 택 1이 아니게 된다.
+ */
+const sortSelection = computed<string>(() =>
+  draft.savedOnly === true ? 'SAVED' : (draft.sort ?? 'NEWEST'),
+)
+
+function selectSort(value: EventSearchFilters['sort']): void {
+  draft.sort = value
+  draft.savedOnly = undefined
+}
+
+/**
+ * 찜한 항목만 보기.
+ *
+ * 목록 순서는 직전 정렬을 그대로 쓴다 — `sort`를 건드리지 않는 이유다. 체크만 옮겨간다.
+ *
+ * 다시 누르면 꺼진다. 라디오라면 켠 것을 다시 눌러도 안 꺼지는 게 맞지만, 이 줄만
+ * 체크박스 모양이라 다시 누르면 꺼진다고 읽힌다. 끄는 길이 화면에 없으면 잘못 눌렀을 때
+ * 되돌릴 방법을 찾지 못한다 — 체크가 정렬 항목으로 돌아가고 순서도 그대로다.
+ */
+function selectSavedOnly(): void {
+  draft.savedOnly = draft.savedOnly === true ? undefined : true
 }
 
 function selectRegion(value: string): void {
@@ -277,50 +319,93 @@ function toggleArea(value: string): void {
   draft.region2 = [...current]
 }
 
-function isSectorSelected(sectorId: number): boolean {
-  return selectedSectors.value.has(sectorId)
-}
+/**
+ * 화면이 들고 있는 소분류 체크 상태.
+ *
+ * 대분류 체크는 따로 저장하지 않고 "그 아래 소분류가 전부 체크됐는가"로만 판단한다. 두 곳에
+ * 따로 두면 소분류를 하나 끄고도 대분류 체크가 남는 어긋남이 생긴다.
+ *
+ * 주소에는 대분류가 ID 하나로 실려 오므로(`eventSectorIds=2`) 여기서 소분류로 펼쳐 둔다.
+ * 서버로 보낼 때는 `collapseCategorySelection`이 다시 대분류로 접는다.
+ */
+const checkedActivities = computed<Set<number>>(() => {
+  const values = new Set(draft.activityIds ?? [])
+  ;(draft.sectorIds ?? []).forEach((sectorId) => {
+    EVENT_SECTOR_OPTIONS.find((sector) => sector.id === sectorId)?.activities.forEach((activity) =>
+      values.add(activity.id),
+    )
+  })
+
+  return values
+})
 
 function isActivitySelected(activityId: number): boolean {
-  return selectedActivities.value.has(activityId)
+  return checkedActivities.value.has(activityId)
 }
 
+/** 그 대분류에서 고른 소분류 개수. 접혀 있어도 무엇을 골랐는지 알 수 있게 헤더에 적는다. */
+function selectedActivityCount(sector: (typeof EVENT_SECTOR_OPTIONS)[number]): number {
+  return sector.activities.filter((activity) => checkedActivities.value.has(activity.id)).length
+}
+
+/** 대분류 체크는 그 아래 소분류가 전부 체크됐을 때만 켜진다. */
 function isSectorFullySelected(sector: (typeof EVENT_SECTOR_OPTIONS)[number]): boolean {
-  return (
-    isSectorSelected(sector.id) ||
-    sector.activities.every((activity) => selectedActivities.value.has(activity.id))
-  )
+  return sector.activities.every((activity) => checkedActivities.value.has(activity.id))
 }
 
+/** 화면 상태를 하나의 소분류 집합으로 확정한다. 대분류 칸은 늘 비운다. */
+function writeCheckedActivities(values: Set<number>): void {
+  draft.sectorIds = undefined
+  draft.activityIds = values.size > 0 ? [...values].sort((a, b) => a - b) : undefined
+}
+
+/** 대분류를 켜면 그 아래 소분류가 전부 켜지고, 끄면 전부 꺼진다. */
 function toggleSector(sector: (typeof EVENT_SECTOR_OPTIONS)[number]): void {
-  const sectorIds = new Set(draft.sectorIds ?? [])
-  const activityIds = new Set(draft.activityIds ?? [])
-  const isSelected = isSectorFullySelected(sector)
+  const values = new Set(checkedActivities.value)
+  const turningOff = isSectorFullySelected(sector)
 
-  sector.activities.forEach((activity) => activityIds.delete(activity.id))
-  if (isSelected) sectorIds.delete(sector.id)
-  else sectorIds.add(sector.id)
+  sector.activities.forEach((activity) => {
+    if (turningOff) values.delete(activity.id)
+    else values.add(activity.id)
+  })
 
-  draft.sectorIds = [...sectorIds]
-  draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
+  writeCheckedActivities(values)
 }
 
-function toggleActivity(sectorId: number, activityId: number): void {
-  const sectorIds = new Set(draft.sectorIds ?? [])
-  const activityIds = new Set(draft.activityIds ?? [])
+/**
+ * 소분류 하나를 켜고 끈다.
+ *
+ * 대분류를 따로 건드리지 않는다 — 하나라도 꺼지면 `isSectorFullySelected`가 저절로 거짓이
+ * 되고, 전부 켜지면 저절로 참이 된다.
+ */
+function toggleActivity(activityId: number): void {
+  const values = new Set(checkedActivities.value)
+  if (values.has(activityId)) values.delete(activityId)
+  else values.add(activityId)
 
-  if (activityIds.has(activityId)) activityIds.delete(activityId)
-  else activityIds.add(activityId)
-  sectorIds.delete(sectorId)
+  writeCheckedActivities(values)
+}
 
-  const sector = EVENT_SECTOR_OPTIONS.find((option) => option.id === sectorId)
-  if (sector?.activities.every((activity) => activityIds.has(activity.id))) {
-    sector.activities.forEach((activity) => activityIds.delete(activity.id))
-    sectorIds.add(sectorId)
-  }
+/**
+ * 서버로 보낼 형태로 접는다. 소분류가 전부 켜진 대분류는 대분류 ID 하나로 바꾼다.
+ *
+ * 서버는 대분류 조건과 소분류 조건을 OR로 묶으므로 접지 않아도 결과는 같다. 그래도 접는
+ * 것은 주소가 짧아지고, 두 조건이 삭제된 활동을 다르게 다루는 차이(소분류 조건은
+ * `activity` 테이블을 join하지 않는다)에 덜 노출되기 때문이다.
+ */
+function collapseCategorySelection(filters: EventSearchFilters): void {
+  const values = new Set(checkedActivities.value)
+  const sectorIds: number[] = []
 
-  draft.sectorIds = sectorIds.size > 0 ? [...sectorIds] : undefined
-  draft.activityIds = activityIds.size > 0 ? [...activityIds] : undefined
+  EVENT_SECTOR_OPTIONS.forEach((sector) => {
+    if (!sector.activities.every((activity) => values.has(activity.id))) return
+
+    sector.activities.forEach((activity) => values.delete(activity.id))
+    sectorIds.push(sector.id)
+  })
+
+  filters.sectorIds = sectorIds.length > 0 ? sectorIds : undefined
+  filters.activityIds = values.size > 0 ? [...values].sort((a, b) => a - b) : undefined
 }
 
 function toggleExpandedCategory(label: string): void {
@@ -358,6 +443,7 @@ function resetSheet(): void {
 
 function apply(): void {
   const filters = cloneFilters(draft)
+  collapseCategorySelection(filters)
   // 하루만 고른 선택은 여기서 시작=종료의 하루짜리 기간으로 확정한다.
   // 달력을 만지지 않은 Opening soon 기본 상태만 상한 없이 시작일을 열어 둔다.
   if (
@@ -516,7 +602,15 @@ function apply(): void {
                 @click="toggleExpandedCategory(sector.labelKey)"
               >
                 <CategoryDot :category="sector.category" />
-                <span class="flex-1 text-title-sm text-ink">{{ t(sector.labelKey) }}</span>
+                <span class="flex-1 text-title-sm text-ink"
+                  >{{ t(sector.labelKey)
+                  }}<span
+                    v-if="selectedActivityCount(sector) > 0"
+                    class="text-caption text-ink-3"
+                  >
+                    · {{ selectedActivityCount(sector) }}</span
+                  ></span
+                >
                 <span
                   role="checkbox"
                   tabindex="0"
@@ -565,7 +659,7 @@ function apply(): void {
                       ? 'border-paper-fill bg-paper-fill text-on-paper'
                       : 'border-hairline text-ink-2'
                   "
-                  @click="toggleActivity(sector.id, activity.id)"
+                  @click="toggleActivity(activity.id)"
                 >
                   {{ t(activity.labelKey) }}
                 </button>
@@ -618,11 +712,11 @@ function apply(): void {
               :key="sortOption.value"
               type="button"
               class="flex min-h-16 w-full items-center justify-between text-left"
-              @click="draft.sort = sortOption.value as EventSearchFilters['sort']"
+              @click="selectSort(sortOption.value as EventSearchFilters['sort'])"
             >
               <span
                 class="text-body"
-                :class="draft.sort === sortOption.value ? 'text-ink' : 'text-ink-2'"
+                :class="sortSelection === sortOption.value ? 'text-ink' : 'text-ink-2'"
               >
                 {{ t(sortOption.labelKey) }}
                 <span
@@ -635,13 +729,13 @@ function apply(): void {
               <span
                 class="flex size-6 items-center justify-center rounded-pill"
                 :class="
-                  draft.sort === sortOption.value
+                  sortSelection === sortOption.value
                     ? 'bg-paper-fill text-on-paper'
                     : 'border border-hairline-2'
                 "
               >
                 <IconCheck
-                  v-if="draft.sort === sortOption.value"
+                  v-if="sortSelection === sortOption.value"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"
@@ -651,22 +745,24 @@ function apply(): void {
             <button
               type="button"
               class="flex min-h-16 w-full items-center justify-between text-left"
-              @click="draft.savedOnly = draft.savedOnly === true ? undefined : true"
+              @click="selectSavedOnly"
             >
               <span
                 class="text-body"
-                :class="draft.savedOnly ? 'text-ink' : 'text-ink-2'"
+                :class="sortSelection === 'SAVED' ? 'text-ink' : 'text-ink-2'"
               >
                 {{ t('explore.sort.saved') }}
               </span>
               <span
                 class="flex size-6 items-center justify-center rounded-pill"
                 :class="
-                  draft.savedOnly ? 'bg-paper-fill text-on-paper' : 'border border-hairline-2'
+                  sortSelection === 'SAVED'
+                    ? 'bg-paper-fill text-on-paper'
+                    : 'border border-hairline-2'
                 "
               >
                 <IconCheck
-                  v-if="draft.savedOnly"
+                  v-if="sortSelection === 'SAVED'"
                   :size="15"
                   :stroke-width="2.5"
                   aria-hidden="true"

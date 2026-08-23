@@ -131,12 +131,20 @@ export async function fetchEventList(filters: EventSearchFilters = {}): Promise<
   return response.data
 }
 
+/**
+ * `countView`는 사용자가 상세 화면을 연 호출에서만 켠다.
+ *
+ * 같은 API를 약속 생성 폼도 위치만 읽으려고 부른다. 서버가 무조건 세면 그 화면을 열 때마다
+ * 조회수가 오르므로, 셀지 말지를 호출부가 알려준다. 기본값이 꺼짐이라 새 호출부가 모르고
+ * 조회수를 부풀리는 일은 없다.
+ */
 export async function fetchEventDetail(
   eventId: number | string,
   language = 'en',
+  { countView = false }: { countView?: boolean } = {},
 ): Promise<EventDetail> {
   const response = await httpClient.get<EventDetail>(`${EVENT_DETAIL_PATH}/${eventId}`, {
-    params: { language },
+    params: countView ? { language, countView: true } : { language },
     responseSchema: eventDetailResponseSchema,
   })
 
@@ -170,12 +178,14 @@ export async function unlikeExploreItem(itemId: number): Promise<ExploreItemLike
   return response.data
 }
 
+/** `countView`의 뜻은 `fetchEventDetail`과 같다. */
 export async function fetchPlaceDetail(
   placeId: number | string,
   language = 'en',
+  { countView = false }: { countView?: boolean } = {},
 ): Promise<PlaceDetail> {
   const response = await httpClient.get<PlaceDetailResponse>(`${PLACE_DETAIL_PATH}/${placeId}`, {
-    params: { language },
+    params: countView ? { language, countView: true } : { language },
     responseSchema: placeDetailResponseSchema,
   })
 

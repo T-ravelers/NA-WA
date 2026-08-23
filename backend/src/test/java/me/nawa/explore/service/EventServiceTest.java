@@ -6,6 +6,7 @@ import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -32,6 +33,9 @@ class EventServiceTest {
 
     @Mock
     private EventMapper eventMapper;
+
+    @Mock
+    private ExploreViewCountRecorder viewCountRecorder;
 
     @InjectMocks
     private EventService eventService;
@@ -275,8 +279,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null
-        );
+            null);
 
         assertEquals(990001L, result.getEventId());
         assertEquals("FESTIVAL", result.getEventKind());
@@ -284,6 +287,40 @@ class EventServiceTest {
         assertEquals(0, result.getActivities().size());
         verify(eventMapper).findEventDetail(990001L, "ko", null);
         verify(eventMapper).findEventActivities(990001L, "ko");
+    }
+
+    /*
+     * 상세를 읽는 경로는 조회수를 세지 않는다. 이 메서드는 읽기 트랜잭션 안에서 돌고,
+     * 그 안에서 집계하면 REQUIRES_NEW가 커넥션을 하나 더 잡는다. 세는 것은 트랜잭션이
+     * 끝난 뒤 호출부(컨트롤러)의 몫이다.
+     */
+    @Test
+    void getEventDetail_leavesTheViewCountAlone() {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .build();
+        when(eventMapper.findEventDetail(990001L, "ko", null)).thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ko")).thenReturn(List.of());
+
+        eventService.getEventDetail(990001L, "ko", null);
+
+        verifyNoInteractions(viewCountRecorder);
+    }
+
+    @Test
+    void recordEventView_countsTheView() {
+        eventService.recordEventView(990001L);
+
+        verify(viewCountRecorder).recordEventView(990001L);
+    }
+
+    @Test
+    void recordEventView_swallowsTheFailure() {
+        doThrow(new IllegalStateException("boom"))
+            .when(viewCountRecorder).recordEventView(990001L);
+
+        /* 조회수는 부가 정보다. 집계가 멈춰도 상세 화면은 열려야 한다. */
+        eventService.recordEventView(990001L);
     }
 
     @Test
@@ -327,8 +364,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null
-        );
+            null);
 
         assertEquals(List.of(), result.getActivities());
         verify(eventMapper).findEventActivities(990001L, "ko");
@@ -359,8 +395,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "en",
-            null
-        );
+            null);
 
         assertEquals(
             "https://example.com",
@@ -402,8 +437,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null
-        );
+            null);
 
         assertEquals(
             "https://example.com/pre-reservation",
@@ -429,8 +463,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null
-        );
+            null);
 
         assertEquals(
             "https://example.com/reservation",
@@ -455,8 +488,7 @@ class EventServiceTest {
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
             "ko",
-            null
-        );
+            null);
 
         assertEquals(
             "https://example.com/links-reservation",

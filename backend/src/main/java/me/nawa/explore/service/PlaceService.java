@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PlaceService {
@@ -36,6 +38,7 @@ public class PlaceService {
         "RESTAURANT", "CAFE", "MARKET", "BEAUTY", "ETC"
     );
     private final PlaceMapper placeMapper;
+    private final ExploreViewCountRecorder viewCountRecorder;
 
     @Transactional(readOnly = true)
     public PlaceListResponse searchPlaces(
@@ -54,6 +57,12 @@ public class PlaceService {
         return createListResponse(content, total, request);
     }
 
+    /**
+     * Place 상세를 읽는다.
+     *
+     * EventService.getEventDetail과 같다. 조회수는 여기서 세지 않고 호출부가 이 메서드를
+     * 마친 뒤 {@link #recordPlaceView(Long)}를 부른다.
+     */
     @Transactional(readOnly = true)
     public PlaceDetailResponse getPlaceDetail(
         Long placeId,
@@ -78,7 +87,21 @@ public class PlaceService {
         place.setImageUrls(normalizeJsonKeys(place.getImageUrls()));
         place.setOpeningHours(normalizeJsonKeys(place.getOpeningHours()));
         place.setClosedDays(normalizeJsonKeys(place.getClosedDays()));
+
         return place;
+    }
+
+    /**
+     * 조회수 집계가 실패해도 상세 화면은 열려야 한다. 삼키되 로그는 남긴다.
+     *
+     * EventService.recordEventView와 같은 이유로 **읽기 트랜잭션 밖에서** 부른다.
+     */
+    public void recordPlaceView(Long placeId) {
+        try {
+            viewCountRecorder.recordPlaceView(placeId);
+        } catch (RuntimeException exception) {
+            log.warn("Failed to record the Place view count. placeId={}", placeId, exception);
+        }
     }
 
     private void normalizeAndValidate(PlaceSearchRequest request) {

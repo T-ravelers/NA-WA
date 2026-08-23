@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EventService {
@@ -45,6 +47,7 @@ public class EventService {
         "EXHIBITION"
     );
     private final EventMapper eventMapper;
+    private final ExploreViewCountRecorder viewCountRecorder;
 
     @Transactional(readOnly = true)
     public EventListResponse searchEvents(
@@ -165,6 +168,12 @@ public class EventService {
         return (int) ((totalElements + size - 1) / size);
     }
 
+    /**
+     * Event 상세를 읽는다.
+     *
+     * 조회수는 여기서 세지 않는다. 읽기 트랜잭션 안에서 집계하면 커넥션을 하나 더 잡으므로
+     * 호출부가 이 메서드를 마친 뒤 {@link #recordEventView(Long)}를 부른다.
+     */
     @Transactional(readOnly = true)
     public EventDetailResponse getEventDetail(
         Long eventId,
@@ -198,7 +207,28 @@ public class EventService {
         event.setActivities(activities == null ? List.of() : activities);
         normalizeJsonResponse(event);
         event.setReservationUrl(resolveReservationUrl(event));
+
         return event;
+    }
+
+    /**
+     * 조회수를 쌓되 실패는 삼킨다.
+     *
+     * 조회수는 부가 정보다. 집계가 실패했다고 상세 화면이 안 열리면 손해가 더 크다.
+     * 조용히 넘기지 않고 로그는 남겨서 집계가 멈춘 것을 알 수 있게 한다.
+     *
+     * **읽기 트랜잭션이 끝난 뒤에 부른다.** 그 안에서 부르면 REQUIRES_NEW가 바깥
+     * 트랜잭션을 중단시키되 커넥션은 풀에 돌려주지 않아, 상세 요청 하나가 커넥션을 두 개
+     * 잡는다. 풀이 10개라 상세 요청 10개가 동시에 들어오면 서로의 두 번째 커넥션을
+     * 기다리다 connectionTimeout(30초)까지 아무도 진행하지 못한다. 그 예외는 여기서
+     * 삼켜지므로 500이 아니라 **상세 API가 통째로 30초씩 늦어지는 형태**로만 드러난다.
+     */
+    public void recordEventView(Long eventId) {
+        try {
+            viewCountRecorder.recordEventView(eventId);
+        } catch (RuntimeException exception) {
+            log.warn("Failed to record the Event view count. eventId={}", eventId, exception);
+        }
     }
 
     private void normalizeJsonResponse(EventDetailResponse event) {

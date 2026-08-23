@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -29,11 +30,14 @@ class PlaceServiceTest {
 
     @Mock
     private PlaceMapper placeMapper;
+
+    @Mock
+    private ExploreViewCountRecorder viewCountRecorder;
     private PlaceService placeService;
 
     @BeforeEach
     void setUp() {
-        placeService = new PlaceService(placeMapper);
+        placeService = new PlaceService(placeMapper, viewCountRecorder);
     }
 
     @Test
@@ -144,6 +148,36 @@ class PlaceServiceTest {
         placeService.getPlaceDetail(1L, "en", 7L);
 
         verify(placeMapper).findPlaceDetail(1L, 7L);
+    }
+
+    /* EventService와 같다. 읽는 경로는 조회수를 세지 않는다. */
+    @Test
+    void getPlaceDetail_leavesTheViewCountAlone() {
+        PlaceDetailResponse place = PlaceDetailResponse.builder()
+            .placeId(1L).itemId(1L).name("테스트").placeKind("CAFE")
+            .build();
+        when(placeMapper.findPlaceDetail(1L, null)).thenReturn(place);
+        when(placeMapper.findPlaceActivities(1L, "en")).thenReturn(List.of());
+
+        placeService.getPlaceDetail(1L, "en", null);
+
+        verifyNoInteractions(viewCountRecorder);
+    }
+
+    @Test
+    void recordPlaceView_countsTheView() {
+        placeService.recordPlaceView(1L);
+
+        verify(viewCountRecorder).recordPlaceView(1L);
+    }
+
+    @Test
+    void recordPlaceView_swallowsTheFailure() {
+        doThrow(new IllegalStateException("boom"))
+            .when(viewCountRecorder).recordPlaceView(1L);
+
+        /* 조회수는 부가 정보다. 집계가 멈춰도 상세 화면은 열려야 한다. */
+        placeService.recordPlaceView(1L);
     }
 
     @Test

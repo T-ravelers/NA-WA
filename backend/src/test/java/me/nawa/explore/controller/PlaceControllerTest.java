@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -117,5 +118,30 @@ class PlaceControllerTest {
             .getContentAsString(StandardCharsets.UTF_8);
         assertEquals("EXPLORE-002", objectMapper.readTree(response)
             .path("error").path("code").asText());
+    }
+
+    /*
+     * 조회수는 상세를 다 읽은 뒤에 센다. 읽기 트랜잭션 안에서 세면 상세 요청 하나가
+     * 커넥션을 두 개 잡아, 풀이 마르면 상세 API가 통째로 느려진다.
+     */
+    @Test
+    void detail_countsTheView_whenTheRequestAsksForIt() throws Exception {
+        when(placeService.getPlaceDetail(1L, "en", null)).thenReturn(PlaceDetailResponse.builder().placeId(1L).build());
+
+        mockMvc.perform(get("/api/v1/explore/places/1").param("countView", "true"))
+            .andExpect(status().isOk());
+
+        verify(placeService).recordPlaceView(1L);
+    }
+
+    @Test
+    void detail_leavesTheViewCountAlone_byDefault() throws Exception {
+        when(placeService.getPlaceDetail(1L, "en", null)).thenReturn(PlaceDetailResponse.builder().placeId(1L).build());
+
+        /* 약속 생성 폼처럼 같은 API로 값만 읽어 가는 호출은 조회가 아니다. */
+        mockMvc.perform(get("/api/v1/explore/places/1"))
+            .andExpect(status().isOk());
+
+        verify(placeService, never()).recordPlaceView(any());
     }
 }
