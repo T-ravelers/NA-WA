@@ -9,6 +9,7 @@ import {
   spendingCategoryLabelKey,
   toSpendingCategory,
 } from '@/shared/lib/spendingCategory'
+import { shareWithFallback } from '@/shared/lib/share'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
@@ -361,44 +362,14 @@ const shareSummary = computed<string | null>(() => {
   })
 })
 
-/**
- * 공유 시트가 있으면 시트로, 없으면 클립보드로, 둘 다 없으면 안내만 한다.
- *
- * 취소(`AbortError`)와 「시트가 이미 열려 있음」(`InvalidStateError`)만 조용히 넘어간다.
- * 나머지 거절은 실패이므로 아래 클립보드 경로가 받는다 — `web-share` 권한이 없는 교차 출처
- * iframe과 인앱 브라우저는 `navigator.share`가 있는데도 `NotAllowedError`로 거절한다. 이때
- * 폴백까지 막으면 시트도 토스트도 없이 끝나 버튼이 고장 난 것처럼 보인다.
- *
- * 복사 완료 문구는 무엇을 복사했는지가 달라서 화면이 인자로 준다.
- */
 async function shareText(title: string, text: string, copiedMessage: string): Promise<void> {
-  if (navigator.share) {
-    try {
-      await navigator.share({ title, text })
-      return
-    } catch (error) {
-      const name = (error as { name?: unknown } | null)?.name
+  const result = await shareWithFallback({ title, text }, text)
 
-      /*
-       * 이름만 본다. `instanceof`로는 판정할 수 없다 — jsdom에서 `DOMException`은 `Error`를
-       * 상속하지 않고, `navigator.share`를 JS 브리지로 얹는 인앱 브라우저는 `DOMException`이
-       * 아닌 값을 던질 수 있다. 어느 쪽이든 취소가 클립보드로 떨어져 「복사했다」가 뜬다.
-       */
-      if (name === 'AbortError' || name === 'InvalidStateError') {
-        return
-      }
-    }
-  }
-
-  if (!navigator.clipboard) {
-    showToast(t('report.detail.sharing.unavailable'))
-    return
-  }
-
-  try {
-    await navigator.clipboard.writeText(text)
+  if (result === 'copied') {
     showToast(copiedMessage)
-  } catch {
+  } else if (result === 'unavailable') {
+    showToast(t('report.detail.sharing.unavailable'))
+  } else if (result === 'failed') {
     showToast(t('report.detail.sharing.copyFailed'))
   }
 }

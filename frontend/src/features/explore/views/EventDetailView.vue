@@ -14,6 +14,7 @@ import {
 
 import { formatCalendarDateString } from '@/shared/lib/datetime'
 import { vFitTextGroup } from '@/shared/lib/fitText'
+import { shareWithFallback } from '@/shared/lib/share'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -23,6 +24,7 @@ import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
+import { showToast } from '@/shared/ui/toast'
 
 import { useEventDetailQuery } from '../composables/useEventDetailQuery'
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
@@ -206,19 +208,16 @@ async function shareEvent(): Promise<void> {
   const current = event.value
   if (!current) return
 
-  try {
-    if (navigator.share) {
-      await navigator.share({ title: current.title, url: window.location.href })
-      shared.value = true
-      return
-    }
+  shared.value = false
+  const result = await shareWithFallback(
+    { title: current.title, url: window.location.href },
+    window.location.href,
+  )
 
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(window.location.href)
-      shared.value = true
-    }
-  } catch {
-    // The native share sheet can be dismissed without completing the action.
+  if (result === 'copied') {
+    shared.value = true
+  } else if (result === 'unavailable' || result === 'failed') {
+    showToast(t('explore.detail.shareFailed'))
   }
 }
 
