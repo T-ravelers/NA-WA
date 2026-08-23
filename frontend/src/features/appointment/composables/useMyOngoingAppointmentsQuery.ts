@@ -1,7 +1,13 @@
 import { useQuery } from '@tanstack/vue-query'
-import { computed, toValue, type MaybeRefOrGetter } from 'vue'
+import { computed, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 
-import { fetchMyOngoingAppointments, type MyAppointmentScope } from '../api/appointmentApi'
+import { toServerCalendarDate } from '@/shared/lib/datetime'
+
+import {
+  fetchMyOngoingAppointments,
+  type MyAppointmentScope,
+  type MyOngoingAppointment,
+} from '../api/appointmentApi'
 import { appointmentKeys } from '../model/appointmentKeys'
 
 /**
@@ -21,4 +27,29 @@ export function useMyOngoingAppointmentsQuery(
     enabled: computed(() => toValue(enabled)),
     staleTime: 30_000,
   })
+}
+
+export function filterAppointmentsForServerDate(
+  appointments: MyOngoingAppointment[] | undefined,
+  date: Date,
+): MyOngoingAppointment[] | undefined {
+  const calendarDate = toServerCalendarDate(date)
+  return appointments?.filter(
+    (appointment) => toServerCalendarDate(appointment.activityStartAt) === calendarDate,
+  )
+}
+
+/**
+ * 서울 날짜 기준으로 오늘 활동하는 내 약속 목록.
+ *
+ * 결제에 연결할 약속은 상태가 아니라 결제한 날짜가 기준이다. 서버의 `ALL` 범위를 받아
+ * 취소를 제외한 내 약속 가운데 활동 시작일이 오늘인 항목만 남긴다.
+ */
+export function useMyTodayAppointmentsQuery(enabled: MaybeRefOrGetter<boolean>) {
+  const query = useMyOngoingAppointmentsQuery(enabled, 'ALL')
+  const data: Ref<MyOngoingAppointment[] | undefined> = computed(() =>
+    filterAppointmentsForServerDate(query.data.value, new Date()),
+  )
+
+  return { ...query, data }
 }

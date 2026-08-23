@@ -97,6 +97,18 @@ describe('WalletHomeView', () => {
     expect(wrapper.text()).toContain('My wallet')
   })
 
+  it('fresh 캐시가 남아 있어도 지갑에 다시 들어오면 최신 잔액을 조회한다', async () => {
+    const first = await mountLoaded()
+    expect(first.text()).toContain('84,500 P')
+    first.unmount()
+
+    fetchWalletHome.mockResolvedValue({ ...WALLET, balance: 104500 })
+    const second = await mountLoaded()
+
+    expect(fetchWalletHome).toHaveBeenCalledTimes(2)
+    expect(second.text()).toContain('104,500 P')
+  })
+
   it('응답에 없는 계좌명을 지어내지 않는다', async () => {
     const wrapper = await mountLoaded()
 

@@ -227,7 +227,7 @@ export default {
       expenseTypeHint: 'Chọn cách đưa thanh toán này vào khi bạn chia tiền.',
       personal: 'Cá nhân',
       shared: 'Chung',
-      activeAppointments: 'Cuộc hẹn hiện tại',
+      activeAppointments: 'Cuộc hẹn hôm nay',
       activeAppointmentsHint: 'Chọn cuộc hẹn mà khoản chi này thuộc về.',
       spendingCategory: 'Danh mục chi tiêu',
       spendingCategoryHint:
@@ -235,7 +235,7 @@ export default {
       selectAppointment: 'Chọn một cuộc hẹn để tiếp tục.',
       appointmentsLoading: 'Đang tải cuộc hẹn của bạn',
       appointmentsError: 'Chúng tôi không tải được cuộc hẹn của bạn. Vui lòng thử lại.',
-      appointmentsEmpty: 'Bạn không có cuộc hẹn đang diễn ra nào để liên kết khoản chi này.',
+      appointmentsEmpty: 'Hôm nay bạn không có cuộc hẹn nào để liên kết khoản chi này.',
       noSessionTitle: 'Chưa quét mã QR nào',
       noSessionDescription: 'Quét mã QR thanh toán để xem chi tiết tại đây.',
       cancel: 'Hủy',

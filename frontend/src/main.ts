@@ -12,7 +12,10 @@ import {
   handleSignedOut,
   handleSignOutBarrier,
 } from '@/app/session/sessionHandlers'
-import { useMyOngoingAppointmentsQuery } from '@/features/appointment/composables/useMyOngoingAppointmentsQuery'
+import {
+  useMyOngoingAppointmentsQuery,
+  useMyTodayAppointmentsQuery,
+} from '@/features/appointment/composables/useMyOngoingAppointmentsQuery'
 import { appointmentJourneyIntegrationKey } from '@/features/appointment/model/journeyIntegration'
 import { appointmentExploreIntegrationKey } from '@/features/appointment/model/exploreIntegration'
 import { appointmentMemberIntegrationKey } from '@/features/appointment/model/memberIntegration'
@@ -71,7 +74,7 @@ app.provide(appointmentJourneyIntegrationKey, {
   checkJourneyItemExists,
 })
 app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
-app.provide(walletAppointmentIntegrationKey, { useMyOngoingAppointmentsQuery })
+app.provide(walletAppointmentIntegrationKey, { useMyTodayAppointmentsQuery })
 app.provide(appointmentExploreIntegrationKey, { useItemLocation: useExploreItemLocationQuery })
 app.provide(memberExploreIntegrationKey, { useSavedItems: useSavedExploreItemsQuery })
 app.provide(memberAppointmentIntegrationKey, {
