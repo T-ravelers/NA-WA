@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class OriginValidationFilterTest {
 
-    private static final String ALLOWED_ORIGIN = "https://clearpng.cloud";
+    private static final String ALLOWED_ORIGIN = "https://na-wa.cloud";
 
     private OriginValidationFilter filter;
 
