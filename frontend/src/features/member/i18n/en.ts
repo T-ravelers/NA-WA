@@ -24,9 +24,14 @@ export default {
         events: 'Events',
         places: 'Places',
       },
+      list: {
+        showMore: 'Show more',
+      },
       saved: {
         emptyEvents: 'Nothing saved yet. Tap the heart on an event to keep it here.',
         emptyPlaces: 'Nothing saved yet. Tap the heart on a place to keep it here.',
+        limitNotice: 'Profile shows up to 30 saved items.',
+        openDiscover: 'See the complete list in Explore',
       },
       appointments: {
         emptyEvents: 'No event appointments yet.',

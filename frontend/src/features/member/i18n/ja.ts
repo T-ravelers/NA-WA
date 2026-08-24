@@ -20,9 +20,14 @@ export default {
         events: 'イベント',
         places: 'スポット',
       },
+      list: {
+        showMore: 'さらに表示',
+      },
       saved: {
         emptyEvents: 'まだお気に入りがありません。イベントのハートを押すとここに残ります。',
         emptyPlaces: 'まだお気に入りがありません。スポットのハートを押すとここに残ります。',
+        limitNotice: 'プロフィールにはお気に入りを30件まで表示します。',
+        openDiscover: '「探索」ですべて見る',
       },
       appointments: {
         emptyEvents: 'イベントの約束はまだありません。',

@@ -20,9 +20,14 @@ export default {
         events: 'Sự kiện',
         places: 'Địa điểm',
       },
+      list: {
+        showMore: 'Xem thêm',
+      },
       saved: {
         emptyEvents: 'Chưa lưu gì. Chạm vào trái tim trên một sự kiện để giữ nó ở đây.',
         emptyPlaces: 'Chưa lưu gì. Chạm vào trái tim trên một địa điểm để giữ nó ở đây.',
+        limitNotice: 'Hồ sơ hiển thị tối đa 30 mục đã lưu.',
+        openDiscover: 'Xem danh sách đầy đủ trong Khám phá',
       },
       appointments: {
         emptyEvents: 'Chưa có cuộc hẹn nào cho sự kiện.',

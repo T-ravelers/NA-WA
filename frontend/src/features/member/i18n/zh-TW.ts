@@ -20,9 +20,14 @@ export default {
         events: '活動',
         places: '地點',
       },
+      list: {
+        showMore: '顯示更多',
+      },
       saved: {
         emptyEvents: '還沒有收藏。點活動上的愛心就會留在這裡。',
         emptyPlaces: '還沒有收藏。點地點上的愛心就會留在這裡。',
+        limitNotice: '個人檔案最多顯示 30 個收藏項目。',
+        openDiscover: '前往探索查看完整清單',
       },
       appointments: {
         emptyEvents: '還沒有活動的約會。',
