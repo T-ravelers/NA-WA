@@ -55,6 +55,14 @@ export default {
         budgetInvalid: 'Nhập ngân sách không quá 15 chữ số.',
       },
     },
+    dateRange: {
+      title: 'Ngày hành trình',
+      description: 'Chọn ngày bắt đầu và kết thúc hành trình.',
+      chooseDate: 'Chọn',
+      selectStart: 'Chọn ngày bắt đầu.',
+      selectEnd: 'Chọn ngày kết thúc. Không thể chọn ngày trước ngày bắt đầu.',
+      apply: 'Áp dụng ngày',
+    },
     detail: {
       budget: 'Ngân sách',
       noBudget: 'Chưa đặt ngân sách',

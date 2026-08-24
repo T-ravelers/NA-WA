@@ -41,6 +41,7 @@ const EXPECTED_BOTTOM_SHEETS = [
   'features/explore/components/JourneyDateSheet.vue',
   'features/explore/components/JourneySelectSheet.vue',
   'features/explore/components/PlaceFilterSheet.vue',
+  'features/journey/components/JourneyDateRangePicker.vue',
   'features/settlement/components/SettlementBottomSheet.vue',
   'shared/ui/LocaleSheet.vue',
 ]

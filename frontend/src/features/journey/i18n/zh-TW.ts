@@ -54,6 +54,14 @@ export default {
         budgetInvalid: '請輸入不超過 15 位數的預算。',
       },
     },
+    dateRange: {
+      title: '旅程日期',
+      description: '選擇旅程的開始與結束日期。',
+      chooseDate: '選擇',
+      selectStart: '請選擇開始日期。',
+      selectEnd: '請選擇結束日期。不能早於開始日期。',
+      apply: '套用日期',
+    },
     detail: {
       budget: '預算',
       noBudget: '未設定預算',

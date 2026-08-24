@@ -16,6 +16,8 @@ import {
   type JourneyFormErrors,
 } from '../model/journeyForm'
 
+import JourneyDateRangePicker from './JourneyDateRangePicker.vue'
+
 interface Props {
   pending?: boolean
   errorMessage?: string
@@ -178,26 +180,14 @@ function submit(): void {
           :error="translatedError(errors.title)"
         />
 
-        <div class="grid grid-cols-2 gap-3">
-          <div class="min-w-0">
-            <TextInput
-              v-model="draft.startDate"
-              type="date"
-              :label="t('journey.create.startDate')"
-              :error="translatedError(errors.startDate)"
-            />
-          </div>
-
-          <div class="min-w-0">
-            <TextInput
-              v-model="draft.endDate"
-              type="date"
-              :min="draft.startDate || undefined"
-              :label="t('journey.create.endDate')"
-              :error="translatedError(errors.endDate)"
-            />
-          </div>
-        </div>
+        <JourneyDateRangePicker
+          v-model:start-date="draft.startDate"
+          v-model:end-date="draft.endDate"
+          :start-label="t('journey.create.startDate')"
+          :end-label="t('journey.create.endDate')"
+          :start-error="translatedError(errors.startDate)"
+          :end-error="translatedError(errors.endDate)"
+        />
 
         <AppButton
           block

@@ -1,0 +1,71 @@
+import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { i18n } from '@/app/i18n'
+
+import JourneyDateRangePicker from '../JourneyDateRangePicker.vue'
+
+const props = {
+  startDate: '2026-08-10',
+  endDate: '2026-08-12',
+  startLabel: 'Start date',
+  endLabel: 'End date',
+}
+
+function mountPicker(overrides: Partial<typeof props> = {}) {
+  return mount(JourneyDateRangePicker, {
+    props: { ...props, ...overrides },
+    global: { plugins: [i18n] },
+  })
+}
+
+describe('JourneyDateRangePicker', () => {
+  beforeEach(() => {
+    i18n.global.locale.value = 'en'
+  })
+
+  it('uses custom date buttons instead of native date inputs', () => {
+    const wrapper = mountPicker()
+
+    expect(wrapper.find('input[type="date"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="journey-date-start"]').text()).toContain('8/10/26')
+    expect(wrapper.get('[data-testid="journey-date-end"]').text()).toContain('8/12/26')
+  })
+
+  it('disables dates before the start while choosing an end date', async () => {
+    const wrapper = mountPicker()
+
+    await wrapper.get('[data-testid="journey-date-end"]').trigger('click')
+
+    expect(wrapper.get('button[aria-label="Select August 9, 2026"]').attributes('disabled')).toBe(
+      '',
+    )
+    expect(
+      wrapper.get('button[aria-label="Select August 10, 2026"]').attributes('disabled'),
+    ).toBeUndefined()
+  })
+
+  it('emits a complete ordered range only after applying', async () => {
+    const wrapper = mountPicker({ startDate: '2026-08-08', endDate: '' })
+
+    await wrapper.get('[data-testid="journey-date-start"]').trigger('click')
+    await wrapper.get('button[aria-label="Select August 10, 2026"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="journey-date-target-end"]').attributes('aria-pressed')).toBe(
+      'true',
+    )
+    expect(wrapper.get('button[aria-label="Select August 9, 2026"]').attributes('disabled')).toBe(
+      '',
+    )
+
+    await wrapper.get('button[aria-label="Select August 12, 2026"]').trigger('click')
+    const applyButton = wrapper.findAll('button').find((button) => button.text() === 'Apply dates')
+
+    expect(applyButton).toBeDefined()
+    await applyButton?.trigger('click')
+
+    expect(wrapper.emitted('update:startDate')).toEqual([['2026-08-10']])
+    expect(wrapper.emitted('update:endDate')).toEqual([['2026-08-12']])
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+})
