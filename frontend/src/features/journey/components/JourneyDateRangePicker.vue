@@ -30,6 +30,7 @@ const target = ref<'start' | 'end'>('start')
 const draftStart = ref('')
 const draftEnd = ref('')
 const dialog = useTemplateRef('dialog')
+const endTargetButton = useTemplateRef('endTargetButton')
 let opener: HTMLElement | null = null
 
 const startId = useId()
@@ -114,6 +115,7 @@ function selectDate(date: string): void {
     draftStart.value = date
     if (draftEnd.value !== '' && draftEnd.value < date) draftEnd.value = ''
     target.value = 'end'
+    void nextTick(() => endTargetButton.value?.focus())
     return
   }
 
@@ -266,6 +268,7 @@ function apply(): void {
             <span class="mt-0.5 block truncate text-body-sm">{{ dateLabel(draftStart) }}</span>
           </button>
           <button
+            ref="endTargetButton"
             type="button"
             data-testid="journey-date-target-end"
             class="min-w-0 rounded-sm border px-3 py-2 text-left"

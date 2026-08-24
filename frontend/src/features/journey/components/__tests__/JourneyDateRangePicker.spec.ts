@@ -87,6 +87,24 @@ describe('JourneyDateRangePicker', () => {
     wrapper.unmount()
   })
 
+  it('moves focus to the end target after the calendar remounts', async () => {
+    const wrapper = mount(JourneyDateRangePicker, {
+      props,
+      global: { plugins: [i18n] },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('[data-testid="journey-date-start"]').trigger('click')
+    await wrapper.get('button[aria-label="Select August 10, 2026"]').trigger('click')
+
+    const endTarget = wrapper.get('[data-testid="journey-date-target-end"]')
+    expect(endTarget.attributes('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(endTarget.element)
+    expect(wrapper.get('[role="dialog"]').element.contains(document.activeElement)).toBe(true)
+
+    wrapper.unmount()
+  })
+
   it('disables dates before the start while choosing an end date', async () => {
     const wrapper = mountPicker()
 
