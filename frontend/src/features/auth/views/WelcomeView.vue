@@ -13,10 +13,16 @@ const router = useRouter()
 <template>
   <!--
     좌표는 시안 A1 · Get started(1965:1457) 실측이다. 헤딩 블록이 상단 148px에서
-    시작하고, 블록과 보딩패스 사이가 92px다.
+    시작하고, 390×844에서 블록과 보딩패스 사이가 92px다.
+
+    667px은 가장 긴 vi 고정 콘텐츠와 회전한 티켓의 안전 여백을 합친 높이다. 390px 이상에서는
+    남은 화면 높이를 간격으로 쓰되 32~92px로 제한한다. 그래서 주소창 높이가 바뀌어도 간격이
+    한 번에 뛰지 않는다. 360px 미만은 줄바꿈이 많으므로 항상 32px이다.
   -->
   <section class="relative flex min-h-dvh flex-col px-screen pt-welcome-top pb-8">
-    <div class="flex flex-1 flex-col gap-8 tall:gap-welcome-ticket-gap">
+    <div
+      class="min-[360px]:gap-[clamp(2rem,calc(100dvh-667px),var(--spacing-welcome-ticket-gap))] flex flex-1 flex-col gap-8"
+    >
       <div class="flex flex-col gap-3.5">
         <div class="flex flex-col items-start gap-welcome-wordmark-gap">
           <!-- 워드마크는 도형이라 번역 대상이 아니다. 문장 속 표기는 `app.name`이다. -->
@@ -39,7 +45,7 @@ const router = useRouter()
       -->
       <div
         aria-hidden="true"
-        class="h-welcome-ticket-height relative mb-1.5 flex -rotate-2 items-stretch rounded-md bg-food"
+        class="h-welcome-ticket-height relative mb-2 flex -rotate-2 items-stretch rounded-md bg-food"
       >
         <!--
           `min-w-0`이 없으면 이 칸이 글자 길이만큼 벌어져 옆의 스텁을 화면 밖으로 밀어낸다.
