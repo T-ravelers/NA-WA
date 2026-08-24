@@ -88,11 +88,6 @@ async function mountView(initialPath = '/appointments/7/attendance') {
         component: { template: '<div>Detail</div>' },
       },
       {
-        path: '/appointments/:appointmentId/reviews',
-        name: 'appointment-reviews',
-        component: { template: '<div>Reviews</div>' },
-      },
-      {
         path: '/appointments',
         name: 'appointment-list',
         component: { template: '<div>List</div>' },

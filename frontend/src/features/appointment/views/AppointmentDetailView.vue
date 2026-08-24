@@ -122,28 +122,21 @@ const isHost = computed(() => participation.value?.host === true)
 const isActiveMember = computed(
   () => participation.value?.joined === true && participation.value.membershipStatus === 'ACTIVE',
 )
-const isAttendedMember = computed(
-  () => isActiveMember.value && participation.value?.attendanceStatus === 'ATTENDED',
-)
-
 // 나가기는 활동 종료 전까지 열린다. 시작 전(RECRUITING·FULL)에는 보증금을
 // 환급받는 탈퇴, 활동 중(IN_PROGRESS)에는 노쇼로 굳어 보증금이 몰수되는
 // 탈퇴다. 어느 구간인지는 클라이언트 시계로 재지 않고 서버가 계산한 표시
 // 상태로 가른다 — 출석 확정 게이트와 같은 근거다.
 const LEAVE_OPEN_STATUSES: AppointmentStatus[] = ['RECRUITING', 'FULL', 'IN_PROGRESS']
 const isLeaveNoShow = computed(() => appointment.value?.appointmentStatus === 'IN_PROGRESS')
-// 두 항목은 언제나 시트에 있고, 조건을 만족하지 않으면 이유와 함께 비활성이다.
-// 조건에 맞는 것만 넣으면 시트가 열 때마다 다른 모양이 되고 나머지 기능이
-// 있다는 것조차 알 수 없다.
+// 출석 확정은 언제나 시트에 있고, 조건을 만족하지 않으면 이유와 함께 비활성이다.
+// 조건에 맞을 때만 넣으면 시트가 열 때마다 다른 모양이 되고 그 기능이 있다는
+// 것조차 알 수 없다.
 //
 // 출석 확정은 활동이 끝난 뒤에 연다. "끝났는가"는 클라이언트 시계로 다시
 // 계산하지 않는다 — 서버가 활동 종료 후 확정 전인 약속의 appointmentStatus를
 // AWAITING_ATTENDANCE로 내려주므로 그 판정을 그대로 쓴다.
 const canOpenAttendance = computed(
   () => isHost.value && appointment.value?.appointmentStatus === 'AWAITING_ATTENDANCE',
-)
-const canOpenReviews = computed(
-  () => appointment.value?.appointmentStatus === 'COMPLETED' && isAttendedMember.value,
 )
 const canLeave = computed(() => {
   const status = appointment.value?.appointmentStatus
@@ -167,16 +160,6 @@ const attendanceDisabledReason = computed(() => {
     return t('appointment.detail.participationCheckFailed')
   }
   return t('appointment.detail.menu.attendanceNotEnded')
-})
-const reviewsDisabledReason = computed(() => {
-  if (canOpenReviews.value) return undefined
-  if (appointment.value?.appointmentStatus !== 'COMPLETED') {
-    return t('appointment.detail.menu.reviewsNotCompleted')
-  }
-  // 여기서부터는 participation 응답에 기대는 판정이다. 조회가 실패한 것은
-  // 참여 여부를 모르는 것이지 아닌 것이 아니다.
-  if (participationCheckFailed.value) return t('appointment.detail.participationCheckFailed')
-  return t('appointment.detail.menu.reviewsNotAttended')
 })
 // 나가기 버튼을 눌렀는데 막혔을 때 모달이 말할 이유.
 //
@@ -202,9 +185,19 @@ const leaveBlockedReason = computed(() => {
 // isHost가 false로 남아 정작 방장에게서 출석 확정이 통째로 사라진다. 모를 때는
 // 감추지 말고 이유로 "확인하지 못했다"를 적는다.
 const showAttendanceItem = computed(() => isHost.value || participationCheckFailed.value)
-// 시트는 상세를 다 받은 뒤에만 렌더되므로(약속 이름과 보증금이 필요하다) 버튼도
-// 같은 조건을 쓴다. 버튼만 헤더에서 먼저 뜨면 눌러도 아무것도 열리지 않는다.
-const canOpenMenu = computed(() => appointment.value !== undefined)
+// 버거 버튼과 시트가 **같은 조건 하나**를 쓴다.
+//
+// 시트는 상세를 다 받아야 렌더된다(약속 이름과 보증금이 필요하다). 그리고 남은 항목이
+// 출석 확정 하나뿐이라 방장이 아니면 담을 것이 없다. 조건을 버튼에만 걸면, 시트가 열려
+// 있는 동안 값이 뒤집힐 때 빈 시트가 남는다 — participation 조회는 retry 없이 5초마다
+// 폴링하므로 "확인 못 함 → 방장 아님"으로 넘어가는 순간이 실제로 있다. 그때 버튼도 함께
+// 사라져 닫고 다시 열 수도 없다.
+//
+// 열림 상태(`menuOpen`)를 따로 닫지는 않는다. 이 조건은 한 방향으로만 간다 —
+// `participationCheckFailed`는 응답이 한 번 오면 다시 참이 되지 않고(마지막 값을
+// 지우지 않는다), 방장이 바뀌는 경로는 저장소에 없다(`is_host`를 갱신하는 코드 0건).
+// 되살아날 수 없는 조건에 감시자를 달면 일어나지 않는 일을 막는 코드가 남는다.
+const canOpenMenu = computed(() => appointment.value !== undefined && showAttendanceItem.value)
 
 /**
  * 일정은 날짜 한 줄과 시각 범위 한 줄로 나눠 적는다.
@@ -287,16 +280,6 @@ function openAttendance(): void {
   menuOpen.value = false
   void router.push({
     name: 'appointment-attendance',
-    params: { appointmentId: appointmentId.value },
-  })
-}
-
-function openReviews(): void {
-  if (appointmentId.value === null || !canOpenReviews.value) return
-
-  menuOpen.value = false
-  void router.push({
-    name: 'appointment-reviews',
     params: { appointmentId: appointmentId.value },
   })
 }
@@ -545,14 +528,11 @@ function goHome(): void {
       </div>
 
       <AppointmentMenuSheet
-        v-if="menuOpen"
+        v-if="menuOpen && canOpenMenu"
         :appointment-name="appointment.appointmentName"
-        :show-attendance="showAttendanceItem"
         :attendance-disabled-reason="attendanceDisabledReason"
-        :reviews-disabled-reason="reviewsDisabledReason"
         @close="menuOpen = false"
         @attendance="openAttendance"
-        @reviews="openReviews"
       />
 
       <AppointmentLeaveBlockedDialog
