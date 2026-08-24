@@ -79,6 +79,45 @@ FROM member_reviews mr
 JOIN appointments a ON a.appointment_id = mr.appointment_id
 WHERE a.appointment_name = 'Seed Report Appointment';
 
+-- 시드 약속 자체가 소유한 정산은 참가자 참조 여부만 지워서는 약속을 삭제할 수 없다.
+-- 알림·영수증·품목 분담·품목·구성원을 모두 지운 뒤 정산을 지운다.
+DELETE n
+FROM notifications n
+JOIN settlements s ON s.settlement_id = n.settlement_id
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE sr
+FROM settlement_receipts sr
+JOIN settlements s ON s.settlement_id = sr.settlement_id
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE sis
+FROM settlement_item_shares sis
+JOIN settlement_items si ON si.settlement_item_id = sis.settlement_item_id
+JOIN settlements s ON s.settlement_id = si.settlement_id
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE si
+FROM settlement_items si
+JOIN settlements s ON s.settlement_id = si.settlement_id
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE sm
+FROM settlement_members sm
+JOIN settlements s ON s.settlement_id = sm.settlement_id
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE s
+FROM settlements s
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+-- 시드 밖 정산이 시드 참가자를 구성원으로 가리키는 경우도 참가자 삭제 전에 끊는다.
 DELETE sis
 FROM settlement_item_shares sis
 JOIN settlement_members sm ON sm.settlement_member_id = sis.settlement_member_id
@@ -92,6 +131,20 @@ JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_
 JOIN appointments a ON a.appointment_id = am.appointment_id
 WHERE a.appointment_name = 'Seed Report Appointment';
 
+-- 지급 배치도 약속을 직접 참조한다. 배치의 지급 행을 먼저 지운 뒤 배치를 지운다.
+DELETE dp
+FROM deposit_payouts dp
+JOIN deposit_payout_batches dpb
+    ON dpb.deposit_payout_batch_id = dp.deposit_payout_batch_id
+JOIN appointments a ON a.appointment_id = dpb.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE dpb
+FROM deposit_payout_batches dpb
+JOIN appointments a ON a.appointment_id = dpb.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+-- 시드 밖 배치가 시드 참가자의 보증금이나 수취인을 가리키는 경우도 함께 끊는다.
 DELETE dp
 FROM deposit_payouts dp
 LEFT JOIN deposits d ON d.deposit_id = dp.source_deposit_id
