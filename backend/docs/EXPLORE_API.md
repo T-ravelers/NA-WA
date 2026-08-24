@@ -81,8 +81,15 @@ Event·Place의 목록과 상세는 `language`가 가리키는 번역을 우선 
 영어로 보이고 끝났을 상황이라, 이 순서가 계약의 일부입니다.
 
 1. 번역 테이블의 `CHECK (language_code IN ...)` 제약을 넓히는 마이그레이션을 배포합니다.
-2. `ExploreLanguagePolicy.normalize`의 허용 목록에 값을 추가해 배포합니다.
-3. 그다음에 프론트 `shared/i18n/locales.ts`의 `SUPPORTED_LOCALES`에 넣습니다.
+2. `ExploreLanguagePolicy.normalize`의 허용 목록(조회)에 값을 추가합니다.
+3. `IngestServiceImpl.LANGUAGES`의 허용 목록(적재)에도 값을 추가합니다. **이 목록은 조회
+   쪽과 별개이며**, 여기 없는 언어는 번역 배치가 통째로 거절됩니다. 빠뜨리면 조회는 되는데
+   그 언어의 번역이 영영 쌓이지 않고, 사용자에게는 "번역이 아직 안 붙었다"와 구별되지
+   않습니다.
+4. 2·3을 배포한 뒤에 프론트 `shared/i18n/locales.ts`의 `SUPPORTED_LOCALES`에 넣습니다.
+
+**허용 목록이 세 벌**(DB `CHECK`·조회·적재)이라는 점에 주의하세요. 하나만 늘리면 어느
+쪽이든 조용히 어긋납니다.
 
 적재 파이프라인이 그 언어의 번역을 채우는 것은 별개이며, 채워지기 전까지는 한국어로
 폴백합니다. **허용 목록에 있다는 것이 번역이 존재한다는 뜻은 아닙니다.** 어떤 언어의 번역이

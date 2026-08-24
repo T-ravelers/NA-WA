@@ -33,7 +33,18 @@ import static java.util.Set.of;
 @Service
 public class IngestServiceImpl implements IngestService {
 
-    /** chk_event_translations_language · chk_place_translations_language 와 같은 목록. */
+    /**
+     * chk_event_translations_language · chk_place_translations_language 와 같은 목록.
+     *
+     * <p>조회 쪽 허용 목록({@code ExploreLanguagePolicy})과 <b>같은 집합을 따로 들고
+     * 있습니다.</b> 로케일을 늘릴 때는 DB {@code CHECK} · 조회 · 적재 세 벌을 함께
+     * 넓혀야 합니다. 여기만 빠지면 조회는 되는데 그 언어의 번역 배치가 통째로 거절돼
+     * 데이터가 영영 쌓이지 않고, 화면에서는 "번역이 아직 안 붙었다"와 구별되지 않습니다.
+     * 순서는 backend/docs/EXPLORE_API.md 의 「새 로케일을 추가하는 순서」에 있습니다.
+     *
+     * <p>비교는 대소문자를 가립니다. 파이프라인은 {@code zh-TW}를 저장된 표기 그대로
+     * 보내야 합니다.
+     */
     private static final Set<String> LANGUAGES = of("en", "ja", "zh-TW", "vi");
 
     private final IngestMapper ingestMapper;

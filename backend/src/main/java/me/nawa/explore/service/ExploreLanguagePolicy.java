@@ -21,6 +21,10 @@ import org.springframework.util.StringUtils;
  *
  * <p>목록과 상세가 이 함수 하나를 함께 쓴다. 두 곳이 따로 정규화하면 같은 요청에 서로 다른
  * 언어가 나가는데, 그 어긋남은 화면을 열어 보기 전까지 드러나지 않는다.
+ *
+ * <p>이 목록은 <b>조회 쪽만</b> 담당한다. 적재 쪽은 {@code IngestServiceImpl.LANGUAGES}가
+ * 같은 집합을 따로 들고 있어, 로케일을 늘릴 때는 DB {@code CHECK}까지 세 벌을 함께 넓혀야
+ * 한다. 순서는 backend/docs/EXPLORE_API.md 의 「새 로케일을 추가하는 순서」에 있다.
  */
 final class ExploreLanguagePolicy {
 
