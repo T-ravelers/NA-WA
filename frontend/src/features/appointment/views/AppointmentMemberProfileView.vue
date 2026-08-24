@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { getAvatarInitial } from '@/shared/lib/avatarInitial'
 import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
@@ -38,10 +39,6 @@ const membersQuery = useQuery({
 const member = computed<AppointmentMember | undefined>(() =>
   membersQuery.data.value?.find((value) => value.memberId === memberId.value),
 )
-
-function initials(displayName: string): string {
-  return displayName.trim().charAt(0).toUpperCase() || '?'
-}
 
 function goBack(): void {
   if (window.history.length > 1) {
@@ -104,7 +101,7 @@ function goBack(): void {
               alt=""
               class="size-full object-cover"
             >
-              <span>{{ initials(member.displayName) }}</span>
+              <span>{{ getAvatarInitial(member.displayName) }}</span>
             </AppImage>
           </div>
           <div class="min-w-0">

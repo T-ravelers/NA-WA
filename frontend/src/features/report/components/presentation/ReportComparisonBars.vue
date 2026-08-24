@@ -1,22 +1,28 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
+import { getAvatarInitial } from '@/shared/lib/avatarInitial'
+import AppImage from '@/shared/ui/AppImage.vue'
+
 import { formatMoney } from './format'
 import type { ReportComparisonBarRow, ReportComparisonBarsProps } from './types'
 
 /**
- * 총 지출 막대 — 나와 고른 동료 한 명.
+ * 총 지출·일 평균 막대 — 나와 고른 동료 한 명.
  *
- * 시안 R4 `VS. GROUP MEMBERS`의 `TOTAL SPEND` 블록이다. 동료 칩은 라디오 그룹으로 그린다 —
- * 선택이 콘텐츠를 바꾸는 것이 아니라 같은 막대의 비교 대상을 바꾸는 것이기 때문이다.
+ * 시안 R4 `VS. GROUP MEMBERS`는 이니셜 칩과 `TOTAL SPEND`만 그리지만, #436에서 동료를
+ * 더 잘 구분하도록 API 프로필 사진과 `DAILY AVG` 비교를 함께 쓰기로 했다. 사진이 없거나
+ * 깨지면 모든 아바타 자리와 같은 공용 이니셜 폴백을 쓴다.
  *
- * 막대 길이는 둘 중 큰 값을 100%로 둔다. 둘 다 0이면 막대를 비우고 금액만 보인다.
+ * 동료 칩은 라디오 그룹이다 — 선택이 콘텐츠를 바꾸는 것이 아니라 같은 두 막대의 비교
+ * 대상을 바꾸기 때문이다. 각 지표는 둘 중 큰 값을 100%로 두고, 둘 다 0이면 막대를 비운다.
  * 표시 문자열은 전부 props로 받는다 — `useI18n`을 쓰면 props-only 계약이 깨진다.
  */
 const {
   me,
   peers,
   totalLabel,
+  dailyAverageLabel,
   chipsLabel,
   chips = true,
   locale = 'en',
@@ -34,18 +40,6 @@ watch(
   },
 )
 
-/**
- * 칩 이니셜. `slice(0, 1)`은 UTF-16 코드 유닛 하나를 잘라 이모지로 시작하는 표시명을
- * 서로게이트 페어 절반으로 만든다.
- *
- * 약속 쪽 네 곳(`AppointmentMemberList`·`AppointmentReviewCard`·`AppointmentAttendanceView`·
- * `AppointmentMemberProfileView`)은 아직 `charAt(0)`이라 그 버그가 남아 있다. 자리는 같지만
- * **규칙이 같지는 않다** — 통일은 #442.
- */
-function initials(label: string): string {
-  return [...label.trim()][0]?.toUpperCase() ?? '?'
-}
-
 const selectedPeer = computed<ReportComparisonBarRow | null>(
   () => peers.find((peer) => peer.id === selectedPeerId.value) ?? null,
 )
@@ -58,16 +52,22 @@ interface BarRow {
   fillClass: string
 }
 
-const rows = computed<BarRow[]>(() => {
+interface MetricBlock {
+  key: 'totalSpent' | 'dailyAverage'
+  label: string
+  rows: BarRow[]
+}
+
+function metricRows(metric: MetricBlock['key']): BarRow[] {
   const peer = selectedPeer.value
-  const max = Math.max(me.amount, peer?.amount ?? 0, 0)
+  const max = Math.max(Number(me[metric]), Number(peer?.[metric] ?? 0), 0)
   const width = (amount: number): number => (max > 0 ? (Math.max(amount, 0) / max) * 100 : 0)
   const result: BarRow[] = [
     {
       key: `me-${String(me.id)}`,
       label: me.label,
-      amountText: formatMoney(me.amount, locale),
-      widthPercent: width(me.amount),
+      amountText: formatMoney(me[metric], locale),
+      widthPercent: width(Number(me[metric])),
       fillClass: 'bg-ink',
     },
   ]
@@ -76,14 +76,19 @@ const rows = computed<BarRow[]>(() => {
     result.push({
       key: `peer-${String(peer.id)}`,
       label: peer.label,
-      amountText: formatMoney(peer.amount, locale),
-      widthPercent: width(peer.amount),
+      amountText: formatMoney(peer[metric], locale),
+      widthPercent: width(Number(peer[metric])),
       fillClass: 'bg-ink-3',
     })
   }
 
   return result
-})
+}
+
+const metricBlocks = computed<MetricBlock[]>(() => [
+  { key: 'totalSpent', label: totalLabel, rows: metricRows('totalSpent') },
+  { key: 'dailyAverage', label: dailyAverageLabel, rows: metricRows('dailyAverage') },
+])
 </script>
 
 <template>
@@ -110,19 +115,32 @@ const rows = computed<BarRow[]>(() => {
       >
         <span
           aria-hidden="true"
-          class="flex size-5 items-center justify-center rounded-pill bg-surface-3 text-micro font-semibold text-ink"
+          class="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-3 text-micro font-semibold text-ink"
         >
-          {{ initials(peer.label) }}
+          <AppImage
+            :src="peer.profileImageUrl"
+            alt=""
+            class="size-full object-cover"
+          >
+            <span class="flex size-full items-center justify-center">
+              {{ getAvatarInitial(peer.label) }}
+            </span>
+          </AppImage>
         </span>
         <span class="truncate">{{ peer.label }}</span>
       </button>
     </div>
 
-    <div class="flex flex-col gap-2">
-      <p class="text-micro uppercase text-ink-3">{{ totalLabel }}</p>
+    <div
+      v-for="metric in metricBlocks"
+      :key="metric.key"
+      :data-metric="metric.key"
+      class="flex flex-col gap-2"
+    >
+      <p class="text-micro uppercase text-ink-3">{{ metric.label }}</p>
       <dl class="flex flex-col gap-2">
         <div
-          v-for="row in rows"
+          v-for="row in metric.rows"
           :key="row.key"
           class="flex items-center gap-3 text-caption tabular-nums"
         >

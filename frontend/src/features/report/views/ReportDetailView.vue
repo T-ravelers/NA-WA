@@ -211,7 +211,8 @@ const comparisonText = computed(() =>
 const comparisonMe = computed<ReportComparisonBarRow>(() => ({
   id: comparison.value?.me.memberId ?? 0,
   label: t('report.detail.comparison.you'),
-  amount: Number(comparison.value?.me.totalSpent ?? 0),
+  totalSpent: Number(comparison.value?.me.totalSpent ?? 0),
+  dailyAverage: Number(comparison.value?.me.dailyAverage ?? 0),
 }))
 /** 막대의 상대. GROUP은 동료들(칩으로 고른다), SIMILAR는 코호트 평균 하나. */
 const comparisonPeers = computed<ReportComparisonBarRow[]>(() => {
@@ -227,7 +228,8 @@ const comparisonPeers = computed<ReportComparisonBarRow[]>(() => {
       {
         id: 0,
         label: t('report.detail.comparison.average'),
-        amount: Number(current.cohort.avgTotalSpent),
+        totalSpent: Number(current.cohort.avgTotalSpent),
+        dailyAverage: Number(current.cohort.avgDailyAverage),
       },
     ]
   }
@@ -235,7 +237,9 @@ const comparisonPeers = computed<ReportComparisonBarRow[]>(() => {
   return current.peers.map((peer) => ({
     id: peer.memberId,
     label: peer.displayName,
-    amount: Number(peer.totalSpent),
+    totalSpent: Number(peer.totalSpent),
+    dailyAverage: Number(peer.dailyAverage),
+    profileImageUrl: peer.profileImageUrl,
   }))
 })
 
@@ -694,6 +698,7 @@ function retry(): void {
               <div class="flex flex-col gap-2">
                 <ReportComparisonBars
                   :total-label="t('report.detail.comparison.totalSpend')"
+                  :daily-average-label="t('report.detail.dailyAverage')"
                   :chips-label="t('report.detail.comparison.members')"
                   :me="comparisonMe"
                   :peers="comparisonPeers"
