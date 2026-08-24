@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
+import { getAvatarInitial } from '@/shared/lib/avatarInitial'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -35,10 +36,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-
-function initials(displayName: string): string {
-  return displayName.trim().charAt(0).toUpperCase() || '?'
-}
 
 function isCurrentMember(member: AppointmentMember): boolean {
   // 참여 조회가 실패하면 currentAppointmentMemberId가 null이라 어느 행도 내 것이
@@ -75,7 +72,7 @@ function showsNoAction(member: AppointmentMember): boolean {
               alt=""
               class="size-full object-cover"
             >
-              <span>{{ initials(member.displayName) }}</span>
+              <span>{{ getAvatarInitial(member.displayName) }}</span>
             </AppImage>
           </div>
 

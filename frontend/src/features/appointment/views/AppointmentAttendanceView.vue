@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { getAvatarInitial } from '@/shared/lib/avatarInitial'
 import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
@@ -77,10 +78,6 @@ const isHost = computed(() => participationQuery.data.value?.host === true)
 const attendanceOpen = computed(
   () => detailQuery.data.value?.appointmentStatus === 'AWAITING_ATTENDANCE',
 )
-function initials(displayName: string): string {
-  return displayName.trim().charAt(0).toUpperCase() || '?'
-}
-
 // 방장이 화면에서 고른 값. 저장 전까지 서버에 반영되지 않는다.
 const draft = reactive<Record<number, ConfirmedAttendance>>({})
 
@@ -281,7 +278,7 @@ function retry(): void {
                     alt=""
                     class="size-full object-cover"
                   >
-                    <span>{{ initials(member.displayName) }}</span>
+                    <span>{{ getAvatarInitial(member.displayName) }}</span>
                   </AppImage>
                 </div>
 

@@ -2,6 +2,7 @@
 import { computed, reactive, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { getAvatarInitial } from '@/shared/lib/avatarInitial'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
@@ -54,10 +55,6 @@ const selectedKeywords = ref<ReviewKeywordCode[]>([])
 
 const isComplete = computed(() => categories.every((category) => scores[category] !== null))
 
-function initials(displayName: string): string {
-  return displayName.trim().charAt(0).toUpperCase() || '?'
-}
-
 function selectScore(category: ReviewCategory, score: number): void {
   scores[category] = score
 }
@@ -105,7 +102,7 @@ function submit(): void {
             alt=""
             class="size-full object-cover"
           >
-            <span>{{ initials(member.displayName) }}</span>
+            <span>{{ getAvatarInitial(member.displayName) }}</span>
           </AppImage>
         </div>
         <div class="min-w-0 flex-1">
