@@ -23,6 +23,16 @@ describe('ExploreFilterBar', () => {
     expect(wrapper.emitted('open')).toEqual([['date']])
   })
 
+  it('hides the scrollbar on both horizontal filter rows', () => {
+    const wrapper = mount(ExploreFilterBar, { global: { plugins: [i18n] }, props })
+    const rows = wrapper.findAll('.overflow-x-auto')
+
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(row.classes()).toContain('scrollbar-hidden')
+    }
+  })
+
   it('emits an event kind toggle for the quick chips', async () => {
     const wrapper = mount(ExploreFilterBar, { global: { plugins: [i18n] }, props })
 

@@ -177,6 +177,14 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
   })
 
+  it('keeps the overflowing language filters scrollable without a visible scrollbar', async () => {
+    const { wrapper } = await mountView()
+
+    expect(wrapper.get('[role="group"]').classes()).toEqual(
+      expect.arrayContaining(['overflow-x-auto', 'scrollbar-hidden']),
+    )
+  })
+
   it('starts from the member language again on the next visit', async () => {
     const { wrapper } = await mountView()
 

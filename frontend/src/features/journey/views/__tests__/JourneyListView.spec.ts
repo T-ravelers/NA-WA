@@ -208,6 +208,7 @@ describe('JourneyListView', () => {
       expect.arrayContaining([
         'flex',
         'overflow-x-auto',
+        'scrollbar-hidden',
         'snap-x',
         'snap-mandatory',
         'scroll-ps-screen',

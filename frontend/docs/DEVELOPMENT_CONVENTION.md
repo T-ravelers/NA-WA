@@ -369,8 +369,8 @@ export default {
   토큰만 사용합니다. **컴포넌트에 HEX 색상을 직접 쓰지 않습니다.**
 - 디자인 시안이 바뀌면 `tokens.css`의 값만 교체하고 컴포넌트는 수정하지 않습니다.
   이 구조를 유지하려면 토큰을 우회하는 임의 색상이 없어야 합니다.
-- `src/app/styles/index.css`는 Tailwind import, `@font-face`, 최소한의 base 레이어만
-  담습니다. 화면별 스타일을 여기에 추가하지 않습니다.
+- `src/app/styles/index.css`는 Tailwind import, `@font-face`, 공용 `@custom-variant`·
+  `@utility`, 최소한의 base 레이어만 담습니다. 화면별 스타일을 여기에 추가하지 않습니다.
 - 화면마다 임의 색상과 z-index를 추가하지 않습니다.
 - 폰트는 `public/fonts`의 woff2를 `@font-face`로 등록합니다. CJK 폰트는 원본이 9~12MB라
   unicode-range 슬라이스로 나눠 등록하고, 브라우저가 화면에 실제로 나온 글자가 속한
