@@ -38,7 +38,7 @@ onBeforeUnmount(() => {
       role="dialog"
       aria-modal="true"
       :aria-label="label"
-      class="max-h-[88dvh] w-full max-w-[390px] overflow-y-auto rounded-t-card bg-canvas px-screen pt-3 pb-8 shadow-sheet"
+      class="max-h-[88dvh] w-full max-w-shell overflow-y-auto rounded-t-card bg-canvas px-screen pt-3 pb-8 shadow-sheet"
     >
       <div class="mx-auto h-1 w-10 rounded-pill bg-hairline-strong" />
       <div class="mt-6"><slot /></div>

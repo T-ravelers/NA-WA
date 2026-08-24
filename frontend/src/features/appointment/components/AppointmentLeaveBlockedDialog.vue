@@ -38,7 +38,7 @@ useOverlayDismiss(dialog, () => emit('close'))
       role="dialog"
       aria-modal="true"
       :aria-label="t('appointment.members.leaveBlockedTitle')"
-      class="w-full max-w-[390px] rounded-card bg-paper p-5 text-on-paper shadow-sheet"
+      class="w-full max-w-shell rounded-card bg-paper p-5 text-on-paper shadow-sheet"
     >
       <h2 class="text-title text-on-paper">{{ t('appointment.members.leaveBlockedTitle') }}</h2>
       <p class="mt-3 text-body-sm text-on-paper/70">{{ reason }}</p>

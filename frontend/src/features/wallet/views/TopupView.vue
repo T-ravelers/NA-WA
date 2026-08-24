@@ -10,10 +10,10 @@ import {
   readReturnRouteName,
   withoutReturnContract,
 } from '@/shared/lib/returnRoute'
-import { vFitText } from '@/shared/lib/fitText'
 import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import { createStripeIntent, getTopupMethods, previewTopup } from '../api/topupApi'
 import {
@@ -225,29 +225,19 @@ const handlePaymentError = (message: string): void => {
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col px-screen pb-8 pt-6">
-    <header class="flex items-center gap-3">
-      <AppButton
-        compact
-        variant="secondary"
-        :aria-label="t('wallet.topUp.back')"
-        @click="goBack"
-      >
-        ‹
-      </AppButton>
-      <h1
-        v-fit-text
-        class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display"
-      >
-        {{
-          step === 'preview'
-            ? t('wallet.topUp.previewTitle')
-            : step === 'payment'
-              ? t('wallet.topUp.paymentTitle')
-              : t('wallet.topUp.title')
-        }}
-      </h1>
-    </header>
+  <main class="flex w-full flex-col px-screen flex-1 pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
+      :title="
+        step === 'preview'
+          ? t('wallet.topUp.previewTitle')
+          : step === 'payment'
+            ? t('wallet.topUp.paymentTitle')
+            : t('wallet.topUp.title')
+      "
+      :back-label="t('wallet.topUp.back')"
+      @back="goBack"
+    />
 
     <section
       v-if="step === 'form'"

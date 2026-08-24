@@ -5,10 +5,10 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
-import { vFitText } from '@/shared/lib/fitText'
 import { intersectItemJourneyPeriod } from '@/shared/lib/journeyPeriod'
 import AppButton from '@/shared/ui/AppButton.vue'
 import InsufficientBalanceDialog from '@/shared/ui/InsufficientBalanceDialog.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import {
   createAppointment,
@@ -470,23 +470,15 @@ function confirmExit(): void {
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col gap-8 px-screen pb-28 pt-6">
-    <header class="flex items-center gap-3">
-      <AppButton
-        compact
-        variant="secondary"
-        :aria-label="t('action.back')"
-        @click="goBack"
-      >
-        ‹
-      </AppButton>
-      <h1
-        v-fit-text
-        class="min-w-0 flex-1 truncate font-display text-screen-title text-ink-display"
-      >
-        {{ t('appointment.create.title') }}
-      </h1>
-    </header>
+  <main
+    class="flex w-full flex-col gap-8 px-screen flex-1 pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))]"
+  >
+    <ScreenHeader
+      variant="back"
+      :title="t('appointment.create.title')"
+      :back-label="t('action.back')"
+      @back="goBack"
+    />
 
     <AppointmentCreateForm
       v-if="phase === 'form' && selectedTripId !== null && selectedVisitDate !== null"
@@ -544,7 +536,7 @@ function confirmExit(): void {
         role="dialog"
         aria-modal="true"
         :aria-label="t('appointment.create.exitConfirmTitle')"
-        class="w-full max-w-[390px] rounded-card bg-surface-1 p-5 shadow-sheet"
+        class="w-full max-w-shell rounded-card bg-surface-1 p-5 shadow-sheet"
       >
         <h2 class="text-title text-ink-display">{{ t('appointment.create.exitConfirmTitle') }}</h2>
         <p class="mt-2 text-body-sm text-ink-3">

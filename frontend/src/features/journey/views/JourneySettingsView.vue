@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { IconArrowLeft, IconTrash } from '@tabler/icons-vue'
+import { IconTrash } from '@tabler/icons-vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
 import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
@@ -40,6 +41,22 @@ const i18n = useI18n()
 const { t } = i18n
 const route = useRoute()
 const router = useRouter()
+
+/**
+ * 여정 상세로 돌아간다.
+ *
+ * 헤더 조형을 `ScreenHeader` 한 벌로 모으면서 `RouterLink`가 버튼이 됐다(#489). 링크가
+ * 주던 새 탭 열기·주소 복사는 사라지지만, 나머지 화면 스무 곳이 전부 버튼이라 뒤로가기
+ * 하나만 링크로 남기면 터치 타깃과 포커스 링이 이 화면에서만 달라진다.
+ *
+ * `back()`이 아니라 `push`인 것은 원래 마크업 그대로다 — 설정 화면은 상세를 거치지 않고도
+ * 들어올 수 있어 이력에 상세가 없을 수 있다.
+ */
+function goBackToDetail(): void {
+  const trip = detailQuery.data.value
+  if (trip === undefined) return
+  void router.push({ name: 'journey-detail', params: { tripId: trip.tripId } })
+}
 const queryClient = useQueryClient()
 
 const tripId = computed(() => {
@@ -202,7 +219,7 @@ function retryAll(): void {
 </script>
 
 <template>
-  <main class="flex w-full flex-col gap-5 px-screen py-8">
+  <main class="flex w-full flex-col gap-5 px-screen flex-1 pt-6 pb-8">
     <section
       v-if="tripId === null"
       role="alert"
@@ -240,22 +257,12 @@ function retryAll(): void {
     />
 
     <template v-else-if="detailQuery.data.value !== undefined">
-      <header class="flex items-center gap-0.5">
-        <RouterLink
-          :to="{ name: 'journey-detail', params: { tripId: detailQuery.data.value.tripId } }"
-          :aria-label="t('action.back')"
-          class="-ml-3 flex size-11 shrink-0 items-center justify-center text-ink"
-        >
-          <IconArrowLeft
-            :size="24"
-            :stroke-width="1.75"
-            aria-hidden="true"
-          />
-        </RouterLink>
-        <h1 class="font-display text-screen-title uppercase text-ink-display">
-          {{ t('journey.settings.title') }}
-        </h1>
-      </header>
+      <ScreenHeader
+        variant="back"
+        :title="t('journey.settings.title')"
+        :back-label="t('action.back')"
+        @back="goBackToDetail"
+      />
 
       <form
         class="flex min-w-0 flex-col gap-5"

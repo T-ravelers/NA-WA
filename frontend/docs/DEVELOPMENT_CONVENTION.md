@@ -425,6 +425,13 @@ export default {
 - 아래쪽 여백은 `pb-8`(32px)입니다.
 - 섹션 사이 간격은 컨테이너의 `gap-8`(32px)로 줍니다. 자식마다 `mt-*`를 붙이지 않습니다.
 
+  **이 항목은 새로 만드는 화면의 규칙입니다.** 기존 화면에 소급 적용하는 것은 #489 적용
+  PR에서 뺐습니다 — 실측하니 컨테이너 `gap`을 가진 화면이 13개(`gap-4`·`gap-5`·`gap-6`·
+  `gap-8`로 갈림)이고 나머지 **28개는 자식이 `mt-1`~`mt-10`으로 간격을 줍니다.** `gap-8`을
+  일괄로 넣으면 그 28개의 세로 리듬이 한꺼번에 바뀌고, 특히 `mt-auto`로 바닥에 붙이는
+  여섯 곳은 `gap`이 더해져 의도가 어긋납니다. 화면마다 의도가 달라 기계적으로 걷어낼 수
+  없으므로 후속 이슈로 나눕니다.
+
 ### 하단 탭 몫 여백은 `AppShell`이 단독으로 책임집니다
 
 `AppShell.vue`가 탭이 보이는 화면에 `pb-[calc(6rem+env(safe-area-inset-bottom))]`을 줍니다.
@@ -464,10 +471,6 @@ export default {
 
 제목을 가진 일반 화면에서는 `<header>`를 직접 쓰지 않습니다. `shared/ui/ScreenHeader.vue`
 한 곳이 조형을 가집니다. 마크업을 베껴 쓰면 지금의 5종이 그대로 다시 자랍니다.
-
-> **아직 구현 전입니다.** `ScreenHeader.vue`는 #482·#477 뒤 적용 PR에서 만들고, 같은 PR에서
-> `shared/ui/README.md` 목록에 등록합니다. 그 전에는 없는 컴포넌트를 새 화면에서 임의로
-> 만들지 말고 프론트엔드 리드와 적용 순서를 맞춥니다.
 
 ```html
 <!-- 뒤로가기가 있는 화면 -->
@@ -518,17 +521,20 @@ export default {
 - `EventDetailView`·`PlaceDetailView`의 `sticky top-0` 띠 — 제목이 없고 뒤로가기와 공유
   아이콘만 있으며, 폭을 꽉 채우는 반투명 띠입니다.
 
-### 기존 화면에 적용할 때 함께 바꿀 것
+### 기존 화면 적용 결과 (#489, 2026-08-24)
 
-- `AppShell.vue` 래퍼를 `flex min-h-dvh flex-col`로 바꾸고, 라우트를 가진 화면은
-  `min-h-dvh` 대신 `flex-1`로 높이를 채웁니다.
-- `ScreenHeader.vue`를 만들고 `shared/ui/README.md` 목록에 등록합니다.
-- `ScreenHeader`가 덮는 화면의 직접 작성한 헤더를 교체하고, 컨테이너·하단 여백은 라우트를
-  가진 화면 전부를 다시 세어 적용합니다.
-- `SettlementPageHeader` 흡수 여부를 확인하고, `max-w-[390px]`는 `max-w-shell`로 바꾸며,
-  제목의 중복 `font-bold`를 제거하고 `ReportsView` 제목에는 `uppercase`를 적용합니다.
-- `AppShell`이 이미 가진 `bg-canvas text-ink`를 화면 컨테이너에서 반복한 곳도 함께
-  걷어냅니다.
+라우트를 가진 화면은 **39개**였습니다(적용 시점 실측 — 8/23의 40, 8/24 낮의 41과 다릅니다).
+
+- `AppShell.vue` 래퍼가 `flex min-h-dvh flex-col`을 갖고, 화면은 `flex-1`로 높이를 채웁니다.
+- `ScreenHeader.vue`를 만들고 `shared/ui/README.md`에 등록했습니다. 뷰 21곳을 교체해
+  `<header>` 직접 사용은 규격 예외 둘(`EventDetailView`·`PlaceDetailView`의 sticky 띠)만
+  남았습니다. 헤더 패턴 6종이 하나가 됐습니다.
+- **`SettlementPageHeader`는 흡수해서 지웠습니다.** props(`title`·`backLabel`)와 emit(`back`)이
+  `ScreenHeader`의 `back`과 같았고, 다른 점은 규격이 금지한 `IconChevronLeft`와 중복
+  `font-bold`뿐이었습니다. 정산 뷰 4곳이 `ScreenHeader`를 씁니다.
+- `max-w-[390px]` 21곳을 `max-w-shell`로 바꿨고, 컨테이너의 `bg-canvas text-ink` 중복과
+  근거를 잃은 아래 여백(`pb-32`·`pb-28`)을 걷어냈으며, 고정 CTA 4곳에 safe-area를 넣었습니다.
+- **남긴 것은 `gap` 소급 적용 하나**입니다(위 「섹션 사이 간격」 참조).
 
 ## PWA 캐시 변경하기
 

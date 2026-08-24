@@ -50,7 +50,7 @@ const title = computed(() => t('appointment.detail.menu.title'))
       role="dialog"
       aria-modal="true"
       :aria-label="title"
-      class="flex max-h-[88dvh] w-full max-w-[390px] flex-col gap-1 overflow-y-auto rounded-t-lg bg-canvas px-screen pt-3 pb-8 shadow-sheet"
+      class="flex max-h-[88dvh] w-full max-w-shell flex-col gap-1 overflow-y-auto rounded-t-lg bg-canvas px-screen pt-3 pb-8 shadow-sheet"
     >
       <span
         aria-hidden="true"

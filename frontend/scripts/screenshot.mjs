@@ -2052,7 +2052,7 @@ const FLOWS = [
       {
         name: '07-list-paid',
         act: async (page) => {
-          await page.getByTestId('settlement-back').click()
+          await page.getByTestId('screen-back').click()
           await page
             .locator('[data-settlement-id="42"]')
             .getByTestId('settlement-paid-mark')
@@ -2305,9 +2305,9 @@ const FLOWS = [
            * `segment-sent`가 있는 화면에 선다. 이 한 단계를 빼면 전체 내역 화면에서
            * 없는 토글을 기다리다 30초 뒤에 끊긴다.
            */
-          await page.getByTestId('settlement-back').click()
+          await page.getByTestId('screen-back').click()
           await page.getByTestId('settlement-history-received').waitFor()
-          await page.getByTestId('settlement-back').click()
+          await page.getByTestId('screen-back').click()
           await page.getByTestId('settlement-home').waitFor()
           await page.getByTestId('segment-sent').click()
           await page.locator('[data-action="view-all"]').click()

@@ -141,7 +141,7 @@ const errorDescription = computed(() => {
 </script>
 
 <template>
-  <section class="px-screen pt-14 pb-8">
+  <section class="flex px-screen flex-1 flex-col w-full pt-6 pb-8">
     <div class="flex items-center justify-between gap-3">
       <h1 class="min-w-0 font-display text-screen-title font-bold text-ink-display uppercase">
         {{ t('wallet.home.title') }}

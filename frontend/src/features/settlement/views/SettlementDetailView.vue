@@ -10,7 +10,7 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import SettlementCollectionCard from '../components/SettlementCollectionCard.vue'
-import SettlementPageHeader from '../components/SettlementPageHeader.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 import SettlementReceiptSheet from '../components/SettlementReceiptSheet.vue'
 import SettlementTransactionCard from '../components/SettlementTransactionCard.vue'
 import { useSettlementPoints } from '../composables/useSettlementPoints'
@@ -124,8 +124,9 @@ function startPayment(): void {
 
 <template>
   <!-- 하단 고정 내비게이션이 CTA를 덮지 않도록 목록 화면과 같은 여백을 둔다. -->
-  <section class="flex min-h-dvh flex-col px-screen pt-8 pb-32">
-    <SettlementPageHeader
+  <section class="flex flex-col px-screen flex-1 w-full pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
       :title="t('settlement.title')"
       :back-label="t('settlement.back')"
       @back="backToList"

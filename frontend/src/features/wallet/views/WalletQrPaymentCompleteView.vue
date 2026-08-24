@@ -45,7 +45,7 @@ const backToWallet = (): void => {
 </script>
 
 <template>
-  <main class="min-h-dvh bg-canvas px-screen pb-8 text-ink">
+  <main class="flex px-screen flex-1 flex-col w-full pt-6 pb-8">
     <section
       class="flex min-h-dvh flex-col items-center text-center"
       aria-labelledby="wallet-qr-payment-complete-heading"

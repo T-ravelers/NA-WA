@@ -13,6 +13,7 @@ import AppCard from '@/shared/ui/AppCard.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import TextInput from '@/shared/ui/TextInput.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import { createMerchantQr, registerAsMerchant, type MerchantQr } from '../api/merchantApi'
 import {
@@ -283,12 +284,11 @@ const createError = computed(() =>
 </script>
 
 <template>
-  <main class="min-h-dvh bg-canvas px-screen pb-8 text-ink">
-    <header class="border-b border-hairline py-4">
-      <h1 class="text-center text-title font-bold tracking-[-0.03em]">
-        {{ t('merchant.title') }}
-      </h1>
-    </header>
+  <main class="flex px-screen flex-1 flex-col w-full pt-6 pb-8">
+    <ScreenHeader
+      variant="root"
+      :title="t('merchant.title')"
+    />
 
     <StateLoading v-if="accountQuery.isPending.value" />
 

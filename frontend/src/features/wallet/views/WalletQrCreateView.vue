@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { IconChevronLeft } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -10,6 +9,7 @@ import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import TextInput from '@/shared/ui/TextInput.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import { createPaymentQr } from '../api/qrPaymentApi'
 import { isValidQrPaymentAmount, qrPaymentKeys } from '../model/qrPayment'
@@ -66,28 +66,13 @@ const createQr = (): void => {
 </script>
 
 <template>
-  <main class="min-h-dvh bg-canvas px-screen pb-8 text-ink">
-    <header class="flex items-center border-b border-hairline py-4">
-      <button
-        type="button"
-        class="grid size-11 place-items-center rounded-sm text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-        :aria-label="t('wallet.qrCreate.back')"
-        @click="goBack"
-      >
-        <IconChevronLeft
-          :size="22"
-          :stroke-width="2"
-          aria-hidden="true"
-        />
-      </button>
-      <h1 class="flex-1 text-center text-title font-bold tracking-[-0.03em]">
-        {{ t('wallet.qrCreate.title') }}
-      </h1>
-      <span
-        class="size-11"
-        aria-hidden="true"
-      />
-    </header>
+  <main class="flex px-screen flex-1 flex-col w-full pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
+      :title="t('wallet.qrCreate.title')"
+      :back-label="t('wallet.qrCreate.back')"
+      @back="goBack"
+    />
 
     <section
       class="space-y-4 pt-6"

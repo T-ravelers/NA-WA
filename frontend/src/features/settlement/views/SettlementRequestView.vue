@@ -59,7 +59,7 @@ function back(): void {
 
 <template>
   <section
-    class="flex min-h-dvh flex-col"
+    class="flex flex-col flex-1 pt-6 pb-8"
     :class="submitting ? '' : 'px-screen pt-14 pb-32'"
   >
     <SettlementFlowHeader

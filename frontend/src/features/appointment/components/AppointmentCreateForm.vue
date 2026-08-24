@@ -494,7 +494,7 @@ defineExpose({ goToPreviousStep, snapshot, restore })
     </fieldset>
 
     <div
-      class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
+      class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-shell bg-canvas/95 px-screen pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur"
     >
       <div class="grid grid-cols-2 gap-3">
         <AppButton
@@ -528,7 +528,7 @@ defineExpose({ goToPreviousStep, snapshot, restore })
       role="dialog"
       aria-modal="true"
       :aria-label="t('appointment.create.confirmTitle')"
-      class="w-full max-w-[390px] rounded-card bg-paper p-5 text-on-paper shadow-sheet"
+      class="w-full max-w-shell rounded-card bg-paper p-5 text-on-paper shadow-sheet"
     >
       <div class="flex items-center justify-between gap-4">
         <h2 class="text-title text-on-paper">{{ t('appointment.create.confirmTitle') }}</h2>

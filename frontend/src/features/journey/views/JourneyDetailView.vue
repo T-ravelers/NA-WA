@@ -144,7 +144,7 @@ function closeRemoveDialog(): void {
 </script>
 
 <template>
-  <main class="flex w-full flex-col gap-6 px-screen py-8">
+  <main class="flex w-full flex-col gap-6 px-screen flex-1 pt-6 pb-8">
     <section
       v-if="tripId === null"
       role="alert"

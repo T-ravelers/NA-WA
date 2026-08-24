@@ -11,7 +11,7 @@ import SettlementDateFilterSheet from '../components/SettlementDateFilterSheet.v
 import SettlementEmptyState from '../components/SettlementEmptyState.vue'
 import SettlementInlineLoading from '../components/SettlementInlineLoading.vue'
 import SettlementListCard from '../components/SettlementListCard.vue'
-import SettlementPageHeader from '../components/SettlementPageHeader.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 import { resolveSettlementError } from '../model/settlementErrors'
 import {
   filterByCompletedDate,
@@ -89,8 +89,9 @@ function open(settlementId: string): void {
 </script>
 
 <template>
-  <section class="flex min-h-dvh flex-col px-screen pt-8 pb-32">
-    <SettlementPageHeader
+  <section class="flex flex-col px-screen flex-1 w-full pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
       :data-testid="`settlement-history-${side}`"
       :title="
         t(side === 'sent' ? 'settlement.history.titleCollect' : 'settlement.history.titlePay')

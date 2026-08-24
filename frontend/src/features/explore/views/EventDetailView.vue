@@ -387,7 +387,7 @@ function retry(): void {
 </script>
 
 <template>
-  <section class="min-h-dvh pb-32">
+  <section class="flex-1 pb-8">
     <header
       class="sticky top-0 z-20 flex items-center justify-between bg-canvas/95 px-screen py-3 backdrop-blur"
     >

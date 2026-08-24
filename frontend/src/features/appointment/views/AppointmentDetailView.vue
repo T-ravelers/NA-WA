@@ -6,7 +6,6 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { formatServerDateTime, parseServerDateTime } from '@/shared/lib/datetime'
-import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import type { AppointmentStatus } from '@/shared/lib/appointmentStatus'
 import AppButton from '@/shared/ui/AppButton.vue'
@@ -15,6 +14,7 @@ import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import { showToast } from '@/shared/ui/toast'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import AppointmentMemberList from '../components/AppointmentMemberList.vue'
 import AppointmentLeaveBlockedDialog from '../components/AppointmentLeaveBlockedDialog.vue'
@@ -369,38 +369,33 @@ function goHome(): void {
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col gap-8 px-screen pb-28 pt-6">
-    <header class="flex items-center gap-3">
-      <AppButton
-        compact
-        variant="secondary"
-        :aria-label="t('action.back')"
-        @click="goBack"
-      >
-        ‹
-      </AppButton>
-      <h1
-        v-fit-text
-        class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display"
-      >
-        {{ t('appointment.detail.title') }}
-      </h1>
-      <AppButton
-        v-if="canOpenMenu"
-        compact
-        variant="secondary"
-        :aria-label="t('appointment.detail.openMenu')"
-        :aria-expanded="menuOpen"
-        aria-haspopup="dialog"
-        @click="menuOpen = true"
-      >
-        <IconMenu2
-          :size="20"
-          :stroke-width="2"
-          aria-hidden="true"
-        />
-      </AppButton>
-    </header>
+  <main
+    class="flex w-full flex-col gap-8 px-screen flex-1 pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))]"
+  >
+    <ScreenHeader
+      variant="back"
+      :title="t('appointment.detail.title')"
+      :back-label="t('action.back')"
+      @back="goBack"
+    >
+      <template #action>
+        <AppButton
+          v-if="canOpenMenu"
+          compact
+          variant="secondary"
+          :aria-label="t('appointment.detail.openMenu')"
+          :aria-expanded="menuOpen"
+          aria-haspopup="dialog"
+          @click="menuOpen = true"
+        >
+          <IconMenu2
+            :size="20"
+            :stroke-width="2"
+            aria-hidden="true"
+          />
+        </AppButton>
+      </template>
+    </ScreenHeader>
 
     <StateEmpty
       v-if="appointmentId === null"
@@ -517,7 +512,7 @@ function goHome(): void {
       </section>
 
       <div
-        class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
+        class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-shell bg-canvas/95 px-screen pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur"
       >
         <AppButton
           block

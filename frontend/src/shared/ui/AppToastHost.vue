@@ -6,7 +6,7 @@ const toasts = useToasts()
 
 <template>
   <div
-    class="pointer-events-none fixed inset-x-0 bottom-28 z-50 mx-auto flex w-full max-w-[390px] flex-col items-center gap-2 px-screen"
+    class="pointer-events-none fixed inset-x-0 bottom-28 z-50 mx-auto flex w-full max-w-shell flex-col items-center gap-2 px-screen"
     aria-live="polite"
   >
     <p
