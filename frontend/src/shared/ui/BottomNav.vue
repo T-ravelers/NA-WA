@@ -41,31 +41,38 @@ function isActive(item: NavItem): boolean {
 
 <template>
   <!--
-    탭 바는 화면 폭을 꽉 채우고 아래로 붙는다. 안쪽 목록만 셸 폭으로 좁혀 넓은 뷰포트에서도
-    아이콘이 본문과 같은 폭 안에 남게 한다.
+    화면 바닥에 붙지 않고 떠 있는 알약이다. `nav`는 자리만 잡고 셸 폭으로 좁히며, 보이는
+    면은 안쪽 `ul`이 가진다. `mb-4`로 바닥에서 띄우고 좌우는 `px-4`만큼 비운다.
 
     바닥을 canvas로 깐 유리다. 반투명만으로는 뒤에 오는 것에 따라 대비가 무너지므로,
     어두운 면을 90%로 깔고 그 위에 흐림을 얹는다. 같은 어휘가 `EventDetailView`·
     `PlaceDetailView`의 sticky 헤더에 이미 있다.
 
-    🔴 **V2 시안 이탈이다.** 시안(`2360:4325`)의 탭은 불투명 종이 면(`#f4f2ed`)이고 PR #429가
-    그것을 따랐다. 콘텐츠가 탭 아래로 이어지는 것이 보이지 않아 유리로 바꿨다 — 근거는
-    #496과 #326 코멘트에 있다.
+    🔴 **V2 시안 이탈이다 — 두 번째.** 시안(`2360:4325`·`2309:2485`)의 탭은 화면 폭을 채우는
+    불투명 종이 면(`#f4f2ed`)이고 PR #429가 그것을 따랐다. 2026-08-24 사용자 결정으로 떠 있는
+    알약으로 되돌린다. 근거는 #516·#496과 #326 코멘트에 있다.
+
+    **옛 알약(#429 이전)을 그대로 되돌리지는 않는다.** 옛 판은 밝은 반투명
+    (`rgb(217 217 217 / 0.2)`)에 `backdrop-filter`가 없어 밝은 면 위에서 대비가 1.15:1까지
+    무너졌고 라벨도 없었다. 형태만 가져오고 재질과 라벨은 #499의 것을 쓴다.
 
     투명도를 줄이도록 설정한 사용자에게는 배경을 불투명하게 하고 흐림을 끈다.
   -->
   <nav
-    class="fixed inset-x-0 bottom-0 z-10 border-t border-hairline-2 bg-canvas/90 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-xl reduce-transparency:bg-canvas reduce-transparency:backdrop-blur-none"
+    class="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-shell px-4 pb-[env(safe-area-inset-bottom)]"
     :aria-label="t('nav.label')"
   >
     <!--
       탭 하나는 시안대로 64px이되, 그보다 좁아지면 같이 줄어든다. 폭을 고정하면 폴더블
-      커버(280)에서 다섯 칸이 화면을 넘어 마지막 탭이 잘린다.
+      커버(280)에서 다섯 칸이 화면을 넘어 마지막 탭이 잘린다. 알약은 좌우 `px-4`만큼 더
+      좁으므로 여유가 그만큼 준다.
 
       좁아진 칸에서 라벨은 자르지 않고 줄인다(#356). 280·ja의 `ウォレット`·`マイページ`가
       실제로 `…`에 걸렸고, 잘린 탭 이름은 어디로 가는 탭인지 알려 주지 못한다.
     -->
-    <ul class="mx-auto flex w-full max-w-shell items-start justify-center px-2 pt-5">
+    <ul
+      class="mb-4 flex items-start justify-center rounded-pill bg-canvas/90 px-2 py-3 shadow-raised backdrop-blur-xl reduce-transparency:bg-canvas reduce-transparency:backdrop-blur-none"
+    >
       <li
         v-for="item in items"
         :key="item.key"
