@@ -145,6 +145,8 @@ export default {
           'カテゴリーごとの支出比率を、あなたに似た旅行者の平均と比べたものです。',
         similarEmptyTitle: 'まだ似た旅行者がいません',
         similarEmptyDescription: '同じ国籍で最終レポートを持つ旅行者がここに表示されます。',
+        rankBasis: '{count}人の中での順位 | {count}人の中での順位',
+        omitted: 'ここに表示していない項目: {categories}',
         tilesLabel: 'グループ内でのカテゴリー順位',
         similarTilesLabel: '似た旅行者と比べたカテゴリー比率',
       },

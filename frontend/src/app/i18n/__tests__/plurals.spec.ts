@@ -27,6 +27,12 @@ const COUNTED = [
   ['explore.resultCount', '1 event', '2 events', '0 events'],
   ['explore.placeResultCount', '1 place', '2 places', '0 places'],
   ['appointment.list.resultCount', '1 appointment', '2 appointments', '0 appointments'],
+  [
+    'report.detail.comparison.rankBasis',
+    'Ranked among 1 member',
+    'Ranked among 2 members',
+    'Ranked among 0 members',
+  ],
 ] as const
 
 describe('counted messages', () => {

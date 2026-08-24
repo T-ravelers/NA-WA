@@ -151,6 +151,8 @@ export default {
           'Tỷ lệ chi tiêu của bạn theo từng danh mục so với trung bình của du khách giống bạn.',
         similarEmptyTitle: 'Chưa có du khách tương tự',
         similarEmptyDescription: 'Du khách cùng quốc tịch và đã có báo cáo tổng kết sẽ hiện ở đây.',
+        rankBasis: 'Xếp hạng trong {count} thành viên | Xếp hạng trong {count} thành viên',
+        omitted: 'Không hiển thị ở đây: {categories}',
         tilesLabel: 'Thứ hạng danh mục trong nhóm',
         similarTilesLabel: 'Tỷ lệ danh mục của bạn so với du khách tương tự',
       },

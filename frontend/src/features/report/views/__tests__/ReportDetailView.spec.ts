@@ -111,6 +111,37 @@ const groupComparison = {
   ],
 }
 
+/**
+ * 일곱 카테고리를 전부 쓴 경우(#434). 레이더 축은 6, 타일은 4가 상한이라 각각 하나·셋이
+ * 밀린다. 비중은 내림차순이라 밀리는 것이 무엇인지 예측할 수 있다.
+ */
+const ALL_CATEGORIES = [
+  ['FOOD', '30'],
+  ['SHOPPING', '25'],
+  ['BEAUTY', '15'],
+  ['SHOW', '12'],
+  ['TRANSPORT', '10'],
+  ['STAY', '5'],
+  ['OTHER', '3'],
+] as const
+
+const crowdedComparison = {
+  ...groupComparison,
+  me: {
+    ...groupComparison.me,
+    categoryBreakdown: ALL_CATEGORIES.map(([category, percentage]) => ({
+      category,
+      amount: percentage,
+      percentage,
+    })),
+  },
+  ranks: ALL_CATEGORIES.map(([category], index) => ({
+    category,
+    rank: index + 1,
+    of: 4,
+  })),
+}
+
 /** 동료 칩 라디오 그룹. 비교 범위 세그먼트도 라디오 그룹이라 이름으로 가른다. */
 const MEMBER_CHIPS = '[role="radiogroup"][aria-label="Group members"]'
 
@@ -826,6 +857,60 @@ describe('ReportDetailView', () => {
   })
 
   // 레이더는 다각형을 만들려고 축을 셋까지 채운다. 그 패딩이 타일로 오면 안 쓴 카테고리에 `AVG`가 찍힌다.
+  /*
+   * #434 — 비교 섹션이 「받은 것을 안 쓰거나 조용히 버리는」 세 자리.
+   */
+
+  it('says how many people the rank is measured against', async () => {
+    // ranks[].of는 나를 포함한 인원이다. 버리면 동료가 한 명인 그룹의 `# Food 1ST`가
+    // 사실상 「둘 중 하나」인데 화면만 보면 대단해 보인다.
+    fetchReportComparison.mockResolvedValueOnce(groupComparison)
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Ranked among 2 members')
+  })
+
+  it('does not claim a rank basis on the similar scope', async () => {
+    // SIMILAR 타일은 순위가 아니라 코호트 대비 비중이라 모수가 뜻을 갖지 않는다.
+    mockScopes(emptyComparison, withCohortFood('48'))
+    const { wrapper } = await mountView()
+
+    await wrapper.get('[data-testid="segment-SIMILAR"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Ranked among')
+  })
+
+  it('leaves the axis that does not fit the radar readable', async () => {
+    // 축 상한은 6이고 소비 카테고리는 7종이라 하나가 밀린다. 잘린 것이 아무 데도 안 남으면
+    // 「쓰지 않은 것」과 구별되지 않는다.
+    fetchReportComparison.mockResolvedValueOnce(crowdedComparison)
+    const { wrapper } = await mountView()
+
+    const omitted = wrapper.findAll('p.sr-only').map((node) => node.text())
+
+    expect(omitted).toContain('Not shown here: Other')
+  })
+
+  it('leaves the categories that do not fit the tiles readable', async () => {
+    // 타일 상한은 4라 셋이 밀린다.
+    fetchReportComparison.mockResolvedValueOnce(crowdedComparison)
+    const { wrapper } = await mountView()
+
+    // 🔴 보이는 타일이 상한을 지키는지 함께 본다. 이것 없이 문구만 단언하면, 상한이
+    // 풀려 일곱 개가 다 보이는데도 "여기 없다"고 말하는 상태를 잡지 못한다.
+    expect(wrapper.findAll('li.rounded-card').map((tile) => tile.text())).toEqual([
+      '# Food1st',
+      '# Shopping2nd',
+      '# Beauty3rd',
+      '# Shows4th',
+    ])
+
+    const omitted = wrapper.findAll('p.sr-only').map((node) => node.text())
+
+    expect(omitted).toContain('Not shown here: Transport, Stay, Other')
+  })
+
   it('keeps radar padding axes out of the similar tiles', async () => {
     const onlyFood = {
       ...similarComparison,
