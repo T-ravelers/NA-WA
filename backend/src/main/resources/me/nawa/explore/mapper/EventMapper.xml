@@ -138,12 +138,11 @@
             e.open_weekend,
             e.opens_late,
             <!--
-                **확인이 필요한 대응이다.** event_translations에는 venue_name이 없어
-                venue_detail이 유일한 후보지만, 적재 DTO·스키마 어디에도 이 컬럼이 장소명인지
-                층·홀 같은 부가 정보인지 적혀 있지 않다(파이프라인이 준 값을 그대로 넣는다).
-                부가 정보라면 번역이 붙은 Event 상세의 장소명 자리에 조각이 나간다.
-                아니라고 확인되면 이 줄만 e.venue_name으로 되돌리면 된다. address_display도
-                같은 성격이라 함께 확인한다(#531 리뷰).
+                이름만 다를 뿐 같은 값의 원문과 번역이다. 크롤러 발행 함수에서 확인했다 —
+                publish_delta_events가 'venueName'에 e.venue_detail을 실어 보내고, 번역 쪽은
+                같은 venue_detail의 번역이다. 층·홀 같은 부가 정보가 아니라 장소명이다.
+                아래 address_display도 같은 성격으로, event.address의 영문 표기다.
+                자세한 대응표는 EXPLORE_API.md에 있다(#531 리뷰).
             -->
             COALESCE(NULLIF(TRIM(et.venue_detail), ''), e.venue_name) AS venue_name,
             e.region1,

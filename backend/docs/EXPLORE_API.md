@@ -53,14 +53,40 @@ Event·Place의 목록과 상세는 `language`가 가리키는 번역을 우선 
 | 목록과 상세 | 같은 규칙을 씁니다. 같은 요청에 서로 다른 언어가 나가지 않습니다 |
 | 목록 밖의 값 | `COMMON-001`(400) |
 
-**`zh-TW`는 대소문자를 보존해 저장합니다.** 두 번역 테이블의 `language_code`가
-`CHECK (... IN ('en','ja','zh-TW','vi'))`이므로, 서버가 요청 값을 통째로 소문자로 접으면
-`zh-tw`가 되어 조인이 한 행도 맞지 않습니다. LEFT JOIN이라 오류 없이 한국어 원문만 나가므로
-이 실수는 화면을 열어 보기 전까지 드러나지 않습니다(#531).
+**`zh-TW`는 대소문자를 보존해 돌려줍니다.** 두 번역 테이블의 `language_code`가
+`CHECK (... IN ('en','ja','zh-TW','vi'))`로 이 표기를 저장하기 때문입니다.
+
+다만 **이것이 "어떤 언어로 요청해도 한국어가 나온다"의 원인은 아니었습니다.** 두 번역
+테이블의 collation이 `utf8mb4_0900_ai_ci`(대소문자 구분 없음)라 `language_code = 'zh-tw'`도
+저장된 `zh-TW`에 그대로 걸립니다. 실제 원인은 조회 SQL에 **번역 조인 자체가 없던 것**이고,
+네 언어가 모두 같은 증상이었습니다(#531).
+
+표기를 보존하는 이유는 방어입니다 — collation을 `_bin`이나 `_as_cs`로 바꾸거나 언어 코드를
+애플리케이션에서 비교하는 코드가 생기는 순간, 소문자 값은 그때 조용히 어긋납니다. 통합
+테스트가 "지금은 두 표기가 같은 결과를 낸다"는 사실을 고정해 두어 collation이 바뀌면 거기서
+먼저 깨집니다.
 
 지원하지 않는 값을 조용히 받아 주지 않는 이유도 같습니다. 번역이 없는 언어로 조인하면
 한국어가 나가는데, 사용자에게는 "번역이 아직 없다"와 "언어 코드를 잘못 보냈다"가 똑같아
 보입니다. **한국어는 서비스 로케일이 아니므로 `ko`도 거절합니다.**
+
+### 새 로케일을 추가하는 순서
+
+목록 밖의 값이 400이므로 **순서를 지키지 않으면 Explore 화면 전체가 죽습니다.** 프론트에
+로케일을 먼저 넣으면 그 언어를 고른 사용자의 목록·상세가 통째로 400을 받습니다. 폴백이었다면
+영어로 보이고 끝났을 상황이라, 이 순서가 계약의 일부입니다.
+
+1. 번역 테이블의 `CHECK (language_code IN ...)` 제약을 넓히는 마이그레이션을 배포합니다.
+2. `ExploreLanguagePolicy.normalize`의 허용 목록에 값을 추가해 배포합니다.
+3. 그다음에 프론트 `shared/i18n/locales.ts`의 `SUPPORTED_LOCALES`에 넣습니다.
+
+적재 파이프라인이 그 언어의 번역을 채우는 것은 별개이며, 채워지기 전까지는 한국어로
+폴백합니다.
+
+> **`vi`는 아직 번역이 들어오지 않습니다.** 백엔드 허용 목록과 DB 제약에는 있지만, 크롤러의
+> 번역 적재가 `en`·`ja`·`zh-TW` 세 언어만 받습니다(`ARRAY['en','ja','zh-TW']`를 정확히
+> 요구하고 그 외에는 `LANGUAGE_SCHEMA_INVALID`로 거절). 베트남어 사용자는 이 수정 이후에도
+> Explore 문자열이 한국어로 보입니다 — 백엔드 결함이 아니라 파이프라인 범위입니다.
 
 키워드 검색은 **화면에 보이는 값과 한국어 원문을 함께** 훑습니다. 번역 제목이 보이는데 그
 제목으로 검색되지 않으면 목록이 고장 난 것으로 보이고, 원문 조건을 빼면 한국어로 찾던
@@ -78,10 +104,19 @@ Event·Place의 목록과 상세는 `language`가 가리키는 번역을 우선 
 | `venueName` | `event.venue_name` | `event_translations.venue_detail` |
 | `addressRoad` | `event.address_road` | `event_translations.address_display` |
 
-> **확인이 남은 항목입니다.** 적재 파이프라인이 `venue_detail`에 장소명을 넣는지, 층·홀 같은
-> 부가 정보를 넣는지 스키마와 적재 DTO 어디에도 적혀 있지 않습니다. 부가 정보라면 번역이
-> 붙은 Event 상세에서 장소명 자리에 조각이 나갑니다. 파이프라인 쪽에서 확인한 뒤 이 표를
-> 확정하세요. 아니라면 `EventMapper.findEventDetail`의 해당 줄만 원문으로 되돌리면 됩니다.
+**이름만 다를 뿐 같은 값의 원문과 번역입니다.** 크롤러(`NA-WA-crawler`)의 발행 함수에서
+확인했습니다.
+
+| 우리 컬럼 | 크롤러 원천 |
+| --- | --- |
+| `event.venue_name` | `publish_delta_events`의 `'venueName', e.venue_detail` |
+| `event_translations.venue_detail` | 같은 `venue_detail`의 번역(`event_translation.venue_detail`) |
+| `event.address_road` | `publish_delta_events`의 `'addressRoad', e.address` |
+| `event_translations.address_display` | `event_translation.address_display ← event.address_en` |
+
+즉 `venue_detail`은 층·홀 같은 부가 정보가 아니라 **장소명 그 자체**이고,
+`address_display`는 같은 주소의 영문 표기입니다. 이름이 어긋난 것은 크롤러 쪽 컬럼명을
+번역 테이블이 그대로 가져왔기 때문입니다.
 
 Place 쪽 `opening_hours`·`closed_days`는 **감싸는 모양이 서로 다릅니다.** 원문이 각각
 OBJECT와 ARRAY이고 프론트가 그 모양에 맞춰 다르게 읽기 때문입니다. 번역값은
