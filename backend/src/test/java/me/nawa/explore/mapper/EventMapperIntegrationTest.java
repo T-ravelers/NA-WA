@@ -252,8 +252,8 @@ class EventMapperIntegrationTest {
             "ENDED"
         );
 
-        // 카드가 상시 Event를 "하루짜리 지난 행사"로 그리지 않으려면 목록도 이 값을
-        // 알아야 한다. 상세만 내려주던 시절에는 카드와 상세가 다른 말을 했다.
+        // 카드가 종료일 미상 Event를 "하루짜리 지난 행사"로 그리지 않으려면 목록도 이
+        // 값을 알아야 한다. 상세만 내려주던 시절에는 카드와 상세가 다른 말을 했다.
         Map<Long, Boolean> permanentById = new HashMap<>();
         for (EventSummaryResponse result
             : mapper.searchEvents(request(null, null), 0, null, today)) {
@@ -267,7 +267,7 @@ class EventMapperIntegrationTest {
         assertEquals(EventStatus.ONGOING, statusById.get(startedToday));
         // 종료일 당일은 아직 진행 중이다. 노출 조건(end_date >= today)과 같은 경계다.
         assertEquals(EventStatus.ONGOING, statusById.get(endsToday));
-        // 상시 Event는 끝나는 날이 없어 ENDED로 가지 않는다.
+        // 종료일이 없으면 종료를 판정할 근거가 없어 ENDED로 가지 않는다.
         assertEquals(EventStatus.ONGOING, statusById.get(permanent));
 
         assertEquals(

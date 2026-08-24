@@ -82,7 +82,7 @@ Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `
 | 기준일 < `start_date` | `SCHEDULED` |
 | `start_date` ≤ 기준일 ≤ `end_date` | `ONGOING` |
 | `end_date` < 기준일 | `ENDED` |
-| `end_date`가 `NULL`인 상시 Event | `start_date`를 지나면 계속 `ONGOING` |
+| `end_date`가 `NULL`(종료일 미상) | `start_date`를 지나면 계속 `ONGOING` |
 
 `ENDED`는 위의 공개 조건이 먼저 걸러 내므로 실제 응답에는 나오지 않습니다. 값 집합은
 유지합니다 — 공개 조건을 완화하는 날 판정을 다시 만들지 않기 위해서입니다.

@@ -44,7 +44,7 @@
         기다리지 않고 여기서 다시 계산한다. 스케줄러가 늦거나 멈춰도, 적재가 방금 덮어써도
         화면은 정확해야 한다. 두 곳이 갈라지지 않도록 식은 이 조각 하나만 쓴다.
 
-        end_date가 NULL인 상시 Event(is_permanent)는 끝나는 날이 없어 ENDED로 가지 않는다.
+        end_date가 NULL이면(is_permanent) 종료를 판정할 근거가 없어 ENDED로 가지 않는다.
         ENDED 갈래 자체도 위 eventNotEndedCondition이 먼저 걸러 내 지금은 응답에 나오지
         않지만, 노출 조건을 푸는 날 배지가 조용히 틀리지 않도록 식은 온전히 둔다.
     -->
