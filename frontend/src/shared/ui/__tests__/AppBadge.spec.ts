@@ -14,7 +14,7 @@ describe('AppBadge', () => {
 
   it.each([
     ['ongoing', 'bg-status-ongoing'],
-    ['scheduled', 'bg-status-scheduled'],
+    ['scheduled', 'bg-on-paper/70'],
     ['pending', 'bg-status-scheduled'],
     ['completed', 'bg-status-ongoing'],
     ['info', 'bg-info'],
@@ -34,5 +34,16 @@ describe('AppBadge', () => {
 
   it('omits the dot by default', () => {
     expect(mountBadge({ tone: 'settlement' }).find('[aria-hidden="true"]').exists()).toBe(false)
+  })
+
+  it('distinguishes ongoing and scheduled with the badge surface, not only the dot', () => {
+    const ongoing = mountBadge({ tone: 'ongoing', dot: true })
+    const scheduled = mountBadge({ tone: 'scheduled', dot: true })
+
+    expect(ongoing.classes()).toEqual(expect.arrayContaining(['bg-canvas/70', 'text-ink']))
+    expect(scheduled.classes()).toEqual(
+      expect.arrayContaining(['bg-status-scheduled', 'text-on-paper']),
+    )
+    expect(ongoing.classes()).not.toContain('bg-status-scheduled')
   })
 })
