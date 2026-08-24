@@ -265,7 +265,9 @@ function openAppointmentList(): void {
 
 function openJourneySelectSheet(): void {
   journeyAddError.value = null
-  selectedJourneyId.value = activeJourneyId.value
+  // 이 화면에서 이미 고른 값이 URL의 진입 맥락보다 최신이다. 매번 query로 덮어쓰면
+  // 날짜 시트를 닫고 다시 열 때 사용자의 마지막 선택이 사라진다(#390).
+  selectedJourneyId.value ??= activeJourneyId.value
   journeySelectSheetOpen.value = true
 }
 
@@ -276,6 +278,14 @@ function closeJourneySelectSheet(): void {
 function selectJourney(journeyId: number): void {
   selectedJourneyId.value = journeyId
   returnContext.setJourneyId(journeyId)
+  if (
+    route.query.journeyId !== undefined &&
+    parseJourneyRouteQuery(route.query.journeyId) !== journeyId
+  ) {
+    const restQuery = { ...route.query }
+    delete restQuery.journeyId
+    void router.replace({ query: restQuery })
+  }
   journeyDate.value = returnContext.visitDate
   journeySelectSheetOpen.value = false
   journeyDateSheetOpen.value = journeyDateRange.value !== null
