@@ -891,7 +891,7 @@ public class AppointmentService {
         }
 
         JourneyExploreItem exploreItem = appointmentMapper.findAvailableItem(
-                request.getItemId()
+                request.getItemId(), LocalDate.now()
         );
         if (exploreItem == null
                 || !request.getItemType().equals(exploreItem.getItemType())) {

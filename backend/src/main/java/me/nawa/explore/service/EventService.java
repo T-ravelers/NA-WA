@@ -67,12 +67,15 @@ public class EventService {
         }
 
         int offset = (int) offsetLong;
+        // 목록과 개수가 같은 날을 봐야 페이지네이션이 어긋나지 않는다. 한 번 읽어 둘에 넘긴다.
+        LocalDate today = LocalDate.now();
         List<EventSummaryResponse> content = eventMapper.searchEvents(
             request,
             offset,
-            memberId
+            memberId,
+            today
         );
-        long totalElements = eventMapper.countEvents(request, memberId);
+        long totalElements = eventMapper.countEvents(request, memberId, today);
         int totalPages = calculateTotalPages(totalElements, request.getSize());
 
         return new EventListResponse(
@@ -192,7 +195,8 @@ public class EventService {
         EventDetailResponse event = eventMapper.findEventDetail(
             eventId,
             normalizedLanguage,
-            memberId
+            memberId,
+            LocalDate.now()
         );
 
         if (event == null) {

@@ -24,9 +24,40 @@
                 typeHandler="me.nawa.explore.mapper.JsonNodeTypeHandler"/>
     </resultMap>
 
-    <!-- Event의 저장 status는 스냅샷 생성 시점 값이므로 현재 종료 여부에는 사용하지 않는다. -->
+    <!--
+        Event의 저장 status는 적재 시점 스냅샷이라 종료 여부에 쓰지 않는다.
+
+        기준일은 DB의 CURRENT_DATE()가 아니라 애플리케이션이 넘긴 #{today}다. 세션
+        시간대에 따라 DB가 다른 날을 보면, 같은 응답 안에서 노출 조건과 아래 status
+        파생이 서로 다른 날을 기준으로 갈려 자정 근처에서만 어긋난다.
+    -->
     <sql id="eventNotEndedCondition">
-        (e.end_date IS NULL OR e.end_date &gt;= CURRENT_DATE())
+        (e.end_date IS NULL OR e.end_date &gt;= #{today})
+    </sql>
+
+    <!--
+        화면에 나가는 status는 저장 컬럼이 아니라 기준일로 파생한다. e.status는 적재
+        파이프라인이 준 값이라 시간이 지나도 스스로 옮겨가지 않고, 그래서 시작일이 지난
+        Event가 계속 'SCHEDULED'로 보였다.
+
+        저장 컬럼도 EventStatusScheduler가 같은 식으로 맞춰 두지만, 조회는 그 결과를
+        기다리지 않고 여기서 다시 계산한다. 스케줄러가 늦거나 멈춰도, 적재가 방금 덮어써도
+        화면은 정확해야 한다. 두 곳이 갈라지지 않도록 식은 이 조각 하나만 쓴다.
+
+        end_date가 NULL인 상시 Event(is_permanent)는 끝나는 날이 없어 ENDED로 가지 않는다.
+        ENDED 갈래 자체도 위 eventNotEndedCondition이 먼저 걸러 내 지금은 응답에 나오지
+        않지만, 노출 조건을 푸는 날 배지가 조용히 틀리지 않도록 식은 온전히 둔다.
+    -->
+    <sql id="eventDerivedStatus">
+        CASE
+            WHEN #{today} &lt; e.start_date THEN 'SCHEDULED'
+            WHEN e.end_date IS NOT NULL AND #{today} &gt; e.end_date THEN 'ENDED'
+            ELSE 'ONGOING'
+        END
+    </sql>
+
+    <sql id="eventDerivedStatusColumn">
+        <include refid="eventDerivedStatus"/> AS status
     </sql>
 
     <!-- 요청한 회원의 찜 여부. 비인증 요청(memberId IS NULL)은 항상 FALSE다. -->
@@ -60,7 +91,7 @@
             e.links,
             e.reservation_url,
             e.pre_reservation,
-            e.status,
+            <include refid="eventDerivedStatusColumn"/>,
             e.is_permanent,
             e.start_date,
             e.end_date,
@@ -322,7 +353,7 @@
         SELECT
         e.event_id AS item_id,
         e.event_kind,
-        e.status,
+        <include refid="eventDerivedStatusColumn"/>,
         e.title,
         e.subtitle,
         e.thumbnail_url,
@@ -369,6 +400,25 @@
         읽기만 하는 상세 조회에서 유일하게 쓰는 구문이라 호출부가 별도 트랜잭션으로
         분리해서 부른다. 여기서 실패해도 상세 응답은 그대로 나가야 한다.
     -->
+    <!--
+        저장 status를 기준일이 정한 값으로 되돌린다. 화면은 이 구문을 기다리지 않지만
+        (조회가 같은 식을 다시 계산한다), 저장값을 그대로 믿는 다른 도구가 화면과 다른
+        말을 하지 않게 맞춰 둔다.
+
+        전진만 하지 않고 어긋난 값을 양방향으로 고친다. 적재 파이프라인이 아직 시작하지
+        않은 Event에 'ENDED'를 실어 보내는 경우가 있어, 전진만 하면 그 행은 영영 틀린 채
+        남는다. 적재가 다시 덮어써도 다음 주기가 되돌린다.
+
+        WHERE의 CASE가 이미 맞는 행을 걸러 낸다. 전부 SET하면 event 테이블 전체가 매번
+        쓰기 대상이 된다.
+    -->
+    <update id="realignEventStatuses">
+        UPDATE event e
+        SET e.status = <include refid="eventDerivedStatus"/>
+        WHERE e.deleted_at IS NULL
+          AND e.status &lt;&gt; <include refid="eventDerivedStatus"/>
+    </update>
+
     <update id="increaseEventViewCount">
         UPDATE event
         SET view_count = view_count + 1

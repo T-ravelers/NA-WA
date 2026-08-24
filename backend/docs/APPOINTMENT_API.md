@@ -11,6 +11,13 @@
   생성 요청의 `visitDate`는 `yyyy-MM-dd`, `activityStartTime`/
   `activityEndTime`은 `HH:mm:ss`(시각만)입니다.
 - 약속 대상 `itemType`은 `EVENT`, `PLACE` 중 하나입니다.
+- 약속을 걸 수 있는 항목은 `APPROVED`·`VISIBLE`이며 삭제되지 않은 것 중, Event는
+  운영 기간이 남은 것(`end_date`가 없거나 기준일 이후), Place는 `is_active`인
+  것입니다. 기준일은 애플리케이션이 넘긴 오늘 날짜입니다. Event 판정은 저장된
+  `status` 컬럼을 보지 않습니다 — 그 값은 적재 파이프라인이 준 스냅샷이라, 예전에는
+  적재 값이 `ENDED`이면 목록·상세에 진행 중으로 보이는 Event에도 약속을 만들 수
+  없었습니다. 여정 담기와 같은 조건입니다([EXPLORE_API.md](./EXPLORE_API.md) 참고).
+  위반 시 `COMMON-001`을 반환합니다.
 - 약속은 항상 여정(Journey) 항목 하나에 연결되어 생성됩니다. 여정 없이 만드는
   경로는 없습니다.
 - 지원 언어는 `en`, `ja`, `zh-TW`, `vi`입니다.

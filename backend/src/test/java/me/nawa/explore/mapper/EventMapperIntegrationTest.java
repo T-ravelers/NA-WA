@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import me.nawa.config.MySqlSchemaExtension;
+import me.nawa.explore.domain.EventStatus;
 import me.nawa.explore.dto.request.EventSearchRequest;
 import me.nawa.explore.dto.response.EventDetailResponse;
 import me.nawa.explore.dto.response.EventSummaryResponse;
@@ -51,6 +52,8 @@ class EventMapperIntegrationTest {
     private final List<Long> eventIds = new ArrayList<>();
     private long memberId;
     private String marker;
+    // 기준일은 애플리케이션이 정한다. DB 세션 시간대가 무엇이든 결과가 같아야 한다.
+    private LocalDate today;
 
     @BeforeAll
     static void setUpDatabase() throws Exception {
@@ -89,6 +92,7 @@ class EventMapperIntegrationTest {
     void setUpFixtureOwner() {
         marker = "event-date-" + UUID.randomUUID();
         memberId = insertMember(marker);
+        today = LocalDate.now();
     }
 
     @AfterEach
@@ -123,7 +127,6 @@ class EventMapperIntegrationTest {
 
     @Test
     void findEventDetail_mapsV7ColumnsAndIgnoresStoredEndedStatus() {
-        LocalDate today = currentDatabaseDate();
         long eventId = insertEvent(
             "mapping",
             today.minusDays(1),
@@ -131,11 +134,13 @@ class EventMapperIntegrationTest {
             "ENDED"
         );
 
-        EventDetailResponse result = mapper.findEventDetail(eventId, "en", null);
+        EventDetailResponse result = mapper.findEventDetail(
+            eventId, "en", null, today);
 
         assertNotNull(result);
         assertNotNull(result.getEventKind());
-        assertNotNull(result.getStatus());
+        // 적재 값은 'ENDED'지만 운영 기간이 오늘을 덮으므로 진행 중으로 나간다.
+        assertEquals(EventStatus.ONGOING, result.getStatus());
         assertNotNull(result.getImageUrls());
         assertTrue(result.getImageUrls().isArray());
         assertNotNull(result.getLinks());
@@ -149,7 +154,6 @@ class EventMapperIntegrationTest {
 
     @Test
     void searchAndDetail_useCurrentDatesForVisibilityAndDateRanges() {
-        LocalDate today = currentDatabaseDate();
         long endedYesterday = insertEvent(
             "ended-yesterday",
             today.minusDays(2),
@@ -206,18 +210,147 @@ class EventMapperIntegrationTest {
             permanentWithEndedStatus
         ), visibleFromTomorrow);
 
-        assertNull(mapper.findEventDetail(endedYesterday, "en", null));
-        assertNotNull(mapper.findEventDetail(endsToday, "en", null));
+        assertNull(mapper.findEventDetail(endedYesterday, "en", null, today));
+        assertNotNull(mapper.findEventDetail(endsToday, "en", null, today));
         assertNotNull(mapper.findEventDetail(
             permanentWithEndedStatus,
             "en",
-            null
+            null,
+            today
         ));
+    }
+
+    /**
+     * 화면에 나가는 status는 적재 값이 아니라 기준일이 정한다.
+     *
+     * <p>적재 값을 일부러 반대로 넣어 둔 픽스처들이다. 예전에는 이 값이 그대로
+     * 나가서, 시작일이 지난 Event가 계속 'SCHEDULED'로 보였다.
+     */
+    @Test
+    void searchAndDetail_deriveStatusFromDatesNotStoredColumn() {
+        long startsTomorrow = insertEvent(
+            "derive-starts-tomorrow",
+            today.plusDays(1),
+            today.plusDays(2),
+            "ONGOING"
+        );
+        long startedToday = insertEvent(
+            "derive-started-today",
+            today,
+            today.plusDays(1),
+            "SCHEDULED"
+        );
+        long endsToday = insertEvent(
+            "derive-ends-today",
+            today.minusDays(1),
+            today,
+            "SCHEDULED"
+        );
+        long permanent = insertPermanentEvent(
+            "derive-permanent",
+            today.minusDays(10),
+            "ENDED"
+        );
+
+        Map<Long, EventStatus> statusById = searchStatuses(today);
+        assertEquals(EventStatus.SCHEDULED, statusById.get(startsTomorrow));
+        assertEquals(EventStatus.ONGOING, statusById.get(startedToday));
+        // 종료일 당일은 아직 진행 중이다. 노출 조건(end_date >= today)과 같은 경계다.
+        assertEquals(EventStatus.ONGOING, statusById.get(endsToday));
+        // 상시 Event는 끝나는 날이 없어 ENDED로 가지 않는다.
+        assertEquals(EventStatus.ONGOING, statusById.get(permanent));
+
+        assertEquals(
+            EventStatus.SCHEDULED,
+            mapper.findEventDetail(startsTomorrow, "en", null, today)
+                .getStatus()
+        );
+        assertEquals(
+            EventStatus.ONGOING,
+            mapper.findEventDetail(permanent, "en", null, today).getStatus()
+        );
+    }
+
+    /**
+     * 기준일은 DB의 CURRENT_DATE()가 아니라 넘겨받은 값이다.
+     *
+     * <p>같은 행이 넘긴 날짜에 따라 다른 status로 나와야, 자정 근처에서 DB 세션
+     * 시간대가 응답을 흔들지 못한다.
+     */
+    @Test
+    void derivedStatus_followsSuppliedDateNotDatabaseDate() {
+        long startsTomorrow = insertEvent(
+            "supplied-date",
+            today.plusDays(1),
+            today.plusDays(2),
+            "ENDED"
+        );
+
+        assertEquals(
+            EventStatus.SCHEDULED,
+            searchStatuses(today).get(startsTomorrow)
+        );
+        assertEquals(
+            EventStatus.ONGOING,
+            searchStatuses(today.plusDays(1)).get(startsTomorrow)
+        );
+    }
+
+    /**
+     * 저장 status도 같은 규칙으로 되돌린다.
+     *
+     * <p>화면은 파생값을 쓰므로 이 구문을 기다리지 않는다. 여기서 맞추는 것은 저장값을
+     * 그대로 읽는 쪽이다. 전진만 하지 않고 양방향으로 고친다 — 적재가 아직 시작하지
+     * 않은 Event에 'ENDED'를 실어 보내면 전진만으로는 영영 틀린 채 남는다.
+     *
+     * <p>이 구문은 event 전체를 대상으로 한다. 단정은 이 테스트가 만든 행으로 좁힌다.
+     */
+    @Test
+    void realignEventStatuses_movesStoredColumnToDerivedValue() {
+        long startedButScheduled = insertEvent(
+            "realign-started",
+            today.minusDays(1),
+            today.plusDays(1),
+            "SCHEDULED"
+        );
+        long notStartedButEnded = insertEvent(
+            "realign-not-started",
+            today.plusDays(1),
+            today.plusDays(2),
+            "ENDED"
+        );
+        long endedButOngoing = insertEvent(
+            "realign-ended",
+            today.minusDays(3),
+            today.minusDays(1),
+            "ONGOING"
+        );
+        long permanentButEnded = insertPermanentEvent(
+            "realign-permanent",
+            today.minusDays(10),
+            "ENDED"
+        );
+        long alreadyCorrect = insertEvent(
+            "realign-correct",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+
+        assertTrue(mapper.realignEventStatuses(today) >= 4);
+
+        assertEquals("ONGOING", storedStatus(startedButScheduled));
+        assertEquals("SCHEDULED", storedStatus(notStartedButEnded));
+        assertEquals("ENDED", storedStatus(endedButOngoing));
+        assertEquals("ONGOING", storedStatus(permanentButEnded));
+        assertEquals("ONGOING", storedStatus(alreadyCorrect));
+
+        // 이미 맞는 행만 남으면 옮길 것이 없다.
+        assertEquals(0, mapper.realignEventStatuses(today));
     }
 
     @Test
     void savedColumn_marksOnlyRequestingMembersActiveLikes() {
-        LocalDate today = currentDatabaseDate();
         long likedId = insertEvent(
             "saved-liked",
             today.minusDays(1),
@@ -251,7 +384,7 @@ class EventMapperIntegrationTest {
 
         Map<Long, Boolean> savedById = new HashMap<>();
         for (EventSummaryResponse result
-            : mapper.searchEvents(request(null, null), 0, memberId)) {
+            : mapper.searchEvents(request(null, null), 0, memberId, today)) {
             savedById.put(result.getItemId(), result.isSaved());
         }
         assertEquals(Boolean.TRUE, savedById.get(likedId));
@@ -259,12 +392,22 @@ class EventMapperIntegrationTest {
         assertEquals(Boolean.FALSE, savedById.get(canceledId));
 
         for (EventSummaryResponse result
-            : mapper.searchEvents(request(null, null), 0, null)) {
+            : mapper.searchEvents(request(null, null), 0, null, today)) {
             assertFalse(result.isSaved());
         }
 
-        assertTrue(mapper.findEventDetail(likedId, "en", memberId).isSaved());
-        assertFalse(mapper.findEventDetail(likedId, "en", null).isSaved());
+        assertTrue(mapper.findEventDetail(likedId, "en", memberId, today)
+            .isSaved());
+        assertFalse(mapper.findEventDetail(likedId, "en", null, today)
+            .isSaved());
+    }
+
+    private String storedStatus(long eventId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT status FROM event WHERE event_id = ?",
+            String.class,
+            eventId
+        );
     }
 
     private Set<Long> searchIds(LocalDate startDate, LocalDate endDate) {
@@ -272,7 +415,8 @@ class EventMapperIntegrationTest {
         List<EventSummaryResponse> results = mapper.searchEvents(
             request,
             0,
-            null
+            null,
+            today
         );
         Set<Long> ids = new HashSet<>();
         for (EventSummaryResponse result : results) {
@@ -281,8 +425,17 @@ class EventMapperIntegrationTest {
         return ids;
     }
 
+    private Map<Long, EventStatus> searchStatuses(LocalDate referenceDate) {
+        Map<Long, EventStatus> statusById = new HashMap<>();
+        for (EventSummaryResponse result
+            : mapper.searchEvents(request(null, null), 0, null, referenceDate)) {
+            statusById.put(result.getItemId(), result.getStatus());
+        }
+        return statusById;
+    }
+
     private long countEvents(LocalDate startDate, LocalDate endDate) {
-        return mapper.countEvents(request(startDate, endDate), null);
+        return mapper.countEvents(request(startDate, endDate), null, today);
     }
 
     private EventSearchRequest request(LocalDate startDate, LocalDate endDate) {
@@ -292,13 +445,6 @@ class EventMapperIntegrationTest {
         request.setEndDate(endDate);
         request.setSize(20);
         return request;
-    }
-
-    private LocalDate currentDatabaseDate() {
-        return jdbcTemplate.queryForObject(
-            "SELECT CURRENT_DATE()",
-            LocalDate.class
-        );
     }
 
     private long insertMember(String displayName) {
