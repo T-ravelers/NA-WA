@@ -82,7 +82,15 @@
 
     <!--
         번역 쪽 영업시간·휴무일은 TEXT인데 응답 DTO는 JSON이다. 그대로 COALESCE하면
-        JsonNodeTypeHandler가 파싱에 실패해 TypeException을 던지므로 {"raw": "..."}로 감싼다.
+        JsonNodeTypeHandler가 파싱에 실패해 TypeException을 던지므로 감싸야 한다.
+
+        **두 컬럼의 감싸는 모양이 다르다.** 원문의 JSON 모양이 서로 다르고, 프론트가 그
+        모양에 맞춰 다르게 읽기 때문이다. 맞추지 않으면 번역이 붙는 순간에만 화면이 깨진다.
+    -->
+
+    <!--
+        원문이 OBJECT다(운영 1,490행 전부). 프론트는 `raw`·`hours`를 크롤러가 붙인 키로 보고
+        라벨에서 지우므로(PlaceDetailView.SYNTHETIC_HOURS_LABELS) 이 모양이 그대로 맞다.
     -->
     <sql id="placeTranslatedOpeningHours">
         CASE
@@ -92,10 +100,16 @@
         END AS opening_hours
     </sql>
 
+    <!--
+        원문이 ARRAY다(운영 2,211행 전부). 여기서 OBJECT로 감싸면 프론트 toClosedDays가
+        객체 갈래를 타서 화면에 **`raw: ...`가 그대로 찍힌다** — openingHours와 달리
+        closedDays에는 합성 키를 지우는 처리가 없다. 배열로 감싸면 기존 배열 갈래를 타서
+        `<br>` 분리까지 원문과 같아진다.
+    -->
     <sql id="placeTranslatedClosedDays">
         CASE
             WHEN NULLIF(TRIM(pt.closed_days_text), '') IS NOT NULL
-                THEN JSON_OBJECT('raw', pt.closed_days_text)
+                THEN JSON_ARRAY(pt.closed_days_text)
             ELSE p.closed_days
         END AS closed_days
     </sql>
@@ -160,24 +174,22 @@
                      open="(" separator="," close=")">#{value}</foreach>
         </if>
         <!--
-            EventMapper와 같은 이유로 표시값과 원문을 모두 훑는다. 번역 이름이 보이는데 그
-            이름으로는 검색되지 않으면 사용자는 목록이 고장 났다고 읽는다.
+            EventMapper와 같은 이유로 번역값과 원문을 모두 훑는다. 번역 이름이 보이는데 그
+            이름으로는 검색되지 않으면 사용자는 목록이 고장 났다고 읽는다. 표시값처럼
+            COALESCE로 감싸지 않는 이유도 같다 — 폴백 갈래를 뒤의 원문 조건이 이미 덮는다.
         -->
         <if test="request.keyword != null and request.keyword != ''">
             AND (
-                COALESCE(NULLIF(TRIM(pt.name), ''), p.name)
-                    LIKE CONCAT('%', #{request.keyword}, '%')
+                NULLIF(TRIM(pt.name), '') LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.name LIKE CONCAT('%', #{request.keyword}, '%')
-                OR COALESCE(NULLIF(TRIM(pt.brand), ''), p.brand)
-                    LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt.brand), '') LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.brand LIKE CONCAT('%', #{request.keyword}, '%')
-                OR COALESCE(NULLIF(TRIM(pt.branch), ''), p.branch)
-                    LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt.branch), '') LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.branch LIKE CONCAT('%', #{request.keyword}, '%')
-                OR COALESCE(NULLIF(TRIM(pt.address_display), ''), p.address_road)
+                OR NULLIF(TRIM(pt.address_display), '')
                     LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.address_road LIKE CONCAT('%', #{request.keyword}, '%')
-                OR COALESCE(NULLIF(TRIM(pt.address_detail), ''), p.address_detail)
+                OR NULLIF(TRIM(pt.address_detail), '')
                     LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.address_detail LIKE CONCAT('%', #{request.keyword}, '%')
             )

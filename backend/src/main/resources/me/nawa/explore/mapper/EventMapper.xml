@@ -137,6 +137,14 @@
             e.open_days,
             e.open_weekend,
             e.opens_late,
+            <!--
+                **확인이 필요한 대응이다.** event_translations에는 venue_name이 없어
+                venue_detail이 유일한 후보지만, 적재 DTO·스키마 어디에도 이 컬럼이 장소명인지
+                층·홀 같은 부가 정보인지 적혀 있지 않다(파이프라인이 준 값을 그대로 넣는다).
+                부가 정보라면 번역이 붙은 Event 상세의 장소명 자리에 조각이 나간다.
+                아니라고 확인되면 이 줄만 e.venue_name으로 되돌리면 된다. address_display도
+                같은 성격이라 함께 확인한다(#531 리뷰).
+            -->
             COALESCE(NULLIF(TRIM(et.venue_detail), ''), e.venue_name) AS venue_name,
             e.region1,
             e.region2,
@@ -286,20 +294,20 @@
 
         <!--
             검색 대상은 화면에 실제로 보이는 값이어야 한다. 한국어 본문만 훑으면 영어 제목이
-            보이는 목록에서 그 영어 제목으로 검색했을 때 0건이 나온다. 표시값과 같은 식을
-            그대로 쓴다.
+            보이는 목록에서 그 영어 제목으로 검색했을 때 0건이 나온다.
 
-            한국어 원문(e.title)도 계속 훑는다 — 번역이 있는 Event는 COALESCE가 번역값을
-            고르므로, 원문 조건을 빼면 한국어로 검색하던 사용자가 갑자기 결과를 잃는다.
+            번역값과 원문을 각각 본다. 표시값처럼 COALESCE로 감쌀 필요가 없다 — 폴백 갈래는
+            뒤의 원문 조건이 이미 덮으므로 같은 결과를 두 번 쓰는 셈이 된다.
+
+            원문 조건을 빼서도 안 된다. 번역이 붙은 Event는 표시값이 번역값이라, 원문만
+            훑던 한국어 검색 경로가 조용히 죽는다.
         -->
         <if test="request.keyword != null and request.keyword != ''">
             AND (
-            COALESCE(NULLIF(TRIM(et.title), ''), e.title)
-                LIKE CONCAT('%', #{request.keyword}, '%')
+            NULLIF(TRIM(et.title), '') LIKE CONCAT('%', #{request.keyword}, '%')
             OR e.title LIKE CONCAT('%', #{request.keyword}, '%')
             OR e.subtitle LIKE CONCAT('%', #{request.keyword}, '%')
-            OR COALESCE(NULLIF(TRIM(et.description), ''), e.description)
-                LIKE CONCAT('%', #{request.keyword}, '%')
+            OR NULLIF(TRIM(et.description), '') LIKE CONCAT('%', #{request.keyword}, '%')
             OR e.description LIKE CONCAT('%', #{request.keyword}, '%')
             )
         </if>

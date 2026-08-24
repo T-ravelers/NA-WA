@@ -425,13 +425,17 @@ class EventMapperXmlTest {
             parameters
         );
 
-        assertTrue(listSql.contains("COALESCE(NULLIF(TRIM(et.title), ''), e.title) LIKE"));
+        /*
+         * 번역값과 원문을 각각 본다. 표시값과 달리 COALESCE로 감싸지 않는다 — 폴백 갈래를
+         * 뒤의 원문 조건이 이미 덮으므로 같은 결과를 두 번 쓰는 셈이다(#531 리뷰).
+         */
+        assertTrue(listSql.contains("NULLIF(TRIM(et.title), '') LIKE"));
         assertTrue(listSql.contains("e.title LIKE"));
         /*
          * 목록만 번역 제목으로 찾고 개수는 원문만 세면 totalElements가 어긋나
          * 페이지네이션이 틀어진다. 두 구문이 같은 조건을 봐야 한다.
          */
-        assertTrue(countSql.contains("COALESCE(NULLIF(TRIM(et.title), ''), e.title) LIKE"));
+        assertTrue(countSql.contains("NULLIF(TRIM(et.title), '') LIKE"));
         assertTrue(countSql.contains("LEFT JOIN event_translations et"));
     }
 

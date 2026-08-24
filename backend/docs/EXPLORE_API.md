@@ -69,6 +69,26 @@ Event·Place의 목록과 상세는 `language`가 가리키는 번역을 우선 
 번역 테이블에 컬럼이 없는 필드(Event의 `subtitle`·`program_text`)는 아직 한국어가 그대로
 나갑니다.
 
+### 번역 컬럼과 응답 필드의 대응
+
+이름이 같지 않은 두 쌍이 있습니다. 번역 테이블에 대응 컬럼이 없어 가장 가까운 것을 씁니다.
+
+| 응답 필드 | 원문 컬럼 | 번역 컬럼 |
+| --- | --- | --- |
+| `venueName` | `event.venue_name` | `event_translations.venue_detail` |
+| `addressRoad` | `event.address_road` | `event_translations.address_display` |
+
+> **확인이 남은 항목입니다.** 적재 파이프라인이 `venue_detail`에 장소명을 넣는지, 층·홀 같은
+> 부가 정보를 넣는지 스키마와 적재 DTO 어디에도 적혀 있지 않습니다. 부가 정보라면 번역이
+> 붙은 Event 상세에서 장소명 자리에 조각이 나갑니다. 파이프라인 쪽에서 확인한 뒤 이 표를
+> 확정하세요. 아니라면 `EventMapper.findEventDetail`의 해당 줄만 원문으로 되돌리면 됩니다.
+
+Place 쪽 `opening_hours`·`closed_days`는 **감싸는 모양이 서로 다릅니다.** 원문이 각각
+OBJECT와 ARRAY이고 프론트가 그 모양에 맞춰 다르게 읽기 때문입니다. 번역값은
+`opening_hours_text` → `{"raw": "..."}`, `closed_days_text` → `["..."]`로 감쌉니다.
+휴무일을 객체로 감싸면 화면에 `raw: ...`가 그대로 찍힙니다 — 영업시간과 달리 휴무일에는
+합성 키를 지우는 처리가 프론트에 없습니다.
+
 ### 필터 결합
 
 - 같은 종류의 다중 값은 OR 조건으로 적용합니다.

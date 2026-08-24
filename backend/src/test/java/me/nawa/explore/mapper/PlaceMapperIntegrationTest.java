@@ -254,6 +254,56 @@ class PlaceMapperIntegrationTest {
     }
 
     /**
+     * 번역된 영업시간·휴무일이 원문과 <b>같은 JSON 모양</b>으로 나가야 한다.
+     *
+     * <p>휴무일을 {@code {"raw": ...}}로 감싸면 프론트 {@code toClosedDays}가 객체 갈래를
+     * 타서 화면 「휴무일」에 {@code raw: ...}가 그대로 찍힌다. 영업시간과 달리 휴무일에는
+     * 합성 키를 지우는 처리가 없다. 한국어 폴백일 때는 정상으로 보여서, 번역 데이터가 붙는
+     * 순간에만 드러나는 회귀다(#531 리뷰).
+     */
+    @Test
+    void findPlaceDetail_keepsTranslatedHoursAndClosedDaysInTheirOriginalJsonShapes() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            String marker = UUID.randomUUID().toString();
+
+            long placeId = insertPlace("한국어 이름 " + marker);
+            jdbcTemplate.update(
+                "UPDATE place SET opening_hours = JSON_OBJECT('raw', '12:00 ~ 22:00'), "
+                    + "closed_days = JSON_ARRAY('매주 월요일') WHERE place_id = ?",
+                placeId
+            );
+            jdbcTemplate.update(
+                "INSERT INTO place_translations "
+                    + "(place_id, language_code, opening_hours_text, closed_days_text) "
+                    + "VALUES (?, 'en', ?, ?)",
+                placeId, "Mon-Fri 09:00-18:00", "Every Monday"
+            );
+
+            PlaceDetailResponse detail = mapper.findPlaceDetail(placeId, "en", null);
+
+            // 영업시간 원문은 OBJECT다. 번역도 객체여야 프론트가 raw를 벗긴다.
+            assertTrue(detail.getOpeningHours().isObject());
+            assertEquals(
+                "Mon-Fri 09:00-18:00",
+                detail.getOpeningHours().path("raw").asText()
+            );
+
+            // 휴무일 원문은 ARRAY다. 객체로 나가면 화면에 `raw: ...`가 찍힌다.
+            assertTrue(
+                detail.getClosedDays().isArray(),
+                "휴무일 번역이 배열이 아니면 프론트가 `raw:` 라벨을 그대로 그린다"
+            );
+            assertEquals("Every Monday", detail.getClosedDays().get(0).asText());
+
+            // 번역이 없는 언어는 원문 모양 그대로.
+            PlaceDetailResponse korean = mapper.findPlaceDetail(placeId, "vi", null);
+            assertTrue(korean.getClosedDays().isArray());
+            assertEquals("매주 월요일", korean.getClosedDays().get(0).asText());
+        });
+    }
+
+    /**
      * {@code chk_explore_items_review}가 승인 상태에 검수자와 검수 시각을 함께 요구하므로
      * 회원을 먼저 만들어 {@code reviewed_by}에 넣는다.
      */
