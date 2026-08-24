@@ -4,6 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
+import AppBadge from '@/shared/ui/AppBadge.vue'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 
 import type { JourneySummary } from '../../api/journeyApi'
@@ -23,6 +24,10 @@ function createRouterStub() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
+      {
+        path: '/',
+        component: { template: '<div />' },
+      },
       {
         path: '/journeys/:tripId',
         name: 'journey-detail',
@@ -46,7 +51,6 @@ function mountCard(
     props: {
       journey: { ...journey, ...overrides },
       status: 'ongoing' as const,
-      statusLabel: 'Ongoing',
       ...props,
     },
   })
@@ -95,6 +99,19 @@ describe('JourneyListCard', () => {
      * 상태를 말하게 된다 — #533 리뷰가 잡은 것이다.
      */
     expect(mountCard({}, { status: 'ongoing', onTrip: false }).text()).not.toContain('On trip')
+  })
+
+  it('distinguishes scheduled, in-progress, and past journey badges', () => {
+    const scheduled = mountCard({}, { status: 'ongoing', onTrip: false })
+    const inProgress = mountCard({}, { status: 'ongoing', onTrip: true })
+    const past = mountCard({}, { status: 'past', onTrip: false })
+
+    expect(scheduled.getComponent(AppBadge).text()).toBe('Scheduled')
+    expect(scheduled.getComponent(AppBadge).classes()).toContain('bg-status-scheduled')
+    expect(inProgress.getComponent(AppBadge).text()).toBe('In progress')
+    expect(inProgress.getComponent(AppBadge).classes()).toContain('bg-canvas/70')
+    expect(past.getComponent(AppBadge).text()).toBe('Past')
+    expect(past.getComponent(AppBadge).classes()).toContain('border-hairline')
   })
 
   /*

@@ -190,7 +190,6 @@ function retry(): void {
             :key="journey.tripId"
             :journey="journey"
             :status="activeTab"
-            :status-label="activeTabLabel"
             :on-trip="isJourneyOnTrip(journey.startDate, journey.endDate, today)"
             :report-id="reportIdByTripId.get(journey.tripId) ?? null"
             class="w-68 shrink-0 snap-start"

@@ -15,7 +15,6 @@ import { formatJourneyDate, type JourneyListStatus } from '../model/journeyStatu
 interface Props {
   journey: JourneySummary
   status: JourneyListStatus
-  statusLabel: string
   /**
    * 지금 실제로 여행 중인가. 도장을 찍을지 정한다.
    *
@@ -33,9 +32,22 @@ interface Props {
   reportId?: number | null
 }
 
-const { journey, status, statusLabel, onTrip = false, reportId = null } = defineProps<Props>()
+const { journey, status, onTrip = false, reportId = null } = defineProps<Props>()
 
 const { locale, t } = useI18n()
+
+/*
+ * `status`는 탭 구분이라 `ongoing`에 예정 여정도 들어간다. 도장과 같은 실제 기간 판정을
+ * 함께 써야 시안의 `In progress` / `Scheduled`를 정확히 구분할 수 있다.
+ */
+const statusTone = computed(() => {
+  if (status === 'past') return 'neutral'
+  return onTrip ? 'ongoing' : 'scheduled'
+})
+const statusLabel = computed(() => {
+  if (status === 'past') return t('journey.list.past')
+  return onTrip ? t('journey.list.inProgress') : t('journey.list.scheduled')
+})
 
 /** 값이 0인 종류는 빼고 담는다. 둘 다 0이면 빈 배열이 되어 줄이 통째로 사라진다. */
 const itemCounts = computed(() => {
@@ -95,7 +107,7 @@ const itemCounts = computed(() => {
 
         <div class="absolute top-3 left-3">
           <AppBadge
-            :tone="status === 'ongoing' ? 'ongoing' : 'neutral'"
+            :tone="statusTone"
             dot
           >
             {{ statusLabel }}

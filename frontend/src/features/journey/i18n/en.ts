@@ -5,6 +5,8 @@ export default {
       add: 'Add journey',
       viewReport: 'View report',
       onTrip: 'On trip',
+      inProgress: 'In progress',
+      scheduled: 'Scheduled',
       tabsLabel: 'Journey status',
       ongoing: 'Ongoing',
       past: 'Past',
