@@ -275,6 +275,22 @@ describe('EventDetailView', () => {
     expect(wrapper.text()).not.toContain('raw:')
   })
 
+  /*
+   * Event 상세는 `raw`만 감추고 `hours`는 그대로 붙여 'hours: ...'가 나갔다. Place 상세는
+   * 둘 다 감추고 있어 같은 값이 화면마다 다르게 보였다. 규칙을 한곳에 모으면서 맞췄다(#534).
+   */
+  it('hides the synthetic hours key too, not just raw', async () => {
+    fetchEventDetail.mockResolvedValue({
+      ...event,
+      operatingHours: { hours: 'Every day 10:00 – 20:00' },
+    })
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Every day 10:00 – 20:00')
+    expect(wrapper.text()).not.toContain('hours:')
+  })
+
   it('returns to the Event list from the detail screen', async () => {
     const { wrapper, router } = await mountView()
 

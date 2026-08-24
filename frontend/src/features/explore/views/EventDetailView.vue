@@ -30,6 +30,7 @@ import { useEventDetailQuery } from '../composables/useEventDetailQuery'
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
 import JourneySelectSheet from '../components/JourneySelectSheet.vue'
 import MapLinkButtons from '../components/MapLinkButtons.vue'
+import { formatDetailEntry } from '../model/detailEntryLabels'
 import {
   resolveHomepageUrl,
   resolveReservationUrl,
@@ -155,11 +156,7 @@ const detailRows = computed(() => {
   if (hours.value.length > 0) {
     rows.push({
       label: t('explore.detail.hours'),
-      value: hours.value
-        .map((entry) =>
-          entry.label.toLowerCase() === 'raw' ? entry.value : `${entry.label}: ${entry.value}`,
-        )
-        .join('\n'),
+      value: hours.value.map(formatDetailEntry).join('\n'),
     })
   } else if (openDays.value) {
     rows.push({ label: t('explore.detail.hours'), value: openDays.value })

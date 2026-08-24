@@ -235,6 +235,23 @@ describe('PlaceDetailView', () => {
     expect(wrapper.text()).not.toContain('<br>')
   })
 
+  /*
+   * 휴무일도 같은 규칙이다. 번역된 휴무일이 객체로 오면 'raw: Every Monday'가 그대로
+   * 나갔고, 그래서 백엔드가 배열로 감싸 피해 갔다(#531). 이제 화면이 어느 모양이든
+   * 같은 줄을 그리므로 그 우회에 기대지 않는다(#534).
+   */
+  it('hides the raw key when closed days arrive as an object', async () => {
+    fetchPlaceDetail.mockResolvedValue({
+      ...place,
+      closedDays: { raw: 'Every Monday' },
+    })
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain('Every Monday')
+    expect(wrapper.text()).not.toContain('raw:')
+  })
+
   // 수집한 대표 메뉴는 대부분 한 문자열에 '/'로 이어져 온다. 나누지 않으면
   // 'A / B / C'가 칩 하나에 통째로 들어간다.
   it('splits the signature menu into one chip per item', async () => {
