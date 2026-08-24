@@ -55,8 +55,21 @@ avatars/{memberId}/{UUID}.{jpg|png|webp}
 
 업로드는 프런트엔드가 백엔드 multipart API에 파일을 보내고 백엔드가 S3에
 `PutObject`하는 방식으로 구현합니다. `SettlementReceiptController`의
-`@RequestPart("file") MultipartFile` 처리와 `ReceiptStorageService`의 형식·크기 검증을
-선례로 사용합니다.
+`@RequestPart("file") MultipartFile` 처리를 선례로 사용합니다. 형식 검증의 선례는
+`ReceiptStorageService`가 아니라 `SettlementReceiptServiceImpl.resolveFormat()`입니다.
+선언한 `Content-Type`과 magic bytes에서 판별한 실제 형식이 모두
+`image/jpeg`·`image/png`·`image/webp` 중 하나이고 서로 같을 때만 허용합니다.
+`ReceiptStorageService`는 객체 키와 S3 I/O만 책임지므로 파일 내용 검증을 맡기지 않습니다.
+
+아바타 한 장의 최대 크기는 8MiB이며 구현 PR에서 `AVATAR_MAX_UPLOAD_BYTES`(기본
+`8388608`)로 주입합니다. 서비스가 실제 바이트 길이에 이 상한을 적용해야 합니다. 현재
+`WebConfig`의 `MultipartConfigElement`는 이름과 달리 영수증뿐 아니라 같은
+`DispatcherServlet`의 모든 multipart 요청에 적용되며 `RECEIPT_MAX_UPLOAD_BYTES`만
+읽습니다. 구현 PR에서는 아바타 서비스와 영수증 서비스가 실제 바이트 길이에 각자의 상한을
+적용하도록 분리하고, servlet의 공통 파일 상한은 두 값 중 큰 값으로 일반화해야 합니다.
+요청 상한에는 multipart overhead를 더하고 `nginx/nginx.conf`의
+`client_max_body_size`는 이 servlet 요청 상한보다 커야 합니다. 관련 환경 변수
+예시·README·nginx 설명도 같은 PR에서 함께 갱신합니다.
 
 업로드·교체·삭제는 인증된 회원이 자신의 아바타에 대해서만 수행할 수 있습니다. 반면
 조회는 약속 참여자 목록·리뷰·회원 프로필·리포트 비교처럼 다른 회원의 사진을 표시해야
@@ -70,8 +83,10 @@ S3 주소 대신 이 UUID를 포함한 백엔드 URL만 반환합니다. 따라�
 사진을 열거할 수는 없습니다. 존재하지 않거나 교체로 폐기된 UUID는 `404`로 응답합니다.
 
 응답은 실제 `Content-Type`, `X-Content-Type-Options: nosniff`와
-`Cache-Control: private`을 포함해야 합니다. 프런트엔드와 백엔드는 같은 사이트의 운영
-도메인을 사용하므로 브라우저는 이 백엔드 이미지 URL에 인증 쿠키를 실을 수 있습니다.
+`Cache-Control: private, no-store`를 포함해야 합니다. 브라우저가 성공 응답을 저장하지
+않아야 교체·삭제·로그아웃 뒤 폐기된 UUID의 이미지를 캐시에서 다시 표시하지 않고, 다음
+조회가 서버의 `404` 계약을 따릅니다. 프런트엔드와 백엔드는 같은 사이트의 운영 도메인을
+사용하므로 브라우저는 이 백엔드 이미지 URL에 인증 쿠키를 실을 수 있습니다.
 
 소셜 프로필 사진의 폴백 규칙은 API 구현 PR에서 확정합니다. 어떤 방식을 고르더라도
 S3 주소를 프런트엔드 응답에 포함하지 않는 원칙은 유지합니다.
@@ -92,11 +107,14 @@ S3 주소를 프런트엔드 응답에 포함하지 않는 원칙은 유지합�
 각각 검증하고 로컬 테스트와 실제 저장소 검증 결과를 구분해 기록해야 합니다.
 
 - 객체 키가 지정한 회원과 `avatars/` 접두사를 벗어나지 않는지
-- 허용한 이미지 형식만 업로드되는지
+- 선언 `Content-Type`과 magic bytes가 일치하는 허용 이미지 형식만 업로드되는지
+- 8MiB까지의 아바타는 허용하고 8MiB 초과는 서비스가 거절하며, servlet 파일 상한과
+  overhead를 포함한 요청 상한, 그보다 큰 nginx 요청 상한의 순서가 지켜지는지
 - 업로드·교체·삭제가 인증된 본인 아바타에만 적용되는지
 - 인증되지 않은 조회는 거절하고, 인증된 사용자가 기존 API 응답으로 받은 다른 회원의
   비추측성 아바타 URL은 약속 참여자·리뷰·회원 프로필·리포트 비교 화면에서 표시되는지
 - 회원 ID 대입으로 아바타를 열거할 수 없고 존재하지 않거나 폐기된 UUID는 `404`인지
+- 응답이 `private, no-store`이며 교체·삭제·로그아웃 뒤 이전 성공 응답을 재사용하지 않는지
 - 새 사진으로 교체한 뒤 이전 객체 삭제가 시도되는지
 - 삭제 실패가 성공한 프로필 변경을 되돌리지 않는지
 - 실제 운영 권한과 같은 조건에서 `PutObject`, `GetObject`, `DeleteObject`가 동작하는지
