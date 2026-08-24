@@ -57,15 +57,36 @@ describe('BottomNav', () => {
    *
    * `tokens.spec.ts`가 이 클래스에서 면 색과 알파를 읽어 대비를 계산하므로, 여기서
    * 이름을 고정하지 않으면 잉크를 되돌려도 대비 계산이 옛 값 그대로 통과한다.
+   *
+   * 보이는 면은 `nav`가 아니라 안쪽 `ul`이 가진다(#516). `nav`는 자리만 잡는다.
    */
-  it('draws the bar as canvas-backed glass with a reduced-transparency fallback', async () => {
+  it('draws the pill as canvas-backed glass with a reduced-transparency fallback', async () => {
     const wrapper = await mountAt('/explore')
-    const classes = wrapper.get('nav').classes()
+    const classes = wrapper.get('nav > ul').classes()
 
     expect(classes).toContain('bg-canvas/90')
     expect(classes).toContain('backdrop-blur-xl')
     expect(classes).toContain('reduce-transparency:bg-canvas')
     expect(classes).toContain('reduce-transparency:backdrop-blur-none')
+  })
+
+  /** 떠 있는 알약이다(#516). 바닥에 붙는 각진 바로 되돌리면 여기서 걸린다. */
+  it('floats the pill above the bottom edge instead of filling the width', async () => {
+    const wrapper = await mountAt('/explore')
+
+    const pill = wrapper.get('nav > ul').classes()
+    expect(pill).toContain('rounded-pill')
+    expect(pill).toContain('mb-4')
+    expect(pill).toContain('shadow-raised')
+    expect(pill).toContain('pointer-events-auto')
+
+    // `nav`는 폭과 자리만 잡으며, 보이지 않는 여백은 아래 콘텐츠의 클릭을 가로채지 않는다.
+    const shell = wrapper.get('nav').classes()
+    expect(shell).toContain('px-4')
+    expect(shell).toContain('max-w-shell')
+    expect(shell).toContain('pointer-events-none')
+    expect(shell.some((name) => /(^|:)bg-/.test(name))).toBe(false)
+    expect(shell.some((name) => /(^|:)border/.test(name))).toBe(false)
   })
 
   /** 유리 면 위 잉크. 밝은 면 위 잉크(`text-on-paper`)로 되돌리면 대비가 1.68:1이 된다. */
