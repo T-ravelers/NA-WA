@@ -216,6 +216,10 @@
   --text-body: 15px;
   --text-body--line-height: 1.55;
 
+  /* iOS Safari가 입력 포커스 시 화면을 확대하지 않는 최소 크기다. 페이지 확대는 유지한다. */
+  --text-input: 16px;
+  --text-input--line-height: 1.5;
+
   --text-body-sm: 13px;
   --text-body-sm--line-height: 1.45;
 

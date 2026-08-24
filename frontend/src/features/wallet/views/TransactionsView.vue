@@ -200,13 +200,13 @@ const openTransactionDetail = (transactionId: number): void => {
         <form @submit.prevent="applyFilters">
           <h2 class="text-title-sm text-ink">{{ t('wallet.transactions.filterTitle') }}</h2>
 
-          <div class="mt-4 grid grid-cols-2 gap-3">
+          <div class="mt-4 grid grid-cols-1 gap-3 min-[330px]:grid-cols-2">
             <!-- 폼 라벨은 보조 텍스트라 ink-2다. ink-3은 흐림·비활성 전용 — #332 참조. -->
             <label class="text-caption text-ink-2">
               {{ t('wallet.transactions.type') }}
               <select
                 v-model="formType"
-                class="mt-2 w-full rounded-sm border border-hairline-2 bg-surface-2 px-3 py-3 text-body-sm text-ink outline-none focus:border-ink"
+                class="mt-2 w-full rounded-sm border border-hairline-2 bg-surface-2 px-3 py-3 text-input text-ink outline-none focus:border-ink"
                 :aria-label="t('wallet.transactions.type')"
               >
                 <option value="">{{ t('wallet.transactions.allTypes') }}</option>
@@ -224,7 +224,7 @@ const openTransactionDetail = (transactionId: number): void => {
               {{ t('wallet.transactions.status') }}
               <select
                 v-model="formStatus"
-                class="mt-2 w-full rounded-sm border border-hairline-2 bg-surface-2 px-3 py-3 text-body-sm text-ink outline-none focus:border-ink"
+                class="mt-2 w-full rounded-sm border border-hairline-2 bg-surface-2 px-3 py-3 text-input text-ink outline-none focus:border-ink"
                 :aria-label="t('wallet.transactions.status')"
               >
                 <option value="">{{ t('wallet.transactions.allStatuses') }}</option>
@@ -238,7 +238,7 @@ const openTransactionDetail = (transactionId: number): void => {
               </select>
             </label>
 
-            <div class="col-span-2">
+            <div class="min-[330px]:col-span-2">
               <p class="text-caption text-ink-2">{{ t('wallet.transactions.dateRange') }}</p>
               <p
                 class="mt-1 text-body-sm text-ink"

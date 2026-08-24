@@ -155,7 +155,7 @@ function handleSubmit(): void {
         id="profile-nationality"
         v-model="country"
         data-testid="profile-nationality"
-        class="h-13 w-full rounded-sm border-2 bg-surface-2 px-4 text-body text-ink outline-none"
+        class="h-13 w-full rounded-sm border-2 bg-surface-2 px-4 text-input text-ink outline-none"
         :class="
           countryError === undefined
             ? 'border-transparent focus-visible:border-ink'

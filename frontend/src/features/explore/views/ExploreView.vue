@@ -1034,7 +1034,7 @@ function addQueryList(
       <input
         v-model="searchKeyword"
         type="search"
-        class="min-w-0 flex-1 bg-transparent py-3 text-body text-ink outline-none placeholder:text-ink-3"
+        class="min-w-0 flex-1 bg-transparent py-3 text-input text-ink outline-none placeholder:text-ink-3"
         :placeholder="
           t(
             selectedTab === 'events'

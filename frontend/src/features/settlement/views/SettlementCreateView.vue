@@ -899,7 +899,7 @@ defineExpose({ back })
             :aria-invalid="invalidItemIndexes.has(index) ? 'true' : undefined"
             :aria-describedby="invalidItemIndexes.has(index) ? `item-error-${index}` : undefined"
             :value="item.name"
-            class="mt-1 min-h-11 w-full rounded-sm bg-surface-2 px-3 text-body-sm"
+            class="mt-1 min-h-11 w-full rounded-sm bg-surface-2 px-3 text-input"
             @input="updateItem(index, 'name', ($event.target as HTMLInputElement).value)"
           />
           <div class="mt-3 grid grid-cols-2 gap-2">
@@ -909,7 +909,7 @@ defineExpose({ back })
                 :data-item-unit-price="index"
                 :value="item.unitPrice"
                 inputmode="decimal"
-                class="mt-1 min-h-11 w-full rounded-sm bg-surface-2 px-3 text-body-sm"
+                class="mt-1 min-h-11 w-full rounded-sm bg-surface-2 px-3 text-input"
                 @input="
                   updateItem(index, 'unitPrice', ($event.target as HTMLInputElement).value)
                 " /></label
@@ -919,7 +919,7 @@ defineExpose({ back })
                 :data-item-quantity="index"
                 :value="item.quantity"
                 inputmode="decimal"
-                class="mt-1 min-h-11 w-full rounded-sm bg-surface-2 px-3 text-body-sm"
+                class="mt-1 min-h-11 w-full rounded-sm bg-surface-2 px-3 text-input"
                 @input="updateItem(index, 'quantity', ($event.target as HTMLInputElement).value)"
             /></label>
           </div>
@@ -933,7 +933,7 @@ defineExpose({ back })
               :data-allocation-quantity="`${index}:${participant.id}`"
               :value="allocationValue(index, participant.id)"
               inputmode="decimal"
-              class="w-24 rounded-sm bg-surface-2 px-3 py-2 text-right"
+              class="w-24 rounded-sm bg-surface-2 px-3 py-2 text-right text-input"
               @input="
                 updateAllocation(index, participant.id, ($event.target as HTMLInputElement).value)
               "

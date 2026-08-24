@@ -431,7 +431,7 @@ const createError = computed(() =>
                       v-model="item.name"
                       type="text"
                       :placeholder="t('merchant.qr.itemNamePlaceholder')"
-                      class="h-11 min-w-0 flex-1 rounded-sm border-2 border-transparent bg-surface-2 px-2 text-body-sm text-ink outline-none placeholder:text-ink-3 focus-visible:border-ink"
+                      class="h-11 min-w-0 flex-1 rounded-sm border-2 border-transparent bg-surface-2 px-2 text-input text-ink outline-none placeholder:text-ink-3 focus-visible:border-ink"
                     />
 
                     <label
@@ -449,7 +449,7 @@ const createError = computed(() =>
                         inputmode="numeric"
                         :value="item.unitPrice === null ? '' : formatAmount(item.unitPrice)"
                         :placeholder="t('merchant.qr.unitPricePlaceholder')"
-                        class="min-w-0 flex-1 bg-transparent text-right text-body-sm text-ink tabular-nums outline-none placeholder:text-ink-3"
+                        class="min-w-0 flex-1 bg-transparent text-right text-input text-ink tabular-nums outline-none placeholder:text-ink-3"
                         @input="updateUnitPrice(item, $event)"
                       />
                       <!--
@@ -489,7 +489,7 @@ const createError = computed(() =>
                         type="text"
                         inputmode="numeric"
                         :value="item.quantity ?? ''"
-                        class="w-8 min-w-0 bg-transparent text-center text-body-sm text-ink tabular-nums outline-none"
+                        class="w-8 min-w-0 bg-transparent text-center text-input text-ink tabular-nums outline-none"
                         @input="updateQuantity(item, $event)"
                       />
                       <button
