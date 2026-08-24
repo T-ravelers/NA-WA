@@ -897,6 +897,15 @@ describe('ReportDetailView', () => {
     fetchReportComparison.mockResolvedValueOnce(crowdedComparison)
     const { wrapper } = await mountView()
 
+    // 🔴 보이는 타일이 상한을 지키는지 함께 본다. 이것 없이 문구만 단언하면, 상한이
+    // 풀려 일곱 개가 다 보이는데도 "여기 없다"고 말하는 상태를 잡지 못한다.
+    expect(wrapper.findAll('li.rounded-card').map((tile) => tile.text())).toEqual([
+      '# Food1st',
+      '# Shopping2nd',
+      '# Beauty3rd',
+      '# Shows4th',
+    ])
+
     const omitted = wrapper.findAll('p.sr-only').map((node) => node.text())
 
     expect(omitted).toContain('Not shown here: Transport, Stay, Other')
