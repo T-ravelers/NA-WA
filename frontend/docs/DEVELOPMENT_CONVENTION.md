@@ -431,8 +431,8 @@ export default {
 **뷰가 탭 몫을 다시 더하지 않습니다.** 더하면 본문 아래가 200px 넘게 빕니다.
 
 `pb-8`보다 큰 아래 여백은 **`fixed inset-x-0 bottom-0` CTA가 있는 화면에서만** 씁니다
-(`pb-28`). 그 CTA를 **자식 컴포넌트가 그리는 경우도 포함합니다** —
-`AppointmentCreateView`의 CTA는 `AppointmentCreateForm.vue`에 있습니다.
+(`pb-[calc(7rem+env(safe-area-inset-bottom))]`). 그 CTA를 **자식 컴포넌트가 그리는 경우도
+포함합니다** — `AppointmentCreateView`의 CTA는 `AppointmentCreateForm.vue`에 있습니다.
 
 `sticky bottom-0` CTA는 부모 여백을 늘리지 않습니다. `sticky`는 흐름 안에 있어 자기 높이만큼
 이미 자리를 차지하고, 그 containing block이 부모의 **content box**라 패딩 영역으로 내려가지
@@ -442,11 +442,23 @@ export default {
 
 ```html
 <div
-  class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-shell bg-canvas/95 px-screen py-3 backdrop-blur"
+  class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-shell bg-canvas/95 px-screen pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur"
 ></div>
 ```
 
 `max-w-[390px]` 직접 표기 대신 `max-w-shell` 토큰을 씁니다.
+
+**화면 바닥에 고정되는 요소는 홈 인디케이터 영역을 스스로 비웁니다.**
+`AppShell`(`pb-[calc(6rem+env(safe-area-inset-bottom))]`)과
+`BottomNav`(`pb-[calc(1rem+env(safe-area-inset-bottom))]`)가 이미 그렇게 하고, 위
+「스타일과 접근성 확인하기」의 「모바일 viewport에서는 `dvh`와 safe-area를 고려합니다」가 같은
+것을 말합니다. 고정 CTA가 있는 화면은 전부 `hideBottomNav: true`라 CTA가 화면 최하단이므로
+직접 책임집니다. `py-3`만 주면 홈 인디케이터가 버튼 위에 겹칩니다.
+
+본문 여백도 같은 이유로 함께 늘립니다. CTA 높이는 `pt-3`(12px) + `AppButton`
+`h-13`(52px) + 아래 여백이라 safe-area만큼 커지므로, 본문 여백을 `pb-28`(112px)로 고정하면
+본문과 CTA 사이가 36px에서 2px로 줄어듭니다. 둘 다 같은 `env()`를 더해야 간격이 기기와
+무관하게 일정합니다.
 
 ### 헤더는 `ScreenHeader`로 씁니다
 
