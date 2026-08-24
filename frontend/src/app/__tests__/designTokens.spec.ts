@@ -83,6 +83,16 @@ describe('Design token ESLint rule', () => {
     expect(messages).toHaveLength(1)
   })
 
+  it('rejects CSS named colors in arbitrary color utilities', async () => {
+    const messages = await lint(
+      '<template><div class="bg-[red] text-[rebeccapurple] border-[gold] fill-[color:tomato]" /></template>',
+      'src/shared/ui/NamedRawColor.vue',
+    )
+
+    expect(messages).toHaveLength(1)
+    expect(messages[0]?.message).toContain('arbitrary 색상')
+  })
+
   it('rejects raw HEX in Vue style blocks', async () => {
     const messages = await lint(
       '<template><div class="sample" /></template><style scoped>.sample { color: #fff; }</style>',
@@ -92,12 +102,12 @@ describe('Design token ESLint rule', () => {
     expect(messages).toHaveLength(1)
   })
 
-  it('allows token classes, CSS variables, non-color arbitrary values, and comments', async () => {
+  it('allows token classes, CSS variables, non-color arbitrary values, URLs, and comments', async () => {
     const messages = await lint(
       `
         <template>
           <!-- 대비 근거 #ffffff -->
-          <div class="border-[1.5px] bg-paper text-ink" />
+          <div class="border-[1.5px] bg-[url('/assets/paper.png')] bg-paper text-ink" />
         </template>
         <script setup lang="ts">
         // 과거 값 #000000
