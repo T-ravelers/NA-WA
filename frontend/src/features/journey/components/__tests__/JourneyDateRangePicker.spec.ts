@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { i18n } from '@/app/i18n'
@@ -30,6 +31,29 @@ describe('JourneyDateRangePicker', () => {
     expect(wrapper.find('input[type="date"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="journey-date-start"]').text()).toContain('8/10/26')
     expect(wrapper.get('[data-testid="journey-date-end"]').text()).toContain('8/12/26')
+  })
+
+  it('moves focus into the picker, closes on Escape, and restores the opener', async () => {
+    const wrapper = mount(JourneyDateRangePicker, {
+      props,
+      global: { plugins: [i18n] },
+      attachTo: document.body,
+    })
+    const opener = wrapper.get('[data-testid="journey-date-start"]').element as HTMLButtonElement
+    opener.focus()
+
+    await wrapper.get('[data-testid="journey-date-start"]').trigger('click')
+
+    expect(document.activeElement).toBe(
+      wrapper.get('[role="dialog"]').findAll('button')[0]?.element,
+    )
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await nextTick()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(opener)
+    wrapper.unmount()
   })
 
   it('disables dates before the start while choosing an end date', async () => {

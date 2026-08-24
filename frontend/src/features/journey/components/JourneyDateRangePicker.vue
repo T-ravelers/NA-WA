@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { IconCalendarEvent } from '@tabler/icons-vue'
-import { ref, useId } from 'vue'
+import { nextTick, onBeforeUnmount, ref, useId, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { formatCalendarDate } from '@/shared/lib/datetime'
@@ -29,6 +29,8 @@ const pickerOpen = ref(false)
 const target = ref<'start' | 'end'>('start')
 const draftStart = ref('')
 const draftEnd = ref('')
+const dialog = useTemplateRef('dialog')
+let opener: HTMLElement | null = null
 
 const startId = useId()
 const endId = useId()
@@ -41,16 +43,34 @@ function dateLabel(value: string): string {
     : formatCalendarDate(value, locale.value, { dateStyle: 'short' }) || value
 }
 
-function openPicker(nextTarget: 'start' | 'end'): void {
+function handleKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') closePicker()
+}
+
+async function openPicker(nextTarget: 'start' | 'end'): Promise<void> {
+  opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
   draftStart.value = props.startDate
   draftEnd.value = props.endDate
   target.value = nextTarget === 'end' && props.startDate === '' ? 'start' : nextTarget
   pickerOpen.value = true
+  window.addEventListener('keydown', handleKeydown)
+
+  await nextTick()
+  dialog.value?.querySelector<HTMLElement>('button:not([disabled]), [tabindex="0"]')?.focus()
 }
 
 function closePicker(): void {
+  const focusTarget = opener
+  opener = null
+  window.removeEventListener('keydown', handleKeydown)
   pickerOpen.value = false
+  void nextTick(() => focusTarget?.focus())
 }
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  if (pickerOpen.value) opener?.focus()
+})
 
 function chooseTarget(nextTarget: 'start' | 'end'): void {
   target.value = nextTarget === 'end' && draftStart.value === '' ? 'start' : nextTarget
@@ -180,6 +200,7 @@ function apply(): void {
       />
 
       <section
+        ref="dialog"
         role="dialog"
         aria-modal="true"
         :aria-label="t('journey.dateRange.title')"
