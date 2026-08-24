@@ -9,6 +9,7 @@ import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import JourneyListCard from '../components/JourneyListCard.vue'
 import { useJourneyListQuery } from '../composables/useJourneyListQuery'
@@ -53,28 +54,30 @@ function retry(): void {
 </script>
 
 <template>
-  <main class="flex w-full flex-col gap-6 px-screen py-8">
-    <header class="flex items-center justify-between gap-4">
-      <h1 class="font-display text-screen-title uppercase text-ink-display">
-        {{ t('journey.list.title') }}
-      </h1>
-      <!--
-        시안(Figma `1532:727`)은 글자 없는 원형 버튼이다. 글자를 함께 두면 제목이 시안 폭
-        (34px 기준 256px)으로 커졌을 때 버튼이 화면 밖으로 밀린다.
-        같은 구조의 `ExploreView` 헤더와 크기·모양을 맞춘다.
-      -->
-      <IconOrb
-        :label="t('journey.list.add')"
-        size="lg"
-        variant="surface"
-        @click="goToCreate"
-      >
-        <IconPlus
-          :size="24"
-          aria-hidden="true"
-        />
-      </IconOrb>
-    </header>
+  <main class="flex w-full flex-col gap-6 px-screen flex-1 pt-6 pb-8">
+    <ScreenHeader
+      variant="root"
+      :title="t('journey.list.title')"
+    >
+      <template #action>
+        <!--
+          시안(Figma `1532:727`)은 글자 없는 원형 버튼이다. 글자를 함께 두면 제목이 시안 폭
+          (34px 기준 256px)으로 커졌을 때 버튼이 화면 밖으로 밀린다.
+          같은 구조의 `ExploreView` 헤더와 크기·모양을 맞춘다.
+        -->
+        <IconOrb
+          :label="t('journey.list.add')"
+          size="lg"
+          variant="surface"
+          @click="goToCreate"
+        >
+          <IconPlus
+            :size="24"
+            aria-hidden="true"
+          />
+        </IconOrb>
+      </template>
+    </ScreenHeader>
 
     <SegmentedControl
       :model-value="activeTab"

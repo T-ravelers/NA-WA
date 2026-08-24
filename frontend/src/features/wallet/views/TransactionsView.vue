@@ -5,13 +5,13 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { formatCalendarDate } from '@/shared/lib/datetime'
-import { vFitText } from '@/shared/lib/fitText'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import CalendarGrid from '@/shared/ui/CalendarGrid.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import { getTransactions } from '../api/walletApi'
 import {
@@ -177,23 +177,13 @@ const openTransactionDetail = (transactionId: number): void => {
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col px-screen pb-8 pt-6">
-    <header class="flex items-center gap-3">
-      <AppButton
-        compact
-        variant="secondary"
-        :aria-label="t('wallet.transactions.back')"
-        @click="goBack"
-      >
-        ‹
-      </AppButton>
-      <h1
-        v-fit-text
-        class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display"
-      >
-        {{ t('wallet.transactions.title') }}
-      </h1>
-    </header>
+  <main class="flex w-full flex-col px-screen flex-1 pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
+      :title="t('wallet.transactions.title')"
+      :back-label="t('wallet.transactions.back')"
+      @back="goBack"
+    />
 
     <section class="mt-5">
       <AppCard>

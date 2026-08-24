@@ -12,7 +12,7 @@ import InsufficientBalanceDialog from '@/shared/ui/InsufficientBalanceDialog.vue
 import StateError from '@/shared/ui/StateError.vue'
 
 import { settlementGateway } from '../api/settlementGateway'
-import SettlementPageHeader from '../components/SettlementPageHeader.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 import SettlementStatusScreen from '../components/SettlementStatusScreen.vue'
 import { useSettlementPoints } from '../composables/useSettlementPoints'
 import { resolveSettlementError } from '../model/settlementErrors'
@@ -226,7 +226,7 @@ function goToTopup(): void {
 <template>
   <section
     v-if="failed"
-    class="flex min-h-dvh flex-col px-screen pt-8 pb-32"
+    class="flex flex-col px-screen flex-1 w-full pt-6 pb-8"
   >
     <StateError
       class="my-auto"
@@ -239,7 +239,8 @@ function goToTopup(): void {
     v-else-if="awaitingConfirmation !== null"
     class="flex min-h-dvh flex-col px-screen pt-8 pb-32"
   >
-    <SettlementPageHeader
+    <ScreenHeader
+      variant="back"
       :title="t('settlement.pay.confirmTitle')"
       :back-label="t('settlement.back')"
       @back="goToDetail"

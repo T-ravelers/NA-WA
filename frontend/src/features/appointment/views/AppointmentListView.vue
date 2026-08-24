@@ -3,12 +3,12 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import { vFitText } from '@/shared/lib/fitText'
 import AppButton from '@/shared/ui/AppButton.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import TextInput from '@/shared/ui/TextInput.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import AppointmentDepositSheet from '../components/AppointmentDepositSheet.vue'
 import AppointmentJourneySelectSheet from '../components/AppointmentJourneySelectSheet.vue'
@@ -259,23 +259,15 @@ function selectJourney(tripId: number): void {
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col gap-8 px-screen pb-28 pt-6">
-    <header class="flex items-center gap-3">
-      <button
-        type="button"
-        class="flex size-11 shrink-0 items-center justify-center rounded-pill bg-surface-1 text-ink"
-        :aria-label="t('action.back')"
-        @click="goBack"
-      >
-        <span aria-hidden="true">‹</span>
-      </button>
-      <h1
-        v-fit-text
-        class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display"
-      >
-        {{ title }}
-      </h1>
-    </header>
+  <main
+    class="flex w-full flex-col gap-8 px-screen flex-1 pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))]"
+  >
+    <ScreenHeader
+      variant="back"
+      :title="title"
+      :back-label="t('action.back')"
+      @back="goBack"
+    />
 
     <TextInput
       v-model="keyword"
@@ -369,7 +361,7 @@ function selectJourney(tripId: number): void {
     </section>
 
     <div
-      class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[390px] bg-canvas/95 px-screen py-3 backdrop-blur"
+      class="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-shell bg-canvas/95 px-screen pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur"
     >
       <AppButton
         block
@@ -410,7 +402,7 @@ function selectJourney(tripId: number): void {
         role="dialog"
         aria-modal="true"
         :aria-label="t('appointment.create.insufficientTitle')"
-        class="w-full max-w-[390px] rounded-card bg-surface-1 p-5 shadow-sheet"
+        class="w-full max-w-shell rounded-card bg-surface-1 p-5 shadow-sheet"
       >
         <h2 class="text-title text-ink-display">
           {{ t('appointment.create.insufficientTitle') }}

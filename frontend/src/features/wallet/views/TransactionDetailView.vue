@@ -4,12 +4,11 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import { vFitText } from '@/shared/lib/fitText'
 import { spendingCategoryLabelKey } from '@/shared/lib/spendingCategory'
-import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import { getTransactionDetail } from '../api/walletApi'
 import {
@@ -56,23 +55,13 @@ const formatSpendingCategory = (value: string | null | undefined): string =>
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col px-screen pb-8 pt-6">
-    <header class="flex items-center gap-3">
-      <AppButton
-        compact
-        variant="secondary"
-        :aria-label="t('wallet.transactionDetail.back')"
-        @click="goBack"
-      >
-        ‹
-      </AppButton>
-      <h1
-        v-fit-text
-        class="min-w-0 flex-1 truncate font-display text-screen-title uppercase text-ink-display"
-      >
-        {{ t('wallet.transactionDetail.title') }}
-      </h1>
-    </header>
+  <main class="flex w-full flex-col px-screen flex-1 pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
+      :title="t('wallet.transactionDetail.title')"
+      :back-label="t('wallet.transactionDetail.back')"
+      @back="goBack"
+    />
 
     <section class="mt-5">
       <p

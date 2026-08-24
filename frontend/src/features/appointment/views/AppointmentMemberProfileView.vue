@@ -5,14 +5,13 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { getAvatarInitial } from '@/shared/lib/avatarInitial'
-import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
-import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import AppImage from '@/shared/ui/AppImage.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import type { AppointmentMember } from '../api/appointmentApi'
 import { appointmentMembersQueryOptions } from '../model/appointmentQueries'
@@ -50,23 +49,13 @@ function goBack(): void {
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col gap-8 px-screen pb-8 pt-6">
-    <header class="flex items-center gap-3">
-      <AppButton
-        compact
-        variant="secondary"
-        :aria-label="t('action.back')"
-        @click="goBack"
-      >
-        ‹
-      </AppButton>
-      <h1
-        v-fit-text
-        class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display"
-      >
-        {{ t('appointment.profile.title') }}
-      </h1>
-    </header>
+  <main class="flex w-full flex-col gap-8 px-screen flex-1 pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
+      :title="t('appointment.profile.title')"
+      :back-label="t('action.back')"
+      @back="goBack"
+    />
 
     <StateEmpty
       v-if="appointmentId === null || memberId === null"

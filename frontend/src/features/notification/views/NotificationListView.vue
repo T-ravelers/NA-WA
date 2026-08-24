@@ -13,6 +13,7 @@ import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import {
   notificationMessageKey,
@@ -152,23 +153,13 @@ function errorDescription(): string | undefined {
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col px-screen pt-6 pb-8">
-    <header class="flex items-center gap-3">
-      <AppButton
-        compact
-        variant="secondary"
-        :aria-label="t('action.back')"
-        data-testid="notification-back"
-        @click="goBack"
-      >
-        ‹
-      </AppButton>
-      <h1
-        class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display uppercase"
-      >
-        {{ t('notification.title') }}
-      </h1>
-    </header>
+  <main class="flex w-full flex-col px-screen flex-1 pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
+      :title="t('notification.title')"
+      :back-label="t('action.back')"
+      @back="goBack"
+    />
 
     <!--
       두 가지 일괄 동작은 헤더가 아니라 그 아래 줄에 둔다. 390px 폭에서 제목과 나란히

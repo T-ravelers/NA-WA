@@ -85,7 +85,7 @@ function confirm(): void {
       role="dialog"
       aria-modal="true"
       :aria-label="t('appointment.journeyDate.title')"
-      class="absolute inset-x-0 bottom-0 z-10 mx-auto flex max-h-[88dvh] w-full max-w-[390px] flex-col rounded-t-lg bg-canvas px-screen pt-3 pb-6 shadow-sheet"
+      class="absolute inset-x-0 bottom-0 z-10 mx-auto flex max-h-[88dvh] w-full max-w-shell flex-col rounded-t-lg bg-canvas px-screen pt-3 pb-6 shadow-sheet"
     >
       <span
         aria-hidden="true"

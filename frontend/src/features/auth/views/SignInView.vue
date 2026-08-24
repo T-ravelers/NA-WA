@@ -55,7 +55,7 @@ function signInWith(provider: 'google' | 'line'): void {
 </script>
 
 <template>
-  <section class="flex min-h-dvh flex-col px-screen pt-14 pb-8">
+  <section class="flex flex-col px-screen flex-1 w-full pt-6 pb-8">
     <div class="flex items-start justify-end">
       <IconOrb
         variant="surface"

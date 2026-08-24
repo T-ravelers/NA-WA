@@ -57,7 +57,7 @@ function formatDeposit(value: string): string {
       role="dialog"
       aria-modal="true"
       :aria-label="t('appointment.leave.title')"
-      class="w-full max-w-[390px] rounded-card bg-paper p-5 text-on-paper shadow-sheet"
+      class="w-full max-w-shell rounded-card bg-paper p-5 text-on-paper shadow-sheet"
     >
       <div class="flex items-center justify-between gap-4">
         <h2 class="text-title text-on-paper">{{ t('appointment.leave.title') }}</h2>

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { IconArrowLeft } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import { serializeCalendarDate } from '@/shared/lib/datetime'
 import {
@@ -144,24 +144,13 @@ function submit(input: JourneyCreateInput): void {
 </script>
 
 <template>
-  <main class="flex w-full flex-col gap-6 px-screen py-8">
-    <header class="flex items-center gap-0.5">
-      <button
-        type="button"
-        :aria-label="t('action.back')"
-        class="-ml-3 flex size-11 shrink-0 items-center justify-center text-ink"
-        @click="goBack"
-      >
-        <IconArrowLeft
-          :size="24"
-          :stroke-width="1.75"
-          aria-hidden="true"
-        />
-      </button>
-      <h1 class="font-display text-screen-title uppercase text-ink-display">
-        {{ t('journey.create.title') }}
-      </h1>
-    </header>
+  <main class="flex w-full flex-col gap-6 px-screen flex-1 pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
+      :title="t('journey.create.title')"
+      :back-label="t('action.back')"
+      @back="goBack"
+    />
     <JourneyCreateForm
       :pending="createMutation.isPending.value"
       :error-message="errorMessage"

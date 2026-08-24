@@ -55,7 +55,7 @@ watchEffect(() => {
 <template>
   <section
     v-if="detailQuery.isError.value"
-    class="flex min-h-dvh flex-col px-screen pt-8 pb-32"
+    class="flex flex-col px-screen flex-1 w-full pt-6 pb-8"
   >
     <StateError
       class="my-auto"

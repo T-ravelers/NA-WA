@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IconArrowLeft, IconChevronRight, IconShare, IconSparkles } from '@tabler/icons-vue'
+import { IconChevronRight, IconShare, IconSparkles } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -18,6 +18,7 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
 import { showToast } from '@/shared/ui/toast'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import type { ReportComparisonScope } from '../api/reportApi'
 import ReportCategoryBreakdown from '../components/presentation/ReportCategoryBreakdown.vue'
@@ -482,41 +483,33 @@ function retry(): void {
 </script>
 
 <template>
-  <main class="flex w-full flex-col gap-6 px-screen py-8">
-    <header class="flex items-center gap-3">
-      <IconOrb
-        :label="t('report.detail.back')"
-        size="md"
-        variant="plain"
-        class="-ml-2.5"
-        @click="goBack"
-      >
-        <IconArrowLeft
-          :size="24"
-          aria-hidden="true"
-        />
-      </IconOrb>
-      <h1 class="flex-1 font-display text-screen-title font-bold uppercase text-ink-display">
-        {{ t('report.detail.title') }}
-      </h1>
-      <!--
-        캐시가 있는 재방문에서 재요청이 실패하면 `data`는 남고 `isError`만 켜진다.
-        그러면 본문은 `StateError`인데 헤더에는 공유 아이콘이 남으므로 함께 본다.
-      -->
-      <IconOrb
-        v-if="shareSummary !== null && !reportQuery.isError.value"
-        :label="t('report.detail.sharing.report')"
-        size="md"
-        variant="surface"
-        @click="shareReport"
-      >
-        <IconShare
-          :size="20"
-          :stroke-width="1.8"
-          aria-hidden="true"
-        />
-      </IconOrb>
-    </header>
+  <main class="flex w-full flex-col gap-6 px-screen flex-1 pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
+      :title="t('report.detail.title')"
+      :back-label="t('report.detail.back')"
+      @back="goBack"
+    >
+      <template #action>
+        <!--
+          캐시가 있는 재방문에서 재요청이 실패하면 `data`는 남고 `isError`만 켜진다.
+          그러면 본문은 `StateError`인데 헤더에는 공유 아이콘이 남으므로 함께 본다.
+        -->
+        <IconOrb
+          v-if="shareSummary !== null && !reportQuery.isError.value"
+          :label="t('report.detail.sharing.report')"
+          size="md"
+          variant="surface"
+          @click="shareReport"
+        >
+          <IconShare
+            :size="20"
+            :stroke-width="1.8"
+            aria-hidden="true"
+          />
+        </IconOrb>
+      </template>
+    </ScreenHeader>
 
     <StateError
       v-if="reportId === null"

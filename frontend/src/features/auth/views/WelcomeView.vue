@@ -19,7 +19,7 @@ const router = useRouter()
     남은 화면 높이를 간격으로 쓰되 32~92px로 제한한다. 그래서 주소창 높이가 바뀌어도 간격이
     한 번에 뛰지 않는다. 360px 미만은 줄바꿈이 많으므로 항상 32px이다.
   -->
-  <section class="relative flex min-h-dvh flex-col px-screen pt-welcome-top pb-8">
+  <section class="relative flex flex-col px-screen pt-welcome-top flex-1 w-full pb-8">
     <div
       class="min-[360px]:gap-[clamp(2rem,calc(100dvh-667px),var(--spacing-welcome-ticket-gap))] flex flex-1 flex-col gap-8"
     >

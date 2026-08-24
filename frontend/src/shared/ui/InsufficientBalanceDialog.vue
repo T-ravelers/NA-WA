@@ -63,7 +63,7 @@ onBeforeUnmount(() => {
       role="dialog"
       aria-modal="true"
       :aria-label="title"
-      class="w-full max-w-[390px] rounded-card bg-surface-1 p-5 shadow-sheet"
+      class="w-full max-w-shell rounded-card bg-surface-1 p-5 shadow-sheet"
     >
       <h2 class="text-title text-ink-display">{{ title }}</h2>
       <p class="mt-2 text-body-sm text-ink-3">{{ description }}</p>

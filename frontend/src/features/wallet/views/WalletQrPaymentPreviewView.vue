@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useMutation, useQuery } from '@tanstack/vue-query'
-import { IconChevronLeft } from '@tabler/icons-vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -23,6 +22,7 @@ import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import { useRovingRadioGroup } from '@/shared/ui/useRovingRadioGroup'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import { executeQrPayment, previewQrPayment } from '../api/qrPaymentApi'
 import { useWalletAppointmentIntegration } from '../model/appointmentIntegration'
@@ -337,28 +337,13 @@ function goToTopup(): void {
 </script>
 
 <template>
-  <main class="min-h-dvh bg-canvas px-screen pb-8 text-ink">
-    <header class="flex items-center border-b border-hairline py-4">
-      <button
-        type="button"
-        class="grid size-11 place-items-center rounded-sm text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-        :aria-label="t('wallet.qrPayment.back')"
-        @click="goBack"
-      >
-        <IconChevronLeft
-          :size="22"
-          :stroke-width="2"
-          aria-hidden="true"
-        />
-      </button>
-      <h1 class="flex-1 text-center text-title font-bold tracking-[-0.03em]">
-        {{ t('wallet.qrPayment.previewTitle') }}
-      </h1>
-      <span
-        class="size-11"
-        aria-hidden="true"
-      />
-    </header>
+  <main class="flex px-screen flex-1 flex-col w-full pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
+      :title="t('wallet.qrPayment.previewTitle')"
+      :back-label="t('wallet.qrPayment.back')"
+      @back="goBack"
+    />
 
     <section
       v-if="session === null"

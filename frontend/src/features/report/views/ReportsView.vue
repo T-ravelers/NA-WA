@@ -8,6 +8,7 @@ import AppButton from '@/shared/ui/AppButton.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import type { ReportExpenseCandidate } from '../api/reportApi'
 import ReportJourneyCard from '../components/ReportJourneyCard.vue'
@@ -191,15 +192,15 @@ async function generateReport(): Promise<void> {
 </script>
 
 <template>
-  <main class="flex w-full flex-col gap-6 px-screen py-8">
-    <header class="flex flex-col gap-2">
-      <h1 class="font-display text-screen-title font-bold text-ink-display">
-        {{ t('report.list.title') }}
-      </h1>
-      <p class="text-body-sm text-ink-3">
+  <main class="flex w-full flex-col gap-6 px-screen flex-1 pt-6 pb-8">
+    <ScreenHeader
+      variant="root"
+      :title="t('report.list.title')"
+    >
+      <template #description>
         {{ t('report.list.description') }}
-      </p>
-    </header>
+      </template>
+    </ScreenHeader>
 
     <StateLoading
       v-if="isListPending"

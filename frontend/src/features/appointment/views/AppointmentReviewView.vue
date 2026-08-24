@@ -4,11 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
-import { vFitText } from '@/shared/lib/fitText'
 import AppButton from '@/shared/ui/AppButton.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import { submitAppointmentReview, type AppointmentReviewRequest } from '../api/appointmentApi'
 import AppointmentReviewCard from '../components/AppointmentReviewCard.vue'
@@ -201,23 +201,13 @@ function finishReviews(): void {
 </script>
 
 <template>
-  <main class="flex min-h-dvh w-full flex-col gap-8 px-screen pb-28 pt-6">
-    <header class="flex items-center gap-3">
-      <AppButton
-        compact
-        variant="secondary"
-        :aria-label="t('action.back')"
-        @click="returnToDetail"
-      >
-        ‹
-      </AppButton>
-      <h1
-        v-fit-text
-        class="min-w-0 flex-1 truncate font-display text-section-header text-ink-display"
-      >
-        {{ t('appointment.review.title') }}
-      </h1>
-    </header>
+  <main class="flex w-full flex-col gap-8 px-screen flex-1 pt-6 pb-8">
+    <ScreenHeader
+      variant="back"
+      :title="t('appointment.review.title')"
+      :back-label="t('action.back')"
+      @back="returnToDetail"
+    />
 
     <StateEmpty
       v-if="appointmentId === null"

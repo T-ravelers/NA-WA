@@ -8,6 +8,7 @@ import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
+import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import EventCard from '../components/EventCard.vue'
 import ExploreFilterBar from '../components/ExploreFilterBar.vue'
@@ -1002,25 +1003,27 @@ function addQueryList(
 </script>
 
 <template>
-  <section class="flex min-h-dvh flex-col gap-4 px-screen pt-8 pb-28">
-    <header class="flex items-center justify-between gap-4">
-      <h1 class="font-display text-screen-title uppercase text-ink-display">
-        {{ t('explore.title') }}
-      </h1>
-      <IconOrb
-        :label="t(selectedTab === 'events' ? 'explore.search.open' : 'explore.search.placeOpen')"
-        size="lg"
-        variant="surface"
-        :pressed="searchOpen"
-        @click="searchOpen = !searchOpen"
-      >
-        <IconSearch
-          :size="24"
-          :stroke-width="1.8"
-          aria-hidden="true"
-        />
-      </IconOrb>
-    </header>
+  <section class="flex flex-col gap-4 px-screen flex-1 w-full pt-6 pb-8">
+    <ScreenHeader
+      variant="root"
+      :title="t('explore.title')"
+    >
+      <template #action>
+        <IconOrb
+          :label="t(selectedTab === 'events' ? 'explore.search.open' : 'explore.search.placeOpen')"
+          size="lg"
+          variant="surface"
+          :pressed="searchOpen"
+          @click="searchOpen = !searchOpen"
+        >
+          <IconSearch
+            :size="24"
+            :stroke-width="1.8"
+            aria-hidden="true"
+          />
+        </IconOrb>
+      </template>
+    </ScreenHeader>
 
     <div
       v-if="searchOpen"

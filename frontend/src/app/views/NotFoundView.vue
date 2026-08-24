@@ -9,7 +9,7 @@ const router = useRouter()
 </script>
 
 <template>
-  <section class="flex min-h-dvh items-center justify-center px-screen">
+  <section class="flex items-center justify-center px-screen flex-1 w-full">
     <StateEmpty
       :title="t('notFound.title')"
       :description="t('notFound.description')"

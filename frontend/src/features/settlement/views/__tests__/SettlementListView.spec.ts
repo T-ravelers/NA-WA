@@ -75,11 +75,19 @@ async function mountList(path = '/settlements') {
 describe('SettlementListView', () => {
   beforeEach(() => getSettlements.mockReset())
 
-  it('reserves space for the fixed bottom navigation below the create button', async () => {
+  /*
+   * 이 단언은 원래 `pb-32`(128px)를 지켰고 이름도 「고정 하단 내비게이션 아래 자리를
+   * 비운다」였는데, 둘 다 사실이 아니었다(#489 실측). 정산 화면은 라우트가 전부
+   * `hideBottomNav: true`라 하단 탭이 없고, 이 화면에는 `fixed`도 `sticky`도 없다.
+   * 탭을 감추기 전에 쓰인 여백이 근거를 잃은 채 남아 있었다.
+   */
+  it('keeps the standard bottom padding — this screen has neither a tab bar nor a fixed CTA', async () => {
     getSettlements.mockResolvedValue({ received: [], sent: [] })
     const { wrapper } = await mountList()
 
-    expect(wrapper.get('section').classes()).toContain('pb-32')
+    const classes = wrapper.get('section').classes()
+    expect(classes).toContain('pb-8')
+    expect(classes).not.toContain('pb-32')
   })
 
   it('shows every ongoing settlement but only a preview of the completed ones', async () => {

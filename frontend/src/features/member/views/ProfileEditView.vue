@@ -51,7 +51,7 @@ function submit(value: { displayName: string; nationalityCode: string }): void {
 </script>
 
 <template>
-  <section class="px-screen pt-14 pb-8">
+  <section class="flex px-screen flex-1 flex-col w-full pt-6 pb-8">
     <h1 class="font-display text-screen-title font-bold text-ink-display uppercase">
       {{ t('member.form.editTitle') }}
     </h1>
