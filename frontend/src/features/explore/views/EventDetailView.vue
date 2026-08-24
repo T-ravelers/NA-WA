@@ -139,11 +139,14 @@ const detailRows = computed(() => {
   if (!current) return []
 
   const rows: DetailEntry[] = []
+  /*
+   * `isPermanent`는 "상시 운영"이 아니라 종료일을 받지 못했다는 뜻이다. 그렇게 적으면
+   * 끝난 콘서트가 영원히 열려 있다고 단언하게 된다. 목록 카드와 같은 규칙을 쓴다.
+   */
+  const startDate = formatCalendarDateString(current.startDate)
   const period = current.isPermanent
-    ? t('explore.detail.permanent')
-    : [formatCalendarDateString(current.startDate), formatCalendarDateString(current.endDate)]
-        .filter(Boolean)
-        .join(' – ')
+    ? (startDate && t('explore.detail.openEndedPeriod', { date: startDate })) || ''
+    : [startDate, formatCalendarDateString(current.endDate)].filter(Boolean).join(' – ')
   if (period) rows.push({ label: t('explore.detail.period'), value: period })
   if (current.venueName || current.addressRoad) {
     rows.push({ label: t('explore.detail.venue'), value: locationLabel.value })
@@ -506,11 +509,6 @@ function retry(): void {
               :tone="statusTone"
               dot
               >{{ statusLabel }}</AppBadge
-            >
-            <AppBadge
-              v-if="event.isPermanent"
-              tone="neutral"
-              >{{ t('explore.detail.permanent') }}</AppBadge
             >
             <AppBadge
               v-if="reservationUrl"

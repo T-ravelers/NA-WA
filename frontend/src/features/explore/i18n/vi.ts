@@ -347,7 +347,7 @@ export default {
       shareUnavailable: 'Thiết bị này không hỗ trợ chia sẻ.',
       reservation: 'Đặt trước',
       openReservation: 'Đăng ký đặt trước',
-      permanent: 'Thường trực',
+      openEndedPeriod: 'Từ {date}',
       free: 'Miễn phí',
       unavailable: 'Chưa cung cấp',
       detailError: 'Chúng tôi hiện không tải được sự kiện này.',

@@ -94,15 +94,22 @@ describe('EventCard', () => {
   })
 
   /*
-   * 상시 이벤트는 `endDate`가 없어 시작일만 남는다. 날짜만 찍으면 "그 하루짜리 지난
-   * 행사"로 읽히고, 같은 이벤트의 상세는 기간 자리에 Permanent를 적어 둘이 다른 말을
-   * 한다. 로컬 시드에서 74건이 이 갈래다.
+   * `isPermanent`는 "상시 운영"이 아니라 종료일을 받지 못했다는 뜻이다(로컬 시드 74건은
+   * 전부 축제·팝업·콘서트다). 시작일만 찍으면 "그 하루짜리 지난 행사"로 읽히고, 상시라고
+   * 적으면 끝난 콘서트가 영원히 열려 있다고 단언하게 된다. 끝을 모른다는 것만 적는다.
    */
-  it('renders the permanent label instead of a start date for permanent events', () => {
+  it('renders an open-ended period when the end date is unknown', () => {
     const wrapper = mountCard({ isPermanent: true, endDate: null })
 
-    expect(wrapper.text()).toContain('Permanent')
-    expect(wrapper.text()).not.toContain('2026.08.01')
+    expect(wrapper.text()).toContain('From 2026.08.01')
+    expect(wrapper.text()).not.toContain('~')
+  })
+
+  it('renders no period when an open-ended event has no start date either', () => {
+    const wrapper = mountCard({ isPermanent: true, startDate: null, endDate: null })
+
+    expect(wrapper.text()).toContain('Sample event')
+    expect(wrapper.text()).not.toContain('From')
   })
 
   it('renders a card whose dates are both missing', () => {
