@@ -26,6 +26,7 @@ import me.nawa.deposit.domain.ResolutionReason;
 import me.nawa.deposit.mapper.DepositMapper;
 import me.nawa.deposit.mapper.DepositPayoutBatchMapper;
 import me.nawa.journey.domain.Journey;
+import me.nawa.journey.domain.JourneyExploreItem;
 import me.nawa.journey.domain.JourneyItem;
 import me.nawa.journey.exception.JourneyErrorCode;
 import me.nawa.journey.mapper.JourneyMapper;
@@ -107,7 +108,7 @@ public class AppointmentService {
         if (appointmentMapper.insertAppointment(appointment) != 1) {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
-        confirmJourneyItem(appointment, request);
+        linkJourneyItem(appointment, request.getTripId());
 
         // 방장이 고른 여정을 멤버십에도 남긴다. trip_items 쪽만 연결하고 여기를 비우면
         // 진행 중인 약속 목록(am.trip_id IS NOT NULL로 거른다)에서 방장이 통째로 빠지고,
@@ -200,7 +201,7 @@ public class AppointmentService {
             member.setTripId(tripId);
             reviveLeftMemberAndHoldDeposit(memberId, member);
         }
-        linkJoinedJourneyItem(appointment, tripId);
+        linkJourneyItem(appointment, tripId);
 
         // 이번 참여로 정원이 다 찼으면 바로 FULL로 전환한다. 정원 도달은 시간
         // 기반 전이와 달리 스케줄러를 기다릴 필요가 없다 — 이 트랜잭션이 이미
@@ -889,15 +890,24 @@ public class AppointmentService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        if (!request.getItemType().equals(
-                appointmentMapper.findAvailableItemType(request.getItemId())
-        )) {
+        JourneyExploreItem exploreItem = appointmentMapper.findAvailableItem(
+                request.getItemId()
+        );
+        if (exploreItem == null
+                || !request.getItemType().equals(exploreItem.getItemType())) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        // 여정 담기와 같은 규칙을 쓴다. 예전에는 이 검사가 없어서, 여정에 담는 것은
+        // 막히는 날짜로도 약속은 만들어졌다.
+        if (!exploreItem.coversVisitDate(request.getVisitDate())) {
+            throw new BusinessException(
+                    JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD
+            );
         }
     }
 
     // 여정 소유자인지, 방문 날짜가 여정 기간 안인지 확인한다. 실제 trip_items
-    // 저장은 insertAppointment로 appointmentId를 확보한 뒤 confirmJourneyItem에서
+    // 저장은 insertAppointment로 appointmentId를 확보한 뒤 linkJourneyItem에서
     // 한다 — 여기서는 조기에 실패시키는 역할만 한다.
     private void validateJourneyLink(
             Long memberId,
@@ -915,11 +925,16 @@ public class AppointmentService {
                     JourneyErrorCode.JOURNEY_ITEM_DATE_OUT_OF_RANGE
             );
         }
-        if (journeyMapper.existsJourneyItem(
+        // 담아만 둔 자리는 막지 않는다 — linkJourneyItem이 약속 항목으로 올린다.
+        // 담아 뒀다는 이유로 약속 생성이 막히면 참여와 앞뒤가 맞지 않는다. 여기서
+        // 걸러 내는 것은 다른 약속이 이미 걸린 자리뿐이다. 존재만 보는 조회 대신
+        // 행을 잠그고 가져와, 그 사이 다른 세션이 같은 자리를 차지하지 못하게 한다.
+        JourneyItem existingItem = journeyMapper.findJourneyItemByItemAndDateForUpdate(
                 request.getTripId(),
                 request.getItemId(),
                 request.getVisitDate()
-        )) {
+        );
+        if (existingItem != null && existingItem.getAppointmentId() != null) {
             throw new BusinessException(JourneyErrorCode.JOURNEY_ITEM_DUPLICATE);
         }
     }
@@ -951,12 +966,16 @@ public class AppointmentService {
     }
 
     /**
-     * 참여자의 여정에 약속을 건다. (trip_id, item_id, visit_date)는 살아 있는 행에
-     * 대해 UNIQUE라, 그 장소를 이미 같은 날짜로 담아 둔 참여자는 새 행을 넣을 수
-     * 없다 — 담아 뒀다는 이유로 참여가 막히면 앞뒤가 맞지 않으므로, 그 행을 약속
-     * 항목으로 올린다. 다른 약속이 이미 걸려 있을 때만 중복으로 거절한다.
+     * 회원의 여정에 약속을 건다. 방장의 생성과 참여자의 참여가 같은 경로를 쓴다 —
+     * 어느 쪽이든 "그 장소를 그 날짜로 여정에 건다"는 동작이 같기 때문이다.
+     *
+     * (trip_id, item_id, visit_date)는 살아 있는 행에 대해 UNIQUE라, 그 장소를 이미
+     * 같은 날짜로 담아 둔 회원은 새 행을 넣을 수 없다 — 담아 뒀다는 이유로 약속이
+     * 막히면 앞뒤가 맞지 않으므로, 그 행을 약속 항목으로 올린다. 승격은 새로 넣는
+     * 것과 달리 회원이 담을 때 정한 표시 순서와 메모를 그대로 둔다. 다른 약속이
+     * 이미 걸려 있을 때만 중복으로 거절한다.
      */
-    private void linkJoinedJourneyItem(Appointment appointment, Long tripId) {
+    private void linkJourneyItem(Appointment appointment, Long tripId) {
         LocalDate visitDate = appointment.getActivityStartAt().toLocalDate();
         JourneyItem existingItem = journeyMapper.findJourneyItemByItemAndDateForUpdate(
                 tripId,
@@ -980,30 +999,6 @@ public class AppointmentService {
                 .tripId(tripId)
                 .itemId(appointment.getItemId())
                 .visitDate(visitDate)
-                .tripItemStatus("CONFIRMED")
-                .displayOrder(0)
-                .appointmentId(appointment.getAppointmentId())
-                .build();
-        try {
-            journeyMapper.insertConfirmedJourneyItem(journeyItem);
-        } catch (DuplicateKeyException exception) {
-            throw new BusinessException(
-                    JourneyErrorCode.JOURNEY_ITEM_DUPLICATE,
-                    exception
-            );
-        }
-    }
-
-    // 같은 트랜잭션 안에서 여정 항목을 CONFIRMED로 만든다. validateJourneyLink가
-    // 미리 중복을 걸렀더라도, 같은 계정의 다른 세션이 그 사이 먼저 확정해버리는
-    // 드문 경쟁 상태가 있을 수 있어 유니크 제약 위반을 별도로 처리한다.
-    private void confirmJourneyItem(
-            Appointment appointment,
-            AppointmentCreateRequest request) {
-        JourneyItem journeyItem = JourneyItem.builder()
-                .tripId(request.getTripId())
-                .itemId(request.getItemId())
-                .visitDate(request.getVisitDate())
                 .tripItemStatus("CONFIRMED")
                 .displayOrder(0)
                 .appointmentId(appointment.getAppointmentId())

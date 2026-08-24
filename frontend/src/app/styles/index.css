@@ -2,6 +2,15 @@
 @import './tokens.css';
 @import './fonts-cjk.css';
 
+/*
+ * 투명도 감소 설정 대응.
+ *
+ * `backdrop-filter`로 만든 유리 면은 뒤가 비쳐 글자와 배경이 섞인다. 시스템에서 투명도를
+ * 줄이도록 설정한 사용자에게는 배경을 불투명하게 하고 흐림을 끈다. Tailwind에 이 미디어
+ * 쿼리 variant가 없어 직접 만든다 — `reduce-transparency:bg-canvas`처럼 쓴다.
+ */
+@custom-variant reduce-transparency (@media (prefers-reduced-transparency: reduce));
+
 /**
  * 폰트.
  *

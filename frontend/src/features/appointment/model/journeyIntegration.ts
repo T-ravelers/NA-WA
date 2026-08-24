@@ -16,7 +16,12 @@ export interface AppointmentJourneyListQuery {
 
 export interface AppointmentJourneyIntegration {
   useJourneyListQuery: (enabled: MaybeRefOrGetter<boolean>) => AppointmentJourneyListQuery
-  checkJourneyItemExists: (tripId: number, itemId: number, visitDate: string) => Promise<boolean>
+  /**
+   * 그 날짜의 그 자리를 **다른 약속이** 이미 차지했는지. 담아만 둔 자리는 약속
+   * 항목으로 승격되므로 참이 아니다 — "여정에 있는지"로 물으면 담아 둔 장소로는
+   * 약속을 만들 수 없게 된다.
+   */
+  checkAppointmentSlotTaken: (tripId: number, itemId: number, visitDate: string) => Promise<boolean>
 }
 
 export const appointmentJourneyIntegrationKey: InjectionKey<AppointmentJourneyIntegration> = Symbol(

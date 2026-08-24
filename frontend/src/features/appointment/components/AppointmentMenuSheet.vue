@@ -8,35 +8,28 @@ import { useOverlayDismiss } from '../composables/useOverlayDismiss'
  * 약속 상세 헤더의 버거 버튼이 여는 바텀시트.
  *
  * 항목은 조건을 만족하지 않아도 숨기지 않고 비활성으로 두고 이유를 함께 적는다.
- * 항목마다 열리는 시점이 달라서(출석은 활동이 끝난 뒤, 후기는 출석 확정 뒤)
- * 조건에 맞는 것만 넣으면 시트가 열 때마다 다른 모양이 되고, 사용자는 나머지
- * 기능이 있다는 것조차 알 수 없다.
+ * 출석 확정은 활동이 끝난 뒤에 열리므로, 조건에 맞을 때만 넣으면 시트가 열 때마다
+ * 다른 모양이 되고 사용자는 그 기능이 있다는 것조차 알 수 없다.
  *
- * 예외는 영영 켜질 수 없는 항목이다. 출석 확정은 방장만 할 수 있어 방장에게만
- * 넣는다.
+ * **시트는 비어 있지 않다.** 출석 확정은 방장만 할 수 있어(APPOINTMENT-004) 방장이
+ * 아니면 담을 항목이 없는데, 그 판정은 이 시트가 아니라 **호출부가 한 곳에서** 한다 —
+ * 버거 버튼과 시트가 같은 조건을 쓴다. 여기에 `v-if`를 하나 더 두면 조건이 두 군데로
+ * 갈라져, 열려 있는 동안 값이 뒤집힐 때 빈 시트가 남는다(#483 리뷰에서 실제로 났다).
  *
  * 나가기는 여기 있다가 회원 목록의 내 행으로 옮겼다. 이 시트는 "약속"을 대상으로
  * 하는 자리라 자기 참여를 취소하는 것인지 약속을 없애는 것인지 구분되지 않았다.
  */
 interface Props {
   appointmentName: string
-  /** 방장에게만 넣는다. */
-  showAttendance: boolean
+  /** 출석 확정을 비활성화할 사유. 없으면 활성화한다. */
   attendanceDisabledReason?: string
-  reviewsDisabledReason?: string
 }
 
-const {
-  appointmentName,
-  showAttendance,
-  attendanceDisabledReason = undefined,
-  reviewsDisabledReason = undefined,
-} = defineProps<Props>()
+const { appointmentName, attendanceDisabledReason = undefined } = defineProps<Props>()
 
 const emit = defineEmits<{
   close: []
   attendance: []
-  reviews: []
 }>()
 
 const { t } = useI18n()
@@ -57,7 +50,7 @@ const title = computed(() => t('appointment.detail.menu.title'))
       role="dialog"
       aria-modal="true"
       :aria-label="title"
-      class="flex max-h-[88dvh] w-full max-w-[390px] flex-col gap-1 overflow-y-auto rounded-t-lg bg-surface-2 px-screen pt-3 pb-8 shadow-sheet"
+      class="flex max-h-[88dvh] w-full max-w-[390px] flex-col gap-1 overflow-y-auto rounded-t-lg bg-canvas px-screen pt-3 pb-8 shadow-sheet"
     >
       <span
         aria-hidden="true"
@@ -68,7 +61,6 @@ const title = computed(() => t('appointment.detail.menu.title'))
       <p class="mb-3 truncate text-body-sm text-ink-3">{{ appointmentName }}</p>
 
       <button
-        v-if="showAttendance"
         type="button"
         class="flex min-h-14 flex-col justify-center rounded-sm px-1 py-3 text-left active:bg-surface-3 disabled:active:bg-transparent"
         :disabled="attendanceDisabledReason !== undefined"
@@ -82,23 +74,6 @@ const title = computed(() => t('appointment.detail.menu.title'))
         </span>
         <span class="mt-0.5 text-caption text-ink-3">
           {{ attendanceDisabledReason ?? t('appointment.detail.menu.attendanceDescription') }}
-        </span>
-      </button>
-
-      <button
-        type="button"
-        class="flex min-h-14 flex-col justify-center rounded-sm px-1 py-3 text-left active:bg-surface-3 disabled:active:bg-transparent"
-        :disabled="reviewsDisabledReason !== undefined"
-        @click="emit('reviews')"
-      >
-        <span
-          class="text-title-sm"
-          :class="reviewsDisabledReason === undefined ? 'text-ink-display' : 'text-ink-3'"
-        >
-          {{ t('appointment.detail.menu.reviews') }}
-        </span>
-        <span class="mt-0.5 text-caption text-ink-3">
-          {{ reviewsDisabledReason ?? t('appointment.detail.menu.reviewsDescription') }}
         </span>
       </button>
     </section>

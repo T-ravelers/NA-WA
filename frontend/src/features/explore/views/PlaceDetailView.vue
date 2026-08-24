@@ -12,15 +12,17 @@ import {
 } from '@tabler/icons-vue'
 
 import { vFitTextGroup } from '@/shared/lib/fitText'
+import { shareWithFallback } from '@/shared/lib/share'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import AppImage from '@/shared/ui/AppImage.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
-import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
+import { showToast } from '@/shared/ui/toast'
 
 import JourneyDateSheet from '../components/JourneyDateSheet.vue'
 import JourneySelectSheet from '../components/JourneySelectSheet.vue'
@@ -30,7 +32,7 @@ import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMut
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
 import { journeyAddErrorMessageKey } from '../model/journeyAddErrors'
-import { intersectItemJourneyPeriod } from '../model/journeyPeriod'
+import { intersectItemJourneyPeriod } from '@/shared/lib/journeyPeriod'
 import { findExploreRegionLabelKey } from '../model/exploreRegions'
 import { normalizePlaceKind, type PlaceKind } from '../model/placeExplore'
 import { toClosedDays, toDetailEntries } from '../model/placeDetail'
@@ -231,19 +233,16 @@ async function sharePlace(): Promise<void> {
   const current = place.value
   if (!current) return
 
-  try {
-    if (navigator.share) {
-      await navigator.share({ title: current.name, url: window.location.href })
-      shared.value = true
-      return
-    }
+  shared.value = false
+  const result = await shareWithFallback(
+    { title: current.name, url: window.location.href },
+    window.location.href,
+  )
 
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(window.location.href)
-      shared.value = true
-    }
-  } catch {
-    // The native share sheet can be dismissed without completing the action.
+  if (result === 'copied') {
+    shared.value = true
+  } else if (result === 'unavailable' || result === 'failed') {
+    showToast(t('explore.placeDetail.shareFailed'))
   }
 }
 
@@ -266,7 +265,9 @@ function openAppointmentList(): void {
 
 function openJourneySelectSheet(): void {
   journeyAddError.value = null
-  selectedJourneyId.value = activeJourneyId.value
+  // 이 화면에서 이미 고른 값이 URL의 진입 맥락보다 최신이다. 매번 query로 덮어쓰면
+  // 날짜 시트를 닫고 다시 열 때 사용자의 마지막 선택이 사라진다(#390).
+  selectedJourneyId.value ??= activeJourneyId.value
   journeySelectSheetOpen.value = true
 }
 
@@ -277,6 +278,14 @@ function closeJourneySelectSheet(): void {
 function selectJourney(journeyId: number): void {
   selectedJourneyId.value = journeyId
   returnContext.setJourneyId(journeyId)
+  if (
+    route.query.journeyId !== undefined &&
+    parseJourneyRouteQuery(route.query.journeyId) !== journeyId
+  ) {
+    const restQuery = { ...route.query }
+    delete restQuery.journeyId
+    void router.replace({ query: restQuery })
+  }
   journeyDate.value = returnContext.visitDate
   journeySelectSheetOpen.value = false
   journeyDateSheetOpen.value = journeyDateRange.value !== null
@@ -425,15 +434,11 @@ onMounted(() => {
     />
     <template v-else>
       <div class="relative aspect-[4/3] w-full overflow-hidden bg-surface-1">
-        <img
-          v-if="currentImage"
+        <AppImage
           :src="currentImage"
           :alt="place.name"
+          :placeholder-label="t('explore.placePhoto')"
           class="size-full object-cover"
-        />
-        <ImagePlaceholder
-          v-else
-          :label="t('explore.placePhoto')"
         />
         <div
           v-if="imageUrls.length > 1"

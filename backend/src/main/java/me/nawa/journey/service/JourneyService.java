@@ -24,6 +24,7 @@ import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
 import me.nawa.journey.dto.request.JourneyUpdateRequest;
+import me.nawa.journey.dto.response.JourneyItemExistsResponse;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyRegionResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
@@ -260,10 +261,15 @@ public class JourneyService {
     }
 
     // 약속 생성 시 여정 항목 날짜를 고르는 시점에, 그 조합이 이미 있는지 미리
-    // 확인하기 위한 조회다. 존재하면 그 날짜는 고를 수 없다는 뜻이지, 실제 저장은
-    // 하지 않는다 — 최종 확정은 AppointmentService.createAppointment가 한다.
+    // 확인하기 위한 조회다. 실제 저장은 하지 않는다 — 최종 확정은
+    // AppointmentService.createAppointment가 한다.
+    //
+    // 두 값을 나눠서 준다. exists는 여정 담기(POST items)가 거절되는 조건이고,
+    // appointmentLinked는 약속 생성이 거절되는 조건이다. 담아만 둔 자리는 약속
+    // 항목으로 승격되므로 약속 생성을 막지 않는다 — 둘을 한 값으로 합치면 담아 둔
+    // 장소로는 약속을 만들 수 없게 된다.
     @Transactional(readOnly = true)
-    public boolean existsJourneyItem(
+    public JourneyItemExistsResponse existsJourneyItem(
         Long memberId,
         Long tripId,
         Long itemId,
@@ -273,7 +279,14 @@ public class JourneyService {
         if (itemId == null || itemId <= 0 || visitDate == null) {
             throw new BusinessException(JourneyErrorCode.INVALID_JOURNEY_INPUT);
         }
-        return journeyMapper.existsJourneyItem(tripId, itemId, visitDate);
+        return JourneyItemExistsResponse.builder()
+            .exists(journeyMapper.existsJourneyItem(tripId, itemId, visitDate))
+            .appointmentLinked(journeyMapper.existsAppointmentJourneyItem(
+                tripId,
+                itemId,
+                visitDate
+            ))
+            .build();
     }
 
     @Transactional(readOnly = true)
@@ -646,24 +659,12 @@ public class JourneyService {
      * 그래서 EVENT일 때만 보고, 값이 비어 있으면 막지 않는다 — 없는 근거로 거절하면
      * 사용자는 고칠 방법이 없다.
      */
+    // 규칙 자체는 JourneyExploreItem이 갖고 있다. 약속 생성도 같은 것을 쓴다.
     private void validateVisitDateWithinItemPeriod(
         JourneyExploreItem exploreItem,
         LocalDate visitDate
     ) {
-        if (!"EVENT".equals(exploreItem.getItemType())) {
-            return;
-        }
-
-        LocalDate startDate = exploreItem.getStartDate();
-        if (startDate != null && visitDate.isBefore(startDate)) {
-            throw new BusinessException(
-                JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD
-            );
-        }
-
-        // 상시 이벤트는 end_date가 NULL이라 상한이 없다. 하한은 위에서 이미 봤다.
-        LocalDate endDate = exploreItem.getEndDate();
-        if (endDate != null && visitDate.isAfter(endDate)) {
+        if (!exploreItem.coversVisitDate(visitDate)) {
             throw new BusinessException(
                 JourneyErrorCode.JOURNEY_ITEM_OUTSIDE_ITEM_PERIOD
             );

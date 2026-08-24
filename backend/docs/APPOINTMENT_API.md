@@ -171,18 +171,35 @@ DB에 실제로 반영된 값만 사용하므로 활동 시작 후 최대 60초�
 날짜 안에서만 성립합니다.
 
 `tripId`는 요청 회원이 소유한 Journey여야 하고, `visitDate`는 그 Journey의
-`startDate`~`endDate` 안이어야 하며, 같은 `(tripId, itemId, visitDate)`
-조합의 활성 일정이 이미 있으면 안 됩니다 — 위반 시 각각 `JOURNEY-002`, `JOURNEY-007`,
-`JOURNEY-004`를 반환합니다([JOURNEY_API.md](./JOURNEY_API.md) 참고). 이 경로는
-Journey 일정 추가와 달리 **항목 자체의 운영 기간(`JOURNEY-012`)은 보지 않습니다** —
-`validateJourneyLink`가 `addJourneyItem`과 별개의 검사를 갖고 있기 때문입니다. 활동
-시작 시각은 종료 시각보다 빨라야 하며 현재 시각 이후여야 합니다. 참여 마감 시각은
+`startDate`~`endDate` 안이어야 하며, 같은 `(tripId, itemId, visitDate)` 자리에
+**다른 약속이** 이미 걸려 있으면 안 됩니다 — 위반 시 각각 `JOURNEY-002`,
+`JOURNEY-007`, `JOURNEY-004`를 반환합니다([JOURNEY_API.md](./JOURNEY_API.md) 참고).
+`Add to journey`로 담아만 둔 자리는 막지 않습니다(아래 참고).
+
+`visitDate`는 **항목 자체의 운영 기간** 안이기도 해야 하며, 벗어나면 `JOURNEY-012`
+입니다. 이 규칙은 Journey 일정 추가와 완전히 같고 같은 코드
+(`JourneyExploreItem.coversVisitDate`)를 씁니다 — 예전에는 약속 생성 경로에만 이
+검사가 없어서, 여정에 담는 것은 막히는 날짜로도 약속이 만들어졌습니다. PLACE는 운영
+기간이 없어 이 검사를 받지 않고, 상시 이벤트는 `end_date`가 `NULL`이라 상한만
+없습니다(시작일 이전은 여전히 거절).
+
+다만 **항목의 가용성 판정 기준은 두 경로가 다릅니다.** 약속 생성은
+`event.status IN ('SCHEDULED','ONGOING')`으로 거르고, Journey 일정 추가는
+`end_date >= CURRENT_DATE()`로 거릅니다. 일부러 갈라 둔 것이라 합치지 않습니다.
+
+활동 시작 시각은 종료 시각보다 빨라야 하며 현재 시각 이후여야 합니다. 참여 마감 시각은
 따로 받지 않습니다 — 참여는 활동이 시작되기 전까지 열려 있습니다.
 
 성공하면 방장의 보증금을 즉시 예치(`DEPOSIT_HOLD`)하고 약속을 `RECRUITING`
 상태로 생성하는 것과 같은 트랜잭션에서, 해당 Journey 항목(`trip_items`)을
-`ADDED`를 거치지 않고 곧바로 `CONFIRMED`로 만듭니다. `appointment_id`와
-`confirmed_at`이 이때 채워집니다.
+`CONFIRMED`로 만듭니다. `appointment_id`와 `confirmed_at`이 이때 채워집니다.
+
+방장이 **이미 `Add to journey`로 같은 장소를 같은 날짜에 담아 둔 경우**에는 새 행을
+만들지 않고 그 행을 약속 항목으로 올립니다. 참여와 완전히 같은 규칙이며(아래
+[참여 요청과 취소](#참여-요청과-취소) 참고) 같은 코드(`linkJourneyItem`)를 씁니다 —
+담아 뒀다는 이유로 참여는 되는데 생성만 막히면 앞뒤가 맞지 않기 때문입니다. 승격은
+새 행을 넣는 것과 달리 회원이 담을 때 정한 `display_order`와 `note`를 그대로 둡니다.
+담아 둔 항목이 없을 때만 `ADDED`를 거치지 않고 곧바로 `CONFIRMED` 행을 넣습니다.
 
 ## 참여 요청과 취소
 

@@ -2,7 +2,7 @@ import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
@@ -16,8 +16,13 @@ import type {
 import { exploreJourneyIntegrationKey } from '../../model/journeyIntegration'
 import type { EventDetail } from '../../model/eventDetail'
 
-const fetchEventDetail = vi.fn()
-const addJourneyItem = vi.fn()
+const { fetchEventDetail, addJourneyItem, showToast } = vi.hoisted(() => ({
+  fetchEventDetail: vi.fn(),
+  addJourneyItem: vi.fn(),
+  showToast: vi.fn(),
+}))
+
+vi.mock('@/shared/ui/toast', () => ({ showToast }))
 
 vi.mock('../../api/exploreApi', () => ({
   fetchEventDetail: (eventId: number | string, language: string) =>
@@ -207,8 +212,14 @@ describe('EventDetailView', () => {
     sessionStorage.clear()
     fetchEventDetail.mockReset()
     addJourneyItem.mockReset()
+    showToast.mockReset()
     fetchEventDetail.mockResolvedValue(event)
     addJourneyItem.mockResolvedValue({})
+  })
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'share')
+    Reflect.deleteProperty(navigator, 'clipboard')
   })
 
   it('mounts with the app-provided Journey integration', async () => {
@@ -275,6 +286,36 @@ describe('EventDetailView', () => {
     expect(router.currentRoute.value.query).toEqual({ tab: 'events' })
   })
 
+  it('falls back to copying the Event link when native sharing is blocked', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', {
+      value: vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError')),
+      configurable: true,
+    })
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share event"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledWith(window.location.href)
+    expect(wrapper.text()).toContain('Event link copied.')
+  })
+
+  it('tells the user when Event sharing and copying are unavailable', async () => {
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
+    const { wrapper } = await mountView()
+
+    await wrapper.get('button[aria-label="Share event"]').trigger('click')
+    await flushPromises()
+
+    expect(showToast).toHaveBeenCalledWith('We could not share this event. Please try again.')
+  })
+
   it('adds the Event to the selected journey for the chosen date', async () => {
     const { wrapper, router } = await mountView()
 
@@ -303,6 +344,58 @@ describe('EventDetailView', () => {
       visitDate: expect.any(String),
     })
     expect(router.currentRoute.value.name).toBe('journey-detail')
+  })
+
+  it('keeps the last journey selection instead of restoring the stale query', async () => {
+    const originalJourney: ExploreJourneySummary = {
+      tripId: 999,
+      title: 'Original journey',
+      startDate: '2026-08-10',
+      endDate: '2026-08-12',
+    }
+    const { wrapper, router } = await mountView('/explore/events/42?journeyId=999', [
+      originalJourney,
+      ...journeys,
+    ])
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get('[role="dialog"]')
+        .findAll('button')
+        .find((button) => button.attributes('aria-pressed') === 'true')
+        ?.text(),
+    ).toContain('Original journey')
+
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul weekend'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper.get('button[aria-label="Close date picker"]').trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get('[role="dialog"]')
+        .findAll('button')
+        .find((button) => button.attributes('aria-pressed') === 'true')
+        ?.text(),
+    ).toContain('Seoul weekend')
+    expect(router.currentRoute.value.query.journeyId).toBeUndefined()
+    expect(readReturnContext()).toEqual({ journeyId: 7, visitDate: null, returnTo: null })
   })
 
   it('adds the Event on the date the Journey entry carried and returns there', async () => {

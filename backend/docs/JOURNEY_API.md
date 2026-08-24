@@ -209,15 +209,23 @@ GET /api/v1/journeys/{tripId}/items/exists?itemId={itemId}&visitDate={visitDate}
 ```
 
 - 약속 생성 폼의 날짜 선택 단계에서, 선택하려는 `(tripId, itemId, visitDate)`
-  조합이 활성 일정으로 이미 `trip_items`에 있는지 미리 확인하기 위한 조회 전용
-  API입니다.
+  자리의 상태를 미리 확인하기 위한 조회 전용 API입니다.
+- **두 값을 따로 돌려줍니다.** 서로 다른 질문에 답하기 때문입니다.
+  - `exists`: 그 자리에 활성 일정이 있는지. **Journey 일정 추가**(`POST
+    /api/v1/journeys/{tripId}/items`)가 `JOURNEY-004`로 거절되는 조건입니다.
+  - `appointmentLinked`: 그 자리에 **다른 약속이** 걸려 있는지. **약속 생성**(`POST
+    /api/v1/appointments`)이 `JOURNEY-004`로 거절되는 조건입니다.
+- 담아만 둔 자리(`ADDED`, `appointment_id`가 비어 있음)는 약속 생성이 약속 항목으로
+  승격시키므로 `exists`가 `true`여도 `appointmentLinked`는 `false`입니다. **약속
+  생성 화면은 `appointmentLinked`로 판단해야 합니다** — `exists`로 막으면 담아 둔
+  장소로는 약속을 만들 수 없습니다.
 - 인증 회원이 소유한 Journey만 조회할 수 있습니다.
 - `visitDate`는 `yyyy-MM-dd` 형식입니다.
 - 이 API는 조회만 하며 아무것도 저장하지 않습니다. 실제 확정은
   `POST /api/v1/appointments`([APPOINTMENT_DEPOSIT_STATE_MACHINE.md](APPOINTMENT_DEPOSIT_STATE_MACHINE.md)
   참고)가 같은 트랜잭션에서 처리하므로, 이 조회와 실제 약속 생성 사이의 시간차
-  동안 다른 세션이 같은 조합을 먼저 확정하면 최종 생성 요청이 `JOURNEY-004`로
-  거부될 수 있습니다.
+  동안 다른 세션이 같은 자리를 먼저 약속으로 차지하면 최종 생성 요청이
+  `JOURNEY-004`로 거부될 수 있습니다.
 
 ### 성공 응답
 
@@ -227,7 +235,8 @@ GET /api/v1/journeys/{tripId}/items/exists?itemId={itemId}&visitDate={visitDate}
 {
   "success": true,
   "data": {
-    "exists": false
+    "exists": false,
+    "appointmentLinked": false
   }
 }
 ```

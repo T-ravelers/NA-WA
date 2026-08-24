@@ -4,8 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 
 import AppBadge from '@/shared/ui/AppBadge.vue'
+import AppImage from '@/shared/ui/AppImage.vue'
 import AppTicket from '@/shared/ui/AppTicket.vue'
-import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 
 import type { JourneySummary } from '../api/journeyApi'
 import { formatJourneyDate, type JourneyListStatus } from '../model/journeyStatus'
@@ -66,18 +66,15 @@ const itemCounts = computed(() => {
           `size-full`로 칸을 채운다. 커버 칸은 `body-size`가 154px로 고정돼 있어 사진
           비율이 카드마다 달라질 일이 없다.
 
-          조건은 `!== null`이 아니라 truthy다. 엄격 비교로 두면 빈 문자열과 `undefined`가
-          사진 갈래로 새어 들어가 `src` 없는 `<img>`가 그려지고, 자리표시로 떨어지지
-          않는다. 형제인 `EventCard`의 썸네일 조건과 같은 방식이다.
+          빈 문자열과 `undefined`도 `AppImage`가 자리표시로 보낸다. 형제인 `EventCard`의
+          썸네일과 같은 규칙이다.
         -->
-        <img
-          v-if="journey.coverImageUrl"
+        <AppImage
           :src="journey.coverImageUrl"
           alt=""
           class="size-full object-cover"
           loading="lazy"
         />
-        <ImagePlaceholder v-else />
 
         <div class="absolute top-3 left-3">
           <AppBadge

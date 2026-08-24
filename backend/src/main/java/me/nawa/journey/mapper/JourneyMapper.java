@@ -49,6 +49,15 @@ public interface JourneyMapper {
         @Param("visitDate") LocalDate visitDate
     );
 
+    // 같은 자리에 약속이 이미 걸려 있는지만 본다. 담아만 둔 자리는 약속 항목으로
+    // 승격되므로 약속 생성을 막지 않는다 — existsJourneyItem으로 대신 판단하면
+    // 담아 둔 장소로는 약속을 만들 수 없게 된다.
+    boolean existsAppointmentJourneyItem(
+        @Param("tripId") Long tripId,
+        @Param("itemId") Long itemId,
+        @Param("visitDate") LocalDate visitDate
+    );
+
     // 참여자가 "Add to journey"로 이미 담아 둔 자리에 약속이 겹칠 수 있다.
     // (trip_id, item_id, visit_date)는 살아 있는 행에 대해 UNIQUE이므로, 새로 넣기
     // 전에 그 행을 잠그고 가져와 약속 항목으로 올릴지 판단한다.

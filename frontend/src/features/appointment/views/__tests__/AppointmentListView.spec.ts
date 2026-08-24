@@ -121,7 +121,7 @@ async function mountView(options: MountOptions = {}) {
             isPending: ref(false),
             isError: ref(false),
           }),
-          checkJourneyItemExists: vi.fn().mockResolvedValue(false),
+          checkAppointmentSlotTaken: vi.fn().mockResolvedValue(false),
         },
       },
     },

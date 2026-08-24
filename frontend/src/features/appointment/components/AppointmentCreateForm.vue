@@ -25,7 +25,7 @@ import {
   type AppointmentFormSnapshot,
 } from '../model/appointmentForm'
 import { defaultCreateLanguage } from '../model/appointmentListLanguage'
-import { useAppointmentItemLocation } from '../model/exploreIntegration'
+import { useAppointmentItemDetail } from '../model/exploreIntegration'
 
 interface Props {
   itemId?: number
@@ -69,19 +69,19 @@ const draft = reactive<AppointmentFormDraft>({
 
 // "이 자리에서 그대로 만난다"를 고르면 항목 위치가 그대로 meetingPlace가 된다.
 // 사용자가 같은 주소를 손으로 옮겨 적을 이유가 없다.
-const itemLocationQuery = useAppointmentItemLocation(
+const itemDetailQuery = useAppointmentItemDetail(
   computed(() => draft.itemId ?? null),
   computed(() => draft.itemType ?? null),
 )
-const itemPlaceName = computed(() => itemLocationQuery.data.value?.placeName ?? null)
+const itemPlaceName = computed(() => itemDetailQuery.data.value?.placeName ?? null)
 
 // 조회 중과 조회 실패는 둘 다 meetingPlace가 비어 있어 같은 오류로 보인다. 아직
 // 읽는 중일 뿐인데 "못 읽었다"고 말하지 않도록 상태를 갈라 안내한다.
 const waitingForItemPlace = computed(
-  () => draft.meetingPlaceMode === 'ITEM' && itemLocationQuery.isLoading.value,
+  () => draft.meetingPlaceMode === 'ITEM' && itemDetailQuery.isLoading.value,
 )
 const itemPlaceFailed = computed(
-  () => draft.meetingPlaceMode === 'ITEM' && itemLocationQuery.isError.value,
+  () => draft.meetingPlaceMode === 'ITEM' && itemDetailQuery.isError.value,
 )
 
 // 직접 적은 장소는 모드를 오갔다 돌아와도 남는다 — 잘못 눌러 지워지면 다시 적어야 한다.
@@ -404,10 +404,10 @@ defineExpose({ goToPreviousStep, snapshot, restore })
             {{ t('appointment.create.validation.itemPlaceUnavailable') }}
           </p>
           <p
-            v-else-if="itemLocationQuery.data.value?.addressRoad"
+            v-else-if="itemDetailQuery.data.value?.addressRoad"
             class="text-caption text-ink-3"
           >
-            {{ itemLocationQuery.data.value.addressRoad }}
+            {{ itemDetailQuery.data.value.addressRoad }}
           </p>
         </div>
 

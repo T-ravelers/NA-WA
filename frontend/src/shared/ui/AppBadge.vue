@@ -30,12 +30,13 @@ interface Props {
 const { tone = 'neutral', dot = false } = defineProps<Props>()
 
 /*
- * `ongoing`·`scheduled`는 여정 대표 이미지 위에 얹힌다. 사진이 밝을 수 있어
- * 반투명 검정 면을 깔아 대비를 확보한다(시안 실측 rgba(23,23,23,0.72)).
+ * `ongoing`은 여정 대표 이미지 위에서도 읽히도록 반투명 검정 면을 유지한다.
+ * `scheduled`는 노란 불투명 면과 어두운 잉크를 써, 점 색을 보지 않아도 인접 단계와
+ * 구분되고 사진 밝기에 관계없이 글자 대비가 유지된다(#402).
  */
 const TONE_CLASS: Record<BadgeTone, string> = {
   ongoing: 'bg-canvas/70 text-ink',
-  scheduled: 'bg-canvas/70 text-ink',
+  scheduled: 'bg-status-scheduled text-on-paper',
   pending: 'border border-status-scheduled/40 bg-status-scheduled/10 text-status-scheduled',
   completed: 'border border-status-ongoing/40 bg-status-ongoing/10 text-status-ongoing',
   settlement: 'border border-settlement bg-transparent text-settlement',
@@ -47,7 +48,7 @@ const TONE_CLASS: Record<BadgeTone, string> = {
 
 const DOT_CLASS: Record<BadgeTone, string> = {
   ongoing: 'bg-status-ongoing',
-  scheduled: 'bg-status-scheduled',
+  scheduled: 'bg-on-paper/70',
   pending: 'bg-status-scheduled',
   completed: 'bg-status-ongoing',
   settlement: 'bg-settlement',

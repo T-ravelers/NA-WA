@@ -20,6 +20,7 @@ export default {
         appointments: 'Appointments',
       },
       kinds: {
+        label: 'Type',
         events: 'Events',
         places: 'Places',
       },

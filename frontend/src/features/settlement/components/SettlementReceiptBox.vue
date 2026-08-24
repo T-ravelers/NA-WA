@@ -3,6 +3,8 @@ import { IconCamera, IconPhoto, IconReceipt } from '@tabler/icons-vue'
 import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import AppImage from '@/shared/ui/AppImage.vue'
+
 import SettlementBottomSheet from './SettlementBottomSheet.vue'
 import SettlementReceiptCamera from './SettlementReceiptCamera.vue'
 
@@ -106,13 +108,11 @@ function handleChange(event: Event): void {
       :class="{ 'border-solid': previewUrl !== null }"
       @click="handleClick"
     >
-      <img
-        v-if="previewUrl !== null"
+      <AppImage
         :src="previewUrl"
         alt=""
         class="size-full object-cover"
-      />
-      <template v-else>
+      >
         <component
           :is="mode === 'add' ? IconCamera : IconReceipt"
           :size="20"
@@ -120,7 +120,7 @@ function handleChange(event: Event): void {
           aria-hidden="true"
         />
         <span class="text-micro">{{ t('settlement.receipt.label') }}</span>
-      </template>
+      </AppImage>
     </button>
 
     <!--

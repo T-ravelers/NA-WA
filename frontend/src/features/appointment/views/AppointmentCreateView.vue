@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
 import { vFitText } from '@/shared/lib/fitText'
+import { intersectItemJourneyPeriod } from '@/shared/lib/journeyPeriod'
 import AppButton from '@/shared/ui/AppButton.vue'
 import InsufficientBalanceDialog from '@/shared/ui/InsufficientBalanceDialog.vue'
 
@@ -19,6 +20,7 @@ import AppointmentJourneyDateSheet from '../components/AppointmentJourneyDateShe
 import AppointmentJourneySelectSheet from '../components/AppointmentJourneySelectSheet.vue'
 import type { AppointmentFormSnapshot } from '../model/appointmentForm'
 import { appointmentKeys } from '../model/appointmentKeys'
+import { useAppointmentItemDetail } from '../model/exploreIntegration'
 import { useAppointmentJourneyIntegration } from '../model/journeyIntegration'
 
 const route = useRoute()
@@ -59,8 +61,8 @@ const createMutation = useMutation({
   },
 })
 
-// 날짜 선택 시 미리 확인했더라도, 같은 계정의 다른 세션이 그 사이 먼저 같은
-// 조합을 확정해버리는 드문 경쟁 상태가 있을 수 있다(JOURNEY-004). 이 경우 폼
+// 날짜 선택 시 미리 확인했더라도, 같은 계정의 다른 세션이 그 사이 먼저 그 자리를
+// 약속으로 차지해버리는 드문 경쟁 상태가 있을 수 있다(JOURNEY-004). 이 경우 폼
 // 입력은 그대로 둔 채 날짜 선택 시트만 다시 띄운다.
 const JOURNEY_ITEM_DUPLICATE_CODE = 'JOURNEY-004'
 const dateConflictRetryOpen = ref(false)
@@ -134,6 +136,9 @@ const selectedVisitDate = ref<string | null>(null)
 const exitConfirmOpen = ref(false)
 const dateCheckPending = ref(false)
 const dateCheckError = ref<string | undefined>(undefined)
+// 고른 여정이 이 항목을 담을 수 없을 때. 목록을 대신하지 않고 위에 붙어서, 다른
+// 여정을 바로 고를 수 있게 한다.
+const journeySelectionError = ref<string | null>(null)
 
 const journeyIntegration = useAppointmentJourneyIntegration()
 const journeyListQuery = journeyIntegration.useJourneyListQuery(true)
@@ -147,8 +152,67 @@ const journeySelectErrorMessage = computed(() =>
   journeyListQuery.isError.value ? t('appointment.journeySelect.error') : null,
 )
 
+// 항목 운영 기간을 읽어 달력을 좁힌다. 폼이 만남 장소를 채울 때 쓰는 것과 같은
+// 조회라 한 번만 나간다(같은 queryKey).
+const itemDetailQuery = useAppointmentItemDetail(
+  computed(() => itemId.value ?? null),
+  computed(() => itemType.value ?? null),
+)
+
+/**
+ * 항목 운영 기간 ∩ 여정 기간. 겹치는 날이 하루도 없으면 `null`.
+ *
+ * 서버는 두 기간을 각각 `JOURNEY-012`·`JOURNEY-007`로 따로 보므로, 달력이 여정
+ * 기간만 열어 주면 사용자는 폼을 다 채우고 제출한 뒤에야 실패를 알게 된다.
+ *
+ * 항목 정보를 아직 읽지 못했으면 양쪽이 `null`이라 여정 기간이 그대로 나온다. 이때
+ * 잘못 고른 날짜는 서버가 `JOURNEY-012`로 막는다 — 달력이 앞서 나가 조용히 열어 주는
+ * 것보다, 읽는 중인 짧은 순간에 예전과 같이 동작하는 편이 낫다.
+ */
+const selectableDateRange = computed(() => {
+  const journey = selectedJourney.value
+  if (journey === null) return null
+
+  return intersectItemJourneyPeriod(
+    {
+      startDate: itemDetailQuery.data.value?.startDate ?? null,
+      endDate: itemDetailQuery.data.value?.endDate ?? null,
+    },
+    { startDate: journey.startDate, endDate: journey.endDate },
+  )
+})
+
+function outsideItemPeriod(): string {
+  return t('appointment.journeySelect.outsideItemPeriod')
+}
+
+/**
+ * 겹치는 날이 없는 것으로 드러나면 날짜 시트에서 목록으로 되돌린다.
+ *
+ * 시트를 열어 둔 채 이유만 붙이면 안 된다 — 범위가 없을 때 달력이 여정 기간으로
+ * 되돌아가 9월 날짜까지 열어 주므로, 사용자는 폼을 다 채운 뒤에야 `JOURNEY-012`를
+ * 받는다.
+ *
+ * 여기서 잡는 것은 **항목 상세가 늦게 도착한 경우**뿐이다. 고르는 순간 이미 알 수
+ * 있으면 selectJourney가 애초에 시트를 열지 않는다. 그 경로는 값이 `null`에서
+ * `null`로 가 이 watcher가 깨어나지 않으므로, 둘 중 하나만 둘 수 없다.
+ */
+watch(selectableDateRange, (range) => {
+  if (range !== null) return
+  if (phase.value !== 'journeyDate' && !dateConflictRetryOpen.value) return
+
+  dateConflictRetryOpen.value = false
+  phase.value = 'journeySelect'
+  selectedTripId.value = null
+  journeySelectionError.value = outsideItemPeriod()
+})
+
 // 여정 생성 화면에서 이 화면으로 돌아온 경우(?tripId=…), 새로 만든 여정이 목록에
 // 보이는 즉시 그 여정을 선택한 채로 날짜 선택 시트로 바로 이어간다.
+//
+// 상태를 직접 바꾸지 않고 selectJourney를 거친다 — 직접 바꾸면 목록에서 고를 때만
+// 하던 기간 교집합 검사를 이 경로가 통째로 건너뛴다. 방금 만든 여정이 이벤트 기간과
+// 겹치지 않는 일은 오히려 여기서 더 잘 일어난다(사용자가 이 흐름 밖에서 날짜를 정했다).
 watch(
   () => [route.query.tripId, journeyListQuery.data.value] as const,
   ([tripIdParam, journeys]) => {
@@ -158,8 +222,7 @@ watch(
     if (parsed === undefined || journeys === undefined) return
     if (!journeys.some((journey) => journey.tripId === parsed)) return
 
-    selectedTripId.value = parsed
-    phase.value = 'journeyDate'
+    selectJourney(parsed)
   },
   { immediate: true },
 )
@@ -167,6 +230,17 @@ watch(
 function selectJourney(tripId: number): void {
   selectedTripId.value = tripId
   dateCheckError.value = undefined
+  journeySelectionError.value = null
+
+  // 항목 기간과 겹치는 날이 하루도 없는 여정이다. 날짜 시트로 보내 봐야 고를 날이
+  // 없으니 목록에 그대로 두고 이유만 알린다. 항목 정보를 아직 읽지 못했으면 기간을
+  // 모르는 것이라 막지 않는다 — 서버가 최종적으로 막는다.
+  if (itemDetailQuery.data.value !== undefined && selectableDateRange.value === null) {
+    selectedTripId.value = null
+    journeySelectionError.value = outsideItemPeriod()
+    return
+  }
+
   phase.value = 'journeyDate'
 }
 
@@ -209,12 +283,14 @@ async function confirmDate(date: string): Promise<void> {
   dateCheckError.value = undefined
 
   try {
-    const exists = await journeyIntegration.checkJourneyItemExists(
+    // 담아만 둔 자리는 막지 않는다 — 서버가 그 항목을 약속 항목으로 올린다. 여기서
+    // 거르는 것은 다른 약속이 이미 차지한 날짜뿐이고, 화면 문구도 그것을 말한다.
+    const taken = await journeyIntegration.checkAppointmentSlotTaken(
       selectedTripId.value,
       itemId.value,
       date,
     )
-    if (exists) {
+    if (taken) {
       dateCheckError.value = t('appointment.journeyDate.alreadyLinked')
       return
     }
@@ -243,12 +319,12 @@ async function retryDate(date: string): Promise<void> {
   dateCheckError.value = undefined
 
   try {
-    const exists = await journeyIntegration.checkJourneyItemExists(
+    const taken = await journeyIntegration.checkAppointmentSlotTaken(
       selectedTripId.value,
       itemId.value,
       date,
     )
-    if (exists) {
+    if (taken) {
       dateCheckError.value = t('appointment.journeyDate.alreadyLinked')
       return
     }
@@ -430,6 +506,7 @@ function confirmExit(): void {
       :selected-journey-id="selectedTripId"
       :loading="journeyListQuery.isPending.value"
       :error-message="journeySelectErrorMessage"
+      :selection-error="journeySelectionError"
       @close="leaveFlow"
       @select="selectJourney"
       @create-journey="goToCreateJourney"
@@ -438,8 +515,8 @@ function confirmExit(): void {
     <AppointmentJourneyDateSheet
       v-if="phase === 'journeyDate' && selectedJourney"
       :journey-title="selectedJourney.title"
-      :start-date="selectedJourney.startDate"
-      :end-date="selectedJourney.endDate"
+      :start-date="selectableDateRange?.start ?? selectedJourney.startDate"
+      :end-date="selectableDateRange?.end ?? selectedJourney.endDate"
       :initial-date="selectedVisitDate"
       :loading="dateCheckPending"
       :error-message="dateCheckError"
@@ -450,8 +527,8 @@ function confirmExit(): void {
     <AppointmentJourneyDateSheet
       v-if="dateConflictRetryOpen && selectedJourney"
       :journey-title="selectedJourney.title"
-      :start-date="selectedJourney.startDate"
-      :end-date="selectedJourney.endDate"
+      :start-date="selectableDateRange?.start ?? selectedJourney.startDate"
+      :end-date="selectableDateRange?.end ?? selectedJourney.endDate"
       :initial-date="selectedVisitDate"
       :loading="dateCheckPending"
       :error-message="dateCheckError"

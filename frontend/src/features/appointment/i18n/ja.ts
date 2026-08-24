@@ -24,7 +24,7 @@ export default {
       searchLabel: '同行グループを検索',
       searchPlaceholder: '同行グループを検索',
       languageLabel: '同行グループの言語',
-      resultCount: '{count}件の同行グループ',
+      resultCount: '{count}件の同行グループ | {count}件の同行グループ',
       memberCount: '{current}/{max}',
       scheduleUnavailable: '日時未定',
       placePending: '集合場所は未確定',
@@ -126,6 +126,8 @@ export default {
       emptyForJoin: 'この同行グループに参加する前に、旅程を作成してください。',
       createJourney: '旅程を作成',
       dateOutOfRange: 'この旅程は同行グループの日付を含んでいません。別の旅程を選んでください。',
+      outsideItemPeriod:
+        'この旅程にはこのイベントの開催期間に入る日がありません。別の旅程を選んでください。',
     },
     journeyDate: {
       close: '日付の選択を閉じる',

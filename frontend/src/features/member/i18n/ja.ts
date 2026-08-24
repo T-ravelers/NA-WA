@@ -16,6 +16,7 @@ export default {
         appointments: '約束',
       },
       kinds: {
+        label: '種類',
         events: 'イベント',
         places: 'スポット',
       },

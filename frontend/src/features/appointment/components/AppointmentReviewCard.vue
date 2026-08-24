@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import AppImage from '@/shared/ui/AppImage.vue'
 
 import type {
   AppointmentMember,
@@ -99,13 +100,13 @@ function submit(): void {
           class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-3 text-title text-ink"
           aria-hidden="true"
         >
-          <img
-            v-if="member.profileImageUrl"
+          <AppImage
             :src="member.profileImageUrl"
             alt=""
             class="size-full object-cover"
-          />
-          <span v-else>{{ initials(member.displayName) }}</span>
+          >
+            <span>{{ initials(member.displayName) }}</span>
+          </AppImage>
         </div>
         <div class="min-w-0 flex-1">
           <h2 class="truncate text-title-sm text-ink">{{ member.displayName }}</h2>

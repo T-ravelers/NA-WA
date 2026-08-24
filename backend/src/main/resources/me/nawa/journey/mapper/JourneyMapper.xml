@@ -313,6 +313,18 @@
         )
     </select>
 
+    <select id="existsAppointmentJourneyItem" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM trip_items
+            WHERE trip_id = #{tripId}
+              AND item_id = #{itemId}
+              AND visit_date = #{visitDate}
+              AND appointment_id IS NOT NULL
+              AND deleted_at IS NULL
+        )
+    </select>
+
     <insert id="insertJourneyItem"
             useGeneratedKeys="true"
             keyProperty="tripItemId">

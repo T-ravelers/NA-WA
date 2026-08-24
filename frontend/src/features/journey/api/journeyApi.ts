@@ -183,17 +183,27 @@ export async function fetchJourneys(): Promise<JourneySummary[]> {
   return response.data
 }
 
-export async function checkJourneyItemExists(
+export interface JourneyItemExistsResult {
+  /** 그 자리에 살아 있는 항목이 있는지. 여정 담기(POST items)가 거절되는 조건이다. */
+  exists: boolean
+  /** 그 자리에 다른 약속이 걸려 있는지. 약속 생성이 거절되는 조건이다. */
+  appointmentLinked: boolean
+}
+
+// 두 값을 함께 돌려준다. 담아만 둔 자리는 약속 항목으로 승격되므로 exists가
+// true여도 약속은 만들 수 있다 — 한 값으로 합치면 담아 둔 장소로는 약속을 만들 수
+// 없게 된다.
+export async function checkJourneyItem(
   tripId: number,
   itemId: number,
   visitDate: string,
-): Promise<boolean> {
-  const response = await httpClient.get<{ exists: boolean }>(
+): Promise<JourneyItemExistsResult> {
+  const response = await httpClient.get<JourneyItemExistsResult>(
     `/api/v1/journeys/${tripId}/items/exists`,
     { params: { itemId, visitDate } },
   )
 
-  return response.data.exists
+  return response.data
 }
 
 export async function addJourneyItem(

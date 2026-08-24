@@ -8,12 +8,12 @@ import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import AppImage from '@/shared/ui/AppImage.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 
 import type { AppointmentMember } from '../api/appointmentApi'
-import { useAppointmentMemberStats } from '../model/memberIntegration'
 import { appointmentMembersQueryOptions } from '../model/appointmentQueries'
 
 const route = useRoute()
@@ -38,20 +38,6 @@ const membersQuery = useQuery({
 const member = computed<AppointmentMember | undefined>(() =>
   membersQuery.data.value?.find((value) => value.memberId === memberId.value),
 )
-
-const profileStatsQuery = useAppointmentMemberStats(memberId)
-
-const profileStats = computed(() => profileStatsQuery.data.value)
-
-function indicatorValue(indicator: 'completionRate' | 'noShowCount' | 'averageRating'): string {
-  const stats = profileStats.value
-  if (!stats) return 'Unavailable'
-  if (indicator === 'completionRate')
-    return stats.completionRate === null ? 'No ratings yet' : `${stats.completionRate}%`
-  if (indicator === 'averageRating')
-    return stats.averageRating === null ? 'No ratings yet' : `${stats.averageRating.toFixed(1)} / 5`
-  return String(stats.noShowCount)
-}
 
 function initials(displayName: string): string {
   return displayName.trim().charAt(0).toUpperCase() || '?'
@@ -113,13 +99,13 @@ function goBack(): void {
             class="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-3 text-section-header text-ink"
             aria-hidden="true"
           >
-            <img
-              v-if="member.profileImageUrl"
+            <AppImage
               :src="member.profileImageUrl"
               alt=""
               class="size-full object-cover"
-            />
-            <span v-else>{{ initials(member.displayName) }}</span>
+            >
+              <span>{{ initials(member.displayName) }}</span>
+            </AppImage>
           </div>
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
@@ -134,34 +120,9 @@ function goBack(): void {
             <p class="mt-1 text-body-sm text-ink-2">
               {{ t(`appointment.languages.${member.preferredLanguage}`) }}
             </p>
-            <p class="mt-1 text-caption text-ink-3">
-              {{
-                profileStats?.reviewCount
-                  ? `${profileStats.reviewCount} reviews`
-                  : t('appointment.profile.ratingUnavailable')
-              }}
-            </p>
           </div>
         </section>
       </AppCard>
-
-      <section class="flex flex-col gap-3">
-        <h2 class="font-display text-title text-ink-display">
-          {{ t('appointment.profile.trustIndicators') }}
-        </h2>
-        <AppCard
-          v-for="indicator in ['completionRate', 'noShowCount', 'averageRating'] as const"
-          :key="indicator"
-          padding="base"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-body-sm text-ink-2">
-              {{ t(`appointment.profile.${indicator}`) }}
-            </span>
-            <span class="text-title-sm text-ink">{{ indicatorValue(indicator) }}</span>
-          </div>
-        </AppCard>
-      </section>
     </template>
   </main>
 </template>

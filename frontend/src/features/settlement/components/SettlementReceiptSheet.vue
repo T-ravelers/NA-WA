@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
+import AppImage from '@/shared/ui/AppImage.vue'
+
 import SettlementBottomSheet from './SettlementBottomSheet.vue'
 
 /**
@@ -23,7 +25,7 @@ const { t } = useI18n()
     :label="t('settlement.receipt.sheetLabel')"
     @close="emit('close')"
   >
-    <img
+    <AppImage
       :src="url"
       :alt="t('settlement.receipt.alt')"
       class="mx-auto max-h-[70dvh] w-full rounded-sm object-contain"
