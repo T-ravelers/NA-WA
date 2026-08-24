@@ -108,8 +108,9 @@ const journeys = computed(() => journeyListQuery.data.value ?? [])
 /**
  * 이벤트의 운영 기간.
  *
- * 상시 이벤트는 `end_date`가 NULL이라는 것이 DB 불변식이지만, 응답이 무엇을 주든
- * `isPermanent`가 참이면 상한이 없는 것으로 읽는다.
+ * `isPermanent`가 참이면 종료일을 알 수 없다는 뜻이고, 그때는 상한이 없는 것으로
+ * 읽는다. "상시 운영"이라는 뜻이 아니다. `end_date`가 NULL이라는 것이 DB 불변식이지만
+ * 응답이 무엇을 주든 이 값을 기준으로 삼는다.
  */
 const itemPeriod = computed(() => ({
   startDate: event.value?.startDate ?? null,
@@ -299,7 +300,7 @@ function goToCreateJourney(): void {
    * 없는** 사람인데, 빈 폼에는 무엇과 겹쳐야 하는지가 없다. 안 겹치는 기간으로 또
    * 만들고 돌아오면 없애려던 막다른 길이 한 바퀴 뒤로 옮겨질 뿐이다.
    *
-   * 상시 이벤트는 상한이 없어 `endDate`를 싣지 않는다.
+   * 종료일 미상 이벤트는 상한이 없어 `endDate`를 싣지 않는다.
    */
   void router.replace({
     name: 'journey-create',
