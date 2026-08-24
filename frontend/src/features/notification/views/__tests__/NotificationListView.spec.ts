@@ -157,9 +157,8 @@ describe('NotificationListView', () => {
     await router.push({ name: 'notifications' })
     await flushPromises()
 
-    // 헤더 조형이 `ScreenHeader`로 모이면서 `data-testid`가 사라졌다(#489).
-    // 뒤로가기는 헤더의 첫 버튼이고, 이 화면에는 오른쪽 액션이 없다.
-    await wrapper.get('header button').trigger('click')
+    // 뒤로가기 훅은 `ScreenHeader`가 소유한다(#489). 뷰마다 다른 이름을 붙이던 것을 모았다.
+    await wrapper.get('[data-testid="screen-back"]').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('wallet')

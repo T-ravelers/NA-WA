@@ -54,9 +54,14 @@ const slots = defineSlots<{
       <!--
         `plain`은 배경이 없어 아이콘 글리프가 `px-screen` 안쪽으로 들어가 보인다.
         왼쪽으로 당겨 제목 세로선과 광학적으로 맞춘다.
+
+        `data-testid`는 이 컴포넌트가 소유한다. 뷰마다 `settlement-back`·`notification-back`
+        처럼 다른 이름을 붙이던 것을 하나로 모았다. 스크린샷 러너가 접근 이름으로 찾으면
+        번역된 로케일에서 못 찾으므로(#489 실측) 구조에 붙은 훅이 필요하다.
       -->
       <IconOrb
         v-if="variant === 'back'"
+        data-testid="screen-back"
         :label="backLabel"
         size="md"
         variant="plain"

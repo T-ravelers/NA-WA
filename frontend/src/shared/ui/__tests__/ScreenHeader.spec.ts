@@ -20,6 +20,11 @@ describe('ScreenHeader', () => {
 
     const button = wrapper.get('button')
     expect(button.attributes('aria-label')).toBe('Back')
+    /*
+     * 스크린샷 러너와 뷰 테스트가 이 훅으로 뒤로가기를 찾는다. 접근 이름으로 찾으면
+     * 번역된 로케일에서 못 찾아 화면을 통째로 건너뛴다(#489에서 실제로 5장이 빠졌다).
+     */
+    expect(button.attributes('data-testid')).toBe('screen-back')
 
     await button.trigger('click')
     expect(wrapper.emitted('back')).toHaveLength(1)
