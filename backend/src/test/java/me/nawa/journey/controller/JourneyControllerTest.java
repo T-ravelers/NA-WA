@@ -27,6 +27,7 @@ import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyUpdateRequest;
+import me.nawa.journey.dto.response.JourneyDetailResponse;
 import me.nawa.journey.dto.response.JourneyItemExistsResponse;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
@@ -373,11 +374,13 @@ class JourneyControllerTest {
 
     @Test
     void getJourney_returns200WithJourneyData() throws Exception {
-        JourneyResponse response = JourneyResponse.builder()
+        JourneyDetailResponse response = JourneyDetailResponse.builder()
             .tripId(20L)
             .title("Seoul Foodie Week")
             .startDate(LocalDate.of(2026, 3, 28))
             .endDate(LocalDate.of(2026, 4, 1))
+            .budgetAmount(new java.math.BigDecimal("1800000"))
+            .spentAmount(new java.math.BigDecimal("1284500"))
             .regions(List.of())
             .build();
         when(journeyService.getJourney(1L, 20L)).thenReturn(response);
@@ -391,6 +394,7 @@ class JourneyControllerTest {
         JsonNode body = objectMapper.readTree(responseBody);
         assertTrue(body.path("success").asBoolean());
         assertEquals("2026-03-28", body.path("data").path("startDate").asText());
+        assertEquals(1284500, body.path("data").path("spentAmount").asInt());
     }
 
     @Test

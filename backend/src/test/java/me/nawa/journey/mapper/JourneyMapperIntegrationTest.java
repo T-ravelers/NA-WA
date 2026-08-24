@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDate;
@@ -686,6 +687,68 @@ class JourneyMapperIntegrationTest {
     }
 
     @Test
+    void findCurrentSpentAmount_sumsOnlyEligibleLiveJourneyExpenses() {
+        String marker = "journey-spending-" + UUID.randomUUID();
+        long memberId = insertMember(marker);
+        long tripId = insertTrip(memberId, marker);
+        WalletFixture wallet = insertMemberWallet(memberId);
+        List<Long> transferIds = new ArrayList<>();
+
+        try {
+            transferIds.add(insertWalletTransferDebit(
+                wallet.walletId(), memberId, marker + "-qr", "QR_PAYMENT",
+                "COMPLETED", LocalDateTime.of(2026, 8, 5, 12, 0),
+                new BigDecimal("100000.0000")
+            ));
+            transferIds.add(insertWalletTransferDebit(
+                wallet.walletId(), memberId, marker + "-settlement", "SETTLEMENT",
+                "COMPLETED", LocalDateTime.of(2026, 8, 10, 15, 0),
+                new BigDecimal("284500.0000")
+            ));
+            transferIds.add(insertWalletTransferDebit(
+                wallet.walletId(), memberId, marker + "-topup", "TOPUP",
+                "COMPLETED", LocalDateTime.of(2026, 8, 8, 9, 0),
+                new BigDecimal("50000.0000")
+            ));
+            transferIds.add(insertWalletTransferDebit(
+                wallet.walletId(), memberId, marker + "-failed", "QR_PAYMENT",
+                "FAILED", null, new BigDecimal("70000.0000")
+            ));
+            transferIds.add(insertWalletTransferDebit(
+                wallet.walletId(), memberId, marker + "-outside", "QR_PAYMENT",
+                "COMPLETED", LocalDateTime.of(2026, 9, 1, 10, 0),
+                new BigDecimal("90000.0000")
+            ));
+
+            assertEquals(
+                new BigDecimal("384500.0000"),
+                mapper.findCurrentSpentAmount(tripId, memberId)
+            );
+        } finally {
+            jdbcTemplate.update(
+                "DELETE FROM wallet_ledger_entries WHERE wallet_id = ?",
+                wallet.walletId()
+            );
+            for (Long transferId : transferIds) {
+                jdbcTemplate.update(
+                    "DELETE FROM wallet_transfers WHERE transfer_id = ?",
+                    transferId
+                );
+            }
+            jdbcTemplate.update(
+                "DELETE FROM wallets WHERE wallet_id = ?",
+                wallet.walletId()
+            );
+            jdbcTemplate.update(
+                "DELETE FROM wallet_owners WHERE wallet_owner_id = ?",
+                wallet.walletOwnerId()
+            );
+            jdbcTemplate.update("DELETE FROM trips WHERE trip_id = ?", tripId);
+            jdbcTemplate.update("DELETE FROM members WHERE member_id = ?", memberId);
+        }
+    }
+
+    @Test
     void journeyRowLock_serializesSettingsUpdateAndItemAddition()
         throws Exception {
         JourneyItemFixture fixture = createFixture();
@@ -875,6 +938,75 @@ class JourneyMapperIntegrationTest {
             return statement;
         }, keyHolder);
         return keyHolder.getKey().longValue();
+    }
+
+    private static WalletFixture insertMemberWallet(long memberId) {
+        KeyHolder ownerKey = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO wallet_owners (member_id, owner_type) VALUES (?, 'MEMBER')",
+                Statement.RETURN_GENERATED_KEYS
+            );
+            statement.setLong(1, memberId);
+            return statement;
+        }, ownerKey);
+
+        long walletOwnerId = ownerKey.getKey().longValue();
+        KeyHolder walletKey = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO wallets "
+                    + "(wallet_owner_id, currency_code, available_balance) "
+                    + "VALUES (?, 'KRW', 1000000)",
+                Statement.RETURN_GENERATED_KEYS
+            );
+            statement.setLong(1, walletOwnerId);
+            return statement;
+        }, walletKey);
+
+        return new WalletFixture(
+            walletOwnerId,
+            walletKey.getKey().longValue()
+        );
+    }
+
+    private static long insertWalletTransferDebit(
+        long walletId,
+        long memberId,
+        String transferNumber,
+        String transferType,
+        String transferStatus,
+        LocalDateTime completedAt,
+        BigDecimal amount
+    ) {
+        KeyHolder transferKey = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO wallet_transfers "
+                    + "(currency_code, initiator_member_id, transfer_number, "
+                    + "transfer_type, transfer_status, amount, completed_at) "
+                    + "VALUES ('KRW', ?, ?, ?, ?, ?, ?)",
+                Statement.RETURN_GENERATED_KEYS
+            );
+            statement.setLong(1, memberId);
+            statement.setString(2, transferNumber);
+            statement.setString(3, transferType);
+            statement.setString(4, transferStatus);
+            statement.setBigDecimal(5, amount);
+            statement.setObject(6, completedAt);
+            return statement;
+        }, transferKey);
+
+        long transferId = transferKey.getKey().longValue();
+        jdbcTemplate.update(
+            "INSERT INTO wallet_ledger_entries "
+                + "(transfer_id, wallet_id, entry_type, amount, balance_after) "
+                + "VALUES (?, ?, 'DEBIT', ?, 0)",
+            transferId,
+            walletId,
+            amount
+        );
+        return transferId;
     }
 
     private static long insertExploreItem(long memberId) {
@@ -1138,6 +1270,9 @@ class JourneyMapperIntegrationTest {
     }
 
     private record JourneyItemFixture(long memberId, long tripId, long itemId) {
+    }
+
+    private record WalletFixture(long walletOwnerId, long walletId) {
     }
 
     private static String requiredEnvironment(String name) {

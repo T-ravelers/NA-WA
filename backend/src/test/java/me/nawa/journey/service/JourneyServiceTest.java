@@ -31,6 +31,7 @@ import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
 import me.nawa.journey.dto.request.JourneyUpdateRequest;
+import me.nawa.journey.dto.response.JourneyDetailResponse;
 import me.nawa.journey.dto.response.JourneyItemExistsResponse;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
@@ -1022,11 +1023,35 @@ class JourneyServiceTest {
             .build();
         when(journeyMapper.findJourneyById(20L)).thenReturn(journey);
         when(journeyMapper.findRegionsByTripId(20L)).thenReturn(null);
+        when(journeyMapper.findCurrentSpentAmount(20L, 1L))
+            .thenReturn(new BigDecimal("1284500.0000"));
 
-        JourneyResponse result = journeyService.getJourney(1L, 20L);
+        JourneyDetailResponse result = journeyService.getJourney(1L, 20L);
 
         assertEquals(20L, result.getTripId());
         assertEquals(List.of(), result.getRegions());
+        assertEquals(
+            new BigDecimal("1284500.0000"),
+            result.getSpentAmount()
+        );
+    }
+
+    @Test
+    void getJourney_returnsZeroSpentAmount_whenMapperReturnsNull() {
+        Journey journey = Journey.builder()
+            .tripId(21L)
+            .memberId(1L)
+            .title("Empty spending journey")
+            .startDate(LocalDate.of(2026, 8, 1))
+            .endDate(LocalDate.of(2026, 8, 2))
+            .build();
+        when(journeyMapper.findJourneyById(21L)).thenReturn(journey);
+        when(journeyMapper.findRegionsByTripId(21L)).thenReturn(List.of());
+        when(journeyMapper.findCurrentSpentAmount(21L, 1L)).thenReturn(null);
+
+        JourneyDetailResponse result = journeyService.getJourney(1L, 21L);
+
+        assertEquals(BigDecimal.ZERO, result.getSpentAmount());
     }
 
     @Test
@@ -1115,6 +1140,7 @@ class JourneyServiceTest {
             exception.getErrorCode()
         );
         verify(journeyMapper, never()).findRegionsByTripId(40L);
+        verify(journeyMapper, never()).findCurrentSpentAmount(40L, 1L);
     }
 
     @Test

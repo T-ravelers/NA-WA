@@ -39,6 +39,9 @@ class JourneyMapperXmlTest {
         ));
         assertTrue(configuration.hasStatement(namespace + "findJourneyById"));
         assertTrue(configuration.hasStatement(
+            namespace + "findCurrentSpentAmount"
+        ));
+        assertTrue(configuration.hasStatement(
             namespace + "findJourneyByIdForUpdate"
         ));
         assertTrue(configuration.hasStatement(namespace + "updateJourney"));
@@ -112,6 +115,27 @@ class JourneyMapperXmlTest {
         assertTrue(journeysSql.contains(
             "ORDER BY ti.visit_date ASC, ti.display_order ASC, ti.trip_item_id ASC LIMIT 1"
         ));
+
+        MappedStatement spendingStatement = configuration.getMappedStatement(
+            namespace + "findCurrentSpentAmount"
+        );
+        String spendingSql = spendingStatement
+            .getBoundSql(Map.of("tripId", 20L, "memberId", 1L))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+
+        assertTrue(spendingSql.contains("COALESCE(SUM(le.amount), 0)"));
+        assertTrue(spendingSql.contains("le.entry_type = 'DEBIT'"));
+        assertTrue(spendingSql.contains("t.currency_code = 'KRW'"));
+        assertTrue(spendingSql.contains("t.transfer_status = 'COMPLETED'"));
+        assertTrue(spendingSql.contains(
+            "t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')"
+        ));
+        assertTrue(spendingSql.contains(
+            "DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date"
+        ));
+        assertFalse(spendingSql.contains("trip_expense_links"));
 
         MappedStatement timelineStatement = configuration.getMappedStatement(
             namespace + "findTimelineItemsByTripId"

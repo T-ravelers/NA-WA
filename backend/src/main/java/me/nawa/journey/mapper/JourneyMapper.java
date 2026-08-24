@@ -1,5 +1,6 @@
 package me.nawa.journey.mapper;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import me.nawa.journey.domain.Journey;
@@ -20,6 +21,11 @@ public interface JourneyMapper {
     List<Journey> findJourneysByMemberId(@Param("memberId") Long memberId);
 
     Journey findJourneyById(@Param("tripId") Long tripId);
+
+    BigDecimal findCurrentSpentAmount(
+        @Param("tripId") Long tripId,
+        @Param("memberId") Long memberId
+    );
 
     Journey findJourneyByIdForUpdate(@Param("tripId") Long tripId);
 

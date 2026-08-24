@@ -31,6 +31,7 @@ const journey = {
   startDate: '2026-08-10',
   endDate: '2026-08-12',
   budgetAmount: 1500000,
+  spentAmount: 875000,
   companionPreference: '2-4',
   regions: [{ regionCode: 'SEOUL', regionName: 'Seoul', displayOrder: 0 }],
 }

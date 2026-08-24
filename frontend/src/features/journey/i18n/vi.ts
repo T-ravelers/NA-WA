@@ -70,6 +70,13 @@ export default {
     detail: {
       budget: 'Ngân sách',
       noBudget: 'Chưa đặt ngân sách',
+      spent: 'Đã chi',
+      left: 'Còn lại',
+      overBudget: 'Vượt ngân sách',
+      budgetUsed: 'Đã dùng {percentage}% ngân sách',
+      noBudgetLimit: 'Không giới hạn ngân sách',
+      zeroBudget: 'Ngân sách là 0 P',
+      budgetTotal: 'Ngân sách {amount}',
       companions: 'Nhóm đi cùng',
       noCompanions: 'Chưa đặt tùy chọn',
       timeline: 'Lịch trình',

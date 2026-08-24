@@ -25,6 +25,7 @@ import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyRegionRequest;
 import me.nawa.journey.dto.request.JourneyUpdateRequest;
+import me.nawa.journey.dto.response.JourneyDetailResponse;
 import me.nawa.journey.dto.response.JourneyItemExistsResponse;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyRegionResponse;
@@ -291,13 +292,18 @@ public class JourneyService {
     }
 
     @Transactional(readOnly = true)
-    public JourneyResponse getJourney(Long memberId, Long tripId) {
+    public JourneyDetailResponse getJourney(Long memberId, Long tripId) {
         Journey journey = findOwnedJourney(memberId, tripId);
 
         List<TripRegion> regions = journeyMapper.findRegionsByTripId(tripId);
-        return toResponse(
+        BigDecimal spentAmount = journeyMapper.findCurrentSpentAmount(
+            tripId,
+            memberId
+        );
+        return toDetailResponse(
             journey,
-            regions == null ? List.of() : regions
+            regions == null ? List.of() : regions,
+            spentAmount == null ? BigDecimal.ZERO : spentAmount
         );
     }
 
@@ -608,6 +614,31 @@ public class JourneyService {
             .startDate(journey.getStartDate())
             .endDate(journey.getEndDate())
             .budgetAmount(journey.getBudgetAmount())
+            .companionPreference(journey.getCompanionPreference())
+            .regions(regionResponses)
+            .build();
+    }
+
+    private JourneyDetailResponse toDetailResponse(
+        Journey journey,
+        List<TripRegion> regions,
+        BigDecimal spentAmount
+    ) {
+        List<JourneyRegionResponse> regionResponses = regions.stream()
+            .map(region -> JourneyRegionResponse.builder()
+                .regionCode(region.getRegionCode())
+                .regionName(region.getRegionName())
+                .displayOrder(region.getDisplayOrder())
+                .build())
+            .toList();
+
+        return JourneyDetailResponse.builder()
+            .tripId(journey.getTripId())
+            .title(journey.getTitle())
+            .startDate(journey.getStartDate())
+            .endDate(journey.getEndDate())
+            .budgetAmount(journey.getBudgetAmount())
+            .spentAmount(spentAmount)
             .companionPreference(journey.getCompanionPreference())
             .regions(regionResponses)
             .build();

@@ -1,8 +1,60 @@
 # Journey API 계약
 
-이 문서는 Journey 설정 수정 API의 요청·응답 및 충돌 처리 계약을 정의합니다.
+이 문서는 Journey 상세·설정·일정 API의 요청·응답 및 충돌 처리 계약을 정의합니다.
 공통 응답 형식은 [API_RESPONSE_CONVENTION.md](API_RESPONSE_CONVENTION.md)를
 따릅니다.
+
+## Journey 상세 조회
+
+```http
+GET /api/v1/journeys/{tripId}
+```
+
+- 인증이 필요하며 해당 Journey의 소유자만 조회할 수 있습니다.
+- `budgetAmount`와 `spentAmount`는 원화와 1:1인 P 단위입니다.
+- `spentAmount`는 조회 시점의 LIVE 합계이며 적격 지출이 없으면 `0`입니다.
+
+### 현재 소비액 집계
+
+`spentAmount`는 다음 조건을 모두 만족하는 지갑 원장 금액을 합산합니다. 종료 후 만드는
+Report 비교의 `LIVE` 집계와 같은 정의이며 Report 스냅샷 생성 여부나
+`trip_expense_links` 선택 여부에는 의존하지 않습니다.
+
+- Journey 소유자가 결제 주체이고 그 회원 지갑에 기록된 `DEBIT`
+- `KRW`, `COMPLETED`, `QR_PAYMENT` 또는 `SETTLEMENT`
+- `completedAt`의 날짜가 Journey의 `startDate`와 `endDate` 사이
+- soft delete되지 않은 지갑·소유자·거래·원장 행
+
+따라서 진행 중 Journey는 조회할 때마다 완료된 지출을 반영합니다. 환급 `CREDIT`, 충전,
+보증금, 실패·취소·역거래와 Journey 기간 밖 결제는 포함하지 않습니다.
+
+### 성공 응답
+
+`200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "tripId": 20,
+    "title": "서울과 부산",
+    "startDate": "2026-08-20",
+    "endDate": "2026-08-24",
+    "budgetAmount": 1800000,
+    "spentAmount": 1284500,
+    "companionPreference": "2-4",
+    "regions": []
+  }
+}
+```
+
+### 오류 코드
+
+| HTTP | 오류 코드 | 발생 조건 |
+| ---: | --- | --- |
+| 400 | `JOURNEY-003` | `tripId`가 유효하지 않음 |
+| 403 | `JOURNEY-002` | 다른 회원이 소유한 Journey 조회 요청 |
+| 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
 
 ## Journey 설정 일괄 수정
 

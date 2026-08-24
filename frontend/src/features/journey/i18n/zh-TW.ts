@@ -69,6 +69,13 @@ export default {
     detail: {
       budget: '預算',
       noBudget: '未設定預算',
+      spent: '已花費',
+      left: '剩餘',
+      overBudget: '超出預算',
+      budgetUsed: '已使用預算的 {percentage}%',
+      noBudgetLimit: '未設定預算上限',
+      zeroBudget: '預算為 0 P',
+      budgetTotal: '預算 {amount}',
       companions: '同行人數',
       noCompanions: '未設定偏好',
       timeline: '行程',

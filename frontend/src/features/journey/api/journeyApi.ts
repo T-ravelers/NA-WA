@@ -54,8 +54,16 @@ export interface Journey {
   regions: JourneyRegion[]
 }
 
+export interface JourneyDetail extends Journey {
+  spentAmount: number
+}
+
 interface JourneyResponse extends Omit<Journey, 'regions'> {
   regions?: JourneyRegion[] | null
+}
+
+interface JourneyDetailResponse extends JourneyResponse {
+  spentAmount: number
 }
 
 export interface JourneyCreateInput {
@@ -152,6 +160,13 @@ function normalizeJourney(journey: JourneyResponse): Journey {
   }
 }
 
+function normalizeJourneyDetail(journey: JourneyDetailResponse): JourneyDetail {
+  return {
+    ...normalizeJourney(journey),
+    spentAmount: journey.spentAmount,
+  }
+}
+
 function normalizeTimeline(response: JourneyTimelineResponse): JourneyTimeline {
   return {
     ...response,
@@ -227,10 +242,10 @@ export async function createJourney(input: JourneyCreateInput): Promise<Journey>
   return normalizeJourney(response.data)
 }
 
-export async function fetchJourney(tripId: number): Promise<Journey> {
-  const response = await httpClient.get<JourneyResponse>(`/api/v1/journeys/${tripId}`)
+export async function fetchJourney(tripId: number): Promise<JourneyDetail> {
+  const response = await httpClient.get<JourneyDetailResponse>(`/api/v1/journeys/${tripId}`)
 
-  return normalizeJourney(response.data)
+  return normalizeJourneyDetail(response.data)
 }
 
 export async function fetchJourneyTimeline(

@@ -63,6 +63,13 @@ export default {
     detail: {
       budget: 'Budget',
       noBudget: 'No budget set',
+      spent: 'Spent',
+      left: 'Left',
+      overBudget: 'Over budget',
+      budgetUsed: '{percentage}% of budget',
+      noBudgetLimit: 'No budget limit',
+      zeroBudget: 'Budget is 0 P',
+      budgetTotal: 'Budget {amount}',
       companions: 'Travel party',
       noCompanions: 'No preference set',
       timeline: 'Itinerary',

@@ -146,6 +146,32 @@
           AND deleted_at IS NULL
     </select>
 
+    <!--
+      Report 비교의 LIVE 지출과 같은 정의다. 리포트 스냅샷을 만들기 전에도 현재까지
+      완료된 결제만 보여 주기 위해 trip_expense_links 선택 여부는 조건에 넣지 않는다.
+    -->
+    <select id="findCurrentSpentAmount" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(le.amount), 0)
+        FROM wallet_ledger_entries le
+        JOIN wallet_transfers t ON t.transfer_id = le.transfer_id
+        JOIN wallets w ON w.wallet_id = le.wallet_id
+          AND w.deleted_at IS NULL
+        JOIN wallet_owners wo ON wo.wallet_owner_id = w.wallet_owner_id
+          AND wo.member_id = #{memberId}
+          AND wo.deleted_at IS NULL
+        JOIN trips tr ON tr.trip_id = #{tripId}
+          AND tr.member_id = #{memberId}
+          AND tr.deleted_at IS NULL
+        WHERE le.entry_type = 'DEBIT'
+          AND le.deleted_at IS NULL
+          AND t.initiator_member_id = #{memberId}
+          AND t.deleted_at IS NULL
+          AND t.currency_code = 'KRW'
+          AND t.transfer_status = 'COMPLETED'
+          AND t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')
+          AND DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date
+    </select>
+
     <select id="findJourneyByIdForUpdate"
             resultType="me.nawa.journey.domain.Journey">
         SELECT
