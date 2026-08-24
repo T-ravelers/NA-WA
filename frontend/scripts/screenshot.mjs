@@ -533,7 +533,8 @@ function stubReportApis(page) {
                   {
                     memberId: 2,
                     displayName: 'Mina',
-                    profileImageUrl: null,
+                    // #436 — 사진 칩과 이니셜 폴백이 한 줄에 섞여도 같은 크기인지 캡처한다.
+                    profileImageUrl: COVER_PIXEL,
                     totalSpent: 978400,
                     dailyAverage: 97840,
                     categoryBreakdown: [

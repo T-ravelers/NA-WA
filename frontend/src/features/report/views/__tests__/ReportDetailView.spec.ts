@@ -93,7 +93,7 @@ const groupComparison = {
     {
       memberId: 2,
       displayName: 'Mina',
-      profileImageUrl: null,
+      profileImageUrl: 'https://example.test/mina.png',
       totalSpent: '978400',
       dailyAverage: '97840',
       categoryBreakdown: [{ category: 'SHOPPING', amount: '978400', percentage: '100' }],
@@ -437,15 +437,20 @@ describe('ReportDetailView', () => {
     expect(wrapper.find(MEMBER_CHIPS).exists()).toBe(false)
   })
 
-  it('compares total spend, category balance and ranks against group members', async () => {
+  it('maps the group profile photo, total spend and daily average into the comparison', async () => {
     fetchReportComparison.mockResolvedValueOnce(groupComparison)
     const { wrapper } = await mountView()
+    const comparisonSection = wrapper.get('section[aria-labelledby="report-comparison-title"]')
 
-    expect(wrapper.text()).toContain('Total spend')
+    expect(comparisonSection.text()).toContain('Total spend')
     expect(wrapper.findAll(`${MEMBER_CHIPS} [role="radio"]`).map((chip) => chip.text())).toEqual([
-      'MMina',
+      'Mina',
     ])
-    expect(wrapper.text()).toContain('978,400 P')
+    expect(wrapper.get(`${MEMBER_CHIPS} img`).attributes('src')).toBe(
+      'https://example.test/mina.png',
+    )
+    expect(comparisonSection.get('[data-metric="totalSpent"]').text()).toContain('978,400 P')
+    expect(comparisonSection.get('[data-metric="dailyAverage"]').text()).toContain('97,840 P')
     expect(wrapper.text()).toContain('Category balance')
     // 레이더 축: 내 FOOD·OTHER + 코호트 SHOPPING — 세 축
     // 추이 차트도 sr-only 목록을 가지므로 레이더 것만 고른다.
@@ -744,6 +749,7 @@ describe('ReportDetailView', () => {
     expect(barLabels).toContain('AVG')
     expect(barLabels).not.toContain('Travelers avg')
     expect(wrapper.text()).toContain('1,052,000 P')
+    expect(wrapper.get('[data-metric="dailyAverage"]').text()).toContain('105,200 P')
     const radarList = wrapper
       .findAll('ul.sr-only')
       .find((list) => list.text().includes('Travelers avg'))

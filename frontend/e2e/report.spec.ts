@@ -59,6 +59,59 @@ const reportDetail = {
   },
 }
 
+const avatarPixel =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+const groupComparison = {
+  scope: 'GROUP',
+  basis: 'LIVE',
+  me: {
+    memberId: 1,
+    displayName: 'Mina Park',
+    profileImageUrl: null,
+    totalSpent: 25_000,
+    dailyAverage: 2_500,
+    categoryBreakdown: [{ category: 'FOOD', amount: 20_000, percentage: 80 }],
+  },
+  peers: [
+    {
+      memberId: 2,
+      displayName: 'Alex',
+      profileImageUrl: avatarPixel,
+      totalSpent: 12_000,
+      dailyAverage: 1_200,
+      categoryBreakdown: [{ category: 'FOOD', amount: 12_000, percentage: 100 }],
+    },
+    {
+      memberId: 3,
+      displayName: '🇰🇷 Jae',
+      profileImageUrl: null,
+      totalSpent: 9_000,
+      dailyAverage: 900,
+      categoryBreakdown: [{ category: 'OTHER', amount: 9_000, percentage: 100 }],
+    },
+  ],
+  cohort: {
+    size: 2,
+    avgTotalSpent: 10_500,
+    avgDailyAverage: 1_050,
+    categoryBreakdown: [
+      { category: 'FOOD', amount: 6_000, percentage: 57.14 },
+      { category: 'OTHER', amount: 4_500, percentage: 42.86 },
+    ],
+  },
+  ranks: [{ category: 'FOOD', rank: 1, of: 3 }],
+}
+
+const similarComparison = {
+  ...groupComparison,
+  scope: 'SIMILAR',
+  basis: 'SNAPSHOT',
+  peers: [],
+  cohort: { ...groupComparison.cohort, size: 12 },
+  ranks: [],
+}
+
 test('selects expenses, prevents duplicate generation, and opens the final report', async ({
   page,
 }) => {
@@ -154,6 +207,16 @@ test('selects expenses, prevents duplicate generation, and opens the final repor
       body: JSON.stringify({ success: true, data: reportDetail }),
     }),
   )
+  await page.route(/\/api\/v1\/reports\/101\/comparison(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: route.request().url().includes('scope=SIMILAR') ? similarComparison : groupComparison,
+      }),
+    }),
+  )
 
   await page.goto('/reports')
   await expect(page.getByRole('heading', { level: 1, name: 'Reports' })).toBeVisible()
@@ -174,9 +237,18 @@ test('selects expenses, prevents duplicate generation, and opens the final repor
   await expect(page.getByRole('heading', { level: 2, name: 'By category' })).toBeVisible()
   // 범례는 분류명과 비율을 각각 다른 요소로 그린다. 한 문자열로 묶어 찾으면
   // 마크업이 조금만 바뀌어도 깨지므로 행 단위로 확인한다.
-  const foodRow = page.getByRole('listitem').filter({ hasText: 'FOOD' })
+  // 비교 섹션에도 같은 카테고리 목록이 있으므로 `By category` 섹션 안으로 한정한다.
+  const categorySection = page.getByRole('heading', { level: 2, name: 'By category' }).locator('..')
+  const foodRow = categorySection.getByRole('listitem').filter({ hasText: 'FOOD' })
   await expect(foodRow).toContainText('78%')
   await expect(page.getByRole('heading', { level: 2, name: 'Spending trend' })).toBeVisible()
   await expect(page.getByRole('listitem').filter({ hasText: '2021.07.20' })).toBeVisible()
+  const comparison = page.locator('section[aria-labelledby="report-comparison-title"]')
+  const memberChips = comparison.getByRole('radiogroup', { name: 'Group members' })
+  await expect(memberChips.getByRole('radio')).toHaveCount(2)
+  await expect(memberChips.locator('img')).toHaveCount(1)
+  await expect(memberChips.getByText('🇰🇷', { exact: true })).toBeVisible()
+  await expect(comparison.getByText('Daily avg', { exact: true })).toBeVisible()
+  await expect(comparison.getByText('1,200 P', { exact: true })).toBeVisible()
   expect(createRequest).toEqual({ locale: 'en', transferIds: [10, 30] })
 })

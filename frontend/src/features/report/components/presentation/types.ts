@@ -119,12 +119,17 @@ export interface ReportComparisonBarRow {
   id: number
   /** 표시명. 나는 화면이 번역한 `You`다. */
   label: string
-  amount: MoneyValue
+  totalSpent: MoneyValue
+  dailyAverage: MoneyValue
+  /** GROUP 동료 칩의 사진. 나와 SIMILAR 평균처럼 칩이 없으면 생략한다. */
+  profileImageUrl?: string | null
 }
 
 export interface ReportComparisonBarsProps extends LocaleAware {
   /** 블록 라벨. 예: `Total spend` */
   totalLabel: string
+  /** 일 평균 블록 라벨. 예: `Daily avg` */
+  dailyAverageLabel: string
   /** 동료 칩 라디오 그룹의 접근 가능한 이름. 예: `Group members` */
   chipsLabel: string
   me: ReportComparisonBarRow
