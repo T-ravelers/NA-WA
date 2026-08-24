@@ -68,6 +68,10 @@ Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `
 모든 프리셋에는 공통 공개 조건인
 `end_date IS NULL OR end_date >= 기준일`이 함께 적용됩니다.
 
+목록 응답은 `isPermanent`를 함께 내려줍니다. 상시 Event는 `endDate`가 없어 시작일만
+남는데, 카드가 그것만 그리면 "그 하루짜리 지난 행사"로 읽힙니다. 상세는 기간 자리에
+상시라고 적고 있어 둘이 다른 말을 했습니다.
+
 ### status 판정
 
 응답의 `status`는 요청 시점 기준일로 계산합니다.

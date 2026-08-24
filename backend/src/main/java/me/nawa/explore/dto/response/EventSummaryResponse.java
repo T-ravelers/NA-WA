@@ -35,5 +35,13 @@ public class EventSummaryResponse {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate endDate;
 
+    /**
+     * 상시 Event 여부. 참이면 endDate가 없습니다(DB 불변식 chk_event_period).
+     *
+     * <p>카드가 이 값 없이 startDate만 그리면 상시 Event가 "그 하루짜리 지난 행사"로
+     * 읽힙니다. 상세는 기간 자리에 Permanent를 적고 있어 둘이 다른 말을 했습니다.
+     */
+    private Boolean isPermanent;
+
     private boolean saved;
 }

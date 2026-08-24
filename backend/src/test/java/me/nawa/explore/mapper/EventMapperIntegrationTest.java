@@ -252,6 +252,16 @@ class EventMapperIntegrationTest {
             "ENDED"
         );
 
+        // 카드가 상시 Event를 "하루짜리 지난 행사"로 그리지 않으려면 목록도 이 값을
+        // 알아야 한다. 상세만 내려주던 시절에는 카드와 상세가 다른 말을 했다.
+        Map<Long, Boolean> permanentById = new HashMap<>();
+        for (EventSummaryResponse result
+            : mapper.searchEvents(request(null, null), 0, null, today)) {
+            permanentById.put(result.getItemId(), result.getIsPermanent());
+        }
+        assertEquals(Boolean.TRUE, permanentById.get(permanent));
+        assertEquals(Boolean.FALSE, permanentById.get(endsToday));
+
         Map<Long, EventStatus> statusById = searchStatuses(today);
         assertEquals(EventStatus.SCHEDULED, statusById.get(startsTomorrow));
         assertEquals(EventStatus.ONGOING, statusById.get(startedToday));

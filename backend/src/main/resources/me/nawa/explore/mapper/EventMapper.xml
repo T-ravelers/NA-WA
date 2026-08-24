@@ -364,6 +364,7 @@
         e.longitude,
         e.start_date,
         e.end_date,
+        e.is_permanent,
         <include refid="savedColumn"/>
         FROM explore_items ei
         JOIN event e

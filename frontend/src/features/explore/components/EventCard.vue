@@ -71,12 +71,21 @@ const regionLabel = computed(() =>
     .join(' · '),
 )
 
-// 한쪽 날짜만 있으면 구분자 없이 그 날짜만 보인다. `EventDetailView`와 같은 방식이다.
-const periodLabel = computed(() =>
-  [formatCalendarDateString(event.startDate), formatCalendarDateString(event.endDate)]
+/**
+ * 운영 기간.
+ *
+ * 상시 이벤트는 기간 대신 "상시"라고 적는다. 끝나는 날이 없어 시작일만 남는데, 그러면
+ * 카드가 "그 하루짜리 지난 행사"로 읽힌다 — 상세는 기간 자리에 같은 말을 적고 있어
+ * 둘이 다른 말을 했다. 라벨도 상세와 같은 것을 쓴다.
+ *
+ * 기간이 있는 이벤트에서 한쪽 날짜만 있으면 구분자 없이 그 날짜만 보인다.
+ */
+const periodLabel = computed(() => {
+  if (event.isPermanent) return t('explore.detail.permanent')
+  return [formatCalendarDateString(event.startDate), formatCalendarDateString(event.endDate)]
     .filter(Boolean)
-    .join(' ~ '),
-)
+    .join(' ~ ')
+})
 
 function openEvent(): void {
   emit('open', event.itemId)

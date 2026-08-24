@@ -28,6 +28,7 @@ const event = {
   longitude: null,
   startDate: '2026-08-01',
   endDate: '2026-08-31',
+  isPermanent: false,
   saved: false,
 }
 
@@ -90,6 +91,18 @@ describe('EventCard', () => {
     expect(wrapper.text()).toContain('Sample event')
     expect(wrapper.text()).toContain('2026.08.01')
     expect(wrapper.text()).not.toContain('~')
+  })
+
+  /*
+   * 상시 이벤트는 `endDate`가 없어 시작일만 남는다. 날짜만 찍으면 "그 하루짜리 지난
+   * 행사"로 읽히고, 같은 이벤트의 상세는 기간 자리에 Permanent를 적어 둘이 다른 말을
+   * 한다. 로컬 시드에서 74건이 이 갈래다.
+   */
+  it('renders the permanent label instead of a start date for permanent events', () => {
+    const wrapper = mountCard({ isPermanent: true, endDate: null })
+
+    expect(wrapper.text()).toContain('Permanent')
+    expect(wrapper.text()).not.toContain('2026.08.01')
   })
 
   it('renders a card whose dates are both missing', () => {

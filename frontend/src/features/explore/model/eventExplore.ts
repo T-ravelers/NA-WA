@@ -21,6 +21,8 @@ export interface EventSummary {
   // `EventSummaryResponse`의 `LocalDate`는 널을 허용한다. 실제로 종료일이 없는 Event가 있다.
   startDate: string | null
   endDate: string | null
+  /** 상시 Event. 참이면 `endDate`가 없다 — 카드가 기간 대신 상시라고 적는다. */
+  isPermanent: boolean
   saved: boolean
 }
 

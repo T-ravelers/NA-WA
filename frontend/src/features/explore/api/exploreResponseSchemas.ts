@@ -37,6 +37,7 @@ export const eventSummaryResponseSchema = z
     longitude: finiteNumberSchema.nullable(),
     startDate: nullableDateSchema,
     endDate: nullableDateSchema,
+    isPermanent: z.boolean(),
     saved: z.boolean(),
   })
   .passthrough()
