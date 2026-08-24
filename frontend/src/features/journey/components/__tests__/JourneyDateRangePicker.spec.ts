@@ -56,6 +56,37 @@ describe('JourneyDateRangePicker', () => {
     wrapper.unmount()
   })
 
+  it('keeps Tab focus inside the open picker', async () => {
+    const wrapper = mount(JourneyDateRangePicker, {
+      props,
+      global: { plugins: [i18n] },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('[data-testid="journey-date-start"]').trigger('click')
+
+    const controls = Array.from(
+      wrapper
+        .get('[role="dialog"]')
+        .element.querySelectorAll<HTMLButtonElement>('button:not([disabled])'),
+    )
+    const first = controls[0]
+    const last = controls[controls.length - 1]
+    if (first === undefined || last === undefined) throw new Error('Expected dialog controls')
+
+    first.focus()
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true }),
+    )
+    expect(document.activeElement).toBe(last)
+
+    last.focus()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }))
+    expect(document.activeElement).toBe(first)
+
+    wrapper.unmount()
+  })
+
   it('disables dates before the start while choosing an end date', async () => {
     const wrapper = mountPicker()
 

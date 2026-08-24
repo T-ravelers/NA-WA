@@ -43,8 +43,37 @@ function dateLabel(value: string): string {
     : formatCalendarDate(value, locale.value, { dateStyle: 'short' }) || value
 }
 
+function dialogControls(): HTMLElement[] {
+  return Array.from(
+    dialog.value?.querySelectorAll<HTMLElement>('button:not([disabled]), [tabindex="0"]') ?? [],
+  )
+}
+
 function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') closePicker()
+  if (event.key === 'Escape') {
+    closePicker()
+    return
+  }
+
+  if (event.key !== 'Tab') return
+
+  const controls = dialogControls()
+  const first = controls[0]
+  const last = controls[controls.length - 1]
+  if (first === undefined || last === undefined) return
+
+  const activeElement = document.activeElement
+  if (activeElement === null || !dialog.value?.contains(activeElement)) {
+    event.preventDefault()
+    const targetControl = event.shiftKey ? last : first
+    targetControl.focus()
+  } else if (event.shiftKey && activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
 }
 
 async function openPicker(nextTarget: 'start' | 'end'): Promise<void> {
@@ -56,7 +85,7 @@ async function openPicker(nextTarget: 'start' | 'end'): Promise<void> {
   window.addEventListener('keydown', handleKeydown)
 
   await nextTick()
-  dialog.value?.querySelector<HTMLElement>('button:not([disabled]), [tabindex="0"]')?.focus()
+  dialogControls()[0]?.focus()
 }
 
 function closePicker(): void {
