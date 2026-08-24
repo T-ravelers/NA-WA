@@ -132,8 +132,7 @@ public class EventService {
         }
         request.setSort(sort);
 
-        request.setLanguage(StringUtils.hasText(request.getLanguage())
-            ? request.getLanguage().trim().toLowerCase(Locale.ROOT) : "en");
+        request.setLanguage(ExploreLanguagePolicy.normalize(request.getLanguage()));
     }
 
     private List<String> normalizeUppercaseValues(List<String> values) {
@@ -187,10 +186,7 @@ public class EventService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        String normalizedLanguage = StringUtils.hasText(language)
-            ? language.toLowerCase(Locale.ROOT)
-            // TODO(국제화 후속 이슈): 크롤링 원본 국제화 전까지 en을 기본 fallback으로 사용한다.
-            : "en";
+        String normalizedLanguage = ExploreLanguagePolicy.normalize(language);
 
         EventDetailResponse event = eventMapper.findEventDetail(
             eventId,

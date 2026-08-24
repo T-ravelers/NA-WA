@@ -76,15 +76,43 @@
         </choose>
     </sql>
 
+    <!--
+        번역값 우선, 없으면 한국어 원문.
+
+        LEFT JOIN이라 번역 행이 없어도 Event 자체는 그대로 나온다. 빈 문자열까지 폴백에
+        태우는 것은(NULLIF(TRIM(...), '')) 파이프라인이 번역하지 못한 필드를 NULL이 아니라
+        빈 값으로 채워 넣는 경우가 있어서다. 그대로 쓰면 화면에 빈칸이 나간다.
+    -->
+    <sql id="eventTranslationJoin">
+        LEFT JOIN event_translations et
+                  ON et.event_id = e.event_id
+                      AND et.language_code = #{language}
+                      AND et.deleted_at IS NULL
+    </sql>
+
+    <!--
+        목록·개수는 언어를 request 안에 담아 넘기므로 파라미터 경로가 다르다. 조각 하나를
+        ${}로 재사용할 수도 있지만, 그 중첩 치환은 경로를 잘못 적어도 조용히 NULL로 조인돼
+        번역이 통째로 빠진 채 한국어만 나가는 이번 장애와 똑같은 모양이 된다. 네 줄을
+        중복해 두고 눈으로 확인할 수 있게 남긴다.
+    -->
+    <sql id="eventListTranslationJoin">
+        LEFT JOIN event_translations et
+                  ON et.event_id = e.event_id
+                      AND et.language_code = #{request.language}
+                      AND et.deleted_at IS NULL
+    </sql>
+
     <select id="findEventDetail"
             resultMap="eventDetailResultMap">
         SELECT
             e.event_id,
             e.event_type,
             e.event_kind,
-            e.title,
+            COALESCE(NULLIF(TRIM(et.title), ''), e.title) AS title,
+            <!-- subtitle·program_text는 번역 테이블에 컬럼이 없어 아직 한국어가 나간다. -->
             e.subtitle,
-            e.description,
+            COALESCE(NULLIF(TRIM(et.description), ''), e.description) AS description,
             e.program_text,
             e.thumbnail_url,
             e.image_urls,
@@ -95,30 +123,52 @@
             e.is_permanent,
             e.start_date,
             e.end_date,
-            e.operating_hours,
+            <!--
+                번역 쪽 operating_hours는 TEXT이고 응답 DTO는 JSON이다. 그대로 COALESCE하면
+                JsonNodeTypeHandler가 파싱에 실패해 TypeException을 던지므로, 원문 JSON과
+                같은 모양이 되도록 {"raw": "..."}로 감싼다. EventService가 텍스트 노드를
+                같은 형태로 접는 것과 결과가 일치한다.
+            -->
+            CASE
+                WHEN NULLIF(TRIM(et.operating_hours), '') IS NOT NULL
+                    THEN JSON_OBJECT('raw', et.operating_hours)
+                ELSE e.operating_hours
+            END AS operating_hours,
             e.open_days,
             e.open_weekend,
             e.opens_late,
-            e.venue_name,
+            <!--
+                이름은 다르지만 원문과 번역이 같은 필드를 가리킨다. 크롤러 발행 함수에서
+                확인했다 — publish_delta_events가 'venueName'에 e.venue_detail을 싣고,
+                번역 쪽은 그 같은 venue_detail의 번역이다. 아래 address_display도 같은
+                성격으로 event.address의 영문 표기다.
+
+                **확인된 것은 대응의 일관성까지다.** venue_detail이 담는 내용 자체는 한
+                가지로 단정하지 않는다 — 크롤러가 상세주소와 장소명을 줄바꿈으로 합쳐
+                만드는 경우가 있다. 원문과 번역이 같은 모양이라 표시 계약에는 영향이 없다.
+                대응표는 EXPLORE_API.md에 있다(#531 리뷰).
+            -->
+            COALESCE(NULLIF(TRIM(et.venue_detail), ''), e.venue_name) AS venue_name,
             e.region1,
             e.region2,
             e.region3,
-            e.address_road,
+            COALESCE(NULLIF(TRIM(et.address_display), ''), e.address_road) AS address_road,
             e.latitude,
             e.longitude,
             e.has_photo_zone,
             e.is_experience,
-            e.age_limit,
+            COALESCE(NULLIF(TRIM(et.age_limit), ''), e.age_limit) AS age_limit,
             e.is_free,
-            e.price_text,
+            COALESCE(NULLIF(TRIM(et.price_text), ''), e.price_text) AS price_text,
             e.has_benefit,
             e.reservable,
             e.contact,
-            e.organizer,
+            COALESCE(NULLIF(TRIM(et.organizer), ''), e.organizer) AS organizer,
             <include refid="savedColumn"/>
         FROM explore_items ei
                  JOIN event e
                       ON e.event_id = ei.item_id
+                 <include refid="eventTranslationJoin"/>
         WHERE ei.item_type = 'EVENT'
           AND ei.item_id = #{eventId}
           AND ei.approval_status = 'APPROVED'
@@ -245,10 +295,22 @@
             </foreach>
         </if>
 
+        <!--
+            검색 대상은 화면에 실제로 보이는 값이어야 한다. 한국어 본문만 훑으면 영어 제목이
+            보이는 목록에서 그 영어 제목으로 검색했을 때 0건이 나온다.
+
+            번역값과 원문을 각각 본다. 표시값처럼 COALESCE로 감쌀 필요가 없다 — 폴백 갈래는
+            뒤의 원문 조건이 이미 덮으므로 같은 결과를 두 번 쓰는 셈이 된다.
+
+            원문 조건을 빼서도 안 된다. 번역이 붙은 Event는 표시값이 번역값이라, 원문만
+            훑던 한국어 검색 경로가 조용히 죽는다.
+        -->
         <if test="request.keyword != null and request.keyword != ''">
             AND (
-            e.title LIKE CONCAT('%', #{request.keyword}, '%')
+            NULLIF(TRIM(et.title), '') LIKE CONCAT('%', #{request.keyword}, '%')
+            OR e.title LIKE CONCAT('%', #{request.keyword}, '%')
             OR e.subtitle LIKE CONCAT('%', #{request.keyword}, '%')
+            OR NULLIF(TRIM(et.description), '') LIKE CONCAT('%', #{request.keyword}, '%')
             OR e.description LIKE CONCAT('%', #{request.keyword}, '%')
             )
         </if>
@@ -354,7 +416,8 @@
         e.event_id AS item_id,
         e.event_kind,
         <include refid="eventDerivedStatusColumn"/>,
-        e.title,
+        COALESCE(NULLIF(TRIM(et.title), ''), e.title) AS title,
+        <!-- subtitle은 번역 테이블에 컬럼이 없어 아직 한국어가 나간다. -->
         e.subtitle,
         e.thumbnail_url,
         e.region1,
@@ -369,6 +432,7 @@
         FROM explore_items ei
         JOIN event e
         ON e.event_id = ei.item_id
+        <include refid="eventListTranslationJoin"/>
         WHERE
         <include refid="eventListWhere"/>
         <choose>
@@ -386,11 +450,18 @@
         OFFSET #{offset}
     </select>
 
+    <!--
+        eventListWhere가 키워드 검색에서 et.title을 보므로 여기에도 같은 조인이 있어야 한다.
+        빠뜨리면 목록은 번역 제목으로 찾아 주는데 개수만 다른 조건으로 세어 페이지네이션이
+        어긋난다. 조인은 PK(event_id, language_code) 기준 최대 한 행이라 COUNT(*)를 부풀리지
+        않는다.
+    -->
     <select id="countEvents" resultType="long">
         SELECT COUNT(*)
         FROM explore_items ei
         JOIN event e
         ON e.event_id = ei.item_id
+        <include refid="eventListTranslationJoin"/>
         WHERE
         <include refid="eventListWhere"/>
     </select>

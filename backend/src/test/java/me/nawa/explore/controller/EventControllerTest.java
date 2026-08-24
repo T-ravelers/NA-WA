@@ -208,12 +208,12 @@ class EventControllerTest {
             .activities(List.of())
             .build();
 
-        when(eventService.getEventDetail(990001L, "ko", null))
+        when(eventService.getEventDetail(990001L, "ja", null))
             .thenReturn(response);
 
         String body = mockMvc.perform(
                 get("/api/v1/explore/events/990001")
-                    .param("language", "ko")
+                    .param("language", "ja")
             )
             .andExpect(status().isOk())
             .andReturn()
@@ -267,12 +267,12 @@ class EventControllerTest {
     @Test
     void getEventDetail_returns404WithErrorCode_whenEventNotFound()
         throws Exception {
-        when(eventService.getEventDetail(990001L, "ko", null))
+        when(eventService.getEventDetail(990001L, "ja", null))
             .thenThrow(new BusinessException(ExploreErrorCode.EVENT_NOT_FOUND));
 
         String responseBody = mockMvc.perform(
                 get("/api/v1/explore/events/990001")
-                    .param("language", "ko")
+                    .param("language", "ja")
             )
             .andExpect(status().isNotFound())
             .andReturn()

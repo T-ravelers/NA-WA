@@ -32,11 +32,109 @@
 | `experienceOnly` | boolean | 체험형 Event만 조회합니다. |
 | `photoZoneOnly` | boolean | 포토존이 있는 Event만 조회합니다. |
 | `sort` | `LATEST` 또는 `POPULAR` | 최신순 또는 인기순으로 정렬합니다. |
+| `language` | `en`, `ja`, `zh-TW`, `vi` | 표시 문자열의 언어입니다. 아래 [표시 언어](#표시-언어)를 따릅니다. |
 | `page` | 0 이상의 정수 | 0부터 시작하는 페이지 번호입니다. |
 | `size` | 양의 정수 | 페이지 크기입니다. 기본값은 20입니다. |
 
 Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `1~4`, Activity는
 `1~56`이며 Event와 Place가 같은 분류표를 공유합니다.
+
+## 표시 언어
+
+Event·Place의 목록과 상세는 `language`가 가리키는 번역을 우선 반환하고, 그 언어의 번역이
+없거나 값이 비어 있으면 **한국어 원문으로 폴백**합니다. 크롤링 원본이 한국어이고 번역은
+`event_translations`·`place_translations`에 언어별로 따로 쌓이기 때문입니다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 허용 값 | `en`, `ja`, `zh-TW`, `vi` |
+| 생략·공백 | `en`으로 봅니다 |
+| 대소문자 | 가리지 않고 받습니다. `ZH-TW`, `zh-tw` 모두 `zh-TW`로 해석합니다 |
+| 목록과 상세 | 같은 규칙을 씁니다. 같은 요청에 서로 다른 언어가 나가지 않습니다 |
+| 목록 밖의 값 | `COMMON-001`(400) |
+
+**`zh-TW`는 대소문자를 보존해 돌려줍니다.** 두 번역 테이블의 `language_code`가
+`CHECK (... IN ('en','ja','zh-TW','vi'))`로 이 표기를 저장하기 때문입니다.
+
+다만 **이것이 "어떤 언어로 요청해도 한국어가 나온다"의 원인은 아니었습니다.** 두 번역
+테이블의 collation이 `utf8mb4_0900_ai_ci`(대소문자 구분 없음)라 `language_code = 'zh-tw'`도
+저장된 `zh-TW`에 그대로 걸립니다. 실제 원인은 조회 SQL에 **번역 조인 자체가 없던 것**이며,
+`zh-TW`만 다르게 깨지고 있던 것이 아닙니다(#531).
+
+증상은 네 언어가 같았지만 **원인은 하나가 아닙니다.** 조인을 넣으면 번역이 쌓여 있는
+언어는 곧바로 그 언어로 나가고, 번역이 없는 언어는 설계대로 한국어로 폴백합니다. 후자는
+백엔드 결함이 아니라 적재 범위입니다(위 [새 로케일을 추가하는 순서](#새-로케일을-추가하는-순서)).
+
+표기를 보존하는 이유는 방어입니다 — collation을 `_bin`이나 `_as_cs`로 바꾸거나 언어 코드를
+애플리케이션에서 비교하는 코드가 생기는 순간, 소문자 값은 그때 조용히 어긋납니다. 통합
+테스트가 "지금은 두 표기가 같은 결과를 낸다"는 사실을 고정해 두어 collation이 바뀌면 거기서
+먼저 깨집니다.
+
+지원하지 않는 값을 조용히 받아 주지 않는 이유도 같습니다. 번역이 없는 언어로 조인하면
+한국어가 나가는데, 사용자에게는 "번역이 아직 없다"와 "언어 코드를 잘못 보냈다"가 똑같아
+보입니다. **한국어는 서비스 로케일이 아니므로 `ko`도 거절합니다.**
+
+### 새 로케일을 추가하는 순서
+
+목록 밖의 값이 400이므로 **순서를 지키지 않으면 Explore 화면 전체가 죽습니다.** 프론트에
+로케일을 먼저 넣으면 그 언어를 고른 사용자의 목록·상세가 통째로 400을 받습니다. 폴백이었다면
+영어로 보이고 끝났을 상황이라, 이 순서가 계약의 일부입니다.
+
+1. 번역 테이블의 `CHECK (language_code IN ...)` 제약을 넓히는 마이그레이션을 배포합니다.
+2. `ExploreLanguagePolicy.normalize`의 허용 목록(조회)에 값을 추가합니다.
+3. `IngestServiceImpl.LANGUAGES`의 허용 목록(적재)에도 값을 추가합니다. **이 목록은 조회
+   쪽과 별개이며**, 여기 없는 언어는 번역 배치가 통째로 거절됩니다. 빠뜨리면 조회는 되는데
+   그 언어의 번역이 영영 쌓이지 않고, 사용자에게는 "번역이 아직 안 붙었다"와 구별되지
+   않습니다.
+4. 2·3을 배포한 뒤에 프론트 `shared/i18n/locales.ts`의 `SUPPORTED_LOCALES`에 넣습니다.
+
+**허용 목록이 세 벌**(DB `CHECK`·조회·적재)이라는 점에 주의하세요. 하나만 늘리면 어느
+쪽이든 조용히 어긋납니다.
+
+적재 파이프라인이 그 언어의 번역을 채우는 것은 별개이며, 채워지기 전까지는 한국어로
+폴백합니다. **허용 목록에 있다는 것이 번역이 존재한다는 뜻은 아닙니다.** 어떤 언어의 번역이
+실제로 쌓여 있는지는 파이프라인 쪽 범위이며, 현재 상태는
+[NA-WA-crawler#1](https://github.com/T-ravelers/NA-WA-crawler/issues/1)에서 추적합니다.
+
+키워드 검색은 **화면에 보이는 값과 한국어 원문을 함께** 훑습니다. 번역 제목이 보이는데 그
+제목으로 검색되지 않으면 목록이 고장 난 것으로 보이고, 원문 조건을 빼면 한국어로 찾던
+경로가 죽습니다. 목록과 개수 쿼리가 같은 조건을 보므로 `totalElements`도 어긋나지 않습니다.
+
+번역 테이블에 컬럼이 없는 필드(Event의 `subtitle`·`program_text`)는 아직 한국어가 그대로
+나갑니다.
+
+### 번역 컬럼과 응답 필드의 대응
+
+이름이 같지 않은 두 쌍이 있습니다. 번역 테이블에 대응 컬럼이 없어 가장 가까운 것을 씁니다.
+
+| 응답 필드 | 원문 컬럼 | 번역 컬럼 |
+| --- | --- | --- |
+| `venueName` | `event.venue_name` | `event_translations.venue_detail` |
+| `addressRoad` | `event.address_road` | `event_translations.address_display` |
+
+**이름은 다르지만 원문과 번역이 같은 필드를 가리킵니다.** 크롤러(`NA-WA-crawler`)의 발행
+함수에서 확인했습니다.
+
+| 우리 컬럼 | 크롤러 원천 |
+| --- | --- |
+| `event.venue_name` | `publish_delta_events`의 `'venueName', e.venue_detail` |
+| `event_translations.venue_detail` | 같은 `venue_detail`의 번역(`event_translation.venue_detail`) |
+| `event.address_road` | `publish_delta_events`의 `'addressRoad', e.address` |
+| `event_translations.address_display` | `event_translation.address_display ← event.address_en` |
+
+이름이 어긋난 것은 크롤러 쪽 컬럼명을 번역 테이블이 그대로 가져왔기 때문입니다. **확인된
+것은 대응의 일관성까지입니다** — 원문 `venueName`과 번역 `venueDetail`이 같은 값에서 나오므로
+둘을 짝지어도 서로 다른 필드가 섞이지 않습니다.
+
+`venue_detail`이 담는 내용 자체는 한 가지로 단정하지 마세요. 크롤러가 상세주소와 장소명을
+줄바꿈으로 합쳐 만드는 경우가 있습니다(`concat_ws(E'\n', address_detail, venue_text)`).
+원문과 번역이 같은 모양이므로 표시 계약에는 영향이 없습니다.
+
+Place 쪽 `opening_hours`·`closed_days`는 **감싸는 모양이 서로 다릅니다.** 원문이 각각
+OBJECT와 ARRAY이고 프론트가 그 모양에 맞춰 다르게 읽기 때문입니다. 번역값은
+`opening_hours_text` → `{"raw": "..."}`, `closed_days_text` → `["..."]`로 감쌉니다.
+휴무일을 객체로 감싸면 화면에 `raw: ...`가 그대로 찍힙니다 — 영업시간과 달리 휴무일에는
+합성 키를 지우는 처리가 프론트에 없습니다.
 
 ### 필터 결합
 
@@ -128,7 +226,7 @@ Sector와 Activity는 `operational_v9`의 기준을 사용합니다. Sector는 `
 | `hasRestroom` | boolean | 화장실이 있는 Place만 조회합니다. |
 | `savedOnly` | boolean | 인증한 회원이 저장한 Place만 조회합니다. |
 | `sort` | `LATEST` 또는 `POPULAR` | 최신순 또는 인기순으로 정렬합니다. |
-| `language` | 문자열 | Activity·Sector 이름 언어입니다. `en`은 영문, 그 외에는 한글입니다. |
+| `language` | `en`, `ja`, `zh-TW`, `vi` | 표시 문자열의 언어입니다. 위 [표시 언어](#표시-언어)를 따릅니다. Activity·Sector 라벨만 `en`일 때 영문, 그 외에는 한글입니다 — 이 두 기준표는 아직 다국어 라벨이 없습니다. |
 | `page` | 0 이상의 정수 | 0부터 시작하며 잘못된 음수는 0으로 보정합니다. |
 | `size` | 양의 정수 | 기본값은 20, 최댓값은 100입니다. |
 

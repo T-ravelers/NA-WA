@@ -59,6 +59,61 @@
         </choose>
     </sql>
 
+    <!--
+        번역값 우선, 없으면 한국어 원문. EventMapper의 같은 조각과 규칙이 같다.
+
+        빈 문자열까지 폴백에 태우는 것은 파이프라인이 번역하지 못한 필드를 NULL이 아니라 빈
+        값으로 채워 넣는 경우가 있어서다. 그대로 쓰면 화면에 빈칸이 나간다.
+    -->
+    <sql id="placeTranslationJoin">
+        LEFT JOIN place_translations pt
+                  ON pt.place_id = p.place_id
+                      AND pt.language_code = #{language}
+                      AND pt.deleted_at IS NULL
+    </sql>
+
+    <!-- 목록·개수는 언어가 request 안에 있어 경로가 다르다. EventMapper와 같은 이유로 중복해 둔다. -->
+    <sql id="placeListTranslationJoin">
+        LEFT JOIN place_translations pt
+                  ON pt.place_id = p.place_id
+                      AND pt.language_code = #{request.language}
+                      AND pt.deleted_at IS NULL
+    </sql>
+
+    <!--
+        번역 쪽 영업시간·휴무일은 TEXT인데 응답 DTO는 JSON이다. 그대로 COALESCE하면
+        JsonNodeTypeHandler가 파싱에 실패해 TypeException을 던지므로 감싸야 한다.
+
+        **두 컬럼의 감싸는 모양이 다르다.** 원문의 JSON 모양이 서로 다르고, 프론트가 그
+        모양에 맞춰 다르게 읽기 때문이다. 맞추지 않으면 번역이 붙는 순간에만 화면이 깨진다.
+    -->
+
+    <!--
+        원문이 OBJECT다(운영 1,490행 전부). 프론트는 `raw`·`hours`를 크롤러가 붙인 키로 보고
+        라벨에서 지우므로(PlaceDetailView.SYNTHETIC_HOURS_LABELS) 이 모양이 그대로 맞다.
+    -->
+    <sql id="placeTranslatedOpeningHours">
+        CASE
+            WHEN NULLIF(TRIM(pt.opening_hours_text), '') IS NOT NULL
+                THEN JSON_OBJECT('raw', pt.opening_hours_text)
+            ELSE p.opening_hours
+        END AS opening_hours
+    </sql>
+
+    <!--
+        원문이 ARRAY다(운영 2,211행 전부). 여기서 OBJECT로 감싸면 프론트 toClosedDays가
+        객체 갈래를 타서 화면에 **`raw: ...`가 그대로 찍힌다** — openingHours와 달리
+        closedDays에는 합성 키를 지우는 처리가 없다. 배열로 감싸면 기존 배열 갈래를 타서
+        `<br>` 분리까지 원문과 같아진다.
+    -->
+    <sql id="placeTranslatedClosedDays">
+        CASE
+            WHEN NULLIF(TRIM(pt.closed_days_text), '') IS NOT NULL
+                THEN JSON_ARRAY(pt.closed_days_text)
+            ELSE p.closed_days
+        END AS closed_days
+    </sql>
+
     <sql id="placeListWhere">
         ei.item_type = 'PLACE'
         AND ei.approval_status = 'APPROVED'
@@ -118,12 +173,24 @@
             <foreach collection="request.region3" item="value"
                      open="(" separator="," close=")">#{value}</foreach>
         </if>
+        <!--
+            EventMapper와 같은 이유로 번역값과 원문을 모두 훑는다. 번역 이름이 보이는데 그
+            이름으로는 검색되지 않으면 사용자는 목록이 고장 났다고 읽는다. 표시값처럼
+            COALESCE로 감싸지 않는 이유도 같다 — 폴백 갈래를 뒤의 원문 조건이 이미 덮는다.
+        -->
         <if test="request.keyword != null and request.keyword != ''">
             AND (
-                p.name LIKE CONCAT('%', #{request.keyword}, '%')
+                NULLIF(TRIM(pt.name), '') LIKE CONCAT('%', #{request.keyword}, '%')
+                OR p.name LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt.brand), '') LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.brand LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt.branch), '') LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.branch LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt.address_display), '')
+                    LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.address_road LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt.address_detail), '')
+                    LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.address_detail LIKE CONCAT('%', #{request.keyword}, '%')
             )
         </if>
@@ -182,16 +249,23 @@
     <select id="searchPlaces" resultMap="placeSummaryResultMap">
         SELECT
             p.place_id AS item_id,
-            p.name, p.brand, p.branch, p.place_kind, p.thumbnail_url,
-            p.image_urls, p.region1, p.region2, p.region3, p.address_road,
-            p.address_detail, p.latitude, p.longitude, p.has_foreign_lang,
+            COALESCE(NULLIF(TRIM(pt.name), ''), p.name) AS name,
+            COALESCE(NULLIF(TRIM(pt.brand), ''), p.brand) AS brand,
+            COALESCE(NULLIF(TRIM(pt.branch), ''), p.branch) AS branch,
+            p.place_kind, p.thumbnail_url,
+            p.image_urls, p.region1, p.region2, p.region3,
+            COALESCE(NULLIF(TRIM(pt.address_display), ''), p.address_road) AS address_road,
+            COALESCE(NULLIF(TRIM(pt.address_detail), ''), p.address_detail) AS address_detail,
+            p.latitude, p.longitude, p.has_foreign_lang,
             p.has_parking, p.reservable, p.takeout_available,
             p.card_payment_available, p.smoke_free, p.kid_facility,
             p.has_restroom, p.is_active, p.view_count, p.favorite_count,
-            p.opening_hours, p.closed_days,
+            <include refid="placeTranslatedOpeningHours"/>,
+            <include refid="placeTranslatedClosedDays"/>,
             <include refid="savedColumn"/>
         FROM explore_items ei
         JOIN place p ON p.place_id = ei.item_id
+        <include refid="placeListTranslationJoin"/>
         WHERE <include refid="placeListWhere"/>
         <choose>
             <when test="request.sort == 'POPULAR'">
@@ -206,20 +280,34 @@
         </if>
     </select>
 
+    <!--
+        placeListWhere가 키워드 검색에서 pt를 보므로 여기에도 같은 조인이 있어야 한다.
+        빠뜨리면 목록과 개수가 다른 조건으로 갈려 페이지네이션이 어긋난다. 조인은
+        PK(place_id, language_code) 기준 최대 한 행이라 COUNT(*)를 부풀리지 않는다.
+    -->
     <select id="countPlaces" resultType="long">
         SELECT COUNT(*)
         FROM explore_items ei
         JOIN place p ON p.place_id = ei.item_id
+        <include refid="placeListTranslationJoin"/>
         WHERE <include refid="placeListWhere"/>
     </select>
 
     <select id="findPlaceDetail" resultMap="placeDetailResultMap">
         SELECT
-            p.place_id, p.place_id AS item_id, p.name, p.brand, p.branch,
+            p.place_id, p.place_id AS item_id,
+            COALESCE(NULLIF(TRIM(pt.name), ''), p.name) AS name,
+            COALESCE(NULLIF(TRIM(pt.brand), ''), p.brand) AS brand,
+            COALESCE(NULLIF(TRIM(pt.branch), ''), p.branch) AS branch,
             p.place_kind, p.thumbnail_url, p.image_urls, p.source_url,
-            p.region1, p.region2, p.region3, p.address_road,
-            p.address_detail, p.postal_code, p.latitude, p.longitude,
-            p.opening_hours, p.closed_days, p.menu_summary, p.tel,
+            p.region1, p.region2, p.region3,
+            COALESCE(NULLIF(TRIM(pt.address_display), ''), p.address_road) AS address_road,
+            COALESCE(NULLIF(TRIM(pt.address_detail), ''), p.address_detail) AS address_detail,
+            p.postal_code, p.latitude, p.longitude,
+            <include refid="placeTranslatedOpeningHours"/>,
+            <include refid="placeTranslatedClosedDays"/>,
+            COALESCE(NULLIF(TRIM(pt.menu_summary), ''), p.menu_summary) AS menu_summary,
+            p.tel,
             p.has_foreign_lang, p.has_parking, p.reservable,
             p.takeout_available, p.card_payment_available, p.smoke_free,
             p.kid_facility, p.has_restroom, p.is_active,
@@ -227,6 +315,7 @@
             <include refid="savedColumn"/>
         FROM explore_items ei
         JOIN place p ON p.place_id = ei.item_id
+        <include refid="placeTranslationJoin"/>
         WHERE ei.item_type = 'PLACE'
           AND ei.item_id = #{placeId}
           AND ei.approval_status = 'APPROVED'

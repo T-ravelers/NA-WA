@@ -12,6 +12,7 @@ import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.mapping.ParameterMapping;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Test;
 
@@ -178,6 +179,126 @@ class PlaceMapperXmlTest {
         assertTrue(sql.contains("OR p.region2 IS NULL"));
         assertTrue(sql.contains("OR p.region2 NOT IN"));
         assertTrue(sql.contains("p.has_parking = TRUE"));
+    }
+
+    /**
+     * 목록·개수·상세가 모두 번역 테이블을 조인해야 한다.
+     *
+     * <p>이 조인이 없어서 어떤 언어로 요청해도 한국어 원문만 나갔다(#531). LEFT JOIN이라
+     * 빠져 있어도 쿼리는 성공하고 오류도 남지 않아 조용히 회귀한다.
+     */
+    @Test
+    void placeStatements_joinTranslationsForRequestedLanguage() throws Exception {
+        Configuration configuration = configuration();
+
+        Map<String, Object> listParameters = new HashMap<>();
+        listParameters.put("request", new PlaceSearchRequest());
+        listParameters.put("offset", 0);
+        listParameters.put("limit", 20);
+
+        for (String statementId : List.of(
+            "searchPlaces",
+            "countPlaces"
+        )) {
+            String sql = normalizedSql(configuration, statementId, listParameters);
+
+            assertTrue(
+                sql.contains("LEFT JOIN place_translations pt"),
+                statementId + "가 번역 테이블을 조인하지 않는다"
+            );
+            assertTrue(sql.contains("pt.deleted_at IS NULL"));
+            assertTrue(
+                boundProperties(configuration, statementId, listParameters)
+                    .contains("request.language"),
+                statementId + "가 request.language를 바인딩하지 않는다"
+            );
+        }
+
+        Map<String, Object> detailParameters = Map.of(
+            "placeId", 1L, "language", "zh-TW"
+        );
+        String detailSql = normalizedSql(configuration, "findPlaceDetail", detailParameters);
+        assertTrue(detailSql.contains("LEFT JOIN place_translations pt"));
+        assertTrue(
+            boundProperties(configuration, "findPlaceDetail", detailParameters)
+                .contains("language")
+        );
+    }
+
+    /** 번역이 없거나 빈 문자열이면 한국어 원문으로 돌아가야 한다. */
+    @Test
+    void placeStatements_fallBackToKoreanColumns() throws Exception {
+        Configuration configuration = configuration();
+
+        String detailSql = normalizedSql(
+            configuration, "findPlaceDetail", Map.of("placeId", 1L, "language", "en")
+        );
+
+        assertTrue(detailSql.contains(
+            "COALESCE(NULLIF(TRIM(pt.name), ''), p.name) AS name"
+        ));
+        assertTrue(detailSql.contains(
+            "COALESCE(NULLIF(TRIM(pt.address_display), ''), p.address_road) AS address_road"
+        ));
+        assertTrue(detailSql.contains(
+            "COALESCE(NULLIF(TRIM(pt.menu_summary), ''), p.menu_summary) AS menu_summary"
+        ));
+        /*
+         * 번역 쪽 영업시간·휴무일은 TEXT고 응답 DTO는 JSON이다. 그냥 COALESCE하면
+         * JsonNodeTypeHandler가 파싱에 실패해 상세 API가 통째로 500이 된다.
+         *
+         * 감싸는 모양이 서로 다른 것이 핵심이다. 원문이 각각 OBJECT와 ARRAY이고 프론트가
+         * 그 모양에 맞춰 다르게 읽는다. 휴무일을 객체로 감싸면 toClosedDays가 객체 갈래를
+         * 타서 화면에 `raw: ...`가 그대로 찍힌다 — openingHours와 달리 closedDays에는
+         * 합성 키를 지우는 처리가 없다(#531 리뷰).
+         */
+        assertTrue(detailSql.contains("JSON_OBJECT('raw', pt.opening_hours_text)"));
+        assertTrue(
+            detailSql.contains("JSON_ARRAY(pt.closed_days_text)"),
+            "휴무일 번역은 배열로 감싸야 프론트가 raw 키를 화면에 찍지 않는다"
+        );
+        assertFalse(
+            detailSql.contains("JSON_OBJECT('raw', pt.closed_days_text)"),
+            "휴무일을 객체로 감싸면 화면에 `raw: ...`가 나간다"
+        );
+    }
+
+    /** 화면에 번역 이름이 보이는데 그 이름으로는 검색되지 않는 상태를 막는다. */
+    @Test
+    void keywordSearch_matchesTranslatedNameAndKoreanOriginal() throws Exception {
+        Configuration configuration = configuration();
+
+        PlaceSearchRequest request = new PlaceSearchRequest();
+        request.setKeyword("Coffee");
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+        parameters.put("offset", 0);
+        parameters.put("limit", 20);
+
+        String listSql = normalizedSql(configuration, "searchPlaces", parameters);
+        String countSql = normalizedSql(configuration, "countPlaces", parameters);
+
+        // 표시값과 달리 COALESCE로 감싸지 않는다 — 폴백 갈래를 원문 조건이 덮는다(#531 리뷰).
+        assertTrue(listSql.contains("NULLIF(TRIM(pt.name), '') LIKE"));
+        assertTrue(listSql.contains("p.name LIKE"));
+        // 목록과 개수가 다른 조건을 보면 totalElements가 어긋나 페이지네이션이 틀어진다.
+        assertTrue(countSql.contains("NULLIF(TRIM(pt.name), '') LIKE"));
+        assertTrue(countSql.contains("LEFT JOIN place_translations pt"));
+    }
+
+    private static List<String> boundProperties(
+        Configuration configuration,
+        String statementName,
+        Map<String, Object> parameters
+    ) {
+        return configuration
+            .getMappedStatement("me.nawa.explore.mapper.PlaceMapper." + statementName)
+            .getBoundSql(parameters)
+            .getParameterMappings()
+            .stream()
+            .map(ParameterMapping::getProperty)
+            .toList();
     }
 
     private Configuration configuration() throws Exception {
