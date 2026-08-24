@@ -182,19 +182,37 @@ const selectableDateRange = computed(() => {
   )
 })
 
-// 겹치는 날이 없으면 달력에 고를 날이 하나도 없다. 이유 없이 빈 달력을 보여 주지 않고
-// 여정 목록에 그대로 두어 다른 여정을 고르게 한다.
-const dateSheetErrorMessage = computed(
-  () =>
-    dateCheckError.value ?? (selectableDateRange.value === null ? outsideItemPeriod() : undefined),
-)
-
 function outsideItemPeriod(): string {
   return t('appointment.journeySelect.outsideItemPeriod')
 }
 
+/**
+ * 겹치는 날이 없는 것으로 드러나면 날짜 시트에서 목록으로 되돌린다.
+ *
+ * 시트를 열어 둔 채 이유만 붙이면 안 된다 — 범위가 없을 때 달력이 여정 기간으로
+ * 되돌아가 9월 날짜까지 열어 주므로, 사용자는 폼을 다 채운 뒤에야 `JOURNEY-012`를
+ * 받는다.
+ *
+ * 여기서 잡는 것은 **항목 상세가 늦게 도착한 경우**뿐이다. 고르는 순간 이미 알 수
+ * 있으면 selectJourney가 애초에 시트를 열지 않는다. 그 경로는 값이 `null`에서
+ * `null`로 가 이 watcher가 깨어나지 않으므로, 둘 중 하나만 둘 수 없다.
+ */
+watch(selectableDateRange, (range) => {
+  if (range !== null) return
+  if (phase.value !== 'journeyDate' && !dateConflictRetryOpen.value) return
+
+  dateConflictRetryOpen.value = false
+  phase.value = 'journeySelect'
+  selectedTripId.value = null
+  journeySelectionError.value = outsideItemPeriod()
+})
+
 // 여정 생성 화면에서 이 화면으로 돌아온 경우(?tripId=…), 새로 만든 여정이 목록에
 // 보이는 즉시 그 여정을 선택한 채로 날짜 선택 시트로 바로 이어간다.
+//
+// 상태를 직접 바꾸지 않고 selectJourney를 거친다 — 직접 바꾸면 목록에서 고를 때만
+// 하던 기간 교집합 검사를 이 경로가 통째로 건너뛴다. 방금 만든 여정이 이벤트 기간과
+// 겹치지 않는 일은 오히려 여기서 더 잘 일어난다(사용자가 이 흐름 밖에서 날짜를 정했다).
 watch(
   () => [route.query.tripId, journeyListQuery.data.value] as const,
   ([tripIdParam, journeys]) => {
@@ -204,8 +222,7 @@ watch(
     if (parsed === undefined || journeys === undefined) return
     if (!journeys.some((journey) => journey.tripId === parsed)) return
 
-    selectedTripId.value = parsed
-    phase.value = 'journeyDate'
+    selectJourney(parsed)
   },
   { immediate: true },
 )
@@ -502,7 +519,7 @@ function confirmExit(): void {
       :end-date="selectableDateRange?.end ?? selectedJourney.endDate"
       :initial-date="selectedVisitDate"
       :loading="dateCheckPending"
-      :error-message="dateSheetErrorMessage"
+      :error-message="dateCheckError"
       @close="closeJourneyDate"
       @confirm="confirmDate"
     />
@@ -514,7 +531,7 @@ function confirmExit(): void {
       :end-date="selectableDateRange?.end ?? selectedJourney.endDate"
       :initial-date="selectedVisitDate"
       :loading="dateCheckPending"
-      :error-message="dateSheetErrorMessage"
+      :error-message="dateCheckError"
       @close="closeDateConflictRetry"
       @confirm="retryDate"
     />

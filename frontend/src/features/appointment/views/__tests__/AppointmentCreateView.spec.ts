@@ -203,6 +203,84 @@ describe('AppointmentCreateView', () => {
     ).toBeDefined()
   })
 
+  // 여정을 새로 만들고 ?tripId=…로 돌아오는 경로다. 목록에서 고를 때만 기간을 보면
+  // 이 경로가 검사를 통째로 건너뛰어, 달력이 여정 기간으로 되돌아가 기간 밖 날짜까지
+  // 열어 준다. 사용자는 폼을 다 채운 뒤에야 JOURNEY-012를 받는다.
+  it('runs the run-date check on the journey it returns to after creating one', async () => {
+    const { wrapper } = await mountView('?itemId=42&itemType=EVENT&tripId=7', {
+      startDate: '2026-09-10',
+      endDate: '2026-09-20',
+    })
+
+    expect(wrapper.text()).toContain(
+      'This journey has no day within this event’s dates. Choose another one.',
+    )
+    expect(wrapper.text()).toContain('Choose a journey')
+    expect(wrapper.text()).not.toContain('Which day?')
+  })
+
+  // 항목 상세가 날짜 시트를 연 뒤에 도착한 경우다. 시트를 열어 둔 채 이유만 붙이면
+  // 달력이 여정 기간으로 되돌아가 기간 밖 날짜가 열린 채로 남는다.
+  it('returns to the journey list when the run dates arrive after the date sheet opened', async () => {
+    const itemDetail = ref<{
+      placeName: string | null
+      addressRoad: string | null
+      startDate: string | null
+      endDate: string | null
+    }>()
+    const router = createTestRouter()
+    await router.push('/appointments/new?itemId=42&itemType=EVENT')
+    await router.isReady()
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const vueQuery: [typeof VueQueryPlugin, { queryClient: QueryClient }] = [
+      VueQueryPlugin,
+      { queryClient },
+    ]
+    const wrapper = mount(AppointmentCreateView, {
+      global: {
+        plugins: [i18n, router, vueQuery],
+        provide: {
+          [appointmentJourneyIntegrationKey as symbol]: {
+            useJourneyListQuery: () => ({
+              data: ref(journeys),
+              isPending: ref(false),
+              isError: ref(false),
+            }),
+            checkAppointmentSlotTaken,
+          },
+          [appointmentExploreIntegrationKey as symbol]: {
+            useItemDetail: () => ({
+              data: itemDetail,
+              isLoading: ref(true),
+              isError: ref(false),
+            }),
+          },
+        },
+      },
+    })
+    await flushPromises()
+
+    // 기간을 모르는 동안에는 막지 않는다 — 날짜 시트가 열린다.
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Which day?')
+
+    // 뒤늦게 도착한 기간이 여정과 겹치지 않는다.
+    itemDetail.value = {
+      placeName: 'DDP Design Plaza',
+      addressRoad: '281 Eulji-ro, Jung-gu',
+      startDate: '2026-09-10',
+      endDate: '2026-09-20',
+    }
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Which day?')
+    expect(wrapper.text()).toContain(
+      'This journey has no day within this event’s dates. Choose another one.',
+    )
+  })
+
   // 겹치는 날이 하루도 없으면 날짜 시트로 보내 봐야 고를 날이 없다. 목록에 그대로
   // 두고 이유만 알려, 다른 여정을 바로 고를 수 있게 한다.
   it('keeps the journey list open when no day overlaps the event’s run dates', async () => {
