@@ -16,6 +16,8 @@ describe('getAvatarInitial', () => {
     ['🌙 Mina', '🌙'],
     ['🇰🇷 Mina', '🇰🇷'],
     ['👩‍💻 Mina', '👩‍💻'],
+    ['ßeta', 'S'],
+    ['ﬃona', 'F'],
   ])('returns one avatar grapheme for %s', (displayName, expected) => {
     expect(getAvatarInitial(displayName)).toBe(expected)
   })
@@ -25,5 +27,6 @@ describe('getAvatarInitial', () => {
     const { getAvatarInitial: getFallbackInitial } = await import('./avatarInitial')
 
     expect(getFallbackInitial('🌙 Mina')).toBe('🌙')
+    expect(getFallbackInitial('ßeta')).toBe('S')
   })
 })
