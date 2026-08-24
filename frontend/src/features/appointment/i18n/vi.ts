@@ -128,6 +128,8 @@ export default {
       emptyForJoin: 'Hãy tạo hành trình trước khi tham gia cuộc hẹn này.',
       createJourney: 'Tạo hành trình',
       dateOutOfRange: 'Hành trình này không bao gồm ngày của cuộc hẹn. Hãy chọn hành trình khác.',
+      outsideItemPeriod:
+        'Hành trình này không có ngày nào nằm trong thời gian diễn ra sự kiện. Hãy chọn hành trình khác.',
     },
     journeyDate: {
       close: 'Đóng bộ chọn ngày',

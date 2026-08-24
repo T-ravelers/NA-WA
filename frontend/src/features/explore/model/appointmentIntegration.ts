@@ -9,12 +9,12 @@ import { fetchEventDetail, fetchPlaceDetail } from '../api/exploreApi'
  * Event는 공연장 이름(`venueName`)이, Place는 상호명(`name`)이 사람이 찾아갈 이름이다.
  * 둘 다 없으면 도로명 주소를 대신 쓴다 — 이름 없는 장소보다는 주소가 낫다.
  */
-export function useExploreItemLocationQuery(
+export function useExploreItemDetailQuery(
   itemId: MaybeRefOrGetter<number | null>,
   itemType: MaybeRefOrGetter<'EVENT' | 'PLACE' | null>,
 ) {
   return useQuery({
-    queryKey: computed(() => ['explore', 'itemLocation', toValue(itemType), toValue(itemId)]),
+    queryKey: computed(() => ['explore', 'itemDetail', toValue(itemType), toValue(itemId)]),
     queryFn: async () => {
       const id = toValue(itemId)
       const type = toValue(itemType)
@@ -22,11 +22,22 @@ export function useExploreItemLocationQuery(
 
       if (type === 'EVENT') {
         const event = await fetchEventDetail(id)
-        return { placeName: event.venueName ?? event.addressRoad, addressRoad: event.addressRoad }
+        return {
+          placeName: event.venueName ?? event.addressRoad,
+          addressRoad: event.addressRoad,
+          startDate: event.startDate,
+          endDate: event.endDate,
+        }
       }
 
+      // Place는 운영 기간이 없다. 서버도 PLACE에는 기간 검사를 걸지 않는다.
       const place = await fetchPlaceDetail(id)
-      return { placeName: place.name ?? place.addressRoad, addressRoad: place.addressRoad }
+      return {
+        placeName: place.name ?? place.addressRoad,
+        addressRoad: place.addressRoad,
+        startDate: null,
+        endDate: null,
+      }
     },
     enabled: computed(() => toValue(itemId) !== null && toValue(itemType) !== null),
     staleTime: 5 * 60_000,

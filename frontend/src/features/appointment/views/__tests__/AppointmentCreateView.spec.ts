@@ -11,7 +11,7 @@ import { appointmentExploreIntegrationKey } from '@/features/appointment/model/e
 import { appointmentJourneyIntegrationKey } from '../../model/journeyIntegration'
 
 const createAppointment = vi.fn()
-const checkJourneyItemExists = vi.fn()
+const checkAppointmentSlotTaken = vi.fn()
 
 vi.mock('../../api/appointmentApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/appointmentApi')>()),
@@ -68,7 +68,13 @@ function createTestRouter() {
   })
 }
 
-function globalOptions(router: ReturnType<typeof createTestRouter>) {
+function globalOptions(
+  router: ReturnType<typeof createTestRouter>,
+  itemPeriod: { startDate: string | null; endDate: string | null } = {
+    startDate: null,
+    endDate: null,
+  },
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   // 튜플로 못박는다. 인라인이 아니면 [플러그인, 옵션]이 그냥 배열로 추론돼 어긋난다.
   const vueQuery: [typeof VueQueryPlugin, { queryClient: QueryClient }] = [
@@ -84,11 +90,15 @@ function globalOptions(router: ReturnType<typeof createTestRouter>) {
           isPending: ref(false),
           isError: ref(false),
         }),
-        checkJourneyItemExists,
+        checkAppointmentSlotTaken,
       },
       [appointmentExploreIntegrationKey as symbol]: {
-        useItemLocation: () => ({
-          data: ref({ placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' }),
+        useItemDetail: () => ({
+          data: ref({
+            placeName: 'DDP Design Plaza',
+            addressRoad: '281 Eulji-ro, Jung-gu',
+            ...itemPeriod,
+          }),
           isLoading: ref(false),
           isError: ref(false),
         }),
@@ -97,12 +107,17 @@ function globalOptions(router: ReturnType<typeof createTestRouter>) {
   }
 }
 
-async function mountView(query = '?itemId=42&itemType=EVENT') {
+async function mountView(
+  query = '?itemId=42&itemType=EVENT',
+  itemPeriod?: { startDate: string | null; endDate: string | null },
+) {
   const router = createTestRouter()
   await router.push(`/appointments/new${query}`)
   await router.isReady()
 
-  const wrapper = mount(AppointmentCreateView, { global: globalOptions(router) })
+  const wrapper = mount(AppointmentCreateView, {
+    global: globalOptions(router, itemPeriod),
+  })
   await flushPromises()
   return { wrapper, router }
 }
@@ -145,8 +160,8 @@ async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> 
 describe('AppointmentCreateView', () => {
   beforeEach(() => {
     createAppointment.mockReset()
-    checkJourneyItemExists.mockReset()
-    checkJourneyItemExists.mockResolvedValue(false)
+    checkAppointmentSlotTaken.mockReset()
+    checkAppointmentSlotTaken.mockResolvedValue(false)
     sessionStorage.clear()
   })
 
@@ -167,12 +182,125 @@ describe('AppointmentCreateView', () => {
     await buttonByText(wrapper, 'Continue with').trigger('click')
     await flushPromises()
 
-    expect(checkJourneyItemExists).toHaveBeenCalledWith(7, 42, expect.any(String))
+    expect(checkAppointmentSlotTaken).toHaveBeenCalledWith(7, 42, expect.any(String))
     expect(wrapper.text()).toContain('Start with your appointment details')
   })
 
-  it('shows an error and keeps the date sheet open when the combination already exists', async () => {
-    checkJourneyItemExists.mockResolvedValueOnce(true)
+  // 서버가 JOURNEY-012로 막는 날짜다. 달력이 여정 기간만 보고 열어 주면 사용자는
+  // 폼을 다 채우고 제출한 뒤에야 실패를 알게 된다.
+  it('closes dates that fall outside the event’s run dates', async () => {
+    const { wrapper } = await mountView('?itemId=42&itemType=EVENT', {
+      startDate: '2026-08-01',
+      endDate: '2026-08-25',
+    })
+
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    await flushPromises()
+
+    // 8/31은 여정 기간(8/1~8/31) 안이지만 이벤트 기간(8/1~8/25) 밖이다.
+    expect(
+      wrapper.get('button[aria-label="Select August 31, 2026"]').attributes('disabled'),
+    ).toBeDefined()
+  })
+
+  // 여정을 새로 만들고 ?tripId=…로 돌아오는 경로다. 목록에서 고를 때만 기간을 보면
+  // 이 경로가 검사를 통째로 건너뛰어, 달력이 여정 기간으로 되돌아가 기간 밖 날짜까지
+  // 열어 준다. 사용자는 폼을 다 채운 뒤에야 JOURNEY-012를 받는다.
+  it('runs the run-date check on the journey it returns to after creating one', async () => {
+    const { wrapper } = await mountView('?itemId=42&itemType=EVENT&tripId=7', {
+      startDate: '2026-09-10',
+      endDate: '2026-09-20',
+    })
+
+    expect(wrapper.text()).toContain(
+      'This journey has no day within this event’s dates. Choose another one.',
+    )
+    expect(wrapper.text()).toContain('Choose a journey')
+    expect(wrapper.text()).not.toContain('Which day?')
+  })
+
+  // 항목 상세가 날짜 시트를 연 뒤에 도착한 경우다. 시트를 열어 둔 채 이유만 붙이면
+  // 달력이 여정 기간으로 되돌아가 기간 밖 날짜가 열린 채로 남는다.
+  it('returns to the journey list when the run dates arrive after the date sheet opened', async () => {
+    const itemDetail = ref<{
+      placeName: string | null
+      addressRoad: string | null
+      startDate: string | null
+      endDate: string | null
+    }>()
+    const router = createTestRouter()
+    await router.push('/appointments/new?itemId=42&itemType=EVENT')
+    await router.isReady()
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const vueQuery: [typeof VueQueryPlugin, { queryClient: QueryClient }] = [
+      VueQueryPlugin,
+      { queryClient },
+    ]
+    const wrapper = mount(AppointmentCreateView, {
+      global: {
+        plugins: [i18n, router, vueQuery],
+        provide: {
+          [appointmentJourneyIntegrationKey as symbol]: {
+            useJourneyListQuery: () => ({
+              data: ref(journeys),
+              isPending: ref(false),
+              isError: ref(false),
+            }),
+            checkAppointmentSlotTaken,
+          },
+          [appointmentExploreIntegrationKey as symbol]: {
+            useItemDetail: () => ({
+              data: itemDetail,
+              isLoading: ref(true),
+              isError: ref(false),
+            }),
+          },
+        },
+      },
+    })
+    await flushPromises()
+
+    // 기간을 모르는 동안에는 막지 않는다 — 날짜 시트가 열린다.
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Which day?')
+
+    // 뒤늦게 도착한 기간이 여정과 겹치지 않는다.
+    itemDetail.value = {
+      placeName: 'DDP Design Plaza',
+      addressRoad: '281 Eulji-ro, Jung-gu',
+      startDate: '2026-09-10',
+      endDate: '2026-09-20',
+    }
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Which day?')
+    expect(wrapper.text()).toContain(
+      'This journey has no day within this event’s dates. Choose another one.',
+    )
+  })
+
+  // 겹치는 날이 하루도 없으면 날짜 시트로 보내 봐야 고를 날이 없다. 목록에 그대로
+  // 두고 이유만 알려, 다른 여정을 바로 고를 수 있게 한다.
+  it('keeps the journey list open when no day overlaps the event’s run dates', async () => {
+    const { wrapper } = await mountView('?itemId=42&itemType=EVENT', {
+      startDate: '2026-09-10',
+      endDate: '2026-09-20',
+    })
+
+    await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(
+      'This journey has no day within this event’s dates. Choose another one.',
+    )
+    expect(wrapper.text()).toContain('Choose a journey')
+    expect(wrapper.text()).not.toContain('Which day?')
+  })
+
+  it('shows an error and keeps the date sheet open when another appointment holds the date', async () => {
+    checkAppointmentSlotTaken.mockResolvedValueOnce(true)
     const { wrapper } = await mountView()
 
     await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
@@ -197,7 +325,7 @@ describe('AppointmentCreateView', () => {
 
     expect(wrapper.text()).toContain('Open this form from an Event or Place.')
     expect(wrapper.find('form').exists()).toBe(false)
-    expect(checkJourneyItemExists).not.toHaveBeenCalled()
+    expect(checkAppointmentSlotTaken).not.toHaveBeenCalled()
   })
 
   it('returns to the journey select sheet when the date sheet is closed', async () => {
@@ -245,10 +373,10 @@ describe('AppointmentCreateView', () => {
               isPending: ref(false),
               isError: ref(false),
             }),
-            checkJourneyItemExists,
+            checkAppointmentSlotTaken,
           },
           [appointmentExploreIntegrationKey as symbol]: {
-            useItemLocation: () => ({
+            useItemDetail: () => ({
               data: ref(undefined),
               isLoading: ref(false),
               isError: ref(false),
@@ -304,11 +432,17 @@ describe('AppointmentCreateView', () => {
                 isPending: ref(false),
                 isError: ref(false),
               }),
-              checkJourneyItemExists,
+              checkAppointmentSlotTaken,
             },
             [appointmentExploreIntegrationKey as symbol]: {
-              useItemLocation: () => ({
-                data: ref({ placeName: 'DDP Design Plaza', addressRoad: '281 Eulji-ro, Jung-gu' }),
+              useItemDetail: () => ({
+                data: ref({
+                  placeName: 'DDP Design Plaza',
+                  addressRoad: '281 Eulji-ro, Jung-gu',
+                  // 기간을 두지 않은 항목이다. 달력은 여정 기간 그대로 열린다.
+                  startDate: null,
+                  endDate: null,
+                }),
                 isLoading: ref(false),
                 isError: ref(false),
               }),
@@ -577,7 +711,7 @@ describe('AppointmentCreateView', () => {
     expect(wrapper.text()).toContain('Set your appointment details')
     expect(wrapper.find<HTMLInputElement>('input[type="time"]').element.value).toBe('18:30')
 
-    checkJourneyItemExists.mockResolvedValueOnce(false)
+    checkAppointmentSlotTaken.mockResolvedValueOnce(false)
     await wrapper.get('button[aria-label="Select August 30, 2026"]').trigger('click')
     await buttonByText(wrapper, 'Continue with').trigger('click')
     await flushPromises()

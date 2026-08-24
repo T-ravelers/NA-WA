@@ -32,7 +32,7 @@ import { useExploreItemLikeMutation } from '../composables/useExploreItemLikeMut
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { useExploreJourneyIntegration } from '../model/journeyIntegration'
 import { journeyAddErrorMessageKey } from '../model/journeyAddErrors'
-import { intersectItemJourneyPeriod } from '../model/journeyPeriod'
+import { intersectItemJourneyPeriod } from '@/shared/lib/journeyPeriod'
 import { findExploreRegionLabelKey } from '../model/exploreRegions'
 import { normalizePlaceKind, type PlaceKind } from '../model/placeExplore'
 import { toClosedDays, toDetailEntries } from '../model/placeDetail'

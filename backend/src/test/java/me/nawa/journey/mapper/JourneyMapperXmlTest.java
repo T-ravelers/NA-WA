@@ -58,6 +58,9 @@ class JourneyMapperXmlTest {
             namespace + "findAvailableExploreItemById"
         ));
         assertTrue(configuration.hasStatement(namespace + "existsJourneyItem"));
+        assertTrue(configuration.hasStatement(
+            namespace + "existsAppointmentJourneyItem"
+        ));
         assertTrue(configuration.hasStatement(namespace + "insertJourneyItem"));
         assertTrue(configuration.hasStatement(
             namespace + "findJourneyItemById"
@@ -170,6 +173,26 @@ class JourneyMapperXmlTest {
             .trim();
         assertTrue(duplicateSql.contains("FROM trip_items"));
         assertTrue(duplicateSql.contains("deleted_at IS NULL"));
+        // 여정 담기 중복 검사는 약속 여부를 보지 않는다. 여기에 조건이 붙으면
+        // 담아 둔 장소를 또 담을 수 있게 된다.
+        assertFalse(duplicateSql.contains("appointment_id"));
+
+        // 약속 생성 검사는 반대로 약속이 걸린 자리만 본다. 이 조건이 빠지면 담아만
+        // 둔 자리에서도 약속 생성이 막힌다.
+        MappedStatement appointmentSlotStatement = configuration
+            .getMappedStatement(namespace + "existsAppointmentJourneyItem");
+        String appointmentSlotSql = appointmentSlotStatement
+            .getBoundSql(Map.of(
+                "tripId", 1L,
+                "itemId", 2L,
+                "visitDate", java.time.LocalDate.of(2026, 8, 8)
+            ))
+            .getSql()
+            .replaceAll("\\s+", " ")
+            .trim();
+        assertTrue(appointmentSlotSql.contains("FROM trip_items"));
+        assertTrue(appointmentSlotSql.contains("appointment_id IS NOT NULL"));
+        assertTrue(appointmentSlotSql.contains("deleted_at IS NULL"));
 
         MappedStatement insertStatement = configuration
             .getMappedStatement(namespace + "insertJourneyItem");

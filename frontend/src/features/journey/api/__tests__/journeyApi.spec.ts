@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   addJourneyItem,
   buildJourneyCreateRequest,
-  checkJourneyItemExists,
+  checkJourneyItem,
   createJourney,
   deleteJourney,
   deleteJourneyItem,
@@ -163,13 +163,26 @@ describe('journeyApi', () => {
     expect(get).toHaveBeenCalledWith('/api/v1/journeys')
   })
 
-  it('checks whether a journey item already exists on a visit date', async () => {
-    get.mockResolvedValueOnce({ data: { exists: true } })
+  it('reports both the item and the appointment on a visit date', async () => {
+    get.mockResolvedValueOnce({ data: { exists: true, appointmentLinked: true } })
 
-    await expect(checkJourneyItemExists(12, 990001, '2026-08-08')).resolves.toBe(true)
+    await expect(checkJourneyItem(12, 990001, '2026-08-08')).resolves.toEqual({
+      exists: true,
+      appointmentLinked: true,
+    })
 
     expect(get).toHaveBeenCalledWith('/api/v1/journeys/12/items/exists', {
       params: { itemId: 990001, visitDate: '2026-08-08' },
+    })
+  })
+
+  // 담아만 둔 자리다. 두 값이 갈려야 약속 생성이 그 날짜를 쓸 수 있다.
+  it('separates a merely added item from one an appointment already holds', async () => {
+    get.mockResolvedValueOnce({ data: { exists: true, appointmentLinked: false } })
+
+    await expect(checkJourneyItem(12, 990001, '2026-08-08')).resolves.toEqual({
+      exists: true,
+      appointmentLinked: false,
     })
   })
 

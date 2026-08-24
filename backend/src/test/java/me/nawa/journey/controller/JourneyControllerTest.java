@@ -27,6 +27,7 @@ import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyUpdateRequest;
+import me.nawa.journey.dto.response.JourneyItemExistsResponse;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
 import me.nawa.journey.dto.response.JourneyTimelineAppointmentResponse;
@@ -272,7 +273,10 @@ class JourneyControllerTest {
     void existsJourneyItem_returns200WithExistsFlag() throws Exception {
         when(journeyService.existsJourneyItem(
             1L, 12L, 990001L, LocalDate.of(2026, 8, 8)
-        )).thenReturn(true);
+        )).thenReturn(JourneyItemExistsResponse.builder()
+            .exists(true)
+            .appointmentLinked(true)
+            .build());
 
         String responseBody = mockMvc.perform(
                 get("/api/v1/journeys/12/items/exists")
@@ -287,6 +291,34 @@ class JourneyControllerTest {
         JsonNode body = objectMapper.readTree(responseBody);
         assertTrue(body.path("success").asBoolean());
         assertTrue(body.path("data").path("exists").asBoolean());
+        assertTrue(body.path("data").path("appointmentLinked").asBoolean());
+    }
+
+    // 담아만 둔 자리다. 여정 담기는 막히지만 약속 생성은 열려 있어야 하므로 두
+    // 값이 갈린다 — 한 값으로 합치면 담아 둔 장소로는 약속을 만들 수 없게 된다.
+    @Test
+    void existsJourneyItem_returns200WithAppointmentLinkedFalse_whenOnlyAdded()
+        throws Exception {
+        when(journeyService.existsJourneyItem(
+            1L, 12L, 990001L, LocalDate.of(2026, 8, 8)
+        )).thenReturn(JourneyItemExistsResponse.builder()
+            .exists(true)
+            .appointmentLinked(false)
+            .build());
+
+        String responseBody = mockMvc.perform(
+                get("/api/v1/journeys/12/items/exists")
+                    .param("itemId", "990001")
+                    .param("visitDate", "2026-08-08")
+            )
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode body = objectMapper.readTree(responseBody);
+        assertTrue(body.path("data").path("exists").asBoolean());
+        assertFalse(body.path("data").path("appointmentLinked").asBoolean());
     }
 
     @Test

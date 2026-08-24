@@ -19,13 +19,13 @@ import {
 import { appointmentJourneyIntegrationKey } from '@/features/appointment/model/journeyIntegration'
 import { appointmentExploreIntegrationKey } from '@/features/appointment/model/exploreIntegration'
 import { appointmentMemberIntegrationKey } from '@/features/appointment/model/memberIntegration'
-import { addJourneyItem, checkJourneyItemExists } from '@/features/journey/api/journeyApi'
+import { addJourneyItem, checkJourneyItem } from '@/features/journey/api/journeyApi'
 import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
 import { parseJourneyRouteQuery } from '@/features/journey/model/journeyRouteQuery'
 import { memberAppointmentIntegrationKey } from '@/features/member/model/appointmentIntegration'
 import { memberExploreIntegrationKey } from '@/features/member/model/exploreIntegration'
 import { useMemberAppointmentProfile } from '@/features/member/model/memberQueries'
-import { useExploreItemLocationQuery } from '@/features/explore/model/appointmentIntegration'
+import { useExploreItemDetailQuery } from '@/features/explore/model/appointmentIntegration'
 import { useSavedExploreItemsQuery } from '@/features/explore/model/memberIntegration'
 import { exploreJourneyIntegrationKey } from '@/features/explore/model/journeyIntegration'
 import { useUnreadNotificationCount } from '@/features/notification/model/notificationQueries'
@@ -75,7 +75,10 @@ app.provide(appointmentMemberIntegrationKey, {
 })
 app.provide(appointmentJourneyIntegrationKey, {
   useJourneyListQuery,
-  checkJourneyItemExists,
+  // 약속 생성이 묻는 것은 "여정에 있는지"가 아니라 "다른 약속이 차지했는지"다.
+  // 담아만 둔 자리는 약속 항목으로 승격되므로 날짜를 막을 이유가 없다.
+  checkAppointmentSlotTaken: async (tripId, itemId, visitDate) =>
+    (await checkJourneyItem(tripId, itemId, visitDate)).appointmentLinked,
 })
 app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
 app.provide(walletAppointmentIntegrationKey, { useMyTodayAppointmentsQuery })
@@ -90,7 +93,7 @@ app.provide(notificationSettlementIntegrationKey, {
     void queryClient.invalidateQueries({ queryKey: settlementKeys.all })
   },
 })
-app.provide(appointmentExploreIntegrationKey, { useItemLocation: useExploreItemLocationQuery })
+app.provide(appointmentExploreIntegrationKey, { useItemDetail: useExploreItemDetailQuery })
 app.provide(memberExploreIntegrationKey, { useSavedItems: useSavedExploreItemsQuery })
 app.provide(memberAppointmentIntegrationKey, {
   // 프로필의 약속 탭은 지난 약속까지 본다. 지갑 QR 결제가 쓰는 기본 범위와 다르다.
