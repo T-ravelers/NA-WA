@@ -347,7 +347,7 @@ export default {
       shareUnavailable: 'この端末では共有を利用できません。',
       reservation: '事前予約',
       openReservation: '事前予約を申し込む',
-      permanent: '常設',
+      openEndedPeriod: '{date}〜',
       free: '無料',
       unavailable: '未提供',
       detailError: '現在、このイベントを読み込めません。',

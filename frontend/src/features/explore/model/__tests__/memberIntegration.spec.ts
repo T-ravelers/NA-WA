@@ -35,6 +35,7 @@ const savedEvent: EventSummary = {
   longitude: null,
   startDate: '2026-08-01',
   endDate: '2026-08-31',
+  isPermanent: false,
   saved: true,
 }
 

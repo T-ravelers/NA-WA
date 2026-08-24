@@ -9,6 +9,7 @@ import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -78,6 +79,25 @@ class AppointmentMapperXmlTest {
         assertTrue(configuration.hasStatement(
                 "me.nawa.appointment.mapper.AppointmentMapper.findLeftNoShowMembersByAppointmentId"
         ));
+    }
+
+    // 약속 생성 관문이 저장 status를 보면, 적재 값이 'ENDED'인데 운영 기간은 남은
+    // Event가 목록·상세에는 진행 중으로 보이면서 약속만 만들어지지 않는다. 여정
+    // 담기(JourneyMapper)와 같은 날짜 조건을 쓴다.
+    @Test
+    void findAvailableItem_usesOperatingPeriodInsteadOfStoredStatus()
+            throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("itemId", 1L);
+        parameters.put("today", LocalDate.now());
+
+        String sql = boundSql("findAvailableItem", parameters);
+
+        assertTrue(sql.contains("e.end_date IS NULL OR e.end_date >= ?"));
+        assertFalse(sql.contains("e.status"));
+        assertFalse(sql.contains("CURRENT_DATE()"));
+        // Place는 여전히 운영 여부로 가른다 — 기간 개념이 없다.
+        assertTrue(sql.contains("p.is_active = TRUE"));
     }
 
     // 활동 중 탈퇴로 굳은 노쇼만 골라야 한다 — 마감 전 정상 탈퇴(LEFT +

@@ -21,6 +21,13 @@ export interface EventSummary {
   // `EventSummaryResponse`의 `LocalDate`는 널을 허용한다. 실제로 종료일이 없는 Event가 있다.
   startDate: string | null
   endDate: string | null
+  /**
+   * 종료일을 받지 못했는지 여부. 참이면 `endDate`가 없다.
+   *
+   * "상시 운영"이 아니다 — 적재가 종료일을 못 채우면 참이 되므로 축제·콘서트도 들어온다.
+   * 카드는 이 값을 "상시"로 옮기지 않고 열린 기간(`From ...`)으로 적는다.
+   */
+  isPermanent: boolean
   saved: boolean
 }
 

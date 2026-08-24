@@ -71,12 +71,24 @@ const regionLabel = computed(() =>
     .join(' · '),
 )
 
-// 한쪽 날짜만 있으면 구분자 없이 그 날짜만 보인다. `EventDetailView`와 같은 방식이다.
-const periodLabel = computed(() =>
-  [formatCalendarDateString(event.startDate), formatCalendarDateString(event.endDate)]
-    .filter(Boolean)
-    .join(' ~ '),
-)
+/**
+ * 운영 기간.
+ *
+ * `isPermanent`는 "상시 운영"이 아니라 **종료일을 받지 못했다**는 뜻이다. DB 제약이
+ * `end_date IS NULL`과 이 값을 묶어 둬서, 적재가 종료일을 못 채우면 축제·팝업·콘서트도
+ * 상시가 된다(로컬 시드 74건 전부가 그런 종류다). 그래서 "상시"라고 적으면 거짓을
+ * 단언한다. 끝을 모른다는 사실만 그대로 적는다.
+ *
+ * 시작일조차 없으면 적을 것이 없어 이 줄을 비운다. 기간이 있는 이벤트에서 한쪽 날짜만
+ * 있으면 구분자 없이 그 날짜만 보인다.
+ */
+const periodLabel = computed(() => {
+  const start = formatCalendarDateString(event.startDate)
+  if (event.isPermanent) {
+    return start ? t('explore.detail.openEndedPeriod', { date: start }) : ''
+  }
+  return [start, formatCalendarDateString(event.endDate)].filter(Boolean).join(' ~ ')
+})
 
 function openEvent(): void {
   emit('open', event.itemId)

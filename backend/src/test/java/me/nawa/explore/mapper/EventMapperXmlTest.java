@@ -46,9 +46,43 @@ class EventMapperXmlTest {
         assertTrue(configuration.hasStatement(
             "me.nawa.explore.mapper.EventMapper.findEventActivities"
         ));
+        assertTrue(configuration.hasStatement(
+            "me.nawa.explore.mapper.EventMapper.realignEventStatuses"
+        ));
         assertTrue(configuration.hasResultMap(
             "me.nawa.explore.mapper.EventMapper.eventDetailResultMap"
         ));
+    }
+
+    // 저장 status 정정은 조회와 같은 식을 써야 한다. 두 곳이 갈라지면 화면과 DB가
+    // 다른 말을 하는데, 어느 쪽이 틀렸는지 화면만 보고는 알 수 없다.
+    @Test
+    void realignEventStatuses_usesSameDerivationAndSkipsMatchingRows()
+        throws Exception {
+        Configuration configuration = new Configuration();
+
+        try (InputStream input = Resources.getResourceAsStream(MAPPER_RESOURCE)) {
+            new XMLMapperBuilder(
+                input,
+                configuration,
+                MAPPER_RESOURCE,
+                configuration.getSqlFragments()
+            ).parse();
+        }
+
+        String sql = normalizedSql(
+            configuration,
+            "me.nawa.explore.mapper.EventMapper.realignEventStatuses",
+            Map.of("today", LocalDate.of(2026, 8, 20))
+        );
+
+        assertFalse(sql.contains("CURRENT_DATE()"));
+        assertTrue(sql.contains("THEN 'SCHEDULED'"));
+        assertTrue(sql.contains("THEN 'ENDED'"));
+        assertTrue(sql.contains("ELSE 'ONGOING'"));
+        // 이미 맞는 행까지 SET하면 event 전체가 매번 쓰기 대상이 된다.
+        assertTrue(sql.contains("e.status <>"));
+        assertTrue(sql.contains("e.deleted_at IS NULL"));
     }
 
     @Test
@@ -194,7 +228,7 @@ class EventMapperXmlTest {
     }
 
     @Test
-    void eventVisibility_usesCurrentDatesInsteadOfStoredStatus()
+    void eventVisibilityAndStatus_useSuppliedDateInsteadOfStoredStatus()
         throws Exception {
         Configuration configuration = new Configuration();
 
@@ -221,16 +255,18 @@ class EventMapperXmlTest {
             oneDayParameters
         );
 
-        assertTrue(oneDaySql.contains(
-            "(e.end_date IS NULL OR e.end_date >= CURRENT_DATE())"
-        ));
+        // 노출 조건과 status 파생이 모두 애플리케이션이 넘긴 기준일을 본다.
+        // DB 세션 시간대에 기대는 CURRENT_DATE()는 어느 쪽에도 남지 않는다.
+        assertFalse(oneDaySql.contains("CURRENT_DATE()"));
         assertTrue(oneDaySql.contains("(e.end_date IS NULL OR e.end_date >= ?)"));
         assertTrue(oneDaySql.contains("e.start_date <= ?"));
         assertFalse(oneDaySql.contains("datePreset"));
-        assertFalse(oneDaySql.contains("e.status = 'ONGOING'"));
-        assertFalse(oneDaySql.contains(
-            "e.status IN ('SCHEDULED', 'ONGOING')"
-        ));
+        // 저장 status 컬럼은 읽지도 내보내지도 않는다.
+        assertFalse(oneDaySql.contains("e.status"));
+        assertTrue(oneDaySql.contains("END AS status"));
+        assertTrue(oneDaySql.contains("THEN 'SCHEDULED'"));
+        assertTrue(oneDaySql.contains("THEN 'ENDED'"));
+        assertTrue(oneDaySql.contains("ELSE 'ONGOING'"));
 
         EventSearchRequest openEndedRequest = new EventSearchRequest();
         openEndedRequest.setStartDate(LocalDate.of(2026, 8, 21));
@@ -245,7 +281,7 @@ class EventMapperXmlTest {
 
         assertTrue(openEndedSql.contains("(e.end_date IS NULL OR e.end_date >= ?)"));
         assertFalse(openEndedSql.contains("e.start_date <= ?"));
-        assertFalse(openEndedSql.contains("e.status = 'SCHEDULED'"));
+        assertFalse(openEndedSql.contains("e.status"));
 
         EventSearchRequest otherRegionRequest = new EventSearchRequest();
         otherRegionRequest.setRegion1(List.of("서울"));
@@ -266,12 +302,10 @@ class EventMapperXmlTest {
             "me.nawa.explore.mapper.EventMapper.findEventDetail",
             Map.of("eventId", 1L, "language", "en")
         );
-        assertTrue(detailSql.contains(
-            "(e.end_date IS NULL OR e.end_date >= CURRENT_DATE())"
-        ));
-        assertFalse(detailSql.contains(
-            "e.status IN ('SCHEDULED', 'ONGOING')"
-        ));
+        assertFalse(detailSql.contains("CURRENT_DATE()"));
+        assertTrue(detailSql.contains("(e.end_date IS NULL OR e.end_date >= ?)"));
+        assertFalse(detailSql.contains("e.status"));
+        assertTrue(detailSql.contains("END AS status"));
     }
 
     private static String normalizedSql(

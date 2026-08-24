@@ -81,7 +81,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_success_holdsHostDepositAndBecomesRecruiting() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(availableEvent());
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(availableEvent());
         when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
                 Journey.builder()
                         .tripId(1L)
@@ -118,7 +119,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_linksHostMembershipToChosenJourney() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(availableEvent());
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(availableEvent());
         when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
                 Journey.builder()
                         .tripId(1L)
@@ -171,7 +173,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_itemNotAvailable_rejectsRequest() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(null);
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(null);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -185,7 +188,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_journeyNotFound_rejectsRequest() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(availableEvent());
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(availableEvent());
         when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(null);
 
         BusinessException exception = assertThrows(
@@ -200,7 +204,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_journeyNotOwned_rejectsRequest() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(availableEvent());
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(availableEvent());
         when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
                 Journey.builder()
                         .tripId(1L)
@@ -222,7 +227,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_visitDateOutsideJourneyRange_rejectsRequest() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(availableEvent());
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(availableEvent());
         when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
                 Journey.builder()
                         .tripId(1L)
@@ -249,7 +255,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_journeyItemOnlyAdded_promotesItemInsteadOfRejecting() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(availableEvent());
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(availableEvent());
         when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
                 Journey.builder()
                         .tripId(1L)
@@ -293,7 +300,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_journeyItemHasOtherAppointment_rejectsRequest() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(availableEvent());
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(availableEvent());
         when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
                 Journey.builder()
                         .tripId(1L)
@@ -326,7 +334,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_journeyItemPromotionRace_rejectsRequestAfterInsert() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(availableEvent());
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(availableEvent());
         when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
                 Journey.builder()
                         .tripId(1L)
@@ -358,7 +367,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_journeyItemRaceCondition_rejectsRequestAfterInsert() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(availableEvent());
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(availableEvent());
         when(journeyMapper.findJourneyByIdForUpdate(1L)).thenReturn(
                 Journey.builder()
                         .tripId(1L)
@@ -385,7 +395,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_visitDateAfterEventEnd_rejectsRequest() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(
                 JourneyExploreItem.builder()
                         .itemId(100L)
                         .itemType("EVENT")
@@ -409,7 +420,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_visitDateBeforeEventStart_rejectsRequest() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(
                 JourneyExploreItem.builder()
                         .itemId(100L)
                         .itemType("EVENT")
@@ -435,7 +447,8 @@ class AppointmentServiceTest {
     @Test
     void createAppointment_permanentEvent_passesItemPeriodCheck() {
         AppointmentCreateRequest request = validRequest();
-        when(appointmentMapper.findAvailableItem(100L)).thenReturn(
+        when(appointmentMapper.findAvailableItem(
+                eq(100L), any(LocalDate.class))).thenReturn(
                 JourneyExploreItem.builder()
                         .itemId(100L)
                         .itemType("EVENT")
@@ -481,7 +494,7 @@ class AppointmentServiceTest {
                 BusinessException.class,
                 () -> appointmentService.createAppointment(1L, request)
         );
-        verify(appointmentMapper, never()).findAvailableItem(any());
+        verify(appointmentMapper, never()).findAvailableItem(any(), any());
     }
 
     @Test
@@ -493,7 +506,7 @@ class AppointmentServiceTest {
                 BusinessException.class,
                 () -> appointmentService.createAppointment(1L, request)
         );
-        verify(appointmentMapper, never()).findAvailableItem(any());
+        verify(appointmentMapper, never()).findAvailableItem(any(), any());
     }
 
     @Test
@@ -505,7 +518,7 @@ class AppointmentServiceTest {
                 BusinessException.class,
                 () -> appointmentService.createAppointment(1L, request)
         );
-        verify(appointmentMapper, never()).findAvailableItem(any());
+        verify(appointmentMapper, never()).findAvailableItem(any(), any());
     }
 
     // 방문 날짜를 품는 이벤트. 기간을 비워 두면 "상시"와 구별되지 않아, 기간 검사가
