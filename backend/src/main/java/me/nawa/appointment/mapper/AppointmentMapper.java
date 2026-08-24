@@ -10,6 +10,7 @@ import me.nawa.deposit.domain.AttendanceStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -18,7 +19,13 @@ public interface AppointmentMapper {
 
     // 항목 타입과 운영 기간을 함께 읽는다. 타입만 읽던 시절에는 약속 생성이 이벤트
     // 운영 기간을 볼 방법이 없어, 끝난 축제 날짜로도 약속이 만들어졌다.
-    JourneyExploreItem findAvailableItem(@Param("itemId") Long itemId);
+    //
+    // today는 애플리케이션이 넘긴다. 여정 담기·탐색 목록과 같은 기준일을 봐야
+    // "목록에는 진행 중으로 뜨는데 약속만 안 만들어지는" 항목이 생기지 않는다.
+    JourneyExploreItem findAvailableItem(
+            @Param("itemId") Long itemId,
+            @Param("today") LocalDate today
+    );
 
     int insertAppointment(Appointment appointment);
 

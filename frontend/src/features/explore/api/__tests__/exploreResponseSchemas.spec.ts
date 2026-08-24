@@ -21,6 +21,7 @@ const eventSummary = {
   longitude: 127,
   startDate: '2026-08-01',
   endDate: null,
+  isPermanent: true,
   saved: false,
 }
 

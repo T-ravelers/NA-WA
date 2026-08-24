@@ -339,7 +339,7 @@ export default {
       shareUnavailable: 'Sharing is not available on this device.',
       reservation: 'Pre-booking',
       openReservation: 'Apply for pre-booking',
-      permanent: 'Permanent',
+      openEndedPeriod: 'From {date}',
       free: 'Free',
       unavailable: 'Not provided',
       detailError: 'We could not load this event right now.',

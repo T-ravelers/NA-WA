@@ -61,12 +61,14 @@ class EventServiceTest {
         when(eventMapper.searchEvents(
             any(EventSearchRequest.class),
             eq(2),
-            isNull(Long.class)
+            isNull(Long.class),
+            any(LocalDate.class)
         ))
             .thenReturn(List.of(event));
         when(eventMapper.countEvents(
             any(EventSearchRequest.class),
-            isNull(Long.class)
+            isNull(Long.class),
+            any(LocalDate.class)
         ))
             .thenReturn(3L);
 
@@ -96,12 +98,14 @@ class EventServiceTest {
         when(eventMapper.searchEvents(
             any(EventSearchRequest.class),
             eq(0),
-            isNull(Long.class)
+            isNull(Long.class),
+            any(LocalDate.class)
         ))
             .thenReturn(List.of());
         when(eventMapper.countEvents(
             any(EventSearchRequest.class),
-            isNull(Long.class)
+            isNull(Long.class),
+            any(LocalDate.class)
         ))
             .thenReturn(0L);
 
@@ -112,7 +116,8 @@ class EventServiceTest {
         assertEquals(0L, result.getTotalElements());
         assertEquals(0, result.getTotalPages());
         assertEquals(false, result.isHasNext());
-        verify(eventMapper).searchEvents(request, 0, null);
+        verify(eventMapper).searchEvents(
+            eq(request), eq(0), isNull(Long.class), any(LocalDate.class));
     }
 
     @Test
@@ -156,11 +161,13 @@ class EventServiceTest {
         when(eventMapper.searchEvents(
             any(EventSearchRequest.class),
             eq(0),
-            isNull(Long.class)
+            isNull(Long.class),
+            any(LocalDate.class)
         )).thenReturn(List.of());
         when(eventMapper.countEvents(
             any(EventSearchRequest.class),
-            isNull(Long.class)
+            isNull(Long.class),
+            any(LocalDate.class)
         )).thenReturn(0L);
 
         eventService.searchEvents(request, null);
@@ -169,7 +176,8 @@ class EventServiceTest {
         verify(eventMapper).searchEvents(
             requestCaptor.capture(),
             eq(0),
-            isNull(Long.class)
+            isNull(Long.class),
+            any(LocalDate.class)
         );
 
         EventSearchRequest normalized = requestCaptor.getValue();
@@ -192,11 +200,13 @@ class EventServiceTest {
         when(eventMapper.searchEvents(
             any(EventSearchRequest.class),
             eq(0),
-            isNull(Long.class)
+            isNull(Long.class),
+            any(LocalDate.class)
         )).thenReturn(List.of());
         when(eventMapper.countEvents(
             any(EventSearchRequest.class),
-            isNull(Long.class)
+            isNull(Long.class),
+            any(LocalDate.class)
         )).thenReturn(0L);
 
         eventService.searchEvents(request, null);
@@ -205,7 +215,8 @@ class EventServiceTest {
         verify(eventMapper).searchEvents(
             requestCaptor.capture(),
             eq(0),
-            isNull(Long.class)
+            isNull(Long.class),
+            any(LocalDate.class)
         );
         assertEquals("NEWEST", requestCaptor.getValue().getSort());
     }
@@ -252,15 +263,19 @@ class EventServiceTest {
         EventSearchRequest request = new EventSearchRequest();
         request.setSavedOnly(true);
 
-        when(eventMapper.searchEvents(request, 0, 7L))
+        when(eventMapper.searchEvents(
+            eq(request), eq(0), eq(7L), any(LocalDate.class)))
             .thenReturn(List.of());
-        when(eventMapper.countEvents(request, 7L)).thenReturn(0L);
+        when(eventMapper.countEvents(
+            eq(request), eq(7L), any(LocalDate.class))).thenReturn(0L);
 
         EventListResponse result = eventService.searchEvents(request, 7L);
 
         assertEquals(0, result.getContent().size());
-        verify(eventMapper).searchEvents(request, 0, 7L);
-        verify(eventMapper).countEvents(request, 7L);
+        verify(eventMapper).searchEvents(
+            eq(request), eq(0), eq(7L), any(LocalDate.class));
+        verify(eventMapper).countEvents(
+            eq(request), eq(7L), any(LocalDate.class));
     }
 
     @Test
@@ -271,7 +286,8 @@ class EventServiceTest {
             .title("서울 야시장 푸드 팝업(테스트)")
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko", null))
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -285,7 +301,8 @@ class EventServiceTest {
         assertEquals("FESTIVAL", result.getEventKind());
         assertEquals("서울 야시장 푸드 팝업(테스트)", result.getTitle());
         assertEquals(0, result.getActivities().size());
-        verify(eventMapper).findEventDetail(990001L, "ko", null);
+        verify(eventMapper).findEventDetail(
+            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class));
         verify(eventMapper).findEventActivities(990001L, "ko");
     }
 
@@ -299,7 +316,8 @@ class EventServiceTest {
         EventDetailResponse event = EventDetailResponse.builder()
             .eventId(990001L)
             .build();
-        when(eventMapper.findEventDetail(990001L, "ko", null)).thenReturn(event);
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class))).thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko")).thenReturn(List.of());
 
         eventService.getEventDetail(990001L, "ko", null);
@@ -334,7 +352,8 @@ class EventServiceTest {
 
     @Test
     void getEventDetail_throwsEventNotFound_whenMapperReturnsNull() {
-        when(eventMapper.findEventDetail(990001L, "ko", null))
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(null);
 
         BusinessException exception = assertThrows(
@@ -346,7 +365,8 @@ class EventServiceTest {
             ExploreErrorCode.EVENT_NOT_FOUND,
             exception.getErrorCode()
         );
-        verify(eventMapper).findEventDetail(990001L, "ko", null);
+        verify(eventMapper).findEventDetail(
+            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class));
     }
 
     @Test
@@ -356,7 +376,8 @@ class EventServiceTest {
             .title("서울 야시장 푸드 팝업(테스트)")
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko", null))
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(null);
@@ -387,7 +408,8 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "en", null))
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("en"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "en"))
             .thenReturn(List.of());
@@ -429,7 +451,8 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko", null))
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -455,7 +478,8 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko", null))
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -480,7 +504,8 @@ class EventServiceTest {
             ))
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko", null))
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
@@ -502,14 +527,16 @@ class EventServiceTest {
             .eventId(990001L)
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "ko", 7L))
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("ko"), eq(7L), any(LocalDate.class)))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "ko"))
             .thenReturn(List.of());
 
         eventService.getEventDetail(990001L, "ko", 7L);
 
-        verify(eventMapper).findEventDetail(990001L, "ko", 7L);
+        verify(eventMapper).findEventDetail(
+            eq(990001L), eq("ko"), eq(7L), any(LocalDate.class));
     }
 
     @Test
@@ -518,14 +545,16 @@ class EventServiceTest {
             .eventId(990001L)
             .build();
 
-        when(eventMapper.findEventDetail(990001L, "en", null))
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("en"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
         when(eventMapper.findEventActivities(990001L, "en"))
             .thenReturn(List.of());
 
         eventService.getEventDetail(990001L, null, null);
 
-        verify(eventMapper).findEventDetail(990001L, "en", null);
+        verify(eventMapper).findEventDetail(
+            eq(990001L), eq("en"), isNull(Long.class), any(LocalDate.class));
         verify(eventMapper).findEventActivities(990001L, "en");
     }
 }

@@ -6,10 +6,13 @@
 <mapper namespace="me.nawa.appointment.mapper.AppointmentMapper">
 
     <!--
-        가용성 조건은 여정 담기(JourneyMapper.findAvailableExploreItemById)와 다르다.
-        약속은 event.status로 거르고 여정은 end_date로 거른다 — 일부러 갈라 둔 것이라
-        여기서 합치지 않는다. 방문 날짜가 운영 기간 안인지는 두 경로 모두
-        JourneyExploreItem.coversVisitDate로 따로 본다.
+        가용성 조건은 여정 담기(JourneyMapper.findAvailableExploreItemById)와 같다.
+        예전에는 약속만 저장 컬럼 e.status로 걸렀는데, 그 값은 적재 파이프라인이 준
+        스냅샷이라 아무도 옮겨 주지 않는다. 그래서 적재 값이 'ENDED'면 운영 기간이 남아
+        목록·상세에 진행 중으로 보이는 Event에도 약속을 만들 수 없었다(#513).
+
+        방문 날짜가 운영 기간 안인지는 두 경로 모두 JourneyExploreItem.coversVisitDate로
+        따로 본다. 여기서 보는 것은 "지금 이 항목에 약속을 걸 수 있는가"뿐이다.
     -->
     <select id="findAvailableItem"
             resultType="me.nawa.journey.domain.JourneyExploreItem">
@@ -33,7 +36,7 @@
               (ei.item_type = 'EVENT'
                   AND e.event_id IS NOT NULL
                   AND e.deleted_at IS NULL
-                  AND e.status IN ('SCHEDULED', 'ONGOING'))
+                  AND (e.end_date IS NULL OR e.end_date &gt;= #{today}))
               OR (ei.item_type = 'PLACE'
                   AND p.place_id IS NOT NULL
                   AND p.deleted_at IS NULL

@@ -344,7 +344,7 @@ export default {
       shareUnavailable: '這台裝置不支援分享功能。',
       reservation: '事先預約',
       openReservation: '申請預約',
-      permanent: '常設',
+      openEndedPeriod: '{date} 起',
       free: '免費',
       unavailable: '未提供',
       detailError: '目前無法載入這個活動。',

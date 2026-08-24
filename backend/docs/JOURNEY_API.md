@@ -156,9 +156,11 @@ POST /api/v1/journeys/{tripId}/items
 항목 운영 기간은 **`EVENT`에만 적용됩니다.** `place` 테이블에는 운영 기간 컬럼이
 없으므로 `PLACE` 항목은 Journey 기간만 봅니다.
 
-상시 이벤트(`is_permanent = TRUE`)는 `chk_event_period` 불변식에 따라 `end_date`가
-반드시 `NULL`이므로 운영 기간이 `[start_date, ∞)`입니다. **상한만 없을 뿐 하한은
-있습니다** — 아직 시작하지 않은 상시 이벤트는 `JOURNEY-012`로 거절됩니다.
+종료일을 받지 못한 Event(`is_permanent = TRUE`)는 `chk_event_period` 불변식에 따라
+`end_date`가 반드시 `NULL`이므로 운영 기간을 `[start_date, ∞)`로 봅니다. 이 값은
+"상시 운영"이 아니라 끝을 모른다는 뜻입니다([EXPLORE_API.md](./EXPLORE_API.md) 참고).
+**상한만 없을 뿐 하한은 있습니다** — 아직 시작하지 않은 Event는 `JOURNEY-012`로
+거절됩니다.
 
 두 검사는 Journey 기간이 먼저입니다. 둘 다 어긋나면 `JOURNEY-007`을 받습니다.
 
