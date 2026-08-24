@@ -2,10 +2,12 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
+import { IconChevronRight } from '@tabler/icons-vue'
 
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppImage from '@/shared/ui/AppImage.vue'
 import AppTicket from '@/shared/ui/AppTicket.vue'
+import TicketStamp from '@/shared/ui/TicketStamp.vue'
 
 import type { JourneySummary } from '../api/journeyApi'
 import { formatJourneyDate, type JourneyListStatus } from '../model/journeyStatus'
@@ -14,9 +16,16 @@ interface Props {
   journey: JourneySummary
   status: JourneyListStatus
   statusLabel: string
+  /**
+   * 이 여정의 최종 리포트 id. 없으면 `null`이다.
+   *
+   * 목록 응답에는 리포트 정보가 없어서 화면이 report feature에서 받아 내려준다
+   * (`model/reportIntegration.ts`). 카드는 값만 받고 어디서 왔는지 알지 않는다.
+   */
+  reportId?: number | null
 }
 
-const { journey, status, statusLabel } = defineProps<Props>()
+const { journey, status, statusLabel, reportId = null } = defineProps<Props>()
 
 const { locale, t } = useI18n()
 
@@ -87,29 +96,63 @@ const itemCounts = computed(() => {
       </template>
 
       <template #stub>
-        <RouterLink
-          :to="{ name: 'journey-detail', params: { tripId: journey.tripId } }"
-          class="flex flex-col gap-2.5 p-4 focus-visible:outline-2 focus-visible:outline-on-paper"
-        >
-          <h3 class="truncate font-display text-trip-ticket-title uppercase">
-            {{ journey.title }}
-          </h3>
-          <p class="text-body-sm font-medium tabular-nums text-on-paper">
-            <time :datetime="journey.startDate">{{
-              formatJourneyDate(journey.startDate, locale)
-            }}</time>
-            <span aria-hidden="true"> – </span>
-            <time :datetime="journey.endDate">{{
-              formatJourneyDate(journey.endDate, locale)
-            }}</time>
-          </p>
-          <p
-            v-if="itemCounts.length > 0"
-            class="text-caption font-semibold tabular-nums text-on-paper/65"
+        <!--
+          바깥을 통째로 링크로 감싸지 않는다. `View report`가 그 안에 들어가면 중첩
+          인터랙티브가 된다. 제목·날짜·항목 수까지만 상세로 가는 링크이고, 리포트 링크와
+          도장은 형제로 둔다.
+        -->
+        <div class="flex min-h-40 flex-col gap-2.5 p-4">
+          <RouterLink
+            :to="{ name: 'journey-detail', params: { tripId: journey.tripId } }"
+            class="flex flex-col gap-2.5 focus-visible:outline-2 focus-visible:outline-on-paper"
           >
-            {{ itemCounts.join(' · ') }}
-          </p>
-        </RouterLink>
+            <h3 class="truncate font-display text-trip-ticket-title uppercase">
+              {{ journey.title }}
+            </h3>
+            <p class="text-body-sm font-medium tabular-nums text-on-paper">
+              <time :datetime="journey.startDate">{{
+                formatJourneyDate(journey.startDate, locale)
+              }}</time>
+              <span aria-hidden="true"> – </span>
+              <time :datetime="journey.endDate">{{
+                formatJourneyDate(journey.endDate, locale)
+              }}</time>
+            </p>
+            <p
+              v-if="itemCounts.length > 0"
+              class="text-caption font-semibold tabular-nums text-on-paper/65"
+            >
+              {{ itemCounts.join(' · ') }}
+            </p>
+          </RouterLink>
+
+          <!--
+            리포트 링크와 도장은 카드 바닥에 붙인다. 둘 다 없는 여정이 있으므로 행 자체는
+            비어 있을 수 있고, 그때도 `mt-auto`가 위 내용을 위로 밀어 카드 높이가 흔들리지
+            않는다.
+          -->
+          <div class="mt-auto flex min-h-11 items-center justify-between gap-2">
+            <RouterLink
+              v-if="reportId !== null"
+              :to="{ name: 'report-detail', params: { reportId } }"
+              class="inline-flex min-h-11 min-w-0 items-center gap-1 rounded-sm px-0.5 text-title-sm text-on-paper transition-transform focus-visible:outline-2 focus-visible:outline-on-paper active:scale-[0.98]"
+            >
+              <span class="truncate">{{ t('journey.list.viewReport') }}</span>
+              <IconChevronRight
+                :size="18"
+                :stroke-width="2"
+                class="shrink-0"
+                aria-hidden="true"
+              />
+            </RouterLink>
+            <span v-else></span>
+
+            <TicketStamp
+              v-if="status === 'ongoing'"
+              :label="t('journey.list.onTrip')"
+            />
+          </div>
+        </div>
       </template>
     </AppTicket>
   </li>

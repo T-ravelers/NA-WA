@@ -1626,7 +1626,39 @@ const SCREENS = [
   {
     name: '13-journey-list',
     path: '/journeys',
-    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyList(page)]),
+    /*
+     * 목록 카드의 `View report`는 report feature의 요약에서 온다(#522). 기본
+     * `stubEmptyReportList`는 빈 배열이라 링크가 한 장도 그려지지 않아 조형을 증명하지
+     * 못한다. 여기서만 첫 여정에 리포트를 붙여 「있는 카드」와 「없는 카드」를 한 화면에
+     * 섞는다.
+     */
+    setup: (page) =>
+      Promise.all([
+        stubMemberProfile(page),
+        stubJourneyList(page),
+        page.route('**/api/v1/reports', (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: true,
+              data: [
+                {
+                  reportId: 101,
+                  tripId: 42,
+                  title: 'Seoul Foodie Week',
+                  startDate: '2098-08-10',
+                  endDate: '2098-08-12',
+                  generationStatus: 'COMPLETED',
+                  locale: 'en',
+                  generatedAt: '2098-08-13T09:00:00',
+                  createdAt: '2098-08-13T09:00:00',
+                },
+              ],
+            }),
+          }),
+        ),
+      ]),
   },
   {
     name: '06-journey-create',

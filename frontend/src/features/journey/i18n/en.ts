@@ -3,6 +3,8 @@ export default {
     list: {
       title: 'Journeys',
       add: 'Add journey',
+      viewReport: 'View report',
+      onTrip: 'On trip',
       tabsLabel: 'Journey status',
       ongoing: 'Ongoing',
       past: 'Past',

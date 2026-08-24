@@ -9,6 +9,8 @@ export default {
     list: {
       title: 'Hành trình',
       add: 'Thêm hành trình',
+      viewReport: 'Xem báo cáo',
+      onTrip: 'Đang đi',
       tabsLabel: 'Trạng thái hành trình',
       ongoing: 'Đang diễn ra',
       past: 'Đã qua',

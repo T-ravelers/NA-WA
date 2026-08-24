@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { vFitText } from '@/shared/lib/fitText'
+
 /**
  * 티켓 우하단의 원형 도장.
  *
@@ -27,9 +29,22 @@ const TONE_CLASS: Record<StampTone, string> = {
 <template>
   <span
     aria-hidden="true"
-    class="flex size-16 -rotate-8 items-center justify-center rounded-pill border-2 text-center font-display text-caption uppercase opacity-70"
+    class="flex size-16 -rotate-8 items-center justify-center rounded-pill border-2 px-2 text-center font-display text-caption uppercase opacity-70"
     :class="TONE_CLASS[tone]"
   >
-    {{ label }}
+    <!--
+      문구 길이가 로케일마다 크게 다르다. `Ended`(5자)가 `Đã kết thúc`(11자)이 되면
+      12px 그대로는 원을 뚫고 나간다 — vi에서 실제로 그랬다.
+
+      🔴 `v-fit-text`는 사각 경계로만 재므로 원의 곡선까지는 모른다(#399에서 배운 것).
+      좌우 `px-2`로 곡선 몫을 미리 비워 두고, 남은 폭에 글자를 맞춘다. 하한에서는
+      줄바꿈으로 넘긴다.
+    -->
+    <span
+      v-fit-text.wrap
+      class="min-w-0"
+    >
+      {{ label }}
+    </span>
   </span>
 </template>
