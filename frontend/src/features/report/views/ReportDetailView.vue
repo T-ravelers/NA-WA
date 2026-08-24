@@ -239,8 +239,16 @@ const comparisonPeers = computed<ReportComparisonBarRow[]>(() => {
   }))
 })
 
-/** 레이더 축 — 나와 코호트 중 한쪽이라도 쓴 카테고리, 내 비중 순. 3개가 안 되면 나머지 카테고리로 채운다. */
-const comparisonAxes = computed<ReportRadarAxis[]>(() => {
+/**
+ * 시안이 정한 상한. 소비 카테고리는 7종(`SPENDING_CATEGORIES`)이라 전부 쓴 사용자는 축이
+ * 넘치고, 타일도 최대 3종이 밀린다. 화면을 늘리자는 뜻이 아니라 **잘린 것이 「없는 것」으로
+ * 읽히지 않게** 상한 밖을 따로 들고 있다가 sr-only로 알린다(#434).
+ */
+const RADAR_AXIS_LIMIT = 6
+const RANK_TILE_LIMIT = 4
+
+/** 레이더 축 후보 — 상한 적용 전. 나와 코호트 중 한쪽이라도 쓴 카테고리, 내 비중 순. 3개가 안 되면 나머지 카테고리로 채운다. */
+const comparisonAxesAll = computed<ReportRadarAxis[]>(() => {
   const current = comparison.value
 
   if (current === null) {
@@ -261,13 +269,18 @@ const comparisonAxes = computed<ReportRadarAxis[]>(() => {
   )
   const axes = used.length >= 3 ? used : ordered.slice(0, 3)
 
-  return axes.slice(0, 6).map((category) => ({
+  return axes.map((category) => ({
     key: category,
     label: t(spendingCategoryLabelKey(category)),
     mine: mine.get(category) ?? 0,
     cohort: cohort.get(category) ?? 0,
   }))
 })
+
+const comparisonAxes = computed(() => comparisonAxesAll.value.slice(0, RADAR_AXIS_LIMIT))
+const comparisonOmittedAxes = computed(() =>
+  comparisonAxesAll.value.slice(RADAR_AXIS_LIMIT).map((axis) => axis.label),
+)
 
 function rankText(rank: number): string {
   if (i18n.locale.value.toLowerCase().startsWith('en')) {
@@ -301,14 +314,16 @@ function shareDiffText(points: number): string {
     : formatSignedPercent(points, i18n.locale.value)
 }
 
-/** 타일 — GROUP은 카테고리별 순위, SIMILAR는 레이더 축 순서대로 코호트 대비 비중 차이. */
-const comparisonTiles = computed<ReportRankTile[]>(() => {
+/** 타일 후보 — 상한 적용 전. GROUP은 카테고리별 순위, SIMILAR는 레이더 축 순서대로 코호트 대비 비중 차이. */
+const comparisonTilesAll = computed<ReportRankTile[]>(() => {
   if (isSimilarScope.value) {
     // 레이더는 다각형을 만들려고 축을 셋까지 채우지만(`comparisonAxes`), 타일에 그 패딩이 오면
     // 나도 0·코호트도 0이라 차이가 0이 되어, 아무도 쓰지 않은 카테고리에 `AVG`가 찍힌다.
+    //
+    // 출처는 **상한을 적용한 뒤의 축**이다. 레이더에 없는 카테고리가 타일에만 나타나면
+    // 두 그림이 다른 말을 한다 — 축 상한으로 밀린 것은 레이더 쪽 sr-only가 알린다.
     return comparisonAxes.value
       .filter((axis) => axis.mine > 0 || axis.cohort > 0)
-      .slice(0, 4)
       .map((axis) => ({
         key: axis.key,
         label: axis.label,
@@ -317,12 +332,30 @@ const comparisonTiles = computed<ReportRankTile[]>(() => {
       }))
   }
 
-  return (comparison.value?.ranks ?? []).slice(0, 4).map((row) => ({
+  return (comparison.value?.ranks ?? []).map((row) => ({
     key: row.category,
     label: t(spendingCategoryLabelKey(row.category)),
     rankText: rankText(row.rank),
     tone: spendingCategoryTone(row.category) ?? 'surface',
   }))
+})
+
+const comparisonTiles = computed(() => comparisonTilesAll.value.slice(0, RANK_TILE_LIMIT))
+const comparisonOmittedTiles = computed(() =>
+  comparisonTilesAll.value.slice(RANK_TILE_LIMIT).map((tile) => tile.label),
+)
+
+/**
+ * 순위의 모수 — 나를 포함한 인원(`ranks[].of`). 서버가 `others.size() + 1`로 채우므로 한
+ * 응답 안에서는 모든 줄이 같은 값이다(`ReportService.rankCategories`).
+ *
+ * 받고도 버리면 동료가 한 명인 그룹의 `# Food 1ST`가 사실상 「둘 중 하나」인데 화면만 보면
+ * 대단해 보인다(#434). SIMILAR는 순위가 아니라 코호트 대비 비중이라 해당하지 않는다.
+ */
+const comparisonRankBasis = computed<number | null>(() => {
+  if (isSimilarScope.value) return null
+
+  return comparison.value?.ranks[0]?.of ?? null
 })
 
 function retryComparison(): void {
@@ -691,12 +724,40 @@ function retry(): void {
                 :cohort-label="comparisonText.cohortLabel"
                 :description="comparisonText.radarDescription"
               />
+              <p
+                v-if="comparisonOmittedAxes.length > 0"
+                class="sr-only"
+              >
+                {{
+                  t('report.detail.comparison.omitted', {
+                    categories: comparisonOmittedAxes.join(', '),
+                  })
+                }}
+              </p>
             </div>
 
-            <ReportRankTiles
-              :tiles="comparisonTiles"
-              :label="comparisonText.tilesLabel"
-            />
+            <div class="flex flex-col gap-2">
+              <ReportRankTiles
+                :tiles="comparisonTiles"
+                :label="comparisonText.tilesLabel"
+              />
+              <p
+                v-if="comparisonRankBasis !== null"
+                class="text-micro text-ink-3"
+              >
+                {{ t('report.detail.comparison.rankBasis', { count: comparisonRankBasis }) }}
+              </p>
+              <p
+                v-if="comparisonOmittedTiles.length > 0"
+                class="sr-only"
+              >
+                {{
+                  t('report.detail.comparison.omitted', {
+                    categories: comparisonOmittedTiles.join(', '),
+                  })
+                }}
+              </p>
+            </div>
           </template>
         </section>
       </template>

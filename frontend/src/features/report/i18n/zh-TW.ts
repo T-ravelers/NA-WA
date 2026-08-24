@@ -141,6 +141,8 @@ export default {
         similarRadarDescription: '您在各類別的花費占比，與相似旅人平均的比較。',
         similarEmptyTitle: '還沒有相似的旅人',
         similarEmptyDescription: '擁有相同國籍且已有最終報告的旅人會顯示在這裡。',
+        rankBasis: '{count} 人之中的排名 | {count} 人之中的排名',
+        omitted: '這裡未顯示的項目：{categories}',
         tilesLabel: '揪團內的類別排名',
         similarTilesLabel: '與相似旅人相比的類別占比',
       },

@@ -143,6 +143,8 @@ export default {
         similarEmptyTitle: 'No similar travelers yet',
         similarEmptyDescription:
           'Travelers with the same nationality and a final report show up here.',
+        rankBasis: 'Ranked among {count} member | Ranked among {count} members',
+        omitted: 'Not shown here: {categories}',
         tilesLabel: 'Category rank among group members',
         similarTilesLabel: 'Your category share compared with travelers like you',
       },
