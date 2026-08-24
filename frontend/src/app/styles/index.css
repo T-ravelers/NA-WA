@@ -14,9 +14,9 @@
 /*
  * 스크롤바를 감춘다. 스크롤 자체는 그대로 둔다.
  *
- * 가로로 미는 목록(여정 캐러셀·탐색 필터 줄)은 스크롤바가 콘텐츠를 가린다. 셋이 각자
- * `<style scoped>`로 같은 블록을 갖고 있었고, `JourneyListView`의 주석이 「공용 유틸리티로
- * 올리는 것이 옳다」고 적어 두었다(#518).
+ * 가로로 미는 목록(여정 캐러셀·탐색 필터·약속 언어 필터)은 스크롤바가 콘텐츠를 가린다.
+ * 셋이 각자 `<style scoped>`로 같은 블록을 갖고 있었고, `JourneyListView`의 주석이
+ * 「공용 유틸리티로 올리는 것이 옳다」고 적어 두었다(#518).
  */
 @utility scrollbar-hidden {
   scrollbar-width: none;
@@ -98,6 +98,18 @@
   html {
     background-color: var(--color-canvas);
     -webkit-text-size-adjust: 100%;
+    /*
+     * 앱 화면에 데스크톱형 스크롤바를 그리지 않는다. 모바일 우선 PWA라 세로 막대가 보이면
+     * 앱이 아니라 웹 페이지로 읽힌다. 스크롤 동작과 키보드 조작은 그대로다.
+     *
+     * 루트의 값만 뷰포트 스크롤바에 적용된다. `body`의 `scrollbar-width`는 뷰포트로
+     * 전파되지 않아 Firefox에서는 페이지 막대를 감추지 못한다.
+     */
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar {
+    display: none;
   }
 
   body {
@@ -106,15 +118,6 @@
     font-family: var(--font-body);
     /* 금액과 날짜의 자릿수가 흔들리지 않게 한다. */
     font-variant-numeric: tabular-nums;
-    /*
-     * 앱 화면에 데스크톱형 스크롤바를 그리지 않는다. 모바일 우선 PWA라 세로 막대가 보이면
-     * 앱이 아니라 웹 페이지로 읽힌다. 스크롤 동작과 키보드 조작은 그대로다.
-     */
-    scrollbar-width: none;
-  }
-
-  body::-webkit-scrollbar {
-    display: none;
   }
 
   :focus-visible {

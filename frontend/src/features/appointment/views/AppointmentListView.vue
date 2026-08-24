@@ -286,7 +286,7 @@ function selectJourney(tripId: number): void {
     />
 
     <div
-      class="flex gap-2 overflow-x-auto pb-1"
+      class="scrollbar-hidden flex gap-2 overflow-x-auto pb-1"
       :aria-label="t('appointment.list.languageLabel')"
       role="group"
     >
