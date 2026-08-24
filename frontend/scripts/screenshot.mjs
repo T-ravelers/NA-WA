@@ -142,6 +142,7 @@ function stubProfileTabs(page) {
           longitude: 126.9925,
           startDate: '2098-11-01',
           endDate: '2098-11-17',
+          isPermanent: false,
           saved: true,
         },
         {
@@ -158,6 +159,7 @@ function stubProfileTabs(page) {
           longitude: 126.9976,
           startDate: '2098-09-04',
           endDate: '2098-09-20',
+          isPermanent: false,
           saved: true,
         },
       ],
