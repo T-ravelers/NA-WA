@@ -69,7 +69,7 @@ function handleInput(event: Event): void {
       :placeholder="placeholder"
       :aria-invalid="hasError"
       :aria-describedby="message === undefined ? undefined : messageId"
-      class="h-13 w-full rounded-sm bg-surface-2 px-4 text-body text-ink outline-none placeholder:text-ink-3"
+      class="h-13 w-full rounded-sm bg-surface-2 px-4 text-input text-ink outline-none placeholder:text-ink-3"
       :class="
         hasError ? 'border-2 border-danger' : 'border-2 border-transparent focus-visible:border-ink'
       "

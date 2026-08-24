@@ -337,7 +337,7 @@ defineExpose({ goToPreviousStep, snapshot, restore })
           <select
             id="appointment-max-members"
             v-model.number="draft.maxMembers"
-            class="h-13 w-full rounded-sm border-2 border-transparent bg-surface-2 px-4 text-body text-ink outline-none focus-visible:border-ink"
+            class="h-13 w-full rounded-sm border-2 border-transparent bg-surface-2 px-4 text-input text-ink outline-none focus-visible:border-ink"
             :aria-invalid="errors.maxMembers !== undefined"
           >
             <option
@@ -365,7 +365,7 @@ defineExpose({ goToPreviousStep, snapshot, restore })
           <select
             id="appointment-meeting-mode"
             v-model="draft.meetingPlaceMode"
-            class="h-13 w-full rounded-sm border-2 border-transparent bg-surface-2 px-4 text-body text-ink outline-none focus-visible:border-ink"
+            class="h-13 w-full rounded-sm border-2 border-transparent bg-surface-2 px-4 text-input text-ink outline-none focus-visible:border-ink"
           >
             <option value="ITEM">
               {{
