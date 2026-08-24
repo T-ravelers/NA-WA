@@ -27,6 +27,12 @@ const statusResponse: StripeTopupStatusResponse = {
 }
 
 describe('StripePaymentStep', () => {
+  const stripeTokens = {
+    '--color-success-subtle': '#8ec4b1',
+    '--color-surface-1': '#262626',
+    '--color-ink': '#fbfaf8',
+    '--color-danger': '#ed3423',
+  }
   const mountPaymentElement = vi.fn()
   const destroyPaymentElement = vi.fn()
   const createPaymentElement = vi.fn(() => ({
@@ -41,6 +47,9 @@ describe('StripePaymentStep', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    for (const [name, value] of Object.entries(stripeTokens)) {
+      document.documentElement.style.setProperty(name, value)
+    }
     vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_test_example')
     vi.mocked(loadStripe).mockResolvedValue(stripe as never)
     confirmPayment.mockResolvedValue({ paymentIntent: { status: 'succeeded' } })
@@ -48,6 +57,9 @@ describe('StripePaymentStep', () => {
   })
 
   afterEach(() => {
+    for (const name of Object.keys(stripeTokens)) {
+      document.documentElement.style.removeProperty(name)
+    }
     vi.unstubAllEnvs()
   })
 
@@ -101,6 +113,26 @@ describe('StripePaymentStep', () => {
     expect(stripe.elements).toHaveBeenCalledWith(expect.objectContaining({ locale: 'ja' }))
 
     i18n.global.locale.value = 'en'
+  })
+
+  it('fails closed when a required design token is missing', async () => {
+    document.documentElement.style.removeProperty('--color-danger')
+
+    const wrapper = mount(StripePaymentStep, {
+      props: {
+        clientSecret: 'pi_test_secret',
+        topupId: 44,
+        amount: '30000',
+      },
+      global: { plugins: [i18n] },
+    })
+
+    await flushPromises()
+
+    expect(stripe.elements).not.toHaveBeenCalled()
+    expect(wrapper.get('[role="alert"]').text()).toBe(
+      i18n.global.t('wallet.topUp.paymentLoadError'),
+    )
   })
 
   it('removes the Stripe developer-tools frame when the step unmounts', async () => {

@@ -4,6 +4,7 @@ import pluginVue from 'eslint-plugin-vue'
 import pluginPlaywright from 'eslint-plugin-playwright'
 import pluginVitest from '@vitest/eslint-plugin'
 import skipFormatting from 'eslint-config-prettier/flat'
+import { designTokensPlugin } from './eslint-rules/design-tokens.mjs'
 import { featureBoundariesPlugin } from './eslint-rules/feature-boundaries.mjs'
 
 export default withVueTs(
@@ -63,6 +64,18 @@ export default withVueTs(
     },
     rules: {
       'architecture/no-cross-feature-imports': 'error',
+    },
+  },
+
+  {
+    name: 'app/design-token-rules',
+    files: ['src/**/*.{ts,tsx,vue}'],
+    ignores: ['src/**/__tests__/**', 'src/**/__fixtures__/**', 'src/**/*.{test,spec}.{ts,tsx}'],
+    plugins: {
+      'design-tokens': designTokensPlugin,
+    },
+    rules: {
+      'design-tokens/no-raw-colors': 'error',
     },
   },
 

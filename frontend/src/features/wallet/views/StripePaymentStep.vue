@@ -53,13 +53,24 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
   return fallback
 }
 
+class MissingDesignTokenError extends Error {
+  constructor(name: string) {
+    super(`Missing design token: ${name}`)
+    this.name = 'MissingDesignTokenError'
+  }
+}
+
 /**
  * Stripe iframe에 넘길 색. CSS 변수를 못 읽는 iframe이라 런타임에 계산값을 뽑아 넘긴다.
  * 값을 여기 적어 두면 tokens.css가 바뀔 때마다 어긋나므로 토큰을 단일 정본으로 유지한다.
  */
-const readToken = (name: string, fallback: string): string => {
+const readToken = (name: string): string => {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-  return value === '' ? fallback : value
+  if (value === '') {
+    throw new MissingDesignTokenError(name)
+  }
+
+  return value
 }
 
 const initializePaymentElement = async (): Promise<void> => {
@@ -99,10 +110,10 @@ const initializePaymentElement = async (): Promise<void> => {
       appearance: {
         theme: 'night',
         variables: {
-          colorPrimary: readToken('--color-success-subtle', '#8ec4b1'),
-          colorBackground: readToken('--color-surface-1', '#262626'),
-          colorText: readToken('--color-ink', '#fbfaf8'),
-          colorDanger: readToken('--color-danger', '#ed3423'),
+          colorPrimary: readToken('--color-success-subtle'),
+          colorBackground: readToken('--color-surface-1'),
+          colorText: readToken('--color-ink'),
+          colorDanger: readToken('--color-danger'),
           fontFamily: "'Noto Sans', sans-serif",
           borderRadius: '12px',
         },
@@ -113,7 +124,10 @@ const initializePaymentElement = async (): Promise<void> => {
     paymentElement.value = paymentElements.create('payment', { layout: 'accordion' })
     paymentElement.value.mount(paymentElementContainer.value)
   } catch (error) {
-    errorMessage.value = getErrorMessage(error, t('wallet.topUp.paymentLoadError'))
+    errorMessage.value =
+      error instanceof MissingDesignTokenError
+        ? t('wallet.topUp.paymentLoadError')
+        : getErrorMessage(error, t('wallet.topUp.paymentLoadError'))
   } finally {
     isLoading.value = false
   }

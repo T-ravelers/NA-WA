@@ -101,7 +101,10 @@ const maskImage = computed(() => {
     : [`${bodySize}px 0`, `${bodySize}px 100%`]
 
   return positions
-    .map((at) => `radial-gradient(circle ${r}px at ${at}, transparent ${r}px, #000 ${r + 0.5}px)`)
+    .map(
+      (at) =>
+        `radial-gradient(circle ${r}px at ${at}, transparent ${r}px, var(--color-scrim) ${r + 0.5}px)`,
+    )
     .join(', ')
 })
 
