@@ -39,7 +39,7 @@ function createRouterStub() {
 
 function mountCard(
   overrides: Partial<JourneySummary> = {},
-  props: { status?: 'ongoing' | 'past'; reportId?: number | null } = {},
+  props: { status?: 'ongoing' | 'past'; onTrip?: boolean; reportId?: number | null } = {},
 ) {
   return mount(JourneyListCard, {
     global: { plugins: [i18n, createRouterStub()] },
@@ -79,17 +79,22 @@ describe('JourneyListCard', () => {
   })
 
   /*
-   * 도장은 진행 중인 여정에만 찍힌다. 지난 여정에 남으면 상태 배지와 어긋난다.
+   * 도장은 지금 떠나 있는 여정에만 찍힌다.
    *
    * 대문자는 `TicketStamp`가 CSS로 강제하므로 DOM 글자는 원문 그대로다. 도장 자체는
    * `aria-hidden`이라 상태를 두 번 읽히지 않는다 — 그 몫은 커버 위 `AppBadge`가 진다.
    */
-  it('stamps the ticket only while the journey is ongoing', () => {
-    const ongoing = mountCard({}, { status: 'ongoing' })
-    const stamp = ongoing.get('[aria-hidden="true"].uppercase')
+  it('stamps the ticket only while the traveller is actually away', () => {
+    const stamp = mountCard({}, { onTrip: true }).get('[aria-hidden="true"].uppercase')
 
     expect(stamp.text()).toBe('On trip')
-    expect(mountCard({}, { status: 'past' }).text()).not.toContain('On trip')
+
+    /*
+     * 🔴 `status`로 정하지 않는다. 그쪽은 탭 구분이라 `ongoing`에 **예정 여정도 들어간다**
+     * (`getJourneyStatus`가 `endDate`만 본다). 시작 전인 여정에 도장이 찍히면 사실이 아닌
+     * 상태를 말하게 된다 — #533 리뷰가 잡은 것이다.
+     */
+    expect(mountCard({}, { status: 'ongoing', onTrip: false }).text()).not.toContain('On trip')
   })
 
   /*

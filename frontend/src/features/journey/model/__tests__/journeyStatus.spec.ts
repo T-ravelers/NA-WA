@@ -4,6 +4,7 @@ import {
   filterJourneysByStatus,
   formatJourneyDate,
   getJourneyStatus,
+  isJourneyOnTrip,
   getKoreaToday,
   getMillisecondsUntilKoreaMidnight,
 } from '../journeyStatus'
@@ -52,5 +53,26 @@ describe('journeyStatus', () => {
 
   it('formats API date-only values without timezone conversion', () => {
     expect(formatJourneyDate('2026-08-09', 'en')).toBe('Aug 9, 2026')
+  })
+})
+
+describe('isJourneyOnTrip', () => {
+  /*
+   * 🔴 `getJourneyStatus`의 `ongoing`과 다르다. 그쪽은 `endDate`만 보므로 시작 전 여정도
+   * `ongoing`이고, 그것을 그대로 도장 조건으로 쓰면 떠나지도 않은 여정에 `ON TRIP`이
+   * 찍힌다 — #533 리뷰가 잡은 것이다.
+   */
+  it('is false before departure even though the tab calls it ongoing', () => {
+    expect(getJourneyStatus('2026-08-30', '2026-08-25')).toBe('ongoing')
+    expect(isJourneyOnTrip('2026-08-28', '2026-08-30', '2026-08-25')).toBe(false)
+  })
+
+  it('covers both boundary days', () => {
+    expect(isJourneyOnTrip('2026-08-25', '2026-08-27', '2026-08-25')).toBe(true)
+    expect(isJourneyOnTrip('2026-08-23', '2026-08-25', '2026-08-25')).toBe(true)
+  })
+
+  it('is false once the journey has ended', () => {
+    expect(isJourneyOnTrip('2026-08-20', '2026-08-24', '2026-08-25')).toBe(false)
   })
 })

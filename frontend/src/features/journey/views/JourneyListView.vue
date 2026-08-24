@@ -15,7 +15,12 @@ import JourneyListCard from '../components/JourneyListCard.vue'
 import { useJourneyListQuery } from '../composables/useJourneyListQuery'
 import { useJourneyReportIntegration } from '../model/reportIntegration'
 import { journeyErrorMessageKey } from '../model/journeyErrors'
-import { filterJourneysByStatus, type JourneyListTab, useKoreaToday } from '../model/journeyStatus'
+import {
+  filterJourneysByStatus,
+  isJourneyOnTrip,
+  type JourneyListTab,
+  useKoreaToday,
+} from '../model/journeyStatus'
 
 const i18n = useI18n()
 const { t } = i18n
@@ -186,6 +191,7 @@ function retry(): void {
             :journey="journey"
             :status="activeTab"
             :status-label="activeTabLabel"
+            :on-trip="isJourneyOnTrip(journey.startDate, journey.endDate, today)"
             :report-id="reportIdByTripId.get(journey.tripId) ?? null"
             class="w-68 shrink-0 snap-start"
           />

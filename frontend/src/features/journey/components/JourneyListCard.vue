@@ -17,6 +17,14 @@ interface Props {
   status: JourneyListStatus
   statusLabel: string
   /**
+   * 지금 실제로 여행 중인가. 도장을 찍을지 정한다.
+   *
+   * 🔴 `status`로 대신하지 않는다. 그쪽은 탭 구분이라 `ongoing`에 **예정 여정도 들어간다**
+   * (`getJourneyStatus`가 `endDate`만 본다). 시작 전인 여정에 `ON TRIP`이 찍히면 사용자에게
+   * 사실이 아닌 상태를 말하게 된다.
+   */
+  onTrip?: boolean
+  /**
    * 이 여정의 최종 리포트 id. 없으면 `null`이다.
    *
    * 목록 응답에는 리포트 정보가 없어서 화면이 report feature에서 받아 내려준다
@@ -25,7 +33,7 @@ interface Props {
   reportId?: number | null
 }
 
-const { journey, status, statusLabel, reportId = null } = defineProps<Props>()
+const { journey, status, statusLabel, onTrip = false, reportId = null } = defineProps<Props>()
 
 const { locale, t } = useI18n()
 
@@ -148,7 +156,7 @@ const itemCounts = computed(() => {
             <span v-else></span>
 
             <TicketStamp
-              v-if="status === 'ongoing'"
+              v-if="onTrip"
               :label="t('journey.list.onTrip')"
             />
           </div>
