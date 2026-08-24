@@ -102,6 +102,11 @@ class EventMapperIntegrationTest {
                 "DELETE FROM explore_item_likes WHERE item_id = ?",
                 eventId
             );
+            // event를 참조하는 FK라 본체보다 먼저 지운다.
+            jdbcTemplate.update(
+                "DELETE FROM event_translations WHERE event_id = ?",
+                eventId
+            );
             jdbcTemplate.update(
                 "DELETE FROM event WHERE event_id = ?",
                 eventId
@@ -123,6 +128,138 @@ class EventMapperIntegrationTest {
         if (dataSource != null) {
             dataSource.close();
         }
+    }
+
+    /**
+     * 요청한 언어의 번역이 있으면 그 값이, 없으면 한국어 원문이 나가야 한다.
+     *
+     * <p>#531 전까지 조회 SQL이 번역 테이블을 아예 조인하지 않아 어떤 언어로 요청해도
+     * 한국어만 나갔다. 목록과 상세가 같은 언어를 돌려주는지도 함께 본다 — 두 곳이 따로
+     * 정규화하던 것이 원인의 절반이었다.
+     */
+    @Test
+    void searchAndDetail_returnTranslatedTextForTheRequestedLanguage() {
+        long eventId = insertEvent(
+            "translated",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        insertEventTranslation(
+            eventId, "en", marker + "-english-title", "English description"
+        );
+
+        EventSearchRequest request = new EventSearchRequest();
+        request.setKeyword(marker + "-english-title");
+        request.setLanguage("en");
+        request.setSize(20);
+
+        List<EventSummaryResponse> results = mapper.searchEvents(
+            request, 0, null, today
+        );
+
+        assertEquals(1, results.size());
+        assertEquals(marker + "-english-title", results.get(0).getTitle());
+        // 목록이 번역 제목으로 찾아 줬다면 개수도 같은 조건을 봐야 한다.
+        assertEquals(1, mapper.countEvents(request, null, today));
+
+        EventDetailResponse detail = mapper.findEventDetail(
+            eventId, "en", null, today
+        );
+        assertEquals(marker + "-english-title", detail.getTitle());
+        assertEquals("English description", detail.getDescription());
+    }
+
+    /**
+     * {@code zh-TW} 번역이 조인된다.
+     *
+     * <p><b>대소문자는 지금 스키마에서는 문제가 되지 않는다.</b> 두 번역 테이블이
+     * {@code utf8mb4_0900_ai_ci}(대소문자 구분 없음)라 {@code zh-tw}로 비교해도 저장된
+     * {@code zh-TW}에 그대로 걸린다. 그래서 "어떤 언어로 요청해도 한국어만 나온다"의 원인은
+     * 소문자 정규화가 아니라 <b>조인 자체가 없던 것</b>이었다(#531).
+     *
+     * <p>그럼에도 {@code ExploreLanguagePolicy}가 {@code zh-TW}를 원형으로 되돌리는 것은
+     * 대비다 — 컬럼 collation을 {@code _bin}이나 {@code _as_cs}로 바꾸거나, 언어 코드를
+     * 자바에서 비교하는 코드가 생기는 순간 소문자 값은 조용히 어긋난다. 이 테스트는 두 표기가
+     * 지금은 같은 결과를 낸다는 사실 자체를 고정해, 나중에 collation이 바뀌면 여기서 깨지게
+     * 한다.
+     */
+    @Test
+    void findEventDetail_matchesZhTwTranslation_regardlessOfCasing() {
+        long eventId = insertEvent(
+            "zh-tw",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        insertEventTranslation(eventId, "zh-TW", marker + "-繁體標題", "繁體說明");
+
+        assertEquals(
+            marker + "-繁體標題",
+            mapper.findEventDetail(eventId, "zh-TW", null, today).getTitle()
+        );
+        assertEquals(
+            marker + "-繁體標題",
+            mapper.findEventDetail(eventId, "zh-tw", null, today).getTitle()
+        );
+    }
+
+    /** 번역 행이 없거나 값이 빈 문자열이면 한국어 원문으로 돌아간다. */
+    @Test
+    void findEventDetail_fallsBackToKorean_whenTranslationIsMissingOrBlank() {
+        long noTranslation = insertEvent(
+            "no-translation",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        long blankTranslation = insertEvent(
+            "blank-translation",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        // 파이프라인이 번역하지 못한 필드를 NULL이 아니라 빈 값으로 채우는 경우가 있다.
+        insertEventTranslation(blankTranslation, "en", "   ", "");
+
+        assertEquals(
+            marker + "-no-translation",
+            mapper.findEventDetail(noTranslation, "en", null, today).getTitle()
+        );
+        assertEquals(
+            marker + "-blank-translation",
+            mapper.findEventDetail(blankTranslation, "en", null, today).getTitle()
+        );
+    }
+
+    /**
+     * 번역 쪽 {@code operating_hours}는 TEXT이고 응답 DTO는 JSON이다.
+     *
+     * <p>그대로 COALESCE하면 {@code JsonNodeTypeHandler}가 파싱에 실패해 상세 API가 통째로
+     * 500이 된다. {@code {"raw": "..."}}로 감싸 원문 JSON과 같은 모양으로 맞춘다.
+     */
+    @Test
+    void findEventDetail_wrapsTranslatedOperatingHoursAsJson() {
+        long eventId = insertEvent(
+            "hours",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        insertEventTranslation(
+            eventId, "en", marker + "-hours-en", null, "Mon-Fri 09:00-18:00"
+        );
+
+        EventDetailResponse detail = mapper.findEventDetail(
+            eventId, "en", null, today
+        );
+
+        assertNotNull(detail.getOperatingHours());
+        assertTrue(detail.getOperatingHours().isObject());
+        assertEquals(
+            "Mon-Fri 09:00-18:00",
+            detail.getOperatingHours().path("raw").asText()
+        );
     }
 
     @Test
@@ -542,6 +679,36 @@ class EventMapperIntegrationTest {
             permanent
         );
         return eventId;
+    }
+
+    private void insertEventTranslation(
+        long eventId,
+        String languageCode,
+        String title,
+        String description
+    ) {
+        insertEventTranslation(eventId, languageCode, title, description, null);
+    }
+
+    private void insertEventTranslation(
+        long eventId,
+        String languageCode,
+        String title,
+        String description,
+        String operatingHours
+    ) {
+        jdbcTemplate.update(
+            """
+            INSERT INTO event_translations (
+                event_id, language_code, title, description, operating_hours
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            eventId,
+            languageCode,
+            title,
+            description,
+            operatingHours
+        );
     }
 
     private static String requiredEnvironment(String name) {

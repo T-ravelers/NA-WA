@@ -25,6 +25,7 @@ public interface PlaceMapper {
 
     PlaceDetailResponse findPlaceDetail(
         @Param("placeId") Long placeId,
+        @Param("language") String language,
         @Param("memberId") Long memberId
     );
 

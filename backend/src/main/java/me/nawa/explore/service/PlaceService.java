@@ -72,10 +72,10 @@ public class PlaceService {
         if (placeId == null || placeId <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
-        String normalizedLanguage = StringUtils.hasText(language)
-            ? language.toLowerCase(Locale.ROOT)
-            : "en";
-        PlaceDetailResponse place = placeMapper.findPlaceDetail(placeId, memberId);
+        String normalizedLanguage = ExploreLanguagePolicy.normalize(language);
+        PlaceDetailResponse place = placeMapper.findPlaceDetail(
+            placeId, normalizedLanguage, memberId
+        );
         if (place == null) {
             throw new BusinessException(ExploreErrorCode.PLACE_NOT_FOUND);
         }
@@ -137,8 +137,7 @@ public class PlaceService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         request.setSort(sort);
-        request.setLanguage(StringUtils.hasText(request.getLanguage())
-            ? request.getLanguage().trim().toLowerCase(Locale.ROOT) : "en");
+        request.setLanguage(ExploreLanguagePolicy.normalize(request.getLanguage()));
     }
 
     private void validateSavedOnly(PlaceSearchRequest request, Long memberId) {

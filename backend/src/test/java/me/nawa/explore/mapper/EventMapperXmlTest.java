@@ -13,6 +13,7 @@ import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.mapping.ParameterMapping;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Test;
 
@@ -306,6 +307,160 @@ class EventMapperXmlTest {
         assertTrue(detailSql.contains("(e.end_date IS NULL OR e.end_date >= ?)"));
         assertFalse(detailSql.contains("e.status"));
         assertTrue(detailSql.contains("END AS status"));
+    }
+
+    /**
+     * 목록·개수·상세가 모두 번역 테이블을 조인해야 한다.
+     *
+     * <p>이 조인이 없어서 어떤 언어로 요청해도 한국어 원문만 나갔다(#531). LEFT JOIN이라
+     * 빠져 있어도 쿼리는 성공하고 오류도 남지 않아, 화면을 열어 보기 전까지 드러나지 않는다.
+     */
+    @Test
+    void eventStatements_joinTranslationsForRequestedLanguage() throws Exception {
+        Configuration configuration = parsedConfiguration();
+
+        Map<String, Object> listParameters = new HashMap<>();
+        listParameters.put("request", new EventSearchRequest());
+        listParameters.put("offset", 0);
+        listParameters.put("today", LocalDate.of(2026, 8, 25));
+
+        for (String statementId : List.of(
+            "me.nawa.explore.mapper.EventMapper.searchEvents",
+            "me.nawa.explore.mapper.EventMapper.countEvents"
+        )) {
+            String sql = normalizedSql(configuration, statementId, listParameters);
+
+            assertTrue(
+                sql.contains("LEFT JOIN event_translations et"),
+                statementId + "가 번역 테이블을 조인하지 않는다"
+            );
+            assertTrue(sql.contains("et.deleted_at IS NULL"));
+            // 언어는 request 안에 있다. 경로를 잘못 적으면 NULL로 조인돼 조용히 원문만 나간다.
+            assertTrue(
+                boundProperties(configuration, statementId, listParameters)
+                    .contains("request.language"),
+                statementId + "가 request.language를 바인딩하지 않는다"
+            );
+        }
+
+        String detailSql = normalizedSql(
+            configuration,
+            "me.nawa.explore.mapper.EventMapper.findEventDetail",
+            Map.of("eventId", 1L, "language", "zh-TW", "today", LocalDate.of(2026, 8, 25))
+        );
+        assertTrue(detailSql.contains("LEFT JOIN event_translations et"));
+        assertTrue(
+            boundProperties(
+                configuration,
+                "me.nawa.explore.mapper.EventMapper.findEventDetail",
+                Map.of("eventId", 1L, "language", "zh-TW", "today", LocalDate.of(2026, 8, 25))
+            ).contains("language")
+        );
+    }
+
+    /** 번역이 없거나 빈 문자열이면 한국어 원문으로 돌아가야 한다. */
+    @Test
+    void eventStatements_fallBackToKoreanColumns() throws Exception {
+        Configuration configuration = parsedConfiguration();
+
+        Map<String, Object> listParameters = new HashMap<>();
+        listParameters.put("request", new EventSearchRequest());
+        listParameters.put("offset", 0);
+        listParameters.put("today", LocalDate.of(2026, 8, 25));
+
+        String listSql = normalizedSql(
+            configuration,
+            "me.nawa.explore.mapper.EventMapper.searchEvents",
+            listParameters
+        );
+        assertTrue(listSql.contains(
+            "COALESCE(NULLIF(TRIM(et.title), ''), e.title) AS title"
+        ));
+
+        String detailSql = normalizedSql(
+            configuration,
+            "me.nawa.explore.mapper.EventMapper.findEventDetail",
+            Map.of("eventId", 1L, "language", "en", "today", LocalDate.of(2026, 8, 25))
+        );
+        assertTrue(detailSql.contains(
+            "COALESCE(NULLIF(TRIM(et.title), ''), e.title) AS title"
+        ));
+        assertTrue(detailSql.contains(
+            "COALESCE(NULLIF(TRIM(et.venue_detail), ''), e.venue_name) AS venue_name"
+        ));
+        assertTrue(detailSql.contains(
+            "COALESCE(NULLIF(TRIM(et.address_display), ''), e.address_road) AS address_road"
+        ));
+        /*
+         * 번역 쪽 operating_hours는 TEXT고 응답 DTO는 JSON이다. 그냥 COALESCE하면
+         * JsonNodeTypeHandler가 파싱에 실패해 상세 API가 통째로 500이 된다.
+         */
+        assertTrue(detailSql.contains("JSON_OBJECT('raw', et.operating_hours)"));
+    }
+
+    /**
+     * 화면에 영어 제목이 보이는데 그 영어 제목으로 검색하면 0건이 나오는 상태를 막는다.
+     * 한국어 원문 조건도 함께 남겨, 번역이 붙은 Event를 한국어로 찾던 경로가 죽지 않게 한다.
+     */
+    @Test
+    void keywordSearch_matchesTranslatedTitleAndKoreanOriginal() throws Exception {
+        Configuration configuration = parsedConfiguration();
+
+        EventSearchRequest request = new EventSearchRequest();
+        request.setKeyword("Lantern");
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+        parameters.put("offset", 0);
+        parameters.put("today", LocalDate.of(2026, 8, 25));
+
+        String listSql = normalizedSql(
+            configuration,
+            "me.nawa.explore.mapper.EventMapper.searchEvents",
+            parameters
+        );
+        String countSql = normalizedSql(
+            configuration,
+            "me.nawa.explore.mapper.EventMapper.countEvents",
+            parameters
+        );
+
+        assertTrue(listSql.contains("COALESCE(NULLIF(TRIM(et.title), ''), e.title) LIKE"));
+        assertTrue(listSql.contains("e.title LIKE"));
+        /*
+         * 목록만 번역 제목으로 찾고 개수는 원문만 세면 totalElements가 어긋나
+         * 페이지네이션이 틀어진다. 두 구문이 같은 조건을 봐야 한다.
+         */
+        assertTrue(countSql.contains("COALESCE(NULLIF(TRIM(et.title), ''), e.title) LIKE"));
+        assertTrue(countSql.contains("LEFT JOIN event_translations et"));
+    }
+
+    private static Configuration parsedConfiguration() throws Exception {
+        Configuration configuration = new Configuration();
+
+        try (InputStream input = Resources.getResourceAsStream(MAPPER_RESOURCE)) {
+            new XMLMapperBuilder(
+                input,
+                configuration,
+                MAPPER_RESOURCE,
+                configuration.getSqlFragments()
+            ).parse();
+        }
+        return configuration;
+    }
+
+    private static List<String> boundProperties(
+        Configuration configuration,
+        String statementId,
+        Map<String, Object> parameters
+    ) {
+        return configuration
+            .getMappedStatement(statementId)
+            .getBoundSql(parameters)
+            .getParameterMappings()
+            .stream()
+            .map(ParameterMapping::getProperty)
+            .toList();
     }
 
     private static String normalizedSql(

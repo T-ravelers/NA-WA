@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
@@ -15,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
+import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.explore.dto.request.EventSearchRequest;
 import me.nawa.explore.dto.response.EventDetailResponse;
 import me.nawa.explore.dto.response.EventListResponse;
@@ -287,14 +289,14 @@ class EventServiceTest {
             .build();
 
         when(eventMapper.findEventDetail(
-            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
+            eq(990001L), eq("ja"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
-        when(eventMapper.findEventActivities(990001L, "ko"))
+        when(eventMapper.findEventActivities(990001L, "ja"))
             .thenReturn(List.of());
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "ko",
+            "ja",
             null);
 
         assertEquals(990001L, result.getEventId());
@@ -302,8 +304,8 @@ class EventServiceTest {
         assertEquals("서울 야시장 푸드 팝업(테스트)", result.getTitle());
         assertEquals(0, result.getActivities().size());
         verify(eventMapper).findEventDetail(
-            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class));
-        verify(eventMapper).findEventActivities(990001L, "ko");
+            eq(990001L), eq("ja"), isNull(Long.class), any(LocalDate.class));
+        verify(eventMapper).findEventActivities(990001L, "ja");
     }
 
     /*
@@ -317,10 +319,10 @@ class EventServiceTest {
             .eventId(990001L)
             .build();
         when(eventMapper.findEventDetail(
-            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class))).thenReturn(event);
-        when(eventMapper.findEventActivities(990001L, "ko")).thenReturn(List.of());
+            eq(990001L), eq("ja"), isNull(Long.class), any(LocalDate.class))).thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "ja")).thenReturn(List.of());
 
-        eventService.getEventDetail(990001L, "ko", null);
+        eventService.getEventDetail(990001L, "ja", null);
 
         verifyNoInteractions(viewCountRecorder);
     }
@@ -345,7 +347,7 @@ class EventServiceTest {
     void getEventDetail_throwsInvalidInput_whenEventIdIsInvalid() {
         assertThrows(
             BusinessException.class,
-            () -> eventService.getEventDetail(0L, "ko", null)
+            () -> eventService.getEventDetail(0L, "ja", null)
         );
         verifyNoInteractions(eventMapper);
     }
@@ -353,12 +355,12 @@ class EventServiceTest {
     @Test
     void getEventDetail_throwsEventNotFound_whenMapperReturnsNull() {
         when(eventMapper.findEventDetail(
-            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
+            eq(990001L), eq("ja"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(null);
 
         BusinessException exception = assertThrows(
             BusinessException.class,
-            () -> eventService.getEventDetail(990001L, "ko", null)
+            () -> eventService.getEventDetail(990001L, "ja", null)
         );
 
         assertEquals(
@@ -366,7 +368,7 @@ class EventServiceTest {
             exception.getErrorCode()
         );
         verify(eventMapper).findEventDetail(
-            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class));
+            eq(990001L), eq("ja"), isNull(Long.class), any(LocalDate.class));
     }
 
     @Test
@@ -377,18 +379,18 @@ class EventServiceTest {
             .build();
 
         when(eventMapper.findEventDetail(
-            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
+            eq(990001L), eq("ja"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
-        when(eventMapper.findEventActivities(990001L, "ko"))
+        when(eventMapper.findEventActivities(990001L, "ja"))
             .thenReturn(null);
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "ko",
+            "ja",
             null);
 
         assertEquals(List.of(), result.getActivities());
-        verify(eventMapper).findEventActivities(990001L, "ko");
+        verify(eventMapper).findEventActivities(990001L, "ja");
     }
 
     @Test
@@ -452,14 +454,14 @@ class EventServiceTest {
             .build();
 
         when(eventMapper.findEventDetail(
-            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
+            eq(990001L), eq("ja"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
-        when(eventMapper.findEventActivities(990001L, "ko"))
+        when(eventMapper.findEventActivities(990001L, "ja"))
             .thenReturn(List.of());
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "ko",
+            "ja",
             null);
 
         assertEquals(
@@ -479,14 +481,14 @@ class EventServiceTest {
             .build();
 
         when(eventMapper.findEventDetail(
-            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
+            eq(990001L), eq("ja"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
-        when(eventMapper.findEventActivities(990001L, "ko"))
+        when(eventMapper.findEventActivities(990001L, "ja"))
             .thenReturn(List.of());
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "ko",
+            "ja",
             null);
 
         assertEquals(
@@ -505,14 +507,14 @@ class EventServiceTest {
             .build();
 
         when(eventMapper.findEventDetail(
-            eq(990001L), eq("ko"), isNull(Long.class), any(LocalDate.class)))
+            eq(990001L), eq("ja"), isNull(Long.class), any(LocalDate.class)))
             .thenReturn(event);
-        when(eventMapper.findEventActivities(990001L, "ko"))
+        when(eventMapper.findEventActivities(990001L, "ja"))
             .thenReturn(List.of());
 
         EventDetailResponse result = eventService.getEventDetail(
             990001L,
-            "ko",
+            "ja",
             null);
 
         assertEquals(
@@ -528,15 +530,15 @@ class EventServiceTest {
             .build();
 
         when(eventMapper.findEventDetail(
-            eq(990001L), eq("ko"), eq(7L), any(LocalDate.class)))
+            eq(990001L), eq("ja"), eq(7L), any(LocalDate.class)))
             .thenReturn(event);
-        when(eventMapper.findEventActivities(990001L, "ko"))
+        when(eventMapper.findEventActivities(990001L, "ja"))
             .thenReturn(List.of());
 
-        eventService.getEventDetail(990001L, "ko", 7L);
+        eventService.getEventDetail(990001L, "ja", 7L);
 
         verify(eventMapper).findEventDetail(
-            eq(990001L), eq("ko"), eq(7L), any(LocalDate.class));
+            eq(990001L), eq("ja"), eq(7L), any(LocalDate.class));
     }
 
     @Test
@@ -556,5 +558,61 @@ class EventServiceTest {
         verify(eventMapper).findEventDetail(
             eq(990001L), eq("en"), isNull(Long.class), any(LocalDate.class));
         verify(eventMapper).findEventActivities(990001L, "en");
+    }
+
+    /**
+     * 상세가 zh-TW를 소문자로 접지 않고 그대로 매퍼에 넘겨야 한다.
+     *
+     * <p>예전에는 요청 값을 통째로 {@code toLowerCase}해 {@code zh-tw}가 넘어갔고, 번역
+     * 테이블의 {@code zh-TW}와 맞지 않아 한국어 원문만 나갔다(#531).
+     */
+    @Test
+    void getEventDetail_keepsZhTwCasing() {
+        EventDetailResponse event = EventDetailResponse.builder()
+            .eventId(990001L)
+            .build();
+
+        when(eventMapper.findEventDetail(
+            eq(990001L), eq("zh-TW"), isNull(Long.class), any(LocalDate.class)))
+            .thenReturn(event);
+        when(eventMapper.findEventActivities(990001L, "zh-TW"))
+            .thenReturn(List.of());
+
+        eventService.getEventDetail(990001L, "zh-TW", null);
+
+        verify(eventMapper).findEventDetail(
+            eq(990001L), eq("zh-TW"), isNull(Long.class), any(LocalDate.class));
+    }
+
+    /** 목록도 같은 정책을 써야 목록과 상세가 다른 언어를 돌려주지 않는다. */
+    @Test
+    void searchEvents_keepsZhTwCasing() {
+        EventSearchRequest request = new EventSearchRequest();
+        request.setLanguage("zh-TW");
+
+        when(eventMapper.searchEvents(
+            any(EventSearchRequest.class), anyInt(), isNull(Long.class),
+            any(LocalDate.class)))
+            .thenReturn(List.of());
+        when(eventMapper.countEvents(
+            any(EventSearchRequest.class), isNull(Long.class),
+            any(LocalDate.class)))
+            .thenReturn(0L);
+
+        eventService.searchEvents(request, null);
+
+        assertEquals("zh-TW", request.getLanguage());
+    }
+
+    /** 지원 목록 밖의 언어는 조용히 한국어로 떨어지지 않고 400으로 끊는다. */
+    @Test
+    void getEventDetail_rejectsUnsupportedLanguage() {
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> eventService.getEventDetail(990001L, "ko", null)
+        );
+
+        assertEquals(CommonErrorCode.INVALID_INPUT, exception.getErrorCode());
+        verifyNoInteractions(eventMapper);
     }
 }
