@@ -138,11 +138,15 @@
             e.open_weekend,
             e.opens_late,
             <!--
-                이름만 다를 뿐 같은 값의 원문과 번역이다. 크롤러 발행 함수에서 확인했다 —
-                publish_delta_events가 'venueName'에 e.venue_detail을 실어 보내고, 번역 쪽은
-                같은 venue_detail의 번역이다. 층·홀 같은 부가 정보가 아니라 장소명이다.
-                아래 address_display도 같은 성격으로, event.address의 영문 표기다.
-                자세한 대응표는 EXPLORE_API.md에 있다(#531 리뷰).
+                이름은 다르지만 원문과 번역이 같은 필드를 가리킨다. 크롤러 발행 함수에서
+                확인했다 — publish_delta_events가 'venueName'에 e.venue_detail을 싣고,
+                번역 쪽은 그 같은 venue_detail의 번역이다. 아래 address_display도 같은
+                성격으로 event.address의 영문 표기다.
+
+                **확인된 것은 대응의 일관성까지다.** venue_detail이 담는 내용 자체는 한
+                가지로 단정하지 않는다 — 크롤러가 상세주소와 장소명을 줄바꿈으로 합쳐
+                만드는 경우가 있다. 원문과 번역이 같은 모양이라 표시 계약에는 영향이 없다.
+                대응표는 EXPLORE_API.md에 있다(#531 리뷰).
             -->
             COALESCE(NULLIF(TRIM(et.venue_detail), ''), e.venue_name) AS venue_name,
             e.region1,

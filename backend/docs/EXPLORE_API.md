@@ -58,8 +58,12 @@ Event·Place의 목록과 상세는 `language`가 가리키는 번역을 우선 
 
 다만 **이것이 "어떤 언어로 요청해도 한국어가 나온다"의 원인은 아니었습니다.** 두 번역
 테이블의 collation이 `utf8mb4_0900_ai_ci`(대소문자 구분 없음)라 `language_code = 'zh-tw'`도
-저장된 `zh-TW`에 그대로 걸립니다. 실제 원인은 조회 SQL에 **번역 조인 자체가 없던 것**이고,
-네 언어가 모두 같은 증상이었습니다(#531).
+저장된 `zh-TW`에 그대로 걸립니다. 실제 원인은 조회 SQL에 **번역 조인 자체가 없던 것**이며,
+`zh-TW`만 다르게 깨지고 있던 것이 아닙니다(#531).
+
+증상은 네 언어가 같았지만 **원인은 하나가 아닙니다.** 조인을 넣으면 번역이 쌓여 있는
+언어는 곧바로 그 언어로 나가고, 번역이 없는 언어는 설계대로 한국어로 폴백합니다. 후자는
+백엔드 결함이 아니라 적재 범위입니다(위 [새 로케일을 추가하는 순서](#새-로케일을-추가하는-순서)).
 
 표기를 보존하는 이유는 방어입니다 — collation을 `_bin`이나 `_as_cs`로 바꾸거나 언어 코드를
 애플리케이션에서 비교하는 코드가 생기는 순간, 소문자 값은 그때 조용히 어긋납니다. 통합
@@ -81,12 +85,9 @@ Event·Place의 목록과 상세는 `language`가 가리키는 번역을 우선 
 3. 그다음에 프론트 `shared/i18n/locales.ts`의 `SUPPORTED_LOCALES`에 넣습니다.
 
 적재 파이프라인이 그 언어의 번역을 채우는 것은 별개이며, 채워지기 전까지는 한국어로
-폴백합니다.
-
-> **`vi`는 아직 번역이 들어오지 않습니다.** 백엔드 허용 목록과 DB 제약에는 있지만, 크롤러의
-> 번역 적재가 `en`·`ja`·`zh-TW` 세 언어만 받습니다(`ARRAY['en','ja','zh-TW']`를 정확히
-> 요구하고 그 외에는 `LANGUAGE_SCHEMA_INVALID`로 거절). 베트남어 사용자는 이 수정 이후에도
-> Explore 문자열이 한국어로 보입니다 — 백엔드 결함이 아니라 파이프라인 범위입니다.
+폴백합니다. **허용 목록에 있다는 것이 번역이 존재한다는 뜻은 아닙니다.** 어떤 언어의 번역이
+실제로 쌓여 있는지는 파이프라인 쪽 범위이며, 현재 상태는
+[NA-WA-crawler#1](https://github.com/T-ravelers/NA-WA-crawler/issues/1)에서 추적합니다.
 
 키워드 검색은 **화면에 보이는 값과 한국어 원문을 함께** 훑습니다. 번역 제목이 보이는데 그
 제목으로 검색되지 않으면 목록이 고장 난 것으로 보이고, 원문 조건을 빼면 한국어로 찾던
@@ -104,8 +105,8 @@ Event·Place의 목록과 상세는 `language`가 가리키는 번역을 우선 
 | `venueName` | `event.venue_name` | `event_translations.venue_detail` |
 | `addressRoad` | `event.address_road` | `event_translations.address_display` |
 
-**이름만 다를 뿐 같은 값의 원문과 번역입니다.** 크롤러(`NA-WA-crawler`)의 발행 함수에서
-확인했습니다.
+**이름은 다르지만 원문과 번역이 같은 필드를 가리킵니다.** 크롤러(`NA-WA-crawler`)의 발행
+함수에서 확인했습니다.
 
 | 우리 컬럼 | 크롤러 원천 |
 | --- | --- |
@@ -114,9 +115,13 @@ Event·Place의 목록과 상세는 `language`가 가리키는 번역을 우선 
 | `event.address_road` | `publish_delta_events`의 `'addressRoad', e.address` |
 | `event_translations.address_display` | `event_translation.address_display ← event.address_en` |
 
-즉 `venue_detail`은 층·홀 같은 부가 정보가 아니라 **장소명 그 자체**이고,
-`address_display`는 같은 주소의 영문 표기입니다. 이름이 어긋난 것은 크롤러 쪽 컬럼명을
-번역 테이블이 그대로 가져왔기 때문입니다.
+이름이 어긋난 것은 크롤러 쪽 컬럼명을 번역 테이블이 그대로 가져왔기 때문입니다. **확인된
+것은 대응의 일관성까지입니다** — 원문 `venueName`과 번역 `venueDetail`이 같은 값에서 나오므로
+둘을 짝지어도 서로 다른 필드가 섞이지 않습니다.
+
+`venue_detail`이 담는 내용 자체는 한 가지로 단정하지 마세요. 크롤러가 상세주소와 장소명을
+줄바꿈으로 합쳐 만드는 경우가 있습니다(`concat_ws(E'\n', address_detail, venue_text)`).
+원문과 번역이 같은 모양이므로 표시 계약에는 영향이 없습니다.
 
 Place 쪽 `opening_hours`·`closed_days`는 **감싸는 모양이 서로 다릅니다.** 원문이 각각
 OBJECT와 ARRAY이고 프론트가 그 모양에 맞춰 다르게 읽기 때문입니다. 번역값은
