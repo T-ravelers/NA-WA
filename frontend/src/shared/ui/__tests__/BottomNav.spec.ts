@@ -78,12 +78,15 @@ describe('BottomNav', () => {
     expect(pill).toContain('rounded-pill')
     expect(pill).toContain('mb-4')
     expect(pill).toContain('shadow-raised')
+    expect(pill).toContain('pointer-events-auto')
 
-    // `nav`는 자리만 잡으므로 면 색도 테두리도 갖지 않는다.
+    // `nav`는 폭과 자리만 잡으며, 보이지 않는 여백은 아래 콘텐츠의 클릭을 가로채지 않는다.
     const shell = wrapper.get('nav').classes()
     expect(shell).toContain('px-4')
-    expect(shell.some((name) => name.startsWith('bg-'))).toBe(false)
-    expect(shell.some((name) => name.startsWith('border'))).toBe(false)
+    expect(shell).toContain('max-w-shell')
+    expect(shell).toContain('pointer-events-none')
+    expect(shell.some((name) => /(^|:)bg-/.test(name))).toBe(false)
+    expect(shell.some((name) => /(^|:)border/.test(name))).toBe(false)
   })
 
   /** 유리 면 위 잉크. 밝은 면 위 잉크(`text-on-paper`)로 되돌리면 대비가 1.68:1이 된다. */

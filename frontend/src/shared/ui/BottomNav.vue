@@ -59,7 +59,7 @@ function isActive(item: NavItem): boolean {
     투명도를 줄이도록 설정한 사용자에게는 배경을 불투명하게 하고 흐림을 끈다.
   -->
   <nav
-    class="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-shell px-4 pb-[env(safe-area-inset-bottom)]"
+    class="pointer-events-none fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-shell px-4 pb-[env(safe-area-inset-bottom)]"
     :aria-label="t('nav.label')"
   >
     <!--
@@ -71,7 +71,7 @@ function isActive(item: NavItem): boolean {
       실제로 `…`에 걸렸고, 잘린 탭 이름은 어디로 가는 탭인지 알려 주지 못한다.
     -->
     <ul
-      class="mb-4 flex items-start justify-center rounded-pill bg-canvas/90 px-2 py-3 shadow-raised backdrop-blur-xl reduce-transparency:bg-canvas reduce-transparency:backdrop-blur-none"
+      class="pointer-events-auto mb-4 flex items-start justify-center rounded-pill bg-canvas/90 px-2 py-3 shadow-raised backdrop-blur-xl reduce-transparency:bg-canvas reduce-transparency:backdrop-blur-none"
     >
       <li
         v-for="item in items"
