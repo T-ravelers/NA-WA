@@ -16,7 +16,7 @@ const router = useRouter()
     시작하고, 블록과 보딩패스 사이가 92px다.
   -->
   <section class="relative flex min-h-dvh flex-col px-screen pt-welcome-top pb-8">
-    <div class="flex flex-1 flex-col gap-welcome-ticket-gap">
+    <div class="flex flex-1 flex-col gap-8 tall:gap-welcome-ticket-gap">
       <div class="flex flex-col gap-3.5">
         <div class="flex flex-col items-start gap-welcome-wordmark-gap">
           <!-- 워드마크는 도형이라 번역 대상이 아니다. 문장 속 표기는 `app.name`이다. -->
@@ -39,7 +39,7 @@ const router = useRouter()
       -->
       <div
         aria-hidden="true"
-        class="h-welcome-ticket-height relative flex -rotate-2 items-stretch rounded-md bg-food"
+        class="h-welcome-ticket-height relative mb-1.5 flex -rotate-2 items-stretch rounded-md bg-food"
       >
         <!--
           `min-w-0`이 없으면 이 칸이 글자 길이만큼 벌어져 옆의 스텁을 화면 밖으로 밀어낸다.
