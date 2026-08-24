@@ -48,6 +48,14 @@ export default {
         budgetInvalid: 'Enter a budget of no more than 15 digits.',
       },
     },
+    dateRange: {
+      title: 'Trip dates',
+      description: 'Choose when this journey starts and ends.',
+      chooseDate: 'Select',
+      selectStart: 'Choose the start date.',
+      selectEnd: 'Choose the end date. Dates before the start are unavailable.',
+      apply: 'Apply dates',
+    },
     detail: {
       budget: 'Budget',
       noBudget: 'No budget set',

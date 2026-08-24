@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { i18n } from '@/app/i18n'
 
 import JourneyCreateForm from '../JourneyCreateForm.vue'
+import JourneyDateRangePicker from '../JourneyDateRangePicker.vue'
 
 function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
   const button = wrapper.findAll('button').find((candidate) => candidate.text().includes(text))
@@ -17,10 +18,11 @@ function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
 
 async function fillRequiredFields(wrapper: ReturnType<typeof mount>): Promise<void> {
   await wrapper.get('input[type="text"]').setValue('Seoul Foodie Week')
-  const dateInputs = wrapper.findAll('input[type="date"]')
+  const picker = wrapper.findComponent(JourneyDateRangePicker)
 
-  await dateInputs[0]?.setValue('2026-08-10')
-  await dateInputs[1]?.setValue('2026-08-12')
+  picker.vm.$emit('update:startDate', '2026-08-10')
+  picker.vm.$emit('update:endDate', '2026-08-12')
+  await wrapper.vm.$nextTick()
 }
 
 describe('JourneyCreateForm', () => {
@@ -35,19 +37,19 @@ describe('JourneyCreateForm', () => {
       global: { plugins: [i18n] },
     })
 
-    const dateInputs = wrapper.findAll('input[type="date"]')
+    const picker = wrapper.getComponent(JourneyDateRangePicker)
 
-    expect((dateInputs[0]?.element as HTMLInputElement).value).toBe('2026-08-10')
-    expect((dateInputs[1]?.element as HTMLInputElement).value).toBe('2026-08-12')
+    expect(picker.props('startDate')).toBe('2026-08-10')
+    expect(picker.props('endDate')).toBe('2026-08-12')
   })
 
   it('항목 기간이 없으면 기간 입력칸은 빈 채로 열린다', () => {
     const wrapper = mount(JourneyCreateForm, { global: { plugins: [i18n] } })
 
-    const dateInputs = wrapper.findAll('input[type="date"]')
+    const picker = wrapper.getComponent(JourneyDateRangePicker)
 
-    expect((dateInputs[0]?.element as HTMLInputElement).value).toBe('')
-    expect((dateInputs[1]?.element as HTMLInputElement).value).toBe('')
+    expect(picker.props('startDate')).toBe('')
+    expect(picker.props('endDate')).toBe('')
   })
 
   it('keeps the user on step one and exposes validation errors', async () => {
@@ -88,14 +90,10 @@ describe('JourneyCreateForm', () => {
     expect(wrapper.get('fieldset').attributes()).toHaveProperty('disabled')
   })
 
-  it('uses unique shared input ids and constrains the end date from the selected start date', async () => {
+  it('uses the shared custom range picker instead of native date inputs', () => {
     const wrapper = mount(JourneyCreateForm, { global: { plugins: [i18n] } })
-    const dateInputs = wrapper.findAll('input[type="date"]')
 
-    await dateInputs[0]?.setValue('2026-08-10')
-
-    expect(dateInputs).toHaveLength(2)
-    expect(dateInputs[0]?.attributes('id')).not.toBe(dateInputs[1]?.attributes('id'))
-    expect(dateInputs[1]?.attributes('min')).toBe('2026-08-10')
+    expect(wrapper.findAll('input[type="date"]')).toHaveLength(0)
+    expect(wrapper.findComponent(JourneyDateRangePicker).exists()).toBe(true)
   })
 })

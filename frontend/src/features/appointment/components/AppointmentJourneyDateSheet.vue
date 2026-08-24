@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { IconChevronLeft } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { IconChevronLeft, IconChevronRight } from '@tabler/icons-vue'
 
 import { formatCalendarDate, parseCalendarDate, serializeCalendarDate } from '@/shared/lib/datetime'
 import AppButton from '@/shared/ui/AppButton.vue'
+import CalendarGrid from '@/shared/ui/CalendarGrid.vue'
 
 interface Props {
   journeyTitle: string
@@ -53,15 +54,6 @@ function getInitialDate(): string | null {
 }
 
 const selectedDate = ref<string | null>(getInitialDate())
-const monthCursor = ref(
-  parseDate(selectedDate.value) ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-)
-
-const monthLabel = computed(() =>
-  new Intl.DateTimeFormat(locale.value, { month: 'long', year: 'numeric' }).format(
-    monthCursor.value,
-  ),
-)
 
 const selectedDateLabel = computed(() => {
   if (!selectedDate.value) return t('appointment.journeyDate.chooseDate')
@@ -71,41 +63,8 @@ const selectedDateLabel = computed(() => {
     : t('appointment.journeyDate.chooseDate')
 })
 
-const calendarDays = computed(() => {
-  const year = monthCursor.value.getFullYear()
-  const month = monthCursor.value.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const startOffset = firstDay.getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const previousMonthDays = new Date(year, month, 0).getDate()
-  const cells: Array<{ date: string; day: number; inMonth: boolean }> = []
-
-  for (let index = 0; index < 42; index += 1) {
-    const rawDay = index - startOffset + 1
-    const inMonth = rawDay >= 1 && rawDay <= daysInMonth
-    const date = new Date(year, month, rawDay)
-    const day = inMonth ? rawDay : rawDay < 1 ? previousMonthDays + rawDay : rawDay - daysInMonth
-    cells.push({ date: serializeCalendarDate(date), day, inMonth })
-  }
-
-  return cells
-})
-
-function shiftMonth(offset: number): void {
-  monthCursor.value = new Date(
-    monthCursor.value.getFullYear(),
-    monthCursor.value.getMonth() + offset,
-    1,
-  )
-}
-
 function selectDate(value: string): void {
   if (isDateAllowed(value)) selectedDate.value = value
-}
-
-function accessibleDateLabel(value: string): string {
-  const date = parseDate(value)
-  return date ? formatCalendarDate(date, locale.value, { dateStyle: 'long' }) : value
 }
 
 function confirm(): void {
@@ -156,59 +115,12 @@ function confirm(): void {
         </p>
       </header>
 
-      <div class="mt-5 flex items-center justify-between">
-        <button
-          type="button"
-          class="flex size-8 items-center justify-center text-ink-2"
-          :aria-label="t('appointment.journeyDate.previousMonth')"
-          @click="shiftMonth(-1)"
-        >
-          <IconChevronLeft
-            :size="18"
-            aria-hidden="true"
-          />
-        </button>
-        <strong class="text-title-sm text-ink">{{ monthLabel }}</strong>
-        <button
-          type="button"
-          class="flex size-8 items-center justify-center text-ink-2"
-          :aria-label="t('appointment.journeyDate.nextMonth')"
-          @click="shiftMonth(1)"
-        >
-          <IconChevronRight
-            :size="18"
-            aria-hidden="true"
-          />
-        </button>
-      </div>
-
-      <div class="mt-3 grid grid-cols-7 text-center text-micro text-ink-3">
-        <span
-          v-for="day in ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']"
-          :key="day"
-          >{{ t(`appointment.calendar.weekdays.${day}`) }}</span
-        >
-      </div>
-      <div class="mt-2 grid grid-cols-7 gap-y-1 text-center">
-        <button
-          v-for="cell in calendarDays"
-          :key="cell.date"
-          type="button"
-          class="mx-auto flex size-9 items-center justify-center rounded-pill text-caption"
-          :class="[
-            !cell.inMonth || !isDateAllowed(cell.date) ? 'text-ink-3/40' : 'text-ink-2',
-            selectedDate === cell.date && 'bg-paper-fill text-on-paper',
-          ]"
-          :aria-label="
-            t('appointment.journeyDate.selectDate', { date: accessibleDateLabel(cell.date) })
-          "
-          :aria-pressed="selectedDate === cell.date"
-          :disabled="!cell.inMonth || !isDateAllowed(cell.date)"
-          @click="selectDate(cell.date)"
-        >
-          {{ cell.day }}
-        </button>
-      </div>
+      <CalendarGrid
+        class="mt-5"
+        :selected="selectedDate"
+        :is-date-allowed="isDateAllowed"
+        @select="selectDate"
+      />
 
       <p
         v-if="props.errorMessage"

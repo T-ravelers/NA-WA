@@ -142,6 +142,7 @@ function stubProfileTabs(page) {
           longitude: 126.9925,
           startDate: '2098-11-01',
           endDate: '2098-11-17',
+          isPermanent: false,
           saved: true,
         },
         {
@@ -158,6 +159,7 @@ function stubProfileTabs(page) {
           longitude: 126.9976,
           startDate: '2098-09-04',
           endDate: '2098-09-20',
+          isPermanent: false,
           saved: true,
         },
       ],
@@ -1586,6 +1588,15 @@ const SCREENS = [
     setup: (page) => stubMemberProfile(page),
   },
   {
+    name: '06a-journey-create-dates',
+    path: '/journeys/new',
+    setup: (page) => stubMemberProfile(page),
+    prepare: async (page) => {
+      await page.getByTestId('journey-date-start').click()
+      await page.getByRole('dialog').waitFor()
+    },
+  },
+  {
     // 생성 2단계는 1단계를 채워야만 나온다. 예산·동행 입력의 디자인은 여기서만 찍힌다.
     name: '06b-journey-create-preferences',
     path: '/journeys/new',
@@ -1593,8 +1604,11 @@ const SCREENS = [
     prepare: async (page) => {
       // `getByLabel`은 이 환경에서 걸리지 않는다. 폼 구조로 직접 잡는다.
       await page.locator('input[type="text"]').first().fill('Seoul Foodie Week')
-      await page.locator('input[type="date"]').nth(0).fill('2026-08-10')
-      await page.locator('input[type="date"]').nth(1).fill('2026-08-12')
+      await page.getByTestId('journey-date-start').click()
+      const dateDialog = page.getByRole('dialog')
+      await dateDialog.locator('button').filter({ hasText: /^10$/ }).click()
+      await dateDialog.locator('button').filter({ hasText: /^12$/ }).click()
+      await dateDialog.locator('button').last().click()
       await page.getByTestId('journey-create-next').click()
       await page.getByTestId('journey-create-step-2').waitFor()
     },
@@ -1609,6 +1623,15 @@ const SCREENS = [
     name: '07b-journey-settings',
     path: '/journeys/42/settings',
     setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetail(page)]),
+  },
+  {
+    name: '07d-journey-settings-dates',
+    path: '/journeys/42/settings',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyDetail(page)]),
+    prepare: async (page) => {
+      await page.getByTestId('journey-date-end').click()
+      await page.getByRole('dialog').waitFor()
+    },
   },
   {
     name: '07c-journey-remove-item',

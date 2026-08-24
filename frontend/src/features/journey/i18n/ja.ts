@@ -54,6 +54,14 @@ export default {
         budgetInvalid: '予算は15桁以内で入力してください。',
       },
     },
+    dateRange: {
+      title: '旅程の日付',
+      description: '旅程の開始日と終了日を選択してください。',
+      chooseDate: '選択',
+      selectStart: '開始日を選択してください。',
+      selectEnd: '終了日を選択してください。開始日より前の日付は選べません。',
+      apply: '日付を適用',
+    },
     detail: {
       budget: '予算',
       noBudget: '予算未設定',

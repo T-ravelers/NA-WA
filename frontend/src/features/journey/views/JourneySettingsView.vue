@@ -22,6 +22,7 @@ import {
   type JourneyUpdateInput,
 } from '../api/journeyApi'
 import JourneyDialog from '../components/JourneyDialog.vue'
+import JourneyDateRangePicker from '../components/JourneyDateRangePicker.vue'
 import { journeyErrorMessageKey, isJourneyForbidden } from '../model/journeyErrors'
 import { journeyKeys as journeyListKeys } from '../model/journeyKeys'
 import {
@@ -274,27 +275,19 @@ function retryAll(): void {
             :label="t('journey.settings.name')"
             :error="submittedErrors.title === undefined ? undefined : t(submittedErrors.title)"
           />
-          <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
-            <TextInput
-              v-model="draft.startDate"
-              class="min-w-0"
-              type="date"
-              :label="t('journey.create.startDate')"
-              :error="
-                submittedErrors.startDate === undefined ? undefined : t(submittedErrors.startDate)
-              "
-            />
-            <TextInput
-              v-model="draft.endDate"
-              class="min-w-0"
-              type="date"
-              :min="draft.startDate || undefined"
-              :label="t('journey.create.endDate')"
-              :error="
-                submittedErrors.endDate === undefined ? undefined : t(submittedErrors.endDate)
-              "
-            />
-          </div>
+          <JourneyDateRangePicker
+            v-model:start-date="draft.startDate"
+            v-model:end-date="draft.endDate"
+            class="min-w-0"
+            :start-label="t('journey.create.startDate')"
+            :end-label="t('journey.create.endDate')"
+            :start-error="
+              submittedErrors.startDate === undefined ? undefined : t(submittedErrors.startDate)
+            "
+            :end-error="
+              submittedErrors.endDate === undefined ? undefined : t(submittedErrors.endDate)
+            "
+          />
           <p
             v-if="hasDateConflict"
             class="rounded-sm border border-warning bg-warning/10 px-3.5 py-3 text-body-sm text-warning"

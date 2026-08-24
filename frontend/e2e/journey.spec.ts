@@ -147,8 +147,11 @@ test('creates a journey and opens its empty itinerary', async ({ page }) => {
 
   await page.goto('/journeys/new')
   await page.getByLabel('Trip name').fill('Seoul Foodie Week')
-  await page.getByLabel('Start date').fill('2026-08-10')
-  await page.getByLabel('End date').fill('2026-08-12')
+  await page.getByTestId('journey-date-start').click()
+  const dateDialog = page.getByRole('dialog')
+  await dateDialog.getByRole('button', { name: /August 10, 2026/ }).click()
+  await dateDialog.getByRole('button', { name: /August 12, 2026/ }).click()
+  await dateDialog.getByRole('button', { name: 'Apply' }).click()
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByLabel('Budget').fill('1500000')
   await page.getByRole('button', { name: /2–4 Small group travel/ }).click()

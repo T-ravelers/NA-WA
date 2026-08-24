@@ -6,6 +6,8 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
+import JourneyDateRangePicker from '../../components/JourneyDateRangePicker.vue'
+
 const { fetchJourney, fetchJourneyTimeline, updateJourney, deleteJourney } = vi.hoisted(() => ({
   fetchJourney: vi.fn(),
   fetchJourneyTimeline: vi.fn(),
@@ -128,7 +130,8 @@ describe('JourneySettingsView', () => {
 
   it('warns and disables save when new dates exclude an itinerary item', async () => {
     const { wrapper } = await mountView()
-    await wrapper.get('input[type="date"]').setValue('2026-08-11')
+    wrapper.getComponent(JourneyDateRangePicker).vm.$emit('update:startDate', '2026-08-11')
+    await wrapper.vm.$nextTick()
 
     expect(wrapper.get('[role="alert"]').text()).toContain(
       'Some itinerary items fall outside the new dates',
