@@ -60,6 +60,15 @@ FROM trip_items ti
 JOIN trips tr ON tr.trip_id = ti.trip_id
 WHERE tr.title LIKE 'Seed Report %';
 
+-- 참여자는 자기 여정에도 이 약속을 CONFIRMED 항목으로 연결한다. 참여를 취소해
+-- soft-delete된 행도 appointment_id FK는 남으므로, 여정 제목과 무관하게 약속에서 직접 지운다.
+DELETE ti
+FROM trip_items ti
+JOIN appointments a
+    ON a.appointment_id = ti.appointment_id
+   AND a.item_id = ti.item_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
 -- 시드 약속 참가자를 가리키는 행은 참조 쪽이 시드 밖 여정·정산에 매달려 있어도
 -- 참가자보다 먼저 끊는다. 후기와 정산 분담에는 한 단계 아래 자식도 있어 FK 역순으로 지운다.
 DELETE mrks
