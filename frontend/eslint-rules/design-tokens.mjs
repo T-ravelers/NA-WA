@@ -1,47 +1,104 @@
 const RAW_HEX_COLOR = /#(?:[\da-f]{8}|[\da-f]{6}|[\da-f]{4}|[\da-f]{3})(?![\da-f])/i
 
 const ARBITRARY_COLOR_UTILITY = new RegExp(
-  String.raw`(?:^|\s)(?:[^\s:]+:)*!?(?:bg|text|border(?:-[trblxyse])?|divide(?:-[xy])?|ring(?:-offset)?|outline|shadow|fill|stroke|caret|accent|decoration|placeholder|from|via|to)-\[([^\]]+)\](?:\/[^\s!]+)?!?(?=$|\s)`,
-  'gi',
+  String.raw`^!?(?:bg|text|border(?:-[trblxyse])?|divide(?:-[xy])?|ring(?:-offset)?|outline|shadow|drop-shadow|fill|stroke|caret|accent|decoration|placeholder|from|via|to)-\[(.+)\](?:\/[^\s!]+)?!?$`,
+  'i',
 )
 
 const ARBITRARY_GRADIENT_UTILITY = new RegExp(
-  String.raw`(?:^|\s)(?:[^\s:]+:)*!?bg-(?:linear|radial|conic)-\[([^\]]+)\](?:\/[^\s!]+)?!?(?=$|\s)`,
-  'gi',
+  String.raw`^!?bg-(?:linear|radial|conic)-\[(.+)\](?:\/[^\s!]+)?!?$`,
+  'i',
 )
 
 const COLOR_FUNCTION =
-  /^(?:#|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark|var)\()/i
+  /(?:^|[^a-z\d-])(?:#|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark|var)\()/i
 const CSS_NAMED_COLORS = new Set(
   `aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal thistle tomato transparent turquoise violet wheat white whitesmoke yellow yellowgreen currentcolor`.split(
     ' ',
   ),
 )
 
-function isArbitraryColor(value) {
-  const normalized = value.trim().replace(/^color:/i, '')
-  return COLOR_FUNCTION.test(normalized) || CSS_NAMED_COLORS.has(normalized.toLowerCase())
+function blankUrlFunctions(value) {
+  const characters = value.split('')
+
+  for (let start = 0; start < value.length - 3; start += 1) {
+    if (value.slice(start, start + 4).toLowerCase() !== 'url(') {
+      continue
+    }
+
+    let depth = 1
+    let quote = null
+    let escaped = false
+    let end = start + 4
+
+    for (; end < value.length && depth > 0; end += 1) {
+      const character = value[end]
+      if (escaped) {
+        escaped = false
+      } else if (character === '\\') {
+        escaped = true
+      } else if (quote !== null) {
+        if (character === quote) {
+          quote = null
+        }
+      } else if (character === "'" || character === '"') {
+        quote = character
+      } else if (character === '(') {
+        depth += 1
+      } else if (character === ')') {
+        depth -= 1
+      }
+    }
+
+    characters.fill(' ', start, end)
+    start = end - 1
+  }
+
+  return characters.join('')
 }
 
-function containsArbitraryGradientColor(value) {
-  return value
-    .split(/[,_\s]+/)
-    .some((part) => isArbitraryColor(part.replace(/(?:\d+(?:\.\d+)?)?%$/, '')))
+function containsRawColor(value) {
+  const withoutUrls = blankUrlFunctions(value)
+  if (COLOR_FUNCTION.test(withoutUrls)) {
+    return true
+  }
+
+  return withoutUrls.split(/[^a-z\d-]+/i).some((token) => CSS_NAMED_COLORS.has(token.toLowerCase()))
 }
 
-function containsArbitraryColorUtility(value) {
-  ARBITRARY_COLOR_UTILITY.lastIndex = 0
+function withoutVariants(className) {
+  let bracketDepth = 0
+  let lastVariantSeparator = -1
+  let escaped = false
 
-  for (const match of value.matchAll(ARBITRARY_COLOR_UTILITY)) {
-    if (typeof match[1] === 'string' && isArbitraryColor(match[1])) {
-      return true
+  for (let index = 0; index < className.length; index += 1) {
+    const character = className[index]
+    if (escaped) {
+      escaped = false
+    } else if (character === '\\') {
+      escaped = true
+    } else if (character === '[') {
+      bracketDepth += 1
+    } else if (character === ']') {
+      bracketDepth = Math.max(0, bracketDepth - 1)
+    } else if (character === ':' && bracketDepth === 0) {
+      lastVariantSeparator = index
     }
   }
 
-  ARBITRARY_GRADIENT_UTILITY.lastIndex = 0
+  return className.slice(lastVariantSeparator + 1)
+}
 
-  for (const match of value.matchAll(ARBITRARY_GRADIENT_UTILITY)) {
-    if (typeof match[1] === 'string' && containsArbitraryGradientColor(match[1])) {
+function containsArbitraryColorUtility(value) {
+  for (const className of value.split(/\s+/)) {
+    const utility = withoutVariants(className)
+    const colorMatch = ARBITRARY_COLOR_UTILITY.exec(utility)
+    if (typeof colorMatch?.[1] === 'string' && containsRawColor(colorMatch[1])) {
+      return true
+    }
+
+    const gradientMatch = ARBITRARY_GRADIENT_UTILITY.exec(utility)
+    if (typeof gradientMatch?.[1] === 'string' && containsRawColor(gradientMatch[1])) {
       return true
     }
   }

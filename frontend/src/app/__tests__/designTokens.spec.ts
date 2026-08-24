@@ -131,6 +131,26 @@ describe('Design token ESLint rule', () => {
     }
   })
 
+  it('rejects raw colors embedded in composite values and arbitrary variants', async () => {
+    const classNames = [
+      'bg-[linear-gradient(to_right,red,blue)]',
+      'shadow-[0_0_2px_rgb(1_2_3)]',
+      'outline-[2px_solid_red]',
+      'drop-shadow-[0_4px_4px_rgb(1_2_3)]',
+      '[&::before]:bg-[red]',
+    ]
+
+    for (const [index, className] of classNames.entries()) {
+      const messages = await lint(
+        `<template><div class="${className}" /></template>`,
+        `src/shared/ui/CompositeRawColor${index}.vue`,
+      )
+
+      expect(messages).toHaveLength(1)
+      expect(messages[0]?.message).toContain('arbitrary 색상')
+    }
+  })
+
   it('rejects raw HEX in Vue style blocks', async () => {
     const messages = await lint(
       '<template><div class="sample" /></template><style scoped>.sample { color: #fff; }</style>',
@@ -145,7 +165,7 @@ describe('Design token ESLint rule', () => {
       `
         <template>
           <!-- 대비 근거 #ffffff -->
-          <div class="border-[1.5px] bg-[url('/assets/paper.png')] bg-paper text-ink" />
+          <div class="border-[1.5px] bg-[url('/assets/red/paper.png')] bg-paper text-ink" />
         </template>
         <script setup lang="ts">
         // 과거 값 #000000
