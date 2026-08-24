@@ -11,8 +11,10 @@ import {
   serializeCalendarDate,
 } from '@/shared/lib/datetime'
 import AppBadge from '@/shared/ui/AppBadge.vue'
+import CategoryChip from '@/shared/ui/CategoryChip.vue'
 
 import type { JourneyTimelineDay, JourneyTimelineItem } from '../api/journeyApi'
+import { categoryForJourneyItem, categoryLabelKey } from '../model/journeyCategory'
 
 interface Props {
   days: JourneyTimelineDay[]
@@ -171,6 +173,7 @@ const displayDays = computed(() => {
         const title = item.exploreItem.title
         const isEvent = item.exploreItem.itemType === 'EVENT'
         const companionsTo = companionsLink(item)
+        const category = categoryForJourneyItem(item)
 
         return {
           source: item,
@@ -180,6 +183,8 @@ const displayDays = computed(() => {
           statusLabel: confirmed ? t('journey.detail.confirmed') : t('journey.detail.saved'),
           title,
           typeLabel: typeLabel(item),
+          category,
+          categoryLabel: t(categoryLabelKey(category)),
           location: formatLocation(item),
           note: item.note,
           detailTo: detailLink(item),
@@ -276,10 +281,18 @@ const displayDays = computed(() => {
                   {{ item.statusLabel }}
                 </AppBadge>
               </div>
-              <p class="text-body-sm text-ink-2">
-                {{ item.typeLabel }}
-                <template v-if="item.location !== null"> · {{ item.location }}</template>
-              </p>
+              <div class="flex flex-wrap items-center gap-1.5 text-body-sm text-ink-2">
+                <span>{{ item.typeLabel }}</span>
+                <CategoryChip
+                  :category="item.category"
+                  :label="item.categoryLabel"
+                  size="sm"
+                />
+                <template v-if="item.location !== null">
+                  <span aria-hidden="true">·</span>
+                  <span>{{ item.location }}</span>
+                </template>
+              </div>
               <p
                 v-if="item.note !== null && item.note !== ''"
                 class="text-body-sm text-ink-3"
@@ -288,11 +301,11 @@ const displayDays = computed(() => {
               </p>
 
               <!-- 시안 J2의 항목 하단 버튼 행. 두 버튼이 폭을 나눠 갖는다. -->
-              <div class="mt-1 flex gap-2">
+              <div class="mt-1 flex flex-wrap gap-2">
                 <RouterLink
                   :to="item.detailTo"
                   :aria-label="item.detailName"
-                  class="flex min-h-11 flex-1 items-center justify-center rounded-sm bg-surface-2 text-body-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  class="flex min-h-11 min-w-0 flex-1 basis-24 items-center justify-center rounded-sm bg-surface-2 px-2 text-center text-body-sm font-semibold leading-tight text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                 >
                   {{ item.detailLabel }}
                 </RouterLink>
@@ -301,7 +314,7 @@ const displayDays = computed(() => {
                   v-if="item.companionsTo !== null"
                   :to="item.companionsTo"
                   :aria-label="item.companionsName"
-                  class="flex min-h-11 flex-1 items-center justify-center rounded-sm text-body-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  class="flex min-h-11 min-w-0 flex-1 basis-24 items-center justify-center rounded-sm px-2 text-center text-body-sm font-semibold leading-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                   :class="
                     item.confirmed
                       ? 'bg-surface-2 text-ink-2'

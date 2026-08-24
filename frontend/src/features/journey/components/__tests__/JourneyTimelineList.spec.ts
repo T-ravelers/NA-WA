@@ -233,6 +233,82 @@ describe('JourneyTimelineList', () => {
     )
   })
 
+  it('shows the four shared consumption areas beside Event and Place labels', async () => {
+    const wrapper = await mountList({
+      days: [
+        dayWith(
+          '2026-08-10',
+          makeItem('Concert', {
+            eventDetail: {
+              eventKind: 'CONCERT',
+              startDate: null,
+              endDate: null,
+              organizer: null,
+              reservationUrl: null,
+              venueName: null,
+            },
+          }),
+          makeItem('Popup', {
+            tripItemId: 2,
+            eventDetail: {
+              eventKind: 'POPUP',
+              startDate: null,
+              endDate: null,
+              organizer: null,
+              reservationUrl: null,
+              venueName: null,
+            },
+          }),
+          makeItem('Beauty shop', {
+            tripItemId: 3,
+            exploreItem: { itemType: 'PLACE' },
+            placeDetail: {
+              placeKind: 'BEAUTY',
+              addressDetail: null,
+              menuSummary: null,
+              isActive: true,
+            },
+          }),
+          makeItem('Cafe', {
+            tripItemId: 4,
+            exploreItem: { itemType: 'PLACE' },
+            placeDetail: {
+              placeKind: 'CAFE',
+              addressDetail: null,
+              menuSummary: null,
+              isActive: true,
+            },
+          }),
+        ),
+      ],
+      startDate: '2026-08-10',
+      endDate: '2026-08-10',
+    })
+
+    expect(wrapper.text()).toContain('Shows')
+    expect(wrapper.text()).toContain('Shopping')
+    expect(wrapper.text()).toContain('Beauty')
+    expect(wrapper.text()).toContain('Food')
+  })
+
+  it('wraps action links before their labels can overflow the card', async () => {
+    const wrapper = await mountList({
+      days: [dayWithItem('2026-08-10', 'Night market')],
+      startDate: '2026-08-10',
+      endDate: '2026-08-10',
+    })
+
+    const detail = ctaFor(wrapper, 'Event detail for Night market')
+    const companions = ctaFor(wrapper, 'Find companions for Night market')
+
+    expect(detail?.element.parentElement?.classList).toContain('flex-wrap')
+    expect(detail?.classes()).toContain('min-w-0')
+    expect(detail?.classes()).toContain('basis-24')
+    expect(companions?.classes()).toContain('min-w-0')
+    expect(companions?.classes()).toContain('basis-24')
+    expect(companions?.classes()).toContain('leading-tight')
+  })
+
   it('sends an unconfirmed item to the appointment list filtered to that item', async () => {
     const wrapper = await mountList({
       days: [dayWithItem('2026-08-10', 'Night market')],
