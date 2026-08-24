@@ -136,13 +136,3 @@ const hasAnyFilter = computed(
     </div>
   </div>
 </template>
-
-<style scoped>
-.scrollbar-hidden {
-  scrollbar-width: none;
-}
-
-.scrollbar-hidden::-webkit-scrollbar {
-  display: none;
-}
-</style>

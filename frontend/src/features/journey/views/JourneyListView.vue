@@ -171,19 +171,3 @@ function retry(): void {
     </section>
   </main>
 </template>
-
-<!--
-  가로 스크롤 컨테이너의 스크롤바를 감춘다. `ExploreFilterBar`·`PlaceFilterBar`에 있는
-  것과 같은 블록이다. 그쪽도 `<style scoped>`로 각자 갖고 있어 클래스 이름만 빌려 쓸 수
-  없다. `app/styles/**`에 공용 유틸리티로 올리는 것이 옳지만 그 경로는 이 작업의 범위
-  밖이라 선례를 그대로 따르고 세 번째 복제를 남긴다.
--->
-<style scoped>
-.scrollbar-hidden {
-  scrollbar-width: none;
-}
-
-.scrollbar-hidden::-webkit-scrollbar {
-  display: none;
-}
-</style>
