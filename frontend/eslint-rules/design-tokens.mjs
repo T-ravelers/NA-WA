@@ -1,7 +1,12 @@
 const RAW_HEX_COLOR = /#(?:[\da-f]{8}|[\da-f]{6}|[\da-f]{4}|[\da-f]{3})(?![\da-f])/i
 
 const ARBITRARY_COLOR_UTILITY = new RegExp(
-  String.raw`(?:^|\s)(?:[^\s:]+:)*(?:bg|text|border(?:-[trblxyse])?|divide(?:-[xy])?|ring(?:-offset)?|outline|shadow|fill|stroke|caret|accent|decoration|placeholder|from|via|to)-\[([^\]]+)\](?:\/[^\s]+)?(?=$|\s)`,
+  String.raw`(?:^|\s)(?:[^\s:]+:)*!?(?:bg|text|border(?:-[trblxyse])?|divide(?:-[xy])?|ring(?:-offset)?|outline|shadow|fill|stroke|caret|accent|decoration|placeholder|from|via|to)-\[([^\]]+)\](?:\/[^\s!]+)?!?(?=$|\s)`,
+  'gi',
+)
+
+const ARBITRARY_GRADIENT_UTILITY = new RegExp(
+  String.raw`(?:^|\s)(?:[^\s:]+:)*!?bg-(?:linear|radial|conic)-\[([^\]]+)\](?:\/[^\s!]+)?!?(?=$|\s)`,
   'gi',
 )
 
@@ -18,11 +23,25 @@ function isArbitraryColor(value) {
   return COLOR_FUNCTION.test(normalized) || CSS_NAMED_COLORS.has(normalized.toLowerCase())
 }
 
+function containsArbitraryGradientColor(value) {
+  return value
+    .split(/[,_\s]+/)
+    .some((part) => isArbitraryColor(part.replace(/(?:\d+(?:\.\d+)?)?%$/, '')))
+}
+
 function containsArbitraryColorUtility(value) {
   ARBITRARY_COLOR_UTILITY.lastIndex = 0
 
   for (const match of value.matchAll(ARBITRARY_COLOR_UTILITY)) {
     if (typeof match[1] === 'string' && isArbitraryColor(match[1])) {
+      return true
+    }
+  }
+
+  ARBITRARY_GRADIENT_UTILITY.lastIndex = 0
+
+  for (const match of value.matchAll(ARBITRARY_GRADIENT_UTILITY)) {
+    if (typeof match[1] === 'string' && containsArbitraryGradientColor(match[1])) {
       return true
     }
   }

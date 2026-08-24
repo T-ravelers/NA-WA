@@ -93,6 +93,44 @@ describe('Design token ESLint rule', () => {
     expect(messages[0]?.message).toContain('arbitrary 색상')
   })
 
+  it('rejects arbitrary colors with current and deprecated important modifiers', async () => {
+    const classNames = [
+      'bg-[red]!',
+      'hover:text-[rgb(1_2_3)]!',
+      'border-[var(--raw)]!',
+      '!bg-[red]',
+      'hover:!text-[rgb(1_2_3)]',
+    ]
+
+    for (const [index, className] of classNames.entries()) {
+      const messages = await lint(
+        `<template><div class="${className}" /></template>`,
+        `src/shared/ui/ImportantRawColor${index}.vue`,
+      )
+
+      expect(messages).toHaveLength(1)
+      expect(messages[0]?.message).toContain('arbitrary 색상')
+    }
+  })
+
+  it('rejects raw colors in arbitrary gradient utilities', async () => {
+    const classNames = [
+      'bg-linear-[25deg,red_5%,yellow_60%,lime_90%]',
+      'hover:bg-radial-[circle,var(--raw)_0%,transparent_100%]!',
+      'bg-conic-[from_45deg_at_50%_50%,tomato,blue]',
+    ]
+
+    for (const [index, className] of classNames.entries()) {
+      const messages = await lint(
+        `<template><div class="${className}" /></template>`,
+        `src/shared/ui/GradientRawColor${index}.vue`,
+      )
+
+      expect(messages).toHaveLength(1)
+      expect(messages[0]?.message).toContain('arbitrary 색상')
+    }
+  })
+
   it('rejects raw HEX in Vue style blocks', async () => {
     const messages = await lint(
       '<template><div class="sample" /></template><style scoped>.sample { color: #fff; }</style>',
