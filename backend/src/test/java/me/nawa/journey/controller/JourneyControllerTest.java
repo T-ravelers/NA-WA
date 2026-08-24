@@ -476,10 +476,10 @@ class JourneyControllerTest {
                 .items(List.of(item))
                 .build()))
             .build();
-        when(journeyService.getTimeline(1L, 20L)).thenReturn(response);
+        when(journeyService.getTimeline(1L, 20L, "ja")).thenReturn(response);
 
         String responseBody = mockMvc.perform(
-                get("/api/v1/journeys/20/timeline")
+                get("/api/v1/journeys/20/timeline").param("language", "ja")
             )
             .andExpect(status().isOk())
             .andReturn()
@@ -525,7 +525,7 @@ class JourneyControllerTest {
                 .items(List.of(item))
                 .build()))
             .build();
-        when(journeyService.getTimeline(1L, 20L)).thenReturn(response);
+        when(journeyService.getTimeline(1L, 20L, "en")).thenReturn(response);
 
         String responseBody = mockMvc.perform(
                 get("/api/v1/journeys/20/timeline")

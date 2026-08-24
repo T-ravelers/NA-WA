@@ -120,10 +120,11 @@ public class JourneyController {
     @ApiOperation("Journey 타임라인 조회")
     public ApiResponse<JourneyTimelineResponse> getTimeline(
         @AuthenticationPrincipal AuthenticatedMember member,
-        @PathVariable Long tripId
+        @PathVariable Long tripId,
+        @RequestParam(defaultValue = "en") String language
     ) {
         return ApiResponse.success(
-            journeyService.getTimeline(member.getMemberId(), tripId)
+            journeyService.getTimeline(member.getMemberId(), tripId, language)
         );
     }
 

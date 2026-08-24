@@ -233,9 +233,13 @@ export async function fetchJourney(tripId: number): Promise<Journey> {
   return normalizeJourney(response.data)
 }
 
-export async function fetchJourneyTimeline(tripId: number): Promise<JourneyTimeline> {
+export async function fetchJourneyTimeline(
+  tripId: number,
+  language: string,
+): Promise<JourneyTimeline> {
   const response = await httpClient.get<JourneyTimelineResponse>(
     `/api/v1/journeys/${tripId}/timeline`,
+    { params: { language } },
   )
 
   return normalizeTimeline(response.data)

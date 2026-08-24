@@ -38,7 +38,7 @@ import {
 } from '../model/journeyQueries'
 
 const i18n = useI18n()
-const { t } = i18n
+const { locale, t } = i18n
 const route = useRoute()
 const router = useRouter()
 
@@ -71,7 +71,7 @@ const detailQuery = useQuery({
   retry: false,
 })
 const timelineQuery = useQuery({
-  ...journeyTimelineQueryOptions(tripId),
+  ...journeyTimelineQueryOptions(tripId, locale),
   enabled: computed(() => tripId.value !== null),
   retry: false,
 })
@@ -161,7 +161,9 @@ const updateMutation = useMutation({
     queryClient.setQueryData(journeyKeys.detail(journey.tripId), journey)
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: journeyListKeys.list() }),
-      queryClient.invalidateQueries({ queryKey: journeyKeys.timeline(journey.tripId) }),
+      queryClient.invalidateQueries({
+        queryKey: journeyKeys.timeline(journey.tripId, locale.value),
+      }),
     ])
     await router.replace({ name: 'journey-detail', params: { tripId: journey.tripId } })
   },

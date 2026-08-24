@@ -36,7 +36,8 @@ public interface JourneyMapper {
     List<TripRegion> findRegionsByTripId(@Param("tripId") Long tripId);
 
     List<JourneyTimelineItem> findTimelineItemsByTripId(
-        @Param("tripId") Long tripId
+        @Param("tripId") Long tripId,
+        @Param("language") String language
     );
 
     JourneyExploreItem findAvailableExploreItemById(

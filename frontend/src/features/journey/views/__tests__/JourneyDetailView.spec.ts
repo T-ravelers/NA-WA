@@ -18,7 +18,8 @@ const deleteJourneyItem = vi.fn()
 vi.mock('../../api/journeyApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/journeyApi')>()),
   fetchJourney: (tripId: number) => fetchJourney(tripId),
-  fetchJourneyTimeline: (tripId: number) => fetchJourneyTimeline(tripId),
+  fetchJourneyTimeline: (tripId: number, language: string) =>
+    fetchJourneyTimeline(tripId, language),
   deleteJourneyItem: (tripId: number, tripItemId: number) => deleteJourneyItem(tripId, tripItemId),
 }))
 
@@ -153,6 +154,7 @@ async function mountAt(path: string, reportOptions: ReportIntegrationOptions = {
 
 describe('JourneyDetailView', () => {
   beforeEach(() => {
+    i18n.global.locale.value = 'en'
     fetchJourney.mockReset()
     fetchJourneyTimeline.mockReset()
     deleteJourneyItem.mockReset()
@@ -165,7 +167,7 @@ describe('JourneyDetailView', () => {
     const wrapper = await mountAt('/journeys/7')
 
     expect(fetchJourney).toHaveBeenCalledWith(7)
-    expect(fetchJourneyTimeline).toHaveBeenCalledWith(7)
+    expect(fetchJourneyTimeline).toHaveBeenCalledWith(7, 'en')
     expect(wrapper.get('h1').text()).toBe('Seoul and Busan')
     expect(wrapper.text()).not.toContain('Visit regions')
     expect(wrapper.text()).not.toContain('No visit regions were added.')
@@ -413,7 +415,7 @@ describe('JourneyDetailView', () => {
     await flushPromises()
 
     expect(fetchJourney).toHaveBeenLastCalledWith(8)
-    expect(fetchJourneyTimeline).toHaveBeenLastCalledWith(8)
+    expect(fetchJourneyTimeline).toHaveBeenLastCalledWith(8, 'en')
     expect(wrapper.get('h1').text()).toBe('Journey 8')
   })
 })

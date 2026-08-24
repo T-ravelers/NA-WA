@@ -51,9 +51,9 @@ function formatTime(item: JourneyTimelineItem): string {
 function formatLocation(item: JourneyTimelineItem): string | null {
   const location = item.exploreItem.location
   return (
+    location.addressRoad ||
     [location.region2, location.region3].filter(Boolean).join(' · ') ||
     location.region1 ||
-    location.addressRoad ||
     null
   )
 }

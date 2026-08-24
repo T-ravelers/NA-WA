@@ -309,6 +309,35 @@ describe('JourneyTimelineList', () => {
     expect(companions?.classes()).toContain('leading-tight')
   })
 
+  it('prefers the translated address over untranslated region fields', async () => {
+    const wrapper = await mountList({
+      days: [
+        dayWith(
+          '2026-08-10',
+          makeItem('Seongsu Onsil', {
+            exploreItem: {
+              itemType: 'PLACE',
+              location: {
+                region1: '서울',
+                region2: '성수',
+                region3: null,
+                addressRoad: 'Seongsu-dong, Seongdong-gu, Seoul',
+                addressDetail: null,
+                latitude: null,
+                longitude: null,
+              },
+            },
+          }),
+        ),
+      ],
+      startDate: '2026-08-10',
+      endDate: '2026-08-10',
+    })
+
+    expect(wrapper.text()).toContain('Seongsu-dong, Seongdong-gu, Seoul')
+    expect(wrapper.text()).not.toContain('성수')
+  })
+
   it('sends an unconfirmed item to the appointment list filtered to that item', async () => {
     const wrapper = await mountList({
       days: [dayWithItem('2026-08-10', 'Night market')],

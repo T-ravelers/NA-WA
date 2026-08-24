@@ -301,11 +301,19 @@ public class JourneyService {
     }
 
     @Transactional(readOnly = true)
-    public JourneyTimelineResponse getTimeline(Long memberId, Long tripId) {
+    public JourneyTimelineResponse getTimeline(
+        Long memberId,
+        Long tripId,
+        String language
+    ) {
         findOwnedJourney(memberId, tripId);
+        String normalizedLanguage = JourneyLanguagePolicy.normalize(language);
 
         List<JourneyTimelineItem> mappedItems =
-            journeyMapper.findTimelineItemsByTripId(tripId);
+            journeyMapper.findTimelineItemsByTripId(
+                tripId,
+                normalizedLanguage
+            );
         if (mappedItems == null || mappedItems.isEmpty()) {
             return JourneyTimelineResponse.builder()
                 .tripId(tripId)

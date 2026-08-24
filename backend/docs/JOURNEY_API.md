@@ -252,6 +252,34 @@ GET /api/v1/journeys/{tripId}/items/exists?itemId={itemId}&visitDate={visitDate}
 | 403 | `JOURNEY-002` | 다른 회원이 소유한 Journey 조회 요청 |
 | 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
 
+## Journey 타임라인 조회 언어
+
+```http
+GET /api/v1/journeys/{tripId}/timeline?language={language}
+```
+
+- `language`는 선택이며 생략하거나 공백이면 `en`으로 처리합니다.
+- 지원 값은 `en`, `ja`, `zh-TW`, `vi`입니다. 대소문자와 앞뒤 공백은 정규화하며,
+  지원하지 않는 값은 `COMMON-001`(400)입니다.
+- Event와 Place의 사용자 표시 필드는 필드별로 다음 순서로 선택합니다.
+  1. 요청 언어의 비어 있지 않은 번역
+  2. 영어(`en`)의 비어 있지 않은 번역
+  3. Event 또는 Place 본체의 한국어 원문
+- 이 규칙은 제목, 표시 주소와 상세 주소, 주최자·장소 상세·메뉴 요약처럼 타임라인
+  응답에 포함되는 번역 가능 필드에 적용합니다.
+- `region1`, `region2`, `region3`는 번역 테이블의 필드가 아니므로 원본 값을 유지합니다.
+  Journey 화면은 번역된 `addressRoad`가 있으면 원본 지역명보다 먼저 표시합니다.
+- 응답 언어는 저장된 `trip_items`를 바꾸지 않습니다. 같은 일정도 요청 `language`에 따라
+  현재 표시 문자열이 달라집니다.
+
+### 오류 코드
+
+| HTTP | 오류 코드 | 발생 조건 |
+| ---: | --- | --- |
+| 400 | `COMMON-001` | `language`가 지원 목록 밖임 |
+| 403 | `JOURNEY-002` | 다른 회원이 소유한 Journey 타임라인 요청 |
+| 404 | `JOURNEY-001` | 삭제됐거나 존재하지 않는 Journey |
+
 ## Journey 개별 일정 삭제
 
 ```http
