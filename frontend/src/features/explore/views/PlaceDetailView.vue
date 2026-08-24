@@ -16,9 +16,9 @@ import { shareWithFallback } from '@/shared/lib/share'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import AppImage from '@/shared/ui/AppImage.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
-import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import type { Category } from '@/shared/ui/category'
@@ -424,15 +424,11 @@ onMounted(() => {
     />
     <template v-else>
       <div class="relative aspect-[4/3] w-full overflow-hidden bg-surface-1">
-        <img
-          v-if="currentImage"
+        <AppImage
           :src="currentImage"
           :alt="place.name"
+          :placeholder-label="t('explore.placePhoto')"
           class="size-full object-cover"
-        />
-        <ImagePlaceholder
-          v-else
-          :label="t('explore.placePhoto')"
         />
         <div
           v-if="imageUrls.length > 1"

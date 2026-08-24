@@ -8,6 +8,7 @@ import { vFitText } from '@/shared/lib/fitText'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import AppImage from '@/shared/ui/AppImage.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
@@ -113,13 +114,13 @@ function goBack(): void {
             class="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-pill bg-surface-3 text-section-header text-ink"
             aria-hidden="true"
           >
-            <img
-              v-if="member.profileImageUrl"
+            <AppImage
               :src="member.profileImageUrl"
               alt=""
               class="size-full object-cover"
-            />
-            <span v-else>{{ initials(member.displayName) }}</span>
+            >
+              <span>{{ initials(member.displayName) }}</span>
+            </AppImage>
           </div>
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">

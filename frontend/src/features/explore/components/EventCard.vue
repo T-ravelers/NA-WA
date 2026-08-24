@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { IconHeart } from '@tabler/icons-vue'
 
 import { formatCalendarDateString } from '@/shared/lib/datetime'
+import AppImage from '@/shared/ui/AppImage.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
@@ -110,26 +111,24 @@ function handleKeydown(event: KeyboardEvent): void {
         <!--
           `aspect-square`로 못박는다. `size-full`만 두면 높이를 글자 칸이 정해서 카드마다
           사진 비율이 달라지고, 자리표시 갈래(`aspect-square`)와도 모양이 어긋난다.
-          썸네일 결측이 33%라 두 갈래가 한 화면에 섞이는 것이 기본이다.
         -->
-        <img
-          v-if="event.thumbnailUrl"
+        <AppImage
           :src="event.thumbnailUrl"
           :alt="event.title"
           class="aspect-square w-full rounded-sm object-cover"
           loading="lazy"
-        />
-        <div
-          v-else
-          class="relative flex aspect-square items-center justify-center overflow-hidden rounded-sm border border-dashed border-hairline-strong bg-surface-2"
         >
-          <ImagePlaceholder :label="t('explore.imageUnavailable')" />
-          <!-- 카드가 시안 밀도로 낮아지면서 자리표시가 72px가 됐다. 캡션을 더 내리고 한 단계
-               줄여야 가운데 아이콘과 겹치지 않는다. -->
-          <span class="absolute inset-x-0 bottom-1 text-center text-micro text-ink-2">{{
-            t('explore.eventPhoto')
-          }}</span>
-        </div>
+          <div
+            class="relative flex aspect-square items-center justify-center overflow-hidden rounded-sm border border-dashed border-hairline-strong bg-surface-2"
+          >
+            <ImagePlaceholder :label="t('explore.imageUnavailable')" />
+            <!-- 카드가 시안 밀도로 낮아지면서 자리표시가 72px가 됐다. 캡션을 더 내리고 한 단계
+                 줄여야 가운데 아이콘과 겹치지 않는다. -->
+            <span class="absolute inset-x-0 bottom-1 text-center text-micro text-ink-2">{{
+              t('explore.eventPhoto')
+            }}</span>
+          </div>
+        </AppImage>
       </div>
 
       <div class="flex min-w-0 flex-1 flex-col gap-1 py-3 pr-3">

@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import AppButton from '@/shared/ui/AppButton.vue'
-import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
+import AppImage from '@/shared/ui/AppImage.vue'
 import TextInput from '@/shared/ui/TextInput.vue'
 
 import { nationalityOptions } from '../model/nationalities'
@@ -128,13 +128,11 @@ function handleSubmit(): void {
   >
     <div class="flex items-center gap-3.5">
       <span class="size-14 shrink-0 overflow-hidden rounded-pill">
-        <img
-          v-if="profileImageUrl !== null"
+        <AppImage
           :src="profileImageUrl"
           alt=""
           class="size-full object-cover"
         />
-        <ImagePlaceholder v-else />
       </span>
       <p class="text-body-sm text-ink-3">{{ t('member.form.photoHint') }}</p>
     </div>

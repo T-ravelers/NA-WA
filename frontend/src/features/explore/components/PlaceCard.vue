@@ -5,6 +5,7 @@ import { IconHeart } from '@tabler/icons-vue'
 
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
+import AppImage from '@/shared/ui/AppImage.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
 import type { Category } from '@/shared/ui/category'
@@ -86,24 +87,23 @@ function toggleSaved(): void {
       >
         <!-- EventCard와 같은 이유다. 비율을 못박지 않으면 카드마다 사진 모양이 달라지고
              자리표시 갈래(`aspect-square`)와도 어긋난다. -->
-        <img
-          v-if="place.thumbnailUrl"
+        <AppImage
           :src="place.thumbnailUrl"
           :alt="place.name"
           class="aspect-square w-full rounded-sm object-cover"
           loading="lazy"
-        />
-        <div
-          v-else
-          class="relative flex aspect-square items-center justify-center overflow-hidden rounded-sm border border-dashed border-hairline-strong bg-surface-2"
         >
-          <ImagePlaceholder :label="t('explore.imageUnavailable')" />
-          <!-- 카드가 시안 밀도로 낮아지면서 자리표시가 72px가 됐다. 캡션을 더 내리고 한 단계
-               줄여야 가운데 아이콘과 겹치지 않는다. -->
-          <span class="absolute inset-x-0 bottom-1 text-center text-micro text-ink-2">
-            {{ t('explore.placePhoto') }}
-          </span>
-        </div>
+          <div
+            class="relative flex aspect-square items-center justify-center overflow-hidden rounded-sm border border-dashed border-hairline-strong bg-surface-2"
+          >
+            <ImagePlaceholder :label="t('explore.imageUnavailable')" />
+            <!-- 카드가 시안 밀도로 낮아지면서 자리표시가 72px가 됐다. 캡션을 더 내리고 한 단계
+                 줄여야 가운데 아이콘과 겹치지 않는다. -->
+            <span class="absolute inset-x-0 bottom-1 text-center text-micro text-ink-2">
+              {{ t('explore.placePhoto') }}
+            </span>
+          </div>
+        </AppImage>
       </button>
 
       <div class="flex min-w-0 flex-1 flex-col gap-1 py-3 pr-3">
