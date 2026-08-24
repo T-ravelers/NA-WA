@@ -60,6 +60,125 @@ FROM trip_items ti
 JOIN trips tr ON tr.trip_id = ti.trip_id
 WHERE tr.title LIKE 'Seed Report %';
 
+-- 참여자는 자기 여정에도 이 약속을 CONFIRMED 항목으로 연결한다. 참여를 취소해
+-- soft-delete된 행도 appointment_id FK는 남으므로, 여정 제목과 무관하게 약속에서 직접 지운다.
+DELETE ti
+FROM trip_items ti
+JOIN appointments a
+    ON a.appointment_id = ti.appointment_id
+   AND a.item_id = ti.item_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+-- 시드 약속 참가자를 가리키는 행은 참조 쪽이 시드 밖 여정·정산에 매달려 있어도
+-- 참가자보다 먼저 끊는다. 후기와 정산 분담에는 한 단계 아래 자식도 있어 FK 역순으로 지운다.
+DELETE mrks
+FROM member_review_keyword_selections mrks
+JOIN member_reviews mr ON mr.review_id = mrks.review_id
+JOIN appointments a ON a.appointment_id = mr.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE mrs
+FROM member_review_scores mrs
+JOIN member_reviews mr ON mr.review_id = mrs.review_id
+JOIN appointments a ON a.appointment_id = mr.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE mr
+FROM member_reviews mr
+JOIN appointments a ON a.appointment_id = mr.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+-- 시드 약속 자체가 소유한 정산은 참가자 참조 여부만 지워서는 약속을 삭제할 수 없다.
+-- 알림·영수증·품목 분담·품목·구성원을 모두 지운 뒤 정산을 지운다.
+DELETE n
+FROM notifications n
+JOIN settlements s ON s.settlement_id = n.settlement_id
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE sr
+FROM settlement_receipts sr
+JOIN settlements s ON s.settlement_id = sr.settlement_id
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE sis
+FROM settlement_item_shares sis
+JOIN settlement_items si ON si.settlement_item_id = sis.settlement_item_id
+JOIN settlements s ON s.settlement_id = si.settlement_id
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE si
+FROM settlement_items si
+JOIN settlements s ON s.settlement_id = si.settlement_id
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE sm
+FROM settlement_members sm
+JOIN settlements s ON s.settlement_id = sm.settlement_id
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE s
+FROM settlements s
+JOIN appointments a ON a.appointment_id = s.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+-- 시드 밖 정산이 시드 참가자를 구성원으로 가리키는 경우도 참가자 삭제 전에 끊는다.
+DELETE sis
+FROM settlement_item_shares sis
+JOIN settlement_members sm ON sm.settlement_member_id = sis.settlement_member_id
+JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+JOIN appointments a ON a.appointment_id = am.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE sm
+FROM settlement_members sm
+JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+JOIN appointments a ON a.appointment_id = am.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+-- 지급 배치도 약속을 직접 참조한다. 배치의 지급 행을 먼저 지운 뒤 배치를 지운다.
+DELETE dp
+FROM deposit_payouts dp
+JOIN deposit_payout_batches dpb
+    ON dpb.deposit_payout_batch_id = dp.deposit_payout_batch_id
+JOIN appointments a ON a.appointment_id = dpb.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE dpb
+FROM deposit_payout_batches dpb
+JOIN appointments a ON a.appointment_id = dpb.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+-- 시드 밖 배치가 시드 참가자의 보증금이나 수취인을 가리키는 경우도 함께 끊는다.
+DELETE dp
+FROM deposit_payouts dp
+LEFT JOIN deposits d ON d.deposit_id = dp.source_deposit_id
+LEFT JOIN appointment_members source_am
+    ON source_am.appointment_member_id = d.appointment_member_id
+LEFT JOIN appointments source_a ON source_a.appointment_id = source_am.appointment_id
+LEFT JOIN appointment_members recipient_am
+    ON recipient_am.appointment_member_id = dp.recipient_appointment_member_id
+LEFT JOIN appointments recipient_a
+    ON recipient_a.appointment_id = recipient_am.appointment_id
+WHERE source_a.appointment_name = 'Seed Report Appointment'
+   OR recipient_a.appointment_name = 'Seed Report Appointment';
+
+DELETE d
+FROM deposits d
+JOIN appointment_members am ON am.appointment_member_id = d.appointment_member_id
+JOIN appointments a ON a.appointment_id = am.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
+DELETE tel
+FROM trip_expense_links tel
+JOIN appointment_members am ON am.appointment_member_id = tel.appointment_member_id
+JOIN appointments a ON a.appointment_id = am.appointment_id
+WHERE a.appointment_name = 'Seed Report Appointment';
+
 DELETE am
 FROM appointment_members am
 JOIN appointments a ON a.appointment_id = am.appointment_id
