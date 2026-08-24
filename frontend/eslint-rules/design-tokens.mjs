@@ -1,6 +1,6 @@
 const RAW_HEX_COLOR = /#(?:[\da-f]{8}|[\da-f]{6}|[\da-f]{4}|[\da-f]{3})(?![\da-f])/i
 
-const COLOR_UTILITY_PATTERN = String.raw`(?:bg(?:-(?:linear|radial|conic))?|text|border(?:-[trblxyse])?|divide(?:-[xy])?|ring(?:-offset)?|outline|shadow|drop-shadow|fill|stroke|caret|accent|decoration|placeholder|from|via|to)`
+const COLOR_UTILITY_PATTERN = String.raw`(?:bg(?:-(?:linear|radial|conic))?|text|border(?:-(?:[trblxyse]|bs|be))?|divide(?:-[xy])?|ring(?:-offset)?|inset-ring|outline|shadow|inset-shadow|text-shadow|drop-shadow|filter|backdrop-filter|mask(?:-(?:linear|radial|conic))?|list-image|scrollbar-(?:thumb|track)|fill|stroke|caret|accent|decoration|placeholder|from|via|to)`
 
 const ARBITRARY_COLOR_UTILITY = new RegExp(
   String.raw`^!?${COLOR_UTILITY_PATTERN}-\[(.+)\](?:\/[^\s!]+)?!?$`,
@@ -30,6 +30,7 @@ const CSS_SYSTEM_COLORS = new Set(
 const COLOR_CAPABLE_CSS_PROPERTIES = new Set([
   'background',
   'background-image',
+  'backdrop-filter',
   'border',
   'border-block',
   'border-block-end',
@@ -47,13 +48,16 @@ const COLOR_CAPABLE_CSS_PROPERTIES = new Set([
   'column-rule',
   'fill',
   'filter',
+  'list-style-image',
   'mask',
   'mask-image',
   'outline',
   'stroke',
+  'shape-outside',
   'text-decoration',
   'text-emphasis',
   'text-shadow',
+  'text-stroke',
 ])
 
 function blankUrlFunctions(value) {
@@ -109,15 +113,17 @@ function containsRawColor(value) {
 
 function isColorCapableProperty(property) {
   const normalized = property.toLowerCase()
+  const unprefixed = normalized.replace(/^-(?:webkit|moz|ms|o)-/, '')
   return (
     normalized.startsWith('--') ||
-    normalized.endsWith('color') ||
-    COLOR_CAPABLE_CSS_PROPERTIES.has(normalized)
+    unprefixed.endsWith('color') ||
+    COLOR_CAPABLE_CSS_PROPERTIES.has(unprefixed)
   )
 }
 
 function withoutVariants(className) {
   let bracketDepth = 0
+  let parenthesisDepth = 0
   let lastVariantSeparator = -1
   let escaped = false
 
@@ -131,7 +137,11 @@ function withoutVariants(className) {
       bracketDepth += 1
     } else if (character === ']') {
       bracketDepth = Math.max(0, bracketDepth - 1)
-    } else if (character === ':' && bracketDepth === 0) {
+    } else if (character === '(') {
+      parenthesisDepth += 1
+    } else if (character === ')') {
+      parenthesisDepth = Math.max(0, parenthesisDepth - 1)
+    } else if (character === ':' && bracketDepth === 0 && parenthesisDepth === 0) {
       lastVariantSeparator = index
     }
   }

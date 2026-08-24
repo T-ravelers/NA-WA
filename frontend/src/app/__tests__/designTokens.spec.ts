@@ -165,6 +165,59 @@ describe('Design token ESLint rule', () => {
     }
   })
 
+  it('rejects typed custom-property shorthand without treating its colon as a variant', async () => {
+    const classNames = [
+      'bg-(color:--raw)',
+      'text-(color:--raw)',
+      'shadow-(color:--raw)',
+      'hover:bg-(color:--raw)!',
+      'focus:bg-(color:--raw)/50!',
+      '[&:where(.x)]:bg-(color:--raw)!',
+    ]
+
+    for (const [index, className] of classNames.entries()) {
+      const messages = await lint(
+        `<template><div class="${className}" /></template>`,
+        `src/shared/ui/TypedCustomPropertyRawColor${index}.vue`,
+      )
+
+      expect(messages).toHaveLength(1)
+      expect(messages[0]?.message).toContain('arbitrary 색상')
+    }
+  })
+
+  it('rejects raw colors in Tailwind v4 shadow, ring, filter, mask, and image utilities', async () => {
+    const classNames = [
+      'inset-shadow-[red]',
+      'inset-shadow-(color:--raw)',
+      'text-shadow-[red]',
+      'text-shadow-(color:--raw)',
+      'inset-ring-[red]',
+      'inset-ring-(color:--raw)',
+      'filter-[drop-shadow(0_0_2px_red)]',
+      'backdrop-filter-[drop-shadow(0_0_2px_red)]',
+      'mask-[linear-gradient(black,transparent)]',
+      'mask-linear-[black,transparent]',
+      'mask-radial-[black,transparent]',
+      'mask-conic-[black,transparent]',
+      'list-image-[linear-gradient(red,blue)]',
+      'border-bs-[red]',
+      'border-be-(color:--raw)',
+      'scrollbar-thumb-[red]',
+      'scrollbar-track-(color:--raw)',
+    ]
+
+    for (const [index, className] of classNames.entries()) {
+      const messages = await lint(
+        `<template><div class="${className}" /></template>`,
+        `src/shared/ui/AdditionalRawColorUtility${index}.vue`,
+      )
+
+      expect(messages).toHaveLength(1)
+      expect(messages[0]?.message).toContain('arbitrary 색상')
+    }
+  })
+
   it('rejects arbitrary CSS color properties without blocking non-color properties', async () => {
     const rawProperties = [
       '[color:red]',
@@ -188,6 +241,26 @@ describe('Design token ESLint rule', () => {
       'src/shared/ui/ArbitraryNonColorProperty.vue',
     )
     expect(safeMessages).toHaveLength(0)
+  })
+
+  it('rejects raw colors in image, filter, mask, and prefixed arbitrary CSS properties', async () => {
+    const classNames = [
+      '[backdrop-filter:drop-shadow(0_0_2px_red)]',
+      '[-webkit-text-stroke:1px_red]',
+      '[list-style-image:linear-gradient(red,blue)]',
+      '[shape-outside:linear-gradient(red,blue)]',
+      '[-webkit-mask-image:linear-gradient(black,transparent)]',
+    ]
+
+    for (const [index, className] of classNames.entries()) {
+      const messages = await lint(
+        `<template><div class="${className}" /></template>`,
+        `src/shared/ui/AdditionalRawColorProperty${index}.vue`,
+      )
+
+      expect(messages).toHaveLength(1)
+      expect(messages[0]?.message).toContain('arbitrary 색상')
+    }
   })
 
   it('rejects opacity modifiers on arbitrary CSS color properties', async () => {
