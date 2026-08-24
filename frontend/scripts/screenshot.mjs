@@ -124,48 +124,49 @@ function stubMemberProfile(page, overrides = {}) {
  * 두 응답 모두 `responseSchema`(zod)를 지나므로 요약 DTO의 필수 필드를 빠짐없이 채운다 —
  * 하나라도 빠지면 검증이 실패해 화면이 오류 상태로 찍힌다.
  */
+const PROFILE_SAVED_EVENT_TITLES = [
+  'Seoul Lantern Festival',
+  'Hanok Craft Week',
+  'Moonlight Palace Tour',
+  'River Jazz Picnic',
+  'Museum Night Seoul',
+  'Seongsu Design Market',
+  'Bukchon Tea Weekend',
+]
+
+const PROFILE_APPOINTMENT_TITLES = [
+  'Lantern night walk',
+  'Palace photo walk',
+  'River jazz picnic',
+  'Museum night meetup',
+  'Seongsu market crawl',
+  'Bukchon tea meetup',
+  'Hanok craft visit',
+]
+
 function stubProfileTabs(page) {
   return Promise.all([
     stubJson(page, '/api/v1/explore/events', {
-      content: [
-        {
-          itemId: 301,
-          eventKind: 'FESTIVAL',
-          status: 'SCHEDULED',
-          title: 'Seoul Lantern Festival',
-          subtitle: null,
-          thumbnailUrl: null,
-          region1: 'Seoul',
-          region2: 'Jongno-gu',
-          region3: null,
-          latitude: 37.5709,
-          longitude: 126.9925,
-          startDate: '2098-11-01',
-          endDate: '2098-11-17',
-          isPermanent: false,
-          saved: true,
-        },
-        {
-          itemId: 302,
-          eventKind: 'EXHIBITION',
-          status: 'ONGOING',
-          title: 'Hanok Craft Week',
-          subtitle: null,
-          thumbnailUrl: null,
-          region1: 'Seoul',
-          region2: 'Jung-gu',
-          region3: null,
-          latitude: 37.5636,
-          longitude: 126.9976,
-          startDate: '2098-09-04',
-          endDate: '2098-09-20',
-          isPermanent: false,
-          saved: true,
-        },
-      ],
+      content: PROFILE_SAVED_EVENT_TITLES.map((title, index) => ({
+        itemId: 301 + index,
+        eventKind: index % 2 === 0 ? 'FESTIVAL' : 'EXHIBITION',
+        status: 'SCHEDULED',
+        title,
+        subtitle: null,
+        thumbnailUrl: null,
+        region1: 'Seoul',
+        region2: index % 2 === 0 ? 'Jongno-gu' : 'Jung-gu',
+        region3: null,
+        latitude: 37.5709,
+        longitude: 126.9925,
+        startDate: '2098-11-01',
+        endDate: '2098-11-17',
+        isPermanent: false,
+        saved: true,
+      })),
       page: 0,
       size: 30,
-      totalElements: 2,
+      totalElements: PROFILE_SAVED_EVENT_TITLES.length,
       totalPages: 1,
       hasNext: false,
     }),
@@ -199,19 +200,19 @@ function stubProfileTabs(page) {
       hasNext: false,
     }),
     stubJson(page, '/api/v1/appointments/me', [
-      {
-        appointmentId: 71,
-        appointmentName: 'Lantern night walk',
+      ...PROFILE_APPOINTMENT_TITLES.map((appointmentName, index) => ({
+        appointmentId: 71 + index,
+        appointmentName,
         tripId: 42,
         meetingPlace: 'Jongno 3-ga Exit 3',
-        activityStartAt: '2098-11-02T19:00:00',
-        activityEndAt: '2098-11-02T21:00:00',
-        itemId: 301,
+        activityStartAt: `2098-11-${String(index + 2).padStart(2, '0')}T19:00:00`,
+        activityEndAt: `2098-11-${String(index + 2).padStart(2, '0')}T21:00:00`,
+        itemId: 301 + index,
         itemType: 'EVENT',
         appointmentStatus: 'RECRUITING',
-      },
+      })),
       {
-        appointmentId: 72,
+        appointmentId: 90,
         appointmentName: 'Market food crawl',
         tripId: 42,
         meetingPlace: 'Gwangjang Market north gate',
@@ -1552,6 +1553,50 @@ const SCREENS = [
     prepare: async (page) => {
       await page.getByTestId('segment-appointments').click()
       await page.getByTestId('profile-list').getByRole('link').first().waitFor()
+    },
+  },
+  {
+    name: '04e-profile-saved-folded',
+    path: '/profile',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubProfileTabs(page)]),
+    prepare: async (page) => {
+      const showMore = page.getByTestId('profile-show-more')
+      await showMore.waitFor()
+      await showMore.scrollIntoViewIfNeeded()
+    },
+  },
+  {
+    name: '04f-profile-saved-expanded',
+    path: '/profile',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubProfileTabs(page)]),
+    prepare: async (page) => {
+      await page.getByTestId('profile-show-more').click()
+      const lastItem = page.getByTestId('profile-list').locator('li').nth(6)
+      await lastItem.waitFor()
+      await lastItem.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+    },
+  },
+  {
+    name: '04g-profile-appointments-folded',
+    path: '/profile',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubProfileTabs(page)]),
+    prepare: async (page) => {
+      await page.getByTestId('segment-appointments').click()
+      const showMore = page.getByTestId('profile-show-more')
+      await showMore.waitFor()
+      await showMore.scrollIntoViewIfNeeded()
+    },
+  },
+  {
+    name: '04h-profile-appointments-expanded',
+    path: '/profile',
+    setup: (page) => Promise.all([stubMemberProfile(page), stubProfileTabs(page)]),
+    prepare: async (page) => {
+      await page.getByTestId('segment-appointments').click()
+      await page.getByTestId('profile-show-more').click()
+      const lastItem = page.getByTestId('profile-list').locator('li').nth(6)
+      await lastItem.waitFor()
+      await lastItem.evaluate((element) => element.scrollIntoView({ block: 'center' }))
     },
   },
   {

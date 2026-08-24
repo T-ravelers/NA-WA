@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useMutation } from '@tanstack/vue-query'
 import { IconChevronRight, IconLogout } from '@tabler/icons-vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { applyLocale } from '@/app/i18n/applyLocale'
@@ -9,6 +9,7 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import { requestSignOut } from '@/shared/api/sessionSignOut'
 import { nativeLocaleLabel, type AppLocale } from '@/shared/i18n/locales'
 import { formatServerDateTime } from '@/shared/lib/datetime'
+import AppButton from '@/shared/ui/AppButton.vue'
 import AppImage from '@/shared/ui/AppImage.vue'
 import LocaleSheet from '@/shared/ui/LocaleSheet.vue'
 import SelectChip from '@/shared/ui/SelectChip.vue'
@@ -34,6 +35,9 @@ const isLocaleSheetOpen = ref(false)
 /** `Saved | Appointments`와 그 안의 `Events | Places`. */
 const tab = ref<'saved' | 'appointments'>('saved')
 const kind = ref<'EVENT' | 'PLACE'>('EVENT')
+const VISIBLE_STEP = 5
+const SAVED_PAGE_SIZE = 30
+const visibleCount = ref(VISIBLE_STEP)
 
 /**
  * 화면에 표시하는 언어는 서버 값이 아니라 실제로 적용된 로케일이다.
@@ -55,10 +59,41 @@ const savedQuery = useSavedExploreItems(
 )
 const appointmentsQuery = useMyAppointments(computed(() => tab.value === 'appointments'))
 
-/** 약속은 서버가 예정 → 지난 순으로 세워 준다. 화면은 종류로 거르기만 한다. */
-const visibleAppointments = computed(
+/** 약속은 서버가 예정 → 지난 순으로 세워 준다. 화면은 종류로 거른 뒤 현재 개수만 그린다. */
+const appointmentsForKind = computed(
   () => appointmentsQuery.data.value?.filter((item) => item.itemType === kind.value) ?? [],
 )
+const visibleSavedItems = computed(() => (savedQuery.data.value ?? []).slice(0, visibleCount.value))
+const visibleAppointments = computed(() => appointmentsForKind.value.slice(0, visibleCount.value))
+const activeItemCount = computed(() =>
+  tab.value === 'saved' ? (savedQuery.data.value?.length ?? 0) : appointmentsForKind.value.length,
+)
+const activeListReady = computed(() =>
+  tab.value === 'saved'
+    ? !savedQuery.isPending.value && !savedQuery.isError.value
+    : !appointmentsQuery.isPending.value && !appointmentsQuery.isError.value,
+)
+const hasMore = computed(() => activeListReady.value && activeItemCount.value > visibleCount.value)
+const savedLimitReached = computed(
+  () =>
+    activeListReady.value &&
+    tab.value === 'saved' &&
+    (savedQuery.data.value?.length ?? 0) === SAVED_PAGE_SIZE &&
+    !hasMore.value,
+)
+const savedDiscoverTo = computed(() =>
+  kind.value === 'EVENT'
+    ? { path: '/explore', query: { eventSavedOnly: 'true' } }
+    : { path: '/explore', query: { tab: 'places', savedOnly: 'true' } },
+)
+
+watch([tab, kind], () => {
+  visibleCount.value = VISIBLE_STEP
+})
+
+function showMore(): void {
+  visibleCount.value += VISIBLE_STEP
+}
 
 const emptyMessage = computed(() => {
   const group = tab.value === 'saved' ? 'saved' : 'appointments'
@@ -209,7 +244,7 @@ function chooseLocale(next: AppLocale): void {
             class="flex flex-col gap-2"
           >
             <li
-              v-for="item in savedQuery.data.value"
+              v-for="item in visibleSavedItems"
               :key="item.itemId"
             >
               <RouterLink
@@ -286,6 +321,31 @@ function chooseLocale(next: AppLocale): void {
             </li>
           </ul>
         </template>
+
+        <AppButton
+          v-if="hasMore"
+          block
+          variant="secondary"
+          class="mt-3"
+          data-testid="profile-show-more"
+          @click="showMore"
+        >
+          {{ t('member.profile.list.showMore') }}
+        </AppButton>
+
+        <p
+          v-if="savedLimitReached"
+          class="mt-3 text-caption text-ink-3"
+          data-testid="profile-saved-limit"
+        >
+          {{ t('member.profile.saved.limitNotice') }}
+          <RouterLink
+            :to="savedDiscoverTo"
+            class="ml-1 text-ink underline underline-offset-4"
+          >
+            {{ t('member.profile.saved.openDiscover') }}
+          </RouterLink>
+        </p>
       </div>
 
       <h2 class="mt-8 font-display text-section-header text-ink-display uppercase">

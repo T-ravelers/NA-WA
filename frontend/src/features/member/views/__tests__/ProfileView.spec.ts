@@ -76,6 +76,22 @@ const PLACE_APPOINTMENT: MyAppointmentItem = {
   activityStartAt: '2026-09-05T12:30:00',
 }
 
+function savedItems(count: number, kind: 'EVENT' | 'PLACE' = 'EVENT'): SavedExploreItem[] {
+  return Array.from({ length: count }, (_, index) => ({
+    ...(kind === 'EVENT' ? SAVED_EVENT : SAVED_PLACE),
+    itemId: (kind === 'EVENT' ? 100 : 200) + index,
+    title: `${kind === 'EVENT' ? 'Saved event' : 'Saved place'} ${index + 1}`,
+  }))
+}
+
+function appointments(count: number, kind: 'EVENT' | 'PLACE'): MyAppointmentItem[] {
+  return Array.from({ length: count }, (_, index) => ({
+    ...(kind === 'EVENT' ? EVENT_APPOINTMENT : PLACE_APPOINTMENT),
+    appointmentId: (kind === 'EVENT' ? 300 : 400) + index,
+    appointmentName: `${kind === 'EVENT' ? 'Event appointment' : 'Place appointment'} ${index + 1}`,
+  }))
+}
+
 interface MountOptions {
   profile?: MemberProfile
   savedByKind?: Record<'EVENT' | 'PLACE', SavedExploreItem[]>
@@ -99,6 +115,7 @@ function mountView({
     history: createMemoryHistory(),
     routes: [
       { path: '/', component: { template: '<div />' } },
+      { path: '/explore', component: { template: '<div />' } },
       { path: '/explore/events/:eventId', component: { template: '<div />' } },
       { path: '/explore/places/:placeId', component: { template: '<div />' } },
       { path: '/appointments/:appointmentId', component: { template: '<div />' } },
@@ -222,6 +239,65 @@ describe('ProfileView', () => {
     const list = wrapper.get('[data-testid="profile-list"]')
     expect(list.text()).toContain('Gwangjang Market')
     expect(list.get('a').attributes('href')).toBe('/explore/places/22')
+  })
+
+  it('shows five saved items first and reveals five more per click', async () => {
+    const { wrapper } = await mounted({
+      savedByKind: { EVENT: savedItems(12), PLACE: [SAVED_PLACE] },
+    })
+
+    expect(wrapper.findAll('[data-testid="profile-list"] li')).toHaveLength(5)
+    expect(wrapper.text()).not.toContain('Saved event 6')
+
+    await wrapper.get('[data-testid="profile-show-more"]').trigger('click')
+
+    expect(wrapper.findAll('[data-testid="profile-list"] li')).toHaveLength(10)
+    expect(wrapper.text()).toContain('Saved event 10')
+
+    await wrapper.get('[data-testid="profile-show-more"]').trigger('click')
+
+    expect(wrapper.findAll('[data-testid="profile-list"] li')).toHaveLength(12)
+    expect(wrapper.find('[data-testid="profile-show-more"]').exists()).toBe(false)
+  })
+
+  it('resets the visible count when the kind or primary tab changes', async () => {
+    const { wrapper } = await mounted({
+      savedByKind: { EVENT: savedItems(12), PLACE: savedItems(7, 'PLACE') },
+      appointments: appointments(7, 'PLACE'),
+    })
+
+    await wrapper.get('[data-testid="profile-show-more"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="profile-list"] li')).toHaveLength(10)
+
+    await wrapper.get('[data-testid="profile-kind-PLACE"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="profile-list"] li')).toHaveLength(5)
+
+    await wrapper.get('[data-testid="profile-show-more"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="profile-list"] li')).toHaveLength(7)
+
+    await wrapper.get('[data-testid="segment-appointments"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="profile-list"] li')).toHaveLength(5)
+    expect(wrapper.text()).toContain('Place appointment 5')
+    expect(wrapper.text()).not.toContain('Place appointment 6')
+
+    await wrapper.get('[data-testid="profile-show-more"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="profile-list"] li')).toHaveLength(7)
+    expect(wrapper.text()).toContain('Place appointment 7')
+  })
+
+  it('links to the complete Saved filter after all 30 profile items are expanded', async () => {
+    const { wrapper } = await mounted({
+      savedByKind: { EVENT: savedItems(30), PLACE: [SAVED_PLACE] },
+    })
+
+    for (let index = 0; index < 5; index += 1) {
+      await wrapper.get('[data-testid="profile-show-more"]').trigger('click')
+    }
+
+    expect(wrapper.findAll('[data-testid="profile-list"] li')).toHaveLength(30)
+    const limit = wrapper.get('[data-testid="profile-saved-limit"]')
+    expect(limit.text()).toContain('Profile shows up to 30 saved items.')
+    expect(limit.get('a').attributes('href')).toContain('eventSavedOnly=true')
   })
 
   it('keeps one primary segment and names the kind chips independently of the tab', async () => {
