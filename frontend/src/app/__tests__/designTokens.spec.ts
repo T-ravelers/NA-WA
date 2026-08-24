@@ -190,6 +190,34 @@ describe('Design token ESLint rule', () => {
     expect(safeMessages).toHaveLength(0)
   })
 
+  it('rejects opacity modifiers on arbitrary CSS color properties', async () => {
+    const classNames = ['[color:red]/50', '[background:rgb(1_2_3)]/50', '[--raw:red]/50!']
+
+    for (const [index, className] of classNames.entries()) {
+      const messages = await lint(
+        `<template><div class="${className}" /></template>`,
+        `src/shared/ui/ArbitraryColorPropertyOpacity${index}.vue`,
+      )
+
+      expect(messages).toHaveLength(1)
+      expect(messages[0]?.message).toContain('arbitrary 색상')
+    }
+  })
+
+  it('rejects device CMYK and CSS system colors', async () => {
+    const classNames = ['bg-[device-cmyk(0_81%_81%_30%)]', 'bg-[Canvas]', 'text-[CanvasText]']
+
+    for (const [index, className] of classNames.entries()) {
+      const messages = await lint(
+        `<template><div class="${className}" /></template>`,
+        `src/shared/ui/SystemRawColor${index}.vue`,
+      )
+
+      expect(messages).toHaveLength(1)
+      expect(messages[0]?.message).toContain('arbitrary 색상')
+    }
+  })
+
   it('rejects raw HEX in Vue style blocks', async () => {
     const messages = await lint(
       '<template><div class="sample" /></template><style scoped>.sample { color: #fff; }</style>',
