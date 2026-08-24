@@ -151,6 +151,45 @@ describe('Design token ESLint rule', () => {
     }
   })
 
+  it('rejects custom-property shorthand for arbitrary color utilities', async () => {
+    const classNames = ['bg-(--raw)', 'text-(--raw)', 'border-(--raw)', 'hover:bg-(--raw)!']
+
+    for (const [index, className] of classNames.entries()) {
+      const messages = await lint(
+        `<template><div class="${className}" /></template>`,
+        `src/shared/ui/CustomPropertyRawColor${index}.vue`,
+      )
+
+      expect(messages).toHaveLength(1)
+      expect(messages[0]?.message).toContain('arbitrary 색상')
+    }
+  })
+
+  it('rejects arbitrary CSS color properties without blocking non-color properties', async () => {
+    const rawProperties = [
+      '[color:red]',
+      '[background:rgb(1_2_3)]',
+      '[&::before]:[color:red]!',
+      '[--raw:red]',
+    ]
+
+    for (const [index, className] of rawProperties.entries()) {
+      const messages = await lint(
+        `<template><div class="${className}" /></template>`,
+        `src/shared/ui/ArbitraryColorProperty${index}.vue`,
+      )
+
+      expect(messages).toHaveLength(1)
+      expect(messages[0]?.message).toContain('arbitrary 색상')
+    }
+
+    const safeMessages = await lint(
+      `<template><div class="[width:1px] [content:'red'] [background:url('/assets/red/paper.png')]" /></template>`,
+      'src/shared/ui/ArbitraryNonColorProperty.vue',
+    )
+    expect(safeMessages).toHaveLength(0)
+  })
+
   it('rejects raw HEX in Vue style blocks', async () => {
     const messages = await lint(
       '<template><div class="sample" /></template><style scoped>.sample { color: #fff; }</style>',

@@ -1,14 +1,18 @@
 const RAW_HEX_COLOR = /#(?:[\da-f]{8}|[\da-f]{6}|[\da-f]{4}|[\da-f]{3})(?![\da-f])/i
 
+const COLOR_UTILITY_PATTERN = String.raw`(?:bg(?:-(?:linear|radial|conic))?|text|border(?:-[trblxyse])?|divide(?:-[xy])?|ring(?:-offset)?|outline|shadow|drop-shadow|fill|stroke|caret|accent|decoration|placeholder|from|via|to)`
+
 const ARBITRARY_COLOR_UTILITY = new RegExp(
-  String.raw`^!?(?:bg|text|border(?:-[trblxyse])?|divide(?:-[xy])?|ring(?:-offset)?|outline|shadow|drop-shadow|fill|stroke|caret|accent|decoration|placeholder|from|via|to)-\[(.+)\](?:\/[^\s!]+)?!?$`,
+  String.raw`^!?${COLOR_UTILITY_PATTERN}-\[(.+)\](?:\/[^\s!]+)?!?$`,
   'i',
 )
 
-const ARBITRARY_GRADIENT_UTILITY = new RegExp(
-  String.raw`^!?bg-(?:linear|radial|conic)-\[(.+)\](?:\/[^\s!]+)?!?$`,
+const CUSTOM_PROPERTY_COLOR_UTILITY = new RegExp(
+  String.raw`^!?${COLOR_UTILITY_PATTERN}-\((?:[a-z-]+:)?--[^)]+\)(?:\/[^\s!]+)?!?$`,
   'i',
 )
+
+const ARBITRARY_PROPERTY = /^!?\[((?:--|-)?[a-z][a-z\d_-]*):(.+)\]!?$/i
 
 const COLOR_FUNCTION =
   /(?:^|[^a-z\d-])(?:#|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark|var)\()/i
@@ -17,6 +21,35 @@ const CSS_NAMED_COLORS = new Set(
     ' ',
   ),
 )
+
+const COLOR_CAPABLE_CSS_PROPERTIES = new Set([
+  'background',
+  'background-image',
+  'border',
+  'border-block',
+  'border-block-end',
+  'border-block-start',
+  'border-bottom',
+  'border-image',
+  'border-image-source',
+  'border-inline',
+  'border-inline-end',
+  'border-inline-start',
+  'border-left',
+  'border-right',
+  'border-top',
+  'box-shadow',
+  'column-rule',
+  'fill',
+  'filter',
+  'mask',
+  'mask-image',
+  'outline',
+  'stroke',
+  'text-decoration',
+  'text-emphasis',
+  'text-shadow',
+])
 
 function blankUrlFunctions(value) {
   const characters = value.split('')
@@ -66,6 +99,15 @@ function containsRawColor(value) {
   return withoutUrls.split(/[^a-z\d-]+/i).some((token) => CSS_NAMED_COLORS.has(token.toLowerCase()))
 }
 
+function isColorCapableProperty(property) {
+  const normalized = property.toLowerCase()
+  return (
+    normalized.startsWith('--') ||
+    normalized.endsWith('color') ||
+    COLOR_CAPABLE_CSS_PROPERTIES.has(normalized)
+  )
+}
+
 function withoutVariants(className) {
   let bracketDepth = 0
   let lastVariantSeparator = -1
@@ -97,8 +139,17 @@ function containsArbitraryColorUtility(value) {
       return true
     }
 
-    const gradientMatch = ARBITRARY_GRADIENT_UTILITY.exec(utility)
-    if (typeof gradientMatch?.[1] === 'string' && containsRawColor(gradientMatch[1])) {
+    if (CUSTOM_PROPERTY_COLOR_UTILITY.test(utility)) {
+      return true
+    }
+
+    const propertyMatch = ARBITRARY_PROPERTY.exec(utility)
+    if (
+      typeof propertyMatch?.[1] === 'string' &&
+      typeof propertyMatch[2] === 'string' &&
+      isColorCapableProperty(propertyMatch[1]) &&
+      containsRawColor(propertyMatch[2])
+    ) {
       return true
     }
   }
