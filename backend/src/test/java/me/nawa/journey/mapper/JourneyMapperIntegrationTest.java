@@ -688,7 +688,17 @@ class JourneyMapperIntegrationTest {
 
     @Test
     void findCurrentSpentAmount_sumsOnlyEligibleLiveJourneyExpenses() {
-        String marker = "journey-spending-" + UUID.randomUUID();
+        /*
+         * 다른 테스트의 marker(prefix + 전체 UUID, 36자)를 그대로 쓰면 이 테스트에서만
+         * 폭이 좁은 두 컬럼에 동시에 걸린다. marker 자체가 members.display_name
+         * VARCHAR(50)에 들어가고, 가장 긴 접미사 "-settlement"(11자)를 붙인 값은
+         * wallet_transfers.transfer_number VARCHAR(50)에 들어간다. "journey-spending-"
+         * (17자) + UUID(36자) = 53자로 접미사 없이도 이미 display_name을 넘겼고,
+         * MySQL 통합 테스트에서 SQL 검증 전에 MysqlDataTruncation으로 끊겼다(리뷰).
+         * 접두사를 짧게 줄이는 대신 UUID를 앞 8자로 잘라 marker 전체를 줄인다 —
+         * finally에서 즉시 정리되는 범위라 8자로도 실제로 부족한 적이 없다.
+         */
+        String marker = "spend-" + UUID.randomUUID().toString().substring(0, 8);
         long memberId = insertMember(marker);
         long tripId = insertTrip(memberId, marker);
         WalletFixture wallet = insertMemberWallet(memberId);
