@@ -81,6 +81,21 @@ export function getJourneyStatus(
   return endDate < today ? 'past' : 'ongoing'
 }
 
+/**
+ * 지금 실제로 여행 중인가.
+ *
+ * 🔴 `getJourneyStatus`의 `ongoing`과 다르다. 그쪽은 `endDate`만 보므로 **아직 시작하지
+ * 않은 여정도 `ongoing`**이다 — 탭이 「지나지 않은 것」을 모으기 때문이다. 카드의
+ * `ON TRIP` 도장처럼 「지금 떠나 있다」를 말하는 자리는 시작일도 함께 봐야 한다.
+ */
+export function isJourneyOnTrip(
+  startDate: string,
+  endDate: string,
+  today: string = getKoreaToday(),
+): boolean {
+  return startDate <= today && today <= endDate
+}
+
 export function filterJourneysByStatus(
   journeys: JourneySummary[],
   status: JourneyListStatus,

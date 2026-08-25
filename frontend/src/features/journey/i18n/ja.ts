@@ -9,6 +9,10 @@ export default {
     list: {
       title: '旅程',
       add: '旅程を追加',
+      viewReport: 'レポートを見る',
+      onTrip: '旅行中',
+      inProgress: '進行中',
+      scheduled: '予定',
       tabsLabel: '旅程のステータス',
       ongoing: '進行中',
       past: '過去',

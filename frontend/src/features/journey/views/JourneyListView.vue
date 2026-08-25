@@ -13,8 +13,14 @@ import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import JourneyListCard from '../components/JourneyListCard.vue'
 import { useJourneyListQuery } from '../composables/useJourneyListQuery'
+import { useJourneyReportIntegration } from '../model/reportIntegration'
 import { journeyErrorMessageKey } from '../model/journeyErrors'
-import { filterJourneysByStatus, type JourneyListTab, useKoreaToday } from '../model/journeyStatus'
+import {
+  filterJourneysByStatus,
+  isJourneyOnTrip,
+  type JourneyListTab,
+  useKoreaToday,
+} from '../model/journeyStatus'
 
 const i18n = useI18n()
 const { t } = i18n
@@ -23,6 +29,24 @@ const activeTab = ref<JourneyListTab>('ongoing')
 const today = useKoreaToday()
 const hasMessage = (key: string): boolean => i18n.te(key)
 const journeyQuery = useJourneyListQuery(true)
+
+/*
+ * 여정 목록 응답에는 리포트 정보가 없다(#424). 카드의 `View report`는 report feature가
+ * 가진 요약 목록에서 온다 — feature끼리 직접 import하지 않도록 `main.ts`가 주입한
+ * 통로를 쓴다(`model/reportIntegration.ts`).
+ *
+ * 같은 쿼리 키를 리포트 화면과 공유하므로, 그쪽을 다녀왔다면 요청이 새로 나가지 않는다.
+ * 실패해도 카드의 나머지는 그대로 그린다 — 리포트 링크만 빠진다.
+ */
+const { useReportSummariesQuery } = useJourneyReportIntegration()
+const reportSummariesQuery = useReportSummariesQuery()
+const reportIdByTripId = computed(() => {
+  const map = new Map<number, number>()
+  for (const summary of reportSummariesQuery.data.value ?? []) {
+    map.set(summary.tripId, summary.reportId)
+  }
+  return map
+})
 
 const tabOptions = computed(() => [
   { value: 'ongoing', label: t('journey.list.ongoing') },
@@ -166,7 +190,8 @@ function retry(): void {
             :key="journey.tripId"
             :journey="journey"
             :status="activeTab"
-            :status-label="activeTabLabel"
+            :on-trip="isJourneyOnTrip(journey.startDate, journey.endDate, today)"
+            :report-id="reportIdByTripId.get(journey.tripId) ?? null"
             class="w-68 shrink-0 snap-start"
           />
         </ul>

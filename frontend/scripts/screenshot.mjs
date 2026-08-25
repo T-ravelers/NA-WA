@@ -91,6 +91,28 @@ const FULL_PAGE = process.env.SCREENSHOT_FULL_PAGE === '1'
 
 /** @typedef {(page: import('@playwright/test').Page) => Promise<unknown>} Hook */
 
+const SCREENSHOT_NOW = new Date()
+
+/**
+ * 한국 달력 기준 오늘에서 날짜를 더한다. 여정 목록 스냅샷은 실행하는 날에도 실제 진행 중인
+ * 카드가 있어야 하므로 2098년 같은 고정 미래 날짜를 쓰지 않는다.
+ */
+function getKoreaDate(offsetDays = 0) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(SCREENSHOT_NOW)
+  const part = (type) => parts.find((entry) => entry.type === type)?.value ?? ''
+  const date = new Date(
+    Date.UTC(Number(part('year')), Number(part('month')) - 1, Number(part('day'))),
+  )
+
+  date.setUTCDate(date.getUTCDate() + offsetDays)
+  return date.toISOString().slice(0, 10)
+}
+
 /** 인증된 회원인 것처럼 프로필 응답을 세운다. 백엔드 `ApiResponse` 봉투를 그대로 흉내낸다. */
 function stubMemberProfile(page, overrides = {}) {
   return page.route('**/api/v1/members/me', (route) =>
@@ -320,15 +342,15 @@ function stubJourneyList(page) {
       body: JSON.stringify({
         success: true,
         data: [
-          // 목록은 가로 스냅 캐러셀이다. ongoing이 한 장뿐이면 스냅도 다음 카드
-          // 엿보기도 화면에 나타나지 않아 캡처가 조형을 증명하지 못한다. 진행 중
-          // 여정을 세 장 둔다.
+          // 목록은 가로 스냅 캐러셀이다. ongoing이 한 장뿐이면 다음 카드 엿보기도 화면에
+          // 나타나지 않아 캡처가 조형을 증명하지 못한다. 실제 진행 중 한 장과 예정 두 장을
+          // 둬 `In progress` / `Scheduled`와 `ON TRIP`을 한 화면에서 검증한다.
           // 커버가 있는 여정과 없는 여정이 한 화면에 섞인다. 두 갈래를 모두 찍는다.
           {
             tripId: 42,
             title: 'Seoul Foodie Week',
-            startDate: '2098-08-10',
-            endDate: '2098-08-12',
+            startDate: getKoreaDate(-2),
+            endDate: getKoreaDate(2),
             eventCount: 8,
             placeCount: 4,
             coverImageUrl: COVER_PIXEL,
@@ -336,8 +358,8 @@ function stubJourneyList(page) {
           {
             tripId: 43,
             title: 'Jeju Island Escape',
-            startDate: '2098-09-02',
-            endDate: '2098-09-07',
+            startDate: getKoreaDate(10),
+            endDate: getKoreaDate(15),
             eventCount: 5,
             placeCount: 9,
             coverImageUrl: null,
@@ -345,8 +367,8 @@ function stubJourneyList(page) {
           {
             tripId: 44,
             title: 'Gangneung Coast Run',
-            startDate: '2098-10-11',
-            endDate: '2098-10-13',
+            startDate: getKoreaDate(30),
+            endDate: getKoreaDate(32),
             eventCount: 0,
             placeCount: 6,
             coverImageUrl: COVER_PIXEL,
@@ -354,11 +376,40 @@ function stubJourneyList(page) {
           {
             tripId: 7,
             title: 'Busan Weekender',
-            startDate: '2020-08-10',
-            endDate: '2020-08-12',
+            startDate: getKoreaDate(-30),
+            endDate: getKoreaDate(-28),
             eventCount: 4,
             placeCount: 2,
             coverImageUrl: null,
+          },
+        ],
+      }),
+    }),
+  )
+}
+
+/**
+ * 최종 리포트는 종료된 여정에만 연결한다. 진행 중/예정 카드에 `COMPLETED` 리포트를 붙이면
+ * 운영에서 만들 수 없는 화면이므로, Past 탭의 Busan 카드만 연결한다.
+ */
+function stubJourneyReportList(page) {
+  return page.route('**/api/v1/reports', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: [
+          {
+            reportId: 101,
+            tripId: 7,
+            title: 'Busan Weekender',
+            startDate: getKoreaDate(-30),
+            endDate: getKoreaDate(-28),
+            generationStatus: 'COMPLETED',
+            locale: 'en',
+            generatedAt: `${getKoreaDate(-27)}T09:00:00`,
+            createdAt: `${getKoreaDate(-27)}T09:00:00`,
           },
         ],
       }),
@@ -1624,9 +1675,24 @@ const SCREENS = [
     },
   },
   {
-    name: '13-journey-list',
+    name: '13-journey-list-ongoing',
     path: '/journeys',
-    setup: (page) => Promise.all([stubMemberProfile(page), stubJourneyList(page)]),
+    /*
+     * 실제 기간 중인 첫 카드로 `ON TRIP`과 `In progress`를, 다음 카드로 `Scheduled`를
+     * 찍는다. 리포트는 Past 여정에만 있으므로 이 탭에는 링크가 나오지 않는다.
+     */
+    setup: (page) =>
+      Promise.all([stubMemberProfile(page), stubJourneyList(page), stubJourneyReportList(page)]),
+  },
+  {
+    name: '13b-journey-list-past-report',
+    path: '/journeys',
+    setup: (page) =>
+      Promise.all([stubMemberProfile(page), stubJourneyList(page), stubJourneyReportList(page)]),
+    prepare: async (page) => {
+      await page.getByTestId('segment-past').click()
+      await page.locator('a[href="/reports/101"]').waitFor()
+    },
   },
   {
     name: '06-journey-create',

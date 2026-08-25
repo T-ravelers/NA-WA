@@ -1,10 +1,12 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { journeyReportIntegrationKey } from '../../model/reportIntegration'
 
 const fetchJourneys = vi.fn()
 
@@ -39,6 +41,9 @@ const journeys = [
 
 let queryClient: QueryClient
 const queryClients: QueryClient[] = []
+/** 기본은 리포트 없음. 링크를 보는 테스트가 이 배열을 바꾼다. */
+let reportSummaries: { tripId: number; reportId: number }[] = []
+
 const mountedWrappers: Array<{ unmount: () => void }> = []
 
 async function mountView() {
@@ -63,6 +68,20 @@ async function mountView() {
   const wrapper = mount(JourneyListView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+      provide: {
+        /*
+         * 카드의 `View report`는 report feature가 가진 요약에서 온다. feature끼리 직접
+         * import하지 않도록 `main.ts`가 주입하는 통로라, 테스트도 같은 자리에 스텁을 준다.
+         */
+        [journeyReportIntegrationKey as symbol]: {
+          useReportSummariesQuery: () => ({
+            data: ref(reportSummaries),
+            isPending: ref(false),
+            isError: ref(false),
+            refetch: vi.fn(),
+          }),
+        },
+      },
     },
   })
 
@@ -75,6 +94,7 @@ async function mountView() {
 describe('JourneyListView', () => {
   beforeEach(() => {
     fetchJourneys.mockReset()
+    reportSummaries = []
   })
 
   afterEach(() => {

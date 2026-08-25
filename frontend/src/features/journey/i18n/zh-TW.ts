@@ -9,6 +9,10 @@ export default {
     list: {
       title: '旅程',
       add: '新增旅程',
+      viewReport: '查看報告',
+      onTrip: '旅行中',
+      inProgress: '進行中',
+      scheduled: '即將開始',
       tabsLabel: '旅程狀態',
       ongoing: '進行中',
       past: '已結束',
