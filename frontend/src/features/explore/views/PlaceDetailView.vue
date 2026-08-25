@@ -35,6 +35,7 @@ import { journeyAddErrorMessageKey } from '../model/journeyAddErrors'
 import { intersectItemJourneyPeriod } from '@/shared/lib/journeyPeriod'
 import { findExploreRegionLabelKey } from '../model/exploreRegions'
 import { normalizePlaceKind, type PlaceKind } from '../model/placeExplore'
+import { formatDetailEntry } from '../model/detailEntryLabels'
 import { toClosedDays, toDetailEntries } from '../model/placeDetail'
 
 const route = useRoute()
@@ -105,22 +106,6 @@ const locationLabel = computed(() =>
 const hours = computed(() => (place.value ? toDetailEntries(place.value.openingHours) : []))
 const closedDays = computed(() => (place.value ? toClosedDays(place.value.closedDays) : ''))
 
-/**
- * 영업시간 한 줄을 적는다.
- *
- * 수집한 영업시간은 대부분 `{ raw: '12:00 ~ 22:00' }` 한 칸짜리 객체다. `raw`는
- * 크롤러가 붙인 키 이름이라 화면 라벨이 아니고, 행에는 이미 "Hours"가 적혀 있다.
- * 그대로 찍으면 `raw: 12:00 ~ 22:00`이 된다. 문자열로 온 값에 우리가 붙이는
- * `hours`도 같은 이유로 감춘다. Event 상세도 같은 규칙이다.
- */
-const SYNTHETIC_HOURS_LABELS = new Set(['raw', 'hours'])
-
-function formatHoursEntry(entry: { label: string; value: string }): string {
-  return SYNTHETIC_HOURS_LABELS.has(entry.label.toLowerCase())
-    ? entry.value
-    : `${entry.label}: ${entry.value}`
-}
-
 const detailRows = computed(() => {
   const current = place.value
   if (!current) return []
@@ -129,7 +114,7 @@ const detailRows = computed(() => {
   if (hours.value.length > 0) {
     rows.push({
       label: t('explore.placeDetail.hours'),
-      value: hours.value.map(formatHoursEntry).join('\n'),
+      value: hours.value.map(formatDetailEntry).join('\n'),
     })
   }
   if (closedDays.value) {

@@ -1581,6 +1581,94 @@ function stubEventDetail(page, { withCoordinates }) {
 }
 
 /**
+ * 상세 행이 크롤러 키를 라벨로 그리지 않는지 보이는 스텁.
+ *
+ * 두 화면의 값을 **객체 모양으로** 세운다. 실제 수집 데이터는 휴무일이 배열이라, 실데이터로는
+ * 이 갈래가 화면에 나오지 않는다. 규칙이 되살아나면 `raw:`·`hours:`가 값 앞에 붙는다.
+ */
+function stubPlaceDetailWithObjectShapedRows(page) {
+  return Promise.all([
+    stubMemberProfile(page),
+    stubJson(page, '/api/v1/explore/places/9001', {
+      placeId: 9001,
+      itemId: 9001,
+      name: 'Seongsu Coffee Stand',
+      brand: null,
+      branch: null,
+      placeKind: 'CAFE',
+      thumbnailUrl: null,
+      imageUrls: [],
+      region1: '서울',
+      region2: '성수',
+      region3: null,
+      addressRoad: '서울 성동구 연무장길 45',
+      addressDetail: null,
+      latitude: 37.5445,
+      longitude: 127.0557,
+      isActive: true,
+      viewCount: 0,
+      favoriteCount: 0,
+      saved: false,
+      sourceUrl: null,
+      postalCode: null,
+      // 번역이 붙으면 백엔드가 원문과 같은 모양으로 감싼다. 화면은 두 모양을 같게 그려야 한다.
+      openingHours: { raw: 'Every day 12:00 – 22:00' },
+      closedDays: { raw: 'Every Monday' },
+      menuSummary: null,
+      tel: null,
+      activities: [],
+    }),
+  ])
+}
+
+function stubEventDetailWithObjectShapedRows(page) {
+  return Promise.all([
+    stubMemberProfile(page),
+    stubJson(page, '/api/v1/explore/events/9002', {
+      eventId: 9002,
+      eventType: null,
+      eventKind: 'FESTIVAL',
+      title: 'Seoul Lantern Festival',
+      subtitle: null,
+      description: null,
+      programText: null,
+      thumbnailUrl: null,
+      imageUrls: [],
+      links: null,
+      reservationUrl: null,
+      preReservation: null,
+      status: 'ONGOING',
+      isPermanent: false,
+      startDate: '2026-08-01',
+      endDate: '2026-09-30',
+      // Event 상세는 예전에 `raw`만 감춰서 이 값이 `hours: ...`로 나갔다.
+      operatingHours: { hours: 'Every day 10:00 – 20:00' },
+      openDays: null,
+      openWeekend: null,
+      opensLate: null,
+      venueName: 'Cheonggyecheon',
+      region1: '서울',
+      region2: '명동',
+      region3: null,
+      addressRoad: '서울 중구 청계천로 1',
+      latitude: 37.5696,
+      longitude: 126.9784,
+      hasPhotoZone: null,
+      isExperience: null,
+      ageLimit: null,
+      isFree: true,
+      priceText: null,
+      hasBenefit: null,
+      reservable: null,
+      contact: null,
+      organizer: null,
+      saved: false,
+      activities: [],
+    }),
+  ])
+}
+
+/**
  * 찍을 화면.
  *
  * 작업 중인 화면을 여기에 추가한다. `prepare`는 진입한 뒤 실행되며, 바텀시트를 연 상태처럼
@@ -1596,6 +1684,28 @@ function stubEventDetail(page, { withCoordinates }) {
  * @type {{ name: string, path: string, setup?: Hook, prepare?: Hook }[]}
  */
 const SCREENS = [
+  {
+    name: '20-place-detail-object-rows',
+    path: '/explore/places/9001',
+    setup: stubPlaceDetailWithObjectShapedRows,
+  },
+  {
+    name: '21-event-detail-object-rows',
+    path: '/explore/events/9002',
+    setup: stubEventDetailWithObjectShapedRows,
+    /*
+     * Hours 행은 첫 화면에서 하단 고정 바에 가린다. scrollIntoViewIfNeeded는 겹침을 보지
+     * 않아 "이미 보인다"고 판단하므로, 화면 가운데로 직접 올린다.
+     */
+    prepare: async (page) => {
+      const hours = page.getByText('Every day 10:00 – 20:00')
+      await hours.waitFor()
+      await hours.evaluate((element) => {
+        element.scrollIntoView({ block: 'center' })
+      })
+      await page.waitForTimeout(300)
+    },
+  },
   { name: '00-welcome', path: '/' },
   { name: '01-sign-in', path: '/sign-in' },
   { name: '02-callback-failed', path: '/auth/callback?error=AUTH-014' },

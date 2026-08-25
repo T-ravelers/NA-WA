@@ -74,4 +74,23 @@ describe('placeDetail model helpers', () => {
   it('strips the crawled <br> tags out of closed days too', () => {
     expect(toClosedDays(['매주 월요일<br>설·추석 당일'])).toBe('매주 월요일, 설·추석 당일')
   })
+
+  /*
+   * 행에 이미 "Closed"가 적혀 있어 크롤러가 붙인 키 이름을 덧붙일 이유가 없다.
+   * 예전에는 객체로 오면 `raw: Every Monday`가 그대로 화면에 나갔고, 백엔드가 번역된
+   * 휴무일을 배열로 감싸 피해 갔다(#531). 그 우회 때문에 프론트 렌더링 규칙이 SQL의
+   * JSON 모양 선택을 붙잡고 있었다(#534).
+   */
+  it('does not print the crawler-made key when closed days arrive as an object', () => {
+    expect(toClosedDays({ raw: 'Every Monday' })).toBe('Every Monday')
+    expect(toClosedDays({ hours: 'Every Monday' })).toBe('Every Monday')
+  })
+
+  // 객체로 와도 배열과 같은 결과여야 백엔드가 어느 모양으로 보내든 화면이 같다.
+  it('gives the same line for both JSON shapes the backend can send', () => {
+    expect(toClosedDays({ raw: 'Every Monday' })).toBe(toClosedDays(['Every Monday']))
+    expect(toClosedDays({ raw: '매주 월요일<br>설 당일' })).toBe(
+      toClosedDays(['매주 월요일<br>설 당일']),
+    )
+  })
 })

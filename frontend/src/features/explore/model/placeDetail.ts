@@ -1,3 +1,4 @@
+import { formatDetailEntry } from './detailEntryLabels'
 import type { PlaceKind, PlaceSummaryResponse } from './placeExplore'
 import { normalizePlaceKind, toImageUrls } from './placeExplore'
 
@@ -86,6 +87,13 @@ export function toDetailEntries(value: unknown): DetailEntry[] {
     .map(([label, item]) => ({ label, value: unescapeLineBreaks(String(item)) }))
 }
 
+/**
+ * 휴무일을 한 줄 문자열로 만든다.
+ *
+ * 객체로 와도 `raw`·`hours` 같은 합성 라벨은 붙이지 않는다. 행에 이미 "Closed"가 적혀 있어
+ * 크롤러가 붙인 키 이름을 덧붙일 이유가 없고, 붙이면 화면에 `raw: Every Monday`가 그대로
+ * 나간다. 영업시간이 쓰는 규칙과 같은 목록을 공유한다(#534).
+ */
 export function toClosedDays(value: unknown): string {
   if (Array.isArray(value)) {
     // 휴무일도 같은 크롤러에서 와서 `<br>`이 섞인다(2,211행 중 16행). 영업시간과
@@ -97,7 +105,7 @@ export function toClosedDays(value: unknown): string {
   }
 
   return toDetailEntries(value)
-    .map((entry) => `${entry.label}: ${entry.value}`)
+    .map((entry) => formatDetailEntry(entry).split('\n').join(', '))
     .join(', ')
 }
 
