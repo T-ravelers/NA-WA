@@ -249,6 +249,100 @@ function stubProfileTabs(page) {
 }
 
 function stubJourneyDetail(page) {
+  const location = (region2, latitude = null, longitude = null) => ({
+    region1: 'Seoul',
+    region2,
+    region3: null,
+    addressRoad: null,
+    addressDetail: null,
+    latitude,
+    longitude,
+  })
+  const appointment = (appointmentId, activityStartAt) => ({
+    appointmentId,
+    activityStartAt,
+    activityEndAt: activityStartAt.replace(/T\d{2}:\d{2}/, 'T23:59'),
+    appointmentStatus: 'COMPLETED',
+  })
+  /*
+   * `eventKind`와 `placeKind`는 운영이 실제로 보내는 값만 쓴다 — eventKind는
+   * POPUP·CONCERT·FESTIVAL·EXHIBITION·ETC 다섯이고 placeKind는 한국어 원문이다.
+   * 소비영역 이름(FOOD·BEAUTY…)을 넣으면 러너만 색이 켜지고 운영에서는 한 번도 안 켜진다.
+   */
+  const timelineItem = ({
+    tripItemId,
+    itemId,
+    title,
+    region2,
+    eventKind = null,
+    placeKind = null,
+    latitude = null,
+    longitude = null,
+    activityStartAt = null,
+    appointmentId = null,
+  }) => ({
+    tripItemId,
+    itemId,
+    status: appointmentId === null ? 'ADDED' : 'CONFIRMED',
+    displayOrder: tripItemId - 1,
+    note: null,
+    exploreItem: {
+      itemType: placeKind === null ? 'EVENT' : 'PLACE',
+      title,
+      thumbnailUrl: null,
+      imageUrls: [],
+      location: location(region2, latitude, longitude),
+    },
+    ...(placeKind === null
+      ? {
+          eventDetail: {
+            eventKind,
+            startDate: null,
+            endDate: null,
+            organizer: null,
+            reservationUrl: null,
+            venueName: null,
+          },
+        }
+      : { placeDetail: { placeKind, businessHours: null, contact: null, homepageUrl: null } }),
+    ...(appointmentId === null ? {} : { appointment: appointment(appointmentId, activityStartAt) }),
+  })
+  const dayOne = [
+    timelineItem({
+      tripItemId: 1,
+      itemId: 101,
+      title: 'Gwangjang Market',
+      region2: 'Jung-gu',
+      eventKind: 'FESTIVAL',
+      latitude: 37.5701,
+      longitude: 126.9997,
+      activityStartAt: '2026-03-28T10:20:00',
+      appointmentId: 701,
+    }),
+    timelineItem({
+      tripItemId: 2,
+      itemId: 102,
+      title: 'Olive Young Myeongdong',
+      region2: 'Myeongdong',
+      placeKind: '뷰티매장',
+      latitude: 37.5604,
+      longitude: 126.9896,
+      activityStartAt: '2026-03-28T13:05:00',
+      appointmentId: 702,
+    }),
+  ]
+  const dayTwo = Array.from({ length: 10 }, (_, index) =>
+    timelineItem({
+      tripItemId: index + 3,
+      itemId: index + 103,
+      title: `Seoul stop ${index + 1}`,
+      region2: 'Gangnam',
+      eventKind: index % 2 === 0 ? 'POPUP' : 'CONCERT',
+      latitude: index === 0 ? 37.541 : null,
+      longitude: index === 0 ? 126.9695 : null,
+    }),
+  )
+
   return Promise.all([
     page.route('**/api/v1/journeys/42', (route) =>
       route.fulfill({
@@ -258,9 +352,9 @@ function stubJourneyDetail(page) {
           success: true,
           data: {
             tripId: 42,
-            title: 'Seoul Foodie Week',
-            startDate: '2026-08-10',
-            endDate: '2026-08-12',
+            title: 'Seoul & Busan',
+            startDate: '2026-03-28',
+            endDate: '2026-04-05',
             budgetAmount: 1800000,
             spentAmount: 1284500,
             companionPreference: '2-4',
@@ -269,7 +363,7 @@ function stubJourneyDetail(page) {
         }),
       }),
     ),
-    page.route('**/api/v1/journeys/42/timeline', (route) =>
+    page.route('**/api/v1/journeys/42/timeline*', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -278,47 +372,97 @@ function stubJourneyDetail(page) {
           data: {
             tripId: 42,
             timeline: [
-              {
-                visitDate: '2026-08-10',
-                items: [
-                  {
-                    tripItemId: 1,
-                    itemId: 101,
-                    status: 'ADDED',
-                    displayOrder: 0,
-                    note: 'Try the evening market',
-                    exploreItem: {
-                      itemType: 'EVENT',
-                      title: 'Seoul Night Market',
-                      thumbnailUrl: null,
-                      imageUrls: [],
-                      location: {
-                        region1: 'Seoul',
-                        region2: 'Yeouido',
-                        region3: null,
-                        addressRoad: null,
-                        addressDetail: null,
-                        latitude: null,
-                        longitude: null,
-                      },
-                    },
-                    eventDetail: {
-                      eventKind: 'CONCERT',
-                      startDate: '2026-08-10',
-                      endDate: '2026-08-12',
-                      organizer: null,
-                      reservationUrl: null,
-                      venueName: null,
-                    },
-                  },
-                ],
-              },
+              { visitDate: '2026-03-28', items: dayOne },
+              { visitDate: '2026-03-29', items: dayTwo },
             ],
           },
         }),
       }),
     ),
+    page.route('**/api/v1/journeys/42/report-expense-candidates', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: [
+            {
+              transferId: 801,
+              amount: 684500,
+              occurredOn: '2026-03-28',
+              category: 'FOOD',
+              memo: 'Markets',
+              selected: true,
+            },
+            {
+              transferId: 802,
+              amount: 400000,
+              occurredOn: '2026-03-28',
+              category: 'SHOPPING',
+              memo: 'Shopping',
+              selected: true,
+            },
+            {
+              transferId: 803,
+              amount: 200000,
+              occurredOn: '2026-03-28',
+              category: 'SHOW',
+              memo: 'Shows',
+              selected: true,
+            },
+          ],
+        }),
+      }),
+    ),
+    ...[701, 702].map((appointmentId, index) =>
+      page.route(`**/api/v1/appointments/${appointmentId}/members`, (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: ['Mina', 'Jae', 'Sora', 'Noah']
+              .slice(0, 4 - index)
+              .map((displayName, memberIndex) => ({
+                appointmentMemberId: appointmentId * 10 + memberIndex,
+                memberId: memberIndex + 1,
+                displayName,
+                profileImageUrl: null,
+                preferredLanguage: 'en',
+                membershipStatus: 'ACTIVE',
+                attendanceStatus: 'ATTENDED',
+                isHost: memberIndex === 0,
+              })),
+          }),
+        }),
+      ),
+    ),
   ])
+}
+
+function stubJourneyDetailReportList(page) {
+  return page.route('**/api/v1/reports', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: [
+          {
+            reportId: 101,
+            tripId: 42,
+            title: 'Seoul & Busan',
+            startDate: '2026-03-28',
+            endDate: '2026-04-05',
+            generationStatus: 'COMPLETED',
+            locale: 'en',
+            generatedAt: '2026-04-06T00:00:00',
+            createdAt: '2026-04-06T00:00:00',
+          },
+        ],
+      }),
+    }),
+  )
 }
 
 /**
@@ -1848,7 +1992,11 @@ const SCREENS = [
     name: '07-journey-detail',
     path: '/journeys/42',
     setup: (page) =>
-      Promise.all([stubMemberProfile(page), stubJourneyDetail(page), stubEmptyReportList(page)]),
+      Promise.all([
+        stubMemberProfile(page),
+        stubJourneyDetail(page),
+        stubJourneyDetailReportList(page),
+      ]),
   },
   {
     name: '07b-journey-settings',
@@ -2613,6 +2761,10 @@ for (const screen of selectedScreens) {
     // 화면 경로 앞의 슬래시도 함께 정규화해 중복 슬래시를 만들지 않는다.
     await page.goto(`${BASE}/${screen.path.replace(/^\/+/, '')}`, { waitUntil: 'networkidle' })
     await screen.prepare?.(page)
+
+    // 탭·버튼 클릭은 좁은 화면에서 Playwright가 대상을 보이도록 페이지를 자동 스크롤할 수 있다.
+    // 독립 화면 산출물은 항상 동일한 시작 위치에서 비교할 수 있도록 캡처 전에 최상단으로 복원한다.
+    await page.evaluate(() => window.scrollTo(0, 0))
 
     // 웹폰트가 도착한 뒤에 찍는다. 글자 폭에 맞춰 크기를 줄이는 제목·버튼(`v-fit-text`)은 폰트가
     // 오면 다시 재므로, 도착 전에 찍으면 한 프레임 전 상태가 남는다. 전환이 자리 잡을 시간도 준다.

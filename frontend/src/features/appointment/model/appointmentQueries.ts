@@ -1,4 +1,5 @@
-import { computed, type Ref } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
+import { computed, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 
 import {
   fetchAppointment,
@@ -28,6 +29,19 @@ export function appointmentMembersQueryOptions(appointmentId: Readonly<Ref<numbe
     queryKey: computed(() => appointmentKeys.members(appointmentId.value)),
     queryFn: () => fetchAppointmentMembers(requireAppointmentId(appointmentId.value)),
   }
+}
+
+/**
+ * 다른 feature가 app 계층의 주입을 통해 약속 멤버를 읽을 때 쓰는 공개 composable이다.
+ * Query key와 fetch 함수는 appointment가 계속 소유하고, 소비 feature는 응답 모양만 받는다.
+ */
+export function useAppointmentMembersQuery(appointmentId: MaybeRefOrGetter<number | null>) {
+  return useQuery({
+    queryKey: computed(() => appointmentKeys.members(toValue(appointmentId))),
+    queryFn: () => fetchAppointmentMembers(requireAppointmentId(toValue(appointmentId))),
+    enabled: computed(() => toValue(appointmentId) !== null),
+    staleTime: 30_000,
+  })
 }
 
 export function appointmentParticipationQueryOptions(appointmentId: Readonly<Ref<number | null>>) {

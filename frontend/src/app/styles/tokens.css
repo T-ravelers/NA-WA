@@ -81,6 +81,12 @@
   --color-show: #ff3825;
   --color-food: #ff6d1a; /* (38회) */
 
+  /* 여정 상세 타임라인의 카테고리 카드 면. V2 `2430:1908` 실측값이다. */
+  --color-beauty-soft: #ffc5ca;
+  --color-shopping-soft: #c9e7ff;
+  --color-show-soft: #ffc7c2;
+  --color-food-soft: #ffd8c1;
+
   /* ── 기능색 ── */
   --color-matching: #097e56;
   --color-settlement: #ffb700;

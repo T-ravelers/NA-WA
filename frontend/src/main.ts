@@ -19,6 +19,7 @@ import {
 import { appointmentJourneyIntegrationKey } from '@/features/appointment/model/journeyIntegration'
 import { appointmentExploreIntegrationKey } from '@/features/appointment/model/exploreIntegration'
 import { appointmentMemberIntegrationKey } from '@/features/appointment/model/memberIntegration'
+import { useAppointmentMembersQuery } from '@/features/appointment/model/appointmentQueries'
 import { addJourneyItem, checkJourneyItem } from '@/features/journey/api/journeyApi'
 import { useJourneyListQuery } from '@/features/journey/composables/useJourneyListQuery'
 import { parseJourneyRouteQuery } from '@/features/journey/model/journeyRouteQuery'
@@ -32,7 +33,11 @@ import { useUnreadNotificationCount } from '@/features/notification/model/notifi
 import { notificationSettlementIntegrationKey } from '@/features/notification/model/settlementIntegration'
 import { settlementKeys } from '@/features/settlement/model/settlementQueries'
 import { journeyReportIntegrationKey } from '@/features/journey/model/reportIntegration'
-import { useReportSummariesQuery } from '@/features/report/composables/useReportQueries'
+import { journeyAppointmentIntegrationKey } from '@/features/journey/model/appointmentIntegration'
+import {
+  useReportExpenseCandidatesQuery,
+  useReportSummariesQuery,
+} from '@/features/report/composables/useReportQueries'
 import { walletAppointmentIntegrationKey } from '@/features/wallet/model/appointmentIntegration'
 import { walletNotificationIntegrationKey } from '@/features/wallet/model/notificationIntegration'
 import '@/app/styles/index.css'
@@ -80,7 +85,11 @@ app.provide(appointmentJourneyIntegrationKey, {
   checkAppointmentSlotTaken: async (tripId, itemId, visitDate) =>
     (await checkJourneyItem(tripId, itemId, visitDate)).appointmentLinked,
 })
-app.provide(journeyReportIntegrationKey, { useReportSummariesQuery })
+app.provide(journeyReportIntegrationKey, {
+  useReportSummariesQuery,
+  useReportExpenseCandidatesQuery,
+})
+app.provide(journeyAppointmentIntegrationKey, { useAppointmentMembersQuery })
 app.provide(walletAppointmentIntegrationKey, { useMyTodayAppointmentsQuery })
 app.provide(walletNotificationIntegrationKey, { useUnreadNotificationCount })
 /*
