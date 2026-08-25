@@ -114,11 +114,24 @@ public class ReportService {
             throw new BusinessException(ReportErrorCode.REPORT_ALREADY_EXISTS);
         }
 
+        // 약속에서 한 QR 결제는 결제 시점에 이 여정으로 이미 연결돼 있다(QrPaymentServiceImpl).
+        // 그 연결까지 막으면 정산한 결제를 리포트에 넣을 수 없다 — 정산은 이 연결이 있어야만
+        // 만들어지기 때문이다(#545). 막아야 하는 것은 다른 여정이 이미 가져간 지출뿐이다.
+        //
+        // 같은 여정이라도 소프트 삭제된 연결은 계속 막는다. 그 행은 UNIQUE(ledger_entry_id)를
+        // 그대로 차지하고 있어 아래 insert가 중복 키로 죽는다.
+        Set<Long> liveLinks = new HashSet<>(
+            reportMapper.findLinkedLedgerEntryIdsByTripId(tripId)
+        );
         for (ReportExpense expense : expenses) {
             Long linkedTripId = reportMapper.findLinkedTripIdByLedgerEntryId(
                 expense.getLedgerEntryId()
             );
-            if (linkedTripId != null) {
+            if (linkedTripId == null) {
+                continue;
+            }
+            if (!tripId.equals(linkedTripId)
+                || !liveLinks.contains(expense.getLedgerEntryId())) {
                 throw new BusinessException(
                     ReportErrorCode.REPORT_EXPENSE_ALREADY_LINKED
                 );
@@ -134,6 +147,12 @@ public class ReportService {
             .reportContent(toSnapshot(journey, timeline, expenses))
             .build();
         for (ReportExpense expense : expenses) {
+            // 결제 시점 연결은 그대로 둔다. 그 행에는 appointment_member_id가 차 있고,
+            // 정산 생성이 그 값으로 결제를 찾는다(SettlementMapper.findCandidateSources).
+            // 지우고 다시 걸면 그 결제로는 정산을 만들 수 없게 된다.
+            if (liveLinks.contains(expense.getLedgerEntryId())) {
+                continue;
+            }
             reportMapper.insertTripExpenseLink(
                 tripId, expense.getLedgerEntryId()
             );

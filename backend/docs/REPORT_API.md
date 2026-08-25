@@ -36,6 +36,22 @@
 - 회수액은 원 결제 행에서 뺀다. 그래서 날짜와 카테고리가 원 결제 그대로 남는다.
   정산으로 들어온 CREDIT 원장을 따로 세지는 않는다.
 
+### 지출 연결
+
+지출 하나는 여정 하나에만 속한다. `trip_expense_links`가 `ledger_entry_id`에 UNIQUE를 걸어
+이를 지킨다. 그래서 **다른 여정이 이미 가져간 지출을 고르면 `REPORT-008`(409)이다.**
+
+연결이 생기는 길은 둘이다.
+
+- **결제할 때** — 약속 맥락에서 QR 결제를 하면 그 자리에서 결제자의 여정으로 연결한다.
+  이 연결에는 `appointment_member_id`가 차 있고, **정산 생성이 이 값으로 결제를 찾는다.**
+- **리포트를 만들 때** — 아직 연결되지 않은 지출을 고르면 그때 연결한다.
+
+**같은 여정으로 이미 연결된 지출은 그대로 고를 수 있다.** 결제 시점 연결을 지우고 다시 걸지
+않으므로 `appointment_member_id`가 살아남고, 리포트를 만든 뒤에도 그 결제로 정산을 만들 수
+있다. 다만 그 여정을 지웠다가 다시 쓰는 경우처럼 **연결이 소프트 삭제된 상태면 `REPORT-008`**
+이다 — 그 행이 UNIQUE 자리를 그대로 차지하고 있다.
+
 ## 비교
 
 ```http
@@ -138,4 +154,4 @@ GET /api/v1/reports/{reportId}/comparison?scope=GROUP
 | `REPORT_ALREADY_EXISTS` | `REPORT-005` | 409 | 활성 리포트가 이미 있음 |
 | `REPORT_JOURNEY_NOT_FOUND` | `REPORT-006` | 404 | 여정이 없음 |
 | `INVALID_REPORT_EXPENSE` | `REPORT-007` | 400 | 고른 지출이 적격이 아님 |
-| `REPORT_EXPENSE_ALREADY_LINKED` | `REPORT-008` | 409 | 다른 여정 리포트에 이미 연결된 지출 |
+| `REPORT_EXPENSE_ALREADY_LINKED` | `REPORT-008` | 409 | 다른 여정이 이미 가져간 지출. 아래 「지출 연결」을 본다 |

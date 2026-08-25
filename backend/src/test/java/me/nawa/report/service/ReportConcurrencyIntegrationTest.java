@@ -275,6 +275,214 @@ class ReportConcurrencyIntegrationTest {
         }
     }
 
+    /**
+     * 약속에서 한 QR 결제는 결제 시점에 이 여정으로 연결된다. 그 연결이 있어도 리포트를
+     * 만들 수 있어야 하고, 그 행은 손대지 않아야 한다 — appointment_member_id가 날아가면
+     * 그 결제로 정산을 만들 수 없다(#545).
+     */
+    @Test
+    void expenseLinkedAtPaymentTime_isReportableAndKeepsItsAppointmentMember() {
+        long memberId = insertMember();
+        long tripId = insertEndedJourney(memberId);
+        long walletOwnerId = 0L;
+        long walletId = 0L;
+        long transferId = 0L;
+        long ledgerEntryId = 0L;
+        long itemId = 0L;
+        long appointmentId = 0L;
+        long appointmentMemberId = 0L;
+
+        try {
+            walletOwnerId = insertWalletOwner(memberId);
+            walletId = insertWallet(walletOwnerId);
+            transferId = insertExpenseTransfer(memberId);
+            ledgerEntryId = insertDebitLedgerEntry(transferId, walletId);
+            itemId = insertApprovedEventItem(memberId);
+            appointmentId = insertAppointment(itemId, memberId);
+            appointmentMemberId = insertActiveMembership(
+                appointmentId, memberId, tripId
+            );
+            jdbcTemplate.update(
+                """
+                INSERT INTO trip_expense_links (
+                    trip_id, ledger_entry_id, appointment_member_id
+                ) VALUES (?, ?, ?)
+                """,
+                tripId,
+                ledgerEntryId,
+                appointmentMemberId
+            );
+
+            TransactionTemplate readOnly = new TransactionTemplate(
+                transactionManager
+            );
+            readOnly.setReadOnly(true);
+            long finalTripId = tripId;
+            assertEquals(
+                List.of(true),
+                readOnly.execute(status -> reportService.getExpenseCandidates(
+                    memberId,
+                    finalTripId
+                )).stream().map(candidate -> candidate.isSelected()).toList()
+            );
+
+            ReportCreateRequest request = new ReportCreateRequest();
+            request.setTransferIds(List.of(transferId));
+            ReportDetailResponse report = new TransactionTemplate(
+                transactionManager
+            ).execute(status -> reportService.createReport(
+                memberId,
+                finalTripId,
+                request
+            ));
+            assertEquals(tripId, report.getTripId());
+
+            // 다시 걸면 UNIQUE(ledger_entry_id)에 걸리고, 지우고 걸면 정산이 끊긴다.
+            assertEquals(
+                1,
+                jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM trip_expense_links
+                    WHERE ledger_entry_id = ? AND deleted_at IS NULL
+                    """,
+                    Integer.class,
+                    ledgerEntryId
+                )
+            );
+            assertEquals(
+                appointmentMemberId,
+                jdbcTemplate.queryForObject(
+                    """
+                    SELECT appointment_member_id FROM trip_expense_links
+                    WHERE ledger_entry_id = ?
+                    """,
+                    Long.class,
+                    ledgerEntryId
+                )
+            );
+        } finally {
+            if (ledgerEntryId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM trip_expense_links WHERE ledger_entry_id = ?",
+                    ledgerEntryId
+                );
+            }
+            jdbcTemplate.update("DELETE FROM reports WHERE trip_id = ?", tripId);
+            if (ledgerEntryId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM wallet_ledger_entries WHERE ledger_entry_id = ?",
+                    ledgerEntryId
+                );
+            }
+            if (appointmentMemberId != 0L) {
+                jdbcTemplate.update(
+                    """
+                    DELETE FROM appointment_members
+                    WHERE appointment_member_id = ?
+                    """,
+                    appointmentMemberId
+                );
+            }
+            if (appointmentId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM appointments WHERE appointment_id = ?",
+                    appointmentId
+                );
+            }
+            if (itemId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM explore_items WHERE item_id = ?",
+                    itemId
+                );
+            }
+            if (transferId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM wallet_transfers WHERE transfer_id = ?",
+                    transferId
+                );
+            }
+            if (walletId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM wallets WHERE wallet_id = ?",
+                    walletId
+                );
+            }
+            if (walletOwnerId != 0L) {
+                jdbcTemplate.update(
+                    "DELETE FROM wallet_owners WHERE wallet_owner_id = ?",
+                    walletOwnerId
+                );
+            }
+            jdbcTemplate.update("DELETE FROM trips WHERE trip_id = ?", tripId);
+            jdbcTemplate.update(
+                "DELETE FROM members WHERE member_id = ?",
+                memberId
+            );
+        }
+    }
+
+    /** chk_explore_items_review — APPROVED는 검수자·검수 시각이 필수다. */
+    private long insertApprovedEventItem(long reviewerId) {
+        jdbcTemplate.update(
+            """
+            INSERT INTO explore_items (
+                item_type, approval_status, visibility_status,
+                reviewed_by, reviewed_at
+            ) VALUES ('EVENT', 'APPROVED', 'VISIBLE', ?, CURRENT_TIMESTAMP)
+            """,
+            reviewerId
+        );
+        return lastInsertId();
+    }
+
+    private long insertAppointment(long itemId, long hostMemberId) {
+        LocalDateTime start = LocalDate.now(KOREA_ZONE).minusDays(1).atTime(10, 0);
+        jdbcTemplate.update(
+            """
+            INSERT INTO appointments (
+                item_id, host_member_id, language_code, appointment_name,
+                max_members, deposit_amount, appointment_status,
+                activity_start_at, activity_end_at
+            ) VALUES (?, ?, 'en', 'Link test appointment', 5, 10000,
+                      'COMPLETED', ?, ?)
+            """,
+            itemId,
+            hostMemberId,
+            start,
+            start.plusHours(2)
+        );
+        return lastInsertId();
+    }
+
+    private long insertActiveMembership(
+        long appointmentId,
+        long memberId,
+        long tripId
+    ) {
+        jdbcTemplate.update(
+            """
+            INSERT INTO appointment_members (
+                appointment_id, member_id, trip_id, membership_status
+            ) VALUES (?, ?, ?, 'ACTIVE')
+            """,
+            appointmentId,
+            memberId,
+            tripId
+        );
+        return lastInsertId();
+    }
+
+    private long lastInsertId() {
+        Long id = jdbcTemplate.queryForObject(
+            "SELECT LAST_INSERT_ID()",
+            Long.class
+        );
+        if (id == null) {
+            throw new IllegalStateException("LAST_INSERT_ID() returned null");
+        }
+        return id;
+    }
+
     private CreationOutcome createReport(
         long memberId,
         long tripId,
