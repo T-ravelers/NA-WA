@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { MotionConfig } from 'motion-v'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -36,5 +37,29 @@ describe('App', () => {
     })
 
     expect(wrapper.get('h1').text()).toBe('NA-WA')
+  })
+
+  it('respects the user reduced-motion preference for Motion components', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        {
+          path: '/',
+          name: 'stub',
+          component: { template: '<h1>NA-WA</h1>' },
+        },
+      ],
+    })
+
+    await router.push('/')
+    await router.isReady()
+
+    const wrapper = mount(App, {
+      global: {
+        plugins: [i18n, router],
+      },
+    })
+
+    expect(wrapper.getComponent(MotionConfig).props('reducedMotion')).toBe('user')
   })
 })
