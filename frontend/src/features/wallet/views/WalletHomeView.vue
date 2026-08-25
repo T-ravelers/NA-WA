@@ -10,7 +10,8 @@ import {
   IconReceipt,
   IconRotateClockwise,
 } from '@tabler/icons-vue'
-import { computed, type Component } from 'vue'
+import { animate, type AnimationPlaybackControls, useReducedMotion } from 'motion-v'
+import { computed, onBeforeUnmount, ref, type Component, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -59,6 +60,61 @@ function openNotifications(): void {
 }
 
 const wallet = computed(() => (data.value === undefined ? null : toWalletHomeData(data.value)))
+const walletBalance = computed(() => wallet.value?.balance ?? null)
+const displayedBalance = ref<number | null>(null)
+const reducedMotion = useReducedMotion()
+let balanceAnimation: AnimationPlaybackControls | null = null
+
+function stopBalanceAnimation(): void {
+  balanceAnimation?.stop()
+  balanceAnimation = null
+}
+
+/*
+ * 첫 응답은 바로 읽히게 하고, 같은 화면을 보고 있는 동안 잔액이 바뀔 때만 보간한다.
+ * 숫자 보간은 MotionConfig가 대신 줄여 주지 않으므로 감소 모션 설정을 여기서 직접 본다.
+ */
+watch(
+  walletBalance,
+  (next, previous) => {
+    if (next === null) {
+      return
+    }
+
+    if (previous === null || previous === undefined || previous === next || reducedMotion.value) {
+      stopBalanceAnimation()
+      displayedBalance.value = next
+      return
+    }
+
+    const animationStart = displayedBalance.value ?? previous
+    stopBalanceAnimation()
+    displayedBalance.value = animationStart
+    balanceAnimation = animate(animationStart, next, {
+      duration: 0.6,
+      ease: 'easeOut',
+      onUpdate: (latest: number) => {
+        displayedBalance.value = latest
+      },
+      onComplete: () => {
+        displayedBalance.value = next
+        balanceAnimation = null
+      },
+    })
+  },
+  { immediate: true },
+)
+
+watch(reducedMotion, (shouldReduce) => {
+  if (!shouldReduce || walletBalance.value === null) {
+    return
+  }
+
+  stopBalanceAnimation()
+  displayedBalance.value = walletBalance.value
+})
+
+onBeforeUnmount(stopBalanceAnimation)
 
 function formatPoints(amount: number): string {
   return t('wallet.home.points', {
@@ -182,7 +238,12 @@ const errorDescription = computed(() => {
           <AppBadge tone="onPaper">{{ t(`wallet.home.status.${wallet.status}`) }}</AppBadge>
         </div>
 
-        <p class="mt-3 text-data-xl">{{ formatPoints(wallet.balance) }}</p>
+        <p
+          class="mt-3 text-data-xl"
+          data-testid="wallet-balance"
+        >
+          {{ formatPoints(displayedBalance ?? wallet.balance) }}
+        </p>
         <p class="mt-3 text-body-sm text-on-paper/70">{{ t('wallet.home.balanceLabel') }}</p>
       </AppCard>
 
