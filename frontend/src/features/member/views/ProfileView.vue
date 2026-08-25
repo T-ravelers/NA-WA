@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useMutation } from '@tanstack/vue-query'
 import { IconChevronRight, IconLogout } from '@tabler/icons-vue'
+import { m } from 'motion-v'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -9,6 +10,7 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import { requestSignOut } from '@/shared/api/sessionSignOut'
 import { nativeLocaleLabel, type AppLocale } from '@/shared/i18n/locales'
 import { formatServerDateTime } from '@/shared/lib/datetime'
+import { useTabContentMotion } from '@/shared/lib/useTabContentMotion'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppImage from '@/shared/ui/AppImage.vue'
 import LocaleSheet from '@/shared/ui/LocaleSheet.vue'
@@ -35,6 +37,7 @@ const isLocaleSheetOpen = ref(false)
 /** `Saved | Appointments`와 그 안의 `Events | Places`. */
 const tab = ref<'saved' | 'appointments'>('saved')
 const kind = ref<'EVENT' | 'PLACE'>('EVENT')
+const tabContentMotion = useTabContentMotion()
 const VISIBLE_STEP = 5
 const SAVED_PAGE_SIZE = 30
 const visibleCount = ref(VISIBLE_STEP)
@@ -225,9 +228,12 @@ function chooseLocale(next: AppLocale): void {
         />
       </div>
 
-      <div
+      <m.div
+        :key="tab"
+        v-bind="tabContentMotion"
         class="mt-4"
         data-testid="profile-list"
+        :data-motion-key="tab"
       >
         <template v-if="tab === 'saved'">
           <StateLoading v-if="savedQuery.isPending.value" />
@@ -346,7 +352,7 @@ function chooseLocale(next: AppLocale): void {
             {{ t('member.profile.saved.openDiscover') }}
           </RouterLink>
         </p>
-      </div>
+      </m.div>
 
       <h2 class="mt-8 font-display text-section-header text-ink-display uppercase">
         {{ t('member.profile.preferences') }}

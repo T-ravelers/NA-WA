@@ -736,9 +736,16 @@ describe('ReportDetailView', () => {
     mockScopes(groupComparison, similarComparison)
     const { wrapper } = await mountView()
 
+    expect(
+      wrapper.get('[data-testid="report-comparison-content"]').attributes('data-motion-key'),
+    ).toBe('GROUP')
+
     await wrapper.get('[data-testid="segment-SIMILAR"]').trigger('click')
     await flushPromises()
 
+    expect(
+      wrapper.get('[data-testid="report-comparison-content"]').attributes('data-motion-key'),
+    ).toBe('SIMILAR')
     expect(wrapper.findAll('h2').map((heading) => heading.text())).toContain(
       'Vs. similar travelers',
     )

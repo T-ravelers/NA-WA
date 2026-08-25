@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { MotionConfig } from 'motion-v'
+import { domAnimation, LazyMotion, MotionConfig } from 'motion-v'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -61,5 +61,7 @@ describe('App', () => {
     })
 
     expect(wrapper.getComponent(MotionConfig).props('reducedMotion')).toBe('user')
+    expect(wrapper.getComponent(LazyMotion).props('features')).toBe(domAnimation)
+    expect(wrapper.getComponent(LazyMotion).props('strict')).toBe(true)
   })
 })

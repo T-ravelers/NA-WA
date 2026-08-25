@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { IconChevronRight, IconShare, IconSparkles } from '@tabler/icons-vue'
+import { m } from 'motion-v'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -10,6 +11,7 @@ import {
   toSpendingCategory,
 } from '@/shared/lib/spendingCategory'
 import { shareWithFallback } from '@/shared/lib/share'
+import { useTabContentMotion } from '@/shared/lib/useTabContentMotion'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
@@ -161,6 +163,7 @@ const groupQuery = useReportComparisonQuery(reportId, 'GROUP', comparisonEnabled
 const similarQuery = useReportComparisonQuery(reportId, 'SIMILAR', comparisonEnabled)
 
 const comparisonScope = ref<ReportComparisonScope>('GROUP')
+const comparisonContentMotion = useTabContentMotion()
 const isSimilarScope = computed(() => comparisonScope.value === 'SIMILAR')
 const comparisonQuery = computed(() => (isSimilarScope.value ? similarQuery : groupQuery))
 const comparisonPending = computed(() => comparisonQuery.value.isPending.value)
@@ -668,95 +671,103 @@ function retry(): void {
             @update:model-value="setComparisonScope"
           />
 
-          <StateLoading
-            v-if="comparisonPending"
-            :label="t('report.detail.comparison.loading')"
-          />
+          <m.div
+            :key="comparisonScope"
+            v-bind="comparisonContentMotion"
+            class="flex flex-col gap-3"
+            data-testid="report-comparison-content"
+            :data-motion-key="comparisonScope"
+          >
+            <StateLoading
+              v-if="comparisonPending"
+              :label="t('report.detail.comparison.loading')"
+            />
 
-          <StateError
-            v-else-if="comparisonFailed"
-            :title="t('report.detail.comparison.loadFailed')"
-            :description="t('report.detail.comparison.loadFailedDescription')"
-            :action-label="t('action.retry')"
-            @retry="retryComparison"
-          />
+            <StateError
+              v-else-if="comparisonFailed"
+              :title="t('report.detail.comparison.loadFailed')"
+              :description="t('report.detail.comparison.loadFailedDescription')"
+              :action-label="t('action.retry')"
+              @retry="retryComparison"
+            />
 
-          <AppCard v-else-if="!hasPeers">
-            <h3 class="text-title text-ink">{{ comparisonText.emptyTitle }}</h3>
-            <p class="mt-2 text-body-sm text-ink-3">{{ comparisonText.emptyDescription }}</p>
-          </AppCard>
-
-          <template v-else>
-            <AppCard padding="lg">
-              <div class="flex flex-col gap-2">
-                <ReportComparisonBars
-                  :total-label="t('report.detail.comparison.totalSpend')"
-                  :daily-average-label="t('report.detail.dailyAverage')"
-                  :chips-label="t('report.detail.comparison.members')"
-                  :me="comparisonMe"
-                  :peers="comparisonPeers"
-                  :chips="!isSimilarScope"
-                  :locale="i18n.locale.value"
-                />
-                <p
-                  v-if="isLiveComparison"
-                  class="text-micro text-ink-3"
-                >
-                  {{ t('report.detail.comparison.liveBasisNote') }}
-                </p>
-              </div>
+            <AppCard v-else-if="!hasPeers">
+              <h3 class="text-title text-ink">{{ comparisonText.emptyTitle }}</h3>
+              <p class="mt-2 text-body-sm text-ink-3">{{ comparisonText.emptyDescription }}</p>
             </AppCard>
 
-            <!--
+            <template v-else>
+              <AppCard padding="lg">
+                <div class="flex flex-col gap-2">
+                  <ReportComparisonBars
+                    :total-label="t('report.detail.comparison.totalSpend')"
+                    :daily-average-label="t('report.detail.dailyAverage')"
+                    :chips-label="t('report.detail.comparison.members')"
+                    :me="comparisonMe"
+                    :peers="comparisonPeers"
+                    :chips="!isSimilarScope"
+                    :locale="i18n.locale.value"
+                  />
+                  <p
+                    v-if="isLiveComparison"
+                    class="text-micro text-ink-3"
+                  >
+                    {{ t('report.detail.comparison.liveBasisNote') }}
+                  </p>
+                </div>
+              </AppCard>
+
+              <!--
               레이더는 축 라벨을 계열색 글자로 쓴다. 카드(`surface-1` #262626) 위에서는
               `text-shopping`·`text-show`가 4.21로 AA에 못 미치므로 canvas(#171717) 위에
               둔다(#476). 시안도 이 차트를 페이지보다 어두운 면에 놓는다.
             -->
-            <div class="flex flex-col gap-3 pt-2">
-              <p class="text-micro uppercase text-ink-3">
-                {{ t('report.detail.comparison.categoryBalance') }}
-              </p>
-              <ReportRadarChart
-                :axes="comparisonAxes"
-                :mine-label="t('report.detail.comparison.you')"
-                :cohort-label="comparisonText.cohortLabel"
-                :description="comparisonText.radarDescription"
-              />
-              <p
-                v-if="comparisonOmittedAxes.length > 0"
-                class="sr-only"
-              >
-                {{
-                  t('report.detail.comparison.omitted', {
-                    categories: comparisonOmittedAxes.join(', '),
-                  })
-                }}
-              </p>
-            </div>
+              <div class="flex flex-col gap-3 pt-2">
+                <p class="text-micro uppercase text-ink-3">
+                  {{ t('report.detail.comparison.categoryBalance') }}
+                </p>
+                <ReportRadarChart
+                  :axes="comparisonAxes"
+                  :mine-label="t('report.detail.comparison.you')"
+                  :cohort-label="comparisonText.cohortLabel"
+                  :description="comparisonText.radarDescription"
+                />
+                <p
+                  v-if="comparisonOmittedAxes.length > 0"
+                  class="sr-only"
+                >
+                  {{
+                    t('report.detail.comparison.omitted', {
+                      categories: comparisonOmittedAxes.join(', '),
+                    })
+                  }}
+                </p>
+              </div>
 
-            <div class="flex flex-col gap-2">
-              <ReportRankTiles
-                :tiles="comparisonTiles"
-                :label="comparisonText.tilesLabel"
-              />
-              <p
-                v-if="comparisonRankBasis !== null"
-                class="text-micro text-ink-3"
-              >
-                {{ t('report.detail.comparison.rankBasis', { count: comparisonRankBasis }) }}
-              </p>
-              <p
-                v-if="comparisonOmittedTiles.length > 0"
-                class="sr-only"
-              >
-                {{
-                  t('report.detail.comparison.omitted', {
-                    categories: comparisonOmittedTiles.join(', '),
-                  })
-                }}
-              </p>
-            </div>
-          </template>
+              <div class="flex flex-col gap-2">
+                <ReportRankTiles
+                  :tiles="comparisonTiles"
+                  :label="comparisonText.tilesLabel"
+                />
+                <p
+                  v-if="comparisonRankBasis !== null"
+                  class="text-micro text-ink-3"
+                >
+                  {{ t('report.detail.comparison.rankBasis', { count: comparisonRankBasis }) }}
+                </p>
+                <p
+                  v-if="comparisonOmittedTiles.length > 0"
+                  class="sr-only"
+                >
+                  {{
+                    t('report.detail.comparison.omitted', {
+                      categories: comparisonOmittedTiles.join(', '),
+                    })
+                  }}
+                </p>
+              </div>
+            </template>
+          </m.div>
         </section>
       </template>
 

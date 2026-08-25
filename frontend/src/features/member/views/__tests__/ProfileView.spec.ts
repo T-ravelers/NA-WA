@@ -304,6 +304,7 @@ describe('ProfileView', () => {
     const { wrapper } = await mounted()
 
     expect(wrapper.findAll('[role="radiogroup"]')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="profile-list"]').attributes('data-motion-key')).toBe('saved')
     expect(wrapper.get('[role="group"]').attributes('aria-label')).toBe('Type')
     expect(wrapper.get('[data-testid="profile-kind-EVENT"]').attributes('aria-pressed')).toBe(
       'true',
@@ -311,6 +312,9 @@ describe('ProfileView', () => {
 
     await wrapper.get('[data-testid="segment-appointments"]').trigger('click')
 
+    expect(wrapper.get('[data-testid="profile-list"]').attributes('data-motion-key')).toBe(
+      'appointments',
+    )
     expect(wrapper.get('[role="group"]').attributes('aria-label')).toBe('Type')
     expect(wrapper.get('[data-testid="profile-kind-EVENT"]').attributes('aria-pressed')).toBe(
       'true',
