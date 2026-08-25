@@ -62,6 +62,26 @@ describe('PlaceCard', () => {
     unlikeExploreItem.mockResolvedValue({ saved: false })
   })
 
+  it('shows press feedback on both open controls unless reduced motion is requested', () => {
+    const wrapper = mountCard()
+    const openControls = [
+      wrapper.get('button[aria-label="Open Seongsu Onsil"]'),
+      wrapper.findAll('button').find((button) => button.text() === 'Seongsu Onsil'),
+    ]
+
+    expect(openControls).not.toContain(undefined)
+    for (const control of openControls) {
+      expect(control?.classes()).toEqual(
+        expect.arrayContaining([
+          'transition-transform',
+          'motion-reduce:transition-none',
+          'active:scale-[0.98]',
+          'motion-reduce:active:scale-100',
+        ]),
+      )
+    }
+  })
+
   it('renders the place kind, region and available options', () => {
     const wrapper = mountCard()
 

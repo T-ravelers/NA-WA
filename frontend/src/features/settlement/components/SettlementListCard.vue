@@ -53,7 +53,7 @@ const showsPaidMark = computed(
   <button
     type="button"
     :data-settlement-id="settlement.id"
-    class="w-full rounded-card bg-surface-1 p-4 text-left"
+    class="w-full rounded-card bg-surface-1 p-4 text-left transition-transform motion-reduce:transition-none active:scale-[0.98] motion-reduce:active:scale-100"
     @click="emit('open')"
   >
     <template v-if="compact">

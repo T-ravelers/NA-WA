@@ -81,7 +81,7 @@ function toggleSaved(): void {
     >
       <button
         type="button"
-        class="w-24 shrink-0 self-start p-3 text-left"
+        class="w-24 shrink-0 self-start p-3 text-left transition-transform motion-reduce:transition-none active:scale-[0.98] motion-reduce:active:scale-100"
         :aria-label="t('explore.openPlace', { name: place.name })"
         @click="openPlace"
       >
@@ -132,7 +132,7 @@ function toggleSaved(): void {
 
         <button
           type="button"
-          class="line-clamp-2 text-left text-title-sm text-ink"
+          class="line-clamp-2 text-left text-title-sm text-ink transition-transform motion-reduce:transition-none active:scale-[0.98] motion-reduce:active:scale-100"
           @click="openPlace"
         >
           {{ place.name }}

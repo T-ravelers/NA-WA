@@ -47,6 +47,19 @@ async function mountCard(overrides: Partial<AppointmentSummary> = {}) {
 }
 
 describe('AppointmentListCard', () => {
+  it('shows press feedback on the clickable card unless reduced motion is requested', async () => {
+    const { wrapper } = await mountCard()
+
+    expect(wrapper.get('article').classes()).toEqual(
+      expect.arrayContaining([
+        'transition-transform',
+        'motion-reduce:transition-none',
+        'active:scale-[0.98]',
+        'motion-reduce:active:scale-100',
+      ]),
+    )
+  })
+
   it('shows the headline numbers without their labels', async () => {
     const { wrapper } = await mountCard()
 

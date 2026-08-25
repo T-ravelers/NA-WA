@@ -51,6 +51,19 @@ describe('EventCard', () => {
     unlikeExploreItem.mockResolvedValue({ saved: false })
   })
 
+  it('shows press feedback on the clickable card unless reduced motion is requested', () => {
+    const wrapper = mountCard()
+
+    expect(wrapper.get('article').classes()).toEqual(
+      expect.arrayContaining([
+        'transition-transform',
+        'motion-reduce:transition-none',
+        'active:scale-[0.98]',
+        'motion-reduce:active:scale-100',
+      ]),
+    )
+  })
+
   it('emits the event id when the card is activated', async () => {
     const wrapper = mountCard()
 

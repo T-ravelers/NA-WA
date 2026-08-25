@@ -124,7 +124,7 @@ const itemCounts = computed(() => {
         <div class="flex min-h-40 flex-col gap-2.5 p-4">
           <RouterLink
             :to="{ name: 'journey-detail', params: { tripId: journey.tripId } }"
-            class="flex flex-col gap-2.5 focus-visible:outline-2 focus-visible:outline-on-paper"
+            class="flex flex-col gap-2.5 transition-transform motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-on-paper active:scale-[0.98] motion-reduce:active:scale-100"
           >
             <h3 class="truncate font-display text-trip-ticket-title uppercase">
               {{ journey.title }}
@@ -155,7 +155,7 @@ const itemCounts = computed(() => {
             <RouterLink
               v-if="reportId !== null"
               :to="{ name: 'report-detail', params: { reportId } }"
-              class="inline-flex min-h-11 min-w-0 items-center gap-1 rounded-sm px-0.5 text-title-sm text-on-paper transition-transform focus-visible:outline-2 focus-visible:outline-on-paper active:scale-[0.98]"
+              class="inline-flex min-h-11 min-w-0 items-center gap-1 rounded-sm px-0.5 text-title-sm text-on-paper transition-transform motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-on-paper active:scale-[0.98] motion-reduce:active:scale-100"
             >
               <span class="truncate">{{ t('journey.list.viewReport') }}</span>
               <IconChevronRight

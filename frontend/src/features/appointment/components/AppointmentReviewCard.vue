@@ -88,7 +88,7 @@ function submit(): void {
     <article class="flex flex-col gap-4">
       <button
         type="button"
-        class="flex w-full items-center gap-3 text-left"
+        class="flex w-full items-center gap-3 text-left transition-transform motion-reduce:transition-none active:scale-[0.98] motion-reduce:active:scale-100"
         :aria-expanded="expanded"
         :aria-controls="panelId"
         @click="emit('toggle')"

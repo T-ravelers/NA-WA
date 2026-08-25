@@ -109,7 +109,7 @@ function handleKeydown(event: KeyboardEvent): void {
 <template>
   <AppCard padding="none">
     <article
-      class="flex cursor-pointer gap-0"
+      class="flex cursor-pointer gap-0 transition-transform motion-reduce:transition-none active:scale-[0.98] motion-reduce:active:scale-100"
       role="link"
       tabindex="0"
       @click="openEvent"
