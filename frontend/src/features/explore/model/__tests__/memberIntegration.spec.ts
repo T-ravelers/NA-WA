@@ -113,8 +113,9 @@ describe('useSavedExploreItemsQuery', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Seongsu Beauty Pop-up|ソウル · 聖水')
-    // 지역명은 표시할 때 번역한다. 언어를 바꿔도 같은 목록을 다시 받아 오지 않는다.
-    expect(fetchEventList).toHaveBeenCalledTimes(1)
+    // 지역명은 서버가 원문 코드로 내려주므로 표시할 때 번역한다. 제목은 서버가 번역해
+    // 주므로(#531) 로케일이 바뀌면 목록을 새 언어로 다시 받아 온다(#461).
+    expect(fetchEventList).toHaveBeenCalledTimes(2)
   })
 
   it('언어를 바꾸면 이미 받아 둔 찜 Place의 지역명도 새 언어로 바뀐다', async () => {
@@ -125,7 +126,19 @@ describe('useSavedExploreItemsQuery', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Seongsu Coffee Lab|ソウル · 聖水')
-    expect(fetchPlaceList).toHaveBeenCalledTimes(1)
+    expect(fetchPlaceList).toHaveBeenCalledTimes(2)
+  })
+
+  it('찜 목록도 Discover와 같은 화면 언어를 실어 보낸다', async () => {
+    applyLocale('ja')
+    await mountHarness('EVENT')
+
+    // 언어를 빼면 서버가 en으로 채운다. 그러면 같은 항목을 Discover는 일본어로,
+    // 찜 탭은 영어로 보여 준다(#461).
+    expect(fetchEventList).toHaveBeenCalledWith(expect.objectContaining({ language: 'ja' }))
+
+    await mountHarness('PLACE')
+    expect(fetchPlaceList).toHaveBeenCalledWith(expect.objectContaining({ language: 'ja' }))
   })
 
   it('로케일 문구가 없는 지역은 서버가 준 값을 그대로 쓴다', async () => {
