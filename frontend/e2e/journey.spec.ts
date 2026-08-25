@@ -167,7 +167,7 @@ test('creates a journey and opens its empty itinerary', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/journeys\/42$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Seoul Foodie Week' })).toBeVisible()
-  await expect(page.getByRole('heading', { level: 2, name: 'Itinerary' })).toBeVisible()
+  await expect(page.getByRole('radio', { name: 'Itinerary' })).toBeChecked()
   expect(createRequest).toEqual({
     title: 'Seoul Foodie Week',
     startDate: '2026-08-10',

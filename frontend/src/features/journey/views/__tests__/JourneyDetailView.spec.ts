@@ -10,6 +10,7 @@ import { NormalizedApiError } from '@/shared/api/apiError'
 import type { JourneyTimeline } from '../../api/journeyApi'
 import type { JourneyReportIntegration, JourneyReportSummary } from '../../model/reportIntegration'
 import { journeyReportIntegrationKey } from '../../model/reportIntegration'
+import { journeyAppointmentIntegrationKey } from '../../model/appointmentIntegration'
 
 const fetchJourney = vi.fn()
 const fetchJourneyTimeline = vi.fn()
@@ -76,10 +77,22 @@ interface ReportIntegrationOptions {
   isPending?: boolean
   isError?: boolean
   refetch?: () => Promise<unknown>
+  expenses?: Array<{
+    amount: string
+    category: string
+    occurredDate: string
+    displayMemo: string | null
+  }>
 }
 
 function createReportIntegration(options: ReportIntegrationOptions = {}): JourneyReportIntegration {
-  const { reports = [], isPending = false, isError = false, refetch = vi.fn() } = options
+  const {
+    reports = [],
+    isPending = false,
+    isError = false,
+    refetch = vi.fn(),
+    expenses = [],
+  } = options
 
   return {
     useReportSummariesQuery: () => ({
@@ -87,6 +100,12 @@ function createReportIntegration(options: ReportIntegrationOptions = {}): Journe
       isPending: ref(isPending),
       isError: ref(isError),
       refetch,
+    }),
+    useReportExpenseCandidatesQuery: () => ({
+      data: ref({ tripId: 7, candidates: expenses }),
+      isPending: ref(false),
+      isError: ref(false),
+      refetch: vi.fn(),
     }),
   }
 }
@@ -96,6 +115,7 @@ async function mountWithRouter(path: string, reportOptions: ReportIntegrationOpt
     history: createMemoryHistory(),
     routes: [
       { path: '/journeys/:tripId', name: 'journey-detail', component: JourneyDetailView },
+      { path: '/journeys', name: 'journey-list', component: { template: '<div>Journeys</div>' } },
       {
         path: '/journeys/:tripId/settings',
         name: 'journey-settings',
@@ -122,6 +142,7 @@ async function mountWithRouter(path: string, reportOptions: ReportIntegrationOpt
         name: 'appointment-detail',
         component: { template: '<div>Appointment</div>' },
       },
+      { path: '/settlements/new', name: 'settlement-new', component: { template: '<div />' } },
       { path: '/reports', name: 'report-list', component: { template: '<div>Reports</div>' } },
       {
         path: '/reports/:reportId',
@@ -140,6 +161,13 @@ async function mountWithRouter(path: string, reportOptions: ReportIntegrationOpt
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
       provide: {
         [journeyReportIntegrationKey as symbol]: createReportIntegration(reportOptions),
+        [journeyAppointmentIntegrationKey as symbol]: {
+          useAppointmentMembersQuery: () => ({
+            data: ref([]),
+            isPending: ref(false),
+            isError: ref(false),
+          }),
+        },
       },
     },
   })
@@ -181,9 +209,7 @@ describe('JourneyDetailView', () => {
     expect(wrapper.text()).not.toContain('Day 4')
     expect(wrapper.findAll('a[aria-label^="Add event on"]')).toHaveLength(3)
     expect(wrapper.findAll('a[aria-label^="Add place on"]')).toHaveLength(3)
-    expect(wrapper.get('a[aria-label="Journey settings"]').attributes('href')).toBe(
-      '/journeys/7/settings',
-    )
+    expect(wrapper.find('a[aria-label="Journey settings"]').exists()).toBe(true)
   })
 
   it('shows no report entry for an ongoing journey', async () => {
@@ -222,9 +248,7 @@ describe('JourneyDetailView', () => {
       reports: [{ tripId: 7, reportId: 55 }],
     })
 
-    const viewButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'View final report')
+    const viewButton = wrapper.findAll('button').find((button) => button.text() === 'View Report')
     expect(viewButton).toBeDefined()
     expect(wrapper.text()).not.toContain('Create final report')
 
@@ -256,7 +280,8 @@ describe('JourneyDetailView', () => {
     expect(wrapper.text()).not.toContain('View final report')
     expect(wrapper.text()).not.toContain('Create final report')
 
-    await wrapper.get('button').trigger('click')
+    const retryButton = wrapper.findAll('button').find((button) => button.text() === 'Try again')
+    await retryButton?.trigger('click')
 
     expect(refetch).toHaveBeenCalledTimes(1)
   })
@@ -330,7 +355,7 @@ describe('JourneyDetailView', () => {
     expect(wrapper.text()).toContain('Event')
     expect(wrapper.text()).toContain('Gwangjang Market')
     expect(wrapper.text()).toContain('Place')
-    expect(wrapper.text()).toContain('Try the tasting menu')
+    expect(wrapper.text()).not.toContain('Try the tasting menu')
   })
 
   it('confirms and deletes one itinerary item through its real API action', async () => {

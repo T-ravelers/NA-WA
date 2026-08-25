@@ -57,13 +57,18 @@ describe('AppImage', () => {
     expect(wrapper.get('[data-testid="initials"]').text()).toBe('AB')
   })
 
-  it('keeps raw image tags limited to generated QR codes and bundled payment logos', () => {
+  /*
+   * `AppImage`는 네트워크 이미지가 실패했을 때를 책임진다. 실패할 수 없는 이미지
+   * — 화면에서 만든 QR, 번들에 들어 있는 결제 로고와 장식 — 만 날 `<img>`로 둔다.
+   */
+  it('keeps raw image tags limited to generated QR codes and bundled assets', () => {
     const sourceRoot = resolve(process.cwd(), 'src')
     const rawImageFiles = globSync('**/*.vue', { cwd: sourceRoot })
       .filter((path) => readFileSync(`${sourceRoot}/${path}`, 'utf8').includes('<img'))
       .sort()
 
     expect(rawImageFiles).toEqual([
+      'features/journey/components/JourneyCategoryBloom.vue',
       'features/merchant/views/MerchantView.vue',
       'features/wallet/views/TopupView.vue',
       'features/wallet/views/WalletQrView.vue',

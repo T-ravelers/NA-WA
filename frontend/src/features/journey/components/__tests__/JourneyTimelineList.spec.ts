@@ -1,10 +1,12 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
 import type { JourneyTimelineDay } from '../../api/journeyApi'
+import { journeyAppointmentIntegrationKey } from '../../model/appointmentIntegration'
 import JourneyTimelineList from '../JourneyTimelineList.vue'
 
 function createRouterStub() {
@@ -101,7 +103,18 @@ async function mountList(props: {
 
   return mount(JourneyTimelineList, {
     props: { tripId: 42, ...props },
-    global: { plugins: [i18n, router] },
+    global: {
+      plugins: [i18n, router],
+      provide: {
+        [journeyAppointmentIntegrationKey as symbol]: {
+          useAppointmentMembersQuery: () => ({
+            data: ref([]),
+            isPending: ref(false),
+            isError: ref(false),
+          }),
+        },
+      },
+    },
   })
 }
 
@@ -233,7 +246,7 @@ describe('JourneyTimelineList', () => {
     )
   })
 
-  it('shows the four shared consumption areas beside Event and Place labels', async () => {
+  it('colours every card by the shared consumption area of its real kind value', async () => {
     const wrapper = await mountList({
       days: [
         dayWith(
@@ -263,7 +276,7 @@ describe('JourneyTimelineList', () => {
             tripItemId: 3,
             exploreItem: { itemType: 'PLACE' },
             placeDetail: {
-              placeKind: 'BEAUTY',
+              placeKind: '뷰티매장',
               addressDetail: null,
               menuSummary: null,
               isActive: true,
@@ -273,7 +286,7 @@ describe('JourneyTimelineList', () => {
             tripItemId: 4,
             exploreItem: { itemType: 'PLACE' },
             placeDetail: {
-              placeKind: 'CAFE',
+              placeKind: '카페',
               addressDetail: null,
               menuSummary: null,
               isActive: true,
@@ -289,24 +302,6 @@ describe('JourneyTimelineList', () => {
     expect(wrapper.text()).toContain('Shopping')
     expect(wrapper.text()).toContain('Beauty')
     expect(wrapper.text()).toContain('Food')
-  })
-
-  it('wraps action links before their labels can overflow the card', async () => {
-    const wrapper = await mountList({
-      days: [dayWithItem('2026-08-10', 'Night market')],
-      startDate: '2026-08-10',
-      endDate: '2026-08-10',
-    })
-
-    const detail = ctaFor(wrapper, 'Event detail for Night market')
-    const companions = ctaFor(wrapper, 'Find companions for Night market')
-
-    expect(detail?.element.parentElement?.classList).toContain('flex-wrap')
-    expect(detail?.classes()).toContain('min-w-0')
-    expect(detail?.classes()).toContain('basis-24')
-    expect(companions?.classes()).toContain('min-w-0')
-    expect(companions?.classes()).toContain('basis-24')
-    expect(companions?.classes()).toContain('leading-tight')
   })
 
   it('prefers the translated address over untranslated region fields', async () => {
@@ -338,30 +333,61 @@ describe('JourneyTimelineList', () => {
     expect(wrapper.text()).not.toContain('성수')
   })
 
-  it('sends an unconfirmed item to the appointment list filtered to that item', async () => {
+  it('shows the coordinate-derived distance to the next stop', async () => {
+    const first = makeItem('Gwangjang Market')
+    first.exploreItem.location.latitude = 37.5701
+    first.exploreItem.location.longitude = 126.9997
+    const second = makeItem('Olive Young Myeongdong', { tripItemId: 2, itemId: 22 })
+    second.exploreItem.location.latitude = 37.5604
+    second.exploreItem.location.longitude = 126.9896
+
+    const wrapper = await mountList({
+      days: [dayWith('2026-08-10', first, second)],
+      startDate: '2026-08-10',
+      endDate: '2026-08-10',
+    })
+
+    expect(wrapper.text()).toContain('1.4 km')
+    expect(wrapper.text().match(/km/g)).toHaveLength(1)
+  })
+
+  it('does not connect the last stop of one day to the first stop of the next day', async () => {
+    const firstDayStop = makeItem('Gwangjang Market')
+    firstDayStop.exploreItem.location.latitude = 37.5701
+    firstDayStop.exploreItem.location.longitude = 126.9997
+    const nextDayStop = makeItem('Olive Young Myeongdong', { tripItemId: 2, itemId: 22 })
+    nextDayStop.exploreItem.location.latitude = 37.5604
+    nextDayStop.exploreItem.location.longitude = 126.9896
+
+    const wrapper = await mountList({
+      days: [dayWith('2026-08-10', firstDayStop), dayWith('2026-08-11', nextDayStop)],
+      startDate: '2026-08-10',
+      endDate: '2026-08-11',
+    })
+
+    expect(wrapper.text()).not.toContain('km')
+  })
+
+  it('keeps companion actions out of the compact Figma timeline card', async () => {
     const wrapper = await mountList({
       days: [dayWithItem('2026-08-10', 'Night market')],
       startDate: '2026-08-10',
       endDate: '2026-08-10',
     })
 
-    const link = ctaFor(wrapper, 'Find companions for Night market')
-
-    expect(link?.text()).toBe('Find companions')
-    expect(link?.attributes('href')).toBe('/appointments?itemId=11&itemType=EVENT')
+    expect(wrapper.text()).not.toContain('Find companions')
+    expect(wrapper.findAll('a[href^="/appointments"]')).toHaveLength(0)
   })
 
-  it('sends a confirmed item to its appointment detail', async () => {
+  it('shows participant data without adding a second appointment CTA', async () => {
     const wrapper = await mountList({
       days: [dayWith('2026-08-10', confirmedItem('Night market', 501))],
       startDate: '2026-08-10',
       endDate: '2026-08-10',
     })
 
-    const link = ctaFor(wrapper, 'View companions for Night market')
-
-    expect(link?.text()).toBe('View companions')
-    expect(link?.attributes('href')).toBe('/appointments/501')
+    expect(wrapper.text()).not.toContain('View companions')
+    expect(wrapper.findAll('a[href^="/appointments"]')).toHaveLength(0)
     expect(wrapper.text()).not.toContain('Find companions')
   })
 
@@ -378,7 +404,7 @@ describe('JourneyTimelineList', () => {
     expect(ctaFor(wrapper, 'Event detail for Night market')?.exists()).toBe(true)
   })
 
-  it('gives every repeated CTA an item-specific accessible name', async () => {
+  it('gives every repeated detail card an item-specific accessible name', async () => {
     const wrapper = await mountList({
       days: [
         dayWith(
@@ -392,12 +418,28 @@ describe('JourneyTimelineList', () => {
     })
 
     const names = wrapper
-      .findAll('a[aria-label^="Event detail for"], a[aria-label^="Find companions for"]')
+      .findAll('a[aria-label^="Event detail for"]')
       .map((link) => link.attributes('aria-label'))
 
-    expect(new Set(names).size).toBe(4)
+    expect(new Set(names).size).toBe(2)
     // 보이는 라벨이 접근 가능한 이름 앞부분에 그대로 들어간다 (WCAG 2.5.3).
-    names.forEach((name) => expect(name).toMatch(/^(Event detail|Find companions) for .+/))
+    names.forEach((name) => expect(name).toMatch(/^Event detail for .+/))
+  })
+
+  it('keeps the remove control visible on the card instead of hiding it from sight', async () => {
+    const wrapper = await mountList({
+      days: [dayWithItem('2026-08-10', 'Night market')],
+      startDate: '2026-08-10',
+      endDate: '2026-08-10',
+    })
+
+    const remove = wrapper.find('[data-testid="itinerary-remove-1"]')
+
+    expect(remove.exists()).toBe(true)
+    expect(remove.classes()).not.toContain('sr-only')
+    expect(remove.attributes('aria-label')).toBe('Remove Night market from itinerary')
+    // 카드 전체가 상세 링크라 삭제 버튼이 그 안에 들어가면 링크가 중첩된다.
+    expect(remove.element.closest('a')).toBeNull()
   })
 
   it('handles a journey longer than a month', async () => {

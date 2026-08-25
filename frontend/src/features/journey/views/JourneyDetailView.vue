@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { IconSettings } from '@tabler/icons-vue'
+import { IconCoin, IconSettings, IconUserPlus } from '@tabler/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
-import AppButton from '@/shared/ui/AppButton.vue'
+import { spendingCategoryLabelKey, toSpendingCategory } from '@/shared/lib/spendingCategory'
+import SegmentedControl from '@/shared/ui/SegmentedControl.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
@@ -59,6 +60,7 @@ const requestErrorDescription = computed(() =>
   t(journeyErrorMessageKey(requestError.value, hasMessage)),
 )
 const selectedItem = ref<JourneyTimelineItem | null>(null)
+const activeSection = ref<'itinerary' | 'spending'>('itinerary')
 const removeDialog = ref<'confirm' | 'blocked' | 'unavailable' | null>(null)
 const removeError = ref<string | null>(null)
 
@@ -96,8 +98,28 @@ const removeMutation = useMutation({
   },
 })
 
-const { useReportSummariesQuery } = useJourneyReportIntegration()
+const { useReportSummariesQuery, useReportExpenseCandidatesQuery } = useJourneyReportIntegration()
 const reportsQuery = useReportSummariesQuery()
+const expenseCandidatesQuery = useReportExpenseCandidatesQuery(tripId)
+const expenseCandidates = computed(() => expenseCandidatesQuery.data.value?.candidates ?? [])
+const itemCount = computed(() =>
+  (timelineQuery.data.value?.timeline ?? []).reduce((sum, day) => sum + day.items.length, 0),
+)
+const sectionOptions = computed(() => [
+  { value: 'itinerary', label: t('journey.detail.timeline') },
+  { value: 'spending', label: t('journey.detail.spending') },
+])
+const spendingRows = computed(() => {
+  const totals = new Map<string, number>()
+  for (const candidate of expenseCandidates.value) {
+    const category = toSpendingCategory(candidate.category)
+    const amount = Number(candidate.amount)
+    if (!Number.isFinite(amount) || amount < 0) continue
+    totals.set(category, (totals.get(category) ?? 0) + amount)
+  }
+
+  return [...totals.entries()].sort((first, second) => second[1] - first[1])
+})
 const journeyEnded = computed(() => {
   const journey = detailQuery.data.value
   return journey !== undefined && getJourneyStatus(journey.endDate) === 'past'
@@ -129,6 +151,16 @@ function createReport(): void {
   void router.push({ name: 'report-list', query: { tripId: journey.tripId } })
 }
 
+function setActiveSection(value: string): void {
+  if (value === 'itinerary' || value === 'spending') activeSection.value = value
+}
+
+// 지갑 통화(KRW)와 1:1이라 통화 스타일 대신 자릿수 구분만 로케일 대응으로 하고
+// 단위는 P로 직접 붙인다(#333).
+function formatExpenseAmount(value: number): string {
+  return `${new Intl.NumberFormat(i18n.locale.value, { maximumFractionDigits: 0 }).format(value)} P`
+}
+
 function requestRemove(item: JourneyTimelineItem): void {
   selectedItem.value = item
   removeError.value = null
@@ -144,7 +176,7 @@ function closeRemoveDialog(): void {
 </script>
 
 <template>
-  <main class="flex w-full flex-col gap-6 px-screen flex-1 pt-6 pb-8">
+  <main class="flex w-full flex-1 flex-col gap-6 px-screen pt-6 pb-8">
     <section
       v-if="tripId === null"
       role="alert"
@@ -179,7 +211,11 @@ function closeRemoveDialog(): void {
     />
 
     <template v-else-if="detailQuery.data.value !== undefined">
-      <JourneySummary :journey="detailQuery.data.value">
+      <JourneySummary
+        :journey="detailQuery.data.value"
+        :expenses="expenseCandidates"
+        :item-count="itemCount"
+      >
         <RouterLink
           :to="{
             name: 'journey-settings',
@@ -196,49 +232,62 @@ function closeRemoveDialog(): void {
         </RouterLink>
       </JourneySummary>
 
-      <section v-if="journeyEnded">
-        <StateLoading
-          v-if="reportsQuery.isPending.value"
-          :label="t('journey.detail.reportChecking')"
-        />
-
-        <StateError
-          v-else-if="reportsQuery.isError.value"
-          :title="t('journey.detail.reportLoadFailed')"
-          :description="t('journey.detail.reportLoadFailedDescription')"
-          :action-label="t('action.retry')"
-          @retry="reportsQuery.refetch"
-        />
-
-        <AppButton
-          v-else-if="matchingReport !== null"
-          variant="secondary"
-          block
-          @click="viewReport(matchingReport.reportId)"
+      <div class="flex h-11.5 gap-2.5">
+        <button
+          v-if="journeyEnded"
+          type="button"
+          :disabled="reportsQuery.isPending.value || reportsQuery.isError.value"
+          class="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-sm border border-paper text-input font-medium text-ink disabled:opacity-50"
+          @click="matchingReport === null ? createReport() : viewReport(matchingReport.reportId)"
         >
-          {{ t('journey.detail.viewReport') }}
-        </AppButton>
-        <AppButton
-          v-else
-          variant="secondary"
-          block
-          @click="createReport"
+          <IconUserPlus
+            :size="24"
+            aria-hidden="true"
+          />
+          <span class="truncate">
+            {{
+              reportsQuery.isPending.value
+                ? t('journey.detail.reportChecking')
+                : reportsQuery.isError.value
+                  ? t('journey.detail.reportLoadFailed')
+                  : matchingReport === null
+                    ? t('journey.detail.createReport')
+                    : t('journey.detail.viewReportShort')
+            }}
+          </span>
+        </button>
+
+        <RouterLink
+          :to="{ name: 'settlement-new' }"
+          class="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-sm bg-paper-fill text-input font-medium text-on-paper"
         >
-          {{ t('journey.detail.createReport') }}
-        </AppButton>
-      </section>
+          <IconCoin
+            :size="24"
+            aria-hidden="true"
+          />
+          <span class="truncate">{{ t('journey.detail.splitExpenses') }}</span>
+        </RouterLink>
+      </div>
+
+      <StateError
+        v-if="journeyEnded && reportsQuery.isError.value"
+        :title="t('journey.detail.reportLoadFailed')"
+        :description="t('journey.detail.reportLoadFailedDescription')"
+        :action-label="t('action.retry')"
+        @retry="reportsQuery.refetch"
+      />
+
+      <SegmentedControl
+        :model-value="activeSection"
+        :options="sectionOptions"
+        :label="t('journey.detail.sectionsLabel')"
+        @update:model-value="setActiveSection"
+      />
 
       <section
-        class="flex flex-col gap-4"
-        aria-labelledby="journey-timeline-title"
+        v-if="activeSection === 'itinerary'"
+        :aria-label="t('journey.detail.timeline')"
       >
-        <h2
-          id="journey-timeline-title"
-          class="font-display text-section-header uppercase text-ink-display"
-        >
-          {{ t('journey.detail.timeline') }}
-        </h2>
-
         <StateLoading
           v-if="timelineQuery.isPending.value"
           :label="t('journey.detail.timelineLoading')"
@@ -271,6 +320,40 @@ function closeRemoveDialog(): void {
           :removing-trip-item-id="removeMutation.isPending.value ? selectedItem?.tripItemId : null"
           @remove="requestRemove"
         />
+      </section>
+
+      <section
+        v-else
+        class="flex flex-col gap-2"
+        :aria-label="t('journey.detail.spending')"
+      >
+        <StateLoading
+          v-if="expenseCandidatesQuery.isPending.value"
+          :label="t('journey.detail.spendingLoading')"
+        />
+        <StateError
+          v-else-if="expenseCandidatesQuery.isError.value"
+          :title="t('journey.detail.spendingLoadFailed')"
+          :description="t('journey.detail.spendingLoadFailedDescription')"
+          :action-label="t('action.retry')"
+          @retry="expenseCandidatesQuery.refetch"
+        />
+        <StateEmpty
+          v-else-if="spendingRows.length === 0"
+          :title="t('journey.detail.spendingEmpty')"
+        />
+        <template v-else>
+          <div
+            v-for="row in spendingRows"
+            :key="row[0]"
+            class="flex items-center justify-between rounded-md bg-surface-1 px-4 py-3"
+          >
+            <span class="text-body-sm text-ink-2">{{ t(spendingCategoryLabelKey(row[0])) }}</span>
+            <strong class="text-title-sm tabular-nums text-ink">{{
+              formatExpenseAmount(row[1])
+            }}</strong>
+          </div>
+        </template>
       </section>
     </template>
 
