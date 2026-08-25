@@ -35,15 +35,23 @@ function useRegionLabel() {
 
 export function useSavedExploreItemsQuery(kind: Ref<'EVENT' | 'PLACE'>, enabled: Ref<boolean>) {
   const regionLabel = useRegionLabel()
+  const { locale } = useI18n()
 
   const query = useQuery({
-    // 캐시에는 서버가 준 지역 코드를 그대로 둔다. 번역한 문자열을 넣으면 언어를 바꾼
-    // 뒤에도 이전 언어가 남는다 — 이 응답은 언어와 무관하므로 로케일을 key에 넣어
-    // 같은 목록을 로케일마다 다시 받아 오는 대신, 표시할 때 번역한다.
-    queryKey: computed(() => ['explore', 'saved', kind.value] as const),
+    // 제목은 서버가 요청 언어로 번역해 내려주므로(#531) 로케일이 바뀌면 다시 받아 온다.
+    // Discover가 같은 목록에 `language`를 실어 보내므로, 여기서 빼면 두 화면이 같은
+    // 항목을 서로 다른 언어로 보여 준다(#461).
+    //
+    // 지역명은 아직 원문 코드로 내려온다. 캐시에는 그 코드를 그대로 두고 표시할 때
+    // 번역한다 — 번역한 문자열을 넣으면 언어를 바꾼 뒤에도 이전 언어가 남는다.
+    queryKey: computed(() => ['explore', 'saved', kind.value, locale.value] as const),
     queryFn: async () => {
       if (kind.value === 'EVENT') {
-        const page = await fetchEventList({ savedOnly: true, size: SAVED_PAGE_SIZE })
+        const page = await fetchEventList({
+          savedOnly: true,
+          size: SAVED_PAGE_SIZE,
+          language: locale.value,
+        })
         return page.content.map((event) => ({
           itemId: event.itemId,
           title: event.title,
@@ -52,7 +60,11 @@ export function useSavedExploreItemsQuery(kind: Ref<'EVENT' | 'PLACE'>, enabled:
         }))
       }
 
-      const page = await fetchPlaceList({ savedOnly: true, size: SAVED_PAGE_SIZE })
+      const page = await fetchPlaceList({
+        savedOnly: true,
+        size: SAVED_PAGE_SIZE,
+        language: locale.value,
+      })
       return page.content.map((place) => ({
         itemId: place.itemId,
         title: place.name,
