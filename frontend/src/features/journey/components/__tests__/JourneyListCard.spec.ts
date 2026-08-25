@@ -173,6 +173,11 @@ describe('JourneyListCard', () => {
 
     expect(title.classes()).toContain('break-words')
     expect(title.classes()).not.toContain('truncate')
-    expect(wrapper.getComponent(AppTicket).classes()).toContain('h-full')
+    expect(wrapper.classes()).toContain('flex')
+    expect(wrapper.classes()).toContain('flex-col')
+    expect(wrapper.getComponent(AppTicket).classes()).toContain('flex-1')
+    expect(
+      wrapper.get('[data-testid="journey-card-actions"]').element.parentElement?.classList,
+    ).toContain('h-full')
   })
 })

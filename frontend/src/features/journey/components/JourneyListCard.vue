@@ -66,7 +66,7 @@ const itemCounts = computed(() => {
 </script>
 
 <template>
-  <li>
+  <li class="flex flex-col">
     <!--
       시안 J1의 여정 카드는 상단 커버 154px + 하단 종이 스텁으로 나뉜 티켓이다.
 
@@ -89,7 +89,7 @@ const itemCounts = computed(() => {
     <AppTicket
       :body-size="154"
       tone="paper"
-      class="h-full"
+      class="flex-1"
     >
       <template #body>
         <!--
@@ -122,7 +122,7 @@ const itemCounts = computed(() => {
           인터랙티브가 된다. 제목·날짜·항목 수까지만 상세로 가는 링크이고, 리포트 링크와
           도장은 형제로 둔다.
         -->
-        <div class="flex min-h-40 flex-col gap-2.5 p-4">
+        <div class="flex h-full min-h-40 flex-col gap-2.5 p-4">
           <RouterLink
             :to="{ name: 'journey-detail', params: { tripId: journey.tripId } }"
             class="flex flex-col gap-2.5 transition-transform motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-on-paper active:scale-[0.98] motion-reduce:active:scale-100"
@@ -152,7 +152,10 @@ const itemCounts = computed(() => {
             비어 있을 수 있고, 그때도 `mt-auto`가 위 내용을 위로 밀어 카드 높이가 흔들리지
             않는다.
           -->
-          <div class="mt-auto flex min-h-11 items-center justify-between gap-2">
+          <div
+            data-testid="journey-card-actions"
+            class="mt-auto flex min-h-11 items-center justify-between gap-2"
+          >
             <RouterLink
               v-if="reportId !== null"
               :to="{ name: 'report-detail', params: { reportId } }"
