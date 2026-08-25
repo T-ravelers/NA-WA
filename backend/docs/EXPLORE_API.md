@@ -130,11 +130,14 @@ Event·Place의 목록과 상세는 `language`가 가리키는 번역을 우선 
 줄바꿈으로 합쳐 만드는 경우가 있습니다(`concat_ws(E'\n', address_detail, venue_text)`).
 원문과 번역이 같은 모양이므로 표시 계약에는 영향이 없습니다.
 
-Place 쪽 `opening_hours`·`closed_days`는 **감싸는 모양이 서로 다릅니다.** 원문이 각각
-OBJECT와 ARRAY이고 프론트가 그 모양에 맞춰 다르게 읽기 때문입니다. 번역값은
-`opening_hours_text` → `{"raw": "..."}`, `closed_days_text` → `["..."]`로 감쌉니다.
-휴무일을 객체로 감싸면 화면에 `raw: ...`가 그대로 찍힙니다 — 영업시간과 달리 휴무일에는
-합성 키를 지우는 처리가 프론트에 없습니다.
+Place 쪽 `opening_hours`·`closed_days`의 번역값은 **원문과 같은 JSON 모양으로 감쌉니다.**
+두 컬럼은 TEXT인데 응답 필드는 JSON이라 그대로 내보내면 파싱에 실패하고, 감싸는 모양은
+원문을 따릅니다 — `opening_hours`는 OBJECT(`opening_hours_text` → `{"raw": "..."}`),
+`closed_days`는 ARRAY(`closed_days_text` → `["..."]`)입니다.
+
+번역이 붙은 항목과 붙지 않은 항목이 **같은 모양으로 나가야** 클라이언트가 한 가지 형태만
+다루면 되기 때문입니다. 표시 계약은 이 모양에 의존하지 않습니다 — 화면은 객체로 오든
+배열로 오든 같은 문자열을 그립니다(#534).
 
 ### 필터 결합
 

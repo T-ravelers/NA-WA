@@ -256,10 +256,9 @@ class PlaceMapperIntegrationTest {
     /**
      * 번역된 영업시간·휴무일이 원문과 <b>같은 JSON 모양</b>으로 나가야 한다.
      *
-     * <p>휴무일을 {@code {"raw": ...}}로 감싸면 프론트 {@code toClosedDays}가 객체 갈래를
-     * 타서 화면 「휴무일」에 {@code raw: ...}가 그대로 찍힌다. 영업시간과 달리 휴무일에는
-     * 합성 키를 지우는 처리가 없다. 한국어 폴백일 때는 정상으로 보여서, 번역 데이터가 붙는
-     * 순간에만 드러나는 회귀다(#531 리뷰).
+     * <p>번역이 붙은 항목과 붙지 않은 항목의 응답 형태가 갈리면 클라이언트가 같은 필드를
+     * 두 가지로 다뤄야 한다. 한국어 폴백일 때는 원문 모양이라 정상으로 보이고, 번역 데이터가
+     * 붙는 순간에만 어긋나는 종류의 회귀다(#531 리뷰).
      */
     @Test
     void findPlaceDetail_keepsTranslatedHoursAndClosedDaysInTheirOriginalJsonShapes() {
@@ -289,10 +288,10 @@ class PlaceMapperIntegrationTest {
                 detail.getOpeningHours().path("raw").asText()
             );
 
-            // 휴무일 원문은 ARRAY다. 객체로 나가면 화면에 `raw: ...`가 찍힌다.
+            // 휴무일 원문은 ARRAY다. 객체로 나가면 번역 여부에 따라 응답 형태가 갈린다.
             assertTrue(
                 detail.getClosedDays().isArray(),
-                "휴무일 번역이 배열이 아니면 프론트가 `raw:` 라벨을 그대로 그린다"
+                "휴무일 번역이 배열이 아니면 원문과 응답 형태가 갈린다"
             );
             assertEquals("Every Monday", detail.getClosedDays().get(0).asText());
 

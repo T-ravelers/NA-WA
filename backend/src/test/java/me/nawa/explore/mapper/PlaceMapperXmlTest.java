@@ -247,19 +247,19 @@ class PlaceMapperXmlTest {
          * 번역 쪽 영업시간·휴무일은 TEXT고 응답 DTO는 JSON이다. 그냥 COALESCE하면
          * JsonNodeTypeHandler가 파싱에 실패해 상세 API가 통째로 500이 된다.
          *
-         * 감싸는 모양이 서로 다른 것이 핵심이다. 원문이 각각 OBJECT와 ARRAY이고 프론트가
-         * 그 모양에 맞춰 다르게 읽는다. 휴무일을 객체로 감싸면 toClosedDays가 객체 갈래를
-         * 타서 화면에 `raw: ...`가 그대로 찍힌다 — openingHours와 달리 closedDays에는
-         * 합성 키를 지우는 처리가 없다(#531 리뷰).
+         * 감싸는 모양은 원문을 따른다 — 영업시간은 OBJECT, 휴무일은 ARRAY다. 번역이 붙은
+         * 항목과 붙지 않은 항목이 같은 모양으로 나가야 클라이언트가 한 가지 형태만 다루면
+         * 된다. 화면은 두 모양을 같게 그리므로(#534) 이 단정은 표시 결과가 아니라 응답
+         * 형태의 일관성을 고정한다.
          */
         assertTrue(detailSql.contains("JSON_OBJECT('raw', pt.opening_hours_text)"));
         assertTrue(
             detailSql.contains("JSON_ARRAY(pt.closed_days_text)"),
-            "휴무일 번역은 배열로 감싸야 프론트가 raw 키를 화면에 찍지 않는다"
+            "휴무일 원문이 ARRAY이므로 번역도 배열이어야 응답 형태가 갈리지 않는다"
         );
         assertFalse(
             detailSql.contains("JSON_OBJECT('raw', pt.closed_days_text)"),
-            "휴무일을 객체로 감싸면 화면에 `raw: ...`가 나간다"
+            "휴무일을 객체로 감싸면 번역 여부에 따라 응답 형태가 달라진다"
         );
     }
 
