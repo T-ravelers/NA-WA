@@ -675,7 +675,8 @@ describe('ReportDetailView', () => {
 
     const summary = share.mock.calls[0]?.[0] as { text: string }
     expect(summary.text).toContain('Jeju Island')
-    expect(summary.text).toContain('final travel report')
+    expect(summary.text).toContain('travel report')
+    expect(summary.text).not.toContain('final')
     expect(summary.text).not.toContain('#')
   })
 

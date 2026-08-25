@@ -6,6 +6,7 @@ import { i18n } from '@/app/i18n'
 
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import ImagePlaceholder from '@/shared/ui/ImagePlaceholder.vue'
+import AppTicket from '@/shared/ui/AppTicket.vue'
 
 import type { JourneySummary } from '../../api/journeyApi'
 import JourneyListCard from '../JourneyListCard.vue'
@@ -79,7 +80,7 @@ describe('JourneyListCard', () => {
    * 목록 응답에는 리포트 정보가 없어서 화면이 report feature에서 받아 내려준다(#522).
    * 카드는 값이 있을 때만 링크를 그린다 — 리포트가 없는 여정이 늘 섞여 있다.
    */
-  it('links to the final report only when the journey has one', () => {
+  it('links to the report only when the journey has one', () => {
     expect(mountCard({}, { reportId: null }).find('a[href^="/reports/"]').exists()).toBe(false)
 
     const wrapper = mountCard({}, { reportId: 7 })
@@ -164,5 +165,14 @@ describe('JourneyListCard', () => {
     const wrapper = mountCard()
 
     expect(wrapper.get('a').attributes('href')).toBe('/journeys/42')
+  })
+
+  it('shows the full title and stretches the ticket to the tallest carousel card', () => {
+    const wrapper = mountCard({ title: 'A very long journey title that needs more than one line' })
+    const title = wrapper.get('h3')
+
+    expect(title.classes()).toContain('break-words')
+    expect(title.classes()).not.toContain('truncate')
+    expect(wrapper.getComponent(AppTicket).classes()).toContain('h-full')
   })
 })

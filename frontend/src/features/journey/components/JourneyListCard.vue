@@ -89,6 +89,7 @@ const itemCounts = computed(() => {
     <AppTicket
       :body-size="154"
       tone="paper"
+      class="h-full"
     >
       <template #body>
         <!--
@@ -126,7 +127,7 @@ const itemCounts = computed(() => {
             :to="{ name: 'journey-detail', params: { tripId: journey.tripId } }"
             class="flex flex-col gap-2.5 transition-transform motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-on-paper active:scale-[0.98] motion-reduce:active:scale-100"
           >
-            <h3 class="truncate font-display text-trip-ticket-title uppercase">
+            <h3 class="break-words font-display text-trip-ticket-title uppercase">
               {{ journey.title }}
             </h3>
             <p class="text-body-sm font-medium tabular-nums text-on-paper">

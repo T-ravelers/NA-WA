@@ -112,9 +112,7 @@ const similarComparison = {
   ranks: [],
 }
 
-test('selects expenses, prevents duplicate generation, and opens the final report', async ({
-  page,
-}) => {
+test('selects expenses, prevents duplicate generation, and opens the report', async ({ page }) => {
   let createRequest: unknown
 
   await page.route('**/api/v1/members/me', (route) =>
@@ -227,7 +225,7 @@ test('selects expenses, prevents duplicate generation, and opens the final repor
   await expect(page.getByLabel(/FOOD.*18,000 P/)).toBeChecked()
   await page.getByLabel(/OTHER.*5,000 P/).check()
 
-  const generate = page.getByRole('button', { name: 'Generate final report' })
+  const generate = page.getByRole('button', { name: 'Generate report' })
   await generate.click()
   await expect(generate).toBeDisabled()
 

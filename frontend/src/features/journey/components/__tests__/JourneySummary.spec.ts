@@ -59,6 +59,9 @@ describe('JourneySummary', () => {
     expect(wrapper.text()).toContain('Budget 1,800,000 P')
     expect(wrapper.getComponent(GaugeBar).props('value')).toBeCloseTo(1_284_500 / 1_800_000)
     expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('71% of budget')
+
+    const spentAmount = wrapper.findAll('p').find((paragraph) => paragraph.text() === '1,284,500 P')
+    expect(spentAmount?.element.parentElement?.classList).toContain('flex-1')
   })
 
   it('reads the ticket stub as the top three consumption areas and the item count', () => {

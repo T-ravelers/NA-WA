@@ -141,7 +141,7 @@ describe('ReportsView', () => {
     queryClients.splice(0).forEach((client) => client.clear())
   })
 
-  it('shows only ended journeys and opens an existing final report', async () => {
+  it('shows only ended journeys and opens an existing report', async () => {
     const { router, wrapper } = await mountView()
 
     expect(wrapper.get('h1').text()).toBe('Reports')
@@ -153,7 +153,7 @@ describe('ReportsView', () => {
     expect(wrapper.text()).not.toContain('0 places')
     expect(wrapper.text()).not.toContain('Future Journey')
 
-    await findButton(wrapper, 'View final report')?.trigger('click')
+    await findButton(wrapper, 'View report')?.trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.fullPath).toBe('/reports/100')
@@ -279,7 +279,7 @@ describe('ReportsView', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain(
       'One of the selected expenses already belongs to another journey. Refresh the list and choose again.',
     )
-    expect(wrapper.text()).not.toContain('A final report already exists')
+    expect(wrapper.text()).not.toContain('A report already exists')
     expect(fetchReports).toHaveBeenCalledTimes(1)
     expect(router.currentRoute.value.fullPath).toBe('/reports')
   })

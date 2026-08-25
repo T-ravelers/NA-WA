@@ -1,5 +1,5 @@
 /**
- * Individual final Report 프레젠테이션 계약.
+ * Individual Report 프레젠테이션 계약.
  *
  * **이 파일이 #152가 소유하는 계약의 정본이다.** 백엔드 wire DTO(#151)가 아니라
  * 화면이 그대로 그릴 수 있는 형태다. wire 값(`string | number`, nullable)을 여기 타입으로
