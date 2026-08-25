@@ -1,4 +1,16 @@
+import type { Locator } from '@playwright/test'
+
 import { expect, test } from './fixtures'
+
+async function requiredBoundingBox(locator: Locator) {
+  const box = await locator.boundingBox()
+
+  if (box === null) {
+    throw new Error('Journey card geometry is unavailable.')
+  }
+
+  return box
+}
 
 test('lists ongoing and past journeys and navigates to journey actions', async ({ page }) => {
   await page.route('**/api/v1/members/me', async (route) => {
@@ -28,9 +40,15 @@ test('lists ongoing and past journeys and navigates to journey actions', async (
         data: [
           {
             tripId: 42,
-            title: 'Seoul Foodie Week',
+            title: 'Seoul Foodie Week With Markets Museums And Late Night Cafes',
             startDate: '2098-08-10',
             endDate: '2098-08-12',
+          },
+          {
+            tripId: 43,
+            title: 'Jeju',
+            startDate: '2098-09-10',
+            endDate: '2098-09-12',
           },
           {
             tripId: 7,
@@ -45,8 +63,28 @@ test('lists ongoing and past journeys and navigates to journey actions', async (
 
   await page.goto('/journeys')
   await expect(page.getByRole('heading', { level: 1, name: 'Journeys' })).toBeVisible()
-  await expect(page.getByRole('link', { name: /Seoul Foodie Week/ })).toBeVisible()
+  const longTitleCard = page.getByRole('listitem').filter({
+    has: page.getByRole('link', { name: /Seoul Foodie Week With Markets Museums/ }),
+  })
+  const shortTitleCard = page.getByRole('listitem').filter({
+    has: page.getByRole('link', { name: /Jeju/ }),
+  })
+
+  await expect(longTitleCard).toBeVisible()
+  await expect(shortTitleCard).toBeVisible()
   await expect(page.getByRole('link', { name: /Busan Weekender/ })).toBeHidden()
+
+  const longTicketBox = await requiredBoundingBox(longTitleCard.locator(':scope > div'))
+  const shortTicketBox = await requiredBoundingBox(shortTitleCard.locator(':scope > div'))
+  const longActionsBox = await requiredBoundingBox(
+    longTitleCard.getByTestId('journey-card-actions'),
+  )
+  const shortActionsBox = await requiredBoundingBox(
+    shortTitleCard.getByTestId('journey-card-actions'),
+  )
+
+  expect(Math.abs(longTicketBox.height - shortTicketBox.height)).toBeLessThanOrEqual(1)
+  expect(Math.abs(longActionsBox.y - shortActionsBox.y)).toBeLessThanOrEqual(1)
 
   await page.getByRole('radio', { name: 'Past' }).click()
   await expect(page.getByRole('link', { name: /Busan Weekender/ })).toBeVisible()
@@ -56,7 +94,7 @@ test('lists ongoing and past journeys and navigates to journey actions', async (
   await expect(page).toHaveURL(/\/journeys\/new$/)
 
   await page.goto('/journeys')
-  await page.getByRole('link', { name: /Seoul Foodie Week/ }).click()
+  await page.getByRole('link', { name: /Seoul Foodie Week With Markets Museums/ }).click()
   await expect(page).toHaveURL(/\/journeys\/42$/)
 })
 

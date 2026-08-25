@@ -94,7 +94,7 @@ function formatBudget(value: number | null): string {
     <template #body>
       <div class="flex h-full flex-col gap-3.5 px-5 pt-5 pb-4.5">
         <div class="flex items-end justify-between gap-4">
-          <div class="min-w-0">
+          <div class="min-w-0 flex-1">
             <p class="text-caption font-semibold tracking-wide uppercase text-on-paper-2">
               {{ t('journey.detail.spent') }}
             </p>

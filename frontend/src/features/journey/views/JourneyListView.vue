@@ -183,7 +183,7 @@ function retry(): void {
           :key="activeTab"
           role="list"
           aria-labelledby="journey-list-section-title"
-          class="scrollbar-hidden -mx-screen flex snap-x snap-mandatory scroll-ps-screen gap-3 overflow-x-auto px-screen pb-3 motion-safe:scroll-smooth"
+          class="scrollbar-hidden -mx-screen flex items-stretch snap-x snap-mandatory scroll-ps-screen gap-3 overflow-x-auto px-screen pb-3 motion-safe:scroll-smooth"
         >
           <JourneyListCard
             v-for="journey in visibleJourneys"

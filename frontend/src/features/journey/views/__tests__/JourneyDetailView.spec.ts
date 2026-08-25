@@ -218,11 +218,11 @@ describe('JourneyDetailView', () => {
 
     const wrapper = await mountAt('/journeys/7')
 
-    expect(wrapper.text()).not.toContain('View final report')
-    expect(wrapper.text()).not.toContain('Create final report')
+    expect(wrapper.text()).not.toContain('View report')
+    expect(wrapper.text()).not.toContain('Create report')
   })
 
-  it('offers to create a final report for an ended journey without one', async () => {
+  it('offers to create a report for an ended journey without one', async () => {
     fetchJourney.mockResolvedValue({ ...journey, startDate: '2020-08-10', endDate: '2020-08-12' })
     fetchJourneyTimeline.mockResolvedValue({ tripId: 7, timeline: [] })
 
@@ -230,9 +230,9 @@ describe('JourneyDetailView', () => {
 
     const createButton = wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Create final report')
+      .find((button) => button.text() === 'Create report')
     expect(createButton).toBeDefined()
-    expect(wrapper.text()).not.toContain('View final report')
+    expect(wrapper.text()).not.toContain('View report')
 
     await createButton?.trigger('click')
     await flushPromises()
@@ -240,7 +240,7 @@ describe('JourneyDetailView', () => {
     expect(router.currentRoute.value.fullPath).toBe('/reports?tripId=7')
   })
 
-  it('links to the existing final report for an ended journey', async () => {
+  it('links to the existing report for an ended journey', async () => {
     fetchJourney.mockResolvedValue({ ...journey, startDate: '2020-08-10', endDate: '2020-08-12' })
     fetchJourneyTimeline.mockResolvedValue({ tripId: 7, timeline: [] })
 
@@ -250,7 +250,7 @@ describe('JourneyDetailView', () => {
 
     const viewButton = wrapper.findAll('button').find((button) => button.text() === 'View Report')
     expect(viewButton).toBeDefined()
-    expect(wrapper.text()).not.toContain('Create final report')
+    expect(wrapper.text()).not.toContain('Create report')
 
     await viewButton?.trigger('click')
     await flushPromises()
@@ -264,9 +264,9 @@ describe('JourneyDetailView', () => {
 
     const wrapper = await mountAt('/journeys/7', { isPending: true })
 
-    expect(wrapper.text()).toContain('Checking final report status')
-    expect(wrapper.text()).not.toContain('View final report')
-    expect(wrapper.text()).not.toContain('Create final report')
+    expect(wrapper.text()).toContain('Checking report status')
+    expect(wrapper.text()).not.toContain('View report')
+    expect(wrapper.text()).not.toContain('Create report')
   })
 
   it('shows a retryable error instead of a CTA when the report list fails to load', async () => {
@@ -277,8 +277,8 @@ describe('JourneyDetailView', () => {
     const wrapper = await mountAt('/journeys/7', { isError: true, refetch })
 
     expect(wrapper.text()).toContain('Report status unavailable')
-    expect(wrapper.text()).not.toContain('View final report')
-    expect(wrapper.text()).not.toContain('Create final report')
+    expect(wrapper.text()).not.toContain('View report')
+    expect(wrapper.text()).not.toContain('Create report')
 
     const retryButton = wrapper.findAll('button').find((button) => button.text() === 'Try again')
     await retryButton?.trigger('click')
