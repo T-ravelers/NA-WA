@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { MotionConfig } from 'motion-v'
+import { domAnimation, LazyMotion, MotionConfig } from 'motion-v'
 
 import AppShell from '@/app/layouts/AppShell.vue'
 </script>
 
 <template>
   <MotionConfig reduced-motion="user">
-    <AppShell />
+    <LazyMotion
+      :features="domAnimation"
+      strict
+    >
+      <AppShell />
+    </LazyMotion>
   </MotionConfig>
 </template>
