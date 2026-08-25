@@ -87,9 +87,10 @@ watch(
       return
     }
 
+    const animationStart = displayedBalance.value ?? previous
     stopBalanceAnimation()
-    displayedBalance.value = previous
-    balanceAnimation = animate(previous, next, {
+    displayedBalance.value = animationStart
+    balanceAnimation = animate(animationStart, next, {
       duration: 0.6,
       ease: 'easeOut',
       onUpdate: (latest: number) => {

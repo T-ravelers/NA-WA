@@ -159,6 +159,33 @@ describe('WalletHomeView', () => {
     expect(wrapper.get('[data-testid="wallet-balance"]').text()).toBe('104,500 P')
   })
 
+  it('연속 갱신은 현재 표시 중인 값에서 최신 잔액으로 이어서 센다', async () => {
+    const wrapper = await mountLoaded()
+    const firstStop = vi.fn()
+    animateBalance.mockReturnValueOnce({ stop: firstStop }).mockReturnValueOnce({ stop: vi.fn() })
+
+    queryClient.setQueryData(walletKeys.home(), { ...WALLET, balance: 104500 })
+    await flushPromises()
+
+    const firstAnimationOptions = animateBalance.mock.calls[0]?.[2] as {
+      onUpdate: (latest: number) => void
+    }
+    firstAnimationOptions.onUpdate(94500)
+    await flushPromises()
+
+    queryClient.setQueryData(walletKeys.home(), { ...WALLET, balance: 120000 })
+    await flushPromises()
+
+    expect(firstStop).toHaveBeenCalledOnce()
+    expect(animateBalance).toHaveBeenNthCalledWith(
+      2,
+      94500,
+      120000,
+      expect.objectContaining({ duration: 0.6, ease: 'easeOut' }),
+    )
+    expect(wrapper.get('[data-testid="wallet-balance"]').text()).toBe('94,500 P')
+  })
+
   it('감소 모션 설정에서는 바뀐 잔액을 즉시 표시한다', async () => {
     reducedMotion.value = true
     const wrapper = await mountLoaded()
