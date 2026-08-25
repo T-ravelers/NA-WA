@@ -220,6 +220,55 @@ class ReportServiceTest {
         );
     }
 
+    /**
+     * 약속에서 한 QR 결제는 결제 시점에 이 여정으로 이미 연결돼 있다. 그 연결까지 막으면
+     * 정산한 결제를 리포트에 넣을 수 없다 — 정산은 이 연결이 있어야만 만들어진다(#545).
+     */
+    @Test
+    void createReport_acceptsExpenseAlreadyLinkedToThisJourneyAndKeepsThatLink() {
+        ReportCreateRequest request = new ReportCreateRequest();
+        request.setTransferIds(List.of(11L, 12L));
+        List<ReportExpense> expenses = List.of(
+            expense(11L, 101L, "10000.00", LocalDate.of(2026, 8, 1), "FOOD"),
+            expense(12L, 102L, "5000.00", LocalDate.of(2026, 8, 3), "FOOD")
+        );
+        when(reportMapper.findJourneyForUpdate(1L)).thenReturn(completedJourney());
+        when(reportMapper.findEligibleExpensesForUpdate(
+            1L,
+            1L,
+            List.of(11L, 12L)
+        )).thenReturn(expenses);
+        when(reportMapper.findActiveReportByTripId(1L)).thenReturn(null);
+        // 101은 결제 시점에 이 여정으로 연결됐고, 102는 아직 어디에도 연결되지 않았다.
+        when(reportMapper.findLinkedLedgerEntryIdsByTripId(1L))
+            .thenReturn(List.of(101L));
+        when(reportMapper.findLinkedTripIdByLedgerEntryId(101L)).thenReturn(1L);
+        when(reportMapper.findLinkedTripIdByLedgerEntryId(102L)).thenReturn(null);
+        when(reportMapper.findTimelineItemsByTripId(1L)).thenReturn(List.of());
+
+        AtomicReference<Report> insertedReport = new AtomicReference<>();
+        doAnswer(invocation -> {
+            Report report = invocation.getArgument(0);
+            report.setReportId(100L);
+            insertedReport.set(report);
+            return null;
+        }).when(reportMapper).insertReport(any(Report.class));
+        when(reportMapper.findReportById(100L)).thenAnswer(
+            invocation -> persistedReport(insertedReport.get())
+        );
+
+        ReportDetailResponse result = reportService.createReport(1L, 1L, request);
+
+        // 이미 있는 연결을 다시 걸면 UNIQUE(ledger_entry_id)에 걸리고,
+        // 지우고 다시 걸면 appointment_member_id가 날아가 정산을 만들 수 없게 된다.
+        verify(reportMapper, never()).insertTripExpenseLink(1L, 101L);
+        verify(reportMapper).insertTripExpenseLink(1L, 102L);
+        assertDecimalEquals(
+            "15000.00",
+            result.getReportContent().getAnalytics().getTotalSpent()
+        );
+    }
+
     @Test
     void createReport_sameSelectionReturnsExistingReportWithoutInserts() {
         ReportCreateRequest request = new ReportCreateRequest();
