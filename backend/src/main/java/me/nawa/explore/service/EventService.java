@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
+import me.nawa.common.i18n.SupportedLanguagePolicy;
 import me.nawa.explore.dto.request.EventSearchRequest;
 import me.nawa.explore.dto.response.EventActivityResponse;
 import me.nawa.explore.dto.response.EventDetailResponse;
@@ -132,7 +133,7 @@ public class EventService {
         }
         request.setSort(sort);
 
-        request.setLanguage(ExploreLanguagePolicy.normalize(request.getLanguage()));
+        request.setLanguage(SupportedLanguagePolicy.normalize(request.getLanguage()));
     }
 
     private List<String> normalizeUppercaseValues(List<String> values) {
@@ -186,7 +187,7 @@ public class EventService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        String normalizedLanguage = ExploreLanguagePolicy.normalize(language);
+        String normalizedLanguage = SupportedLanguagePolicy.normalize(language);
 
         EventDetailResponse event = eventMapper.findEventDetail(
             eventId,

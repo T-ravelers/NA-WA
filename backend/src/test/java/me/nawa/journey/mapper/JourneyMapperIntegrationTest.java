@@ -107,7 +107,7 @@ class JourneyMapperIntegrationTest {
     @Test
     void findTimelineItems_executesV7JoinWithStableOrdering() {
         List<JourneyTimelineItem> result =
-            mapper.findTimelineItemsByTripId(Long.MAX_VALUE);
+            mapper.findTimelineItemsByTripId(Long.MAX_VALUE, "en");
 
         assertNotNull(result);
         assertTrue(result.isEmpty());

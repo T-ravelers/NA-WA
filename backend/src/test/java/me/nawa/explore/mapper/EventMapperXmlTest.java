@@ -358,9 +358,15 @@ class EventMapperXmlTest {
         );
     }
 
-    /** 번역이 없거나 빈 문자열이면 한국어 원문으로 돌아가야 한다. */
+    /**
+     * 번역이 없거나 빈 문자열이면 영어로, 영어도 없으면 한국어 원문으로 돌아가야 한다.
+     *
+     * <p>영어 폴백은 Journey 타임라인(#536)과 맞춘 것이다 — 요청 언어 번역이 아직 없고
+     * 영어 번역만 있는 Event를 Explore에서는 한국어로, Journey에 담은 뒤에는 영어로 보는
+     * 어긋남을 없앤다.
+     */
     @Test
-    void eventStatements_fallBackToKoreanColumns() throws Exception {
+    void eventStatements_fallBackToEnglishThenKoreanColumns() throws Exception {
         Configuration configuration = parsedConfiguration();
 
         Map<String, Object> listParameters = new HashMap<>();
@@ -374,28 +380,34 @@ class EventMapperXmlTest {
             listParameters
         );
         assertTrue(listSql.contains(
-            "COALESCE(NULLIF(TRIM(et.title), ''), e.title) AS title"
+            "COALESCE(NULLIF(TRIM(et.title), ''), NULLIF(TRIM(et_en.title), ''), e.title) AS title"
         ));
 
         String detailSql = normalizedSql(
             configuration,
             "me.nawa.explore.mapper.EventMapper.findEventDetail",
-            Map.of("eventId", 1L, "language", "en", "today", LocalDate.of(2026, 8, 25))
+            Map.of("eventId", 1L, "language", "ja", "today", LocalDate.of(2026, 8, 25))
         );
         assertTrue(detailSql.contains(
-            "COALESCE(NULLIF(TRIM(et.title), ''), e.title) AS title"
+            "COALESCE(NULLIF(TRIM(et.title), ''), NULLIF(TRIM(et_en.title), ''), e.title) AS title"
         ));
         assertTrue(detailSql.contains(
-            "COALESCE(NULLIF(TRIM(et.venue_detail), ''), e.venue_name) AS venue_name"
+            "COALESCE(NULLIF(TRIM(et.venue_detail), ''), NULLIF(TRIM(et_en.venue_detail), ''), "
+                + "e.venue_name) AS venue_name"
         ));
         assertTrue(detailSql.contains(
-            "COALESCE(NULLIF(TRIM(et.address_display), ''), e.address_road) AS address_road"
+            "COALESCE(NULLIF(TRIM(et.address_display), ''), NULLIF(TRIM(et_en.address_display), ''), "
+                + "e.address_road) AS address_road"
         ));
+        // 영어 조인은 항상 'en' 고정이지, 요청 언어 파라미터를 재사용하지 않는다.
+        assertTrue(detailSql.contains("et_en.language_code = 'en'"));
         /*
          * 번역 쪽 operating_hours는 TEXT고 응답 DTO는 JSON이다. 그냥 COALESCE하면
-         * JsonNodeTypeHandler가 파싱에 실패해 상세 API가 통째로 500이 된다.
+         * JsonNodeTypeHandler가 파싱에 실패해 상세 API가 통째로 500이 된다. 영어 폴백도
+         * 같은 모양으로 감싸야 한다.
          */
         assertTrue(detailSql.contains("JSON_OBJECT('raw', et.operating_hours)"));
+        assertTrue(detailSql.contains("JSON_OBJECT('raw', et_en.operating_hours)"));
     }
 
     /**
@@ -430,12 +442,15 @@ class EventMapperXmlTest {
          * 뒤의 원문 조건이 이미 덮으므로 같은 결과를 두 번 쓰는 셈이다(#531 리뷰).
          */
         assertTrue(listSql.contains("NULLIF(TRIM(et.title), '') LIKE"));
+        // 요청 언어 번역이 없어 영어 제목이 보이는 Event도 그 영어 제목으로 찾아야 한다(#536).
+        assertTrue(listSql.contains("NULLIF(TRIM(et_en.title), '') LIKE"));
         assertTrue(listSql.contains("e.title LIKE"));
         /*
          * 목록만 번역 제목으로 찾고 개수는 원문만 세면 totalElements가 어긋나
          * 페이지네이션이 틀어진다. 두 구문이 같은 조건을 봐야 한다.
          */
         assertTrue(countSql.contains("NULLIF(TRIM(et.title), '') LIKE"));
+        assertTrue(countSql.contains("NULLIF(TRIM(et_en.title), '') LIKE"));
         assertTrue(countSql.contains("LEFT JOIN event_translations et"));
     }
 

@@ -118,7 +118,12 @@ test('creates a journey and opens its empty itinerary', async ({ page }) => {
     })
   })
 
-  await page.route('**/api/v1/journeys/42/timeline', async (route) => {
+  // #536부터 language 쿼리스트링이 붙는다. 문자열 glob은 끝까지 정확히 일치해야 해서
+  // `?language=en`이 덧붙은 요청을 놓치고 실제 네트워크로 흘려보낸다 — report.spec.ts와
+  // 같은 정규식 패턴으로 쿼리스트링 유무를 함께 잡는다.
+  let timelineRequestUrl: string | undefined
+  await page.route(/\/api\/v1\/journeys\/42\/timeline(\?.*)?$/, async (route) => {
+    timelineRequestUrl = route.request().url()
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -171,6 +176,8 @@ test('creates a journey and opens its empty itinerary', async ({ page }) => {
     companionPreference: '2-4',
     regions: [],
   })
+  // 목만 넓히면 회귀를 놓친다 — 실제로 language=en이 실렸는지까지 확인한다.
+  expect(timelineRequestUrl).toContain('language=en')
 })
 
 test('updates journey settings and removes an itinerary item', async ({ page }) => {
@@ -213,7 +220,10 @@ test('updates journey settings and removes an itinerary item', async ({ page }) 
       }),
     })
   })
-  await page.route('**/api/v1/journeys/42/timeline', async (route) => {
+  // #536부터 language 쿼리스트링이 붙는다. 문자열 glob은 끝까지 정확히 일치해야 해서
+  // `?language=en`이 덧붙은 요청을 놓치고 실제 네트워크로 흘려보낸다 — report.spec.ts와
+  // 같은 정규식 패턴으로 쿼리스트링 유무를 함께 잡는다.
+  await page.route(/\/api\/v1\/journeys\/42\/timeline(\?.*)?$/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

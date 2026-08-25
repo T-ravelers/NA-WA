@@ -1208,9 +1208,14 @@ class JourneyServiceTest {
     @Test
     void getTimeline_returnsEmptyTimeline_whenJourneyHasNoItems() {
         when(journeyMapper.findJourneyById(50L)).thenReturn(ownedJourney(50L));
-        when(journeyMapper.findTimelineItemsByTripId(50L)).thenReturn(null);
+        when(journeyMapper.findTimelineItemsByTripId(50L, "en"))
+            .thenReturn(null);
 
-        JourneyTimelineResponse result = journeyService.getTimeline(1L, 50L);
+        JourneyTimelineResponse result = journeyService.getTimeline(
+            1L,
+            50L,
+            null
+        );
 
         assertEquals(50L, result.getTripId());
         assertEquals(List.of(), result.getTimeline());
@@ -1262,11 +1267,15 @@ class JourneyServiceTest {
         first.setVenueName("City Hall");
 
         when(journeyMapper.findJourneyById(60L)).thenReturn(ownedJourney(60L));
-        when(journeyMapper.findTimelineItemsByTripId(60L)).thenReturn(
+        when(journeyMapper.findTimelineItemsByTripId(60L, "zh-TW")).thenReturn(
             List.of(laterDate, second, first)
         );
 
-        JourneyTimelineResponse result = journeyService.getTimeline(1L, 60L);
+        JourneyTimelineResponse result = journeyService.getTimeline(
+            1L,
+            60L,
+            "ZH-tw"
+        );
 
         assertEquals(2, result.getTimeline().size());
         assertEquals(
@@ -1295,14 +1304,14 @@ class JourneyServiceTest {
 
         BusinessException exception = assertThrows(
             BusinessException.class,
-            () -> journeyService.getTimeline(1L, 70L)
+            () -> journeyService.getTimeline(1L, 70L, "en")
         );
 
         assertEquals(
             JourneyErrorCode.JOURNEY_NOT_FOUND,
             exception.getErrorCode()
         );
-        verify(journeyMapper, never()).findTimelineItemsByTripId(70L);
+        verify(journeyMapper, never()).findTimelineItemsByTripId(any(), any());
     }
 
     @Test
@@ -1313,14 +1322,14 @@ class JourneyServiceTest {
 
         BusinessException exception = assertThrows(
             BusinessException.class,
-            () -> journeyService.getTimeline(1L, 80L)
+            () -> journeyService.getTimeline(1L, 80L, "en")
         );
 
         assertEquals(
             JourneyErrorCode.JOURNEY_FORBIDDEN,
             exception.getErrorCode()
         );
-        verify(journeyMapper, never()).findTimelineItemsByTripId(80L);
+        verify(journeyMapper, never()).findTimelineItemsByTripId(any(), any());
     }
 
     private Journey ownedJourney(Long tripId) {

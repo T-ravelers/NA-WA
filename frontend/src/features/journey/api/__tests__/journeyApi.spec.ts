@@ -133,8 +133,10 @@ describe('journeyApi', () => {
     const response = { tripId: 7, timeline: null }
     get.mockResolvedValue({ data: response })
 
-    await expect(fetchJourneyTimeline(7)).resolves.toEqual({ tripId: 7, timeline: [] })
-    expect(get).toHaveBeenCalledWith('/api/v1/journeys/7/timeline')
+    await expect(fetchJourneyTimeline(7, 'en')).resolves.toEqual({ tripId: 7, timeline: [] })
+    expect(get).toHaveBeenCalledWith('/api/v1/journeys/7/timeline', {
+      params: { language: 'en' },
+    })
   })
 
   it('normalizes absent day items to an empty list', async () => {
@@ -142,7 +144,7 @@ describe('journeyApi', () => {
       data: { tripId: 7, timeline: [{ visitDate: '2026-08-10', items: null }] },
     })
 
-    await expect(fetchJourneyTimeline(7)).resolves.toEqual({
+    await expect(fetchJourneyTimeline(7, 'ja')).resolves.toEqual({
       tripId: 7,
       timeline: [{ visitDate: '2026-08-10', items: [] }],
     })

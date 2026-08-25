@@ -1,4 +1,4 @@
-package me.nawa.explore.service;
+package me.nawa.common.i18n;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -12,12 +12,17 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-class ExploreLanguagePolicyTest {
+/**
+ * Explore와 Journey가 공유하는 정책이라, 여기서 한 번만 검증하면 두 도메인이 같은 규칙을
+ * 쓴다는 것이 보장된다. 도메인별 서비스 테스트는 이 함수를 호출한다는 사실만 확인한다.
+ */
+class SupportedLanguagePolicyTest {
 
     /**
-     * 예전 정규화는 요청 값을 통째로 소문자로 접어 {@code zh-TW}를 {@code zh-tw}로 바꿨다.
+     * 이 테스트가 이 클래스의 핵심이다.
      *
-     * <p><b>그 자체가 장애의 원인은 아니었다</b> — 번역 테이블 collation이
+     * <p>예전 정규화는 요청 값을 통째로 소문자로 접어 {@code zh-TW}를 {@code zh-tw}로 바꿨다.
+     * <b>그 자체가 장애의 원인은 아니었다</b> — 번역 테이블 collation이
      * {@code utf8mb4_0900_ai_ci}라 소문자로도 조인이 됐다. 표기를 되돌리는 것은 대비다.
      * collation이 대소문자를 가리게 바뀌거나 언어 코드를 자바에서 비교하는 코드가 생기면
      * 소문자 값은 그때 조용히 어긋난다.
@@ -25,7 +30,7 @@ class ExploreLanguagePolicyTest {
     @Test
     @DisplayName("zh-TW는 소문자로 접지 않고 저장된 표기 그대로 돌려준다")
     void normalize_preservesZhTwCasing() {
-        assertEquals("zh-TW", ExploreLanguagePolicy.normalize("zh-TW"));
+        assertEquals("zh-TW", SupportedLanguagePolicy.normalize("zh-TW"));
     }
 
     @ParameterizedTest
@@ -47,7 +52,7 @@ class ExploreLanguagePolicyTest {
         String given,
         String expected
     ) {
-        assertEquals(expected, ExploreLanguagePolicy.normalize(given));
+        assertEquals(expected, SupportedLanguagePolicy.normalize(given));
     }
 
     @ParameterizedTest
@@ -55,7 +60,7 @@ class ExploreLanguagePolicyTest {
     @NullAndEmptySource
     @ValueSource(strings = {"   "})
     void normalize_defaultsToEnglish_whenAbsent(String given) {
-        assertEquals("en", ExploreLanguagePolicy.normalize(given));
+        assertEquals("en", SupportedLanguagePolicy.normalize(given));
     }
 
     /**
@@ -69,7 +74,7 @@ class ExploreLanguagePolicyTest {
     void normalize_rejectsUnsupportedLanguages(String given) {
         BusinessException exception = assertThrows(
             BusinessException.class,
-            () -> ExploreLanguagePolicy.normalize(given)
+            () -> SupportedLanguagePolicy.normalize(given)
         );
 
         assertEquals(CommonErrorCode.INVALID_INPUT, exception.getErrorCode());

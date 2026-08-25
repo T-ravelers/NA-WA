@@ -26,7 +26,7 @@ import {
 import { useJourneyReportIntegration } from '../model/reportIntegration'
 
 const i18n = useI18n()
-const { t } = i18n
+const { locale, t } = i18n
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -48,7 +48,7 @@ const detailQuery = useQuery({
 })
 
 const timelineQuery = useQuery({
-  ...journeyTimelineQueryOptions(tripId),
+  ...journeyTimelineQueryOptions(tripId, locale),
   enabled: computed(() => tripId.value !== null),
   retry: false,
 })
@@ -77,7 +77,7 @@ const removeMutation = useMutation({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: journeyListKeys.list() }),
       queryClient.invalidateQueries({ queryKey: journeyKeys.detail(id) }),
-      queryClient.invalidateQueries({ queryKey: journeyKeys.timeline(id) }),
+      queryClient.invalidateQueries({ queryKey: journeyKeys.timeline(id, locale.value) }),
     ])
   },
   onError: (error) => {

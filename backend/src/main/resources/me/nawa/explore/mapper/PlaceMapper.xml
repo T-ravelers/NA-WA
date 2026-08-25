@@ -60,7 +60,8 @@
     </sql>
 
     <!--
-        번역값 우선, 없으면 한국어 원문. EventMapper의 같은 조각과 규칙이 같다.
+        번역값 우선, 없으면 영어, 그래도 없으면 한국어 원문. EventMapper의 같은 조각과
+        규칙이 같다 — Journey 타임라인과도 맞춘다(#536).
 
         빈 문자열까지 폴백에 태우는 것은 파이프라인이 번역하지 못한 필드를 NULL이 아니라 빈
         값으로 채워 넣는 경우가 있어서다. 그대로 쓰면 화면에 빈칸이 나간다.
@@ -70,6 +71,10 @@
                   ON pt.place_id = p.place_id
                       AND pt.language_code = #{language}
                       AND pt.deleted_at IS NULL
+        LEFT JOIN place_translations pt_en
+                  ON pt_en.place_id = p.place_id
+                      AND pt_en.language_code = 'en'
+                      AND pt_en.deleted_at IS NULL
     </sql>
 
     <!-- 목록·개수는 언어가 request 안에 있어 경로가 다르다. EventMapper와 같은 이유로 중복해 둔다. -->
@@ -78,6 +83,10 @@
                   ON pt.place_id = p.place_id
                       AND pt.language_code = #{request.language}
                       AND pt.deleted_at IS NULL
+        LEFT JOIN place_translations pt_en
+                  ON pt_en.place_id = p.place_id
+                      AND pt_en.language_code = 'en'
+                      AND pt_en.deleted_at IS NULL
     </sql>
 
     <!--
@@ -98,6 +107,8 @@
         CASE
             WHEN NULLIF(TRIM(pt.opening_hours_text), '') IS NOT NULL
                 THEN JSON_OBJECT('raw', pt.opening_hours_text)
+            WHEN NULLIF(TRIM(pt_en.opening_hours_text), '') IS NOT NULL
+                THEN JSON_OBJECT('raw', pt_en.opening_hours_text)
             ELSE p.opening_hours
         END AS opening_hours
     </sql>
@@ -110,6 +121,8 @@
         CASE
             WHEN NULLIF(TRIM(pt.closed_days_text), '') IS NOT NULL
                 THEN JSON_ARRAY(pt.closed_days_text)
+            WHEN NULLIF(TRIM(pt_en.closed_days_text), '') IS NOT NULL
+                THEN JSON_ARRAY(pt_en.closed_days_text)
             ELSE p.closed_days
         END AS closed_days
     </sql>
@@ -181,15 +194,22 @@
         <if test="request.keyword != null and request.keyword != ''">
             AND (
                 NULLIF(TRIM(pt.name), '') LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt_en.name), '') LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.name LIKE CONCAT('%', #{request.keyword}, '%')
                 OR NULLIF(TRIM(pt.brand), '') LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt_en.brand), '') LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.brand LIKE CONCAT('%', #{request.keyword}, '%')
                 OR NULLIF(TRIM(pt.branch), '') LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt_en.branch), '') LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.branch LIKE CONCAT('%', #{request.keyword}, '%')
                 OR NULLIF(TRIM(pt.address_display), '')
                     LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt_en.address_display), '')
+                    LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.address_road LIKE CONCAT('%', #{request.keyword}, '%')
                 OR NULLIF(TRIM(pt.address_detail), '')
+                    LIKE CONCAT('%', #{request.keyword}, '%')
+                OR NULLIF(TRIM(pt_en.address_detail), '')
                     LIKE CONCAT('%', #{request.keyword}, '%')
                 OR p.address_detail LIKE CONCAT('%', #{request.keyword}, '%')
             )
@@ -249,13 +269,13 @@
     <select id="searchPlaces" resultMap="placeSummaryResultMap">
         SELECT
             p.place_id AS item_id,
-            COALESCE(NULLIF(TRIM(pt.name), ''), p.name) AS name,
-            COALESCE(NULLIF(TRIM(pt.brand), ''), p.brand) AS brand,
-            COALESCE(NULLIF(TRIM(pt.branch), ''), p.branch) AS branch,
+            COALESCE(NULLIF(TRIM(pt.name), ''), NULLIF(TRIM(pt_en.name), ''), p.name) AS name,
+            COALESCE(NULLIF(TRIM(pt.brand), ''), NULLIF(TRIM(pt_en.brand), ''), p.brand) AS brand,
+            COALESCE(NULLIF(TRIM(pt.branch), ''), NULLIF(TRIM(pt_en.branch), ''), p.branch) AS branch,
             p.place_kind, p.thumbnail_url,
             p.image_urls, p.region1, p.region2, p.region3,
-            COALESCE(NULLIF(TRIM(pt.address_display), ''), p.address_road) AS address_road,
-            COALESCE(NULLIF(TRIM(pt.address_detail), ''), p.address_detail) AS address_detail,
+            COALESCE(NULLIF(TRIM(pt.address_display), ''), NULLIF(TRIM(pt_en.address_display), ''), p.address_road) AS address_road,
+            COALESCE(NULLIF(TRIM(pt.address_detail), ''), NULLIF(TRIM(pt_en.address_detail), ''), p.address_detail) AS address_detail,
             p.latitude, p.longitude, p.has_foreign_lang,
             p.has_parking, p.reservable, p.takeout_available,
             p.card_payment_available, p.smoke_free, p.kid_facility,
@@ -296,17 +316,17 @@
     <select id="findPlaceDetail" resultMap="placeDetailResultMap">
         SELECT
             p.place_id, p.place_id AS item_id,
-            COALESCE(NULLIF(TRIM(pt.name), ''), p.name) AS name,
-            COALESCE(NULLIF(TRIM(pt.brand), ''), p.brand) AS brand,
-            COALESCE(NULLIF(TRIM(pt.branch), ''), p.branch) AS branch,
+            COALESCE(NULLIF(TRIM(pt.name), ''), NULLIF(TRIM(pt_en.name), ''), p.name) AS name,
+            COALESCE(NULLIF(TRIM(pt.brand), ''), NULLIF(TRIM(pt_en.brand), ''), p.brand) AS brand,
+            COALESCE(NULLIF(TRIM(pt.branch), ''), NULLIF(TRIM(pt_en.branch), ''), p.branch) AS branch,
             p.place_kind, p.thumbnail_url, p.image_urls, p.source_url,
             p.region1, p.region2, p.region3,
-            COALESCE(NULLIF(TRIM(pt.address_display), ''), p.address_road) AS address_road,
-            COALESCE(NULLIF(TRIM(pt.address_detail), ''), p.address_detail) AS address_detail,
+            COALESCE(NULLIF(TRIM(pt.address_display), ''), NULLIF(TRIM(pt_en.address_display), ''), p.address_road) AS address_road,
+            COALESCE(NULLIF(TRIM(pt.address_detail), ''), NULLIF(TRIM(pt_en.address_detail), ''), p.address_detail) AS address_detail,
             p.postal_code, p.latitude, p.longitude,
             <include refid="placeTranslatedOpeningHours"/>,
             <include refid="placeTranslatedClosedDays"/>,
-            COALESCE(NULLIF(TRIM(pt.menu_summary), ''), p.menu_summary) AS menu_summary,
+            COALESCE(NULLIF(TRIM(pt.menu_summary), ''), NULLIF(TRIM(pt_en.menu_summary), ''), p.menu_summary) AS menu_summary,
             p.tel,
             p.has_foreign_lang, p.has_parking, p.reservable,
             p.takeout_available, p.card_payment_available, p.smoke_free,

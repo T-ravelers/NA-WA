@@ -117,7 +117,7 @@ class JourneyMapperXmlTest {
             namespace + "findTimelineItemsByTripId"
         );
         String timelineSql = timelineStatement
-            .getBoundSql(Map.of("tripId", 1L))
+            .getBoundSql(Map.of("tripId", 1L, "language", "ja"))
             .getSql()
             .replaceAll("\\s+", " ")
             .trim();
@@ -126,6 +126,42 @@ class JourneyMapperXmlTest {
         assertTrue(timelineSql.contains("JOIN explore_items ei"));
         assertTrue(timelineSql.contains("LEFT JOIN event e"));
         assertTrue(timelineSql.contains("LEFT JOIN place p"));
+        assertTrue(timelineSql.contains(
+            "LEFT JOIN event_translations et_requested"
+        ));
+        assertTrue(timelineSql.contains(
+            "LEFT JOIN event_translations et_english"
+        ));
+        assertTrue(timelineSql.contains(
+            "LEFT JOIN place_translations pt_requested"
+        ));
+        assertTrue(timelineSql.contains(
+            "LEFT JOIN place_translations pt_english"
+        ));
+        assertTrue(timelineSql.contains(
+            "et_requested.language_code = ?"
+        ));
+        assertTrue(timelineSql.contains(
+            "et_english.language_code = 'en'"
+        ));
+        assertTrue(timelineSql.contains(
+            "pt_requested.language_code = ?"
+        ));
+        assertTrue(timelineSql.contains(
+            "pt_english.language_code = 'en'"
+        ));
+        assertTrue(timelineSql.contains(
+            "NULLIF(TRIM(et_requested.title), '')"
+        ));
+        assertTrue(timelineSql.contains(
+            "NULLIF(TRIM(pt_english.name), '')"
+        ));
+        assertTrue(timelineSql.contains(
+            "NULLIF(TRIM(et_requested.address_display), '')"
+        ));
+        assertTrue(timelineSql.contains(
+            "NULLIF(TRIM(pt_english.address_display), '')"
+        ));
         assertTrue(timelineSql.contains("LEFT JOIN appointments a"));
         assertTrue(timelineSql.contains("ti.deleted_at IS NULL"));
         assertTrue(timelineSql.contains("ei.deleted_at IS NULL"));

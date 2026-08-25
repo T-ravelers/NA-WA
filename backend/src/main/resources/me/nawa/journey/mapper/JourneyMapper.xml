@@ -195,7 +195,18 @@
             ti.display_order,
             ti.note,
             ei.item_type,
-            COALESCE(e.title, p.name) AS title,
+            CASE
+                WHEN ei.item_type = 'EVENT' THEN COALESCE(
+                    NULLIF(TRIM(et_requested.title), ''),
+                    NULLIF(TRIM(et_english.title), ''),
+                    e.title
+                )
+                ELSE COALESCE(
+                    NULLIF(TRIM(pt_requested.name), ''),
+                    NULLIF(TRIM(pt_english.name), ''),
+                    p.name
+                )
+            END AS title,
             COALESCE(e.thumbnail_url, p.thumbnail_url) AS thumbnail_url,
             CASE
                 WHEN ei.item_type = 'EVENT' THEN e.image_urls
@@ -204,14 +215,33 @@
             COALESCE(e.region1, p.region1) AS region1,
             COALESCE(e.region2, p.region2) AS region2,
             COALESCE(e.region3, p.region3) AS region3,
-            COALESCE(e.address_road, p.address_road) AS address_road,
-            p.address_detail,
+            CASE
+                WHEN ei.item_type = 'EVENT' THEN COALESCE(
+                    NULLIF(TRIM(et_requested.address_display), ''),
+                    NULLIF(TRIM(et_english.address_display), ''),
+                    e.address_road
+                )
+                ELSE COALESCE(
+                    NULLIF(TRIM(pt_requested.address_display), ''),
+                    NULLIF(TRIM(pt_english.address_display), ''),
+                    p.address_road
+                )
+            END AS address_road,
+            COALESCE(
+                NULLIF(TRIM(pt_requested.address_detail), ''),
+                NULLIF(TRIM(pt_english.address_detail), ''),
+                p.address_detail
+            ) AS address_detail,
             COALESCE(e.latitude, p.latitude) AS latitude,
             COALESCE(e.longitude, p.longitude) AS longitude,
             e.event_kind,
             e.start_date AS event_start_date,
             e.end_date AS event_end_date,
-            e.organizer,
+            COALESCE(
+                NULLIF(TRIM(et_requested.organizer), ''),
+                NULLIF(TRIM(et_english.organizer), ''),
+                e.organizer
+            ) AS organizer,
             COALESCE(
                 CASE
                     WHEN JSON_UNQUOTE(
@@ -234,9 +264,17 @@
                     ''
                 )
             ) AS event_reservation_url,
-            e.venue_name,
+            COALESCE(
+                NULLIF(TRIM(et_requested.venue_detail), ''),
+                NULLIF(TRIM(et_english.venue_detail), ''),
+                e.venue_name
+            ) AS venue_name,
             p.place_kind,
-            p.menu_summary,
+            COALESCE(
+                NULLIF(TRIM(pt_requested.menu_summary), ''),
+                NULLIF(TRIM(pt_english.menu_summary), ''),
+                p.menu_summary
+            ) AS menu_summary,
             p.is_active AS place_active,
             a.activity_start_at,
             a.activity_end_at,
@@ -253,6 +291,22 @@
           ON p.place_id = ei.item_id
          AND ei.item_type = 'PLACE'
          AND p.deleted_at IS NULL
+        LEFT JOIN event_translations et_requested
+          ON et_requested.event_id = e.event_id
+         AND et_requested.language_code = #{language}
+         AND et_requested.deleted_at IS NULL
+        LEFT JOIN event_translations et_english
+          ON et_english.event_id = e.event_id
+         AND et_english.language_code = 'en'
+         AND et_english.deleted_at IS NULL
+        LEFT JOIN place_translations pt_requested
+          ON pt_requested.place_id = p.place_id
+         AND pt_requested.language_code = #{language}
+         AND pt_requested.deleted_at IS NULL
+        LEFT JOIN place_translations pt_english
+          ON pt_english.place_id = p.place_id
+         AND pt_english.language_code = 'en'
+         AND pt_english.deleted_at IS NULL
         LEFT JOIN appointments a
           ON a.appointment_id = ti.appointment_id
          AND a.item_id = ti.item_id

@@ -99,6 +99,7 @@ async function mountView() {
 
 describe('JourneySettingsView', () => {
   beforeEach(() => {
+    i18n.global.locale.value = 'en'
     fetchJourney.mockReset()
     fetchJourneyTimeline.mockReset()
     updateJourney.mockReset()

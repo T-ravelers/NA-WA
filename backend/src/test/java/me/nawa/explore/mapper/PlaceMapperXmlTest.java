@@ -225,24 +225,32 @@ class PlaceMapperXmlTest {
         );
     }
 
-    /** 번역이 없거나 빈 문자열이면 한국어 원문으로 돌아가야 한다. */
+    /**
+     * 번역이 없거나 빈 문자열이면 영어로, 영어도 없으면 한국어 원문으로 돌아가야 한다.
+     *
+     * <p>영어 폴백은 Journey 타임라인(#536)과 맞춘 것이다.
+     */
     @Test
-    void placeStatements_fallBackToKoreanColumns() throws Exception {
+    void placeStatements_fallBackToEnglishThenKoreanColumns() throws Exception {
         Configuration configuration = configuration();
 
         String detailSql = normalizedSql(
-            configuration, "findPlaceDetail", Map.of("placeId", 1L, "language", "en")
+            configuration, "findPlaceDetail", Map.of("placeId", 1L, "language", "ja")
         );
 
         assertTrue(detailSql.contains(
-            "COALESCE(NULLIF(TRIM(pt.name), ''), p.name) AS name"
+            "COALESCE(NULLIF(TRIM(pt.name), ''), NULLIF(TRIM(pt_en.name), ''), p.name) AS name"
         ));
         assertTrue(detailSql.contains(
-            "COALESCE(NULLIF(TRIM(pt.address_display), ''), p.address_road) AS address_road"
+            "COALESCE(NULLIF(TRIM(pt.address_display), ''), NULLIF(TRIM(pt_en.address_display), ''), "
+                + "p.address_road) AS address_road"
         ));
         assertTrue(detailSql.contains(
-            "COALESCE(NULLIF(TRIM(pt.menu_summary), ''), p.menu_summary) AS menu_summary"
+            "COALESCE(NULLIF(TRIM(pt.menu_summary), ''), NULLIF(TRIM(pt_en.menu_summary), ''), "
+                + "p.menu_summary) AS menu_summary"
         ));
+        // 영어 조인은 항상 'en' 고정이지, 요청 언어 파라미터를 재사용하지 않는다.
+        assertTrue(detailSql.contains("pt_en.language_code = 'en'"));
         /*
          * 번역 쪽 영업시간·휴무일은 TEXT고 응답 DTO는 JSON이다. 그냥 COALESCE하면
          * JsonNodeTypeHandler가 파싱에 실패해 상세 API가 통째로 500이 된다.
@@ -253,10 +261,12 @@ class PlaceMapperXmlTest {
          * 형태의 일관성을 고정한다.
          */
         assertTrue(detailSql.contains("JSON_OBJECT('raw', pt.opening_hours_text)"));
+        assertTrue(detailSql.contains("JSON_OBJECT('raw', pt_en.opening_hours_text)"));
         assertTrue(
             detailSql.contains("JSON_ARRAY(pt.closed_days_text)"),
             "휴무일 원문이 ARRAY이므로 번역도 배열이어야 응답 형태가 갈리지 않는다"
         );
+        assertTrue(detailSql.contains("JSON_ARRAY(pt_en.closed_days_text)"));
         assertFalse(
             detailSql.contains("JSON_OBJECT('raw', pt.closed_days_text)"),
             "휴무일을 객체로 감싸면 번역 여부에 따라 응답 형태가 달라진다"
@@ -281,9 +291,12 @@ class PlaceMapperXmlTest {
 
         // 표시값과 달리 COALESCE로 감싸지 않는다 — 폴백 갈래를 원문 조건이 덮는다(#531 리뷰).
         assertTrue(listSql.contains("NULLIF(TRIM(pt.name), '') LIKE"));
+        // 요청 언어 번역이 없어 영어 이름이 보이는 Place도 그 영어 이름으로 찾아야 한다(#536).
+        assertTrue(listSql.contains("NULLIF(TRIM(pt_en.name), '') LIKE"));
         assertTrue(listSql.contains("p.name LIKE"));
         // 목록과 개수가 다른 조건을 보면 totalElements가 어긋나 페이지네이션이 틀어진다.
         assertTrue(countSql.contains("NULLIF(TRIM(pt.name), '') LIKE"));
+        assertTrue(countSql.contains("NULLIF(TRIM(pt_en.name), '') LIKE"));
         assertTrue(countSql.contains("LEFT JOIN place_translations pt"));
     }
 
