@@ -79,6 +79,12 @@ class ReportMapperXmlTest {
         assertTrue(candidateSql.contains(
             "tel.trip_id = ? AND tel.deleted_at IS NULL"
         ));
+        assertTrue(candidateSql.contains("sm.paid_transfer_id = t.transfer_id"));
+        assertTrue(candidateSql.contains("source_t.completed_at"));
+        assertTrue(candidateSql.contains("source_t.spending_category"));
+        assertTrue(candidateSql.contains(
+            "BETWEEN tr.start_date AND tr.end_date"
+        ));
 
         MappedStatement linkedTripStatement = configuration.getMappedStatement(
             namespace + "findLinkedTripIdByLedgerEntryId"

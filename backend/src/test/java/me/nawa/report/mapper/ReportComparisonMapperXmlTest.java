@@ -54,6 +54,9 @@ class ReportComparisonMapperXmlTest {
         assertTrue(spendingSql.contains("transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')"));
         assertTrue(spendingSql.contains("wo.member_id = t.initiator_member_id"));
         assertTrue(spendingSql.contains("GROUP BY t.initiator_member_id"));
+        assertTrue(spendingSql.contains("sm.paid_transfer_id = t.transfer_id"));
+        assertTrue(spendingSql.contains("source_t.completed_at"));
+        assertTrue(spendingSql.contains("source_t.spending_category"));
         assertTrue(!spendingSql.contains("trip_expense_links"));
 
         // 회원마다 최신 리포트 하나, analytics만 꺼낸다.

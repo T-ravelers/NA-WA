@@ -125,15 +125,28 @@ class JourneyMapperXmlTest {
             .replaceAll("\\s+", " ")
             .trim();
 
-        assertTrue(spendingSql.contains("COALESCE(SUM(le.amount), 0)"));
+        // 「쓴 금액」은 결제액이 아니라 정산으로 회수하고 남은 순액이다. 리포트와 같은
+        // 정의여야 같은 여정에서 두 화면이 다른 숫자를 말하지 않는다(#543).
+        assertTrue(spendingSql.contains(
+            "COALESCE(SUM( le.amount - ( SELECT COALESCE(SUM(sm.share_amount), 0)"
+        ));
+        assertTrue(spendingSql.contains("sm.request_status = 'PAID'"));
+        assertTrue(spendingSql.contains(
+            "WHERE s.source_transfer_id = t.transfer_id"
+        ));
         assertTrue(spendingSql.contains("le.entry_type = 'DEBIT'"));
         assertTrue(spendingSql.contains("t.currency_code = 'KRW'"));
         assertTrue(spendingSql.contains("t.transfer_status = 'COMPLETED'"));
         assertTrue(spendingSql.contains(
             "t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')"
         ));
+        assertTrue(spendingSql.contains("paid_sm.paid_transfer_id = t.transfer_id"));
+        assertTrue(spendingSql.contains("source_t.completed_at"));
         assertTrue(spendingSql.contains(
-            "DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date"
+            "DATE(COALESCE( ( SELECT source_t.completed_at"
+        ));
+        assertTrue(spendingSql.contains(
+            "t.completed_at )) BETWEEN tr.start_date AND tr.end_date"
         ));
         assertFalse(spendingSql.contains("trip_expense_links"));
 

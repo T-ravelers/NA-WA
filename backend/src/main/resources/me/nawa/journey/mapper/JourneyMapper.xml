@@ -149,9 +149,28 @@
     <!--
       Report 비교의 LIVE 지출과 같은 정의다. 리포트 스냅샷을 만들기 전에도 현재까지
       완료된 결제만 보여 주기 위해 trip_expense_links 선택 여부는 조건에 넣지 않는다.
+
+      금액도 같은 정의라 정산으로 실제로 받은 몫을 뺀다. 여기서만 빼지 않으면 같은
+      여정에서 상세 화면과 리포트가 다른 숫자를 말하고, 예산 잔액도 실제보다 적게
+      나온다(#543). 이 조각은 ReportMapper.xml의 settledAmount와 같은 것인데,
+      테스트가 매퍼 XML을 하나씩 따로 읽어 들여 include로 공유하면 풀리지 않는다.
+
+      정산 지급 이체의 기간은 실제 지급일이 아니라 원 결제일로 판단한다. 여정 종료
+      뒤에 지급됐다는 이유로 지급자의 지출만 빠지면 결제자에게서 뺀 금액이 사라진다.
     -->
     <select id="findCurrentSpentAmount" resultType="java.math.BigDecimal">
-        SELECT COALESCE(SUM(le.amount), 0)
+        SELECT COALESCE(SUM(
+            le.amount - (
+                SELECT COALESCE(SUM(sm.share_amount), 0)
+                FROM settlements s
+                JOIN settlement_members sm
+                  ON sm.settlement_id = s.settlement_id
+                 AND sm.request_status = 'PAID'
+                 AND sm.deleted_at IS NULL
+                WHERE s.source_transfer_id = t.transfer_id
+                  AND s.deleted_at IS NULL
+            )
+        ), 0)
         FROM wallet_ledger_entries le
         JOIN wallet_transfers t ON t.transfer_id = le.transfer_id
         JOIN wallets w ON w.wallet_id = le.wallet_id
@@ -169,7 +188,22 @@
           AND t.currency_code = 'KRW'
           AND t.transfer_status = 'COMPLETED'
           AND t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')
-          AND DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date
+          AND DATE(COALESCE(
+              (
+                  SELECT source_t.completed_at
+                  FROM settlement_members paid_sm
+                  JOIN settlements paid_s
+                    ON paid_s.settlement_id = paid_sm.settlement_id
+                   AND paid_s.deleted_at IS NULL
+                  JOIN wallet_transfers source_t
+                    ON source_t.transfer_id = paid_s.source_transfer_id
+                   AND source_t.deleted_at IS NULL
+                  WHERE paid_sm.paid_transfer_id = t.transfer_id
+                    AND paid_sm.request_status = 'PAID'
+                    AND paid_sm.deleted_at IS NULL
+              ),
+              t.completed_at
+          )) BETWEEN tr.start_date AND tr.end_date
     </select>
 
     <select id="findJourneyByIdForUpdate"
