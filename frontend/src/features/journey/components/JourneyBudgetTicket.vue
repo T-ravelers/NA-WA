@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { vFitText } from '@/shared/lib/fitText'
 import { spendingCategoryLabelKey, toSpendingCategory } from '@/shared/lib/spendingCategory'
 import AppTicket from '@/shared/ui/AppTicket.vue'
 import CategoryDot from '@/shared/ui/CategoryDot.vue'
@@ -97,7 +98,10 @@ function formatBudget(value: number | null): string {
             <p class="text-caption font-semibold tracking-wide uppercase text-on-paper-2">
               {{ t('journey.detail.spent') }}
             </p>
-            <p class="mt-1 truncate text-data-lg tabular-nums text-on-paper">
+            <p
+              v-fit-text
+              class="mt-1 truncate text-data-lg tabular-nums text-on-paper"
+            >
               {{ formatMoney(spent) }}
             </p>
           </div>
@@ -106,7 +110,8 @@ function formatBudget(value: number | null): string {
               {{ balanceLabel }}
             </p>
             <p
-              class="mt-0.5 text-title font-bold tabular-nums"
+              v-fit-text
+              class="mt-0.5 truncate text-title font-bold tabular-nums"
               :class="over > 0 ? 'text-danger' : 'text-success'"
             >
               {{ balanceText }}
@@ -121,7 +126,7 @@ function formatBudget(value: number | null): string {
           />
           <div class="flex items-center justify-between gap-3 text-caption text-on-paper">
             <span>{{ budgetStatus }}</span>
-            <span class="truncate text-on-paper-2">
+            <span class="shrink-0 tabular-nums text-on-paper-2">
               {{ t('journey.detail.budgetTotal', { amount: formatBudget(budgetAmount) }) }}
             </span>
           </div>
