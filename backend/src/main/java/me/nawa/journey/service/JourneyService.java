@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import me.nawa.appointment.service.AppointmentService;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
+import me.nawa.common.i18n.SupportedLanguagePolicy;
 import me.nawa.journey.domain.Journey;
 import me.nawa.journey.domain.JourneyExploreItem;
 import me.nawa.journey.domain.JourneyItem;
@@ -307,7 +308,7 @@ public class JourneyService {
         String language
     ) {
         findOwnedJourney(memberId, tripId);
-        String normalizedLanguage = JourneyLanguagePolicy.normalize(language);
+        String normalizedLanguage = SupportedLanguagePolicy.normalize(language);
 
         List<JourneyTimelineItem> mappedItems =
             journeyMapper.findTimelineItemsByTripId(

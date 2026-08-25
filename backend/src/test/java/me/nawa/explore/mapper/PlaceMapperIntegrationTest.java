@@ -184,19 +184,25 @@ class PlaceMapperIntegrationTest {
      * Place도 Event와 같은 결함이 있었다 — 조회 SQL이 번역 테이블을 보지 않았고,
      * {@code findPlaceDetail}은 언어 파라미터조차 받지 않았다.
      *
+     * <p>요청 언어 → 영어 → 한국어 원문 순으로 세 단을 확인한다. 영어 중간 폴백은
+     * Journey 타임라인(#536)과 맞춘 것이다 — 요청 언어 번역이 없고 영어 번역만 있는
+     * Place를 Explore에서는 한국어로, Journey에 담은 뒤에는 영어로 보는 어긋남을 없앤다.
+     *
      * <p>rollback-only 트랜잭션 안에서 fixture를 만들어 데이터가 남지 않는다.
      */
     @Test
-    void searchAndDetail_returnTranslatedTextAndFallBackToKorean() {
+    void searchAndDetail_fallsBackThroughEnglishToKorean() {
         transactionTemplate.executeWithoutResult(status -> {
             status.setRollbackOnly();
             String marker = UUID.randomUUID().toString();
 
             long translated = insertPlace("한국어 이름 " + marker);
             long untranslated = insertPlace("번역 없음 " + marker);
+            long noVietnamese = insertPlace("한국어만 " + marker);
             insertPlaceTranslation(translated, "en", "English Name " + marker);
             // 파이프라인이 번역하지 못한 필드를 빈 값으로 채우는 경우가 있다.
             insertPlaceTranslation(untranslated, "en", "   ");
+            insertPlaceTranslation(noVietnamese, "en", "English Only " + marker);
 
             assertEquals(
                 "English Name " + marker,
@@ -207,10 +213,17 @@ class PlaceMapperIntegrationTest {
                 mapper.findPlaceDetail(untranslated, "en", null).getName()
             );
 
-            // 번역이 없는 언어를 요청하면 한국어 원문으로 돌아간다.
+            // 요청 언어(vi) 번역이 없어도 영어 번역이 있으면 한국어를 건너뛰고 영어로 간다.
             assertEquals(
-                "한국어 이름 " + marker,
-                mapper.findPlaceDetail(translated, "vi", null).getName()
+                "English Only " + marker,
+                mapper.findPlaceDetail(noVietnamese, "vi", null).getName()
+            );
+
+            // 영어 번역조차 없으면 그제서야 한국어 원문으로 돌아간다.
+            long noTranslationAtAll = insertPlace("번역 전혀 없음 " + marker);
+            assertEquals(
+                "번역 전혀 없음 " + marker,
+                mapper.findPlaceDetail(noTranslationAtAll, "vi", null).getName()
             );
 
             PlaceSearchRequest request = new PlaceSearchRequest();
@@ -224,6 +237,17 @@ class PlaceMapperIntegrationTest {
             assertEquals("English Name " + marker, results.get(0).getName());
             // 목록이 번역 이름으로 찾아 줬다면 개수도 같은 조건을 봐야 한다.
             assertEquals(1, mapper.countPlaces(request, null));
+
+            // 요청 언어 번역이 없어 영어 이름이 보이는 Place도 그 이름으로 찾을 수 있다.
+            PlaceSearchRequest englishFallbackSearch = new PlaceSearchRequest();
+            englishFallbackSearch.setKeyword("English Only " + marker);
+            englishFallbackSearch.setLanguage("vi");
+
+            List<PlaceSummaryResponse> fallbackResults = mapper.searchPlaces(
+                englishFallbackSearch, 0, 20, null
+            );
+            assertEquals(1, fallbackResults.size());
+            assertEquals(1, mapper.countPlaces(englishFallbackSearch, null));
         });
     }
 
@@ -295,8 +319,18 @@ class PlaceMapperIntegrationTest {
             );
             assertEquals("Every Monday", detail.getClosedDays().get(0).asText());
 
-            // 번역이 없는 언어는 원문 모양 그대로.
-            PlaceDetailResponse korean = mapper.findPlaceDetail(placeId, "vi", null);
+            // 요청 언어(vi) 번역은 없지만 영어 번역이 있으므로 한국어를 건너뛰고 영어로 간다.
+            PlaceDetailResponse englishFallback = mapper.findPlaceDetail(placeId, "vi", null);
+            assertTrue(englishFallback.getClosedDays().isArray());
+            assertEquals("Every Monday", englishFallback.getClosedDays().get(0).asText());
+
+            // 영어 번역조차 없는 Place는 원문 모양 그대로 한국어로 돌아간다.
+            long noTranslation = insertPlace("한국어 이름 없음 " + marker);
+            jdbcTemplate.update(
+                "UPDATE place SET closed_days = JSON_ARRAY('매주 월요일') WHERE place_id = ?",
+                noTranslation
+            );
+            PlaceDetailResponse korean = mapper.findPlaceDetail(noTranslation, "vi", null);
             assertTrue(korean.getClosedDays().isArray());
             assertEquals("매주 월요일", korean.getClosedDays().get(0).asText());
         });

@@ -260,11 +260,18 @@ GET /api/v1/journeys/{tripId}/timeline?language={language}
 
 - `language`는 선택이며 생략하거나 공백이면 `en`으로 처리합니다.
 - 지원 값은 `en`, `ja`, `zh-TW`, `vi`입니다. 대소문자와 앞뒤 공백은 정규화하며,
-  지원하지 않는 값은 `COMMON-001`(400)입니다.
+  지원하지 않는 값은 `COMMON-001`(400)입니다. 정규화 규칙은
+  `me.nawa.common.i18n.SupportedLanguagePolicy` 하나를 Explore 조회와 함께 씁니다 —
+  두 도메인이 각자 정규화하면 같은 요청에 서로 다른 언어가 나갑니다.
 - Event와 Place의 사용자 표시 필드는 필드별로 다음 순서로 선택합니다.
   1. 요청 언어의 비어 있지 않은 번역
   2. 영어(`en`)의 비어 있지 않은 번역
   3. Event 또는 Place 본체의 한국어 원문
+
+  Explore 목록·상세([EXPLORE_API.md](EXPLORE_API.md#표시-언어))도 같은 3단 순서를
+  씁니다. 처음에는 Explore가 "요청 언어 → 한국어" 2단만 썼는데, 그러면 요청 언어 번역이
+  없고 영어 번역만 있는 항목을 Explore에서는 한국어로, Journey에 담은 뒤에는 영어로 보는
+  어긋남이 있었다(#536).
 - 이 규칙은 제목, 표시 주소와 상세 주소, 주최자·장소 상세·메뉴 요약처럼 타임라인
   응답에 포함되는 번역 가능 필드에 적용합니다.
 - `region1`, `region2`, `region3`는 번역 테이블의 필드가 아니므로 원본 값을 유지합니다.

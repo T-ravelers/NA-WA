@@ -178,7 +178,7 @@ class EventMapperIntegrationTest {
      * {@code zh-TW}에 그대로 걸린다. 그래서 "어떤 언어로 요청해도 한국어만 나온다"의 원인은
      * 소문자 정규화가 아니라 <b>조인 자체가 없던 것</b>이었다(#531).
      *
-     * <p>그럼에도 {@code ExploreLanguagePolicy}가 {@code zh-TW}를 원형으로 되돌리는 것은
+     * <p>그럼에도 {@code SupportedLanguagePolicy}가 {@code zh-TW}를 원형으로 되돌리는 것은
      * 대비다 — 컬럼 collation을 {@code _bin}이나 {@code _as_cs}로 바꾸거나, 언어 코드를
      * 자바에서 비교하는 코드가 생기는 순간 소문자 값은 조용히 어긋난다. 이 테스트는 두 표기가
      * 지금은 같은 결과를 낸다는 사실 자체를 고정해, 나중에 collation이 바뀌면 여기서 깨지게
@@ -230,6 +230,57 @@ class EventMapperIntegrationTest {
             marker + "-blank-translation",
             mapper.findEventDetail(blankTranslation, "en", null, today).getTitle()
         );
+    }
+
+    /**
+     * 요청 언어 번역이 없어도 영어 번역이 있으면 한국어를 건너뛰고 영어로 간다.
+     *
+     * <p>Journey 타임라인(#536)과 맞춘 규칙이다 — 요청 언어 번역이 없고 영어 번역만 있는
+     * Event를 Explore에서는 한국어로, Journey에 담은 뒤에는 영어로 보는 어긋남을 없앤다.
+     * 영어 번역조차 없으면 그제서야 한국어 원문으로 돌아간다.
+     */
+    @Test
+    void findEventDetail_fallsBackThroughEnglishBeforeKorean() {
+        long englishOnly = insertEvent(
+            "english-only",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        long noTranslationAtAll = insertEvent(
+            "no-translation-at-all",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        insertEventTranslation(
+            englishOnly, "en", marker + "-english-only-title", "English description"
+        );
+
+        assertEquals(
+            marker + "-english-only-title",
+            mapper.findEventDetail(englishOnly, "ja", null, today).getTitle()
+        );
+        assertEquals(
+            "English description",
+            mapper.findEventDetail(englishOnly, "vi", null, today).getDescription()
+        );
+        assertEquals(
+            marker + "-no-translation-at-all",
+            mapper.findEventDetail(noTranslationAtAll, "ja", null, today).getTitle()
+        );
+
+        // 목록·검색도 같은 규칙을 봐야 한다.
+        EventSearchRequest request = new EventSearchRequest();
+        request.setKeyword(marker + "-english-only-title");
+        request.setLanguage("ja");
+        request.setSize(20);
+
+        List<EventSummaryResponse> results = mapper.searchEvents(request, 0, null, today);
+
+        assertEquals(1, results.size());
+        assertEquals(marker + "-english-only-title", results.get(0).getTitle());
+        assertEquals(1, mapper.countEvents(request, null, today));
     }
 
     /**

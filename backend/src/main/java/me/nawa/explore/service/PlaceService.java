@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import me.nawa.auth.exception.AuthErrorCode;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
+import me.nawa.common.i18n.SupportedLanguagePolicy;
 import me.nawa.explore.dto.request.PlaceSearchRequest;
 import me.nawa.explore.dto.response.PlaceActivityResponse;
 import me.nawa.explore.dto.response.PlaceDetailResponse;
@@ -72,7 +73,7 @@ public class PlaceService {
         if (placeId == null || placeId <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
-        String normalizedLanguage = ExploreLanguagePolicy.normalize(language);
+        String normalizedLanguage = SupportedLanguagePolicy.normalize(language);
         PlaceDetailResponse place = placeMapper.findPlaceDetail(
             placeId, normalizedLanguage, memberId
         );
@@ -137,7 +138,7 @@ public class PlaceService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         request.setSort(sort);
-        request.setLanguage(ExploreLanguagePolicy.normalize(request.getLanguage()));
+        request.setLanguage(SupportedLanguagePolicy.normalize(request.getLanguage()));
     }
 
     private void validateSavedOnly(PlaceSearchRequest request, Long memberId) {
