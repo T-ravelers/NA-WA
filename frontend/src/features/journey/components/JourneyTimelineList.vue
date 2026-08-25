@@ -122,12 +122,6 @@ const displayDays = computed(() => {
     journeyDates(props.startDate, props.endDate).map((visitDate, index) => [visitDate, index + 1]),
   )
   const visitDates = [...new Set([...dayNumbers.keys(), ...itemsByDate.keys()])].sort()
-  const orderedItems = visitDates.flatMap((visitDate) => itemsByDate.get(visitDate) ?? [])
-  const nextItemByTripItemId = new Map(
-    orderedItems
-      .slice(0, -1)
-      .map((item, index) => [item.tripItemId, orderedItems[index + 1]] as const),
-  )
 
   return visitDates.map((visitDate) => {
     const items = itemsByDate.get(visitDate) ?? []
@@ -152,7 +146,7 @@ const displayDays = computed(() => {
         tripItemId: item.tripItemId,
         timeLabel: formatTime(item),
         location: formatLocation(item),
-        distanceKm: distanceToNextStop(item, nextItemByTripItemId.get(item.tripItemId)),
+        distanceKm: distanceToNextStop(item, items[index + 1]),
         /* 운영 `placeKind`는 한국어 원문이라 소비영역 이름으로는 한 번도 맞지 않는다.
            Explore와 같은 표시 규칙을 쓰는 #540의 매핑이 그 자리를 맡는다. */
         category: categoryForJourneyItem(item),

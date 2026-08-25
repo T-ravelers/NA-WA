@@ -351,6 +351,23 @@ describe('JourneyTimelineList', () => {
     expect(wrapper.text().match(/km/g)).toHaveLength(1)
   })
 
+  it('does not connect the last stop of one day to the first stop of the next day', async () => {
+    const firstDayStop = makeItem('Gwangjang Market')
+    firstDayStop.exploreItem.location.latitude = 37.5701
+    firstDayStop.exploreItem.location.longitude = 126.9997
+    const nextDayStop = makeItem('Olive Young Myeongdong', { tripItemId: 2, itemId: 22 })
+    nextDayStop.exploreItem.location.latitude = 37.5604
+    nextDayStop.exploreItem.location.longitude = 126.9896
+
+    const wrapper = await mountList({
+      days: [dayWith('2026-08-10', firstDayStop), dayWith('2026-08-11', nextDayStop)],
+      startDate: '2026-08-10',
+      endDate: '2026-08-11',
+    })
+
+    expect(wrapper.text()).not.toContain('km')
+  })
+
   it('keeps companion actions out of the compact Figma timeline card', async () => {
     const wrapper = await mountList({
       days: [dayWithItem('2026-08-10', 'Night market')],
