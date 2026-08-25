@@ -9,6 +9,7 @@ import { queryClient } from '@/app/query/client'
 import { NormalizedApiError } from '@/shared/api/apiError'
 
 import { walletNotificationIntegrationKey } from '../../model/notificationIntegration'
+import { walletKeys } from '../../model/walletHome'
 
 import type { WalletHome } from '../../api/walletApi'
 
@@ -36,9 +37,17 @@ function createTestRouter(): Router {
 }
 
 const fetchWalletHome = vi.fn()
+const animateBalance = vi.fn()
+const reducedMotion = ref(false)
 
 vi.mock('../../api/walletApi', () => ({
   fetchWalletHome: () => fetchWalletHome(),
+}))
+
+vi.mock('motion-v', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('motion-v')>()),
+  animate: (...args: unknown[]) => animateBalance(...args),
+  useReducedMotion: () => reducedMotion,
 }))
 
 const WalletHomeView = (await import('../WalletHomeView.vue')).default
@@ -92,6 +101,14 @@ beforeEach(() => {
   queryClient.clear()
   fetchWalletHome.mockReset()
   fetchWalletHome.mockResolvedValue(WALLET)
+  animateBalance.mockReset()
+  animateBalance.mockImplementation((...args: unknown[]) => {
+    const options = args[2] as { onComplete?: () => void }
+    options.onComplete?.()
+
+    return { stop: vi.fn() }
+  })
+  reducedMotion.value = false
   unreadCount.value = 0
 })
 
@@ -111,8 +128,46 @@ describe('WalletHomeView', () => {
     const wrapper = await mountLoaded()
 
     expect(wrapper.text()).toContain('84,500 P')
+    expect(animateBalance).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Active')
     expect(wrapper.text()).toContain('My wallet')
+  })
+
+  it('잔액이 바뀌면 이전 값에서 새 값까지 0.6초 안에 센다', async () => {
+    const wrapper = await mountLoaded()
+    animateBalance.mockReturnValue({ stop: vi.fn() })
+
+    queryClient.setQueryData(walletKeys.home(), { ...WALLET, balance: 104500 })
+    await flushPromises()
+
+    expect(animateBalance).toHaveBeenCalledWith(
+      84500,
+      104500,
+      expect.objectContaining({ duration: 0.6, ease: 'easeOut' }),
+    )
+
+    const animationOptions = animateBalance.mock.calls[0]?.[2] as {
+      onUpdate: (latest: number) => void
+      onComplete: () => void
+    }
+    animationOptions.onUpdate(94500)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="wallet-balance"]').text()).toBe('94,500 P')
+
+    animationOptions.onComplete()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="wallet-balance"]').text()).toBe('104,500 P')
+  })
+
+  it('감소 모션 설정에서는 바뀐 잔액을 즉시 표시한다', async () => {
+    reducedMotion.value = true
+    const wrapper = await mountLoaded()
+
+    queryClient.setQueryData(walletKeys.home(), { ...WALLET, balance: 104500 })
+    await flushPromises()
+
+    expect(animateBalance).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="wallet-balance"]').text()).toBe('104,500 P')
   })
 
   it('fresh 캐시가 남아 있어도 지갑에 다시 들어오면 최신 잔액을 조회한다', async () => {
