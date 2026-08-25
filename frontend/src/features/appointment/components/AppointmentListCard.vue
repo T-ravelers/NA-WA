@@ -100,7 +100,7 @@ function requestJoin(): void {
       키보드로 상세에 가는 길은 View 버튼이 맡는다.
     -->
     <article
-      class="flex cursor-pointer flex-col gap-3"
+      class="flex cursor-pointer flex-col gap-3 transition-transform motion-reduce:transition-none active:scale-[0.98] motion-reduce:active:scale-100"
       @click="openDetail"
     >
       <div class="flex items-start justify-between gap-3">

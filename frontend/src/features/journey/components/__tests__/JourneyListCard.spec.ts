@@ -57,6 +57,24 @@ function mountCard(
 }
 
 describe('JourneyListCard', () => {
+  it('shows press feedback on card links unless reduced motion is requested', () => {
+    const wrapper = mountCard({}, { reportId: 7 })
+
+    for (const link of [
+      wrapper.get('a[href="/journeys/42"]'),
+      wrapper.get('a[href="/reports/7"]'),
+    ]) {
+      expect(link.classes()).toEqual(
+        expect.arrayContaining([
+          'transition-transform',
+          'motion-reduce:transition-none',
+          'active:scale-[0.98]',
+          'motion-reduce:active:scale-100',
+        ]),
+      )
+    }
+  })
+
   /*
    * 목록 응답에는 리포트 정보가 없어서 화면이 report feature에서 받아 내려준다(#522).
    * 카드는 값이 있을 때만 링크를 그린다 — 리포트가 없는 여정이 늘 섞여 있다.

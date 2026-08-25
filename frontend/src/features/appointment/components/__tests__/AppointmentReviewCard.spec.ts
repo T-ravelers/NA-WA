@@ -17,6 +17,22 @@ const member = {
 }
 
 describe('AppointmentReviewCard', () => {
+  it('shows press feedback on the disclosure button unless reduced motion is requested', () => {
+    const wrapper = mount(AppointmentReviewCard, {
+      props: { member },
+      global: { plugins: [i18n] },
+    })
+
+    expect(wrapper.get('button[aria-expanded]').classes()).toEqual(
+      expect.arrayContaining([
+        'transition-transform',
+        'motion-reduce:transition-none',
+        'active:scale-[0.98]',
+        'motion-reduce:active:scale-100',
+      ]),
+    )
+  })
+
   it('requires all three scores before saving', () => {
     const wrapper = mount(AppointmentReviewCard, {
       props: { member },
