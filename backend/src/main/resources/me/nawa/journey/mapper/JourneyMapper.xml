@@ -149,9 +149,25 @@
     <!--
       Report 비교의 LIVE 지출과 같은 정의다. 리포트 스냅샷을 만들기 전에도 현재까지
       완료된 결제만 보여 주기 위해 trip_expense_links 선택 여부는 조건에 넣지 않는다.
+
+      금액도 같은 정의라 정산으로 실제로 받은 몫을 뺀다. 여기서만 빼지 않으면 같은
+      여정에서 상세 화면과 리포트가 다른 숫자를 말하고, 예산 잔액도 실제보다 적게
+      나온다(#543). 이 조각은 ReportMapper.xml의 settledAmount와 같은 것인데,
+      테스트가 매퍼 XML을 하나씩 따로 읽어 들여 include로 공유하면 풀리지 않는다.
     -->
     <select id="findCurrentSpentAmount" resultType="java.math.BigDecimal">
-        SELECT COALESCE(SUM(le.amount), 0)
+        SELECT COALESCE(SUM(
+            le.amount - (
+                SELECT COALESCE(SUM(sm.share_amount), 0)
+                FROM settlements s
+                JOIN settlement_members sm
+                  ON sm.settlement_id = s.settlement_id
+                 AND sm.request_status = 'PAID'
+                 AND sm.deleted_at IS NULL
+                WHERE s.source_transfer_id = t.transfer_id
+                  AND s.deleted_at IS NULL
+            )
+        ), 0)
         FROM wallet_ledger_entries le
         JOIN wallet_transfers t ON t.transfer_id = le.transfer_id
         JOIN wallets w ON w.wallet_id = le.wallet_id

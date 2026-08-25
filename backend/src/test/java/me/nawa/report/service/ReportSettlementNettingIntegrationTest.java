@@ -13,6 +13,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.UUID;
 import me.nawa.config.MySqlSchemaExtension;
+import me.nawa.journey.mapper.JourneyMapper;
 import me.nawa.report.domain.ReportComparisonSpending;
 import me.nawa.report.domain.ReportExpense;
 import me.nawa.report.dto.request.ReportCreateRequest;
@@ -45,6 +46,7 @@ class ReportSettlementNettingIntegrationTest {
     private static HikariDataSource dataSource;
     private static JdbcTemplate jdbcTemplate;
     private static ReportMapper reportMapper;
+    private static JourneyMapper journeyMapper;
     private static ReportService reportService;
 
     @BeforeAll
@@ -62,14 +64,20 @@ class ReportSettlementNettingIntegrationTest {
         SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
         factoryBean.setDataSource(dataSource);
         factoryBean.setConfigLocation(new ClassPathResource("mybatis-config.xml"));
-        factoryBean.setMapperLocations(new ClassPathResource(
-            "me/nawa/report/mapper/ReportMapper.xml"
-        ));
+        factoryBean.setMapperLocations(
+            new ClassPathResource("me/nawa/report/mapper/ReportMapper.xml"),
+            new ClassPathResource("me/nawa/journey/mapper/JourneyMapper.xml")
+        );
         SqlSessionFactory sqlSessionFactory = factoryBean.getObject();
         if (!sqlSessionFactory.getConfiguration().hasMapper(ReportMapper.class)) {
             sqlSessionFactory.getConfiguration().addMapper(ReportMapper.class);
         }
-        reportMapper = new SqlSessionTemplate(sqlSessionFactory).getMapper(ReportMapper.class);
+        if (!sqlSessionFactory.getConfiguration().hasMapper(JourneyMapper.class)) {
+            sqlSessionFactory.getConfiguration().addMapper(JourneyMapper.class);
+        }
+        SqlSessionTemplate sessionTemplate = new SqlSessionTemplate(sqlSessionFactory);
+        reportMapper = sessionTemplate.getMapper(ReportMapper.class);
+        journeyMapper = sessionTemplate.getMapper(JourneyMapper.class);
         reportService = new ReportService(reportMapper);
     }
 
@@ -185,6 +193,15 @@ class ReportSettlementNettingIntegrationTest {
             assertEquals(1, paidOneCandidates.size());
             assertEquals(new BigDecimal("10000.0000"), paidOneCandidates.get(0).getAmount());
             assertEquals("OTHER", paidOneCandidates.get(0).getCategory());
+
+            // 여정 상세의 「쓴 금액」도 같은 정의다. 여기서만 빼지 않으면 같은 여정에서
+            // 상세 화면 50000과 리포트 30000이 갈리고, 예산 잔액도 실제보다 적게 나온다.
+            assertEquals(
+                0,
+                new BigDecimal("30000.0000").compareTo(
+                    journeyMapper.findCurrentSpentAmount(payerTrip, payer)
+                )
+            );
 
             // 비교 쿼리도 같은 정의여야 상세 화면 총액과 갈리지 않는다.
             List<ReportComparisonSpending> spending = reportMapper.findComparisonSpending(
