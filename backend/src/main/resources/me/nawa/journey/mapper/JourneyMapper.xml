@@ -154,6 +154,9 @@
       여정에서 상세 화면과 리포트가 다른 숫자를 말하고, 예산 잔액도 실제보다 적게
       나온다(#543). 이 조각은 ReportMapper.xml의 settledAmount와 같은 것인데,
       테스트가 매퍼 XML을 하나씩 따로 읽어 들여 include로 공유하면 풀리지 않는다.
+
+      정산 지급 이체의 기간은 실제 지급일이 아니라 원 결제일로 판단한다. 여정 종료
+      뒤에 지급됐다는 이유로 지급자의 지출만 빠지면 결제자에게서 뺀 금액이 사라진다.
     -->
     <select id="findCurrentSpentAmount" resultType="java.math.BigDecimal">
         SELECT COALESCE(SUM(
@@ -185,7 +188,22 @@
           AND t.currency_code = 'KRW'
           AND t.transfer_status = 'COMPLETED'
           AND t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')
-          AND DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date
+          AND DATE(COALESCE(
+              (
+                  SELECT source_t.completed_at
+                  FROM settlement_members paid_sm
+                  JOIN settlements paid_s
+                    ON paid_s.settlement_id = paid_sm.settlement_id
+                   AND paid_s.deleted_at IS NULL
+                  JOIN wallet_transfers source_t
+                    ON source_t.transfer_id = paid_s.source_transfer_id
+                   AND source_t.deleted_at IS NULL
+                  WHERE paid_sm.paid_transfer_id = t.transfer_id
+                    AND paid_sm.request_status = 'PAID'
+                    AND paid_sm.deleted_at IS NULL
+              ),
+              t.completed_at
+          )) BETWEEN tr.start_date AND tr.end_date
     </select>
 
     <select id="findJourneyByIdForUpdate"

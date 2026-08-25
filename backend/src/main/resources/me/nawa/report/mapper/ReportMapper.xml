@@ -109,6 +109,49 @@
     </sql>
 
     <!--
+      정산 지급 이체는 실제 지급일이 아니라 원 결제의 날짜와 카테고리에 귀속한다.
+      리포트는 여정 종료 뒤에 만들 수 있고 정산도 주로 그 뒤에 지급되므로, 지급일로
+      기간을 자르면 결제자에게서 뺀 금액이 지급자의 지출에는 더해지지 않아 사라진다.
+      settlement_members.paid_transfer_id가 UNIQUE라 각 지급 이체의 원 결제는 최대 하나다.
+    -->
+    <sql id="settlementSourceCompletedAt">
+        (SELECT source_t.completed_at
+         FROM settlement_members sm
+         JOIN settlements s
+           ON s.settlement_id = sm.settlement_id
+          AND s.deleted_at IS NULL
+         JOIN wallet_transfers source_t
+           ON source_t.transfer_id = s.source_transfer_id
+          AND source_t.deleted_at IS NULL
+         WHERE sm.paid_transfer_id = t.transfer_id
+           AND sm.request_status = 'PAID'
+           AND sm.deleted_at IS NULL)
+    </sql>
+
+    <sql id="settlementSourceCategory">
+        (SELECT source_t.spending_category
+         FROM settlement_members sm
+         JOIN settlements s
+           ON s.settlement_id = sm.settlement_id
+          AND s.deleted_at IS NULL
+         JOIN wallet_transfers source_t
+           ON source_t.transfer_id = s.source_transfer_id
+          AND source_t.deleted_at IS NULL
+         WHERE sm.paid_transfer_id = t.transfer_id
+           AND sm.request_status = 'PAID'
+           AND sm.deleted_at IS NULL)
+    </sql>
+
+    <sql id="expenseOccurredOn">
+        DATE(COALESCE(<include refid="settlementSourceCompletedAt" />, t.completed_at))
+    </sql>
+
+    <sql id="expenseCategory">
+        COALESCE(NULLIF(<include refid="settlementSourceCategory" />, ''),
+                 NULLIF(t.spending_category, ''), 'OTHER')
+    </sql>
+
+    <!--
       지출은 결제액이 아니라 내가 실제로 부담한 순액이다. 정산 이체(SETTLEMENT)로
       들어온 CREDIT 원장을 음수로 더하지 않고 원 결제 행에서 빼는 이유는 세 가지다.
       정산금은 여정이 끝난 뒤 들어와 아래 기간 조건 밖이고, 정산 이체에는
@@ -116,15 +159,15 @@
       trip_expense_links가 ledger_entry_id에 UNIQUE라 참가자 수만큼 연결이 늘어난다.
       원 결제 행에서 빼면 날짜와 카테고리가 원 결제 그대로 남는다.
 
-      참가자가 낸 정산 몫은 그 사람의 DEBIT이라 지금도 그대로 잡힌다. 정산은 결제
-      하나당 하나뿐이므로 뺀 값이 음수가 될 수 없다.
+      참가자가 낸 정산 몫은 그 사람의 DEBIT으로 잡되, 원 결제의 날짜와 카테고리를
+      쓴다. 정산은 결제 하나당 하나뿐이므로 뺀 값이 음수가 될 수 없다.
     -->
     <sql id="eligibleExpenseColumns">
         t.transfer_id,
         le.ledger_entry_id,
         le.amount - <include refid="settledAmount" /> AS amount,
-        DATE(t.completed_at) AS occurred_on,
-        COALESCE(NULLIF(t.spending_category, ''), 'OTHER') AS category,
+        <include refid="expenseOccurredOn" /> AS occurred_on,
+        <include refid="expenseCategory" /> AS category,
         t.memo
     </sql>
 
@@ -144,7 +187,7 @@
           AND t.initiator_member_id = #{memberId} AND t.deleted_at IS NULL
           AND t.currency_code = 'KRW' AND t.transfer_status = 'COMPLETED'
           AND t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')
-          AND DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date
+          AND <include refid="expenseOccurredOn" /> BETWEEN tr.start_date AND tr.end_date
           AND (
               tel.ledger_entry_id IS NULL
               OR (tel.trip_id = #{tripId} AND tel.deleted_at IS NULL)
@@ -167,7 +210,7 @@
           AND t.initiator_member_id = #{memberId} AND t.deleted_at IS NULL
           AND t.currency_code = 'KRW' AND t.transfer_status = 'COMPLETED'
           AND t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')
-          AND DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date
+          AND <include refid="expenseOccurredOn" /> BETWEEN tr.start_date AND tr.end_date
           AND t.transfer_id IN
           <foreach collection="transferIds" item="transferId" open="(" separator="," close=")">
               #{transferId}
@@ -304,9 +347,9 @@
       비교용 지출 정의. findEligibleExpensesForUpdate와 같은 필터(결제자 본인 지갑의 DEBIT·
       KRW·COMPLETED·QR/정산·여정 기간)에서 trip_expense_links 조건만 뺐다 — 동료는 내 여정에
       지출을 연결할 수 없으므로 연결 여부로 거르면 동료 쪽이 항상 0이 된다. 나도 같은 정의로
-      합산한다. 정산(SETTLEMENT)은 카테고리가 없어 OTHER로 잡힌다(SPENDING_CATEGORY.md).
-      금액도 같은 정의라 settledAmount로 회수액을 뺀다 — 여기서만 빼지 않으면 같은 사람의
-      상세 화면 총액과 비교 화면 총액이 갈린다.
+      합산한다. 금액도 같은 정의라 settledAmount로 회수액을 뺀다 — 여기서만 빼지 않으면
+      같은 사람의 상세 화면 총액과 비교 화면 총액이 갈린다. 종료 뒤 지급된 정산도 빠지지
+      않도록 정산 지급 이체의 날짜와 카테고리는 원 결제에서 가져온다.
     -->
     <sql id="comparisonExpenseSource">
         FROM wallet_ledger_entries le
@@ -318,21 +361,21 @@
           AND t.deleted_at IS NULL
           AND t.currency_code = 'KRW' AND t.transfer_status = 'COMPLETED'
           AND t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')
-          AND DATE(t.completed_at) BETWEEN #{startDate} AND #{endDate}
+          AND <include refid="expenseOccurredOn" /> BETWEEN #{startDate} AND #{endDate}
     </sql>
 
     <select id="findComparisonSpending"
             resultType="me.nawa.report.domain.ReportComparisonSpending">
         SELECT
             t.initiator_member_id AS member_id,
-            COALESCE(NULLIF(t.spending_category, ''), 'OTHER') AS category,
+            <include refid="expenseCategory" /> AS category,
             SUM(le.amount - <include refid="settledAmount" />) AS amount
         <include refid="comparisonExpenseSource" />
           AND t.initiator_member_id IN
           <foreach collection="memberIds" item="id" open="(" separator="," close=")">
               #{id}
           </foreach>
-        GROUP BY t.initiator_member_id, COALESCE(NULLIF(t.spending_category, ''), 'OTHER')
+        GROUP BY t.initiator_member_id, <include refid="expenseCategory" />
         ORDER BY t.initiator_member_id ASC, amount DESC, category ASC
     </select>
 

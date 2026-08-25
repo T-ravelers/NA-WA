@@ -98,7 +98,8 @@ class ReportSettlementNettingIntegrationTest {
         try {
             LocalDate endDate = LocalDate.now(KOREA_ZONE).minusDays(1);
             LocalDate startDate = endDate.minusDays(3);
-            LocalDateTime paidAt = endDate.atTime(12, 0);
+            LocalDateTime paymentAt = endDate.atTime(12, 0);
+            LocalDateTime settlementPaidAt = endDate.plusDays(1).atTime(12, 0);
 
             long payer = insertMember("Netting payer", cleanup);
             long paidOne = insertMember("Netting paid one", cleanup);
@@ -122,7 +123,7 @@ class ReportSettlementNettingIntegrationTest {
             long unpaidTwoMembership = insertActiveMembership(appointment, unpaidTwo, null, cleanup);
 
             long payment = insertTransferWithDebit(
-                payer, payerWallet, "QR_PAYMENT", "FOOD", "50000.0000", paidAt, cleanup
+                payer, payerWallet, "QR_PAYMENT", "FOOD", "50000.0000", paymentAt, cleanup
             );
             long settlement = insertSettlement(
                 appointment, payer, payment, "50000.0000", "10000.0000", "40000.0000", cleanup
@@ -134,14 +135,16 @@ class ReportSettlementNettingIntegrationTest {
                 settlement, payerMembership, "10000.0000", "NOT_REQUESTED", null, cleanup
             );
             long paidOneTransfer = insertTransferWithDebit(
-                paidOne, paidOneWallet, "SETTLEMENT", null, "10000.0000", paidAt, cleanup
+                paidOne, paidOneWallet, "SETTLEMENT", null, "10000.0000", settlementPaidAt,
+                cleanup
             );
             insertSettlementMember(
                 settlement, paidOneMembership, "10000.0000", "PAID", paidOneTransfer, cleanup
             );
             long paidTwoWallet = insertWallet(paidTwo, cleanup);
             long paidTwoTransfer = insertTransferWithDebit(
-                paidTwo, paidTwoWallet, "SETTLEMENT", null, "10000.0000", paidAt, cleanup
+                paidTwo, paidTwoWallet, "SETTLEMENT", null, "10000.0000", settlementPaidAt,
+                cleanup
             );
             insertSettlementMember(
                 settlement, paidTwoMembership, "10000.0000", "PAID", paidTwoTransfer, cleanup
@@ -186,13 +189,34 @@ class ReportSettlementNettingIntegrationTest {
                 )
             );
 
-            // 낸 사람 쪽 1만 원은 자기 DEBIT이라 지금도 그대로다. 정산 이체를 상계 대상으로
-            // 잘못 잡으면 여기가 0원이 된다.
+            // 정산은 여정 종료 다음 날 지급됐다. 실제 지급일로 자르면 결제자에게서 빠진
+            // 1만 원이 지급자 지출에는 더해지지 않아 사라진다. 원 결제의 날짜와 카테고리에
+            // 귀속해야 합계가 보존된다.
             List<ReportExpense> paidOneCandidates =
                 reportMapper.findExpenseCandidates(paidOneTrip, paidOne);
             assertEquals(1, paidOneCandidates.size());
             assertEquals(new BigDecimal("10000.0000"), paidOneCandidates.get(0).getAmount());
-            assertEquals("OTHER", paidOneCandidates.get(0).getCategory());
+            assertEquals("FOOD", paidOneCandidates.get(0).getCategory());
+            assertEquals(endDate, paidOneCandidates.get(0).getOccurredOn());
+
+            ReportCreateRequest paidOneRequest = new ReportCreateRequest();
+            paidOneRequest.setTransferIds(List.of(paidOneTransfer));
+            ReportDetailResponse paidOneReport = reportService.createReport(
+                paidOne, paidOneTrip, paidOneRequest
+            );
+            cleanupReport(paidOneTrip, cleanup);
+            assertEquals(
+                0,
+                new BigDecimal("10000.0000").compareTo(
+                    paidOneReport.getReportContent().getAnalytics().getTotalSpent()
+                ),
+                "종료 뒤 지급한 사람의 리포트에서도 분담액이 사라지면 안 된다"
+            );
+            assertEquals(
+                "FOOD",
+                paidOneReport.getReportContent().getAnalytics()
+                    .getCategoryBreakdown().get(0).getCategory()
+            );
 
             // 여정 상세의 「쓴 금액」도 같은 정의다. 여기서만 빼지 않으면 같은 여정에서
             // 상세 화면 50000과 리포트 30000이 갈리고, 예산 잔액도 실제보다 적게 나온다.
@@ -202,13 +226,20 @@ class ReportSettlementNettingIntegrationTest {
                     journeyMapper.findCurrentSpentAmount(payerTrip, payer)
                 )
             );
+            assertEquals(
+                0,
+                new BigDecimal("10000.0000").compareTo(
+                    journeyMapper.findCurrentSpentAmount(paidOneTrip, paidOne)
+                ),
+                "종료 뒤 지급한 정산도 원 결제일 기준으로 여정 지출에 포함돼야 한다"
+            );
 
             // 비교 쿼리도 같은 정의여야 상세 화면 총액과 갈리지 않는다.
             List<ReportComparisonSpending> spending = reportMapper.findComparisonSpending(
                 List.of(payer, paidOne), startDate, endDate
             );
             assertEquals(new BigDecimal("30000.0000"), amountOf(spending, payer, "FOOD"));
-            assertEquals(new BigDecimal("10000.0000"), amountOf(spending, paidOne, "OTHER"));
+            assertEquals(new BigDecimal("10000.0000"), amountOf(spending, paidOne, "FOOD"));
         } finally {
             while (!cleanup.isEmpty()) {
                 cleanup.pop().run();

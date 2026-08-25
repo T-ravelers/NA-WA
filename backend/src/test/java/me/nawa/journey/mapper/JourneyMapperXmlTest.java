@@ -140,8 +140,13 @@ class JourneyMapperXmlTest {
         assertTrue(spendingSql.contains(
             "t.transfer_type IN ('QR_PAYMENT', 'SETTLEMENT')"
         ));
+        assertTrue(spendingSql.contains("paid_sm.paid_transfer_id = t.transfer_id"));
+        assertTrue(spendingSql.contains("source_t.completed_at"));
         assertTrue(spendingSql.contains(
-            "DATE(t.completed_at) BETWEEN tr.start_date AND tr.end_date"
+            "DATE(COALESCE( ( SELECT source_t.completed_at"
+        ));
+        assertTrue(spendingSql.contains(
+            "t.completed_at )) BETWEEN tr.start_date AND tr.end_date"
         ));
         assertFalse(spendingSql.contains("trip_expense_links"));
 
