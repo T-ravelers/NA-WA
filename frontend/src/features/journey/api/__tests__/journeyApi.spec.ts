@@ -117,14 +117,17 @@ describe('journeyApi', () => {
   })
 
   it('fetches detail through the shared client', async () => {
-    get.mockResolvedValue({ data: journey })
+    get.mockResolvedValue({ data: { ...journey, spentAmount: 1284500 } })
 
-    await expect(fetchJourney(7)).resolves.toMatchObject({ tripId: 7 })
+    await expect(fetchJourney(7)).resolves.toMatchObject({
+      tripId: 7,
+      spentAmount: 1284500,
+    })
     expect(get).toHaveBeenCalledWith('/api/v1/journeys/7')
   })
 
   it('normalizes absent response regions to an empty list', async () => {
-    get.mockResolvedValue({ data: { ...journey, regions: null } })
+    get.mockResolvedValue({ data: { ...journey, spentAmount: 0, regions: null } })
 
     await expect(fetchJourney(7)).resolves.toMatchObject({ regions: [] })
   })

@@ -69,6 +69,13 @@ export default {
     detail: {
       budget: '予算',
       noBudget: '予算未設定',
+      spent: '支出',
+      left: '残り',
+      overBudget: '予算超過',
+      budgetUsed: '予算の{percentage}%を使用',
+      noBudgetLimit: '予算上限なし',
+      zeroBudget: '予算は0 P',
+      budgetTotal: '予算 {amount}',
       companions: '同行人数',
       noCompanions: '未設定',
       timeline: '日程',

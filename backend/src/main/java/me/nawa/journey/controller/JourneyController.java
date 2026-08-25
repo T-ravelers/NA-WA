@@ -9,6 +9,7 @@ import me.nawa.common.response.ApiResponse;
 import me.nawa.journey.dto.request.JourneyCreateRequest;
 import me.nawa.journey.dto.request.JourneyItemCreateRequest;
 import me.nawa.journey.dto.request.JourneyUpdateRequest;
+import me.nawa.journey.dto.response.JourneyDetailResponse;
 import me.nawa.journey.dto.response.JourneyItemExistsResponse;
 import me.nawa.journey.dto.response.JourneyItemResponse;
 import me.nawa.journey.dto.response.JourneyResponse;
@@ -89,7 +90,7 @@ public class JourneyController {
 
     @GetMapping("/{tripId}")
     @ApiOperation("Journey 상세 조회")
-    public ApiResponse<JourneyResponse> getJourney(
+    public ApiResponse<JourneyDetailResponse> getJourney(
         @AuthenticationPrincipal AuthenticatedMember member,
         @PathVariable Long tripId
     ) {
