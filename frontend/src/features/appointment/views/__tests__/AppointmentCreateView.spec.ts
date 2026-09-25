@@ -1,6 +1,6 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -137,8 +137,7 @@ async function mountRoutedApp(query = '?itemId=42&itemType=EVENT') {
 async function completeJourneySelection(wrapper: ReturnType<typeof mount>): Promise<void> {
   await buttonByText(wrapper, 'Seoul Foodie Week').trigger('click')
   await flushPromises()
-  // 실제 시각과 무관하게 항상 미래인 날짜를 골라, 활동 시작 시각의 "과거 금지" 검증이
-  // 테스트 실행 시각에 따라 흔들리지 않게 한다.
+  // 테스트의 오늘(2026-08-19)보다 미래인 날짜를 고른다.
   await wrapper.get('button[aria-label="Select August 31, 2026"]').trigger('click')
   await buttonByText(wrapper, 'Continue with').trigger('click')
   await flushPromises()
@@ -159,10 +158,16 @@ async function fillAndConfirm(wrapper: ReturnType<typeof mount>): Promise<void> 
 
 describe('AppointmentCreateView', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-19T12:00:00'))
     createAppointment.mockReset()
     checkAppointmentSlotTaken.mockReset()
     checkAppointmentSlotTaken.mockResolvedValue(false)
     sessionStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('opens the journey select sheet on entry and hides the form', async () => {
