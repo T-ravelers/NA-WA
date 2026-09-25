@@ -101,6 +101,9 @@ test('lists ongoing and past journeys and navigates to journey actions', async (
 test('creates a journey and opens its empty itinerary', async ({ page }) => {
   let createRequest: unknown
 
+  // 고정된 8월 날짜가 첫 달력에 보이도록 이 시나리오의 브라우저 시각만 맞춘다.
+  await page.clock.setFixedTime(new Date('2026-08-01T12:00:00Z'))
+
   await page.route('**/api/v1/members/me', async (route) => {
     await route.fulfill({
       status: 200,
