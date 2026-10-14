@@ -183,9 +183,9 @@ class AppointmentMapperXmlTest {
         assertFalse(sql.contains("a.appointment_status = ?"));
     }
 
-    // 끝난 약속 제외는 LIMIT 앞에 있어야 한다. 받은 쪽에서 거르면 정렬이
-    // activity_start_at ASC라 지난 약속이 앞에 서고, 지난 약속이 한 페이지를 채우는
-    // 항목에서는 다음 페이지에 모집 중 약속이 있어도 화면이 0건이 된다.
+    // 끝난 약속 제외는 LIMIT 앞에 있어야 한다. 받은 쪽에서 거르면 끝난 약속이 차지한
+    // 자리만큼 페이지가 비고, 끝난 약속만으로 채워진 페이지는 다음 페이지에 모집 중
+    // 약속이 있어도 0건이 된다.
     @Test
     void appointmentList_withoutStatusFilter_excludesCompletedBeforeLimit()
             throws Exception {
