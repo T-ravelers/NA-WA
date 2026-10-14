@@ -203,7 +203,23 @@
           ON host.member_id = a.host_member_id
         WHERE
             <include refid="appointmentListWhere"/>
-        ORDER BY a.activity_start_at ASC, a.appointment_id DESC
+        <!--
+            참여할 수 있는 약속(임박한 순)을 위에, 이미 시작한 약속(최근 순)을 아래에 둔다.
+            경계가 activity_start_at인 것은 참여를 받는 경계가 이 값이기 때문이다.
+            출석을 확정하지 않은 지난 약속은 COMPLETED가 되지 않고 쌓이므로, 오래된 순으로
+            두면 그런 약속이 첫 페이지를 채워 모집 중 약속을 밀어낸다.
+
+            경계는 DB의 NOW()가 아니라 애플리케이션이 넘긴 #{now}로 가른다
+            (findMyOngoingAppointments와 같은 이유). #{now}는 정렬에만 쓴다 —
+            appointmentListWhere에 넣으면 countAppointments와 대상이 갈라진다.
+            마지막 appointment_id는 같은 시각끼리 순서를 고정해 페이지 경계에서 카드가
+            겹치거나 빠지지 않게 한다.
+        -->
+        ORDER BY (a.activity_start_at &lt; #{now}),
+                 CASE WHEN a.activity_start_at &gt;= #{now}
+                      THEN a.activity_start_at END ASC,
+                 a.activity_start_at DESC,
+                 a.appointment_id DESC
         LIMIT #{request.size}
         OFFSET #{offset}
     </select>
