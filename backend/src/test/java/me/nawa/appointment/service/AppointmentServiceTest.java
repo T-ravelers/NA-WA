@@ -554,7 +554,8 @@ class AppointmentServiceTest {
         request.setPage(1);
         request.setSize(2);
         Appointment appointment = appointment(10L, AppointmentStatus.RECRUITING);
-        when(appointmentMapper.searchAppointments(request, 2))
+        when(appointmentMapper.searchAppointments(
+                eq(request), eq(2), any(LocalDateTime.class)))
                 .thenReturn(List.of(appointment));
         when(appointmentMapper.countAppointments(request)).thenReturn(5L);
 
