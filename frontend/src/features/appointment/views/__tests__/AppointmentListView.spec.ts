@@ -1,6 +1,6 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
-import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref, type Ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -22,6 +22,10 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
 }))
 
 const AppointmentListView = (await import('../AppointmentListView.vue')).default
+
+// 목록은 켜져 있는 동안 5초마다 다시 조회한다. 끝난 테스트의 화면을 남겨 두면 그 조회가
+// 뒤 테스트의 fetchAppointments 호출 수에 섞여, 파일이 5초를 넘게 도는 날에만 실패한다.
+enableAutoUnmount(afterEach)
 
 const appointment = {
   appointmentId: 7,
