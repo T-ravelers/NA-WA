@@ -41,6 +41,12 @@ export default {
       emptyDescription: 'Create an appointment for this activity.',
       loadFailed: 'Appointments could not be loaded',
       loadFailedDescription: 'Please try again in a moment.',
+      pagination: {
+        label: 'Appointment pages',
+        previousPage: 'Previous page',
+        nextPage: 'Next page',
+        page: 'Page {page}',
+      },
     },
     status: {
       PAYMENT_PENDING: 'Payment pending',

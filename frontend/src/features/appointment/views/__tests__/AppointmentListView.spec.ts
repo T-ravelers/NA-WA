@@ -139,8 +139,28 @@ const EMPTY_PAGE = {
   hasNext: false,
 }
 
+/** 약속이 50개라 페이지가 세 개인 항목. 요청한 페이지를 그대로 돌려준다. */
+function threePages(filters: { page: number }) {
+  return Promise.resolve({
+    content: filters.page < 3 ? [{ ...appointment, appointmentId: 100 + filters.page }] : [],
+    page: filters.page,
+    size: 20,
+    totalElements: 50,
+    totalPages: 3,
+    hasNext: filters.page < 2,
+  })
+}
+
+const scrollToMock = vi.fn()
+
 describe('AppointmentListView', () => {
   beforeEach(() => {
+    scrollToMock.mockReset()
+    vi.stubGlobal('scrollTo', scrollToMock)
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
     fetchAppointments.mockReset()
     joinAppointment.mockReset()
     fetchAppointments.mockResolvedValue({
@@ -279,8 +299,8 @@ describe('AppointmentListView', () => {
   })
 
   // 끝난 약속을 빼는 것은 서버가 LIMIT 앞에서 한다(APPOINTMENT_API.md). 받은 쪽에서
-  // 다시 거르면 정렬이 activity_start_at ASC라 지난 약속이 앞에 서고, 지난 약속이 한
-  // 페이지를 채우는 항목에서는 다음 페이지에 모집 중 약속이 있어도 화면이 0건이 된다.
+  // 다시 거르면 끝난 약속이 차지한 자리만큼 페이지가 비고, 끝난 약속만으로 채워진
+  // 페이지는 다음 페이지에 모집 중 약속이 있어도 0건이 된다.
   it('shows every appointment the server returned, filtering none of them out', async () => {
     fetchAppointments.mockResolvedValue({
       content: [
@@ -316,6 +336,75 @@ describe('AppointmentListView', () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('37 appointments')
+  })
+
+  // 페이지는 주소에 있어야 참여하러 나갔다 돌아오거나 새로 고쳐도 남는다.
+  it('reads a zero-based page from the address', async () => {
+    fetchAppointments.mockImplementation(threePages)
+
+    const { wrapper } = await mountView({ path: '/appointments?itemId=42&itemType=EVENT&page=1' })
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }))
+    expect(wrapper.get('[aria-current="page"]').text()).toBe('2')
+  })
+
+  it('moves to the chosen page and back to the top of the list', async () => {
+    fetchAppointments.mockImplementation(threePages)
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('button[aria-label="Page 3"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.page).toBe('2')
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }))
+    expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
+  })
+
+  // 조건이 바뀌면 결과가 통째로 달라진다. 보던 페이지 번호가 새 결과에는 없을 수 있다.
+  it('starts from the first page when the keyword or language changes', async () => {
+    fetchAppointments.mockImplementation(threePages)
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&page=2',
+    })
+
+    await wrapper.get('input[type="search"]').setValue('tour')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.page).toBeUndefined()
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: 'tour', page: 0 }),
+    )
+
+    await router.replace({ query: { ...router.currentRoute.value.query, page: '2' } })
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Japanese')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.page).toBeUndefined()
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ language: 'ja', page: 0 }),
+    )
+  })
+
+  // 보던 약속이 끝나 목록이 줄면 주소의 페이지가 범위를 벗어난다. 빈 화면은 약속이
+  // 없는 것과 구분되지 않는다.
+  it('moves to the last page when the address points past the end', async () => {
+    fetchAppointments.mockImplementation(threePages)
+
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&page=9',
+    })
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.page).toBe('2')
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      // 범위 밖 페이지가 0건이어도 회원 언어를 풀지 않는다. 약속은 있다.
+      expect.objectContaining({ page: 2, language: 'en' }),
+    )
+    expect(wrapper.get('[aria-current="page"]').text()).toBe('3')
   })
 
   it('opens the detail when the card itself is pressed', async () => {

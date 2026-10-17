@@ -37,6 +37,12 @@ export default {
       emptyDescription: '為這個活動建立一個揪團吧。',
       loadFailed: '無法載入揪團',
       loadFailedDescription: '請稍後再試一次。',
+      pagination: {
+        label: '揪團頁面',
+        previousPage: '上一頁',
+        nextPage: '下一頁',
+        page: '第 {page} 頁',
+      },
     },
     status: {
       PAYMENT_PENDING: '待付款',

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import AppButton from '@/shared/ui/AppButton.vue'
+import AppPagination from '@/shared/ui/AppPagination.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
@@ -60,22 +61,32 @@ function readItemType(value: unknown): AppointmentItemType | undefined {
   return raw === 'EVENT' || raw === 'PLACE' ? raw : undefined
 }
 
+// 0부터 센다(`?page=1`이 두 번째 페이지). Explore 목록과 같은 규칙이다.
+function readPageIndex(value: unknown): number {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number(raw)
+
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0
+}
+
 const itemId = computed(() => readPositiveInteger(route.query.itemId))
 const itemType = computed(() => readItemType(route.query.itemType))
+// 페이지는 주소에 둔다. 참여하러 나갔다 돌아오거나 새로 고쳐도 보던 페이지가 남는다.
+const page = computed(() => readPageIndex(route.query.page))
 
 const filters = computed<AppointmentListFilters>(() => ({
   itemId: itemId.value,
   itemType: itemType.value,
   keyword: keyword.value.trim() || undefined,
   language: selectedLanguage.value === 'ALL' ? undefined : selectedLanguage.value,
-  page: 0,
+  page: page.value,
   size: 20,
 }))
 
 const appointmentQuery = useAppointmentListQuery(filters)
-// 끝난 약속은 서버가 LIMIT 앞에서 뺀다(APPOINTMENT_API.md). 받은 쪽에서 거르면
-// 정렬이 activity_start_at ASC라 지난 약속이 앞에 서고, 지난 약속이 한 페이지를 채우는
-// 항목에서는 다음 페이지에 모집 중 약속이 있어도 화면이 0건이 된다.
+// 끝난 약속은 서버가 LIMIT 앞에서 뺀다(APPOINTMENT_API.md). 받은 쪽에서 거르면 끝난
+// 약속이 차지한 자리만큼 페이지가 비고, 끝난 약속만으로 채워진 페이지는 다음 페이지에
+// 모집 중 약속이 있어도 0건이 된다.
 const appointments = computed(() => appointmentQuery.data.value?.content ?? [])
 // 목록은 5초마다 다시 조회한다. 그 주기마다 실패할 기회도 함께 생기므로, 이미
 // 받아 둔 목록이 있으면 지우지 않고 그대로 둔다. 오류 화면은 보여줄 카드가 아예
@@ -132,6 +143,41 @@ function retry(): void {
   void appointmentQuery.refetch()
 }
 
+/** 첫 페이지는 주소에 남기지 않는다. Explore와 같다. */
+function replacePage(next: number): void {
+  const rest = { ...route.query }
+  delete rest.page
+  void router.replace({
+    path: route.path,
+    query: next > 0 ? { ...rest, page: String(next) } : rest,
+  })
+}
+
+function changePage(next: number): void {
+  // 다음 페이지는 맨 위 카드부터 읽어야 한다. 움직임을 줄이도록 설정한 사용자에게는 바로 옮긴다.
+  window.scrollTo({
+    top: 0,
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  })
+  replacePage(next)
+}
+
+// 조건이 바뀌면 결과가 통째로 달라지므로 첫 페이지부터 본다. 보던 페이지 번호가 새 결과에는
+// 없을 수 있다.
+watch([() => keyword.value.trim(), selectedLanguage], () => {
+  if (page.value > 0) replacePage(0)
+})
+
+// 보던 약속이 끝나 목록이 줄면 주소의 페이지가 범위를 벗어난다. 빈 화면 대신 마지막 페이지를
+// 보여 준다 — 약속이 없는 것과 구분되지 않기 때문이다.
+watch(
+  () => [page.value, appointmentQuery.data.value?.totalPages] as const,
+  ([current, totalPages]) => {
+    if (totalPages === undefined || current === 0 || current < totalPages) return
+    replacePage(Math.max(0, totalPages - 1))
+  },
+)
+
 /**
  * 카드의 Join. 상세 화면의 참여 버튼과 같은 흐름을 목록에서 그대로 연다.
  *
@@ -158,9 +204,13 @@ const listQuery = computed(() => ({
  * 공유하므로 회원 언어로 건 0건 결과가 캐시에 남은 재방문에서는 마운트 시점에 이미
  * `isSuccess=true`·`count=0`이라 값이 변하지 않는다 — watch가 한 번도 돌지 않는다.
  * 첫 실행에서 곧장 돌아 나오는 것은 **캐시가 빈 첫 방문에서만** 참이다.
+ *
+ * 받은 카드 수가 아니라 서버가 센 전체 개수를 본다. 범위를 벗어난 페이지도 카드가 0개라,
+ * 카드 수를 보면 약속이 있는 언어까지 풀어 버린다.
  */
 watch(
-  () => [appointmentQuery.isSuccess.value, appointments.value.length] as const,
+  () =>
+    [appointmentQuery.isSuccess.value, appointmentQuery.data.value?.totalElements ?? 0] as const,
   ([isSuccess, count]) => {
     if (userChoseLanguage.value || selectedLanguage.value === 'ALL') return
     if (!isSuccess || count > 0 || keyword.value.trim() !== '') return
@@ -344,20 +394,33 @@ function selectJourney(tripId: number): void {
         :description="t('appointment.list.emptyDescription')"
       />
 
-      <ul
-        v-else
-        class="flex flex-col gap-3"
-      >
-        <li
-          v-for="appointment in appointments"
-          :key="appointment.appointmentId"
-        >
-          <AppointmentListCard
-            :appointment="appointment"
-            @join="startJoin"
-          />
-        </li>
-      </ul>
+      <template v-else>
+        <ul class="flex flex-col gap-3">
+          <li
+            v-for="appointment in appointments"
+            :key="appointment.appointmentId"
+          >
+            <AppointmentListCard
+              :appointment="appointment"
+              @join="startJoin"
+            />
+          </li>
+        </ul>
+        <!--
+          잠금은 isPending으로만 건다. 목록이 5초마다 다시 조회되므로 isFetching을 쓰면
+          버튼이 그 주기마다 잠겼다 풀린다.
+        -->
+        <AppPagination
+          :page="page"
+          :total-pages="appointmentQuery.data.value?.totalPages ?? 0"
+          :loading="appointmentQuery.isPending.value"
+          :label="t('appointment.list.pagination.label')"
+          :previous-label="t('appointment.list.pagination.previousPage')"
+          :next-label="t('appointment.list.pagination.nextPage')"
+          :page-label="(shown) => t('appointment.list.pagination.page', { page: shown })"
+          @change="changePage"
+        />
+      </template>
     </section>
 
     <div
