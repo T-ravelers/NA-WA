@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { onBeforeRouteUpdate, useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { IconChevronDown, IconSearch } from '@tabler/icons-vue'
 
+import AppPagination from '@/shared/ui/AppPagination.vue'
 import IconOrb from '@/shared/ui/IconOrb.vue'
 import StateError from '@/shared/ui/StateError.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
@@ -17,7 +18,6 @@ import ExploreItemTabs from '../components/ExploreItemTabs.vue'
 import PlaceFilterBar from '../components/PlaceFilterBar.vue'
 import PlaceFilterSheet from '../components/PlaceFilterSheet.vue'
 import PlaceCard from '../components/PlaceCard.vue'
-import ExplorePagination from '../components/ExplorePagination.vue'
 import { useEventListQuery } from '../composables/useEventListQuery'
 import { usePlaceListQuery } from '../composables/usePlaceListQuery'
 import { presetDateRange } from '../model/datePresets'
@@ -1107,10 +1107,14 @@ function addQueryList(
           @open="router.push({ name: 'explore-event-detail', params: { eventId: event.itemId } })"
         />
       </div>
-      <ExplorePagination
+      <AppPagination
         :page="selectedEventPage"
         :total-pages="eventQuery.data.value?.totalPages ?? 0"
         :loading="eventQuery.isFetching.value"
+        :label="t('explore.pagination.label')"
+        :previous-label="t('explore.pagination.previousPage')"
+        :next-label="t('explore.pagination.nextPage')"
+        :page-label="(page) => t('explore.pagination.page', { page })"
         @change="changePage('events', $event)"
       />
     </template>
@@ -1165,10 +1169,14 @@ function addQueryList(
         />
       </div>
 
-      <ExplorePagination
+      <AppPagination
         :page="selectedPlacePage"
         :total-pages="placeQuery.data.value?.totalPages ?? 0"
         :loading="placeQuery.isFetching.value"
+        :label="t('explore.pagination.label')"
+        :previous-label="t('explore.pagination.previousPage')"
+        :next-label="t('explore.pagination.nextPage')"
+        :page-label="(page) => t('explore.pagination.page', { page })"
         @change="changePage('places', $event)"
       />
     </template>

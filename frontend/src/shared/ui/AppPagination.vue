@@ -2,10 +2,20 @@
 import { computed } from 'vue'
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-vue'
 
+/**
+ * 0부터 세는 페이지 번호 버튼. 현재 페이지 주변으로 최대 다섯 개를 보인다.
+ *
+ * 문구는 부르는 쪽이 넘긴다. "무엇의 페이지인지"는 화면마다 다르기 때문이다.
+ */
 interface Props {
   page: number
   totalPages: number
   loading?: boolean
+  label: string
+  previousLabel: string
+  nextLabel: string
+  /** 화면에 보이는 번호(1부터)를 받아 버튼의 읽기 이름을 만든다. */
+  pageLabel: (page: number) => string
 }
 
 const props = withDefaults(defineProps<Props>(), { loading: false })
@@ -28,12 +38,12 @@ function selectPage(page: number): void {
   <nav
     v-if="totalPages > 1"
     class="mt-3 flex items-center justify-center gap-1"
-    :aria-label="$t('explore.pagination.label')"
+    :aria-label="label"
   >
     <button
       type="button"
       class="flex size-10 items-center justify-center rounded-pill text-ink-2 disabled:opacity-30"
-      :aria-label="$t('explore.pagination.previousPage')"
+      :aria-label="previousLabel"
       :disabled="page === 0 || loading"
       @click="selectPage(page - 1)"
     >
@@ -54,7 +64,7 @@ function selectPage(page: number): void {
           : 'text-ink-2 hover:bg-surface-2'
       "
       :aria-current="visiblePage === page ? 'page' : undefined"
-      :aria-label="$t('explore.pagination.page', { page: visiblePage + 1 })"
+      :aria-label="pageLabel(visiblePage + 1)"
       :disabled="loading"
       @click="selectPage(visiblePage)"
     >
@@ -64,7 +74,7 @@ function selectPage(page: number): void {
     <button
       type="button"
       class="flex size-10 items-center justify-center rounded-pill text-ink-2 disabled:opacity-30"
-      :aria-label="$t('explore.pagination.nextPage')"
+      :aria-label="nextLabel"
       :disabled="page >= totalPages - 1 || loading"
       @click="selectPage(page + 1)"
     >

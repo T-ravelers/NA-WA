@@ -32,6 +32,7 @@
 | `LocaleSheet`                                | 로케일 선택 시트                                                         |
 | `InsufficientBalanceDialog`                  | 잔액이 모자랄 때 충전으로 이어 주는 팝업                                 |
 | `CalendarGrid`                               | 달 하나짜리 달력. 하루 선택·기간 선택 겸용                               |
+| `AppPagination`                              | 0부터 세는 페이지 번호. 현재 페이지 주변 최대 5개 + 이전/다음            |
 
 ## 지켜야 할 것
 
