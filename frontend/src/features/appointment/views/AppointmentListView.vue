@@ -188,6 +188,8 @@ watch(
 const listQuery = computed(() => ({
   ...(itemId.value === undefined ? {} : { itemId: String(itemId.value) }),
   ...(itemType.value === undefined ? {} : { itemType: itemType.value }),
+  // 고르던 카드가 있는 페이지로 돌아와야 한다. 첫 페이지로 오면 그 카드가 보이지 않는다.
+  ...(page.value > 0 ? { page: String(page.value) } : {}),
 }))
 
 /**

@@ -5,6 +5,7 @@ import { ref, type Ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 import {
   appointmentJourneyIntegrationKey,
@@ -518,6 +519,74 @@ describe('AppointmentListView', () => {
 
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
+  })
+
+  // 여정 생성·충전은 돌아올 주소를 들고 간다. 페이지가 빠지면 첫 페이지로 돌아와, 고르던
+  // 카드가 보이지 않는다.
+  it('takes the page along when it leaves to create a journey', async () => {
+    fetchAppointments.mockImplementation(threePages)
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&page=2',
+      journeys: ref<AppointmentJourneySummary[] | undefined>([]),
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text() === 'Create a journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-create')
+    expect(router.currentRoute.value.query).toMatchObject({
+      returnRouteName: 'appointment-list',
+      itemId: '42',
+      page: '2',
+    })
+  })
+
+  it('takes the page along when it leaves to top up', async () => {
+    fetchAppointments.mockImplementation(threePages)
+    joinAppointment.mockRejectedValue(
+      new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
+    )
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&page=2',
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul Foodie Week'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Pay'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Top up')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('wallet-top-up')
+    expect(router.currentRoute.value.query).toMatchObject({
+      returnRouteName: 'appointment-list',
+      itemId: '42',
+      page: '2',
+    })
   })
 
   // 여정을 만들거나 충전하고 돌아오면 시트를 다시 열어 **그 여정을 골라 둔 채로**
