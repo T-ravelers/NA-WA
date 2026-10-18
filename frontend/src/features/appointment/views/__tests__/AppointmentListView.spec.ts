@@ -158,6 +158,17 @@ function threePages(filters: { page: number }) {
 
 const scrollToMock = vi.fn()
 
+/**
+ * 검색어가 주소로 옮겨질 때까지 기다린다. 화면의 지연(300ms)보다 조금 길게 잡는다.
+ *
+ * 가짜 시계는 쓰지 않는다. flushPromises가 setTimeout을 쓰므로 그것까지 가짜가 되면
+ * 테스트가 끝나지 않는다(아래 폴링 테스트와 같은 이유).
+ */
+async function waitForKeywordDebounce(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 350))
+  await flushPromises()
+}
+
 describe('AppointmentListView', () => {
   beforeEach(() => {
     scrollToMock.mockReset()
@@ -373,7 +384,7 @@ describe('AppointmentListView', () => {
     })
 
     await wrapper.get('input[type="search"]').setValue('tour')
-    await flushPromises()
+    await waitForKeywordDebounce()
 
     expect(router.currentRoute.value.query.page).toBeUndefined()
     expect(fetchAppointments).toHaveBeenLastCalledWith(
@@ -391,6 +402,51 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.query.page).toBeUndefined()
     expect(fetchAppointments).toHaveBeenLastCalledWith(
       expect.objectContaining({ language: 'ja', page: 0 }),
+    )
+  })
+
+  // 검색어는 주소에 있어야 새로 고치거나 상세에 갔다 뒤로 와도 남는다.
+  it('starts from the keyword in the address', async () => {
+    const { wrapper } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&keyword=tour',
+    })
+
+    expect((wrapper.get('input[type="search"]').element as HTMLInputElement).value).toBe('tour')
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: 'tour' }))
+  })
+
+  // 글자마다 주소를 고치면 그때마다 서버에 다시 묻는다.
+  it('writes the keyword to the address once typing pauses', async () => {
+    const { wrapper, router } = await mountView()
+    const callsBefore = fetchAppointments.mock.calls.length
+
+    await wrapper.get('input[type="search"]').setValue('to')
+    await wrapper.get('input[type="search"]').setValue('tour ')
+    // 지연보다 짧게 기다린다. 바로 확인하면 주소 이동이 끝나기 전이라 지연이 없어도 통과한다.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.keyword).toBeUndefined()
+    expect(fetchAppointments).toHaveBeenCalledTimes(callsBefore)
+
+    await waitForKeywordDebounce()
+
+    expect(router.currentRoute.value.query.keyword).toBe('tour')
+    expect(fetchAppointments).toHaveBeenCalledTimes(callsBefore + 1)
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: 'tour' }))
+  })
+
+  it('removes the keyword from the address when the search is cleared', async () => {
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&keyword=tour',
+    })
+
+    await wrapper.get('input[type="search"]').setValue('  ')
+    await waitForKeywordDebounce()
+
+    expect(router.currentRoute.value.query).not.toHaveProperty('keyword')
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: undefined }),
     )
   })
 
