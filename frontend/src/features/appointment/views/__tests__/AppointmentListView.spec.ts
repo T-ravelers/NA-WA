@@ -450,6 +450,74 @@ describe('AppointmentListView', () => {
     )
   })
 
+  // 직접 고른 언어는 주소에 있어야 새로 고치거나 다녀와도 남는다.
+  it('writes a chosen language to the address and starts from the first page', async () => {
+    fetchAppointments.mockImplementation(threePages)
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&page=2',
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Japanese')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.language).toBe('ja')
+    expect(router.currentRoute.value.query).not.toHaveProperty('page')
+  })
+
+  // 주소에 없는 것(회원 언어로 시작)과 구분해야 한다.
+  it('writes "All" to the address too', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'All')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.language).toBe('ALL')
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ language: undefined }),
+    )
+  })
+
+  // 주소의 언어는 사용자가 고른 것이다. 0건이라도 화면이 임의로 풀지 않는다.
+  it('keeps the language from the address even when it has no appointments', async () => {
+    fetchAppointments.mockResolvedValue(EMPTY_PAGE)
+
+    const { wrapper } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&language=ja',
+    })
+    await flushPromises()
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'ja' }))
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Japanese')
+        ?.attributes('aria-pressed'),
+    ).toBe('true')
+  })
+
+  // 자동으로 넓힌 것은 사용자가 고른 것이 아니다. 주소에 적으면 다음 방문에서 "직접 고른
+  // 전체"로 읽혀, 회원 언어에 약속이 생겨도 다시 좁히지 않는다.
+  it('does not write the automatic fallback to the address', async () => {
+    fetchAppointments.mockResolvedValueOnce(EMPTY_PAGE)
+
+    const { wrapper, router } = await mountView()
+    await flushPromises()
+
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'All')
+        ?.attributes('aria-pressed'),
+    ).toBe('true')
+    expect(router.currentRoute.value.query).not.toHaveProperty('language')
+  })
+
   // 보던 약속이 끝나 목록이 줄면 주소의 페이지가 범위를 벗어난다. 빈 화면은 약속이
   // 없는 것과 구분되지 않는다.
   it('moves to the last page when the address points past the end', async () => {
