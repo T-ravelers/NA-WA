@@ -662,12 +662,22 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
   })
 
-  // 여정 생성·충전은 돌아올 주소를 들고 간다. 페이지가 빠지면 첫 페이지로 돌아와, 고르던
-  // 카드가 보이지 않는다.
-  it('takes the page along when it leaves to create a journey', async () => {
+  // 여정 생성·충전은 돌아올 주소를 들고 간다. 페이지·검색어·고른 언어 중 하나라도 빠지면
+  // 다른 목록으로 돌아와, 고르던 카드가 보이지 않는다.
+  const FILTERED_LIST_PATH =
+    '/appointments?itemId=42&itemType=EVENT&page=2&keyword=tour&language=ja'
+  const FILTERED_RETURN_QUERY = {
+    returnRouteName: 'appointment-list',
+    itemId: '42',
+    page: '2',
+    keyword: 'tour',
+    language: 'ja',
+  }
+
+  it('takes the page, keyword and language along when it leaves to create a journey', async () => {
     fetchAppointments.mockImplementation(threePages)
     const { wrapper, router } = await mountView({
-      path: '/appointments?itemId=42&itemType=EVENT&page=2',
+      path: FILTERED_LIST_PATH,
       journeys: ref<AppointmentJourneySummary[] | undefined>([]),
     })
 
@@ -684,21 +694,15 @@ describe('AppointmentListView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('journey-create')
-    expect(router.currentRoute.value.query).toMatchObject({
-      returnRouteName: 'appointment-list',
-      itemId: '42',
-      page: '2',
-    })
+    expect(router.currentRoute.value.query).toMatchObject(FILTERED_RETURN_QUERY)
   })
 
-  it('takes the page along when it leaves to top up', async () => {
+  it('takes the page, keyword and language along when it leaves to top up', async () => {
     fetchAppointments.mockImplementation(threePages)
     joinAppointment.mockRejectedValue(
       new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
     )
-    const { wrapper, router } = await mountView({
-      path: '/appointments?itemId=42&itemType=EVENT&page=2',
-    })
+    const { wrapper, router } = await mountView({ path: FILTERED_LIST_PATH })
 
     await wrapper
       .findAll('button')
@@ -723,11 +727,31 @@ describe('AppointmentListView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('wallet-top-up')
-    expect(router.currentRoute.value.query).toMatchObject({
-      returnRouteName: 'appointment-list',
-      itemId: '42',
-      page: '2',
+    expect(router.currentRoute.value.query).toMatchObject(FILTERED_RETURN_QUERY)
+  })
+
+  // 자동으로 넓힌 언어는 사용자가 고른 것이 아니다. 들고 가면 돌아와서 "직접 고른 전체"로 읽힌다.
+  it('does not take the automatic language along', async () => {
+    fetchAppointments.mockResolvedValueOnce(EMPTY_PAGE)
+    const { wrapper, router } = await mountView({
+      journeys: ref<AppointmentJourneySummary[] | undefined>([]),
     })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text() === 'Create a journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-create')
+    expect(router.currentRoute.value.query).not.toHaveProperty('language')
   })
 
   // 여정을 만들거나 충전하고 돌아오면 시트를 다시 열어 **그 여정을 골라 둔 채로**
