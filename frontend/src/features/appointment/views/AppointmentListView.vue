@@ -235,6 +235,10 @@ const listQuery = computed(() => ({
   ...(itemType.value === undefined ? {} : { itemType: itemType.value }),
   // 고르던 카드가 있는 페이지로 돌아와야 한다. 첫 페이지로 오면 그 카드가 보이지 않는다.
   ...(page.value > 0 ? { page: String(page.value) } : {}),
+  // 검색어·언어가 빠지면 같은 페이지 번호라도 다른 목록이라 그 카드가 없다.
+  // 자동으로 넓힌 언어는 주소에 없으므로 싣지 않는다 — 돌아와서 다시 판단한다.
+  ...(keyword.value === '' ? {} : { keyword: keyword.value }),
+  ...(chosenLanguage.value === undefined ? {} : { language: chosenLanguage.value }),
 }))
 
 /**
