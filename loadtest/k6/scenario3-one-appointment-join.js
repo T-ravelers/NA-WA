@@ -28,6 +28,14 @@ import {
 const VUS = Number(__ENV.VUS || 100)
 /** 로그인·여정 생성을 마치는 데 주는 시간. 모자라면 focus_late_start가 늘어난다. */
 const PREPARE_SECONDS = Number(__ENV.PREPARE_SECONDS || 60)
+/**
+ * 준비 시작을 나눠 놓는 구간. 준비 시간의 앞쪽 절반이다.
+ *
+ * 1,000 VU가 0초에 한꺼번에 로그인하면 서버가 연결 일부를 끊어(EOF) 그 VU들이 출발선에
+ * 서지 못한다. 재려는 것은 참여 순간의 몰림이지 로그인 순간의 몰림이 아니므로, 준비는
+ * 나눠서 하고 참여 요청만 같은 시각에 보낸다. 시나리오 1이 시작을 나눠 두는 것과 같다.
+ */
+const PREPARE_SPREAD_SECONDS = Number(__ENV.PREPARE_SPREAD_SECONDS || PREPARE_SECONDS / 2)
 /** 방장을 뺀 남은 자리. 시드의 `@vu_slots_per_appointment`와 같아야 한다. */
 const SLOTS = Number(__ENV.VU_SLOTS_PER_APPOINTMENT || 5)
 const EXPECTED_JOINS = Math.min(VUS, SLOTS)
@@ -116,8 +124,17 @@ function errorCodeOf(response) {
 }
 
 export default function (data) {
+  sleep(((__VU - 1) * PREPARE_SPREAD_SECONDS) / VUS)
+
   const jar = new http.CookieJar()
-  const tripId = prepare(jar)
+  let tripId = null
+  try {
+    tripId = prepare(jar)
+  } catch (error) {
+    // issueCsrfHeaders가 fail()로 멈추면 iteration이 그대로 끝나 아래에서 세지 못한다.
+    // 출발선에 서지 못한 VU는 모두 같은 이름으로 센다.
+    console.error(`focus prepare failed: ${error}`)
+  }
 
   if (tripId === null) {
     prepareFailed.add(1)
