@@ -183,6 +183,35 @@ WITH RECURSIVE
 SELECT @recruiting_base + (r - 1) * @run_stride + n, 990000, NULL, 'ACTIVE', 'PENDING'
 FROM run_seq CROSS JOIN seq;
 
+-- 시나리오 3(한 약속 집중)의 참여 대상. 회차마다 하나다.
+--
+-- 위 약속들과 반대로 일부러 모든 VU를 한 약속에 몬다. 재려는 것이 바로 그 행의
+-- FOR UPDATE 대기와, 그 속에서 정원을 넘기지 않는지다. 정원과 보증금은 위와 같아
+-- 두 시나리오의 차이는 "몇 명이 한 행에 몰리는가" 하나뿐이다. 방장이 한 자리를
+-- 차지하므로 VU가 들어갈 자리는 @vu_slots_per_appointment개다.
+SET @focus_base = 3000000;
+
+INSERT INTO appointments (
+    appointment_id, item_id, host_member_id, language_code, appointment_name,
+    appointment_description, max_members, deposit_amount, appointment_status,
+    meeting_place, activity_start_at, activity_end_at
+)
+WITH RECURSIVE run_seq(r) AS (SELECT 1 UNION ALL SELECT r + 1 FROM run_seq WHERE r < @runs)
+SELECT @focus_base + r, 500000, 990000, 'en',
+       CONCAT('loadtest-focus-r', r),
+       'Synthetic appointment for scenario 3',
+       @members_per_appointment, 5000.0000, 'RECRUITING', 'Load-test venue',
+       CURRENT_TIMESTAMP + INTERVAL 30 DAY,
+       CURRENT_TIMESTAMP + INTERVAL 30 DAY + INTERVAL 2 HOUR
+FROM run_seq;
+
+INSERT INTO appointment_members (
+    appointment_id, member_id, trip_id, membership_status, attendance_status
+)
+WITH RECURSIVE run_seq(r) AS (SELECT 1 UNION ALL SELECT r + 1 FROM run_seq WHERE r < @runs)
+SELECT @focus_base + r, 990000, NULL, 'ACTIVE', 'PENDING'
+FROM run_seq;
+
 -- 시나리오 2의 QR 공동지출·정산용 진행 중 약속.
 INSERT INTO appointments (
     appointment_id, item_id, host_member_id, language_code, appointment_name,
