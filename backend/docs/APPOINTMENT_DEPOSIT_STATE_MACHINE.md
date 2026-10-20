@@ -7,8 +7,11 @@
 
 ## 1. 현재 구현 상태
 
-- 상태 ENUM과 `canTransitionTo()` 규칙: `Appointment`·`Deposit`·`DepositPayoutBatch`
-  도메인 객체와 매퍼(CRUD)까지 구현돼 있습니다.
+- 상태 ENUM: `Appointment`·`Deposit`·`DepositPayoutBatch` 도메인 객체와 매퍼(CRUD)까지
+  구현돼 있습니다. 보증금(`DepositStatus`)과 정산 배치(`ResolutionStatus`)는
+  `canTransitionTo()` 규칙표로 전이를 검사합니다. 약속(`AppointmentStatus`)과 회원
+  (`MembershipStatus`)은 코드 규칙표 없이 상태를 바꾸는 조건부 UPDATE가 검사하며,
+  이 문서의 2·3절이 정본입니다(#388).
 - 약속 생성·참여: 실제로 동작합니다. 보증금 예치(회원 지갑 → `DEPOSIT_POOL`)와
   `AppointmentStatus`/`MembershipStatus` 전환이 같은 트랜잭션에서 함께 끝납니다
   (14절).
@@ -39,7 +42,9 @@ DB 컬럼: `appointments.appointment_status`
 | `COMPLETED` | 출석 확정과 약속 진행이 모두 끝난 상태 |
 | `CANCELLED` | 코드에는 정의돼 있으나, 17절 정책에 따라 실제로 도달하는 경로가 없는 상태 |
 
-허용 상태 전이(코드 `AppointmentStatus.canTransitionTo()` 기준):
+허용 상태 전이. 코드에 규칙표를 두지 않고, 상태를 바꾸는 조건부 UPDATE
+(`WHERE appointment_status = 이전 상태`)가 아래 전이만 통과시킵니다. 이 그림과 다음 표가
+정본이므로 전이를 바꾸면 쿼리와 함께 여기를 고칩니다.
 
     PAYMENT_PENDING
     ├─→ RECRUITING
@@ -88,9 +93,10 @@ DB 컬럼: `appointment_members.membership_status`
 | --- | --- |
 | `PENDING` | 참여 의사를 확인했지만 보증금 결제가 완료되지 않은 상태 |
 | `ACTIVE` | 보증금 결제와 예치가 완료되어 참여가 확정된 상태 |
-| `LEFT` | 참여를 취소하거나 약속에서 나간 최종 상태 |
+| `LEFT` | 참여를 취소하거나 약속에서 나간 상태. 활동 시작 전에는 재참여로 `PENDING`이 됩니다 |
 
-허용 상태 전이:
+허용 상태 전이. 약속 상태와 같이 코드 규칙표 없이 조건부 UPDATE
+(`WHERE membership_status = 이전 상태`)가 검사하며, 이 그림과 다음 표가 정본입니다.
 
     PENDING
     ├─→ ACTIVE

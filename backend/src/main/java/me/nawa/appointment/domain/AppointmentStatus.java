@@ -2,6 +2,11 @@ package me.nawa.appointment.domain;
 
 /**
  * 약속의 진행 상태입니다.
+ *
+ * <p>허용 전이를 코드 규칙표로 두지 않습니다. 실제로 막는 것은 상태를 바꾸는 조건부
+ * UPDATE({@code WHERE appointment_status = 이전 상태})이고, 전이 전체의 정본은
+ * {@code backend/docs/APPOINTMENT_DEPOSIT_STATE_MACHINE.md} 2절입니다. 호출되지 않는
+ * 규칙표는 실제 동작과 어긋나도 아무것도 잡지 못해 지웠습니다(#388).
  */
 public enum AppointmentStatus {
     PAYMENT_PENDING,
@@ -24,37 +29,5 @@ public enum AppointmentStatus {
      */
     AWAITING_ATTENDANCE,
     COMPLETED,
-    CANCELLED;
-
-    public boolean canTransitionTo(AppointmentStatus nextStatus) {
-        if (nextStatus == null) {
-            return false;
-        }
-
-        return switch (this) {
-            case PAYMENT_PENDING ->
-                    nextStatus == RECRUITING || nextStatus == CANCELLED;
-            // 활동 시작 시각이 되면 방장의 별도 확정 없이 바로 진행중으로
-            // 전환한다. 정원이 차지 않은 약속은 FULL을 거치지 않으므로
-            // RECRUITING에서 곧장 IN_PROGRESS로 간다 — 이 경로가 없으면 정원
-            // 미달 약속이 활동 시작 뒤에도 RECRUITING에 남는다.
-            case RECRUITING ->
-                    nextStatus == FULL
-                            || nextStatus == IN_PROGRESS
-                            || nextStatus == CANCELLED;
-            // 정원이 차서 FULL이 된 뒤 활동 시작 전에 참여 취소가 생기면
-            // 빈자리를 다시 채울 수 있도록 RECRUITING으로 되돌아간다.
-            case FULL ->
-                    nextStatus == RECRUITING
-                            || nextStatus == IN_PROGRESS
-                            || nextStatus == CANCELLED;
-            // 스케줄러가 출석 확정 대기로 옮기기 전 몇 초 사이에도 화면은 이미
-            // 출석 확정을 열어 주므로, 완료로 가는 길을 함께 둔다.
-            case IN_PROGRESS ->
-                    nextStatus == AWAITING_ATTENDANCE
-                            || nextStatus == COMPLETED;
-            case AWAITING_ATTENDANCE -> nextStatus == COMPLETED;
-            case COMPLETED, CANCELLED -> false;
-        };
-    }
+    CANCELLED
 }
