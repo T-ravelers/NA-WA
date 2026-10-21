@@ -11,8 +11,8 @@ export type AppointmentLanguageFilter = 'ALL' | AppointmentLanguage
  * 쓴다. 회원 언어는 로그인 시 `members.preferred_language`와 맞춰지므로(localeSync)
  * 목록이 회원 조회를 따로 하지 않아도 같은 값을 본다.
  *
- * 고른 칩을 저장하지는 않는다. 목록에 들어올 때는 언제나 회원 언어에서 시작하고,
- * 다른 언어를 보는 것은 그 화면에 머무는 동안의 일이다.
+ * 고른 칩을 저장하지는 않는다. 목록에 새로 들어올 때는 언제나 회원 언어에서 시작한다.
+ * 직접 고른 칩은 목록 주소(`?language=`)에만 남아, 그 주소로 돌아올 때만 되살아난다.
  */
 export function defaultListLanguage(locale: string): AppointmentLanguageFilter {
   return isSupportedLocale(locale) ? locale : 'ALL'
