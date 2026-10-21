@@ -64,6 +64,9 @@ export const options = {
     // 준비가 늦은 VU가 있으면 동시 요청 수가 VUS보다 적어 결과를 그대로 읽을 수 없다.
     focus_prepare_failed: ['count==0'],
     focus_late_start: ['count==0'],
+    // 위 카운터는 응답을 받은 요청만 센다. maxDuration에 걸려 중단된 VU는 어디에도
+    // 남지 않아, 가장 오래 기다린 요청이 빠진 채 통과하고 응답시간도 좋아 보인다.
+    'iterations{scenario:one_appointment}': [`count==${VUS}`],
   },
   summaryTrendStats: ['avg', 'min', 'med', 'p(95)', 'p(99)', 'max'],
 }
