@@ -174,6 +174,7 @@ class AppointmentMapperXmlTest {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("request", request);
         parameters.put("offset", 0);
+        parameters.put("now", LocalDateTime.now());
 
         String sql = boundSql("searchAppointments", parameters);
 
@@ -182,9 +183,9 @@ class AppointmentMapperXmlTest {
         assertFalse(sql.contains("a.appointment_status = ?"));
     }
 
-    // 끝난 약속 제외는 LIMIT 앞에 있어야 한다. 받은 쪽에서 거르면 정렬이
-    // activity_start_at ASC라 지난 약속이 앞에 서고, 지난 약속이 한 페이지를 채우는
-    // 항목에서는 다음 페이지에 모집 중 약속이 있어도 화면이 0건이 된다.
+    // 끝난 약속 제외는 LIMIT 앞에 있어야 한다. 받은 쪽에서 거르면 끝난 약속이 차지한
+    // 자리만큼 페이지가 비고, 끝난 약속만으로 채워진 페이지는 다음 페이지에 모집 중
+    // 약속이 있어도 0건이 된다.
     @Test
     void appointmentList_withoutStatusFilter_excludesCompletedBeforeLimit()
             throws Exception {
@@ -192,6 +193,7 @@ class AppointmentMapperXmlTest {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("request", request);
         parameters.put("offset", 0);
+        parameters.put("now", LocalDateTime.now());
 
         String sql = boundSql("searchAppointments", parameters);
 
@@ -222,11 +224,42 @@ class AppointmentMapperXmlTest {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("request", request);
         parameters.put("offset", 0);
+        parameters.put("now", LocalDateTime.now());
 
         String sql = boundSql("searchAppointments", parameters);
 
         assertTrue(sql.contains("a.appointment_status = ?"));
         assertFalse(sql.contains("a.appointment_status <> 'COMPLETED'"));
+    }
+
+    // 다가오는 약속과 이미 시작한 약속의 경계는 애플리케이션이 넘긴 값으로 갈려야 한다.
+    // DB 시계로 돌아가면 DB 컨테이너 시간대가 어긋난 만큼 경계 근처의 약속이 반대쪽에 선다.
+    @Test
+    void appointmentList_ordersUpcomingFirstByBoundParameterNotDatabaseClock()
+            throws Exception {
+        AppointmentSearchRequest request = new AppointmentSearchRequest();
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+        parameters.put("offset", 0);
+        parameters.put("now", LocalDateTime.now());
+
+        String sql = boundSql("searchAppointments", parameters);
+
+        assertFalse(sql.contains("NOW()"));
+        assertTrue(sql.contains("ORDER BY (a.activity_start_at < ?)"));
+    }
+
+    // 시각은 정렬에만 쓴다. 검색 조건에 들어가면 개수와 카드의 대상이 갈라져
+    // "N appointments"와 보이는 카드가 어긋난다.
+    @Test
+    void appointmentCount_doesNotDependOnCurrentTime() throws Exception {
+        AppointmentSearchRequest request = new AppointmentSearchRequest();
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", request);
+
+        String sql = boundSql("countAppointments", parameters);
+
+        assertFalse(sql.contains("activity_start_at"));
     }
 
     @Test

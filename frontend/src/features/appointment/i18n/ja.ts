@@ -38,6 +38,12 @@ export default {
       emptyDescription: 'このアクティビティの同行グループを作成しましょう。',
       loadFailed: '同行グループを読み込めませんでした',
       loadFailedDescription: 'しばらくしてから、もう一度お試しください。',
+      pagination: {
+        label: '同行グループのページ',
+        previousPage: '前のページ',
+        nextPage: '次のページ',
+        page: '{page}ページ',
+      },
     },
     status: {
       PAYMENT_PENDING: '支払い待ち',

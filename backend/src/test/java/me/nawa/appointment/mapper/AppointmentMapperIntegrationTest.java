@@ -2,7 +2,9 @@ package me.nawa.appointment.mapper;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import me.nawa.appointment.domain.Appointment;
 import me.nawa.appointment.domain.MyOngoingAppointment;
+import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import me.nawa.config.MySqlSchemaExtension;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -18,13 +20,15 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * findMyOngoingAppointments의 scope 분기(진행 중만 / 취소 제외 전체)와 정렬,
- * explore_items 조인으로 얻는 itemType을 실제 MySQL에서 검증한다.
+ * explore_items 조인으로 얻는 itemType을 실제 MySQL에서 검증한다. 같은 정렬을
+ * 쓰는 공개 목록(searchAppointments)의 순서와 페이지 경계도 함께 검증한다.
  *
  * 모든 테스트는 rollback-only 트랜잭션 안에서 돌므로 데이터가 남지 않는다.
  */
@@ -163,6 +167,128 @@ class AppointmentMapperIntegrationTest {
                     List.of(justAheadId, laterAheadId, justPastId, olderPastId),
                     all.stream().map(MyOngoingAppointment::getAppointmentId).toList());
         });
+    }
+
+    /**
+     * 공개 목록은 참여할 수 있는 약속을 임박한 순으로 먼저, 이미 시작한 약속을 최근
+     * 순으로 뒤에 둔다. 이미 시작해 진행 중인 약속도 참여할 수 없으니 뒤로 간다.
+     * 개수는 카드와 같은 대상을 센다.
+     */
+    @Test
+    void searchAppointments_ordersUpcomingFirstThenRecentPast() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            LocalDateTime now = LocalDateTime.now();
+            ListFixture fixture = insertListFixture(now);
+
+            AppointmentSearchRequest request = searchRequest(fixture.itemId(), 20);
+            List<Long> ids = searchIds(request, 0, now);
+
+            assertEquals(fixture.expectedOrder(), ids);
+            assertEquals(
+                    fixture.expectedOrder().size(),
+                    appointmentMapper.countAppointments(request));
+        });
+    }
+
+    /**
+     * 경계는 애플리케이션이 넘긴 시각이다. CI MySQL은 UTC라 DB 시계로 가르면 몇 분
+     * 떨어진 약속들이 시차 안에 들어가 통째로 반대쪽에 선다. 그래서 분 단위로 본다.
+     */
+    @Test
+    void searchAppointments_classifiesAroundApplicationClock() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long memberId = insertMember();
+            long itemId = insertVisibleEventItem(memberId);
+
+            LocalDateTime now = LocalDateTime.now();
+            long justAheadId = insertAppointment(
+                    itemId, memberId, "RECRUITING", now.plusMinutes(5));
+            long laterAheadId = insertAppointment(
+                    itemId, memberId, "RECRUITING", now.plusMinutes(30));
+            long justPastId = insertAppointment(
+                    itemId, memberId, "IN_PROGRESS", now.minusMinutes(5));
+            long olderPastId = insertAppointment(
+                    itemId, memberId, "IN_PROGRESS", now.minusMinutes(30));
+
+            assertEquals(
+                    List.of(justAheadId, laterAheadId, justPastId, olderPastId),
+                    searchIds(searchRequest(itemId, 20), 0, now));
+        });
+    }
+
+    /**
+     * 같은 시각의 약속이 페이지 경계에 걸려도 카드가 겹치거나 빠지지 않는다.
+     * 마지막 정렬 키(appointment_id)가 빠지면 동점의 순서가 호출마다 달라질 수 있다.
+     */
+    @Test
+    void searchAppointments_pagesWithoutOverlapOrGap() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            LocalDateTime now = LocalDateTime.now();
+            ListFixture fixture = insertListFixture(now);
+
+            int size = 2;
+            AppointmentSearchRequest request = searchRequest(fixture.itemId(), size);
+            List<Long> paged = new ArrayList<>();
+            for (int page = 0; page * size < fixture.expectedOrder().size(); page++) {
+                paged.addAll(searchIds(request, page * size, now));
+            }
+
+            assertEquals(fixture.expectedOrder(), paged);
+        });
+    }
+
+    private record ListFixture(long itemId, List<Long> expectedOrder) {
+    }
+
+    /**
+     * 공개 목록용 약속 묶음. 같은 시각 쌍(sameTime*)은 size=2일 때 첫 페이지와 둘째
+     * 페이지의 경계에 걸리도록 두 번째·세 번째 자리에 둔다.
+     */
+    private ListFixture insertListFixture(LocalDateTime now) {
+        long memberId = insertMember();
+        long itemId = insertVisibleEventItem(memberId);
+
+        long soonId = insertAppointment(
+                itemId, memberId, "RECRUITING", now.plusDays(2));
+        // 같은 시각이면 나중에 만든(id가 큰) 약속이 먼저다.
+        long sameTimeOlderId = insertAppointment(
+                itemId, memberId, "FULL", now.plusDays(5));
+        long sameTimeNewerId = insertAppointment(
+                itemId, memberId, "RECRUITING", now.plusDays(5));
+        long laterId = insertAppointment(
+                itemId, memberId, "RECRUITING", now.plusDays(10));
+        long startedId = insertAppointment(
+                itemId, memberId, "IN_PROGRESS", now.minusHours(1));
+        long awaitingId = insertAppointment(
+                itemId, memberId, "AWAITING_ATTENDANCE", now.minusDays(3));
+        // 출석을 확정하지 않아 COMPLETED가 되지 못하고 쌓인 약속.
+        long staleId = insertAppointment(
+                itemId, memberId, "IN_PROGRESS", now.minusDays(10));
+        // 목록 대상이 아니다.
+        insertAppointment(itemId, memberId, "COMPLETED", now.minusDays(1));
+        insertAppointment(itemId, memberId, "PAYMENT_PENDING", now.plusDays(1));
+
+        return new ListFixture(itemId, List.of(
+                soonId, sameTimeNewerId, sameTimeOlderId, laterId,
+                startedId, awaitingId, staleId));
+    }
+
+    /** 다른 테스트 데이터가 섞이지 않도록 이번에 만든 항목으로만 좁힌다. */
+    private static AppointmentSearchRequest searchRequest(long itemId, int size) {
+        AppointmentSearchRequest request = new AppointmentSearchRequest();
+        request.setItemId(itemId);
+        request.setSize(size);
+        return request;
+    }
+
+    private List<Long> searchIds(
+            AppointmentSearchRequest request, int offset, LocalDateTime now) {
+        return appointmentMapper.searchAppointments(request, offset, now).stream()
+                .map(Appointment::getAppointmentId)
+                .toList();
     }
 
     private long insertMember() {

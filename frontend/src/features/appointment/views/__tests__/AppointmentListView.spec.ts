@@ -1,10 +1,11 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
-import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref, type Ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 import {
   appointmentJourneyIntegrationKey,
@@ -22,6 +23,10 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
 }))
 
 const AppointmentListView = (await import('../AppointmentListView.vue')).default
+
+// 목록은 켜져 있는 동안 5초마다 다시 조회한다. 끝난 테스트의 화면을 남겨 두면 그 조회가
+// 뒤 테스트의 fetchAppointments 호출 수에 섞여, 파일이 5초를 넘게 도는 날에만 실패한다.
+enableAutoUnmount(afterEach)
 
 const appointment = {
   appointmentId: 7,
@@ -139,8 +144,28 @@ const EMPTY_PAGE = {
   hasNext: false,
 }
 
+/** 약속이 50개라 페이지가 세 개인 항목. 요청한 페이지를 그대로 돌려준다. */
+function threePages(filters: { page: number }) {
+  return Promise.resolve({
+    content: filters.page < 3 ? [{ ...appointment, appointmentId: 100 + filters.page }] : [],
+    page: filters.page,
+    size: 20,
+    totalElements: 50,
+    totalPages: 3,
+    hasNext: filters.page < 2,
+  })
+}
+
+const scrollToMock = vi.fn()
+
 describe('AppointmentListView', () => {
   beforeEach(() => {
+    scrollToMock.mockReset()
+    vi.stubGlobal('scrollTo', scrollToMock)
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
     fetchAppointments.mockReset()
     joinAppointment.mockReset()
     fetchAppointments.mockResolvedValue({
@@ -279,8 +304,8 @@ describe('AppointmentListView', () => {
   })
 
   // 끝난 약속을 빼는 것은 서버가 LIMIT 앞에서 한다(APPOINTMENT_API.md). 받은 쪽에서
-  // 다시 거르면 정렬이 activity_start_at ASC라 지난 약속이 앞에 서고, 지난 약속이 한
-  // 페이지를 채우는 항목에서는 다음 페이지에 모집 중 약속이 있어도 화면이 0건이 된다.
+  // 다시 거르면 끝난 약속이 차지한 자리만큼 페이지가 비고, 끝난 약속만으로 채워진
+  // 페이지는 다음 페이지에 모집 중 약속이 있어도 0건이 된다.
   it('shows every appointment the server returned, filtering none of them out', async () => {
     fetchAppointments.mockResolvedValue({
       content: [
@@ -316,6 +341,92 @@ describe('AppointmentListView', () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.text()).toContain('37 appointments')
+  })
+
+  // 페이지는 주소에 있어야 참여하러 나갔다 돌아오거나 새로 고쳐도 남는다.
+  it('reads a zero-based page from the address', async () => {
+    fetchAppointments.mockImplementation(threePages)
+
+    const { wrapper } = await mountView({ path: '/appointments?itemId=42&itemType=EVENT&page=1' })
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }))
+    expect(wrapper.get('[aria-current="page"]').text()).toBe('2')
+  })
+
+  it('moves to the chosen page and back to the top of the list', async () => {
+    fetchAppointments.mockImplementation(threePages)
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('button[aria-label="Page 3"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.page).toBe('2')
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }))
+    expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
+  })
+
+  // 조건이 바뀌면 결과가 통째로 달라진다. 보던 페이지 번호가 새 결과에는 없을 수 있다.
+  it('starts from the first page when the keyword or language changes', async () => {
+    fetchAppointments.mockImplementation(threePages)
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&page=2',
+    })
+
+    await wrapper.get('input[type="search"]').setValue('tour')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.page).toBeUndefined()
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: 'tour', page: 0 }),
+    )
+
+    await router.replace({ query: { ...router.currentRoute.value.query, page: '2' } })
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Japanese')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.page).toBeUndefined()
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ language: 'ja', page: 0 }),
+    )
+  })
+
+  // 보던 약속이 끝나 목록이 줄면 주소의 페이지가 범위를 벗어난다. 빈 화면은 약속이
+  // 없는 것과 구분되지 않는다.
+  it('moves to the last page when the address points past the end', async () => {
+    fetchAppointments.mockImplementation(threePages)
+
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&page=9',
+    })
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.page).toBe('2')
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      // 범위 밖 페이지가 0건이어도 회원 언어를 풀지 않는다. 약속은 있다.
+      expect.objectContaining({ page: 2, language: 'en' }),
+    )
+    expect(wrapper.get('[aria-current="page"]').text()).toBe('3')
+  })
+
+  // 캐시가 남은 재방문은 마운트 시점에 이미 page·totalPages가 정해져 있어 값이 변하지
+  // 않는다. 첫 판정이 없으면 빈 화면에 페이지 버튼도 없이 멈춘다.
+  it('moves to the last page again when the past-the-end page came from the cache', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    fetchAppointments.mockImplementation(threePages)
+    const path = '/appointments?itemId=42&itemType=EVENT&page=9'
+
+    const first = await mountView({ path, queryClient })
+    await flushPromises()
+    first.wrapper.unmount()
+
+    const { router } = await mountView({ path, queryClient })
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.page).toBe('2')
   })
 
   it('opens the detail when the card itself is pressed', async () => {
@@ -425,6 +536,74 @@ describe('AppointmentListView', () => {
 
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
+  })
+
+  // 여정 생성·충전은 돌아올 주소를 들고 간다. 페이지가 빠지면 첫 페이지로 돌아와, 고르던
+  // 카드가 보이지 않는다.
+  it('takes the page along when it leaves to create a journey', async () => {
+    fetchAppointments.mockImplementation(threePages)
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&page=2',
+      journeys: ref<AppointmentJourneySummary[] | undefined>([]),
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text() === 'Create a journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-create')
+    expect(router.currentRoute.value.query).toMatchObject({
+      returnRouteName: 'appointment-list',
+      itemId: '42',
+      page: '2',
+    })
+  })
+
+  it('takes the page along when it leaves to top up', async () => {
+    fetchAppointments.mockImplementation(threePages)
+    joinAppointment.mockRejectedValue(
+      new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
+    )
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&page=2',
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul Foodie Week'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Pay'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Top up')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('wallet-top-up')
+    expect(router.currentRoute.value.query).toMatchObject({
+      returnRouteName: 'appointment-list',
+      itemId: '42',
+      page: '2',
+    })
   })
 
   // 여정을 만들거나 충전하고 돌아오면 시트를 다시 열어 **그 여정을 골라 둔 채로**

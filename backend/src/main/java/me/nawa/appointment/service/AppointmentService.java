@@ -577,7 +577,7 @@ public class AppointmentService {
         }
 
         List<AppointmentSummaryResponse> content = appointmentMapper
-                .searchAppointments(request, (int) offsetLong)
+                .searchAppointments(request, (int) offsetLong, LocalDateTime.now())
                 .stream()
                 .map(AppointmentService::toSummaryResponse)
                 .toList();

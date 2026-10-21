@@ -1,6 +1,6 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
-import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
@@ -26,6 +26,10 @@ vi.mock('../../api/appointmentApi', async (importOriginal) => ({
 }))
 
 const AppointmentDetailView = (await import('../AppointmentDetailView.vue')).default
+
+// 상세는 켜져 있는 동안 5초마다 다시 조회한다. 끝난 테스트의 화면을 남겨 두면 그 조회가
+// 뒤 테스트가 한 번만 쓰도록 정해 둔 응답(mockResolvedValueOnce)을 먼저 가져갈 수 있다.
+enableAutoUnmount(afterEach)
 
 const appointment = {
   appointmentId: 7,

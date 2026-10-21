@@ -39,6 +39,12 @@ export default {
       emptyDescription: 'Tạo cuộc hẹn cho hoạt động này.',
       loadFailed: 'Không tải được danh sách cuộc hẹn',
       loadFailedDescription: 'Vui lòng thử lại sau ít phút.',
+      pagination: {
+        label: 'Các trang cuộc hẹn',
+        previousPage: 'Trang trước',
+        nextPage: 'Trang sau',
+        page: 'Trang {page}',
+      },
     },
     status: {
       PAYMENT_PENDING: 'Chờ thanh toán',

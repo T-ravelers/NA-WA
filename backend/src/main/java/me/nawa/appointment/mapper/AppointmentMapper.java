@@ -60,9 +60,12 @@ public interface AppointmentMapper {
     // 시각 비교 기준을 애플리케이션에서 받는 이유는 위와 같다.
     int endDueAppointments(@Param("now") LocalDateTime now);
 
+    // now는 정렬에만 쓴다. 검색 조건에 넣으면 countAppointments와 대상이 갈라진다.
+    // DB 시계 대신 애플리케이션이 넘기는 이유는 startDueAppointments와 같다.
     List<Appointment> searchAppointments(
             @Param("request") AppointmentSearchRequest request,
-            @Param("offset") int offset
+            @Param("offset") int offset,
+            @Param("now") LocalDateTime now
     );
 
     long countAppointments(
