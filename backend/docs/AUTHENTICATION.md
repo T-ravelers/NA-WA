@@ -126,8 +126,11 @@ access token이 없거나 유효하지 않으면 `AUTH-003`, 정지 회원은 `A
 
 - MySQL의 `members`, `social_accounts`가 회원과 소셜 계정 연결의 영구 원본입니다.
 - 같은 이메일이라는 이유만으로 서로 다른 소셜 계정을 자동 병합하지 않습니다.
-- Redis에는 `state`와 refresh token 세션만 TTL과 함께 저장합니다. Redis 데이터는
-  재생성 가능한 인증 상태이며 회원 원본으로 사용하지 않습니다.
+- 인증 데이터로는 Redis에 `state`와 refresh token 세션만 TTL과 함께 저장합니다. Redis
+  데이터는 재생성 가능한 인증 상태이며 회원 원본으로 사용하지 않습니다.
+- 같은 Redis에 탐색 목록 캐시(`explore:list:`, TTL 30초)도 있습니다. 운영 Redis에는
+  `maxmemory` 축출 설정이 없어 캐시가 늘어도 인증 키를 밀어내지 않습니다. 축출 정책을
+  켜려면 인증 키가 함께 지워질 수 있는지 먼저 검토하세요.
 - `state` 세션에는 브라우저 상태 쿠키의 원본이 아니라 SHA-256 해시만 넣습니다.
 - access token은 짧게 유지하고, refresh token은 회전시킵니다. 재사용이 감지되면
   해당 세션을 폐기합니다.

@@ -40,6 +40,7 @@ class ExploreItemLikeMapperXmlTest {
                 "softDeleteLike",
                 "adjustEventFavoriteCount",
                 "adjustPlaceFavoriteCount",
+                "findSavedItemIds",
         }) {
             assertTrue(configuration.hasStatement(
                     "me.nawa.explore.mapper.ExploreItemLikeMapper." + statement

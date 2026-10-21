@@ -225,11 +225,12 @@ public MemberResponse createMember(MemberCreateRequest request) {
 - 수명이 있는 데이터에는 TTL을 설정합니다.
 - 인증, 토큰과 임시 데이터의 Key namespace를 분리합니다.
 
-| 데이터          | Key 예시                       |
-| --------------- | ------------------------------ |
-| Refresh Token   | `auth:refresh:{sessionId}`     |
-| Token Blacklist | `auth:blacklist:{tokenId}`     |
-| 인증번호        | `auth:code:{purpose}:{target}` |
+| 데이터          | Key 예시                                     |
+| --------------- | -------------------------------------------- |
+| Refresh Token   | `auth:refresh:{sessionId}`                   |
+| Token Blacklist | `auth:blacklist:{tokenId}`                   |
+| 인증번호        | `auth:code:{purpose}:{target}`               |
+| 탐색 목록 캐시  | `explore:list:v1:{event\|place}:{조건 해시}` |
 
 인증 상태와 일반 캐시가 같은 Redis를 사용한다면 eviction이 인증에 미치는 영향을
 검토하세요.

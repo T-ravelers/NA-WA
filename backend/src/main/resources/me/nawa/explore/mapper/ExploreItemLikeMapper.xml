@@ -68,4 +68,16 @@
         WHERE place_id = #{itemId}
     </update>
 
+    <!-- EventMapper·PlaceMapper의 savedColumn과 같은 조건이어야 캐시 여부에 따라 찜 표시가 갈리지 않는다. -->
+    <select id="findSavedItemIds" resultType="long">
+        SELECT item_id
+        FROM explore_item_likes
+        WHERE member_id = #{memberId}
+          AND deleted_at IS NULL
+          AND item_id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+    </select>
+
 </mapper>

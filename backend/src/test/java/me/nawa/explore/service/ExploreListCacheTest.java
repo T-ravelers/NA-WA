@@ -1,6 +1,7 @@
 package me.nawa.explore.service;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import me.nawa.explore.dto.request.EventSearchRequest;
 import me.nawa.explore.dto.response.EventSummaryResponse;
 import me.nawa.explore.service.ExploreListCache.CachedPage;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,12 +11,14 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -99,6 +102,25 @@ class ExploreListCacheTest {
         cache.write("event", CONDITION, new CachedPage<>(List.of(), 0));
 
         verify(values).set(anyString(), any(String.class), eq(Duration.ofSeconds(30)));
+    }
+
+    /** 서비스는 요청 객체를 통째로 키에 넣는다. 같은 내용이면 같은 키, 한 필드라도 다르면 다른 키다. */
+    @Test
+    void key_followsTheWholeSearchRequest() throws Exception {
+        EventSearchRequest first = new EventSearchRequest();
+        first.setRegion1(List.of("서울"));
+        EventSearchRequest same = new EventSearchRequest();
+        same.setRegion1(List.of("서울"));
+        EventSearchRequest otherLanguage = new EventSearchRequest();
+        otherLanguage.setRegion1(List.of("서울"));
+        otherLanguage.setLanguage("ja");
+        LocalDate today = LocalDate.of(2026, 10, 21);
+
+        String key = cache.key("event", Map.of("request", first, "today", today));
+
+        assertEquals(key, cache.key("event", Map.of("request", same, "today", today)));
+        assertNotEquals(key, cache.key("event", Map.of("request", otherLanguage, "today", today)));
+        assertNotEquals(key, cache.key("event", Map.of("request", first, "today", today.plusDays(1))));
     }
 
     private double count(String kind, String result) {

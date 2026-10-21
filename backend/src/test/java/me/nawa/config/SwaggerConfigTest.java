@@ -419,7 +419,7 @@ class SwaggerConfigTest {
 
         @Bean
         EventService eventService() {
-            return new EventService(null, null);
+            return new EventService(null, null, null, null);
         }
 
         @Bean
@@ -429,7 +429,7 @@ class SwaggerConfigTest {
 
         @Bean
         PlaceService placeService() {
-            return new PlaceService(null, null);
+            return new PlaceService(null, null, null, null);
         }
     }
 

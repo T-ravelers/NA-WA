@@ -1,5 +1,6 @@
 package me.nawa.explore.mapper;
 
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -24,4 +25,14 @@ public interface ExploreItemLikeMapper {
     int adjustEventFavoriteCount(@Param("itemId") long itemId, @Param("delta") int delta);
 
     int adjustPlaceFavoriteCount(@Param("itemId") long itemId, @Param("delta") int delta);
+
+    /**
+     * 주어진 항목 중 회원이 지금 찜한 항목의 id. 목록의 savedColumn과 같은 조건을 본다.
+     *
+     * <p>캐시에서 꺼낸 탐색 목록에 회원별 찜 여부를 붙일 때 쓴다(#575). itemIds는 비어 있으면 안 된다.
+     */
+    List<Long> findSavedItemIds(
+        @Param("memberId") long memberId,
+        @Param("itemIds") List<Long> itemIds
+    );
 }
