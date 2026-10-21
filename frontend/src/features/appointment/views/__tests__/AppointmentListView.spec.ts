@@ -412,6 +412,23 @@ describe('AppointmentListView', () => {
     expect(wrapper.get('[aria-current="page"]').text()).toBe('3')
   })
 
+  // 캐시가 남은 재방문은 마운트 시점에 이미 page·totalPages가 정해져 있어 값이 변하지
+  // 않는다. 첫 판정이 없으면 빈 화면에 페이지 버튼도 없이 멈춘다.
+  it('moves to the last page again when the past-the-end page came from the cache', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    fetchAppointments.mockImplementation(threePages)
+    const path = '/appointments?itemId=42&itemType=EVENT&page=9'
+
+    const first = await mountView({ path, queryClient })
+    await flushPromises()
+    first.wrapper.unmount()
+
+    const { router } = await mountView({ path, queryClient })
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.page).toBe('2')
+  })
+
   it('opens the detail when the card itself is pressed', async () => {
     const { wrapper, router } = await mountView()
 

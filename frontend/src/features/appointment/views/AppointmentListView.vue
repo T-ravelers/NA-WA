@@ -169,13 +169,15 @@ watch([() => keyword.value.trim(), selectedLanguage], () => {
 })
 
 // 보던 약속이 끝나 목록이 줄면 주소의 페이지가 범위를 벗어난다. 빈 화면 대신 마지막 페이지를
-// 보여 준다 — 약속이 없는 것과 구분되지 않기 때문이다.
+// 보여 준다 — 약속이 없는 것과 구분되지 않기 때문이다. 캐시가 남은 재방문은 값이 변하지
+// 않아 첫 판정을 `immediate`가 맡는다.
 watch(
   () => [page.value, appointmentQuery.data.value?.totalPages] as const,
   ([current, totalPages]) => {
     if (totalPages === undefined || current === 0 || current < totalPages) return
     replacePage(Math.max(0, totalPages - 1))
   },
+  { immediate: true },
 )
 
 /**
