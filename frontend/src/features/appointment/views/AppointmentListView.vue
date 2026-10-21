@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppPagination from '@/shared/ui/AppPagination.vue'
@@ -33,19 +33,30 @@ const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
 
-const keyword = ref('')
+const languageOptions: AppointmentLanguageFilter[] = ['ALL', 'en', 'ja', 'zh-TW', 'vi']
+
+function readLanguage(value: unknown): AppointmentLanguageFilter | undefined {
+  const raw = Array.isArray(value) ? value[0] : value
+
+  return languageOptions.find((option) => option === raw)
+}
+
 // 기본은 회원이 고른 언어다. 방한 외국인이 알아들을 수 있는 약속이 먼저 보여야
 // 하는데, 목록 전체를 보여주면 대부분이 못 알아듣는 언어로 채워진다.
 //
-// 고른 칩은 저장하지 않는다. 들어올 때는 언제나 회원 언어에서 시작하고, 다른 언어를
-// 보는 것은 이 화면에 머무는 동안의 일이다. 다만 그동안은 자동 되돌림을 멈춰야 해서
-// (아래 watch) 직접 골랐는지만 화면 안에서 기억한다.
-const userChoseLanguage = ref(false)
-const selectedLanguage = ref<AppointmentLanguageFilter>(defaultListLanguage(locale.value))
+// 칩을 직접 누른 언어만 주소(`?language=`)에 적는다. 그래서 주소에 언어가 있으면 직접
+// 고른 것이고, 없으면 회원 언어에서 시작한다 — Explore에서 처음 들어오는 길은 언제나
+// 회원 언어다. "전체"도 `ALL`로 적어야 "아직 안 골랐다"와 구분된다.
+const chosenLanguage = computed(() => readLanguage(route.query.language))
+// 고르지 않았을 때의 언어. 0건이라 전체로 넓히는 것(아래 watch)은 사용자가 고른 것이
+// 아니므로 주소에 적지 않고 여기서만 바꾼다. 다시 들어오면 처음부터 다시 판단한다.
+const automaticLanguage = ref<AppointmentLanguageFilter>(defaultListLanguage(locale.value))
+const selectedLanguage = computed(() => chosenLanguage.value ?? automaticLanguage.value)
 
 function chooseLanguage(next: AppointmentLanguageFilter): void {
-  selectedLanguage.value = next
-  userChoseLanguage.value = true
+  const rest = { ...route.query }
+  delete rest.page
+  void router.replace({ path: route.path, query: { ...rest, language: next } })
 }
 
 function readPositiveInteger(value: unknown): number | undefined {
@@ -69,15 +80,25 @@ function readPageIndex(value: unknown): number {
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0
 }
 
+function readKeyword(value: unknown): string {
+  const raw = Array.isArray(value) ? value[0] : value
+
+  return typeof raw === 'string' ? raw.trim() : ''
+}
+
 const itemId = computed(() => readPositiveInteger(route.query.itemId))
 const itemType = computed(() => readItemType(route.query.itemType))
 // 페이지는 주소에 둔다. 참여하러 나갔다 돌아오거나 새로 고쳐도 보던 페이지가 남는다.
 const page = computed(() => readPageIndex(route.query.page))
+// 검색어도 주소에 둔다(페이지와 같은 이유). 검색칸에 치는 글자는 따로 두고, 타자가
+// 멈춘 뒤에만 주소로 옮긴다 — 글자마다 주소를 고치면 그때마다 서버에 다시 묻는다.
+const keyword = computed(() => readKeyword(route.query.keyword))
+const keywordInput = ref(keyword.value)
 
 const filters = computed<AppointmentListFilters>(() => ({
   itemId: itemId.value,
   itemType: itemType.value,
-  keyword: keyword.value.trim() || undefined,
+  keyword: keyword.value || undefined,
   language: selectedLanguage.value === 'ALL' ? undefined : selectedLanguage.value,
   page: page.value,
   size: 20,
@@ -101,8 +122,6 @@ const title = computed(() =>
       ? t('appointment.list.titleEvent')
       : t('appointment.list.title'),
 )
-
-const languageOptions: AppointmentLanguageFilter[] = ['ALL', 'en', 'ja', 'zh-TW', 'vi']
 
 function goBack(): void {
   if (itemId.value !== undefined && itemType.value === 'EVENT') {
@@ -163,10 +182,36 @@ function changePage(next: number): void {
 }
 
 // 조건이 바뀌면 결과가 통째로 달라지므로 첫 페이지부터 본다. 보던 페이지 번호가 새 결과에는
-// 없을 수 있다.
-watch([() => keyword.value.trim(), selectedLanguage], () => {
+// 없을 수 있다. 검색어와 직접 고른 언어는 주소를 고칠 때 페이지를 함께 지우고, 이 watch는
+// 전체로 자동으로 넓힌 경우를 맡는다.
+watch(selectedLanguage, () => {
   if (page.value > 0) replacePage(0)
 })
+
+// Explore 검색과 같은 지연이다. replace라 뒤로 가기 기록도 쌓이지 않는다.
+const KEYWORD_DEBOUNCE_MS = 300
+let keywordTimer: ReturnType<typeof setTimeout> | undefined
+
+watch(keywordInput, (value) => {
+  clearTimeout(keywordTimer)
+  keywordTimer = setTimeout(() => {
+    const next = value.trim()
+    if (next === keyword.value) return
+
+    const rest = { ...route.query }
+    delete rest.keyword
+    delete rest.page
+    void router.replace({
+      path: route.path,
+      query: next === '' ? rest : { ...rest, keyword: next },
+    })
+  }, KEYWORD_DEBOUNCE_MS)
+})
+
+// 기다리는 동안 화면을 떠나면, 떠난 화면이 다음 화면의 주소를 고치게 된다. unmount만으로는
+// 늦다 — 상세 진입 가드가 지연보다 오래 기다리면 그사이 타이머의 replace가 그 이동을 취소한다.
+onBeforeRouteLeave(() => clearTimeout(keywordTimer))
+onBeforeUnmount(() => clearTimeout(keywordTimer))
 
 // 보던 약속이 끝나 목록이 줄면 주소의 페이지가 범위를 벗어난다. 빈 화면 대신 마지막 페이지를
 // 보여 준다 — 약속이 없는 것과 구분되지 않기 때문이다. 캐시가 남은 재방문은 값이 변하지
@@ -192,6 +237,10 @@ const listQuery = computed(() => ({
   ...(itemType.value === undefined ? {} : { itemType: itemType.value }),
   // 고르던 카드가 있는 페이지로 돌아와야 한다. 첫 페이지로 오면 그 카드가 보이지 않는다.
   ...(page.value > 0 ? { page: String(page.value) } : {}),
+  // 검색어·언어가 빠지면 같은 페이지 번호라도 다른 목록이라 그 카드가 없다.
+  // 자동으로 넓힌 언어는 주소에 없으므로 싣지 않는다 — 돌아와서 다시 판단한다.
+  ...(keyword.value === '' ? {} : { keyword: keyword.value }),
+  ...(chosenLanguage.value === undefined ? {} : { language: chosenLanguage.value }),
 }))
 
 /**
@@ -216,10 +265,12 @@ watch(
   () =>
     [appointmentQuery.isSuccess.value, appointmentQuery.data.value?.totalElements ?? 0] as const,
   ([isSuccess, count]) => {
-    if (userChoseLanguage.value || selectedLanguage.value === 'ALL') return
-    if (!isSuccess || count > 0 || keyword.value.trim() !== '') return
+    // 직접 고른 언어는 selectedLanguage에서 automaticLanguage보다 앞서므로 여기서 바꿔도
+    // 화면에 닿지 않는다. 그래도 고른 언어가 있으면 판단 자체를 하지 않는다.
+    if (chosenLanguage.value !== undefined || selectedLanguage.value === 'ALL') return
+    if (!isSuccess || count > 0 || keyword.value !== '') return
 
-    selectedLanguage.value = 'ALL'
+    automaticLanguage.value = 'ALL'
   },
   { immediate: true },
 )
@@ -324,7 +375,7 @@ function selectJourney(tripId: number): void {
     />
 
     <TextInput
-      v-model="keyword"
+      v-model="keywordInput"
       type="search"
       :label="t('appointment.list.searchLabel')"
       :placeholder="t('appointment.list.searchPlaceholder')"

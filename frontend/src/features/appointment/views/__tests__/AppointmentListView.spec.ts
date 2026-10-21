@@ -1,8 +1,8 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref, type Ref } from 'vue'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { h, ref, type Ref } from 'vue'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
@@ -56,6 +56,11 @@ interface MountOptions {
   journeys?: Ref<AppointmentJourneySummary[] | undefined>
   /** 캐시가 남은 재방문을 흉내낼 때 넘긴다. 앱은 QueryClient 하나를 공유한다. */
   queryClient?: QueryClient
+  /**
+   * 화면을 RouterView 안에 띄운다. onBeforeRouteLeave는 라우트 레코드에 붙은
+   * 컴포넌트에서만 등록되므로, 떠나는 순간을 보는 테스트는 이걸 켠다.
+   */
+  throughRouterView?: boolean
 }
 
 async function mountView(options: MountOptions = {}) {
@@ -115,22 +120,25 @@ async function mountView(options: MountOptions = {}) {
   await router.push(options.path ?? '/appointments?itemId=42&itemType=EVENT')
   await router.isReady()
 
-  const wrapper = mount(AppointmentListView, {
-    global: {
-      plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
-      provide: {
-        // 카드의 Join이 여정 선택 시트를 연다. 약속 날짜(2026-08-08)를 담는 여정 하나.
-        [appointmentJourneyIntegrationKey as symbol]: {
-          useJourneyListQuery: () => ({
-            data: journeys,
-            isPending: ref(false),
-            isError: ref(false),
-          }),
-          checkAppointmentSlotTaken: vi.fn().mockResolvedValue(false),
+  const wrapper = mount(
+    options.throughRouterView ? { render: () => h(RouterView) } : AppointmentListView,
+    {
+      global: {
+        plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+        provide: {
+          // 카드의 Join이 여정 선택 시트를 연다. 약속 날짜(2026-08-08)를 담는 여정 하나.
+          [appointmentJourneyIntegrationKey as symbol]: {
+            useJourneyListQuery: () => ({
+              data: journeys,
+              isPending: ref(false),
+              isError: ref(false),
+            }),
+            checkAppointmentSlotTaken: vi.fn().mockResolvedValue(false),
+          },
         },
       },
     },
-  })
+  )
   await flushPromises()
   return { wrapper, router, queryClient }
 }
@@ -157,6 +165,17 @@ function threePages(filters: { page: number }) {
 }
 
 const scrollToMock = vi.fn()
+
+/**
+ * 검색어가 주소로 옮겨질 때까지 기다린다. 화면의 지연(300ms)보다 조금 길게 잡는다.
+ *
+ * 가짜 시계는 쓰지 않는다. flushPromises가 setTimeout을 쓰므로 그것까지 가짜가 되면
+ * 테스트가 끝나지 않는다(아래 폴링 테스트와 같은 이유).
+ */
+async function waitForKeywordDebounce(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 350))
+  await flushPromises()
+}
 
 describe('AppointmentListView', () => {
   beforeEach(() => {
@@ -373,7 +392,7 @@ describe('AppointmentListView', () => {
     })
 
     await wrapper.get('input[type="search"]').setValue('tour')
-    await flushPromises()
+    await waitForKeywordDebounce()
 
     expect(router.currentRoute.value.query.page).toBeUndefined()
     expect(fetchAppointments).toHaveBeenLastCalledWith(
@@ -392,6 +411,119 @@ describe('AppointmentListView', () => {
     expect(fetchAppointments).toHaveBeenLastCalledWith(
       expect.objectContaining({ language: 'ja', page: 0 }),
     )
+  })
+
+  // 검색어는 주소에 있어야 새로 고치거나 상세에 갔다 뒤로 와도 남는다.
+  it('starts from the keyword in the address', async () => {
+    const { wrapper } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&keyword=tour',
+    })
+
+    expect((wrapper.get('input[type="search"]').element as HTMLInputElement).value).toBe('tour')
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: 'tour' }))
+  })
+
+  // 글자마다 주소를 고치면 그때마다 서버에 다시 묻는다.
+  it('writes the keyword to the address once typing pauses', async () => {
+    const { wrapper, router } = await mountView()
+    const callsBefore = fetchAppointments.mock.calls.length
+
+    await wrapper.get('input[type="search"]').setValue('to')
+    await wrapper.get('input[type="search"]').setValue('tour ')
+    // 지연보다 짧게 기다린다. 바로 확인하면 주소 이동이 끝나기 전이라 지연이 없어도 통과한다.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.keyword).toBeUndefined()
+    expect(fetchAppointments).toHaveBeenCalledTimes(callsBefore)
+
+    await waitForKeywordDebounce()
+
+    expect(router.currentRoute.value.query.keyword).toBe('tour')
+    expect(fetchAppointments).toHaveBeenCalledTimes(callsBefore + 1)
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: 'tour' }))
+  })
+
+  it('removes the keyword from the address when the search is cleared', async () => {
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&keyword=tour',
+    })
+
+    await wrapper.get('input[type="search"]').setValue('  ')
+    await waitForKeywordDebounce()
+
+    expect(router.currentRoute.value.query).not.toHaveProperty('keyword')
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: undefined }),
+    )
+  })
+
+  // 직접 고른 언어는 주소에 있어야 새로 고치거나 다녀와도 남는다.
+  it('writes a chosen language to the address and starts from the first page', async () => {
+    fetchAppointments.mockImplementation(threePages)
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&page=2',
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Japanese')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.language).toBe('ja')
+    expect(router.currentRoute.value.query).not.toHaveProperty('page')
+  })
+
+  // 주소에 없는 것(회원 언어로 시작)과 구분해야 한다.
+  it('writes "All" to the address too', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'All')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.language).toBe('ALL')
+    expect(fetchAppointments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ language: undefined }),
+    )
+  })
+
+  // 주소의 언어는 사용자가 고른 것이다. 0건이라도 화면이 임의로 풀지 않는다.
+  it('keeps the language from the address even when it has no appointments', async () => {
+    fetchAppointments.mockResolvedValue(EMPTY_PAGE)
+
+    const { wrapper } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&language=ja',
+    })
+    await flushPromises()
+
+    expect(fetchAppointments).toHaveBeenLastCalledWith(expect.objectContaining({ language: 'ja' }))
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Japanese')
+        ?.attributes('aria-pressed'),
+    ).toBe('true')
+  })
+
+  // 자동으로 넓힌 것은 사용자가 고른 것이 아니다. 주소에 적으면 다음 방문에서 "직접 고른
+  // 전체"로 읽혀, 회원 언어에 약속이 생겨도 다시 좁히지 않는다.
+  it('does not write the automatic fallback to the address', async () => {
+    fetchAppointments.mockResolvedValueOnce(EMPTY_PAGE)
+
+    const { wrapper, router } = await mountView()
+    await flushPromises()
+
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'All')
+        ?.attributes('aria-pressed'),
+    ).toBe('true')
+    expect(router.currentRoute.value.query).not.toHaveProperty('language')
   })
 
   // 보던 약속이 끝나 목록이 줄면 주소의 페이지가 범위를 벗어난다. 빈 화면은 약속이
@@ -437,6 +569,28 @@ describe('AppointmentListView', () => {
 
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
+  })
+
+  // 상세 진입 가드(프로필·언어 동기화)가 검색 지연보다 오래 걸리면 목록은 아직
+  // 사라지지 않았다. 그때 울린 타이머의 replace가 사용자가 누른 상세 이동을 취소한다.
+  it('still opens the detail when the keyword timer fires while leaving', async () => {
+    const { wrapper, router } = await mountView({ throughRouterView: true })
+    let releaseGuard: () => void = () => {}
+    router.beforeEach((to) =>
+      to.name === 'appointment-detail'
+        ? new Promise<void>((resolve) => {
+            releaseGuard = resolve
+          })
+        : undefined,
+    )
+
+    await wrapper.get('input[type="search"]').setValue('tour')
+    await wrapper.get('article').trigger('click')
+    await waitForKeywordDebounce()
+    releaseGuard()
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
   })
 
   // Join을 누르는 것만으로는 목록을 떠나지 않는다. 여정 선택 시트가 목록 위에 열린다.
@@ -538,12 +692,22 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
   })
 
-  // 여정 생성·충전은 돌아올 주소를 들고 간다. 페이지가 빠지면 첫 페이지로 돌아와, 고르던
-  // 카드가 보이지 않는다.
-  it('takes the page along when it leaves to create a journey', async () => {
+  // 여정 생성·충전은 돌아올 주소를 들고 간다. 페이지·검색어·고른 언어 중 하나라도 빠지면
+  // 다른 목록으로 돌아와, 고르던 카드가 보이지 않는다.
+  const FILTERED_LIST_PATH =
+    '/appointments?itemId=42&itemType=EVENT&page=2&keyword=tour&language=ja'
+  const FILTERED_RETURN_QUERY = {
+    returnRouteName: 'appointment-list',
+    itemId: '42',
+    page: '2',
+    keyword: 'tour',
+    language: 'ja',
+  }
+
+  it('takes the page, keyword and language along when it leaves to create a journey', async () => {
     fetchAppointments.mockImplementation(threePages)
     const { wrapper, router } = await mountView({
-      path: '/appointments?itemId=42&itemType=EVENT&page=2',
+      path: FILTERED_LIST_PATH,
       journeys: ref<AppointmentJourneySummary[] | undefined>([]),
     })
 
@@ -560,21 +724,15 @@ describe('AppointmentListView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('journey-create')
-    expect(router.currentRoute.value.query).toMatchObject({
-      returnRouteName: 'appointment-list',
-      itemId: '42',
-      page: '2',
-    })
+    expect(router.currentRoute.value.query).toMatchObject(FILTERED_RETURN_QUERY)
   })
 
-  it('takes the page along when it leaves to top up', async () => {
+  it('takes the page, keyword and language along when it leaves to top up', async () => {
     fetchAppointments.mockImplementation(threePages)
     joinAppointment.mockRejectedValue(
       new NormalizedApiError('WALLET-015', 409, '지갑 잔액이 부족합니다.'),
     )
-    const { wrapper, router } = await mountView({
-      path: '/appointments?itemId=42&itemType=EVENT&page=2',
-    })
+    const { wrapper, router } = await mountView({ path: FILTERED_LIST_PATH })
 
     await wrapper
       .findAll('button')
@@ -599,11 +757,31 @@ describe('AppointmentListView', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('wallet-top-up')
-    expect(router.currentRoute.value.query).toMatchObject({
-      returnRouteName: 'appointment-list',
-      itemId: '42',
-      page: '2',
+    expect(router.currentRoute.value.query).toMatchObject(FILTERED_RETURN_QUERY)
+  })
+
+  // 자동으로 넓힌 언어는 사용자가 고른 것이 아니다. 들고 가면 돌아와서 "직접 고른 전체"로 읽힌다.
+  it('does not take the automatic language along', async () => {
+    fetchAppointments.mockResolvedValueOnce(EMPTY_PAGE)
+    const { wrapper, router } = await mountView({
+      journeys: ref<AppointmentJourneySummary[] | undefined>([]),
     })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text() === 'Create a journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-create')
+    expect(router.currentRoute.value.query).not.toHaveProperty('language')
   })
 
   // 여정을 만들거나 충전하고 돌아오면 시트를 다시 열어 **그 여정을 골라 둔 채로**
