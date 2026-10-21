@@ -171,6 +171,36 @@ class EventMapperIntegrationTest {
     }
 
     /**
+     * 키워드 없는 개수 쿼리는 번역을 조인하지 않지만(#575) 목록과 같은 수를 세야 한다.
+     *
+     * <p>번역이 없는 Event와 두 언어 번역이 있는 Event를 섞어, 조인을 빼도 빠지는 행이 없고
+     * 조인이 있을 때도 행이 불어나지 않았음을 목록 길이와 맞춰 본다.
+     */
+    @Test
+    void countEvents_matchesListWithoutKeyword() {
+        long untranslated = insertEvent(
+            "count-untranslated", today.minusDays(1), today.plusDays(1), "ONGOING"
+        );
+        long translated = insertEvent(
+            "count-translated", today.minusDays(1), today.plusDays(1), "ONGOING"
+        );
+        insertEventTranslation(translated, "en", marker + "-count-en", "English");
+        insertEventTranslation(translated, "ja", marker + "-count-ja", "日本語");
+        jdbcTemplate.update(
+            "UPDATE event SET region1 = ? WHERE event_id IN (?, ?)",
+            marker, untranslated, translated
+        );
+
+        EventSearchRequest request = new EventSearchRequest();
+        request.setRegion1(List.of(marker));
+        request.setLanguage("ja");
+        request.setSize(20);
+
+        assertEquals(2, mapper.searchEvents(request, 0, null, today).size());
+        assertEquals(2, mapper.countEvents(request, null, today));
+    }
+
+    /**
      * {@code zh-TW} 번역이 조인된다.
      *
      * <p><b>대소문자는 지금 스키마에서는 문제가 되지 않는다.</b> 두 번역 테이블이

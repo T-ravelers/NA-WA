@@ -252,6 +252,36 @@ class PlaceMapperIntegrationTest {
     }
 
     /**
+     * 키워드 없는 개수 쿼리는 번역을 조인하지 않지만(#575) 목록과 같은 수를 세야 한다.
+     *
+     * <p>번역이 없는 Place와 두 언어 번역이 있는 Place를 섞어, 조인을 빼도 빠지는 행이 없고
+     * 조인이 있을 때도 행이 불어나지 않았음을 목록 길이와 맞춰 본다.
+     */
+    @Test
+    void countPlaces_matchesListWithoutKeyword() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            String marker = UUID.randomUUID().toString();
+
+            long untranslated = insertPlace("번역 없음 " + marker);
+            long translated = insertPlace("번역 있음 " + marker);
+            insertPlaceTranslation(translated, "en", "Translated " + marker);
+            insertPlaceTranslation(translated, "ja", "翻訳 " + marker);
+            jdbcTemplate.update(
+                "UPDATE place SET region1 = ? WHERE place_id IN (?, ?)",
+                marker, untranslated, translated
+            );
+
+            PlaceSearchRequest request = new PlaceSearchRequest();
+            request.setRegion1(List.of(marker));
+            request.setLanguage("ja");
+
+            assertEquals(2, mapper.searchPlaces(request, 0, 20, null).size());
+            assertEquals(2, mapper.countPlaces(request, null));
+        });
+    }
+
+    /**
      * {@code zh-TW} 번역이 조인된다.
      *
      * <p>EventMapper 쪽과 같다 — 컬럼 collation이 {@code utf8mb4_0900_ai_ci}라 지금은 두 표기가
