@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppPagination from '@/shared/ui/AppPagination.vue'
@@ -208,7 +208,9 @@ watch(keywordInput, (value) => {
   }, KEYWORD_DEBOUNCE_MS)
 })
 
-// 기다리는 동안 화면을 떠나면, 떠난 화면이 다음 화면의 주소를 고치게 된다.
+// 기다리는 동안 화면을 떠나면, 떠난 화면이 다음 화면의 주소를 고치게 된다. unmount만으로는
+// 늦다 — 상세 진입 가드가 지연보다 오래 기다리면 그사이 타이머의 replace가 그 이동을 취소한다.
+onBeforeRouteLeave(() => clearTimeout(keywordTimer))
 onBeforeUnmount(() => clearTimeout(keywordTimer))
 
 // 보던 약속이 끝나 목록이 줄면 주소의 페이지가 범위를 벗어난다. 빈 화면 대신 마지막 페이지를

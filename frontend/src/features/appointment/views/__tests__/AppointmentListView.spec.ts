@@ -1,8 +1,8 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref, type Ref } from 'vue'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { h, ref, type Ref } from 'vue'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
@@ -56,6 +56,11 @@ interface MountOptions {
   journeys?: Ref<AppointmentJourneySummary[] | undefined>
   /** 캐시가 남은 재방문을 흉내낼 때 넘긴다. 앱은 QueryClient 하나를 공유한다. */
   queryClient?: QueryClient
+  /**
+   * 화면을 RouterView 안에 띄운다. onBeforeRouteLeave는 라우트 레코드에 붙은
+   * 컴포넌트에서만 등록되므로, 떠나는 순간을 보는 테스트는 이걸 켠다.
+   */
+  throughRouterView?: boolean
 }
 
 async function mountView(options: MountOptions = {}) {
@@ -115,22 +120,25 @@ async function mountView(options: MountOptions = {}) {
   await router.push(options.path ?? '/appointments?itemId=42&itemType=EVENT')
   await router.isReady()
 
-  const wrapper = mount(AppointmentListView, {
-    global: {
-      plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
-      provide: {
-        // 카드의 Join이 여정 선택 시트를 연다. 약속 날짜(2026-08-08)를 담는 여정 하나.
-        [appointmentJourneyIntegrationKey as symbol]: {
-          useJourneyListQuery: () => ({
-            data: journeys,
-            isPending: ref(false),
-            isError: ref(false),
-          }),
-          checkAppointmentSlotTaken: vi.fn().mockResolvedValue(false),
+  const wrapper = mount(
+    options.throughRouterView ? { render: () => h(RouterView) } : AppointmentListView,
+    {
+      global: {
+        plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
+        provide: {
+          // 카드의 Join이 여정 선택 시트를 연다. 약속 날짜(2026-08-08)를 담는 여정 하나.
+          [appointmentJourneyIntegrationKey as symbol]: {
+            useJourneyListQuery: () => ({
+              data: journeys,
+              isPending: ref(false),
+              isError: ref(false),
+            }),
+            checkAppointmentSlotTaken: vi.fn().mockResolvedValue(false),
+          },
         },
       },
     },
-  })
+  )
   await flushPromises()
   return { wrapper, router, queryClient }
 }
@@ -561,6 +569,28 @@ describe('AppointmentListView', () => {
 
     expect(router.currentRoute.value.name).toBe('appointment-detail')
     expect(router.currentRoute.value.params.appointmentId).toBe('7')
+  })
+
+  // 상세 진입 가드(프로필·언어 동기화)가 검색 지연보다 오래 걸리면 목록은 아직
+  // 사라지지 않았다. 그때 울린 타이머의 replace가 사용자가 누른 상세 이동을 취소한다.
+  it('still opens the detail when the keyword timer fires while leaving', async () => {
+    const { wrapper, router } = await mountView({ throughRouterView: true })
+    let releaseGuard: () => void = () => {}
+    router.beforeEach((to) =>
+      to.name === 'appointment-detail'
+        ? new Promise<void>((resolve) => {
+            releaseGuard = resolve
+          })
+        : undefined,
+    )
+
+    await wrapper.get('input[type="search"]').setValue('tour')
+    await wrapper.get('article').trigger('click')
+    await waitForKeywordDebounce()
+    releaseGuard()
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('appointment-detail')
   })
 
   // Join을 누르는 것만으로는 목록을 떠나지 않는다. 여정 선택 시트가 목록 위에 열린다.
