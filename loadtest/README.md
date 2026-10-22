@@ -206,6 +206,59 @@ k6 run -e LOADTEST_LOGIN_SECRET="$LOADTEST_LOGIN_SECRET" \
 두 실행 모두 `checks` 성공률이 100%여야 합니다. 그다음 `100 → 1,000 → 8,920`으로
 단계를 올립니다. 각 VU는 한 번만 실행되고 시작 시각만 5분 창에 분산됩니다.
 
+## 시나리오 3 — 한 약속 집중
+
+시나리오 1과 반대로 **모든 VU를 약속 하나에 몹니다.** `joinAppointment`가 약속 행을
+`FOR UPDATE`로 잠그므로 요청이 그 행 앞에서 줄을 섭니다. 재는 것은 셋입니다.
+
+- 정원 초과 0건 — 성공은 정확히 `min(VUS, 5)`여야 합니다
+- 참여 요청의 응답시간(`focus_join_duration`)과 InnoDB 행 락 대기
+- 정원 초과 거절(`APPOINTMENT-002`)을 뺀 오류(`focus_join_unexpected`)
+
+VU는 준비 시간(`PREPARE_SECONDS`)의 앞쪽 절반에 나눠 로그인·여정 생성을 마치고,
+**참여 요청만 같은 시각에** 보냅니다. 준비까지 한꺼번에 시작하면 로그인 몰림에서 연결이
+끊겨 출발선에 서지 못하는 VU가 생깁니다. `focus_prepare_failed`나 `focus_late_start`가
+0이 아니면 동시 요청 수가 `VUS`보다 적다는 뜻이라 그 실행은 해석하지 않습니다.
+끝까지 마친 VU 수(`iterations`)도 정확히 `VUS`여야 합니다. `MAX_DURATION`에 걸려 응답을
+받기 전에 중단된 VU는 위 카운터 어디에도 남지 않아, 가장 느린 요청이 빠진 결과가 됩니다.
+
+시드가 회차마다 약속 `3000000 + 회차`(정원 6, 방장 포함)를 만듭니다. 한 번 돌리면 그
+약속이 마감되므로 실행마다 `RUN_INDEX`를 올리고, 회차를 다 쓰면 '정리'의 `down -v` 뒤
+`RUNS`를 늘려 다시 시드합니다.
+
+```shell
+set -a && source .env.loadtest && set +a
+
+# 1. 실행 전 행 락 누적값 — 서버 전체 누적이라 전후 차이로 읽는다
+docker compose -p nawa-loadtest -f docker-compose.yml -f docker-compose.ec2-clone.yml \
+  exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
+  mysql -uroot "$MYSQL_DATABASE" -e "SHOW GLOBAL STATUS LIKE 'Innodb_row_lock%'"
+
+# 2. 부하 — 100명은 PREPARE_SECONDS=30, 1,000명은 120을 썼다
+k6 run -e LOADTEST_LOGIN_SECRET="$LOADTEST_LOGIN_SECRET" -e RUN_ID="$(date +%s)" \
+  -e RUN_INDEX=2 -e VUS=100 -e PREPARE_SECONDS=30 \
+  loadtest/k6/scenario3-one-appointment-join.js
+
+# 3. 확인 — @appointment_id는 3000000 + RUN_INDEX
+{ printf 'SET @appointment_id = 3000002;\n'; cat loadtest/verify-one-appointment.sql; } \
+  | docker compose -p nawa-loadtest -f docker-compose.yml -f docker-compose.ec2-clone.yml \
+    exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql mysql -uroot "$MYSQL_DATABASE"
+```
+
+확인 SQL의 판정 네 칸이 모두 `OK`여야 합니다. 하나라도 `NG`면 응답시간을 해석하기 전에
+그 불일치부터 봅니다.
+
+`focus_join_unexpected`가 `status=0`(연결 끊김)으로만 쌓이면 요청이 백엔드에 닿기 전에
+nginx에서 끊긴 것입니다. nginx 로그의 `worker_connections are not enough`와 함께 봅니다.
+
+| 변수 | 기본값 | 뜻 |
+| --- | --- | --- |
+| `VUS` | `100` | 동시에 참여할 VU 수 |
+| `PREPARE_SECONDS` | `60` | 준비 시작부터 참여 요청까지의 시간 |
+| `PREPARE_SPREAD_SECONDS` | `PREPARE_SECONDS / 2` | 준비 시작을 나눠 놓는 구간 |
+| `FOCUS_APPOINTMENT_BASE` | `3000000` | 집중 측정 약속 번호. **시드의 `@focus_base`와 같아야 한다** |
+| `VU_SLOTS_PER_APPOINTMENT` | `5` | 남은 자리. 시나리오 1과 같은 값 |
+
 ### 시나리오 2의 보조 세션 트래픽
 
 Notion의 20건은 QR 결제부터 리포트까지의 업무 API만 센 값입니다. 독립된 k6 파일은
