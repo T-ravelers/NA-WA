@@ -18,6 +18,7 @@ erDiagram
     MEMBERS ||--o{ SETTLEMENT_RECEIPTS : uploads
     SETTLEMENTS ||--o{ NOTIFICATIONS : announces
     MEMBERS ||--o{ NOTIFICATIONS : receives
+    MEMBERS ||--o{ PUSH_SUBSCRIPTIONS : subscribes
 
     APPOINTMENTS ||--o{ MEMBER_REVIEWS : reviews_after
     APPOINTMENT_MEMBERS ||--o{ MEMBER_REVIEWS : reviewer
@@ -104,6 +105,15 @@ erDiagram
         DATETIME read_at
     }
 
+    PUSH_SUBSCRIPTIONS {
+        BIGINT push_subscription_id PK
+        BIGINT member_id FK
+        VARCHAR endpoint UK
+        VARCHAR p256dh
+        VARCHAR auth_secret
+        VARCHAR language_code
+    }
+
     MEMBER_REVIEWS {
         BIGINT review_id PK
         BIGINT appointment_id FK
@@ -173,3 +183,19 @@ erDiagram
 `(recipient_member_id, created_at DESC)` 인덱스 하나를 함께 쓴다.
 
 계약과 알림 종류별 수신자 규칙은 [알림 API 계약](../NOTIFICATION_API.md)에 있다.
+
+## 푸시 구독
+
+`push_subscriptions`는 브라우저가 알려 준 "이 기기로 푸시를 보내라"는 주소(구독)를 회원에
+붙여 저장한다. 한 회원이 기기마다 구독을 하나씩 가지므로 회원 하나에 여러 행이 붙는다.
+
+`endpoint`에 UNIQUE가 걸려 있다. `endpoint`는 기기(브라우저) 하나를 가리키는 값이라 전체에서
+하나뿐이어야 한다. 같은 기기에서 다른 계정이 로그인하면 새 행을 만들지 않고 기존 행의 주인을
+옮긴다 — 그러지 않으면 이전 계정의 알림이 지금 그 기기를 쓰는 사람에게 계속 도착한다.
+
+`p256dh`·`auth_secret`은 푸시 본문을 그 기기만 풀 수 있게 암호화하는 데 쓰는 기기의 공개키와
+비밀값이다. `language_code`는 구독을 등록한 화면의 언어이고, 서버가 푸시 본문에 실어 보낸다.
+백엔드에는 알림 문구를 만드는 i18n이 없어서 문구는 서비스 워커가 만든다.
+
+해지하거나 푸시 서비스가 끝난 구독이라고 알려 오면 행을 지운다(소프트 삭제가 아니다). 지워도
+잃는 이력이 없고, 알림 자체는 `notifications`에 남아 있다.

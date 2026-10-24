@@ -541,9 +541,13 @@ export default {
 - 서비스 워커는 앱 셸과 정적 자원만 사전 캐시합니다.
 - 인증, 개인정보, 비용·정산, mutation 응답과 지도 타일을 runtime cache에 넣지
   않습니다.
-- **폰트를 precache에 넣지 않습니다.** `vite.config.ts`의 `workbox.globPatterns`가
+- **폰트를 precache에 넣지 않습니다.** `vite.config.ts`의 `injectManifest.globPatterns`가
   `js`, `css`, `html`만 포함하므로 woff2는 사전 캐시되지 않습니다. CJK 폰트까지
   포함하면 사전 캐시가 수십 MB로 커지므로 이 패턴을 넓히지 않습니다.
+- 서비스 워커는 `src/sw.ts`에 직접 작성합니다. runtime cache는 설정이 아니라 코드이므로
+  API 요청을 가로채는 `registerRoute`를 추가하지 않습니다. 웹 푸시(`push`·
+  `notificationclick`)도 이 파일에 있고, 문구와 이동 주소를 만드는 로직은
+  `features/notification/model/pushNotification.ts`에서 테스트합니다.
 - 오프라인 읽기 기능을 추가하기 전에 데이터 종류, 만료 시간과 로그아웃 시 제거
   방법을 정합니다.
 - 서비스 워커를 변경하면 새 버전 업데이트와 기존 캐시 제거 동작을 확인합니다.

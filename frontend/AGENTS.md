@@ -103,7 +103,16 @@ API mock 또는 Playwright route stub을 사용합니다.
 
 앱 셸과 정적 자원만 precache합니다. 인증·개인정보·정산·mutation 응답, 일반 API,
 지도 타일은 runtime cache에 넣지 않습니다. 폰트도 precache에 넣지 않습니다
-(`workbox.globPatterns`는 js/css/html만).
+(`injectManifest.globPatterns`는 js/css/html만).
+
+서비스 워커는 `generateSW`가 만들지 않고 `src/sw.ts`에 직접 적습니다(웹 푸시 처리를 얹기
+위해서입니다). 그래서 캐시 경계는 설정이 아니라 **코드로 지켜집니다.** `registerRoute`가
+`index.html` 내비게이션 폴백 하나뿐인 것이 "runtime cache 없음"의 전부이니, API 요청을
+가로채는 라우트를 여기에 추가하지 마세요.
+
+푸시는 알림 목록을 대신하지 않습니다. 구독하지 않았거나 브라우저가 지원하지 않거나 권한이
+막혀 있어도 알림 목록과 15초 폴링은 그대로 동작해야 하고, 푸시 쪽 실패가 화면 오류로 번지면
+안 됩니다.
 
 ## 화면을 바꿨다면 스냅샷을 남긴다
 
