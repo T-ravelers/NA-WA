@@ -1,0 +1,170 @@
+package me.nawa.notification.mapper;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+import java.util.Map;
+import java.util.UUID;
+import me.nawa.config.MySqlSchemaExtension;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
+
+@ExtendWith(MySqlSchemaExtension.class)
+@EnabledIfEnvironmentVariable(
+    named = "RUN_MYSQL_INTEGRATION_TESTS",
+    matches = "(?i)true"
+)
+class PushSubscriptionMapperIntegrationTest {
+
+    private static HikariDataSource dataSource;
+    private static JdbcTemplate jdbcTemplate;
+    private static PushSubscriptionMapper mapper;
+
+    @BeforeAll
+    static void setUpDatabase() throws Exception {
+        HikariConfig hikariConfig = new HikariConfig();
+        hikariConfig.setDriverClassName(requiredEnvironment("DATABASE_DRIVER"));
+        hikariConfig.setJdbcUrl(requiredEnvironment("DATABASE_URL"));
+        hikariConfig.setUsername(requiredEnvironment("DATABASE_USERNAME"));
+        hikariConfig.setPassword(requiredEnvironment("DATABASE_PASSWORD"));
+        hikariConfig.setMaximumPoolSize(2);
+        hikariConfig.setMinimumIdle(0);
+        dataSource = new HikariDataSource(hikariConfig);
+        jdbcTemplate = new JdbcTemplate(dataSource);
+
+        SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
+        factoryBean.setDataSource(dataSource);
+        factoryBean.setConfigLocation(new ClassPathResource("mybatis-config.xml"));
+        factoryBean.setMapperLocations(
+            new ClassPathResource("me/nawa/notification/mapper/PushSubscriptionMapper.xml")
+        );
+        SqlSessionFactory sqlSessionFactory = factoryBean.getObject();
+        if (!sqlSessionFactory.getConfiguration().hasMapper(PushSubscriptionMapper.class)) {
+            sqlSessionFactory.getConfiguration().addMapper(PushSubscriptionMapper.class);
+        }
+        mapper = new SqlSessionTemplate(sqlSessionFactory).getMapper(PushSubscriptionMapper.class);
+    }
+
+    @AfterAll
+    static void closeDatabase() {
+        if (dataSource != null) {
+            dataSource.close();
+        }
+    }
+
+    /** 한 회원이 폰과 노트북을 모두 등록하면 행이 둘 생긴다. */
+    @Test
+    void upsert_keepsOneRowPerDeviceForTheSameMember() {
+        long memberId = insertMember();
+        String phone = endpoint();
+        String laptop = endpoint();
+        try {
+            mapper.upsert(memberId, phone, "p256dh-a", "auth-a", "en");
+            mapper.upsert(memberId, laptop, "p256dh-b", "auth-b", "ja");
+            // 같은 기기를 다시 등록해도 행이 늘지 않는다.
+            mapper.upsert(memberId, phone, "p256dh-a", "auth-a", "en");
+
+            assertEquals(2, countByMember(memberId));
+        } finally {
+            deleteSubscriptions(phone, laptop);
+            deleteMember(memberId);
+        }
+    }
+
+    /**
+     * 같은 기기에 다른 계정이 로그인하면 구독이 새로 생기지 않고 주인만 옮겨 간다.
+     * 옮겨 가지 않으면 이전 계정의 알림이 이 기기에 계속 도착한다.
+     */
+    @Test
+    void upsert_movesTheSubscriptionToTheMemberWhoLoggedInOnTheSameDevice() {
+        long first = insertMember();
+        long second = insertMember();
+        String device = endpoint();
+        try {
+            mapper.upsert(first, device, "old-key", "old-auth", "en");
+            mapper.upsert(second, device, "new-key", "new-auth", "vi");
+
+            assertEquals(0, countByMember(first));
+            assertEquals(1, countByMember(second));
+            Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT p256dh, auth_secret, language_code FROM push_subscriptions WHERE endpoint = ?",
+                device
+            );
+            assertEquals("new-key", row.get("p256dh"));
+            assertEquals("new-auth", row.get("auth_secret"));
+            assertEquals("vi", row.get("language_code"));
+        } finally {
+            deleteSubscriptions(device);
+            deleteMember(first);
+            deleteMember(second);
+        }
+    }
+
+    /** 해지는 내 기기만 지운다. 남의 endpoint를 적어 보내도 아무 행도 바뀌지 않는다. */
+    @Test
+    void deleteByMemberAndEndpoint_onlyRemovesTheOwnersSubscription() {
+        long owner = insertMember();
+        long stranger = insertMember();
+        String device = endpoint();
+        try {
+            mapper.upsert(owner, device, "key", "auth", "en");
+
+            assertEquals(0, mapper.deleteByMemberAndEndpoint(stranger, device));
+            assertEquals(1, countByMember(owner));
+
+            assertEquals(1, mapper.deleteByMemberAndEndpoint(owner, device));
+            assertEquals(0, countByMember(owner));
+        } finally {
+            deleteSubscriptions(device);
+            deleteMember(owner);
+            deleteMember(stranger);
+        }
+    }
+
+    private static String endpoint() {
+        return "https://push.example.test/send/" + UUID.randomUUID();
+    }
+
+    private static long insertMember() {
+        return new SimpleJdbcInsert(dataSource)
+            .withTableName("members")
+            .usingColumns("display_name")
+            .usingGeneratedKeyColumns("member_id")
+            .executeAndReturnKey(Map.of("display_name", "psh-" + UUID.randomUUID()))
+            .longValue();
+    }
+
+    private static int countByMember(long memberId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM push_subscriptions WHERE member_id = ?", Integer.class, memberId
+        );
+    }
+
+    private static void deleteSubscriptions(String... endpoints) {
+        for (String endpoint : endpoints) {
+            jdbcTemplate.update("DELETE FROM push_subscriptions WHERE endpoint = ?", endpoint);
+        }
+    }
+
+    private static void deleteMember(long memberId) {
+        jdbcTemplate.update("DELETE FROM members WHERE member_id = ?", memberId);
+    }
+
+    private static String requiredEnvironment(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(name + " is required");
+        }
+        return value;
+    }
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.notification.mapper.PushSubscriptionMapper">
+
+    <insert id="upsert">
+        INSERT INTO push_subscriptions
+            (member_id, endpoint, p256dh, auth_secret, language_code)
+        VALUES
+            (#{memberId}, #{endpoint}, #{p256dh}, #{authSecret}, #{languageCode})
+        ON DUPLICATE KEY UPDATE
+            member_id = VALUES(member_id),
+            p256dh = VALUES(p256dh),
+            auth_secret = VALUES(auth_secret),
+            language_code = VALUES(language_code)
+    </insert>
+
+    <delete id="deleteByMemberAndEndpoint">
+        DELETE FROM push_subscriptions
+        WHERE member_id = #{memberId}
+          AND endpoint = #{endpoint}
+    </delete>
+</mapper>

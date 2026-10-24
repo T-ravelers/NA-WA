@@ -19,6 +19,7 @@ import me.nawa.member.dto.UpdateMemberProfileRequest;
 import me.nawa.member.mapper.MemberMapper;
 import me.nawa.member.service.MemberProfileService;
 import me.nawa.notification.service.NotificationService;
+import me.nawa.notification.service.PushSubscriptionService;
 import me.nawa.settlement.service.SettlementCreationService;
 import me.nawa.settlement.service.SettlementPaymentService;
 import me.nawa.settlement.service.SettlementQueryService;
@@ -543,6 +544,25 @@ class SwaggerConfigTest {
 
                 @Override public me.nawa.notification.dto.response.NotificationDeleteAllResponse
                     deleteAll(Long memberId) {
+                    throw new UnsupportedOperationException();
+                }
+            };
+        }
+
+        @Bean
+        PushSubscriptionService pushSubscriptionService() {
+            return new PushSubscriptionService() {
+                @Override public String getPublicKey() {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override public void subscribe(
+                    Long memberId, me.nawa.notification.dto.request.PushSubscribeRequest request
+                ) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override public void unsubscribe(Long memberId, String endpoint) {
                     throw new UnsupportedOperationException();
                 }
             };
