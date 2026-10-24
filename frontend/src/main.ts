@@ -5,6 +5,7 @@ import { createApp } from 'vue'
 import App from '@/app/App.vue'
 import { i18n } from '@/app/i18n'
 import { bootstrapLocale } from '@/app/i18n/applyLocale'
+import { listenForPushMessages } from '@/app/push/pushMessageListener'
 import { queryClient } from '@/app/query/client'
 import { router } from '@/app/router'
 import {
@@ -63,6 +64,12 @@ subscribeSignOutBarrier((active) => {
 })
 
 bootstrapLocale()
+
+// 서비스 워커가 알리는 "푸시 도착"을 듣는다. 서비스 워커를 못 쓰는 환경에서는 건너뛴다.
+listenForPushMessages(
+  queryClient,
+  'serviceWorker' in navigator ? navigator.serviceWorker : undefined,
+)
 
 const app = createApp(App)
 
