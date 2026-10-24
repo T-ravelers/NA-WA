@@ -12,7 +12,10 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      strategies: 'generateSW',
+      // 서비스 워커를 직접 적는다(src/sw.ts). 푸시 처리를 얹으려면 생성된 코드로는 안 된다.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       includeAssets: ['favicon.ico', 'pwa-icon.svg', 'apple-touch-icon.png'],
       manifest: {
         id: '/',
@@ -39,10 +42,10 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      // precache 대상. 앱 셸과 정적 자원(js/css/html)만이고 폰트는 넣지 않는다.
+      // runtime cache와 index.html 폴백은 src/sw.ts에 코드로 있다.
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html}'],
-        navigateFallback: 'index.html',
-        runtimeCaching: [],
       },
     }),
   ],
