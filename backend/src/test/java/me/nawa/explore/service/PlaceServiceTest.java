@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.explore.dto.request.PlaceSearchRequest;
@@ -20,10 +21,13 @@ import me.nawa.explore.dto.response.PlaceDetailResponse;
 import me.nawa.explore.dto.response.PlaceListResponse;
 import me.nawa.explore.dto.response.PlaceSummaryResponse;
 import me.nawa.explore.exception.ExploreErrorCode;
+import me.nawa.explore.mapper.ExploreItemLikeMapper;
 import me.nawa.explore.mapper.PlaceMapper;
+import me.nawa.explore.service.ExploreListCache.CachedPage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -35,11 +39,70 @@ class PlaceServiceTest {
 
     @Mock
     private ExploreViewCountRecorder viewCountRecorder;
+
+    @Mock
+    private ExploreListCache listCache;
+
+    @Mock
+    private ExploreItemLikeMapper likeMapper;
     private PlaceService placeService;
 
     @BeforeEach
     void setUp() {
-        placeService = new PlaceService(placeMapper, viewCountRecorder);
+        placeService = new PlaceService(placeMapper, viewCountRecorder, listCache, likeMapper);
+    }
+
+    @Test
+    void searchPlaces_readsSharedFirstPageFromCache_andMarksSavedForMember() {
+        PlaceSummaryResponse cached = PlaceSummaryResponse.builder()
+            .itemId(1L).placeKind("RESTAURANT").build();
+        when(listCache.read(eq("place"), any(), eq(PlaceSummaryResponse.class)))
+            .thenReturn(Optional.of(new CachedPage<>(List.of(cached), 21)));
+        when(likeMapper.findSavedItemIds(7L, List.of(1L))).thenReturn(List.of(1L));
+
+        PlaceListResponse result = placeService.searchPlaces(new PlaceSearchRequest(), 7L);
+
+        assertEquals(21L, result.getTotalElements());
+        assertEquals(2, result.getTotalPages());
+        assertTrue(result.getContent().get(0).isSaved());
+        verifyNoInteractions(placeMapper);
+    }
+
+    @Test
+    void searchPlaces_storesNormalizedFirstPageReadWithoutMember() {
+        PlaceSearchRequest request = new PlaceSearchRequest();
+        when(placeMapper.searchPlaces(request, 0, 20, null)).thenReturn(List.of(
+            PlaceSummaryResponse.builder().itemId(1L).placeKind("관광식당").build()
+        ));
+        when(placeMapper.countPlaces(request, null)).thenReturn(1L);
+        when(likeMapper.findSavedItemIds(7L, List.of(1L))).thenReturn(List.of());
+
+        placeService.searchPlaces(request, 7L);
+
+        // 정규화한 값을 담아야 꺼낸 쪽이 다시 정규화하지 않아도 된다.
+        ArgumentCaptor<CachedPage<PlaceSummaryResponse>> stored = pageCaptor();
+        verify(listCache).write(eq("place"), eq(request), stored.capture());
+        assertEquals("RESTAURANT", stored.getValue().content().get(0).getPlaceKind());
+    }
+
+    @Test
+    void searchPlaces_skipsCache_forKeywordsAndSavedOnly() {
+        PlaceSearchRequest keyword = new PlaceSearchRequest();
+        keyword.setKeyword(" 카페 ");
+        PlaceSearchRequest savedOnly = new PlaceSearchRequest();
+        savedOnly.setSavedOnly(true);
+        when(placeMapper.searchPlaces(any(), eq(0), eq(20), eq(7L))).thenReturn(List.of());
+        when(placeMapper.countPlaces(any(), eq(7L))).thenReturn(0L);
+
+        placeService.searchPlaces(keyword, 7L);
+        placeService.searchPlaces(savedOnly, 7L);
+
+        verifyNoInteractions(listCache, likeMapper);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ArgumentCaptor<CachedPage<PlaceSummaryResponse>> pageCaptor() {
+        return ArgumentCaptor.forClass((Class<CachedPage<PlaceSummaryResponse>>) (Class<?>) CachedPage.class);
     }
 
     @Test

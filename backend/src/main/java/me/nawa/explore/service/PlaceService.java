@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -21,7 +22,9 @@ import me.nawa.explore.dto.response.PlaceDetailResponse;
 import me.nawa.explore.dto.response.PlaceListResponse;
 import me.nawa.explore.dto.response.PlaceSummaryResponse;
 import me.nawa.explore.exception.ExploreErrorCode;
+import me.nawa.explore.mapper.ExploreItemLikeMapper;
 import me.nawa.explore.mapper.PlaceMapper;
+import me.nawa.explore.service.ExploreListCache.CachedPage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -38,8 +41,12 @@ public class PlaceService {
     private static final Set<String> PLACE_KINDS = Set.of(
         "RESTAURANT", "CAFE", "MARKET", "BEAUTY", "ETC"
     );
+    private static final String CACHE_KIND = "place";
+
     private final PlaceMapper placeMapper;
     private final ExploreViewCountRecorder viewCountRecorder;
+    private final ExploreListCache listCache;
+    private final ExploreItemLikeMapper likeMapper;
 
     @Transactional(readOnly = true)
     public PlaceListResponse searchPlaces(
@@ -50,12 +57,58 @@ public class PlaceService {
         validateSavedOnly(request, memberId);
         int offset = calculateOffset(request);
 
+        if (isSharedFirstPage(request)) {
+            CachedPage<PlaceSummaryResponse> page = readSharedFirstPage(request);
+            markSaved(page.content(), memberId);
+            return createListResponse(page.content(), page.totalElements(), request);
+        }
+
         List<PlaceSummaryResponse> content = placeMapper.searchPlaces(
             request, offset, request.getSize(), memberId
         );
         normalizeSummaries(content);
         long total = placeMapper.countPlaces(request, memberId);
         return createListResponse(content, total, request);
+    }
+
+    /** EventService.isSharedFirstPage와 같은 기준이다(#575). */
+    private boolean isSharedFirstPage(PlaceSearchRequest request) {
+        return request.getPage() == 0
+            && request.getKeyword() == null
+            && !Boolean.TRUE.equals(request.getSavedOnly());
+    }
+
+    /**
+     * 키는 정규화를 마친 요청 전체다. EventService.readSharedFirstPage와 같은 이유로 필드를 골라
+     * 담지 않는다. Place 목록은 기준일에 따라 달라지지 않는다.
+     *
+     * <p>정규화한 값을 담아 꺼낸 뒤 다시 정규화하지 않는다.
+     */
+    private CachedPage<PlaceSummaryResponse> readSharedFirstPage(PlaceSearchRequest request) {
+        return listCache.read(CACHE_KIND, request, PlaceSummaryResponse.class)
+            .orElseGet(() -> {
+                List<PlaceSummaryResponse> content = placeMapper.searchPlaces(
+                    request, 0, request.getSize(), null
+                );
+                normalizeSummaries(content);
+                CachedPage<PlaceSummaryResponse> page = new CachedPage<>(
+                    content,
+                    placeMapper.countPlaces(request, null)
+                );
+                listCache.write(CACHE_KIND, request, page);
+                return page;
+            });
+    }
+
+    private void markSaved(List<PlaceSummaryResponse> content, Long memberId) {
+        if (memberId == null || content.isEmpty()) {
+            return;
+        }
+        Set<Long> savedIds = new HashSet<>(likeMapper.findSavedItemIds(
+            memberId,
+            content.stream().map(PlaceSummaryResponse::getItemId).toList()
+        ));
+        content.forEach(place -> place.setSaved(savedIds.contains(place.getItemId())));
     }
 
     /**

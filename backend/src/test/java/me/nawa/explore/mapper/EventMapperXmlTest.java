@@ -324,11 +324,18 @@ class EventMapperXmlTest {
         listParameters.put("offset", 0);
         listParameters.put("today", LocalDate.of(2026, 8, 25));
 
-        for (String statementId : List.of(
-            "me.nawa.explore.mapper.EventMapper.searchEvents",
-            "me.nawa.explore.mapper.EventMapper.countEvents"
-        )) {
-            String sql = normalizedSql(configuration, statementId, listParameters);
+        EventSearchRequest keywordRequest = new EventSearchRequest();
+        keywordRequest.setKeyword("Festival");
+        Map<String, Object> keywordParameters = new HashMap<>(listParameters);
+        keywordParameters.put("request", keywordRequest);
+
+        // 개수 쿼리는 키워드가 있을 때만 번역 열을 본다(#575). 목록은 표시값 때문에 늘 조인한다.
+        for (Map.Entry<String, Map<String, Object>> statement : Map.of(
+            "me.nawa.explore.mapper.EventMapper.searchEvents", listParameters,
+            "me.nawa.explore.mapper.EventMapper.countEvents", keywordParameters
+        ).entrySet()) {
+            String statementId = statement.getKey();
+            String sql = normalizedSql(configuration, statementId, statement.getValue());
 
             assertTrue(
                 sql.contains("LEFT JOIN event_translations et"),
@@ -337,11 +344,21 @@ class EventMapperXmlTest {
             assertTrue(sql.contains("et.deleted_at IS NULL"));
             // 언어는 request 안에 있다. 경로를 잘못 적으면 NULL로 조인돼 조용히 원문만 나간다.
             assertTrue(
-                boundProperties(configuration, statementId, listParameters)
+                boundProperties(configuration, statementId, statement.getValue())
                     .contains("request.language"),
                 statementId + "가 request.language를 바인딩하지 않는다"
             );
         }
+
+        // 키워드가 없으면 개수 쿼리는 번역 열을 보지 않는다. 조인이 남아도 결과가 같아
+        // 테스트 없이는 조용히 되돌아간다.
+        assertFalse(
+            normalizedSql(
+                configuration,
+                "me.nawa.explore.mapper.EventMapper.countEvents",
+                listParameters
+            ).contains("event_translations")
+        );
 
         String detailSql = normalizedSql(
             configuration,

@@ -470,17 +470,23 @@
     </select>
 
     <!--
-        eventListWhere가 키워드 검색에서 et.title을 보므로 여기에도 같은 조인이 있어야 한다.
-        빠뜨리면 목록은 번역 제목으로 찾아 주는데 개수만 다른 조건으로 세어 페이지네이션이
+        eventListWhere가 키워드 검색에서 et·et_en을 보므로 키워드가 있으면 같은 조인이 있어야
+        한다. 빠뜨리면 목록은 번역 제목으로 찾아 주는데 개수만 다른 조건으로 세어 페이지네이션이
         어긋난다. 조인은 PK(event_id, language_code) 기준 최대 한 행이라 COUNT(*)를 부풀리지
         않는다.
+
+        키워드가 없으면 번역 열을 보는 곳이 없어 조인을 뺀다. 붙여 두면 결과는 같은데 행마다
+        번역 표를 두 번 찾아 개수 세기가 목록보다 훨씬 느렸다(#575). 아래 조건은
+        eventListWhere의 키워드 조건과 같은 식이어야 한다.
     -->
     <select id="countEvents" resultType="long">
         SELECT COUNT(*)
         FROM explore_items ei
         JOIN event e
         ON e.event_id = ei.item_id
-        <include refid="eventListTranslationJoin"/>
+        <if test="request.keyword != null and request.keyword != ''">
+            <include refid="eventListTranslationJoin"/>
+        </if>
         WHERE
         <include refid="eventListWhere"/>
     </select>

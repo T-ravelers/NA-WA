@@ -301,15 +301,21 @@
     </select>
 
     <!--
-        placeListWhere가 키워드 검색에서 pt를 보므로 여기에도 같은 조인이 있어야 한다.
-        빠뜨리면 목록과 개수가 다른 조건으로 갈려 페이지네이션이 어긋난다. 조인은
+        placeListWhere가 키워드 검색에서 pt·pt_en을 보므로 키워드가 있으면 같은 조인이 있어야
+        한다. 빠뜨리면 목록과 개수가 다른 조건으로 갈려 페이지네이션이 어긋난다. 조인은
         PK(place_id, language_code) 기준 최대 한 행이라 COUNT(*)를 부풀리지 않는다.
+
+        키워드가 없으면 번역 열을 보는 곳이 없어 조인을 뺀다. 붙여 두면 결과는 같은데 행마다
+        번역 표를 두 번 찾아 개수 세기가 목록보다 훨씬 느렸다(#575). 아래 조건은
+        placeListWhere의 키워드 조건과 같은 식이어야 한다.
     -->
     <select id="countPlaces" resultType="long">
         SELECT COUNT(*)
         FROM explore_items ei
         JOIN place p ON p.place_id = ei.item_id
-        <include refid="placeListTranslationJoin"/>
+        <if test="request.keyword != null and request.keyword != ''">
+            <include refid="placeListTranslationJoin"/>
+        </if>
         WHERE <include refid="placeListWhere"/>
     </select>
 

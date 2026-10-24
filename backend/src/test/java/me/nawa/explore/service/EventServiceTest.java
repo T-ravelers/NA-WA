@@ -1,7 +1,9 @@
 package me.nawa.explore.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -15,6 +17,8 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
 import me.nawa.explore.dto.request.EventSearchRequest;
@@ -24,8 +28,11 @@ import me.nawa.explore.dto.response.EventSummaryResponse;
 import me.nawa.explore.domain.EventStatus;
 import me.nawa.explore.exception.ExploreErrorCode;
 import me.nawa.explore.mapper.EventMapper;
+import me.nawa.explore.mapper.ExploreItemLikeMapper;
+import me.nawa.explore.service.ExploreListCache.CachedPage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -38,6 +45,12 @@ class EventServiceTest {
 
     @Mock
     private ExploreViewCountRecorder viewCountRecorder;
+
+    @Mock
+    private ExploreListCache listCache;
+
+    @Mock
+    private ExploreItemLikeMapper likeMapper;
 
     @InjectMocks
     private EventService eventService;
@@ -278,6 +291,103 @@ class EventServiceTest {
             eq(request), eq(0), eq(7L), any(LocalDate.class));
         verify(eventMapper).countEvents(
             eq(request), eq(7L), any(LocalDate.class));
+        verifyNoInteractions(listCache);
+    }
+
+    @Test
+    void searchEvents_readsSharedFirstPageFromCache_withoutTouchingDb() {
+        when(listCache.read(eq("event"), any(), eq(EventSummaryResponse.class)))
+            .thenReturn(Optional.of(new CachedPage<>(List.of(summary(1L)), 45)));
+
+        EventListResponse result = eventService.searchEvents(new EventSearchRequest(), null);
+
+        assertEquals(45, result.getTotalElements());
+        assertEquals(3, result.getTotalPages());
+        assertEquals(1L, result.getContent().get(0).getItemId());
+        verifyNoInteractions(eventMapper, likeMapper);
+    }
+
+    @Test
+    void searchEvents_storesSharedFirstPageReadWithoutMember() {
+        EventSummaryResponse liked = summary(1L);
+        EventSummaryResponse notLiked = summary(2L);
+        when(eventMapper.searchEvents(
+            any(EventSearchRequest.class), eq(0), isNull(Long.class), any(LocalDate.class)))
+            .thenReturn(List.of(liked, notLiked));
+        when(eventMapper.countEvents(
+            any(EventSearchRequest.class), isNull(Long.class), any(LocalDate.class)))
+            .thenReturn(2L);
+        when(likeMapper.findSavedItemIds(7L, List.of(1L, 2L))).thenReturn(List.of(1L));
+
+        EventListResponse result = eventService.searchEvents(new EventSearchRequest(), 7L);
+
+        // 회원 없이 읽은 값을 담고, 이 회원의 찜 여부는 그 뒤에 붙인다.
+        ArgumentCaptor<CachedPage<EventSummaryResponse>> stored = pageCaptor();
+        verify(listCache).write(eq("event"), any(), stored.capture());
+        assertEquals(2L, stored.getValue().totalElements());
+        assertTrue(result.getContent().get(0).isSaved());
+        assertFalse(result.getContent().get(1).isSaved());
+    }
+
+    /** 같은 캐시 값을 읽어도 찜 여부는 요청한 회원 것이어야 한다. */
+    @Test
+    void searchEvents_marksSavedPerMember_onTheSameCachedPage() {
+        // Redis에서 꺼낼 때마다 새 객체가 만들어지는 것과 같게 한다.
+        when(listCache.read(eq("event"), any(), eq(EventSummaryResponse.class)))
+            .thenAnswer(invocation -> Optional.of(new CachedPage<>(List.of(summary(1L)), 1)));
+        when(likeMapper.findSavedItemIds(7L, List.of(1L))).thenReturn(List.of(1L));
+        when(likeMapper.findSavedItemIds(8L, List.of(1L))).thenReturn(List.of());
+
+        assertTrue(eventService.searchEvents(new EventSearchRequest(), 7L)
+            .getContent().get(0).isSaved());
+        assertFalse(eventService.searchEvents(new EventSearchRequest(), 8L)
+            .getContent().get(0).isSaved());
+        assertFalse(eventService.searchEvents(new EventSearchRequest(), null)
+            .getContent().get(0).isSaved());
+    }
+
+    @Test
+    void searchEvents_skipsCache_forLaterPagesAndKeywords() {
+        EventSearchRequest secondPage = new EventSearchRequest();
+        secondPage.setPage(1);
+        EventSearchRequest keyword = new EventSearchRequest();
+        keyword.setKeyword("벚꽃");
+        when(eventMapper.searchEvents(
+            any(EventSearchRequest.class), anyInt(), eq(7L), any(LocalDate.class)))
+            .thenReturn(List.of());
+        when(eventMapper.countEvents(
+            any(EventSearchRequest.class), eq(7L), any(LocalDate.class)))
+            .thenReturn(0L);
+
+        eventService.searchEvents(secondPage, 7L);
+        eventService.searchEvents(keyword, 7L);
+
+        verifyNoInteractions(listCache, likeMapper);
+    }
+
+    /** 요청 전체와 기준일이 키가 되어야 날짜·조건이 다른 결과를 돌려주지 않는다. */
+    @Test
+    void searchEvents_keysCacheByNormalizedRequestAndDate() {
+        EventSearchRequest request = new EventSearchRequest();
+        request.setRegion1(List.of(" 서울 "));
+
+        eventService.searchEvents(request, null);
+
+        ArgumentCaptor<Object> condition = forClass(Object.class);
+        verify(listCache).read(eq("event"), condition.capture(), eq(EventSummaryResponse.class));
+        Map<?, ?> key = (Map<?, ?>) condition.getValue();
+        assertEquals(request, key.get("request"));
+        assertEquals(List.of("서울"), request.getRegion1());
+        assertEquals(LocalDate.now(), key.get("today"));
+    }
+
+    private static EventSummaryResponse summary(long itemId) {
+        return EventSummaryResponse.builder().itemId(itemId).build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ArgumentCaptor<CachedPage<EventSummaryResponse>> pageCaptor() {
+        return ArgumentCaptor.forClass((Class<CachedPage<EventSummaryResponse>>) (Class<?>) CachedPage.class);
     }
 
     @Test

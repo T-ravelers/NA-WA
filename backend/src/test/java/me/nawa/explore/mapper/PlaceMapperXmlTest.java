@@ -196,23 +196,18 @@ class PlaceMapperXmlTest {
         listParameters.put("offset", 0);
         listParameters.put("limit", 20);
 
-        for (String statementId : List.of(
-            "searchPlaces",
-            "countPlaces"
-        )) {
-            String sql = normalizedSql(configuration, statementId, listParameters);
+        String sql = normalizedSql(configuration, "searchPlaces", listParameters);
 
-            assertTrue(
-                sql.contains("LEFT JOIN place_translations pt"),
-                statementId + "가 번역 테이블을 조인하지 않는다"
-            );
-            assertTrue(sql.contains("pt.deleted_at IS NULL"));
-            assertTrue(
-                boundProperties(configuration, statementId, listParameters)
-                    .contains("request.language"),
-                statementId + "가 request.language를 바인딩하지 않는다"
-            );
-        }
+        assertTrue(
+            sql.contains("LEFT JOIN place_translations pt"),
+            "searchPlaces가 번역 테이블을 조인하지 않는다"
+        );
+        assertTrue(sql.contains("pt.deleted_at IS NULL"));
+        assertTrue(
+            boundProperties(configuration, "searchPlaces", listParameters)
+                .contains("request.language"),
+            "searchPlaces가 request.language를 바인딩하지 않는다"
+        );
 
         Map<String, Object> detailParameters = Map.of(
             "placeId", 1L, "language", "zh-TW"
@@ -298,6 +293,24 @@ class PlaceMapperXmlTest {
         assertTrue(countSql.contains("NULLIF(TRIM(pt.name), '') LIKE"));
         assertTrue(countSql.contains("NULLIF(TRIM(pt_en.name), '') LIKE"));
         assertTrue(countSql.contains("LEFT JOIN place_translations pt"));
+        assertTrue(boundProperties(configuration, "countPlaces", parameters)
+            .contains("request.language"));
+    }
+
+    /**
+     * 키워드가 없으면 개수 쿼리는 번역 열을 보지 않으므로 조인하지 않는다(#575).
+     *
+     * <p>조인이 남아 있어도 결과는 같아서 테스트 없이는 조용히 되돌아간다. 키워드가 있을 때
+     * 조인하는 것은 placeStatements_joinTranslationsForRequestedLanguage가 지킨다.
+     */
+    @Test
+    void countPlaces_skipsTranslationJoin_whenKeywordIsAbsent() throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("request", new PlaceSearchRequest());
+
+        String countSql = normalizedSql(configuration(), "countPlaces", parameters);
+
+        assertFalse(countSql.contains("place_translations"));
     }
 
     private static List<String> boundProperties(

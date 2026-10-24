@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,8 @@ import me.nawa.explore.dto.response.EventListResponse;
 import me.nawa.explore.dto.response.EventSummaryResponse;
 import me.nawa.explore.exception.ExploreErrorCode;
 import me.nawa.explore.mapper.EventMapper;
+import me.nawa.explore.mapper.ExploreItemLikeMapper;
+import me.nawa.explore.service.ExploreListCache.CachedPage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -47,8 +51,12 @@ public class EventService {
         "FESTIVAL",
         "EXHIBITION"
     );
+    private static final String CACHE_KIND = "event";
+
     private final EventMapper eventMapper;
     private final ExploreViewCountRecorder viewCountRecorder;
+    private final ExploreListCache listCache;
+    private final ExploreItemLikeMapper likeMapper;
 
     @Transactional(readOnly = true)
     public EventListResponse searchEvents(
@@ -70,13 +78,17 @@ public class EventService {
         int offset = (int) offsetLong;
         // 목록과 개수가 같은 날을 봐야 페이지네이션이 어긋나지 않는다. 한 번 읽어 둘에 넘긴다.
         LocalDate today = LocalDate.now();
-        List<EventSummaryResponse> content = eventMapper.searchEvents(
-            request,
-            offset,
-            memberId,
-            today
-        );
-        long totalElements = eventMapper.countEvents(request, memberId, today);
+        List<EventSummaryResponse> content;
+        long totalElements;
+        if (isSharedFirstPage(request)) {
+            CachedPage<EventSummaryResponse> page = readSharedFirstPage(request, today);
+            content = page.content();
+            totalElements = page.totalElements();
+            markSaved(content, memberId);
+        } else {
+            content = eventMapper.searchEvents(request, offset, memberId, today);
+            totalElements = eventMapper.countEvents(request, memberId, today);
+        }
         int totalPages = calculateTotalPages(totalElements, request.getSize());
 
         return new EventListResponse(
@@ -87,6 +99,49 @@ public class EventService {
             totalPages,
             request.getPage() + 1 < totalPages
         );
+    }
+
+    /**
+     * 많은 사람이 같은 값을 보는 첫 화면만 캐시한다(#575). 검색어·뒤 페이지는 조합이 많아 다시
+     * 쓰일 일이 드물고, 찜한 것만 보기는 회원마다 결과가 다르다.
+     */
+    private boolean isSharedFirstPage(EventSearchRequest request) {
+        return request.getPage() == 0
+            && !StringUtils.hasText(request.getKeyword())
+            && !Boolean.TRUE.equals(request.getSavedOnly());
+    }
+
+    /**
+     * 키는 정규화를 마친 요청 전체와 기준일이다. 필드를 골라 담으면 나중에 필터를 더할 때 빠뜨려
+     * 다른 조건의 결과를 돌려준다. 기준일은 행사 상태와 노출 여부를 바꾼다.
+     *
+     * <p>회원 없이 읽어 모든 회원에게 같은 값만 담는다. 찜 여부는 꺼낸 뒤 {@link #markSaved}가 붙인다.
+     */
+    private CachedPage<EventSummaryResponse> readSharedFirstPage(
+        EventSearchRequest request,
+        LocalDate today
+    ) {
+        Map<String, Object> condition = Map.of("request", request, "today", today);
+        return listCache.read(CACHE_KIND, condition, EventSummaryResponse.class)
+            .orElseGet(() -> {
+                CachedPage<EventSummaryResponse> page = new CachedPage<>(
+                    eventMapper.searchEvents(request, 0, null, today),
+                    eventMapper.countEvents(request, null, today)
+                );
+                listCache.write(CACHE_KIND, condition, page);
+                return page;
+            });
+    }
+
+    private void markSaved(List<EventSummaryResponse> content, Long memberId) {
+        if (memberId == null || content.isEmpty()) {
+            return;
+        }
+        Set<Long> savedIds = new HashSet<>(likeMapper.findSavedItemIds(
+            memberId,
+            content.stream().map(EventSummaryResponse::getItemId).toList()
+        ));
+        content.forEach(event -> event.setSaved(savedIds.contains(event.getItemId())));
     }
 
     private void normalizeAndValidate(EventSearchRequest request) {

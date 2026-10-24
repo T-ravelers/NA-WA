@@ -16,6 +16,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -155,6 +157,36 @@ class ExploreItemLikeMapperIntegrationTest {
                     "UPDATE event SET deleted_at = CURRENT_TIMESTAMP "
                             + "WHERE event_id = ?", deletedEventId);
             assertEquals("EVENT", likeMapper.findVisibleItemType(deletedEventId));
+        });
+    }
+
+    /**
+     * 캐시에서 꺼낸 목록에 찜 여부를 붙일 때 쓰는 조회다(#575). 목록 savedColumn과 같이
+     * 취소한 찜과 다른 회원의 찜은 빼야 한다.
+     */
+    @Test
+    void findSavedItemIds_returnsOnlyActiveLikesOfTheMember() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long memberId = insertMember();
+            long otherMemberId = insertMember();
+            long liked = insertEventItem(memberId, "VISIBLE");
+            long cancelled = insertPlaceItem(memberId);
+            long likedByOther = insertEventItem(memberId, "VISIBLE");
+            long notLiked = insertPlaceItem(memberId);
+
+            likeMapper.insertLike(liked, memberId);
+            likeMapper.insertLike(cancelled, memberId);
+            likeMapper.softDeleteLike(cancelled, memberId);
+            likeMapper.insertLike(likedByOther, otherMemberId);
+
+            assertEquals(
+                    List.of(liked),
+                    likeMapper.findSavedItemIds(
+                            memberId,
+                            List.of(liked, cancelled, likedByOther, notLiked)
+                    )
+            );
         });
     }
 
