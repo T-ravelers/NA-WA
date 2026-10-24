@@ -1,0 +1,192 @@
+import { deletePushSubscription, savePushSubscription } from '../api/pushSubscriptionApi'
+import type { PushSubscribeBody } from '../api/pushSubscriptionApi.types'
+
+/**
+ * 이 기기의 웹 푸시 구독을 다루는 브라우저 쪽 동작.
+ *
+ * 푸시는 목록을 대신하지 않는다. 여기 있는 어떤 것도 실패하거나 지원되지 않아도 알림 목록과
+ * 15초 폴링은 그대로 동작해야 하므로, 화면이 기다리는 쪽(`enablePush`)을 빼면 실패를 밖으로
+ * 던지지 않는다.
+ */
+
+/**
+ * - `supported`: 이 브라우저로 구독할 수 있다.
+ * - `needs-install`: iOS 사파리 탭이다. 홈 화면에 추가한 앱(iOS 16.4 이상)에서만 웹 푸시가
+ *   열리므로, 설치부터 안내해야 한다.
+ * - `unsupported`: 구독할 방법이 없다.
+ */
+export type PushSupport = 'supported' | 'needs-install' | 'unsupported'
+
+export interface PushEnvironment {
+  hasServiceWorker: boolean
+  hasPushManager: boolean
+  hasNotification: boolean
+  userAgent: string
+  platform: string
+  maxTouchPoints: number
+  /** 홈 화면에 추가한 앱으로 열렸는가. */
+  standalone: boolean
+}
+
+export function browserPushEnvironment(): PushEnvironment {
+  return {
+    hasServiceWorker: 'serviceWorker' in navigator,
+    hasPushManager: 'PushManager' in window,
+    hasNotification: 'Notification' in window,
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    maxTouchPoints: navigator.maxTouchPoints,
+    standalone:
+      (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+      (typeof window.matchMedia === 'function' &&
+        window.matchMedia('(display-mode: standalone)').matches),
+  }
+}
+
+/** iPadOS 13 이상은 사용자 에이전트가 Mac으로 나와서, 터치 지원으로 따로 가려낸다. */
+function isIos(environment: PushEnvironment): boolean {
+  return (
+    /iPad|iPhone|iPod/.test(environment.userAgent) ||
+    (environment.platform === 'MacIntel' && environment.maxTouchPoints > 1)
+  )
+}
+
+export function detectPushSupport(environment: PushEnvironment): PushSupport {
+  if (environment.hasServiceWorker && environment.hasPushManager && environment.hasNotification) {
+    return 'supported'
+  }
+
+  return isIos(environment) && !environment.standalone ? 'needs-install' : 'unsupported'
+}
+
+/** VAPID 공개키(base64url)를 `subscribe`가 받는 바이트로 바꾼다. */
+export function urlBase64ToUint8Array(base64Url: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64Url.length % 4)) % 4)
+  const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/')
+
+  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+}
+
+/** 브라우저의 구독을 서버가 받는 모양으로 옮긴다. 키가 하나라도 빠지면 보낼 수 없다. */
+export function toSubscribeBody(
+  subscription: PushSubscription,
+  language: string,
+): PushSubscribeBody {
+  const { endpoint, keys } = subscription.toJSON()
+  const p256dh = keys?.p256dh
+  const auth = keys?.auth
+
+  if (!endpoint || !p256dh || !auth) {
+    throw new Error('The push subscription is missing its endpoint or keys.')
+  }
+
+  return { endpoint, p256dh, auth, language }
+}
+
+/**
+ * 이 기기에 이미 있는 구독.
+ *
+ * `serviceWorker.ready`가 아니라 `getRegistration`을 쓴다. 서비스 워커가 등록되지 않은 환경
+ * (개발 서버 등)에서는 `ready`가 영영 끝나지 않아 화면 상태를 읽는 일이 멈춘다.
+ */
+export async function readPushSubscription(): Promise<PushSubscription | null> {
+  const registration = await navigator.serviceWorker.getRegistration()
+
+  return (await registration?.pushManager.getSubscription()) ?? null
+}
+
+export interface EnablePushResult {
+  permission: NotificationPermission
+  enabled: boolean
+}
+
+/**
+ * 권한을 묻고, 구독하고, 서버에 등록한다.
+ *
+ * **사용자의 클릭에서 곧바로 이어서 불러야 한다.** 권한 요청을 비동기 작업 뒤로 미루면 Safari가
+ * 사용자 동작이 아니라고 보고 거절한다. 그래서 공개키는 미리 받아 두고 인자로 넘긴다.
+ */
+export async function enablePush(publicKey: string, language: string): Promise<EnablePushResult> {
+  const permission = await Notification.requestPermission()
+  if (permission !== 'granted') {
+    return { permission, enabled: false }
+  }
+
+  const registration = await navigator.serviceWorker.ready
+  const subscription =
+    (await registration.pushManager.getSubscription()) ??
+    (await registration.pushManager.subscribe({
+      // 알림을 띄우지 않는 푸시는 받지 않겠다는 약속이다. iOS는 이 값을 반드시 요구한다.
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+    }))
+
+  await savePushSubscription(toSubscribeBody(subscription, language))
+
+  return { permission, enabled: true }
+}
+
+/**
+ * 서버와 브라우저에서 이 기기의 구독을 지운다.
+ *
+ * 서버 쪽이 실패해도 브라우저 구독은 끊는다. 서버에 남은 행은 푸시 서비스가 410으로 끝난
+ * 구독이라고 알려 줄 때 서버가 스스로 치운다.
+ */
+export async function disablePush(): Promise<void> {
+  const subscription = await readPushSubscription()
+  if (subscription === null) {
+    return
+  }
+
+  try {
+    await deletePushSubscription(subscription.endpoint)
+  } catch {
+    // 위 설명대로 서버가 나중에 정리한다.
+  }
+  await subscription.unsubscribe()
+}
+
+/**
+ * 이 기기에 이미 있는 구독을 로그인한 계정과 현재 언어로 서버에 다시 맞춘다.
+ *
+ * 같은 기기에 다른 계정이 로그인하면 서버가 소유자를 옮기고, 화면 언어를 바꾸면 서버가 보내는
+ * 푸시 본문의 언어가 바뀐다. 구독이 없으면 아무것도 하지 않고(권한도 묻지 않는다), 실패해도
+ * 던지지 않는다 — 다음에 앱을 열 때 다시 맞춘다.
+ */
+export async function syncPushSubscription(language: string): Promise<void> {
+  try {
+    if (
+      detectPushSupport(browserPushEnvironment()) !== 'supported' ||
+      Notification.permission !== 'granted'
+    ) {
+      return
+    }
+
+    const subscription = await readPushSubscription()
+    if (subscription !== null) {
+      await savePushSubscription(toSubscribeBody(subscription, language))
+    }
+  } catch {
+    // 위 설명대로 다음에 다시 맞춘다.
+  }
+}
+
+/**
+ * 로그아웃하기 전에 이 기기의 구독을 서버에서 지운다.
+ *
+ * 인증이 살아 있는 동안에만 할 수 있어서 로그아웃 요청보다 먼저 불러야 한다. 지우지 않으면
+ * 로그아웃한 계정의 알림이 이 기기에 계속 도착한다. 브라우저 구독은 그대로 두어, 같은 기기로
+ * 다시 로그인하면 `syncPushSubscription`이 새 계정으로 등록한다.
+ *
+ * 실패는 던진다. 로그아웃을 막지 않는 것은 부르는 쪽(`requestSignOut`)의 몫이다.
+ */
+export async function removePushSubscriptionFromServer(): Promise<void> {
+  if (detectPushSupport(browserPushEnvironment()) !== 'supported') {
+    return
+  }
+
+  const subscription = await readPushSubscription()
+  if (subscription !== null) {
+    await deletePushSubscription(subscription.endpoint)
+  }
+}

@@ -35,6 +35,32 @@ export default {
       title: 'No notifications yet',
       description: 'Split requests and payments will show up here.',
     },
+    /**
+     * 이 기기로 받는 푸시 알림 카드.
+     *
+     * iOS는 사파리 탭에서 웹 푸시를 받지 못한다. 켜는 방법보다 홈 화면에 추가하는 방법을 먼저
+     * 안내한다(`install`). `blocked`는 브라우저가 막은 상태라 앱이 풀 수 없다.
+     */
+    push: {
+      title: 'Alerts on this device',
+      off: {
+        description: 'Get notified about split requests and payments, even when the app is closed.',
+        action: 'Turn on',
+      },
+      on: {
+        description: 'This device will get alerts for new split requests and payments.',
+        action: 'Turn off',
+      },
+      blocked: {
+        description:
+          'Notifications are blocked for NA-WA. Allow them in your browser or device settings to turn this on.',
+      },
+      install: {
+        description:
+          'On iPhone and iPad, add NA-WA to your Home Screen first (Share, then Add to Home Screen), then open it from there to turn on alerts.',
+      },
+      failed: 'Something went wrong. Please try again.',
+    },
     item: {
       SETTLEMENT_REQUESTED: '{actor} asked you for {amount} for {gathering}',
       SETTLEMENT_PAID: '{actor} paid you {amount} for {gathering}',

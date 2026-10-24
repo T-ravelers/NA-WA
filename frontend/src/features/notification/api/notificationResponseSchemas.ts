@@ -45,3 +45,13 @@ export const notificationListResponseSchema = z
 export const unreadNotificationCountResponseSchema = z
   .object({ count: z.number().int().nonnegative() })
   .passthrough()
+
+/**
+ * 푸시 구독에 쓸 VAPID 공개키.
+ *
+ * 푸시가 꺼진 서버는 키를 비워 보낸다. 빠진 것과 `null`은 같은 뜻이라 둘 다 받는다. 숫자 같은
+ * 엉뚱한 값은 막는다 — 그대로 구독에 넘기면 브라우저가 이유를 알 수 없는 오류를 낸다.
+ */
+export const pushPublicKeyResponseSchema = z
+  .object({ publicKey: z.string().nullish() })
+  .passthrough()

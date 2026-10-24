@@ -15,6 +15,7 @@ import StateError from '@/shared/ui/StateError.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
+import PushSubscriptionCard from '../components/PushSubscriptionCard.vue'
 import {
   notificationMessageKey,
   settlementReturnQuery,
@@ -160,6 +161,9 @@ function errorDescription(): string | undefined {
       :back-label="t('action.back')"
       @back="goBack"
     />
+
+    <!-- 이 기기로 푸시를 받을지. 켜지 않거나 못 켜도 아래 목록은 그대로 동작한다. -->
+    <PushSubscriptionCard />
 
     <!--
       두 가지 일괄 동작은 헤더가 아니라 그 아래 줄에 둔다. 390px 폭에서 제목과 나란히

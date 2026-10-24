@@ -6,6 +6,7 @@ import App from '@/app/App.vue'
 import { i18n } from '@/app/i18n'
 import { bootstrapLocale } from '@/app/i18n/applyLocale'
 import { listenForPushMessages } from '@/app/push/pushMessageListener'
+import { registerPushSubscriptionLifecycle } from '@/app/push/pushSubscriptionLifecycle'
 import { queryClient } from '@/app/query/client'
 import { router } from '@/app/router'
 import {
@@ -70,6 +71,9 @@ listenForPushMessages(
   queryClient,
   'serviceWorker' in navigator ? navigator.serviceWorker : undefined,
 )
+
+// 이 기기의 푸시 구독을 로그인한 계정·화면 언어와 맞추고, 로그아웃 전에 서버에서 지운다.
+registerPushSubscriptionLifecycle(router)
 
 const app = createApp(App)
 
