@@ -24,9 +24,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * 누구에게 얼마로 알릴지의 규칙을 고정한다.
  *
  * 정산 하나에 원결제자 1번(Ari), 아직 안 낸 2번(Bora), 이미 낸 3번(Chan)이 있는 상황을 쓴다.
+ *
+ * 돌려주는 값은 적은 줄 그대로여야 한다. 호출한 쪽(리스너)이 이 값으로 푸시를 보내므로,
+ * 적은 것과 돌려준 것이 어긋나면 알림 목록에 없는 푸시가 나가거나 그 반대가 된다.
  */
 @ExtendWith(MockitoExtension.class)
-class SettlementNotificationRecorderTest {
+class SettlementNotificationRecorderImplTest {
 
     private static final Long SETTLEMENT_ID = 90L;
 
@@ -39,10 +42,11 @@ class SettlementNotificationRecorderTest {
     void recordRequested_notifiesOnlyUnpaidMembersWithTheirOwnShare() {
         givenSettlement();
 
-        recorder().recordRequested(SETTLEMENT_ID);
+        List<Notification> recorded = recorder().recordRequested(SETTLEMENT_ID);
 
         verify(notificationMapper).insertNotifications(captor.capture());
         List<Notification> notifications = captor.getValue();
+        assertEquals(notifications, recorded);
         assertEquals(1, notifications.size());
         Notification notification = notifications.get(0);
         assertEquals("SETTLEMENT_REQUESTED", notification.getNotificationType());
@@ -59,10 +63,11 @@ class SettlementNotificationRecorderTest {
     void recordPaid_notifiesThePayerWithWhoPaidAndHowMuch() {
         givenSettlement();
 
-        recorder().recordPaid(SETTLEMENT_ID, 3L);
+        List<Notification> recorded = recorder().recordPaid(SETTLEMENT_ID, 3L);
 
         verify(notificationMapper).insertNotifications(captor.capture());
         List<Notification> notifications = captor.getValue();
+        assertEquals(notifications, recorded);
         assertEquals(1, notifications.size());
         Notification notification = notifications.get(0);
         assertEquals("SETTLEMENT_PAID", notification.getNotificationType());
@@ -76,10 +81,11 @@ class SettlementNotificationRecorderTest {
     void recordCompleted_notifiesEveryoneIncludingThePayerWithTheTotal() {
         givenSettlement();
 
-        recorder().recordCompleted(SETTLEMENT_ID);
+        List<Notification> recorded = recorder().recordCompleted(SETTLEMENT_ID);
 
         verify(notificationMapper).insertNotifications(captor.capture());
         List<Notification> notifications = captor.getValue();
+        assertEquals(notifications, recorded);
         assertEquals(3, notifications.size());
         assertTrue(notifications.stream()
             .allMatch(notification -> "SETTLEMENT_COMPLETED".equals(notification.getNotificationType())));
@@ -98,28 +104,31 @@ class SettlementNotificationRecorderTest {
         when(notificationMapper.findSettlementMemberShares(SETTLEMENT_ID))
             .thenReturn(List.of(share(3L, "Chan", "20", "PAID")));
 
-        recorder().recordRequested(SETTLEMENT_ID);
+        List<Notification> recorded = recorder().recordRequested(SETTLEMENT_ID);
 
         // 빈 목록으로 INSERT를 부르면 VALUES가 비어 SQL이 깨진다.
         verify(notificationMapper, never()).insertNotifications(any());
+        assertTrue(recorded.isEmpty());
     }
 
     @Test
     void recordPaid_memberNotInSettlement_insertsNothing() {
         givenSettlement();
 
-        recorder().recordPaid(SETTLEMENT_ID, 999L);
+        List<Notification> recorded = recorder().recordPaid(SETTLEMENT_ID, 999L);
 
         verify(notificationMapper, never()).insertNotifications(any());
+        assertTrue(recorded.isEmpty());
     }
 
     @Test
     void record_missingSettlement_insertsNothing() {
         when(notificationMapper.findSettlementSnapshot(SETTLEMENT_ID)).thenReturn(null);
 
-        recorder().recordCompleted(SETTLEMENT_ID);
+        List<Notification> recorded = recorder().recordCompleted(SETTLEMENT_ID);
 
         verify(notificationMapper, never()).insertNotifications(any());
+        assertTrue(recorded.isEmpty());
     }
 
     private void givenSettlement() {
@@ -130,8 +139,9 @@ class SettlementNotificationRecorderTest {
         ));
     }
 
+    // 테스트는 인터페이스 타입으로 부른다. 구현체는 여기서 한 번만 만든다.
     private SettlementNotificationRecorder recorder() {
-        return new SettlementNotificationRecorder(notificationMapper);
+        return new SettlementNotificationRecorderImpl(notificationMapper);
     }
 
     private SettlementNotificationSnapshot snapshot() {
