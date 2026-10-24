@@ -1,6 +1,7 @@
 package me.nawa.settlement.service.creation;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -213,6 +214,8 @@ public class ItemizedSettlementCreator implements SettlementCreationHandler {
             .totalAmount(source.getAmount())
             .payerShareAmount(payerShare)
             .receivableAmount(source.getAmount().subtract(payerShare))
+            // 이유는 EqualSettlementCreator.newSettlement와 같다.
+            .createdAt(LocalDateTime.now().withNano(0))
             .build();
     }
 

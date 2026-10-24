@@ -104,6 +104,36 @@ class SettlementMapperIntegrationTest {
         }
     }
 
+    /**
+     * 만든 시각은 DB 기본값이 아니라 애플리케이션이 넘긴 값이 그대로 들어가야 한다.
+     *
+     * 미납 리마인더가 이 값을 앱의 날짜와 견주므로, DB 시계로 적으면 시간대가 어긋난 만큼
+     * 첫 리마인더가 밀린다. CI의 MySQL은 이 의존을 드러내려고 일부러 UTC라서, DB 시계를
+     * 쓰면 여기서 9시간 어긋난 값이 읽힌다. 먼 과거의 고정 값을 쓰면 기본값이 우연히
+     * 같아질 수도 없다.
+     */
+    @Test
+    void insertSettlement_storesCreatedAtGivenByApplication() {
+        Fixture fixture = createFixture();
+        try {
+            LocalDateTime createdAt = LocalDateTime.of(2026, 8, 20, 21, 5, 0);
+            Settlement settlement = settlement(fixture);
+            settlement.setCreatedAt(createdAt);
+
+            mapper.insertSettlement(settlement);
+
+            Timestamp stored = jdbcTemplate.queryForObject(
+                "SELECT created_at FROM settlements WHERE settlement_id = ?",
+                Timestamp.class,
+                settlement.getSettlementId()
+            );
+            assertNotNull(stored);
+            assertEquals(createdAt, stored.toLocalDateTime());
+        } finally {
+            deleteFixture(fixture);
+        }
+    }
+
     @Test
     void insertSettlementItemShares_generatedItemId_linksActiveSettlementMember() {
         Fixture fixture = createFixture();
@@ -563,6 +593,7 @@ class SettlementMapperIntegrationTest {
             .totalAmount(new BigDecimal("100"))
             .payerShareAmount(new BigDecimal("100"))
             .receivableAmount(BigDecimal.ZERO)
+            .createdAt(LocalDateTime.now().withNano(0))
             .build();
     }
 
