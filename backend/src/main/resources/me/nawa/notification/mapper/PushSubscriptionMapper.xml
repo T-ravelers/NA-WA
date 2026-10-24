@@ -22,4 +22,16 @@
         WHERE member_id = #{memberId}
           AND endpoint = #{endpoint}
     </delete>
+
+    <select id="findByMemberId" resultType="me.nawa.notification.domain.PushSubscription">
+        SELECT push_subscription_id, member_id, endpoint, p256dh, auth_secret, language_code
+        FROM push_subscriptions
+        WHERE member_id = #{memberId}
+        ORDER BY push_subscription_id
+    </select>
+
+    <delete id="deleteByEndpoint">
+        DELETE FROM push_subscriptions
+        WHERE endpoint = #{endpoint}
+    </delete>
 </mapper>

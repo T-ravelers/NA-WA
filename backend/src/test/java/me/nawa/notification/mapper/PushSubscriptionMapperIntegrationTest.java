@@ -1,12 +1,15 @@
 package me.nawa.notification.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import me.nawa.config.MySqlSchemaExtension;
+import me.nawa.notification.domain.PushSubscription;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -128,6 +131,56 @@ class PushSubscriptionMapperIntegrationTest {
             deleteSubscriptions(device);
             deleteMember(owner);
             deleteMember(stranger);
+        }
+    }
+
+    /** 발송이 읽는 값이다. 회원의 모든 기기가 저장한 키·언어 그대로 나오고, 남의 기기는 섞이지 않는다. */
+    @Test
+    void findByMemberId_returnsEveryDeviceOfTheMemberWithTheStoredKeysAndLanguage() {
+        long member = insertMember();
+        long other = insertMember();
+        String phone = endpoint();
+        String laptop = endpoint();
+        String othersDevice = endpoint();
+        try {
+            mapper.upsert(member, phone, "p256dh-a", "auth-a", "ja");
+            mapper.upsert(member, laptop, "p256dh-b", "auth-b", "vi");
+            mapper.upsert(other, othersDevice, "p256dh-c", "auth-c", "en");
+
+            List<PushSubscription> subscriptions = mapper.findByMemberId(member);
+
+            assertEquals(2, subscriptions.size());
+            PushSubscription first = subscriptions.get(0);
+            assertNotNull(first.getPushSubscriptionId());
+            assertEquals(member, first.getMemberId());
+            assertEquals(phone, first.getEndpoint());
+            assertEquals("p256dh-a", first.getP256dh());
+            assertEquals("auth-a", first.getAuthSecret());
+            assertEquals("ja", first.getLanguageCode());
+            assertEquals(laptop, subscriptions.get(1).getEndpoint());
+        } finally {
+            deleteSubscriptions(phone, laptop, othersDevice);
+            deleteMember(member);
+            deleteMember(other);
+        }
+    }
+
+    /** 푸시 서비스가 끝났다고 알린 구독은 주인이 누구든 지운다. 이미 없으면 0행이다. */
+    @Test
+    void deleteByEndpoint_removesOnlyThatSubscriptionRegardlessOfOwner() {
+        long member = insertMember();
+        String gone = endpoint();
+        String kept = endpoint();
+        try {
+            mapper.upsert(member, gone, "key", "auth", "en");
+            mapper.upsert(member, kept, "key", "auth", "en");
+
+            assertEquals(1, mapper.deleteByEndpoint(gone));
+            assertEquals(0, mapper.deleteByEndpoint(gone));
+            assertEquals(1, countByMember(member));
+        } finally {
+            deleteSubscriptions(gone, kept);
+            deleteMember(member);
         }
     }
 
