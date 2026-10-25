@@ -74,6 +74,8 @@ erDiagram
         VARCHAR payment_idempotency_key
         ENUM request_status
         DECIMAL share_amount
+        DATETIME last_reminded_at
+        INT reminder_count
     }
 
     SETTLEMENT_ITEM_SHARES {
@@ -167,10 +169,28 @@ erDiagram
 `object_key`는 반드시 `receipts/`로 시작한다. IAM 정책이 이 접두사로 좁혀져 있어 벗어난
 키는 런타임에 접근이 거부된다.
 
+## 미납 리마인더 기록
+
+`settlement_members.last_reminded_at`과 `reminder_count`(V23)는 안 낸 구성원에게 서버가 다시 알린
+마지막 시각과 횟수다. V1에 있던 열을 V9가 정산 도메인을 줄이면서 지웠고, 리마인더가 생기면서
+되살렸다. `last_reminded_at`이 비어 있으면 한 번도 안 보냈다는 뜻이고, 값은 DB 시계가 아니라 앱이
+넘긴 시각이다. 이 두 열을 바꾸는 곳은 리마인더 실행 하나뿐이다.
+
+`(request_status, settlement_member_id)` 인덱스(`idx_settlement_members_request_status`)가 "미납
+행만 번호 순서로" 읽는 것을 받친다. 정산이 끝난 `PAID` 행이 쌓여도 리마인더가 읽는 범위는 미납
+행으로 좁혀진다. 두 번째 열은 InnoDB가 보조 인덱스에 기본키를 붙이는 것과 같지만, 이 읽기가 그
+순서에 기댄다는 것이 보이도록 일부러 적었다. 후보 읽기는 이 인덱스를 `FORCE INDEX`로 지정한다.
+
+정책과 대상 조건은 [알림 API 계약](../NOTIFICATION_API.md#미납-리마인더)에 있다.
+
 ## 알림
 
 `notifications`는 정산에서 일어난 일을 받는 사람 앞으로 한 줄씩 쌓아 둔다. 정산에서 파생된
 표시용 데이터라 정산 상태의 정본이 아니다.
+
+`notification_type`은 `SETTLEMENT_REQUESTED`·`SETTLEMENT_PAID`·`SETTLEMENT_COMPLETED`에 더해
+`SETTLEMENT_REMINDER`(V23)를 가진다. ENUM의 끝에 값을 붙인 것이라 기존 행의 저장 값이 밀리지
+않는다.
 
 `actor_name`·`gathering_name`·`amount`·`currency_code`는 **알림을 만들 때 복사해 둔 값**이다.
 매번 원본을 조인해 오지 않는 이유는, 상대가 이름을 바꾸거나 정산이 지워져도 그때 받은

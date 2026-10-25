@@ -23,23 +23,23 @@
 `GET /api/v1/settlements`의 각 요약은 `createdAt`과 `completedAt`을 함께 반환한다. 형식은
 `yyyy-MM-dd'T'HH:mm:ss`이고 기준 시간대는 서버와 같은 `Asia/Seoul`이다.
 
-`completedAt`은 **애플리케이션이 넘긴 시각**을 기록한다. DB의 `CURRENT_TIMESTAMP`를 쓰지
-않는다. 이 값이 기간 필터의 기준이 되므로, DB 시계에 기대면 시간대 설정이 어긋나는 순간
-경계 근처의 정산이 통째로 다른 날짜로 묶인다.
-
-**두 시각은 서로 다른 시계에서 나온다.** 아래 표가 정본이다.
+`createdAt`과 `completedAt`은 **둘 다 애플리케이션이 넘긴 시각**을 기록한다(#578). DB의
+`CURRENT_TIMESTAMP`를 쓰지 않는다. `completedAt`은 기간 필터의 기준이고 `createdAt`은 미납
+리마인더가 "요청한 지 며칠째인가"를 가르는 기준이라([알림 API 계약](NOTIFICATION_API.md#미납-리마인더)),
+DB 시계에 기대면 시간대 설정이 어긋나는 순간 경계 근처의 정산이 통째로 다른 날짜로 묶이거나
+첫 리마인더가 밀린다.
 
 | 필드 | 값을 적는 쪽 | 기준 시계 |
 | --- | --- | --- |
-| `createdAt` | `settlements.created_at`의 컬럼 기본값 `CURRENT_TIMESTAMP` | DB 세션 시간대 |
-| `completedAt` | 애플리케이션이 넘긴 `LocalDateTime.now()` | JVM 시간대 |
+| `createdAt` | 애플리케이션이 넘긴 `LocalDateTime.now()` (정산을 만들 때) | JVM 시간대 |
+| `completedAt` | 애플리케이션이 넘긴 `LocalDateTime.now()` (완료로 전이할 때) | JVM 시간대 |
 
-`created_at`을 DB가 적는 것은 이 저장소의 모든 테이블이 그렇게 하기 때문이고, 정산만
-바꾸면 오히려 규칙이 갈린다. 대신 **두 값이 같은 기준으로 읽히려면 DB와 애플리케이션의
-시간대가 맞아 있어야 한다.** 운영은 맞춰 두었다 — `docker-compose.yml`의 `mysql`이
-`--default-time-zone=+09:00`이고 백엔드 컨테이너가 `TZ=Asia/Seoul`이다(#294). CI는 이
-맞춤을 **일부러 깨서**(MySQL만 UTC) DB 시계에 기대는 코드가 드러나게 한다. 세 곳의 설정은
-[AGENTS.md](../../AGENTS.md)와 [docs/TECH_STACK.md](../../docs/TECH_STACK.md)가 정본이다.
+**이 변경 전에 만든 정산의 `createdAt`은 DB 시계가 적은 값이다.** 그 행은 고치지 않았다. 운영은
+DB와 애플리케이션의 시간대를 맞춰 두었으므로(`docker-compose.yml`의 `mysql`이
+`--default-time-zone=+09:00`이고 백엔드 컨테이너가 `TZ=Asia/Seoul`이다, #294) 옛 행도 같은
+기준으로 읽힌다. CI는 이 맞춤을 **일부러 깨서**(MySQL만 UTC) DB 시계에 기대는 코드가 드러나게
+한다. 세 곳의 설정은 [AGENTS.md](../../AGENTS.md)와 [docs/TECH_STACK.md](../../docs/TECH_STACK.md)가
+정본이다.
 
 `completedAt`은 settlement가 `COMPLETED`로 전이한 시각이며, `REQUESTED`인 동안에는 `null`이다.
 이 필드를 남기기 시작한 시점보다 먼저 완료된 정산도 `null`이다. `updated_at`이 갱신되지 않는
@@ -133,6 +133,19 @@ URL의 경로 변수이고, `transferId`는 생성 요청의 `sourceTransferId`�
 발행은 모두 `@Transactional` 안에서 일어나고 리스너는 커밋된 뒤에만 듣는다. 멱등 재시도
 경로에서는 발행하지 않으며, 완료 이벤트는 완료 `UPDATE`가 실제로 한 줄을 바꿨을 때만
 나간다. 받는 사람과 금액 규칙은 [알림 API 계약](NOTIFICATION_API.md)에 있다.
+
+## 미납 리마인더 기록
+
+`settlement_members`는 구성원마다 마지막으로 리마인더를 적은 시각(`last_reminded_at`)과 횟수
+(`reminder_count`)를 가진다(V23). 아직 안 낸(`PENDING`) 구성원에게 서버가 정해진 시각에 다시
+알리는 기능이 쓰고, 이 두 열을 바꾸는 곳은 리마인더 실행 하나뿐이다. 지급과 완료 흐름은 이
+열을 읽지도 쓰지도 않는다. 정책(첫 발송·간격·상한)과 대상 조건은
+[알림 API 계약](NOTIFICATION_API.md#미납-리마인더)이 정본이다.
+
+- `last_reminded_at`이 비어 있으면 아직 한 번도 안 보냈다. 값은 앱이 넘긴 시각이다.
+- `(request_status, settlement_member_id)` 인덱스가 "미납 행만 번호 순서로" 읽는 것을 받친다.
+- 구성원이 지급하거나 정산이 `COMPLETED`가 되면 그 뒤로는 대상에서 빠진다. 이 열을 되돌리거나
+  지우지 않는다.
 
 ## 멱등성
 

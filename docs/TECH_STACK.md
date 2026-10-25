@@ -56,6 +56,72 @@ Vue Query가 서버 응답을 소유합니다. 서버 응답을 Pinia에 복제�
 [API 응답 및 오류 코드 컨벤션](../backend/docs/API_RESPONSE_CONVENTION.md)에서
 확인할 수 있습니다.
 
+## 스케줄러와 배치성 작업
+
+백엔드의 `@Scheduled` 작업(약속 상태 전이, 보증금 정산 처리, 이벤트 상태 정정, 미납 리마인더)은
+**스레드 하나를 같이 쓴다.** `RootConfig`에 `@EnableScheduling`만 있고 스케줄러 빈이 없어서
+스프링이 기본 단일 스레드 스케줄러를 만들기 때문이다. 오래 걸리는 작업을 `@Scheduled` 메서드에서
+직접 돌리면 나머지 스케줄러가 그만큼 밀린다.
+
+미납 리마인더(#578)는 그래서 일을 전용 실행기에 넘기고 스케줄러 스레드는 바로 돌아온다.
+
+| 항목 | 값 |
+| --- | --- |
+| 스케줄 | 서울 시각 10~20시 매시 정각 (`SettlementReminderScheduler`) |
+| 실행기 | `reminderExecutor` — 스레드 1개(이름 `reminder-`), 대기열 없음 |
+| 앞 실행이 안 끝났을 때 | 이번 정각은 건너뛴다(로그만). 다음 정각이 남은 사람부터 이어받는다 |
+| 한 번에 잡는 크기 | 100명씩 묶음마다 자기 트랜잭션 |
+| 서버가 여러 대일 때 | 행 잠금(`SKIP LOCKED`)과 다시 읽는 조건으로 중복이 없다. 실행 단위 잠금은 없다 |
+
+동작 계약과 측정 결과는 [알림 API 계약](../backend/docs/NOTIFICATION_API.md#미납-리마인더)에 있습니다.
+
+### Spring Batch를 쓰지 않은 이유
+
+이슈 #578은 새 라이브러리 도입을 제외 범위로 정했고, 필요한 성질을 기존 스택만으로 얻을 수
+있는지 먼저 재 보기로 했습니다. 배치에서 흔히 필요한 성질은 아래처럼 풀었습니다.
+
+| 필요한 성질 | 지금 구현 |
+| --- | --- |
+| 묶음(chunk) 단위 커밋 | 묶음마다 `REQUIRES_NEW` 트랜잭션 |
+| 실패한 건만 건너뛰기(skip) | 묶음이 실패하면 한 건씩 다시 처리하고, 그래도 실패한 건만 건너뜀 |
+| 중단 뒤 재시작(restart) | 처리한 행은 조건에서 빠지므로 다시 부르면 남은 행부터 이어짐 |
+| 중복 방지·동시 실행 | 행 잠금과 다시 읽는 조건 |
+| 실행 요약 | 반환값과 로그 |
+
+측정(로컬 컨테이너, 미납 10만 건)에서 불량이 없는 구간은 한 실행이 초당 약 1.6만 건을 처리했고,
+중단 뒤 재개·동시 2회 실행·불량 건 건너뛰기가 모두 정확히 한 번씩만 알림을 남겼습니다. 숫자와
+조건은 [알림 API 계약의 측정](../backend/docs/NOTIFICATION_API.md#대량-처리-측정)에 있습니다.
+
+도입하지 않은 근거를 세 가지로 정리합니다.
+
+- **이 저장소가 쓸 수 있는 버전이 제한적입니다.** 백엔드는 Spring Framework 5.3과 `javax`에
+  고정돼 있고 6으로 임의 전환하지 않습니다([backend/AGENTS.md](../backend/AGENTS.md)). Spring
+  Batch 5는 Spring Framework 6을 기반으로 하고 Java 17 이상이 필요하며 `javax.*` import를
+  `jakarta.*`로 바꿔야 합니다([Spring Batch 5.0 Migration Guide](https://github.com/spring-projects/spring-batch/wiki/Spring-Batch-5.0-Migration-Guide)).
+  Spring Framework 5.3 기반으로 빌드된 것은 4.3.x 계열입니다(공식 저장소 `4.3.10` 태그의
+  `build.gradle`에 `springVersionDefault = '5.3.31'`). 현재 최신 계열은 6.x입니다
+  ([spring.io/projects/spring-batch](https://spring.io/projects/spring-batch)가 6.0.6을
+  표시, 2026-10-25 확인).
+- **Boot가 아니라서 배선과 스키마를 직접 맡습니다.** 자동 구성이 없고 스키마는 Flyway
+  forward-only로 관리합니다. Spring Batch 5의 기본 `JobRepository`는 `DataSource`를 쓰는 JDBC
+  기반이라([같은 가이드](https://github.com/spring-projects/spring-batch/wiki/Spring-Batch-5.0-Migration-Guide))
+  실행 상태를 담는 스키마를 마이그레이션으로 옮겨 관리하는 일이 따라옵니다. 4.3.x에서의 구성은
+  확인하지 않았습니다.
+- **지금 필요한 것이 이미 충족됩니다.** 위 표의 성질이 테스트로 증명돼 있고, 필요한 코드가 작업
+  하나(대상 쿼리 2개, 라이터, 실행 서비스, 스케줄러)에 들어 있습니다.
+
+### 다시 볼 신호
+
+아래 중 하나가 생기면 Spring Batch(또는 같은 역할의 도구)를 다시 검토합니다. 그때는 위에서
+확인하지 못한 4.3.x의 지원 상태와 메타데이터 스키마를 Flyway로 관리하는 방법을 먼저 확인하세요.
+
+- 실행 이력(언제, 몇 건, 무엇이 실패했는지)을 DB에 남기고 화면이나 감사에서 봐야 할 때
+- 배치성 작업이 둘 이상으로 늘어 각자 묶음·건너뛰기·재개를 따로 짜게 될 때
+- 한 번의 실행이 스케줄 주기(지금은 1시간)에 가까워지거나, 서버 한 대로 끝나지 않아 나눠
+  처리(파티셔닝)해야 할 때
+- 여러 단계로 나뉘고 뒤 단계가 앞 단계의 결과에 기대는 작업이 생길 때
+- 실패한 건을 사람이 골라 다시 돌리는 운영 도구가 필요할 때
+
 ## API와 인증 경계
 
 - 프론트엔드는 `VITE_API_BASE_URL`에서 API 주소를 읽습니다.
