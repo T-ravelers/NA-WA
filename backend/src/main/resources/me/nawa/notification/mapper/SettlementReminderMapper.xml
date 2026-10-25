@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me.nawa.notification.mapper.SettlementReminderMapper">
+
+    <!--
+        리마인더 대상은 "아직 안 낸 구성원 중, 기준을 채운 사람"이다. 후보를 고르는 쿼리와
+        잠그는 쿼리가 이 두 조각을 함께 쓴다. 조건을 한쪽에만 고치면 후보로는 뽑히는데 잠글 때
+        늘 걸러지거나, 걸러져야 할 사람이 잠금 쪽을 통과하는 어긋남이 생긴다.
+
+        기준 시각은 모두 criteria로 받는다. 이 쿼리는 NOW()를 부르지 않는다. DB 시계에 기대면
+        DB와 앱의 시간대가 어긋난 만큼 대상이 하루씩 밀리거나 당겨진다.
+
+        받는 회원의 약속 참가 상태(membership_status·deleted_at)는 보지 않는다. 정산은 약속에서
+        나간 사람의 빚도 그대로 남기므로(SETTLEMENT.md) 아직 안 냈다면 알려 줄 사람이다. 막는
+        것은 회원 자체의 상태(탈퇴·정지·삭제)뿐이다.
+    -->
+    <sql id="dueFrom">
+        FROM settlement_members sm
+        JOIN settlements s ON s.settlement_id = sm.settlement_id
+        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        JOIN members m ON m.member_id = am.member_id
+    </sql>
+
+    <sql id="dueConditions">
+        sm.request_status = 'PENDING'
+        AND sm.deleted_at IS NULL
+        AND sm.reminder_count &lt; #{criteria.maxCount}
+        AND (sm.last_reminded_at IS NULL OR sm.last_reminded_at &lt; #{criteria.remindedBefore})
+        AND s.settlement_status = 'REQUESTED'
+        AND s.deleted_at IS NULL
+        AND s.created_at &lt; #{criteria.firstBefore}
+        AND m.member_status = 'ACTIVE'
+        AND m.deleted_at IS NULL
+    </sql>
+
+    <!--
+        잠그지 않는 키셋 읽기다. 번호 순서로 limit개만 고르고 커서(afterId)를 넘겨 다음 묶음을
+        읽는다.
+
+        (request_status, settlement_member_id) 인덱스(V23)가 "미납 행만, 번호 순서로"를 그대로
+        받쳐 준다. 정산이 끝난 PAID 행이 아무리 쌓여도 읽는 범위는 미납 행으로 좁혀진다.
+
+        여기서 뽑힌 사람이 실제로 보내지는 사람이라는 보장은 없다. 읽은 뒤 잠그기 전에 누가
+        내거나 다른 인스턴스가 먼저 보낼 수 있어서, 확정은 lockTargets가 한다.
+    -->
+    <select id="findCandidateIds" resultType="long">
+        SELECT sm.settlement_member_id
+        <include refid="dueFrom"/>
+        WHERE sm.settlement_member_id &gt; #{afterId}
+          AND <include refid="dueConditions"/>
+        ORDER BY sm.settlement_member_id
+        LIMIT #{limit}
+    </select>
+
+    <!--
+        후보를 같은 조건으로 다시 읽으며 잠근다. 알림에 복사해 둘 값(받는 사람·원결제자 이름·
+        약속명·몫·통화)도 이 쿼리에서 함께 읽는다. 통화는 settlements에 없고 원거래에만 있다.
+
+        FOR UPDATE OF sm SKIP LOCKED
+            다른 트랜잭션이 이미 잡은 행은 기다리지 않고 건너뛴다. 다른 인스턴스가 같은 행을
+            처리 중이거나 그 사람이 지금 내고 있다는 뜻이므로, 이번 실행이 그 사람 몫을 가져갈
+            이유가 없다. 건너뛴 행이 그쪽에서 실패하면 다음 실행이 다시 집는다. 조건을 다시
+            확인하므로 후보를 고른 뒤에 낸 사람은 여기서 빠진다.
+
+        FOR SHARE OF s SKIP LOCKED
+            정산 행에는 공유 잠금만 건다. 알림을 INSERT할 때 외래키 검사가 부모인 정산 행에
+            공유 잠금을 잡는데, 그때는 이미 구성원 행을 쥐고 있다. 지급은 반대로 정산 행을
+            먼저 잡고 구성원 행을 잡으므로(findByIdForUpdate → 구성원 FOR UPDATE), 같은
+            사람의 지급과 리마인더가 겹치면 서로를 기다리는 교착이 난다. 정산 행을 구성원
+            행과 함께 먼저 잡아 두면 한쪽이 건너뛰거나 기다리기만 하고 서로 물리지 않는다.
+            공유 잠금이라 같은 정산의 다른 구성원을 처리하는 인스턴스끼리는 막지 않는다.
+
+        번호 순서로 잠가서, 같은 행을 노리는 둘이 서로 다른 순서로 잡는 일이 없게 한다.
+    -->
+    <select id="lockTargets" resultType="me.nawa.notification.domain.SettlementReminderTarget">
+        SELECT sm.settlement_member_id, am.member_id AS recipient_member_id, sm.settlement_id,
+               payer.display_name AS payer_name, a.appointment_name AS gathering_name,
+               sm.share_amount, t.currency_code
+        <include refid="dueFrom"/>
+        JOIN members payer ON payer.member_id = s.payer_member_id
+        JOIN appointments a ON a.appointment_id = s.appointment_id
+        JOIN wallet_transfers t ON t.transfer_id = s.source_transfer_id
+        WHERE sm.settlement_member_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          AND <include refid="dueConditions"/>
+        ORDER BY sm.settlement_member_id
+        FOR UPDATE OF sm SKIP LOCKED
+        FOR SHARE OF s SKIP LOCKED
+    </select>
+
+    <!--
+        마지막 리마인더 시각은 앱이 넘긴 값을 적는다. 이 값이 다음 간격 판단의 기준이라 DB
+        시계에 맡기지 않는다. 같은 행의 updated_at은 컬럼 설정대로 DB 시계로 바뀌지만 어떤
+        판단에도 쓰지 않는다.
+
+        잠근 행만 넘어오므로 조건을 다시 걸지 않는다. 잠근 뒤에는 다른 트랜잭션이 이 행을
+        바꿀 수 없다.
+    -->
+    <update id="markReminded">
+        UPDATE settlement_members
+        SET last_reminded_at = #{remindedAt}, reminder_count = reminder_count + 1
+        WHERE settlement_member_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+</mapper>
