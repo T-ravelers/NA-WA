@@ -17,11 +17,17 @@
         나간 사람의 빚도 그대로 남기므로(SETTLEMENT.md) 아직 안 냈다면 알려 줄 사람이다. 막는
         것은 회원 자체의 상태(탈퇴·정지·삭제)뿐이다.
     -->
-    <sql id="dueFrom">
-        FROM settlement_members sm
-        JOIN settlements s ON s.settlement_id = sm.settlement_id
-        JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
-        JOIN members m ON m.member_id = am.member_id
+    <!--
+        STRAIGHT_JOIN으로 읽는 순서를 못 박는다. 구성원 행을 번호 순서로 훑으면서 정산·약속
+        참가·회원을 기본키로 찾는 것이 의도한 계획이다. 그런데 정산 쪽 조건(상태·만든 시각)에는
+        걸린 인덱스가 없어서, 가만두면 옵티마이저가 정산 표를 통째로 먼저 훑고 임시 테이블과
+        정렬(Using temporary; Using filesort)로 번호 순서를 만든다. 정산 1만 개 규모에서 EXPLAIN으로
+        확인했고, 묶음마다 그 일을 되풀이하니 실행 시간이 정산 수에 비례해 늘어난다.
+    -->
+    <sql id="dueJoins">
+        STRAIGHT_JOIN settlements s ON s.settlement_id = sm.settlement_id
+        STRAIGHT_JOIN appointment_members am ON am.appointment_member_id = sm.appointment_member_id
+        STRAIGHT_JOIN members m ON m.member_id = am.member_id
     </sql>
 
     <sql id="dueConditions">
@@ -43,12 +49,18 @@
         (request_status, settlement_member_id) 인덱스(V23)가 "미납 행만, 번호 순서로"를 그대로
         받쳐 준다. 정산이 끝난 PAID 행이 아무리 쌓여도 읽는 범위는 미납 행으로 좁혀진다.
 
+        FORCE INDEX로 그 인덱스를 못 박는다. 기본키 범위를 그냥 훑어도 번호 순서는 나오므로
+        옵티마이저가 기본키를 고를 수 있고, 실제로 이미 낸 행 10만 건이 더 있는 분포에서도
+        기본키를 골랐다. 그러면 묶음마다 이미 낸 행을 지나쳐 가야 하고, 끝에 오는 빈 읽기는 표
+        끝까지 훑는다. 인덱스가 없어지면 이 쿼리가 조용히 느려지는 대신 오류로 드러난다.
+
         여기서 뽑힌 사람이 실제로 보내지는 사람이라는 보장은 없다. 읽은 뒤 잠그기 전에 누가
         내거나 다른 인스턴스가 먼저 보낼 수 있어서, 확정은 lockTargets가 한다.
     -->
     <select id="findCandidateIds" resultType="long">
         SELECT sm.settlement_member_id
-        <include refid="dueFrom"/>
+        FROM settlement_members sm FORCE INDEX (idx_settlement_members_request_status)
+        <include refid="dueJoins"/>
         WHERE sm.settlement_member_id &gt; #{afterId}
           AND <include refid="dueConditions"/>
         ORDER BY sm.settlement_member_id
@@ -79,7 +91,8 @@
         SELECT sm.settlement_member_id, am.member_id AS recipient_member_id, sm.settlement_id,
                payer.display_name AS payer_name, a.appointment_name AS gathering_name,
                sm.share_amount, t.currency_code
-        <include refid="dueFrom"/>
+        FROM settlement_members sm
+        <include refid="dueJoins"/>
         JOIN members payer ON payer.member_id = s.payer_member_id
         JOIN appointments a ON a.appointment_id = s.appointment_id
         JOIN wallet_transfers t ON t.transfer_id = s.source_transfer_id
