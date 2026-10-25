@@ -125,6 +125,15 @@ public final class ReminderTestData {
         return member(settlement, "PENDING");
     }
 
+    /** 아직 안 낸 구성원 {@code count}명을 정산에 더한다. */
+    public List<MemberRow> pendingMembers(SettlementRow settlement, int count) {
+        List<MemberRow> members = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            members.add(pendingMember(settlement));
+        }
+        return members;
+    }
+
     /** 이미 낸(PAID) 구성원 한 명을 정산에 더한다. */
     public MemberRow paidMember(SettlementRow settlement) {
         return member(settlement, "PAID");
