@@ -134,6 +134,23 @@ describe('NotificationListView', () => {
     expect(wrapper.text()).toContain('Everyone has paid for Dinner')
   })
 
+  /*
+   * 리마인더는 목록에 자기 문장으로 나온다. 문구 키가 없으면 "무슨 일이 있었다"는 일반 문장으로
+   * 떨어져, 무엇을 독촉받았는지 알 수 없다.
+   */
+  it('리마인더는 아직 기다리고 있다는 문장으로 그린다', async () => {
+    fetchNotifications.mockResolvedValue(
+      page([{ ...REQUESTED, type: 'SETTLEMENT_REMINDER', amount: '30000' }]),
+    )
+
+    const wrapper = await mountView()
+
+    expect(wrapper.get('li button').text()).toContain(
+      'Reminder: Ari is still waiting for your ₩30,000 for Dinner',
+    )
+    expect(wrapper.text()).not.toContain('Something happened with Dinner')
+  })
+
   it('알림이 없으면 빈 상태를 보여준다', async () => {
     fetchNotifications.mockResolvedValue(page([]))
 
@@ -203,6 +220,31 @@ describe('NotificationListView', () => {
       await flushPromises()
 
       expect(markNotificationRead).not.toHaveBeenCalled()
+    })
+
+    /*
+     * 리마인더를 눌러도 요청 알림과 같이 받은 정산 상세로 간다. 누른 것만으로 읽음이 되지는 않고,
+     * 이 알림 하나만 읽음으로 바뀐다.
+     */
+    it('리마인더는 낼 정산 상세로 가고 그 알림만 읽음으로 바꾼다', async () => {
+      fetchNotifications.mockResolvedValue(
+        page([
+          { ...REQUESTED, id: 7, type: 'SETTLEMENT_REMINDER' },
+          { ...REQUESTED, id: 8, settlementId: 91 },
+        ]),
+      )
+      const router = createTestRouter()
+
+      const wrapper = await mountView(router)
+      await wrapper.get('li button').trigger('click')
+      await flushPromises()
+
+      expect(markNotificationRead).toHaveBeenCalledTimes(1)
+      expect(markNotificationRead).toHaveBeenCalledWith('7')
+      expect(router.currentRoute.value.name).toBe('settlement-detail')
+      expect(router.currentRoute.value.params.settlementId).toBe('90')
+      expect(router.currentRoute.value.query.origin).toBe('notifications')
+      expect(router.currentRoute.value.query.side).toBe('received')
     })
 
     it('받을 정산 알림은 받을 쪽 목록에서 들어온 것으로 넘긴다', async () => {

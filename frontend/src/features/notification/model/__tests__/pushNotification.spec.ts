@@ -77,6 +77,26 @@ describe('pushNotificationContent', () => {
     )
   })
 
+  /*
+   * 리마인더도 목록과 같은 문장으로 기기 알림에 뜬다. 문구 키가 한 언어에서라도 빠지면 그 언어
+   * 사용자에게는 "무슨 일이 있었다"는 일반 문장으로 떨어진다.
+   */
+  it('writes the reminder sentence in every supported language', () => {
+    const reminder = (language: string) =>
+      pushNotificationContent(payload({ type: 'SETTLEMENT_REMINDER', language })).body
+
+    expect(reminder('en')).toBe(
+      `Reminder: Ari is still waiting for your ${amount('en')} for Dinner`,
+    )
+    expect(reminder('ja')).toBe(
+      `リマインド：Ariさんが「Dinner」の ${amount('ja')} の支払いを待っています`,
+    )
+    expect(reminder('zh-TW')).toBe(`提醒：Ari 還在等你支付「Dinner」的 ${amount('zh-TW')}`)
+    expect(reminder('vi')).toBe(
+      `Nhắc nhở: Ari vẫn đang chờ bạn thanh toán ${amount('vi')} cho Dinner`,
+    )
+  })
+
   it('formats the amount with the currency, not as a bare number', () => {
     expect(pushNotificationContent(payload()).body).toContain('₩30,000')
   })
@@ -122,6 +142,10 @@ describe('pushNotificationContent', () => {
    */
   it('opens the settlement the way the notification list does', () => {
     expect(pushNotificationContent(payload()).url).toBe(
+      '/settlements/90?origin=notifications&side=received',
+    )
+    // 리마인더는 요청과 같은 쪽이다. 낼 사람이 받는 알림이다.
+    expect(pushNotificationContent(payload({ type: 'SETTLEMENT_REMINDER' })).url).toBe(
       '/settlements/90?origin=notifications&side=received',
     )
     expect(pushNotificationContent(payload({ type: 'SETTLEMENT_PAID' })).url).toBe(

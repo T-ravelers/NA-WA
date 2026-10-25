@@ -1824,6 +1824,17 @@ function stubNotificationList(page) {
     stubJson(page, '/api/v1/notifications', {
       notifications: [
         {
+          id: 3,
+          type: 'SETTLEMENT_REMINDER',
+          settlementId: 91,
+          actorName: 'Mina Park',
+          gatheringName: 'Hongdae dinner',
+          amount: '32000.0000',
+          currencyCode: 'KRW',
+          readAt: null,
+          createdAt: '2026-08-21T13:00:00',
+        },
+        {
           id: 2,
           type: 'SETTLEMENT_PAID',
           settlementId: 90,
@@ -1848,7 +1859,7 @@ function stubNotificationList(page) {
       ],
       nextCursor: null,
     }),
-    stubJson(page, '/api/v1/notifications/unread-count', { count: 1 }),
+    stubJson(page, '/api/v1/notifications/unread-count', { count: 2 }),
     stubJson(page, '/api/v1/push-subscriptions/public-key', { publicKey: 'BScreenshotKey' }),
   ])
 }

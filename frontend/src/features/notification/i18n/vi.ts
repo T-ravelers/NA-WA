@@ -44,6 +44,7 @@ export default {
       SETTLEMENT_REQUESTED: '{actor} đã yêu cầu bạn {amount} cho {gathering}',
       SETTLEMENT_PAID: '{actor} đã trả bạn {amount} cho {gathering}',
       SETTLEMENT_COMPLETED: 'Mọi người đã thanh toán xong cho {gathering}',
+      SETTLEMENT_REMINDER: 'Nhắc nhở: {actor} vẫn đang chờ bạn thanh toán {amount} cho {gathering}',
       UNKNOWN: 'Có cập nhật mới về {gathering}',
     },
   },

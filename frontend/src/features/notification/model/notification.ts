@@ -7,12 +7,17 @@ import type { NotificationDto } from '../api/notificationApi.types'
  * 모르는 알림도 시각과 약속 이름은 읽히므로, 버리는 것보다 남기는 편이 낫다.
  */
 export type NotificationKind =
-  'SETTLEMENT_REQUESTED' | 'SETTLEMENT_PAID' | 'SETTLEMENT_COMPLETED' | 'UNKNOWN'
+  | 'SETTLEMENT_REQUESTED'
+  | 'SETTLEMENT_PAID'
+  | 'SETTLEMENT_COMPLETED'
+  | 'SETTLEMENT_REMINDER'
+  | 'UNKNOWN'
 
 const KNOWN_KINDS: NotificationKind[] = [
   'SETTLEMENT_REQUESTED',
   'SETTLEMENT_PAID',
   'SETTLEMENT_COMPLETED',
+  'SETTLEMENT_REMINDER',
 ]
 
 export interface AppNotification {
@@ -65,11 +70,14 @@ export function notificationMessageKey(kind: NotificationKind): string {
  * 정산 상세는 `query.side`로 뒤로 갈 곳을 정한다. 값을 안 주면 "낼 것"으로 떨어져서,
  * 받을 정산 알림을 눌러 들어갔다 뒤로 가면 그 정산이 없는 탭이 열린다.
  *
+ * 요청과 리마인더는 둘 다 낼 사람이 받는 알림이라 같은 쪽(`received`)이다. 리마인더는 아직 안 낸
+ * 사람에게만 가므로 완료 알림과 달리 어느 쪽인지 알 수 있다.
+ *
  * 완료 알림만은 여기서 정할 수 없다. 낸 사람과 받은 사람이 같은 알림을 받는데, 알림 한 줄에
  * 그 사람이 어느 쪽이었는지가 남아 있지 않다. 이 경우에만 정산 상세의 기본값에 맡긴다.
  */
 export function settlementSideFor(kind: NotificationKind): 'received' | 'sent' | undefined {
-  if (kind === 'SETTLEMENT_REQUESTED') return 'received'
+  if (kind === 'SETTLEMENT_REQUESTED' || kind === 'SETTLEMENT_REMINDER') return 'received'
   if (kind === 'SETTLEMENT_PAID') return 'sent'
   return undefined
 }

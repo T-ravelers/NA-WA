@@ -43,6 +43,8 @@ export default {
       SETTLEMENT_REQUESTED: '{actor}さんが「{gathering}」の {amount} を請求しました',
       SETTLEMENT_PAID: '{actor}さんが「{gathering}」の {amount} を支払いました',
       SETTLEMENT_COMPLETED: '「{gathering}」の支払いが全員完了しました',
+      SETTLEMENT_REMINDER:
+        'リマインド：{actor}さんが「{gathering}」の {amount} の支払いを待っています',
       UNKNOWN: '「{gathering}」に更新がありました',
     },
   },
