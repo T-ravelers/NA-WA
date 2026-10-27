@@ -284,6 +284,62 @@ class MemberMapperIntegrationTest {
         });
     }
 
+    /** 허용 상태마다 다른 회원 쌍을 써서, 한 상태가 빠져도 다른 상태의 약속이 가리지 못하게 한다. */
+    @Test
+    void existsSharedAppointment_acceptsEveryVisibleAppointmentStatus() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            String[] visibleStatuses = {
+                    "RECRUITING", "FULL", "IN_PROGRESS", "AWAITING_ATTENDANCE", "COMPLETED"
+            };
+
+            for (String appointmentStatus : visibleStatuses) {
+                long viewer = insertMember("조회하는 회원 " + appointmentStatus);
+                long mate = insertMember("같은 약속 회원 " + appointmentStatus);
+                long appointmentId = insertAppointment(
+                        insertVisibleEventItem(viewer), viewer, appointmentStatus);
+                insertMembership(appointmentId, viewer, "ACTIVE");
+                insertMembership(appointmentId, mate, "ACTIVE");
+
+                assertTrue(memberMapper.existsSharedAppointment(viewer, mate), appointmentStatus);
+            }
+        });
+    }
+
+    /** 요청자 참여 행·대상 참여 행·약속 중 하나라도 soft delete되면 열람 근거가 아니다. */
+    @Test
+    void existsSharedAppointment_ignoresSoftDeletedMembershipsAndAppointment() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            String[] deleteTargets = {"viewer", "mate", "appointment"};
+
+            for (String deleteTarget : deleteTargets) {
+                long viewer = insertMember("조회하는 회원 " + deleteTarget);
+                long mate = insertMember("같은 약속 회원 " + deleteTarget);
+                long appointmentId = insertAppointment(
+                        insertVisibleEventItem(viewer), viewer, "RECRUITING");
+                insertMembership(appointmentId, viewer, "ACTIVE");
+                insertMembership(appointmentId, mate, "ACTIVE");
+                assertTrue(memberMapper.existsSharedAppointment(viewer, mate), deleteTarget);
+
+                if ("appointment".equals(deleteTarget)) {
+                    jdbcTemplate.update(
+                            "UPDATE appointments SET deleted_at = CURRENT_TIMESTAMP "
+                                    + "WHERE appointment_id = ?",
+                            appointmentId);
+                } else {
+                    jdbcTemplate.update(
+                            "UPDATE appointment_members SET deleted_at = CURRENT_TIMESTAMP "
+                                    + "WHERE appointment_id = ? AND member_id = ?",
+                            appointmentId, "viewer".equals(deleteTarget) ? viewer : mate);
+                }
+
+                sqlSessionTemplate.clearCache();
+                assertFalse(memberMapper.existsSharedAppointment(viewer, mate), deleteTarget);
+            }
+        });
+    }
+
     /** 출석 이력이 없는 회원도 noShowCount가 0으로, completionRate가 null로 매핑된다. */
     @Test
     void findAppointmentProfile_mapsEmptyAttendance() {
