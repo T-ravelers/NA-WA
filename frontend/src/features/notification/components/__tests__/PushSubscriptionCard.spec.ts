@@ -108,7 +108,6 @@ describe('push card messages', () => {
     'notification.push.on.action',
     'notification.push.blocked.description',
     'notification.push.install.description',
-    'notification.push.failed',
   ]
 
   /** 영어로 폴백되면 일본어·베트남어 사용자에게 영어 안내가 섞여 나온다. 네 언어를 모두 확인한다. */

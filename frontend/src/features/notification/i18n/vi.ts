@@ -37,9 +37,8 @@ export default {
       },
       install: {
         description:
-          'Trên iPhone và iPad, hãy thêm NA-WA vào Màn hình chính trước (Chia sẻ, rồi Thêm vào MH chính), sau đó mở ứng dụng từ đó để bật thông báo.',
+          'Trên iPhone và iPad, hãy thêm NA-WA vào Màn hình chính trước (Chia sẻ, rồi Thêm vào Màn hình chính), sau đó mở ứng dụng từ đó để bật thông báo.',
       },
-      failed: 'Đã xảy ra lỗi. Vui lòng thử lại.',
     },
     item: {
       SETTLEMENT_REQUESTED: '{actor} đã yêu cầu bạn {amount} cho {gathering}',

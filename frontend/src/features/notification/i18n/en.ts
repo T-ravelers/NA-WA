@@ -59,7 +59,6 @@ export default {
         description:
           'On iPhone and iPad, add NA-WA to your Home Screen first (Share, then Add to Home Screen), then open it from there to turn on alerts.',
       },
-      failed: 'Something went wrong. Please try again.',
     },
     item: {
       SETTLEMENT_REQUESTED: '{actor} asked you for {amount} for {gathering}',

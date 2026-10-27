@@ -38,7 +38,6 @@ export default {
         description:
           'iPhoneとiPadでは、先にNA-WAをホーム画面に追加し（共有 → ホーム画面に追加）、そこから開いて通知をオンにしてください。',
       },
-      failed: '問題が発生しました。もう一度お試しください。',
     },
     item: {
       SETTLEMENT_REQUESTED: '{actor}さんが「{gathering}」の {amount} を請求しました',

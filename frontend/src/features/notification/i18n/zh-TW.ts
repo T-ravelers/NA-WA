@@ -37,7 +37,6 @@ export default {
         description:
           '在 iPhone 和 iPad 上，請先將 NA-WA 加入主畫面（分享 → 加入主畫面），再從主畫面開啟並開啟通知。',
       },
-      failed: '發生問題，請再試一次。',
     },
     item: {
       SETTLEMENT_REQUESTED: '{actor} 向你請款「{gathering}」的 {amount}',

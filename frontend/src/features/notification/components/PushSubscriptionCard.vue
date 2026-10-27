@@ -57,7 +57,7 @@ const { mode, busy, failed, enable, disable } = usePushSubscription()
       class="mt-2 text-caption text-ink-3"
       data-testid="push-failed"
     >
-      {{ t('notification.push.failed') }}
+      {{ t('error.unknown') }}
     </p>
   </AppCard>
 </template>

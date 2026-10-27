@@ -10,6 +10,7 @@ import {
   enablePush,
   readPushSubscription,
 } from './pushSubscription'
+import { pushKeys } from './pushKeys'
 
 /**
  * 카드가 어떤 모습인가.
@@ -46,7 +47,7 @@ export function usePushSubscription() {
    * 꺼진 것이다.
    */
   const publicKey = useQuery({
-    queryKey: ['push', 'public-key'],
+    queryKey: pushKeys.publicKey(),
     queryFn: fetchPushPublicKey,
     enabled: support !== 'unsupported',
     staleTime: Infinity,
