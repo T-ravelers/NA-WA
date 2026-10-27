@@ -54,7 +54,7 @@ describe('EventCard', () => {
   it('shows press feedback on the clickable card unless reduced motion is requested', () => {
     const wrapper = mountCard()
 
-    expect(wrapper.get('article').classes()).toEqual(
+    expect(wrapper.get('[data-testid="event-card-body"]').classes()).toEqual(
       expect.arrayContaining([
         'transition-transform',
         'motion-reduce:transition-none',
@@ -67,9 +67,40 @@ describe('EventCard', () => {
   it('emits the event id when the card is activated', async () => {
     const wrapper = mountCard()
 
-    await wrapper.get('article').trigger('click')
+    await wrapper.get('[data-testid="event-card-body"]').trigger('click')
 
     expect(wrapper.emitted('open')).toEqual([[42]])
+  })
+
+  // 키보드와 스크린 리더가 쓰는 자리다. 위 영역에도 클릭이 걸려 있어 두 번 나가면 안 된다.
+  it('opens the event once from the title button', async () => {
+    const wrapper = mountCard()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Sample event')
+      ?.trigger('click')
+
+    expect(wrapper.emitted('open')).toEqual([[42]])
+  })
+
+  it.each([
+    ['Add Sample event to trip', 'addToTrip'],
+    ['Find buddy for Sample event', 'findBuddy'],
+  ] as const)('emits %s without opening the detail', async (label, emitted) => {
+    const wrapper = mountCard()
+
+    await wrapper.get(`button[aria-label="${label}"]`).trigger('click')
+
+    expect(wrapper.emitted(emitted)).toEqual([[42]])
+    expect(wrapper.emitted('open')).toBeUndefined()
+  })
+
+  it('keeps only the category, title, period and status from the design', () => {
+    const wrapper = mountCard({ subtitle: 'Sample subtitle' })
+
+    expect(wrapper.text()).not.toContain('Sample subtitle')
+    expect(wrapper.text()).not.toContain('Seoul')
   })
 
   /*
