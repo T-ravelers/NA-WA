@@ -4,10 +4,12 @@ import type { PushEnvironment } from '../pushSubscription'
 
 const savePushSubscription = vi.fn()
 const deletePushSubscription = vi.fn()
+const fetchPushPublicKey = vi.fn()
 
 vi.mock('../../api/pushSubscriptionApi', () => ({
   savePushSubscription: (...args: unknown[]) => savePushSubscription(...args),
   deletePushSubscription: (...args: unknown[]) => deletePushSubscription(...args),
+  fetchPushPublicKey: (...args: unknown[]) => fetchPushPublicKey(...args),
 }))
 
 const {
@@ -23,6 +25,9 @@ const {
 } = await import('../pushSubscription')
 
 const ENDPOINT = 'https://fcm.googleapis.com/fcm/send/abc'
+const NEW_ENDPOINT = 'https://fcm.googleapis.com/fcm/send/new'
+// 서버의 현재 공개키다. base64url `-_8`은 바이트 [251, 255]다.
+const SERVER_KEY = '-_8'
 
 function environment(overrides: Partial<PushEnvironment> = {}): PushEnvironment {
   return {
@@ -37,10 +42,15 @@ function environment(overrides: Partial<PushEnvironment> = {}): PushEnvironment 
   }
 }
 
-function fakeSubscription() {
+/** `usedKey`는 구독을 만들 때 쓴 공개키다. 기본값은 서버의 현재 키이고, null은 브라우저가 키를 알려 주지 않는 경우다. */
+function fakeSubscription(options: { endpoint?: string; usedKey?: number[] | null } = {}) {
+  const endpoint = options.endpoint ?? ENDPOINT
+  const usedKey = options.usedKey === undefined ? [251, 255] : options.usedKey
+
   return {
-    endpoint: ENDPOINT,
-    toJSON: () => ({ endpoint: ENDPOINT, keys: { p256dh: 'P256DH', auth: 'AUTH' } }),
+    endpoint,
+    options: { applicationServerKey: usedKey === null ? null : new Uint8Array(usedKey).buffer },
+    toJSON: () => ({ endpoint, keys: { p256dh: 'P256DH', auth: 'AUTH' } }),
     unsubscribe: vi.fn().mockResolvedValue(true),
   }
 }
@@ -169,6 +179,8 @@ beforeEach(() => {
   savePushSubscription.mockResolvedValue(undefined)
   deletePushSubscription.mockReset()
   deletePushSubscription.mockResolvedValue(undefined)
+  fetchPushPublicKey.mockReset()
+  fetchPushPublicKey.mockResolvedValue(SERVER_KEY)
 })
 
 afterEach(() => {
@@ -310,6 +322,85 @@ describe('enablePush', () => {
     expect(created.unsubscribe).toHaveBeenCalledOnce()
     expect(savePushSubscription).not.toHaveBeenCalled()
   })
+
+  /**
+   * 구독은 만든 VAPID 공개키에 묶여 있다. 서버가 키를 바꾸면 예전 구독은 푸시 서비스가 거절하는데,
+   * 브라우저는 키가 다른 구독이 남아 있으면 새 키로 구독하지도 못한다.
+   */
+  describe('when the device subscribed with an older server key', () => {
+    it('replaces the stale subscription: server row, browser subscription, then a new one', async () => {
+      const stale = fakeSubscription({ usedKey: [1, 2] })
+      const created = fakeSubscription({ endpoint: NEW_ENDPOINT })
+      const { pushManager } = installBrowser({ existing: stale, created })
+      const order: string[] = []
+      deletePushSubscription.mockImplementation(() => {
+        order.push('delete-server-row')
+        return Promise.resolve()
+      })
+      stale.unsubscribe.mockImplementation(() => {
+        order.push('unsubscribe')
+        return Promise.resolve(true)
+      })
+      pushManager.subscribe.mockImplementation(() => {
+        order.push('subscribe')
+        return Promise.resolve(created)
+      })
+
+      await expect(enablePush(SERVER_KEY, 'en')).resolves.toEqual({
+        permission: 'granted',
+        enabled: true,
+      })
+
+      expect(order).toEqual(['delete-server-row', 'unsubscribe', 'subscribe'])
+      expect(deletePushSubscription).toHaveBeenCalledWith(ENDPOINT)
+      expect(savePushSubscription).toHaveBeenCalledWith(
+        expect.objectContaining({ endpoint: NEW_ENDPOINT }),
+      )
+    })
+
+    /** 길이만 같고 내용이 다른 키도 다른 키다. */
+    it('compares the key bytes, not just their length', async () => {
+      const stale = fakeSubscription({ usedKey: [251, 254] })
+      const { pushManager } = installBrowser({ existing: stale })
+
+      await enablePush(SERVER_KEY, 'en')
+
+      expect(stale.unsubscribe).toHaveBeenCalledOnce()
+      expect(pushManager.subscribe).toHaveBeenCalledOnce()
+    })
+
+    it('still replaces it when the server row cannot be deleted', async () => {
+      const stale = fakeSubscription({ usedKey: [1, 2] })
+      const { pushManager } = installBrowser({ existing: stale })
+      deletePushSubscription.mockRejectedValue(new Error('offline'))
+
+      await expect(enablePush(SERVER_KEY, 'en')).resolves.toMatchObject({ enabled: true })
+
+      expect(stale.unsubscribe).toHaveBeenCalledOnce()
+      expect(pushManager.subscribe).toHaveBeenCalledOnce()
+    })
+
+    it('cancels the replacement too when the server rejects its registration', async () => {
+      const stale = fakeSubscription({ usedKey: [1, 2] })
+      const { created } = installBrowser({ existing: stale })
+      savePushSubscription.mockRejectedValue(new Error('server down'))
+
+      await expect(enablePush(SERVER_KEY, 'en')).rejects.toThrow('server down')
+
+      expect(created.unsubscribe).toHaveBeenCalledOnce()
+    })
+
+    it('keeps a subscription whose key the browser does not report', async () => {
+      const unknown = fakeSubscription({ usedKey: null })
+      const { pushManager } = installBrowser({ existing: unknown })
+
+      await enablePush(SERVER_KEY, 'en')
+
+      expect(unknown.unsubscribe).not.toHaveBeenCalled()
+      expect(pushManager.subscribe).not.toHaveBeenCalled()
+      expect(savePushSubscription).toHaveBeenCalledOnce()
+    })
+  })
 })
 
 describe('disablePush', () => {
@@ -390,6 +481,86 @@ describe('syncPushSubscription', () => {
     savePushSubscription.mockRejectedValue(new Error('server down'))
 
     await expect(syncPushSubscription('en')).resolves.toBeUndefined()
+  })
+
+  it('leaves a subscription made with the current server key alone', async () => {
+    const existing = fakeSubscription()
+    const { pushManager } = installBrowser({ permission: 'granted', existing })
+
+    await syncPushSubscription('en')
+
+    expect(deletePushSubscription).not.toHaveBeenCalled()
+    expect(existing.unsubscribe).not.toHaveBeenCalled()
+    expect(pushManager.subscribe).not.toHaveBeenCalled()
+  })
+
+  /** 키를 바꾼 서버에서 앱을 열면, 사용자가 아무것도 하지 않아도 새 키로 이어져야 한다. */
+  describe('when the server key changed since the device subscribed', () => {
+    it('subscribes again with the new key and registers that subscription', async () => {
+      const stale = fakeSubscription({ usedKey: [1, 2] })
+      const created = fakeSubscription({ endpoint: NEW_ENDPOINT })
+      const { pushManager } = installBrowser({ permission: 'granted', existing: stale, created })
+
+      await syncPushSubscription('ja')
+
+      expect(deletePushSubscription).toHaveBeenCalledWith(ENDPOINT)
+      expect(stale.unsubscribe).toHaveBeenCalledOnce()
+      expect(Array.from(pushManager.subscribe.mock.calls[0]?.[0].applicationServerKey)).toEqual([
+        251, 255,
+      ])
+      expect(savePushSubscription).toHaveBeenCalledExactlyOnceWith({
+        endpoint: NEW_ENDPOINT,
+        p256dh: 'P256DH',
+        auth: 'AUTH',
+        language: 'ja',
+      })
+    })
+
+    it('cancels the new subscription when its registration fails', async () => {
+      const { created } = installBrowser({
+        permission: 'granted',
+        existing: fakeSubscription({ usedKey: [1, 2] }),
+      })
+      savePushSubscription.mockRejectedValue(new Error('server down'))
+
+      await expect(syncPushSubscription('en')).resolves.toBeUndefined()
+
+      expect(created.unsubscribe).toHaveBeenCalledOnce()
+    })
+
+    /**
+     * 사용자 동작을 요구하는 브라우저에서는 다시 구독이 막힐 수 있다. 쓸 수 없던 구독이라 잃는 것은
+     * 없고, 구독이 없으니 카드가 "켜기"로 돌아가 사용자가 눌러 다시 켠다.
+     */
+    it('ends without a subscription, quietly, when subscribing again is refused', async () => {
+      const { pushManager } = installBrowser({
+        permission: 'granted',
+        existing: fakeSubscription({ usedKey: [1, 2] }),
+      })
+      pushManager.subscribe.mockRejectedValue(new Error('NotAllowedError'))
+
+      await expect(syncPushSubscription('en')).resolves.toBeUndefined()
+
+      expect(savePushSubscription).not.toHaveBeenCalled()
+    })
+
+    /** 서버의 키를 모르면 예전 키인지도 알 수 없다. 멀쩡한 구독을 지우지 않고 이전처럼 등록만 한다. */
+    it.each([
+      ['the server has push turned off', () => fetchPushPublicKey.mockResolvedValue(null)],
+      ['the key lookup fails', () => fetchPushPublicKey.mockRejectedValue(new Error('offline'))],
+    ])('keeps the subscription when %s', async (_name, arrange) => {
+      const existing = fakeSubscription({ usedKey: [1, 2] })
+      const { pushManager } = installBrowser({ permission: 'granted', existing })
+      arrange()
+
+      await syncPushSubscription('en')
+
+      expect(existing.unsubscribe).not.toHaveBeenCalled()
+      expect(pushManager.subscribe).not.toHaveBeenCalled()
+      expect(savePushSubscription).toHaveBeenCalledWith(
+        expect.objectContaining({ endpoint: ENDPOINT }),
+      )
+    })
   })
 })
 

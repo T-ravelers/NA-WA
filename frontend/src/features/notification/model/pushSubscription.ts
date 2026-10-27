@@ -1,4 +1,8 @@
-import { deletePushSubscription, savePushSubscription } from '../api/pushSubscriptionApi'
+import {
+  deletePushSubscription,
+  fetchPushPublicKey,
+  savePushSubscription,
+} from '../api/pushSubscriptionApi'
 import type { PushSubscribeBody } from '../api/pushSubscriptionApi.types'
 
 /**
@@ -84,6 +88,70 @@ export function toSubscribeBody(
 }
 
 /**
+ * 이 구독을 만들 때 쓴 VAPID 공개키가 지금 서버의 키인가.
+ *
+ * 구독은 만든 키에 묶여 있어서, 서버가 키를 바꾸면 푸시 서비스가 예전 구독으로 가는 발송을
+ * 거절한다. 브라우저가 키를 알려 주지 않으면(null) 같다고 본다 — 확인할 수 없는 구독을 지우지 않는다.
+ */
+function isSubscribedWithKey(subscription: PushSubscription, publicKey: string): boolean {
+  const used = subscription.options.applicationServerKey
+  if (used === null) {
+    return true
+  }
+
+  const expected = urlBase64ToUint8Array(publicKey)
+  const actual = new Uint8Array(used)
+
+  return (
+    actual.length === expected.length && actual.every((byte, index) => byte === expected[index])
+  )
+}
+
+function subscribeWithKey(
+  registration: ServiceWorkerRegistration,
+  publicKey: string,
+): Promise<PushSubscription> {
+  return registration.pushManager.subscribe({
+    // 알림을 띄우지 않는 푸시는 받지 않겠다는 약속이다. iOS는 이 값을 반드시 요구한다.
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+  })
+}
+
+/**
+ * 예전 키로 만든 구독을 서버와 브라우저에서 치운다.
+ *
+ * 브라우저는 키가 다른 구독이 남아 있으면 새 키로 구독하지 못한다. 서버에 남은 행은 푸시 서비스가
+ * "끝난 구독"(404·410)이 아니라 인증 거절로 답할 수 있어 스스로 지워진다는 보장이 없으므로 직접
+ * 지운다. 서버 삭제가 실패해도 브라우저 구독은 끊는다.
+ */
+async function discardStaleSubscription(stale: PushSubscription): Promise<void> {
+  await deletePushSubscription(stale.endpoint).catch(() => undefined)
+  await stale.unsubscribe()
+}
+
+/**
+ * 구독을 서버에 등록한다. `created`는 이번 시도가 새로 만든 구독이라는 뜻이다.
+ *
+ * 새로 만든 구독만 등록에 실패했을 때 되돌린다. 서버에 등록되지 않은 채 브라우저에 남으면 카드를
+ * 다시 열 때 구독이 있다는 이유로 "켜짐"으로 보이고, 켜기 버튼도 사라져 다시 시도할 수 없다.
+ */
+async function register(
+  subscription: PushSubscription,
+  language: string,
+  created: boolean,
+): Promise<void> {
+  try {
+    await savePushSubscription(toSubscribeBody(subscription, language))
+  } catch (error) {
+    if (created) {
+      await subscription.unsubscribe().catch(() => undefined)
+    }
+    throw error
+  }
+}
+
+/**
  * 이 기기에 이미 있는 구독.
  *
  * `serviceWorker.ready`가 아니라 `getRegistration`을 쓴다. 서비스 워커가 등록되지 않은 환경
@@ -129,6 +197,8 @@ export interface EnablePushResult {
  *
  * **사용자의 클릭에서 곧바로 이어서 불러야 한다.** 권한 요청을 비동기 작업 뒤로 미루면 Safari가
  * 사용자 동작이 아니라고 보고 거절한다. 그래서 공개키는 미리 받아 두고 인자로 넘긴다.
+ *
+ * 기기에 이미 있는 구독이 다른 공개키로 만든 것이면 지우고 새 키로 다시 구독한다.
  */
 export function enablePush(publicKey: string, language: string): Promise<EnablePushResult> {
   // 안쪽 함수를 곧바로 불러, 권한 요청이 클릭과 같은 호출 안에서 시작되게 한다.
@@ -142,25 +212,14 @@ async function requestAndRegister(publicKey: string, language: string): Promise<
   }
 
   const registration = await navigator.serviceWorker.ready
-  const existing = await registration.pushManager.getSubscription()
-  const subscription =
-    existing ??
-    (await registration.pushManager.subscribe({
-      // 알림을 띄우지 않는 푸시는 받지 않겠다는 약속이다. iOS는 이 값을 반드시 요구한다.
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
-    }))
-
-  try {
-    await savePushSubscription(toSubscribeBody(subscription, language))
-  } catch (error) {
-    // 이번에 새로 만든 구독만 되돌린다. 서버에 등록되지 않은 채 브라우저에 남으면 카드를 다시 열 때
-    // 구독이 있다는 이유로 "켜짐"으로 보이고, 켜기 버튼도 사라져 다시 시도할 수 없다.
-    if (existing === null) {
-      await subscription.unsubscribe().catch(() => undefined)
-    }
-    throw error
+  let existing = await registration.pushManager.getSubscription()
+  if (existing !== null && !isSubscribedWithKey(existing, publicKey)) {
+    // 서버가 키를 바꾸기 전에 만든 구독이다. 그대로 등록하면 푸시 서비스가 발송을 계속 거절한다.
+    await discardStaleSubscription(existing)
+    existing = null
   }
+  const subscription = existing ?? (await subscribeWithKey(registration, publicKey))
+  await register(subscription, language, existing === null)
 
   return { permission, enabled: true }
 }
@@ -189,8 +248,9 @@ export async function disablePush(): Promise<void> {
  * 이 기기에 이미 있는 구독을 로그인한 계정과 현재 언어로 서버에 다시 맞춘다.
  *
  * 같은 기기에 다른 계정이 로그인하면 서버가 소유자를 옮기고, 화면 언어를 바꾸면 서버가 보내는
- * 푸시 본문의 언어가 바뀐다. 구독이 없으면 아무것도 하지 않고(권한도 묻지 않는다), 실패해도
- * 던지지 않는다 — 다음에 앱을 열 때 다시 맞춘다.
+ * 푸시 본문의 언어가 바뀐다. 서버가 VAPID 키를 바꿨다면 예전 키로 만든 구독은 푸시 서비스가
+ * 거절하므로 이때 새 키로 다시 구독한다. 구독이 없으면 아무것도 하지 않고(권한도 묻지 않는다),
+ * 실패해도 던지지 않는다 — 다음에 앱을 열 때 다시 맞춘다.
  */
 export function syncPushSubscription(language: string): Promise<void> {
   return trackRegistration(registerExistingSubscription(language))
@@ -207,11 +267,33 @@ async function registerExistingSubscription(language: string): Promise<void> {
 
     const subscription = await readPushSubscription()
     if (subscription !== null) {
-      await savePushSubscription(toSubscribeBody(subscription, language))
+      const current = await renewIfStale(subscription)
+      await register(current.subscription, language, current.created)
     }
   } catch {
     // 위 설명대로 다음에 다시 맞춘다.
   }
+}
+
+/**
+ * 구독이 예전 키로 만든 것이면 지금 키로 다시 구독해 돌려준다.
+ *
+ * 서버의 키를 알 수 없으면(푸시가 꺼졌거나 조회에 실패) 확인할 수 없으니 그대로 둔다. 다시 구독이
+ * 브라우저에서 막혀 실패하면(사용자 동작을 요구하는 환경 등) 구독이 없는 상태로 끝난다. 어차피
+ * 쓸 수 없던 구독이라 잃는 것은 없고, 카드가 "켜기"로 돌아가 사용자가 눌러 다시 켤 수 있다.
+ */
+async function renewIfStale(
+  subscription: PushSubscription,
+): Promise<{ subscription: PushSubscription; created: boolean }> {
+  const publicKey = await fetchPushPublicKey().catch(() => null)
+  if (publicKey === null || isSubscribedWithKey(subscription, publicKey)) {
+    return { subscription, created: false }
+  }
+
+  await discardStaleSubscription(subscription)
+  const registration = await navigator.serviceWorker.ready
+
+  return { subscription: await subscribeWithKey(registration, publicKey), created: true }
 }
 
 /**

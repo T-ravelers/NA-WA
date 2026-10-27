@@ -10,16 +10,21 @@ import { i18n } from '@/app/i18n'
  */
 
 const ENDPOINT = 'https://fcm.googleapis.com/fcm/send/abc'
+const NEW_ENDPOINT = 'https://fcm.googleapis.com/fcm/send/new'
+// 서버의 현재 공개키(base64url `-_8`, 바이트 [251, 255])다.
+const SERVER_KEY = '-_8'
 
 /** 서버에 저장된 이 기기의 구독. PUT이 넣고 DELETE가 지운다. */
 const serverRows = new Set<string>()
 const savePushSubscription = vi.fn()
 const deletePushSubscription = vi.fn()
+const fetchPushPublicKey = vi.fn()
 const post = vi.fn()
 
 vi.mock('@/features/notification/api/pushSubscriptionApi', () => ({
   savePushSubscription: (...args: unknown[]) => savePushSubscription(...args),
   deletePushSubscription: (...args: unknown[]) => deletePushSubscription(...args),
+  fetchPushPublicKey: (...args: unknown[]) => fetchPushPublicKey(...args),
 }))
 
 vi.mock('@/shared/api/httpClient', () => ({
@@ -41,12 +46,35 @@ function createTestRouter(): Router {
   })
 }
 
-/** 브라우저에 이 기기의 구독이 하나 있다. 로그아웃 뒤에도 남아 있는지 `unsubscribe`로 본다. */
-function installBrowserWithSubscription() {
-  const subscription = {
-    endpoint: ENDPOINT,
-    toJSON: () => ({ endpoint: ENDPOINT, keys: { p256dh: 'P256DH', auth: 'AUTH' } }),
+function fakeSubscription(endpoint: string, usedKey: number[]) {
+  return {
+    endpoint,
+    options: { applicationServerKey: new Uint8Array(usedKey).buffer },
+    toJSON: () => ({ endpoint, keys: { p256dh: 'P256DH', auth: 'AUTH' } }),
     unsubscribe: vi.fn().mockResolvedValue(true),
+  }
+}
+
+/**
+ * 브라우저에 이 기기의 구독이 하나 있다. 로그아웃 뒤에도 남아 있는지 `unsubscribe`로 본다.
+ * `staleKey`이면 서버가 키를 바꾸기 전에 만든 구독이라, 해지하면 새 키로 만든 `renewed`가 대신한다.
+ */
+function installBrowserWithSubscription(options: { staleKey?: boolean } = {}) {
+  const subscription = fakeSubscription(ENDPOINT, options.staleKey === true ? [1, 2] : [251, 255])
+  const renewed = fakeSubscription(NEW_ENDPOINT, [251, 255])
+  let current: typeof subscription | null = subscription
+  subscription.unsubscribe.mockImplementation(() => {
+    current = null
+    return Promise.resolve(true)
+  })
+  const registration = {
+    pushManager: {
+      getSubscription: () => Promise.resolve(current),
+      subscribe: vi.fn(() => {
+        current = renewed
+        return Promise.resolve(renewed)
+      }),
+    },
   }
 
   vi.stubGlobal('PushManager', class {})
@@ -54,12 +82,12 @@ function installBrowserWithSubscription() {
   Object.defineProperty(navigator, 'serviceWorker', {
     configurable: true,
     value: {
-      getRegistration: () =>
-        Promise.resolve({ pushManager: { getSubscription: () => Promise.resolve(subscription) } }),
+      getRegistration: () => Promise.resolve(registration),
+      ready: Promise.resolve(registration),
     },
   })
 
-  return subscription
+  return { subscription, renewed }
 }
 
 /** 서버에 저장되는 PUT. 호출마다 직접 끝낼 때까지 서버에 닿지 않은 채로 둔다. */
@@ -96,6 +124,8 @@ beforeEach(() => {
     serverRows.delete(endpoint)
     return Promise.resolve()
   })
+  fetchPushPublicKey.mockReset()
+  fetchPushPublicKey.mockResolvedValue(SERVER_KEY)
   post.mockReset()
   post.mockResolvedValue(undefined)
   localStorage.clear()
@@ -111,7 +141,7 @@ afterEach(() => {
 
 describe('signing out while a language-change sync is still being saved', () => {
   it('leaves no subscription on the server, because the delete waits for the save', async () => {
-    const subscription = installBrowserWithSubscription()
+    const { subscription } = installBrowserWithSubscription()
     const releases = holdSaves()
     const router = createTestRouter()
     stop = registerPushSubscriptionLifecycle(router)
@@ -165,7 +195,7 @@ describe('signing out while a language-change sync is still being saved', () => 
    */
   it('cancels the browser subscription when the save does not finish in time', async () => {
     vi.useFakeTimers()
-    const subscription = installBrowserWithSubscription()
+    const { subscription } = installBrowserWithSubscription()
     const releases = holdSaves()
     const router = createTestRouter()
     stop = registerPushSubscriptionLifecycle(router)
@@ -185,5 +215,32 @@ describe('signing out while a language-change sync is still being saved', () => 
     // 멈춰 있던 저장이 나중에 끝나도 뒤처리가 남지 않게 마무리한다.
     releases[1]?.()
     await vi.runAllTimersAsync()
+  })
+})
+
+describe('signing out while a subscription renewed for a changed server key is being saved', () => {
+  /**
+   * 키가 바뀐 서버에서 앱을 열면 예전 구독의 서버 행을 지우고 새로 구독해 등록한다. 그 등록이 끝나기
+   * 전에 로그아웃해도, 지워지는 것은 예전 주소가 아니라 새로 등록되는 주소여야 한다.
+   */
+  it('deletes the renewed subscription once it has been saved', async () => {
+    const { renewed } = installBrowserWithSubscription({ staleKey: true })
+    const releases = holdSaves()
+    const router = createTestRouter()
+    stop = registerPushSubscriptionLifecycle(router)
+
+    await router.push('/wallet')
+    await vi.waitFor(() => expect(releases).toHaveLength(1))
+    const signOut = requestSignOut()
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(deletePushSubscription.mock.calls).toEqual([[ENDPOINT]])
+
+    releases[0]?.()
+    await signOut
+
+    expect(deletePushSubscription.mock.calls).toEqual([[ENDPOINT], [NEW_ENDPOINT]])
+    expect(serverRows.size).toBe(0)
+    expect(renewed.unsubscribe).not.toHaveBeenCalled()
   })
 })
