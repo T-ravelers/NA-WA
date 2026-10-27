@@ -95,6 +95,30 @@ export async function readPushSubscription(): Promise<PushSubscription | null> {
   return (await registration?.pushManager.getSubscription()) ?? null
 }
 
+/**
+ * 서버에 구독을 등록하는 작업 가운데 아직 끝나지 않은 것.
+ *
+ * 로그인·언어 변경의 동기화는 기다리지 않고 시작한다. 이미 인증을 통과해 처리 중인 요청은 로그아웃으로
+ * 취소되지 않아서, 그 PUT이 로그아웃의 DELETE보다 늦게 저장되면 지운 구독이 이전 계정 몫으로 되살아난다.
+ * 그래서 등록 작업은 끝날 때까지 여기에 담아 두고, 로그아웃의 삭제가 이것이 끝나기를 기다린다.
+ */
+const registrationsInFlight = new Set<Promise<unknown>>()
+
+function trackRegistration<T>(task: Promise<T>): Promise<T> {
+  registrationsInFlight.add(task)
+  const forget = () => registrationsInFlight.delete(task)
+  task.then(forget, forget)
+
+  return task
+}
+
+/** 진행 중인 등록이 성공하든 실패하든 모두 끝날 때까지 기다린다. 기다리는 동안 시작된 것도 포함한다. */
+async function registrationsSettled(): Promise<void> {
+  while (registrationsInFlight.size > 0) {
+    await Promise.allSettled([...registrationsInFlight])
+  }
+}
+
 export interface EnablePushResult {
   permission: NotificationPermission
   enabled: boolean
@@ -106,7 +130,12 @@ export interface EnablePushResult {
  * **사용자의 클릭에서 곧바로 이어서 불러야 한다.** 권한 요청을 비동기 작업 뒤로 미루면 Safari가
  * 사용자 동작이 아니라고 보고 거절한다. 그래서 공개키는 미리 받아 두고 인자로 넘긴다.
  */
-export async function enablePush(publicKey: string, language: string): Promise<EnablePushResult> {
+export function enablePush(publicKey: string, language: string): Promise<EnablePushResult> {
+  // 안쪽 함수를 곧바로 불러, 권한 요청이 클릭과 같은 호출 안에서 시작되게 한다.
+  return trackRegistration(requestAndRegister(publicKey, language))
+}
+
+async function requestAndRegister(publicKey: string, language: string): Promise<EnablePushResult> {
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') {
     return { permission, enabled: false }
@@ -163,7 +192,11 @@ export async function disablePush(): Promise<void> {
  * 푸시 본문의 언어가 바뀐다. 구독이 없으면 아무것도 하지 않고(권한도 묻지 않는다), 실패해도
  * 던지지 않는다 — 다음에 앱을 열 때 다시 맞춘다.
  */
-export async function syncPushSubscription(language: string): Promise<void> {
+export function syncPushSubscription(language: string): Promise<void> {
+  return trackRegistration(registerExistingSubscription(language))
+}
+
+async function registerExistingSubscription(language: string): Promise<void> {
   try {
     if (
       detectPushSupport(browserPushEnvironment()) !== 'supported' ||
@@ -188,14 +221,18 @@ export async function syncPushSubscription(language: string): Promise<void> {
  * 로그아웃한 계정의 알림이 이 기기에 계속 도착한다. 브라우저 구독은 그대로 두어, 같은 기기로
  * 다시 로그인하면 `syncPushSubscription`이 새 계정으로 등록한다.
  *
+ * 진행 중인 등록(로그인·언어 변경의 동기화, 켜기)이 있으면 그것이 끝난 뒤에 지운다. 먼저 지우면
+ * 늦게 끝난 등록이 삭제 뒤에 저장되어 이전 계정의 구독이 되살아난다.
+ *
  * 실패는 던진다. 로그아웃을 막지 않는 것은 부르는 쪽(`requestSignOut`)의 몫이고, 이 삭제가
- * 끝나지 못했을 때의 대체 정리는 `dropBrowserPushSubscription`이다.
+ * 끝나지 못했을 때(기다리는 시간 포함)의 대체 정리는 `dropBrowserPushSubscription`이다.
  */
 export async function removePushSubscriptionFromServer(): Promise<void> {
   if (detectPushSupport(browserPushEnvironment()) !== 'supported') {
     return
   }
 
+  await registrationsSettled()
   const subscription = await readPushSubscription()
   if (subscription !== null) {
     await deletePushSubscription(subscription.endpoint)

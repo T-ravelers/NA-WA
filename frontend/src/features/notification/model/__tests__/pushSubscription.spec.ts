@@ -138,6 +138,9 @@ function installBrowser(options: {
     subscribe: vi.fn().mockResolvedValue(created),
   }
   const registration = { pushManager }
+  const getRegistration = vi
+    .fn()
+    .mockResolvedValue(options.registered === false ? undefined : registration)
 
   vi.stubGlobal('PushManager', class {})
   vi.stubGlobal('Notification', {
@@ -150,9 +153,7 @@ function installBrowser(options: {
   Object.defineProperty(navigator, 'serviceWorker', {
     configurable: true,
     value: {
-      getRegistration: vi
-        .fn()
-        .mockResolvedValue(options.registered === false ? undefined : registration),
+      getRegistration,
       get ready() {
         calls.push('ready')
         return Promise.resolve(registration)
@@ -160,7 +161,7 @@ function installBrowser(options: {
     },
   })
 
-  return { pushManager, calls, created }
+  return { pushManager, calls, created, getRegistration }
 }
 
 beforeEach(() => {
@@ -417,6 +418,110 @@ describe('removePushSubscriptionFromServer', () => {
     deletePushSubscription.mockRejectedValue(new Error('401'))
 
     await expect(removePushSubscriptionFromServer()).rejects.toThrow('401')
+  })
+
+  /**
+   * 이미 인증을 통과해 처리 중인 등록은 로그아웃으로 취소되지 않는다. 먼저 지우면 늦게 저장된
+   * 등록이 삭제 뒤에 이전 계정의 구독을 되살린다.
+   */
+  describe('while a registration is still in flight', () => {
+    let order: string[]
+    let finishPut: () => void
+    let failPut: () => void
+
+    /** PUT은 직접 끝낼 때까지 서버에 닿지 않은 상태로 둔다. */
+    function holdRegistration() {
+      savePushSubscription.mockImplementation(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            finishPut = () => {
+              order.push('put')
+              resolve()
+            }
+            failPut = () => reject(new Error('503'))
+          }),
+      )
+      deletePushSubscription.mockImplementation(() => {
+        order.push('delete')
+        return Promise.resolve()
+      })
+    }
+
+    beforeEach(() => {
+      order = []
+    })
+
+    /** 한 번 기다려 주어도 삭제가 먼저 나가지 않는지 본다. */
+    const letPendingWorkRun = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+    it('deletes only after a language-change sync has been saved', async () => {
+      installBrowser({ permission: 'granted', existing: fakeSubscription() })
+      holdRegistration()
+
+      const sync = syncPushSubscription('ja')
+      await vi.waitFor(() => expect(savePushSubscription).toHaveBeenCalled())
+      const removal = removePushSubscriptionFromServer()
+
+      await letPendingWorkRun()
+      expect(deletePushSubscription).not.toHaveBeenCalled()
+
+      finishPut()
+      await Promise.all([sync, removal])
+
+      expect(order).toEqual(['put', 'delete'])
+    })
+
+    /** PUT을 시작하기 전, 구독을 읽는 중인 동기화도 같은 이유로 기다려야 한다. */
+    it('also waits for a sync that has not reached the server yet', async () => {
+      const existing = fakeSubscription()
+      const { pushManager, getRegistration } = installBrowser({ permission: 'granted', existing })
+      let readSubscription: (value: unknown) => void = () => undefined
+      getRegistration.mockReturnValueOnce(new Promise((resolve) => (readSubscription = resolve)))
+      holdRegistration()
+
+      const sync = syncPushSubscription('ja')
+      const removal = removePushSubscriptionFromServer()
+      await letPendingWorkRun()
+      expect(deletePushSubscription).not.toHaveBeenCalled()
+
+      readSubscription({ pushManager })
+      await vi.waitFor(() => expect(savePushSubscription).toHaveBeenCalled())
+      finishPut()
+      await Promise.all([sync, removal])
+
+      expect(order).toEqual(['put', 'delete'])
+    })
+
+    it('deletes only after turning push on has been saved', async () => {
+      installBrowser({ existing: fakeSubscription() })
+      holdRegistration()
+
+      const enabling = enablePush('-_8', 'en')
+      await vi.waitFor(() => expect(savePushSubscription).toHaveBeenCalled())
+      const removal = removePushSubscriptionFromServer()
+
+      await letPendingWorkRun()
+      expect(deletePushSubscription).not.toHaveBeenCalled()
+
+      finishPut()
+      await Promise.all([enabling, removal])
+
+      expect(order).toEqual(['put', 'delete'])
+    })
+
+    it('still deletes when the registration it waited for failed', async () => {
+      installBrowser({ permission: 'granted', existing: fakeSubscription() })
+      holdRegistration()
+
+      const sync = syncPushSubscription('ja')
+      await vi.waitFor(() => expect(savePushSubscription).toHaveBeenCalled())
+      const removal = removePushSubscriptionFromServer()
+
+      failPut()
+      await Promise.all([sync, removal])
+
+      expect(order).toEqual(['delete'])
+    })
   })
 })
 

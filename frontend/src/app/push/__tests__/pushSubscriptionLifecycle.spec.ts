@@ -115,6 +115,36 @@ describe('registerPushSubscriptionLifecycle', () => {
     expect(removePushSubscriptionFromServer).not.toHaveBeenCalled()
   })
 
+  /**
+   * 정리가 진행 중인 등록이 끝나기를 기다리는 동안 새 PUT이 끼어들면 기다림이 끝나지 않고, 삭제 뒤에
+   * 저장되면 구독이 되살아난다. 로그아웃 정리가 시작되면 새 동기화를 시작하지 않는다.
+   */
+  it('stops starting new syncs once the sign-out cleanup has begun', async () => {
+    const router = createTestRouter()
+    stop = registerPushSubscriptionLifecycle(router)
+    await router.push('/wallet')
+    expect(syncPushSubscription).toHaveBeenCalledOnce()
+
+    const hook = setBeforeSignOutHook.mock.calls[0]?.[0] as () => void
+    hook()
+    i18n.global.locale.value = 'ja'
+    await nextTick()
+    await router.push('/notifications')
+
+    expect(syncPushSubscription).toHaveBeenCalledOnce()
+  })
+
+  it('does not sync on the first protected screen when the cleanup began before it', async () => {
+    const router = createTestRouter()
+    stop = registerPushSubscriptionLifecycle(router)
+
+    const hook = setBeforeSignOutHook.mock.calls[0]?.[0] as () => void
+    hook()
+    await router.push('/wallet')
+
+    expect(syncPushSubscription).not.toHaveBeenCalled()
+  })
+
   it('takes everything back when stopped', async () => {
     const router = createTestRouter()
     stop = registerPushSubscriptionLifecycle(router)
