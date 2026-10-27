@@ -375,7 +375,7 @@ describe('JourneyTimelineList', () => {
       endDate: '2026-08-10',
     })
 
-    expect(wrapper.text()).not.toContain('Find companions')
+    expect(wrapper.text()).not.toContain('Find buddy')
     expect(wrapper.findAll('a[href^="/appointments"]')).toHaveLength(0)
   })
 
@@ -388,7 +388,7 @@ describe('JourneyTimelineList', () => {
 
     expect(wrapper.text()).not.toContain('View companions')
     expect(wrapper.findAll('a[href^="/appointments"]')).toHaveLength(0)
-    expect(wrapper.text()).not.toContain('Find companions')
+    expect(wrapper.text()).not.toContain('Find buddy')
   })
 
   it('drops the companions CTA when a confirmed item has no appointment id', async () => {

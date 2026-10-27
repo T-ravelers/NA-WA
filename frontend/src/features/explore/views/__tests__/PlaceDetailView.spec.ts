@@ -179,7 +179,7 @@ describe('PlaceDetailView', () => {
     expect(
       wrapper
         .findAll('button')
-        .find((button) => button.text() === 'Find companions')
+        .find((button) => button.text() === 'Find buddy')
         ?.attributes('disabled'),
     ).toBeUndefined()
   })
@@ -313,7 +313,7 @@ describe('PlaceDetailView', () => {
   it('opens the Place appointment list with the Place filter', async () => {
     const { wrapper, router } = await mountView()
 
-    const button = wrapper.findAll('button').find((button) => button.text() === 'Find companions')
+    const button = wrapper.findAll('button').find((button) => button.text() === 'Find buddy')
 
     expect(button?.attributes('disabled')).toBeUndefined()
     await button?.trigger('click')
@@ -323,12 +323,12 @@ describe('PlaceDetailView', () => {
     expect(router.currentRoute.value.query).toEqual({ itemId: '42', itemType: 'PLACE' })
   })
 
-  it('opens the journey selector from Add to journey', async () => {
+  it('opens the journey selector from Add to trip', async () => {
     const { wrapper } = await mountView()
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -341,7 +341,7 @@ describe('PlaceDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -381,7 +381,7 @@ describe('PlaceDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -404,7 +404,7 @@ describe('PlaceDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -427,7 +427,7 @@ describe('PlaceDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -457,7 +457,7 @@ describe('PlaceDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -485,7 +485,7 @@ describe('PlaceDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 

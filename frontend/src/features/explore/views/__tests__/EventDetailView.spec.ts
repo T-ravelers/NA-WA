@@ -188,7 +188,7 @@ async function runAddToJourney(
 ): Promise<void> {
   await wrapper
     .findAll('button')
-    .find((button) => button.text() === 'Add to journey')
+    .find((button) => button.text() === 'Add to trip')
     ?.trigger('click')
   await flushPromises()
 
@@ -337,7 +337,7 @@ describe('EventDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -361,9 +361,7 @@ describe('EventDetailView', () => {
     })
     expect(router.currentRoute.value.name).toBe('explore-event-detail')
     expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/^Added to Seoul weekend on /))
-    expect(wrapper.findAll('button').some((button) => button.text() === 'Add to journey')).toBe(
-      true,
-    )
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Add to trip')).toBe(true)
   })
 
   it('keeps the last journey selection instead of restoring the stale query', async () => {
@@ -380,7 +378,7 @@ describe('EventDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -403,7 +401,7 @@ describe('EventDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -438,7 +436,7 @@ describe('EventDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
     await wrapper
@@ -519,7 +517,7 @@ describe('EventDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -546,7 +544,7 @@ describe('EventDetailView', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Add to journey')
+      .find((button) => button.text() === 'Add to trip')
       ?.trigger('click')
     await flushPromises()
 
@@ -606,7 +604,7 @@ describe('EventDetailView', () => {
   it('opens the Event appointment list with the Event filter', async () => {
     const { wrapper, router } = await mountView()
 
-    const button = wrapper.findAll('button').find((button) => button.text() === 'Find companions')
+    const button = wrapper.findAll('button').find((button) => button.text() === 'Find buddy')
 
     expect(button?.attributes('disabled')).toBeUndefined()
     await button?.trigger('click')
