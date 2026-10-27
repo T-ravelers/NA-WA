@@ -138,6 +138,19 @@ dependencies {
     // 구현 시점에 최신 안정 버전 확인
     implementation 'com.stripe:stripe-java:29.0.0'
 
+    // 웹 푸시 (본문 암호화·VAPID 서명)
+    // 요청 조립(AbstractPushService)만 쓰고 전송은 JDK HttpClient로 한다. 그래서 라이브러리가
+    // 런타임으로 끌고 오는 Apache HTTP 클라이언트 4.x·async-http-client(Netty 중복)·CLI 파서는
+    // 필요 없다. BouncyCastle은 라이브러리가 optional로만 걸어 두므로 직접 선언하고, 라이브러리
+    // 기본 1.70(jdk15on, 단종 계열) 대신 jdk18on을 쓴다. jose4j도 기본 0.7.9보다 올려 둔다.
+    implementation('nl.martijndwars:web-push:5.1.2') {
+        exclude group: 'org.apache.httpcomponents'
+        exclude group: 'org.asynchttpclient'
+        exclude group: 'com.beust'
+    }
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.86'
+    implementation 'org.bitbucket.b_c:jose4j:0.9.7'
+
     // S3 (영수증 이미지 저장)
     // 버킷은 별도 AWS 계정이 소유하므로 인스턴스 역할이 아니라 IAM 사용자 키로 접근한다.
     implementation 'software.amazon.awssdk:s3'

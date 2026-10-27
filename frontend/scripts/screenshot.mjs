@@ -1814,6 +1814,88 @@ function stubEventDetailWithObjectShapedRows(page) {
 }
 
 /**
+ * 알림 목록. 위에 푸시 구독 카드가 붙는다.
+ *
+ * 카드는 서버가 공개키를 내려 줘야(푸시가 켜져 있어야) 나타나므로 키도 함께 세운다.
+ */
+function stubNotificationList(page) {
+  return Promise.all([
+    stubMemberProfile(page),
+    stubJson(page, '/api/v1/notifications', {
+      notifications: [
+        {
+          id: 2,
+          type: 'SETTLEMENT_PAID',
+          settlementId: 90,
+          actorName: 'Daichi',
+          gatheringName: 'Gyeongbokgung walk',
+          amount: '15000.0000',
+          currencyCode: 'KRW',
+          readAt: null,
+          createdAt: '2026-08-21T12:30:00',
+        },
+        {
+          id: 1,
+          type: 'SETTLEMENT_REQUESTED',
+          settlementId: 91,
+          actorName: 'Mina Park',
+          gatheringName: 'Hongdae dinner',
+          amount: '32000.0000',
+          currencyCode: 'KRW',
+          readAt: '2026-08-21T11:10:00',
+          createdAt: '2026-08-21T11:00:00',
+        },
+      ],
+      nextCursor: null,
+    }),
+    stubJson(page, '/api/v1/notifications/unread-count', { count: 1 }),
+    stubJson(page, '/api/v1/push-subscriptions/public-key', { publicKey: 'BScreenshotKey' }),
+  ])
+}
+
+/**
+ * 푸시 카드의 네 모양은 브라우저 환경이 정한다. 러너의 Chromium은 푸시를 쓸 수 있고 권한도
+ * 묻기 전이라 기본이 "켜기"이고, 나머지는 환경을 흉내 내서 만든다.
+ *
+ * - `permission`: 알림 권한. `denied`면 브라우저가 막은 모양이다.
+ * - `subscribed`: 이 기기에 구독이 이미 있는 것처럼 보이게 한다. 개발 서버에는 서비스 워커가
+ *   등록되지 않아 그대로 두면 구독이 없다.
+ * - `ios`: iPhone 사파리 탭. 푸시 API가 없어서 홈 화면 추가 안내가 나온다.
+ */
+function stubPushEnvironment(
+  page,
+  { permission = 'default', subscribed = false, ios = false } = {},
+) {
+  return page.addInitScript(
+    (env) => {
+      Object.defineProperty(Notification, 'permission', {
+        configurable: true,
+        get: () => env.permission,
+      })
+      if (env.ios) {
+        delete window.PushManager
+        Object.defineProperty(navigator, 'userAgent', {
+          configurable: true,
+          get: () =>
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 ' +
+            '(KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+        })
+      }
+      if (env.subscribed) {
+        const subscription = {
+          endpoint: 'https://fcm.googleapis.com/fcm/send/screenshot',
+          unsubscribe: async () => true,
+        }
+        navigator.serviceWorker.getRegistration = async () => ({
+          pushManager: { getSubscription: async () => subscription },
+        })
+      }
+    },
+    { permission, subscribed, ios },
+  )
+}
+
+/**
  * 찍을 화면.
  *
  * 작업 중인 화면을 여기에 추가한다. `prepare`는 진입한 뒤 실행되며, 바텀시트를 연 상태처럼
@@ -1829,6 +1911,39 @@ function stubEventDetailWithObjectShapedRows(page) {
  * @type {{ name: string, path: string, setup?: Hook, prepare?: Hook }[]}
  */
 const SCREENS = [
+  {
+    name: '36-notifications-push-off',
+    path: '/notifications',
+    setup: (page) => Promise.all([stubNotificationList(page), stubPushEnvironment(page)]),
+    prepare: (page) => page.getByTestId('push-enable').waitFor(),
+  },
+  {
+    name: '37-notifications-push-on',
+    path: '/notifications',
+    setup: (page) =>
+      Promise.all([
+        stubNotificationList(page),
+        stubPushEnvironment(page, { permission: 'granted', subscribed: true }),
+      ]),
+    prepare: (page) => page.getByTestId('push-disable').waitFor(),
+  },
+  {
+    name: '38-notifications-push-blocked',
+    path: '/notifications',
+    setup: (page) =>
+      Promise.all([
+        stubNotificationList(page),
+        stubPushEnvironment(page, { permission: 'denied' }),
+      ]),
+    prepare: (page) => page.getByTestId('push-card').waitFor(),
+  },
+  {
+    name: '39-notifications-push-install',
+    path: '/notifications',
+    setup: (page) =>
+      Promise.all([stubNotificationList(page), stubPushEnvironment(page, { ios: true })]),
+    prepare: (page) => page.getByTestId('push-card').waitFor(),
+  },
   {
     name: '20-place-detail-object-rows',
     path: '/explore/places/9001',

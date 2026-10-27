@@ -19,7 +19,7 @@
 | HTTP         | Axios `1`                             | 공통 API 클라이언트                   |
 | i18n         | Vue I18n `11`                         | 영어 기본 다국어 메시지               |
 | Styling      | Tailwind CSS `4`                      | 디자인 토큰 기반 UI 스타일            |
-| PWA          | vite-plugin-pwa, Workbox `generateSW` | 앱 셸과 정적 자원 사전 캐시           |
+| PWA          | vite-plugin-pwa, Workbox `injectManifest` | 앱 셸·정적 자원 사전 캐시와 웹 푸시 수신 |
 | Test         | Vitest, Vue Test Utils, Playwright    | 단위, 컴포넌트와 브라우저 테스트      |
 | Quality      | ESLint, Prettier, Husky, lint-staged  | 정적 검사와 커밋 전 검사              |
 
@@ -48,6 +48,7 @@ Vue Query가 서버 응답을 소유합니다. 서버 응답을 Pinia에 복제�
 | Cache       | Redis `7`                                         | TTL이 필요한 인증과 캐시 데이터   |
 | Build       | Gradle Wrapper `9.6`, WAR plugin                  | 빌드와 테스트                     |
 | API docs    | Springfox Swagger `2.9`                           | 개발 중 API 확인                  |
+| Web Push    | `web-push` `5.1`, BouncyCastle `jdk18on`, JDK `HttpClient` | VAPID 서명·본문 암호화와 푸시 전송 |
 | Container   | Docker, Docker Compose                            | 백엔드, Nginx, MySQL과 Redis 실행 |
 
 구현 규칙은 [백엔드 개발 컨벤션](../backend/docs/DEVELOPMENT_CONVENTION.md)을
@@ -88,8 +89,23 @@ PWA는 필수 기능입니다. 개인정보와 정산 데이터의 안전을 위
 - 지도 타일
 - 일반 API runtime cache
 
-서비스 워커는 `generateSW`를 사용합니다. 캐시 범위를 넓히기 전에 데이터 민감도,
-만료 시간과 로그아웃 시 제거 방법을 문서화하세요.
+서비스 워커는 `injectManifest`로 `frontend/src/sw.ts`에 직접 작성합니다. 웹 푸시 처리를
+얹으려고 `generateSW`에서 바꿨고, 사전 캐시 대상(js/css/html)과 "runtime cache를 두지
+않는다"는 경계는 그대로입니다. 캐시 범위를 넓히기 전에 데이터 민감도, 만료 시간과 로그아웃 시
+제거 방법을 문서화하세요.
+
+### 웹 푸시
+
+정산 알림이 적재되면 같은 알림을 받는 사람의 기기로 웹 푸시도 보냅니다. 구독 등록·해지와
+발송 계약은 [알림 API 계약](../backend/docs/NOTIFICATION_API.md#웹-푸시)에 있습니다.
+
+- 푸시는 **최선 노력**이고 알림 목록과 폴링을 대신하지 않습니다.
+- 본문 암호화와 VAPID 서명은 `web-push` 라이브러리의 요청 조립 부분만 쓰고, 전송은 시간
+  제한을 둔 JDK `HttpClient`가 전용 스레드풀에서 합니다. 라이브러리의 전송 메서드는
+  호출마다 HTTP 클라이언트를 새로 만들고 기다리는 시간이 없어서 쓰지 않습니다.
+- BouncyCastle은 라이브러리가 기본으로 끌고 오는 `jdk15on`(단종 계열) 대신 `jdk18on`을
+  직접 선언해 씁니다.
+- 로컬 개발의 VAPID 키는 직접 만들고 커밋하지 않습니다. 방법은 `.env.example`에 있습니다.
 
 ## CI/CD와 배포
 

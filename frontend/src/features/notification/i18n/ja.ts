@@ -20,6 +20,25 @@ export default {
       title: 'お知らせはまだありません',
       description: '割り勘のリクエストや支払いがここに表示されます。',
     },
+    push: {
+      title: 'この端末の通知',
+      off: {
+        description: 'アプリを閉じていても、割り勘のリクエストや支払いをお知らせします。',
+        action: 'オンにする',
+      },
+      on: {
+        description: 'この端末に、割り勘のリクエストや支払いの通知が届きます。',
+        action: 'オフにする',
+      },
+      blocked: {
+        description:
+          'NA-WAの通知がブロックされています。オンにするには、ブラウザまたは端末の設定で通知を許可してください。',
+      },
+      install: {
+        description:
+          'iPhoneとiPadでは、先にNA-WAをホーム画面に追加し（共有 → ホーム画面に追加）、そこから開いて通知をオンにしてください。',
+      },
+    },
     item: {
       SETTLEMENT_REQUESTED: '{actor}さんが「{gathering}」の {amount} を請求しました',
       SETTLEMENT_PAID: '{actor}さんが「{gathering}」の {amount} を支払いました',

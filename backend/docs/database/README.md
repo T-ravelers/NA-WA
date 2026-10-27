@@ -1,10 +1,12 @@
-# V21 데이터베이스 지도
+# V23 데이터베이스 지도
 
-이 문서는 Flyway V21 적용 후의 NA-WA 데이터베이스를 도메인 단위로 보여줍니다.
+이 문서는 Flyway V23 적용 후의 NA-WA 데이터베이스를 도메인 단위로 보여줍니다.
 전체 구조를 먼저 이해한 뒤 필요한 상세 ERD로 이동할 수 있습니다.
 
 V9는 정산 테이블을 축소된 계약으로 전환하며 새 서비스 테이블을 만들지 않습니다.
 V21은 탐색 행사·장소 목록의 정렬용 인덱스만 추가하며 테이블 구조는 바꾸지 않습니다.
+V22는 웹 푸시 구독을 저장하는 `push_subscriptions`를 추가합니다.
+V23은 `push_subscriptions.endpoint`를 대소문자를 구분해 비교하도록 collation만 바꾸며 테이블 구조는 바꾸지 않습니다.
 Flyway로 적용하면 관리용 `flyway_schema_history`가 별도로 생성됩니다.
 
 ## 전체 도메인 관계
@@ -41,7 +43,7 @@ flowchart LR
 | 여정·일정·리포트 | `trips`, `trip_regions`, `trip_items`, `reports`, `trip_expense_links`                                       | [여정 ERD](JOURNEY_ERD.md)                |
 | 지갑·거래·결제   | `wallet_owners`, `wallets`, `wallet_transfers`, `wallet_ledger_entries`, `wallet_topups`, `qr_payment_codes` | [지갑 ERD](WALLET_ERD.md)                 |
 | 정산·리뷰        | `settlements`, 정산 상세 테이블, `settlement_receipts`, `member_reviews`, 리뷰 점수·키워드 테이블             | [정산·리뷰 ERD](SETTLEMENT_REVIEW_ERD.md) |
-| 알림             | `notifications`                                                                                              | [정산·리뷰 ERD](SETTLEMENT_REVIEW_ERD.md) |
+| 알림             | `notifications`, `push_subscriptions`                                                                        | [정산·리뷰 ERD](SETTLEMENT_REVIEW_ERD.md) |
 
 ## 구조 읽는 순서
 

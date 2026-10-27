@@ -1,0 +1,19 @@
+// 서비스 워커는 브라우저 창이 아니라 워커 전역에서 돈다. DOM 타입을 쓰는 앱 설정과 한 프로그램에
+// 섞으면 전역 선언이 부딪히므로 따로 검사한다.
+{
+  "extends": "@vue/tsconfig/tsconfig.json",
+  "include": ["src/sw.ts"],
+  "compilerOptions": {
+    "lib": ["ES2022", "WebWorker"],
+    "types": [],
+
+    // 푸시 문구를 만드는 알림 feature의 모델을 가져다 쓴다(`@/features/...`).
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    // `vue-tsc --build` produces a .tsbuildinfo file for incremental type-checking.
+    // Specified here to keep it out of the root directory.
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.sw.tsbuildinfo"
+  }
+}
