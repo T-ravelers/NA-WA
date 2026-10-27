@@ -471,6 +471,7 @@ class MemberProfileServiceImplTest {
 
     @Test
     void getAppointmentProfile_hidesAttendance_whenViewingAppointmentMate() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
         when(memberMapper.findProfile(2L)).thenReturn(profile("ACTIVE", true));
         when(memberMapper.existsSharedAppointment(1L, 2L)).thenReturn(true);
         when(memberMapper.findAppointmentProfile(2L)).thenReturn(appointmentProfile(2L));
@@ -486,6 +487,7 @@ class MemberProfileServiceImplTest {
 
     @Test
     void getAppointmentProfile_throwsForbidden_whenNoSharedAppointment() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
         when(memberMapper.findProfile(2L)).thenReturn(profile("ACTIVE", true));
         when(memberMapper.existsSharedAppointment(1L, 2L)).thenReturn(false);
 
@@ -498,8 +500,33 @@ class MemberProfileServiceImplTest {
         verify(memberMapper, never()).findAppointmentProfile(anyLong());
     }
 
+    /** 인증 필터가 상태를 보지 않으므로, 남은 access token으로 타인을 조회하는 경로를 막는다. */
+    @Test
+    void getAppointmentProfile_throwsViewerStatus_beforeLookingUpOtherMember() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("SUSPENDED", true));
+
+        BusinessException suspended = assertThrows(
+                BusinessException.class,
+                () -> service.getAppointmentProfile(1L, 2L)
+        );
+        assertEquals("AUTH-016", suspended.getErrorCode().getCode());
+
+        when(memberMapper.findProfile(1L)).thenReturn(profile("WITHDRAWN", true));
+
+        BusinessException withdrawn = assertThrows(
+                BusinessException.class,
+                () -> service.getAppointmentProfile(1L, 2L)
+        );
+        assertEquals("AUTH-017", withdrawn.getErrorCode().getCode());
+
+        verify(memberMapper, never()).findProfile(2L);
+        verify(memberMapper, never()).existsSharedAppointment(anyLong(), anyLong());
+        verify(memberMapper, never()).findAppointmentProfile(anyLong());
+    }
+
     @Test
     void getAppointmentProfile_throwsNotFound_whenOtherMemberMissing() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
         when(memberMapper.findProfile(2L)).thenReturn(null);
 
         BusinessException exception = assertThrows(
@@ -514,6 +541,7 @@ class MemberProfileServiceImplTest {
     @Test
     void getAppointmentProfile_throwsNotFound_whenOtherMemberNotActive() {
         String[] inactiveStatuses = {"WITHDRAWN", "SUSPENDED"};
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
 
         for (String status : inactiveStatuses) {
             when(memberMapper.findProfile(2L)).thenReturn(profile(status, true));
@@ -532,6 +560,7 @@ class MemberProfileServiceImplTest {
     void getAppointmentProfile_throwsNotFound_whenOtherMemberSoftDeleted() {
         MemberProfile deleted = profile("ACTIVE", true);
         deleted.setDeleted(true);
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
         when(memberMapper.findProfile(2L)).thenReturn(deleted);
 
         BusinessException exception = assertThrows(

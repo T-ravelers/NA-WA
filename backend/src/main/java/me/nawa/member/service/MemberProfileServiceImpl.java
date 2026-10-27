@@ -47,8 +47,10 @@ public class MemberProfileServiceImpl implements MemberProfileService {
     @Override
     @Transactional(readOnly = true)
     public MemberAppointmentProfileResponse getAppointmentProfile(long viewerId, long memberId) {
+        // 인증 필터는 회원 상태를 보지 않는다. 정지·탈퇴 직후 남은 access token으로
+        // 타인 프로필을 보지 못하도록 본인·타인 조회 모두 요청자 상태부터 확인한다.
+        loadActiveProfile(viewerId);
         if (viewerId == memberId) {
-            loadActiveProfile(memberId);
             return memberMapper.findAppointmentProfile(memberId);
         }
 

@@ -275,6 +275,7 @@ public enum MemberErrorCode implements ErrorCode {
 아니면 `MEMBER-010`을 돌려줍니다. 결제 전(`PAYMENT_PENDING`)이거나 취소된 약속은 이
 판정에 쓰지 않습니다. 대상이 없거나 활성 회원이 아니면 상태와 관계없이 `MEMBER-001`입니다.
 다른 회원의 응답에는 `completionRate`·`noShowCount` 키가 없습니다(#173, #580).
+요청자 자신이 정지·탈퇴 상태면 본인·타인 조회 모두 `AUTH-016`·`AUTH-017`입니다.
 
 약속 도메인에는 다음 오류 코드가 구현돼 있습니다.
 
