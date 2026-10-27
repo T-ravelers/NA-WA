@@ -113,15 +113,25 @@ export async function enablePush(publicKey: string, language: string): Promise<E
   }
 
   const registration = await navigator.serviceWorker.ready
+  const existing = await registration.pushManager.getSubscription()
   const subscription =
-    (await registration.pushManager.getSubscription()) ??
+    existing ??
     (await registration.pushManager.subscribe({
       // 알림을 띄우지 않는 푸시는 받지 않겠다는 약속이다. iOS는 이 값을 반드시 요구한다.
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
     }))
 
-  await savePushSubscription(toSubscribeBody(subscription, language))
+  try {
+    await savePushSubscription(toSubscribeBody(subscription, language))
+  } catch (error) {
+    // 이번에 새로 만든 구독만 되돌린다. 서버에 등록되지 않은 채 브라우저에 남으면 카드를 다시 열 때
+    // 구독이 있다는 이유로 "켜짐"으로 보이고, 켜기 버튼도 사라져 다시 시도할 수 없다.
+    if (existing === null) {
+      await subscription.unsubscribe().catch(() => undefined)
+    }
+    throw error
+  }
 
   return { permission, enabled: true }
 }

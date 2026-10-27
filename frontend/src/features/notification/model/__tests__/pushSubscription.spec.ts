@@ -254,6 +254,61 @@ describe('enablePush', () => {
 
     await expect(enablePush('-_8', 'en')).rejects.toThrow('server down')
   })
+
+  /**
+   * 서버에 등록하지 못한 새 구독이 브라우저에 남으면, 화면을 다시 열 때 구독이 있다는 이유로
+   * "켜짐"으로 보인다. 서버에는 보낼 주소가 없어 알림이 오지 않는데도 켜기 버튼이 사라진다.
+   */
+  it('cancels the subscription it just created when the server rejects the registration', async () => {
+    const { pushManager, created } = installBrowser({})
+    let current: ReturnType<typeof fakeSubscription> | null = null
+    pushManager.subscribe.mockImplementation(() => {
+      current = created
+      return Promise.resolve(created)
+    })
+    pushManager.getSubscription.mockImplementation(() => Promise.resolve(current))
+    created.unsubscribe.mockImplementation(() => {
+      current = null
+      return Promise.resolve(true)
+    })
+    savePushSubscription.mockRejectedValue(new Error('server down'))
+
+    await expect(enablePush('-_8', 'en')).rejects.toThrow('server down')
+
+    expect(created.unsubscribe).toHaveBeenCalledOnce()
+    // 카드를 다시 열었을 때 읽는 값이다. 구독이 없어야 "켜기"가 다시 보인다.
+    await expect(readPushSubscription()).resolves.toBeNull()
+  })
+
+  it('reports the registration failure even when cancelling the new subscription fails too', async () => {
+    const { created } = installBrowser({})
+    created.unsubscribe.mockRejectedValue(new Error('push service unreachable'))
+    savePushSubscription.mockRejectedValue(new Error('server down'))
+
+    await expect(enablePush('-_8', 'en')).rejects.toThrow('server down')
+  })
+
+  /** 이미 있던 구독은 이번 시도가 만든 것이 아니다. 등록이 실패해도 건드리지 않는다. */
+  it('keeps a subscription the device already had when the registration fails', async () => {
+    const existing = fakeSubscription()
+    installBrowser({ existing })
+    savePushSubscription.mockRejectedValue(new Error('server down'))
+
+    await expect(enablePush('-_8', 'en')).rejects.toThrow('server down')
+
+    expect(existing.unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('cancels the new subscription when the browser gave back no keys', async () => {
+    const { created } = installBrowser({
+      created: { ...fakeSubscription(), toJSON: () => ({ endpoint: ENDPOINT }) },
+    })
+
+    await expect(enablePush('-_8', 'en')).rejects.toThrow('missing its endpoint or keys')
+
+    expect(created.unsubscribe).toHaveBeenCalledOnce()
+    expect(savePushSubscription).not.toHaveBeenCalled()
+  })
 })
 
 describe('disablePush', () => {
