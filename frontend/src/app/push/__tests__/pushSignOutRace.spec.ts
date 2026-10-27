@@ -67,14 +67,12 @@ function installBrowserWithSubscription(options: { staleKey?: boolean } = {}) {
     current = null
     return Promise.resolve(true)
   })
+  const subscribe = vi.fn(() => {
+    current = renewed
+    return Promise.resolve(renewed)
+  })
   const registration = {
-    pushManager: {
-      getSubscription: () => Promise.resolve(current),
-      subscribe: vi.fn(() => {
-        current = renewed
-        return Promise.resolve(renewed)
-      }),
-    },
+    pushManager: { getSubscription: () => Promise.resolve(current), subscribe },
   }
 
   vi.stubGlobal('PushManager', class {})
@@ -87,7 +85,7 @@ function installBrowserWithSubscription(options: { staleKey?: boolean } = {}) {
     },
   })
 
-  return { subscription, renewed }
+  return { subscription, renewed, subscribe }
 }
 
 /** 서버에 저장되는 PUT. 호출마다 직접 끝낼 때까지 서버에 닿지 않은 채로 둔다. */
@@ -240,6 +238,43 @@ describe('signing out while a subscription renewed for a changed server key is b
     await signOut
 
     expect(deletePushSubscription.mock.calls).toEqual([[ENDPOINT], [NEW_ENDPOINT]])
+    expect(serverRows.size).toBe(0)
+    expect(renewed.unsubscribe).not.toHaveBeenCalled()
+  })
+
+  /**
+   * 예전 행의 삭제가 3초 안에 끝나지 않으면 로그아웃은 기다림을 놓고 브라우저 구독을 끊는다. 놓인
+   * 갱신은 취소되지 않으므로, 삭제가 나중에 끝났을 때 새 구독을 만들어 저장하면 로그아웃한 계정의 알림이
+   * 이 기기로 다시 온다.
+   */
+  it('does not create or save a new subscription once the sign-out gave up waiting', async () => {
+    vi.useFakeTimers()
+    const { subscription, renewed, subscribe } = installBrowserWithSubscription({ staleKey: true })
+    let finishStaleDelete: () => void = () => undefined
+    deletePushSubscription.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishStaleDelete = resolve
+        }),
+    )
+    const router = createTestRouter()
+    stop = registerPushSubscriptionLifecycle(router)
+
+    await router.push('/wallet')
+    await vi.waitFor(() => expect(deletePushSubscription).toHaveBeenCalledWith(ENDPOINT))
+    const signOut = requestSignOut()
+    await vi.advanceTimersByTimeAsync(3_000)
+    await signOut
+
+    expect(post).toHaveBeenCalledWith('/api/v1/auth/logout')
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce()
+
+    // 멈춰 있던 삭제가 로그아웃이 끝난 뒤에 응답한다.
+    finishStaleDelete()
+    await vi.runAllTimersAsync()
+
+    expect(subscribe).not.toHaveBeenCalled()
+    expect(savePushSubscription).not.toHaveBeenCalled()
     expect(serverRows.size).toBe(0)
     expect(renewed.unsubscribe).not.toHaveBeenCalled()
   })

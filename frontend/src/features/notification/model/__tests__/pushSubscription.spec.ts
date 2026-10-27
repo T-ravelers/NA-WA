@@ -151,14 +151,15 @@ function installBrowser(options: {
   const getRegistration = vi
     .fn()
     .mockResolvedValue(options.registered === false ? undefined : registration)
+  const requestPermission = vi.fn(() => {
+    calls.push('requestPermission')
+    return Promise.resolve(options.requested ?? 'granted')
+  })
 
   vi.stubGlobal('PushManager', class {})
   vi.stubGlobal('Notification', {
     permission: options.permission ?? 'default',
-    requestPermission: vi.fn(() => {
-      calls.push('requestPermission')
-      return Promise.resolve(options.requested ?? 'granted')
-    }),
+    requestPermission,
   })
   Object.defineProperty(navigator, 'serviceWorker', {
     configurable: true,
@@ -171,7 +172,7 @@ function installBrowser(options: {
     },
   })
 
-  return { pushManager, calls, created, getRegistration }
+  return { pushManager, calls, created, getRegistration, requestPermission }
 }
 
 beforeEach(() => {
@@ -714,5 +715,106 @@ describe('dropBrowserPushSubscription', () => {
     await dropBrowserPushSubscription()
 
     expect(deletePushSubscription).not.toHaveBeenCalled()
+  })
+
+  /**
+   * 로그아웃은 등록이 끝나기를 3초만 기다리고 이 함수로 넘어온다. 기다림을 놓은 등록은 취소되지 않고
+   * 계속 돌아서, 늦게 새 구독을 만들어 로그아웃한 계정으로 저장할 수 있다. 이 함수가 실행된 뒤에는
+   * 그런 등록이 구독을 만들지 않아야 한다.
+   */
+  describe('for a registration that was still running when it ran', () => {
+    /** 직접 끝낼 때까지 끝나지 않는 Promise와 그것을 끝내는 함수. */
+    function hold<T>(value: T) {
+      let release: () => void = () => undefined
+      const promise = new Promise<T>((resolve) => {
+        release = () => resolve(value)
+      })
+
+      return { promise, release }
+    }
+
+    it('lets a renewal that is waiting on the old server row stop before it subscribes', async () => {
+      const stale = fakeSubscription({ usedKey: [1, 2] })
+      const { pushManager } = installBrowser({ permission: 'granted', existing: stale })
+      const deletion = hold(undefined)
+      deletePushSubscription.mockReturnValue(deletion.promise)
+
+      const sync = syncPushSubscription('ja')
+      await vi.waitFor(() => expect(deletePushSubscription).toHaveBeenCalledWith(ENDPOINT))
+      await dropBrowserPushSubscription()
+      deletion.release()
+      await sync
+
+      expect(pushManager.subscribe).not.toHaveBeenCalled()
+      expect(savePushSubscription).not.toHaveBeenCalled()
+    })
+
+    it('cancels the subscription a renewal finished creating afterwards, without saving it', async () => {
+      const created = fakeSubscription({ endpoint: NEW_ENDPOINT })
+      const { pushManager } = installBrowser({
+        permission: 'granted',
+        existing: fakeSubscription({ usedKey: [1, 2] }),
+        created,
+      })
+      const subscribing = hold(created)
+      pushManager.subscribe.mockReturnValue(subscribing.promise)
+
+      const sync = syncPushSubscription('ja')
+      await vi.waitFor(() => expect(pushManager.subscribe).toHaveBeenCalled())
+      await dropBrowserPushSubscription()
+      subscribing.release()
+      await sync
+
+      expect(created.unsubscribe).toHaveBeenCalledOnce()
+      expect(savePushSubscription).not.toHaveBeenCalled()
+    })
+
+    it('does not subscribe for a permission answer that arrives afterwards', async () => {
+      const { pushManager, requestPermission } = installBrowser({ existing: null })
+      const answer = hold<NotificationPermission>('granted')
+      requestPermission.mockReturnValueOnce(answer.promise)
+
+      const enabling = enablePush('-_8', 'en')
+      await dropBrowserPushSubscription()
+      answer.release()
+
+      await expect(enabling).resolves.toEqual({ permission: 'granted', enabled: false })
+      expect(pushManager.subscribe).not.toHaveBeenCalled()
+      expect(savePushSubscription).not.toHaveBeenCalled()
+    })
+
+    it('cancels the subscription that turning push on finished creating afterwards', async () => {
+      const created = fakeSubscription({ endpoint: NEW_ENDPOINT })
+      const { pushManager } = installBrowser({ existing: null, created })
+      const subscribing = hold(created)
+      pushManager.subscribe.mockReturnValue(subscribing.promise)
+
+      const enabling = enablePush('-_8', 'en')
+      await vi.waitFor(() => expect(pushManager.subscribe).toHaveBeenCalled())
+      await dropBrowserPushSubscription()
+      subscribing.release()
+
+      await expect(enabling).resolves.toEqual({ permission: 'granted', enabled: false })
+      expect(created.unsubscribe).toHaveBeenCalledOnce()
+      expect(savePushSubscription).not.toHaveBeenCalled()
+    })
+
+    /** 로그아웃이 실패해 같은 페이지에 남을 수 있다. 그 뒤에 새로 시작하는 등록까지 막으면 안 된다. */
+    it('does not stop a registration that starts afterwards', async () => {
+      const created = fakeSubscription({ endpoint: NEW_ENDPOINT })
+      installBrowser({
+        permission: 'granted',
+        existing: fakeSubscription({ usedKey: [1, 2] }),
+        created,
+      })
+
+      await dropBrowserPushSubscription()
+      await syncPushSubscription('en')
+
+      expect(savePushSubscription).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ endpoint: NEW_ENDPOINT }),
+      )
+      expect(created.unsubscribe).not.toHaveBeenCalled()
+    })
   })
 })

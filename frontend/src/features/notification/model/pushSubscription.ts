@@ -107,15 +107,50 @@ function isSubscribedWithKey(subscription: PushSubscription, publicKey: string):
   )
 }
 
-function subscribeWithKey(
+/**
+ * 로그아웃이 등록 작업을 기다리다 포기한 횟수. 포기하는 곳은 `dropBrowserPushSubscription`이다.
+ *
+ * 로그아웃은 등록 작업이 끝나기를 3초만 기다리고, 넘으면 기다림을 놓은 채 브라우저 구독을 끊고
+ * 로그아웃한다. 놓인 작업은 취소되지 않고 계속 돌아서, 구독을 새로 만들어 로그아웃한 계정으로 저장할
+ * 수 있다. 그래서 구독을 만드는 작업은 시작할 때 이 값을 기억해 두고, 달라졌으면 만들지 않는다.
+ * 시작 때의 값과 비교하므로 로그아웃이 실패해 같은 페이지에 남은 뒤 새로 시작하는 작업은 막지 않는다.
+ */
+let signOutGiveUps = 0
+
+/** 로그아웃이 지금 시작하는 작업을 포기했는지 알려 주는 함수. 작업을 시작할 때 만든다. */
+function watchSignOutGiveUp(): () => boolean {
+  const startedAt = signOutGiveUps
+
+  return () => signOutGiveUps !== startedAt
+}
+
+/**
+ * 공개키로 새 구독을 만든다. 이 앱에서 구독을 만드는 곳은 여기뿐이다.
+ *
+ * 로그아웃이 작업을 포기했으면 만들지 않고, 만드는 도중에 포기했으면 만든 구독을 도로 끊는다. 두
+ * 경우 모두 null이고, 부르는 쪽은 서버에 저장하지 않고 끝낸다.
+ */
+async function subscribeWithKey(
   registration: ServiceWorkerRegistration,
   publicKey: string,
-): Promise<PushSubscription> {
-  return registration.pushManager.subscribe({
+  signOutGaveUp: () => boolean,
+): Promise<PushSubscription | null> {
+  if (signOutGaveUp()) {
+    return null
+  }
+
+  const subscription = await registration.pushManager.subscribe({
     // 알림을 띄우지 않는 푸시는 받지 않겠다는 약속이다. iOS는 이 값을 반드시 요구한다.
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
   })
+  if (!signOutGaveUp()) {
+    return subscription
+  }
+
+  await subscription.unsubscribe().catch(() => undefined)
+
+  return null
 }
 
 /**
@@ -199,6 +234,9 @@ export interface EnablePushResult {
  * 사용자 동작이 아니라고 보고 거절한다. 그래서 공개키는 미리 받아 두고 인자로 넘긴다.
  *
  * 기기에 이미 있는 구독이 다른 공개키로 만든 것이면 지우고 새 키로 다시 구독한다.
+ *
+ * 구독을 만들기 전에 로그아웃이 이 작업을 포기했다면(`dropBrowserPushSubscription`) 구독하지 않고
+ * `enabled: false`로 끝난다.
  */
 export function enablePush(publicKey: string, language: string): Promise<EnablePushResult> {
   // 안쪽 함수를 곧바로 불러, 권한 요청이 클릭과 같은 호출 안에서 시작되게 한다.
@@ -206,6 +244,7 @@ export function enablePush(publicKey: string, language: string): Promise<EnableP
 }
 
 async function requestAndRegister(publicKey: string, language: string): Promise<EnablePushResult> {
+  const signOutGaveUp = watchSignOutGiveUp()
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') {
     return { permission, enabled: false }
@@ -218,7 +257,10 @@ async function requestAndRegister(publicKey: string, language: string): Promise<
     await discardStaleSubscription(existing)
     existing = null
   }
-  const subscription = existing ?? (await subscribeWithKey(registration, publicKey))
+  const subscription = existing ?? (await subscribeWithKey(registration, publicKey, signOutGaveUp))
+  if (subscription === null) {
+    return { permission, enabled: false }
+  }
   await register(subscription, language, existing === null)
 
   return { permission, enabled: true }
@@ -251,12 +293,16 @@ export async function disablePush(): Promise<void> {
  * 푸시 본문의 언어가 바뀐다. 서버가 VAPID 키를 바꿨다면 예전 키로 만든 구독은 푸시 서비스가
  * 거절하므로 이때 새 키로 다시 구독한다. 구독이 없으면 아무것도 하지 않고(권한도 묻지 않는다),
  * 실패해도 던지지 않는다 — 다음에 앱을 열 때 다시 맞춘다.
+ *
+ * 다시 구독하기 전에 로그아웃이 이 작업을 포기했다면(`dropBrowserPushSubscription`) 구독을 만들지
+ * 않고 끝난다.
  */
 export function syncPushSubscription(language: string): Promise<void> {
   return trackRegistration(registerExistingSubscription(language))
 }
 
 async function registerExistingSubscription(language: string): Promise<void> {
+  const signOutGaveUp = watchSignOutGiveUp()
   try {
     if (
       detectPushSupport(browserPushEnvironment()) !== 'supported' ||
@@ -267,8 +313,10 @@ async function registerExistingSubscription(language: string): Promise<void> {
 
     const subscription = await readPushSubscription()
     if (subscription !== null) {
-      const current = await renewIfStale(subscription)
-      await register(current.subscription, language, current.created)
+      const current = await renewIfStale(subscription, signOutGaveUp)
+      if (current !== null) {
+        await register(current.subscription, language, current.created)
+      }
     }
   } catch {
     // 위 설명대로 다음에 다시 맞춘다.
@@ -281,10 +329,12 @@ async function registerExistingSubscription(language: string): Promise<void> {
  * 서버의 키를 알 수 없으면(푸시가 꺼졌거나 조회에 실패) 확인할 수 없으니 그대로 둔다. 다시 구독이
  * 브라우저에서 막혀 실패하면(사용자 동작을 요구하는 환경 등) 구독이 없는 상태로 끝난다. 어차피
  * 쓸 수 없던 구독이라 잃는 것은 없고, 카드가 "켜기"로 돌아가 사용자가 눌러 다시 켤 수 있다.
+ * 로그아웃이 이 작업을 포기해 구독을 만들지 못한 경우도 같은 상태로 끝나며, null을 돌려준다.
  */
 async function renewIfStale(
   subscription: PushSubscription,
-): Promise<{ subscription: PushSubscription; created: boolean }> {
+  signOutGaveUp: () => boolean,
+): Promise<{ subscription: PushSubscription; created: boolean } | null> {
   const publicKey = await fetchPushPublicKey().catch(() => null)
   if (publicKey === null || isSubscribedWithKey(subscription, publicKey)) {
     return { subscription, created: false }
@@ -292,8 +342,9 @@ async function renewIfStale(
 
   await discardStaleSubscription(subscription)
   const registration = await navigator.serviceWorker.ready
+  const renewed = await subscribeWithKey(registration, publicKey, signOutGaveUp)
 
-  return { subscription: await subscribeWithKey(registration, publicKey), created: true }
+  return renewed === null ? null : { subscription: renewed, created: true }
 }
 
 /**
@@ -329,8 +380,13 @@ export async function removePushSubscriptionFromServer(): Promise<void> {
  * 인증이 없어도 되는 일이라 그때 대신 한다. 서버에 남은 행은 푸시 서비스가 410으로 끝난 구독이라고
  * 알려 줄 때 서버가 스스로 치운다. 이 경로에서는 같은 기기로 다시 로그인해도 푸시가 자동으로
  * 이어지지 않으므로 알림 화면의 카드에서 다시 켜야 한다.
+ *
+ * 이 함수가 실행되면 로그아웃이 아직 끝나지 않은 등록 작업을 기다리다 포기한 것이다. 그 작업은 계속
+ * 돌지만, 이 뒤에 구독을 새로 만들지는 못한다(`subscribeWithKey`). 그러지 않으면 방금 끊은 자리에
+ * 새 구독이 생겨 로그아웃한 계정의 알림이 다시 이 기기로 온다.
  */
 export async function dropBrowserPushSubscription(): Promise<void> {
+  signOutGiveUps += 1
   if (detectPushSupport(browserPushEnvironment()) !== 'supported') {
     return
   }
