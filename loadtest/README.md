@@ -310,6 +310,9 @@ k6 run --out influxdb=http://127.0.0.1:8086/k6 \
   loadtest/k6/scenario4-member-profile.js
 compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
   mysql -uroot "$MYSQL_DATABASE" < loadtest/verify-member-profile.sql
+
+# 4. 규모마다 한 번, 부하가 끝난 뒤 — 집계 쿼리의 실제 계획과 읽은 행 수
+./loadtest/explain-member-profile.sh
 ```
 
 `profile_unexpected`·`profile_prepare_failed`·`profile_without_reviews`가 하나라도 0이
@@ -318,12 +321,20 @@ compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
 봄(`REVIEWS`를 안 줌)입니다.
 
 확인 SQL은 시드 건수, 풀 회원 한 명이 받은 후기 수(최소·평균·최대), 그리고 부하 동안
-**집계 쿼리 한 번이 읽은 행 수**(`rows_examined_per_call`)를 보여 줍니다. 마지막 값은
-`EXPLAIN ANALYZE` 대신 실제로 실행된 문장의 통계라, 쿼리를 고쳐도 이 파일은 그대로 씁니다.
+집계 쿼리가 실행된 횟수와 서버 안에서 걸린 시간을 보여 줍니다. 실행 횟수가 k6의 프로필
+요청 수와 다르면 다른 문장을 보고 있는 것입니다.
+
+**읽은 행 수는 `explain-member-profile.sh`로 잽니다.** 매퍼 XML에서 집계 쿼리를 꺼내 풀
+회원 세 명(980001·980500·981000, 인자로 바꿀 수 있음)에게 `EXPLAIN ANALYZE`를 실행하므로,
+쿼리를 고쳐도(#583) 스크립트는 그대로 씁니다. 계획에서 `Table scan`·`Index scan` 줄의
+`actual ... rows=`가 그 단계가 실제로 읽은 행 수입니다. performance_schema의
+`SUM_ROWS_EXAMINED`는 쓰지 않습니다 — 1만 건 측정에서 계획이 같은데도 값이 실행 도중 약
+4만에서 약 1만으로 바뀌었습니다.
 
 기록은 이슈 댓글과 PR 본문에 표로 남깁니다. 칸은 커밋 SHA, 후기 규모, VU 단계, 달성
 TPS, `profile_duration`의 p95·p99, 에러율, `hikaricp_connections_pending`,
-`tomcat_threads_busy / config_max`, GC 정지시간, `rows_examined_per_call`입니다.
+`tomcat_threads_busy / config_max`, GC 정지시간이고, 규모마다 `EXPLAIN ANALYZE`의 단계별
+읽은 행 수를 함께 적습니다.
 
 | 변수 | 기본값 | 뜻 |
 | --- | --- | --- |
