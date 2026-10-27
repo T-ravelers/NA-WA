@@ -134,6 +134,77 @@ describe('sessionSignOut before-sign-out hook', () => {
     expect(clearSpy).toHaveBeenCalledWith(timeouts[0]?.timer)
   })
 
+  /**
+   * 서버 삭제가 끝나지 못하면 서버 행과 브라우저 구독이 둘 다 남아 로그아웃한 계정의 알림이 계속
+   * 뜬다. 그때는 인증 없이 되는 대체 정리를 한 번 더 한다.
+   */
+  it.each([
+    ['rejects', () => Promise.reject(new Error('503'))],
+    [
+      'throws',
+      () => {
+        throw new Error('broken')
+      },
+    ],
+  ])('runs the fallback, before the logout request, when the hook %s', async (_label, hook) => {
+    const order: string[] = []
+    setBeforeSignOutHook(hook, () => {
+      order.push('fallback')
+      return Promise.resolve()
+    })
+    post.mockImplementation(() => {
+      order.push('logout')
+      return Promise.resolve()
+    })
+
+    await requestSignOut()
+
+    expect(order).toEqual(['fallback', 'logout'])
+  })
+
+  it('runs the fallback when the hook does not finish in time', async () => {
+    vi.useFakeTimers()
+    const fallback = vi.fn().mockResolvedValue(undefined)
+    setBeforeSignOutHook(() => new Promise<void>(() => undefined), fallback)
+
+    const signOut = requestSignOut()
+    await vi.advanceTimersByTimeAsync(2_999)
+    expect(fallback).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1)
+    await signOut
+
+    expect(fallback).toHaveBeenCalledOnce()
+    expect(post).toHaveBeenCalledOnce()
+  })
+
+  it('skips the fallback when the hook finished', async () => {
+    const fallback = vi.fn().mockResolvedValue(undefined)
+    setBeforeSignOutHook(() => Promise.resolve(), fallback)
+
+    await requestSignOut()
+
+    expect(fallback).not.toHaveBeenCalled()
+  })
+
+  /** 대체 정리가 실패하거나 멈춰도 사용자는 로그아웃할 수 있어야 한다. */
+  it('still signs out when the fallback fails or never finishes', async () => {
+    vi.useFakeTimers()
+    const onSignedOut = vi.fn()
+    setSignedOutHandler(onSignedOut)
+    setBeforeSignOutHook(
+      () => Promise.reject(new Error('503')),
+      () => new Promise<void>(() => undefined),
+    )
+
+    const signOut = requestSignOut()
+    await vi.advanceTimersByTimeAsync(3_000)
+    await signOut
+
+    expect(post).toHaveBeenCalledOnce()
+    expect(onSignedOut).toHaveBeenCalledOnce()
+  })
+
   it('signs out as before when no hook is set', async () => {
     await requestSignOut()
 

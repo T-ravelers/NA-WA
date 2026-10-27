@@ -3,6 +3,7 @@ import type { Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import {
+  dropBrowserPushSubscription,
   removePushSubscriptionFromServer,
   syncPushSubscription,
 } from '@/features/notification/model/pushSubscription'
@@ -17,10 +18,13 @@ import { setBeforeSignOutHook } from '@/shared/api/sessionSignOut'
  * - **화면 언어를 바꾸면** 다시 등록한다. 서버가 푸시 본문에 실어 보내는 언어가 구독에 저장돼
  *   있어서, 그대로 두면 화면은 일본어인데 알림은 예전 언어로 온다.
  * - **로그아웃하기 전에** 서버에서 지운다. 인증이 살아 있을 때만 가능하다. 실패해도 로그아웃은
- *   막지 않는다(`requestSignOut`가 보장한다).
+ *   막지 않는다(`requestSignOut`가 보장한다). 다만 서버 삭제가 실패하거나 시간 안에 끝나지
+ *   않으면 브라우저 구독을 대신 끊는다. 그러지 않으면 로그아웃한 계정의 알림이 이 기기에 계속
+ *   뜬다.
  *
- * 브라우저 구독은 지우지 않는다. 같은 기기로 다시 로그인하면 권한을 다시 묻지 않고 새 계정으로
- * 이어진다. 구독이 없거나 푸시를 쓸 수 없는 환경에서는 모두 아무 일도 하지 않는다.
+ * 서버 삭제가 성공했을 때는 브라우저 구독을 지우지 않는다. 같은 기기로 다시 로그인하면 권한을
+ * 다시 묻지 않고 새 계정으로 이어진다. 구독이 없거나 푸시를 쓸 수 없는 환경에서는 모두 아무 일도
+ * 하지 않는다.
  *
  * @returns 이 연결을 모두 걷어내는 함수
  */
@@ -48,7 +52,7 @@ export function registerPushSubscriptionLifecycle(router: Router): () => void {
     }
   })
 
-  setBeforeSignOutHook(removePushSubscriptionFromServer)
+  setBeforeSignOutHook(removePushSubscriptionFromServer, dropBrowserPushSubscription)
 
   return () => {
     removeAfterEach()

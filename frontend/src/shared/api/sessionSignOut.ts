@@ -15,12 +15,13 @@ export function setSignedOutHandler(handler: SignedOutHandler): void {
   signedOutHandler = handler
 }
 
-type BeforeSignOutHook = () => Promise<void>
+type SignOutCleanup = () => Promise<void>
 
-/** 정리가 이보다 오래 걸리면 기다리지 않고 로그아웃한다. */
+/** 정리가 이보다 오래 걸리면 기다리지 않고 다음으로 넘어간다. */
 const BEFORE_SIGN_OUT_TIMEOUT_MS = 3_000
 
-let beforeSignOutHook: BeforeSignOutHook | undefined
+let beforeSignOutHook: SignOutCleanup | undefined
+let beforeSignOutFallback: SignOutCleanup | undefined
 
 /**
  * 로그아웃 요청을 보내기 전에 할 정리를 주입한다.
@@ -28,32 +29,47 @@ let beforeSignOutHook: BeforeSignOutHook | undefined
  * 인증이 살아 있는 동안에만 할 수 있는 일이 대상이다(예: 이 기기의 푸시 구독을 서버에서 지우기).
  * 로그아웃 요청이 나가면 쿠키가 만료되어 그런 호출은 인증 실패로 돌아온다. shared는 feature를
  * import하지 않으므로 어떤 정리인지는 app 계층이 채운다.
+ *
+ * `fallback`은 정리가 실패하거나 시간 안에 끝나지 않았을 때만 대신 실행한다. 인증 없이도 되는
+ * 더 작은 정리여야 한다(예: 서버를 거치지 않고 브라우저의 푸시 구독만 끊기).
  */
-export function setBeforeSignOutHook(hook: BeforeSignOutHook | undefined): void {
+export function setBeforeSignOutHook(
+  hook: SignOutCleanup | undefined,
+  fallback?: SignOutCleanup,
+): void {
   beforeSignOutHook = hook
+  beforeSignOutFallback = fallback
+}
+
+/** 제한 시간 안에 끝나면 true. 실패하거나 시간이 지나면 false이고, 던지지 않는다. */
+async function finishesInTime(task: SignOutCleanup): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      task().then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), BEFORE_SIGN_OUT_TIMEOUT_MS)
+      }),
+    ])
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /**
  * 정리는 덤이다. 실패하거나 오래 걸려도 로그아웃을 막지 않는다 — 사용자가 로그아웃을 눌렀는데
- * 부가 정리 때문에 못 나가면 안 된다. 못 한 정리는 다음 로그인에서 맞춰진다.
+ * 부가 정리 때문에 못 나가면 안 된다. 다만 정리를 끝내지 못했다고 그대로 두면 안 되는 일이 있어
+ * (로그아웃한 계정의 푸시가 이 기기에 계속 온다), 그때는 대체 정리를 한 번 더 시도한다.
  */
 async function runBeforeSignOutHook(): Promise<void> {
   if (beforeSignOutHook === undefined) {
     return
   }
 
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    await Promise.race([
-      beforeSignOutHook(),
-      new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, BEFORE_SIGN_OUT_TIMEOUT_MS)
-      }),
-    ])
-  } catch {
-    // 위 설명대로 로그아웃은 계속한다.
-  } finally {
-    clearTimeout(timer)
+  if (!(await finishesInTime(beforeSignOutHook)) && beforeSignOutFallback !== undefined) {
+    await finishesInTime(beforeSignOutFallback)
   }
 }
 

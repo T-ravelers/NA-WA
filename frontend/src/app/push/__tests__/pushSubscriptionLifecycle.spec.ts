@@ -6,15 +6,17 @@ import { i18n } from '@/app/i18n'
 
 const syncPushSubscription = vi.fn()
 const removePushSubscriptionFromServer = vi.fn()
+const dropBrowserPushSubscription = vi.fn()
 const setBeforeSignOutHook = vi.fn()
 
 vi.mock('@/features/notification/model/pushSubscription', () => ({
   syncPushSubscription: (language: string) => syncPushSubscription(language),
   removePushSubscriptionFromServer: () => removePushSubscriptionFromServer(),
+  dropBrowserPushSubscription: () => dropBrowserPushSubscription(),
 }))
 
 vi.mock('@/shared/api/sessionSignOut', () => ({
-  setBeforeSignOutHook: (hook: unknown) => setBeforeSignOutHook(hook),
+  setBeforeSignOutHook: (hook: unknown, fallback?: unknown) => setBeforeSignOutHook(hook, fallback),
 }))
 
 const { registerPushSubscriptionLifecycle } = await import('../pushSubscriptionLifecycle')
@@ -42,6 +44,7 @@ let stop: () => void = () => undefined
 beforeEach(() => {
   syncPushSubscription.mockReset()
   removePushSubscriptionFromServer.mockReset()
+  dropBrowserPushSubscription.mockReset()
   setBeforeSignOutHook.mockReset()
   i18n.global.locale.value = 'en'
 })
@@ -101,6 +104,17 @@ describe('registerPushSubscriptionLifecycle', () => {
     expect(removePushSubscriptionFromServer).toHaveBeenCalledOnce()
   })
 
+  /** 서버 삭제가 끝나지 못해도 로그아웃한 계정의 알림이 이 기기에 남지 않게 한다. */
+  it('cuts only the browser subscription when the server removal cannot finish', () => {
+    stop = registerPushSubscriptionLifecycle(createTestRouter())
+
+    const fallback = setBeforeSignOutHook.mock.calls[0]?.[1] as () => void
+    fallback()
+
+    expect(dropBrowserPushSubscription).toHaveBeenCalledOnce()
+    expect(removePushSubscriptionFromServer).not.toHaveBeenCalled()
+  })
+
   it('takes everything back when stopped', async () => {
     const router = createTestRouter()
     stop = registerPushSubscriptionLifecycle(router)
@@ -111,6 +125,6 @@ describe('registerPushSubscriptionLifecycle', () => {
     await nextTick()
 
     expect(syncPushSubscription).not.toHaveBeenCalled()
-    expect(setBeforeSignOutHook).toHaveBeenLastCalledWith(undefined)
+    expect(setBeforeSignOutHook).toHaveBeenLastCalledWith(undefined, undefined)
   })
 })

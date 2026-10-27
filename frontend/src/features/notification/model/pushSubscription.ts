@@ -178,7 +178,8 @@ export async function syncPushSubscription(language: string): Promise<void> {
  * 로그아웃한 계정의 알림이 이 기기에 계속 도착한다. 브라우저 구독은 그대로 두어, 같은 기기로
  * 다시 로그인하면 `syncPushSubscription`이 새 계정으로 등록한다.
  *
- * 실패는 던진다. 로그아웃을 막지 않는 것은 부르는 쪽(`requestSignOut`)의 몫이다.
+ * 실패는 던진다. 로그아웃을 막지 않는 것은 부르는 쪽(`requestSignOut`)의 몫이고, 이 삭제가
+ * 끝나지 못했을 때의 대체 정리는 `dropBrowserPushSubscription`이다.
  */
 export async function removePushSubscriptionFromServer(): Promise<void> {
   if (detectPushSupport(browserPushEnvironment()) !== 'supported') {
@@ -189,4 +190,21 @@ export async function removePushSubscriptionFromServer(): Promise<void> {
   if (subscription !== null) {
     await deletePushSubscription(subscription.endpoint)
   }
+}
+
+/**
+ * 서버를 거치지 않고 이 기기의 브라우저 구독만 끊는다.
+ *
+ * 로그아웃 전 서버 삭제(`removePushSubscriptionFromServer`)가 실패하거나 시간 안에 끝나지 못하면
+ * 서버 행과 브라우저 구독이 모두 남아, 로그아웃한 계정의 알림이 다음 로그인까지 이 기기에 뜬다.
+ * 인증이 없어도 되는 일이라 그때 대신 한다. 서버에 남은 행은 푸시 서비스가 410으로 끝난 구독이라고
+ * 알려 줄 때 서버가 스스로 치운다. 이 경로에서는 같은 기기로 다시 로그인해도 푸시가 자동으로
+ * 이어지지 않으므로 알림 화면의 카드에서 다시 켜야 한다.
+ */
+export async function dropBrowserPushSubscription(): Promise<void> {
+  if (detectPushSupport(browserPushEnvironment()) !== 'supported') {
+    return
+  }
+
+  await (await readPushSubscription())?.unsubscribe()
 }

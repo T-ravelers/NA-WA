@@ -13,6 +13,7 @@ vi.mock('../../api/pushSubscriptionApi', () => ({
 const {
   detectPushSupport,
   disablePush,
+  dropBrowserPushSubscription,
   enablePush,
   readPushSubscription,
   removePushSubscriptionFromServer,
@@ -361,5 +362,26 @@ describe('removePushSubscriptionFromServer', () => {
     deletePushSubscription.mockRejectedValue(new Error('401'))
 
     await expect(removePushSubscriptionFromServer()).rejects.toThrow('401')
+  })
+})
+
+describe('dropBrowserPushSubscription', () => {
+  /** 서버 삭제가 실패한 로그아웃에서 알림이 계속 뜨지 않도록, 서버 호출 없이 브라우저 구독을 끊는다. */
+  it('cancels the browser subscription without calling the server', async () => {
+    const existing = fakeSubscription()
+    installBrowser({ existing })
+
+    await dropBrowserPushSubscription()
+
+    expect(existing.unsubscribe).toHaveBeenCalledOnce()
+    expect(deletePushSubscription).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when there is no subscription or push is not available', async () => {
+    await dropBrowserPushSubscription()
+    installBrowser({ existing: null })
+    await dropBrowserPushSubscription()
+
+    expect(deletePushSubscription).not.toHaveBeenCalled()
   })
 })
