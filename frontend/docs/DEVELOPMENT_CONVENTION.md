@@ -270,7 +270,7 @@ export default routes
   상세(`/appointments/:appointmentId`)가 이 경우이고, `appointment-create`처럼 param이
   없는 화면은 싣지 않습니다.
   - 이 규약을 읽고 쓰는 것은 **`shared/lib/returnRoute.ts` 하나뿐입니다.** 받는 쪽이
-    여정 생성과 충전 둘이라, 파싱이 각각 있으면 한쪽만 고쳐져 어긋납니다.
+    여정 생성·충전·약속 목록 셋이라, 파싱이 각각 있으면 한쪽만 고쳐져 어긋납니다.
 - 돌아갈 화면이 param 없이 **여러 항목 중 하나**를 다루던 중이면(Discover 목록의 카드),
   어느 항목이었는지를 자기 표시 key로 함께 싣습니다(`journeyAddItemId`·`journeyAddItemType`).
   규약이 나머지 query로 그대로 돌려주므로, 돌아온 화면이 읽자마자 지웁니다. Discover 목록은

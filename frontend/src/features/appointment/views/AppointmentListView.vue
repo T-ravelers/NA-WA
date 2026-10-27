@@ -131,7 +131,7 @@ function goBack(): void {
    * 보는 화면이 뜬다. 보낸 쪽이 자리를 지키고 `push`로 보냈으므로 되감아 돌려준다 — 그래야
    * 보던 탭·필터·스크롤이 그대로다. 되감을 기록이 없을 때(딥링크)만 그 화면으로 보낸다.
    */
-  const returnTo = readReturnRouteName(route.query, router)
+  const returnTo = returnRouteName.value
   if (returnTo !== null) {
     if (window.history.length > 1) {
       router.back()
@@ -249,11 +249,11 @@ watch(
  * 주기마다 카드 수만큼 요청이 나간다. 그래서 미리 막지 않고 서버 판정에 맡긴다.
  * 이미 참여한 약속이면 서버가 APPOINTMENT-003으로 돌려보내고 시트가 그 이유를 보여준다.
  */
+const returnRouteName = computed(() => readReturnRouteName(route.query, router))
+
 const listQuery = computed(() => ({
   // 탐색 목록에서 온 표시. 빠지면 참여하러 나갔다 돌아온 뒤 뒤로 가기가 상세로 간다.
-  ...(typeof route.query.returnRouteName === 'string'
-    ? { returnRouteName: route.query.returnRouteName }
-    : {}),
+  ...(returnRouteName.value === null ? {} : { returnRouteName: returnRouteName.value }),
   ...(itemId.value === undefined ? {} : { itemId: String(itemId.value) }),
   ...(itemType.value === undefined ? {} : { itemType: itemType.value }),
   // 고르던 카드가 있는 페이지로 돌아와야 한다. 첫 페이지로 오면 그 카드가 보이지 않는다.
