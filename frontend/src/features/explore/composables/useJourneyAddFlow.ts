@@ -1,6 +1,6 @@
 import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 
 import { formatCalendarDate } from '@/shared/lib/datetime'
 import { intersectItemJourneyPeriod } from '@/shared/lib/journeyPeriod'
@@ -26,11 +26,18 @@ export interface JourneyAddItem {
 export interface JourneyCreateReturn {
   returnRouteName: string
   returnParams?: string
+  /** 돌아왔을 때 그대로 돌려받을 보내는 쪽 query. 목록은 필터와 담던 항목을 싣는다. */
+  query?: LocationQueryRaw
 }
 
 interface JourneyAddFlowOptions {
   item: MaybeRefOrGetter<JourneyAddItem | null>
   createJourneyReturn: MaybeRefOrGetter<JourneyCreateReturn>
+  /**
+   * 이 흐름이 자기 화면 주소를 고칠 때 쓴다. 목록은 주소를 쓰기 전에 필터 기억에도
+   * 같은 값을 적어야 해서 바꿔 끼운다(`ExploreView`의 `onBeforeRouteUpdate` 참고).
+   */
+  replaceQuery?: (query: LocationQueryRaw) => void
 }
 
 /**
@@ -39,9 +46,15 @@ interface JourneyAddFlowOptions {
  * 겹치는 여정이 없으면 여정을 만들러 나갔다가 돌아와 하던 담기를 잇는다. 돌아온 화면은
  * `onMounted`에서 `resumeAfterJourneyCreate`를 불러야 한다.
  */
-export function useJourneyAddFlow({ item, createJourneyReturn }: JourneyAddFlowOptions) {
+export function useJourneyAddFlow({
+  item,
+  createJourneyReturn,
+  replaceQuery,
+}: JourneyAddFlowOptions) {
   const route = useRoute()
   const router = useRouter()
+  const replaceOwnQuery =
+    replaceQuery ?? ((query: LocationQueryRaw) => void router.replace({ query }))
   const i18n = useI18n()
   const hasMessage = (key: string): boolean => i18n.te(key)
   const { addJourneyItem, parseJourneyRouteQuery, useJourneyListQuery } =
@@ -103,7 +116,7 @@ export function useJourneyAddFlow({ item, createJourneyReturn }: JourneyAddFlowO
     ) {
       const restQuery = { ...route.query }
       delete restQuery.journeyId
-      void router.replace({ query: restQuery })
+      replaceOwnQuery(restQuery)
     }
     journeyDate.value = returnContext.visitDate
     journeySelectSheetOpen.value = false
@@ -136,11 +149,12 @@ export function useJourneyAddFlow({ item, createJourneyReturn }: JourneyAddFlowO
      *
      * 경계가 없는 쪽(장소, 종료일 미상 이벤트)은 싣지 않는다.
      */
-    const { returnRouteName, returnParams } = toValue(createJourneyReturn)
+    const { returnRouteName, returnParams, query } = toValue(createJourneyReturn)
     const { startDate, endDate } = itemPeriod.value
     void router.replace({
       name: 'journey-create',
       query: {
+        ...query,
         returnRouteName,
         ...(returnParams !== undefined ? { returnParams } : {}),
         openJourneySelect: '1',
@@ -212,11 +226,17 @@ export function useJourneyAddFlow({ item, createJourneyReturn }: JourneyAddFlowO
    * `openJourneySelect` 표시를 남겨 두면 새로고침이나 뒤로 가기에서도 시트가 다시
    * 열리므로 읽자마자 주소에서 지운다. 새 여정 id를 어떻게 받는지는 아래 블록 주석에
    * 적었다.
+   *
+   * `extraKeys`는 보내는 쪽이 따로 실었던 표시(목록의 담던 항목)다. 같은 이유로 함께
+   * 지운다. 담던 항목을 되살리지 못한 화면은 `openSheet: false`로 주소만 정리한다.
    */
-  function resumeAfterJourneyCreate(): void {
+  function resumeAfterJourneyCreate(
+    extraKeys: readonly string[] = [],
+    { openSheet = true }: { openSheet?: boolean } = {},
+  ): void {
     if (route.query.openJourneySelect !== '1') return
 
-    openJourneySelectSheet()
+    if (openSheet) openJourneySelectSheet()
 
     /*
      * 규약이 정한 결과 key는 `tripId`다. 여기서 한 번 읽어 고른 여정으로 삼고 주소에서
@@ -235,7 +255,8 @@ export function useJourneyAddFlow({ item, createJourneyReturn }: JourneyAddFlowO
     // 이 화면에서는 쓰이지 않으니 주소에 남기지 않는다.
     delete restQuery.itemStartDate
     delete restQuery.itemEndDate
-    void router.replace({ query: restQuery })
+    for (const key of extraKeys) delete restQuery[key]
+    replaceOwnQuery(restQuery)
   }
 
   return {

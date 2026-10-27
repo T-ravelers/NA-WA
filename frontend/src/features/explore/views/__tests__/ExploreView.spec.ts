@@ -17,6 +17,7 @@ import exploreRoutes from '../../routes'
 
 const fetchEventList = vi.fn()
 const fetchPlaceList = vi.fn()
+const fetchEventDetail = vi.fn()
 const scrollToMock = vi.fn()
 const addJourneyItem = vi.fn()
 const showToast = vi.fn()
@@ -26,6 +27,8 @@ vi.mock('@/shared/ui/toast', () => ({ showToast: (message: string) => showToast(
 vi.mock('../../api/exploreApi', () => ({
   fetchEventList: (filters: unknown) => fetchEventList(filters),
   fetchPlaceList: (filters: unknown) => fetchPlaceList(filters),
+  fetchEventDetail: (eventId: unknown, language: unknown) => fetchEventDetail(eventId, language),
+  fetchPlaceDetail: vi.fn(),
 }))
 
 const ExploreView = (await import('../ExploreView.vue')).default
@@ -102,6 +105,7 @@ async function mountView(path = '/explore') {
         name: 'explore-place-detail',
         component: { template: '<div>Place detail</div>' },
       },
+      { path: '/journeys/new', name: 'journey-create', component: Stub },
       { path: '/journeys/:tripId', name: 'journey-detail', component: Stub },
       { path: '/appointments', name: 'appointment-list', component: Stub },
     ],
@@ -725,6 +729,7 @@ describe('ExploreView card actions', () => {
     addJourneyItem.mockReset()
     addJourneyItem.mockResolvedValue({})
     showToast.mockReset()
+    fetchEventDetail.mockReset()
     fetchEventList.mockReset()
     fetchPlaceList.mockReset()
     fetchEventList.mockResolvedValue({ ...EMPTY_PAGE, content: [event], totalElements: 1 })
@@ -792,6 +797,71 @@ describe('ExploreView card actions', () => {
     expect(addJourneyItem).toHaveBeenCalledWith(7, { itemId: 301, visitDate: '2026-08-11' })
     expect(router.currentRoute.value.name).toBe('journey-detail')
     expect(router.currentRoute.value.params.tripId).toBe('7')
+  })
+
+  // 겹치는 여정이 없어 만들러 나가는 경우. 돌아와서 보던 목록과 담던 카드를 이어야 한다.
+  it('carries the list query and the card being added when leaving to create a journey', async () => {
+    fetchEventList.mockResolvedValue({
+      ...EMPTY_PAGE,
+      content: [{ ...event, startDate: '2026-09-01', endDate: '2026-09-03' }],
+      totalElements: 1,
+    })
+    const { wrapper, router } = await mountView('/explore?eventKinds=FESTIVAL')
+
+    await wrapper.get('button[aria-label="Add DDP Architecture Tour to trip"]').trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text() === 'Create a journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-create')
+    expect(router.currentRoute.value.query).toEqual({
+      eventKinds: 'FESTIVAL',
+      returnRouteName: 'explore',
+      journeyAddItemId: '301',
+      journeyAddItemType: 'EVENT',
+      openJourneySelect: '1',
+      itemStartDate: '2026-09-01',
+      itemEndDate: '2026-09-03',
+    })
+  })
+
+  it('reopens the journey selector for the card after creating a journey', async () => {
+    fetchEventDetail.mockResolvedValue({
+      ...event,
+      eventId: 301,
+      region1: 'Seoul',
+      region2: null,
+      region3: null,
+    })
+    const { wrapper, router } = await mountView(
+      '/explore?eventKinds=FESTIVAL&openJourneySelect=1&tripId=7&journeyAddItemId=301&journeyAddItemType=EVENT&itemStartDate=2026-08-10&itemEndDate=2026-08-12',
+    )
+    await flushPromises()
+
+    expect(fetchEventDetail).toHaveBeenCalledWith(301, 'en')
+    expect(
+      wrapper
+        .get('[role="dialog"]')
+        .findAll('button')
+        .find((button) => button.attributes('aria-pressed') === 'true')
+        ?.text(),
+    ).toContain('Seoul weekend')
+    expect(router.currentRoute.value.query).toEqual({ eventKinds: 'FESTIVAL' })
+  })
+
+  it('only clears the resume marks when the card cannot be loaded again', async () => {
+    fetchEventDetail.mockRejectedValue(new Error('gone'))
+    const { wrapper, router } = await mountView(
+      '/explore?openJourneySelect=1&tripId=7&journeyAddItemId=301&journeyAddItemType=EVENT',
+    )
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(router.currentRoute.value.query).toEqual({})
   })
 
   it.each([

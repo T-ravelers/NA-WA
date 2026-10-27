@@ -11,6 +11,7 @@ import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
+import { fetchEventDetail, fetchPlaceDetail } from '../api/exploreApi'
 import EventCard from '../components/EventCard.vue'
 import ExploreFilterBar from '../components/ExploreFilterBar.vue'
 import ExploreFilterSheet from '../components/ExploreFilterSheet.vue'
@@ -195,8 +196,19 @@ const totalEventElements = computed(() => eventQuery.data.value?.totalElements ?
 const placeList = computed(() => placeQuery.data.value?.content ?? [])
 const totalPlaceElements = computed(() => placeQuery.data.value?.totalElements ?? 0)
 
+type JourneyAddItemType = 'EVENT' | 'PLACE'
+
 /** 카드에서 담기를 누른 항목. 시트는 이 항목을 담는다. */
-const journeyAddTarget = ref<(JourneyAddItem & { title: string; location: string }) | null>(null)
+const journeyAddTarget = ref<
+  (JourneyAddItem & { itemType: JourneyAddItemType; title: string; location: string }) | null
+>(null)
+
+/*
+ * 여정을 만들러 나갈 때 어느 카드를 담던 중이었는지 주소에 싣는다. 목록에는 카드가 여러
+ * 장이라 상세 화면처럼 route param으로 알 수 없다. 돌아오면 읽고 지운다.
+ */
+const JOURNEY_ADD_ITEM_ID_KEY = 'journeyAddItemId'
+const JOURNEY_ADD_ITEM_TYPE_KEY = 'journeyAddItemType'
 const {
   journeySelectSheetOpen,
   journeyDateSheetOpen,
@@ -214,9 +226,29 @@ const {
   goToCreateJourney,
   closeJourneyDateSheet,
   confirmJourneyDate,
+  resumeAfterJourneyCreate,
 } = useJourneyAddFlow({
   item: journeyAddTarget,
-  createJourneyReturn: { returnRouteName: 'explore' },
+  /*
+   * 규약대로 자기 query(탭·필터)를 그대로 싣는다. 싣지 않으면 돌아왔을 때 보던 목록 대신
+   * 필터가 빠진 첫 목록이 뜬다.
+   */
+  createJourneyReturn: () => ({
+    returnRouteName: 'explore',
+    query: {
+      ...route.query,
+      ...(journeyAddTarget.value
+        ? {
+            [JOURNEY_ADD_ITEM_ID_KEY]: String(journeyAddTarget.value.itemId),
+            [JOURNEY_ADD_ITEM_TYPE_KEY]: journeyAddTarget.value.itemType,
+          }
+        : {}),
+    },
+  }),
+  replaceQuery: (query) => {
+    filterMemory.remember(query)
+    navigateSelf(() => router.replace({ query }))
+  },
 })
 
 function toRegionLabel(regions: Array<string | null | undefined>): string {
@@ -239,6 +271,7 @@ function addEventToTrip(eventId: number): void {
 
   journeyAddTarget.value = {
     itemId: event.itemId,
+    itemType: 'EVENT',
     title: event.title,
     location: toRegionLabel([event.region1, event.region2, event.region3]),
     startDate: event.startDate ?? null,
@@ -253,6 +286,7 @@ function addPlaceToTrip(placeId: number): void {
 
   journeyAddTarget.value = {
     itemId: place.itemId,
+    itemType: 'PLACE',
     title: place.name,
     location: toRegionLabel([place.region1, place.region2, place.region3]),
     startDate: null,
@@ -261,7 +295,59 @@ function addPlaceToTrip(placeId: number): void {
   openJourneySelectSheet()
 }
 
-function openAppointmentList(itemId: number, itemType: 'EVENT' | 'PLACE'): void {
+/**
+ * 여정을 만들고 돌아온 진입. 담던 항목을 다시 불러와 하던 담기를 잇는다.
+ *
+ * 그 항목이 지금 목록에 있다는 보장이 없어(다른 쪽에 있었거나 그사이 순서가 바뀜) 상세를
+ * 다시 조회한다. 불러오지 못하면 시트를 열지 않고 주소의 표시만 지운다 — 무엇을 담는지
+ * 모르는 시트는 고를 수 없는 여정까지 열어 준다.
+ */
+async function resumeJourneyAddFromCard(): Promise<void> {
+  if (route.query.openJourneySelect !== '1') return
+
+  const extraKeys = [JOURNEY_ADD_ITEM_ID_KEY, JOURNEY_ADD_ITEM_TYPE_KEY]
+  const itemId = Number(route.query[JOURNEY_ADD_ITEM_ID_KEY])
+  const itemType = route.query[JOURNEY_ADD_ITEM_TYPE_KEY]
+
+  try {
+    if (!Number.isSafeInteger(itemId) || itemId <= 0) throw new Error('No item to resume.')
+
+    if (itemType === 'EVENT') {
+      const event = await fetchEventDetail(itemId, locale.value)
+      journeyAddTarget.value = {
+        itemId: event.eventId,
+        itemType: 'EVENT',
+        title: event.title,
+        location: toRegionLabel([event.region1, event.region2, event.region3]),
+        startDate: event.startDate ?? null,
+        endDate: event.isPermanent === true ? null : (event.endDate ?? null),
+      }
+    } else if (itemType === 'PLACE') {
+      const place = await fetchPlaceDetail(itemId, locale.value)
+      journeyAddTarget.value = {
+        itemId: place.itemId,
+        itemType: 'PLACE',
+        title: place.name,
+        location: toRegionLabel([place.region1, place.region2, place.region3]),
+        startDate: null,
+        endDate: null,
+      }
+    } else {
+      throw new Error('Unknown item type to resume.')
+    }
+  } catch {
+    resumeAfterJourneyCreate(extraKeys, { openSheet: false })
+    return
+  }
+
+  resumeAfterJourneyCreate(extraKeys)
+}
+
+onMounted(() => {
+  void resumeJourneyAddFromCard()
+})
+
+function openAppointmentList(itemId: number, itemType: JourneyAddItemType): void {
   void router.push({
     name: 'appointment-list',
     query: { itemId: String(itemId), itemType },
