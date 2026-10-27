@@ -876,6 +876,9 @@ describe('ExploreView card actions', () => {
     await wrapper.get(`button[aria-label="${label}"]`).trigger('click')
     await flushPromises()
 
-    expect(push).toHaveBeenCalledWith({ name: 'appointment-list', query: { itemId, itemType } })
+    expect(push).toHaveBeenCalledWith({
+      name: 'appointment-list',
+      query: { itemId, itemType, returnRouteName: 'explore' },
+    })
   })
 })

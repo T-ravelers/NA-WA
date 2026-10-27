@@ -347,10 +347,14 @@ onMounted(() => {
   void resumeJourneyAddFromCard()
 })
 
+/**
+ * 상세를 거치지 않고 약속 목록으로 간다. 돌아올 곳을 함께 실어, 그쪽의 뒤로 가기가 이 목록으로
+ * 되감기게 한다. 싣지 않으면 열어 본 적 없는 상세로 간다.
+ */
 function openAppointmentList(itemId: number, itemType: JourneyAddItemType): void {
   void router.push({
     name: 'appointment-list',
-    query: { itemId: String(itemId), itemType },
+    query: { itemId: String(itemId), itemType, returnRouteName: 'explore' },
   })
 }
 const sheetResultCount = computed(

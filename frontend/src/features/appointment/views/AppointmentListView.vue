@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
+import { readReturnParams, readReturnRouteName } from '@/shared/lib/returnRoute'
+
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppPagination from '@/shared/ui/AppPagination.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
@@ -124,6 +126,21 @@ const title = computed(() =>
 )
 
 function goBack(): void {
+  /*
+   * 탐색 목록의 카드에서 바로 온 경우다. 상세를 열지 않았으니 아래처럼 상세로 보내면 처음
+   * 보는 화면이 뜬다. 보낸 쪽이 자리를 지키고 `push`로 보냈으므로 되감아 돌려준다 — 그래야
+   * 보던 탭·필터·스크롤이 그대로다. 되감을 기록이 없을 때(딥링크)만 그 화면으로 보낸다.
+   */
+  const returnTo = readReturnRouteName(route.query, router)
+  if (returnTo !== null) {
+    if (window.history.length > 1) {
+      router.back()
+      return
+    }
+    void router.push({ name: returnTo, params: readReturnParams(route.query) })
+    return
+  }
+
   if (itemId.value !== undefined && itemType.value === 'EVENT') {
     void router.push({
       name: 'explore-event-detail',
@@ -233,6 +250,10 @@ watch(
  * 이미 참여한 약속이면 서버가 APPOINTMENT-003으로 돌려보내고 시트가 그 이유를 보여준다.
  */
 const listQuery = computed(() => ({
+  // 탐색 목록에서 온 표시. 빠지면 참여하러 나갔다 돌아온 뒤 뒤로 가기가 상세로 간다.
+  ...(typeof route.query.returnRouteName === 'string'
+    ? { returnRouteName: route.query.returnRouteName }
+    : {}),
   ...(itemId.value === undefined ? {} : { itemId: String(itemId.value) }),
   ...(itemType.value === undefined ? {} : { itemType: itemType.value }),
   // 고르던 카드가 있는 페이지로 돌아와야 한다. 첫 페이지로 오면 그 카드가 보이지 않는다.

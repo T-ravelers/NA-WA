@@ -94,6 +94,11 @@ async function mountView(options: MountOptions = {}) {
         component: { template: '<div>Create</div>' },
       },
       {
+        path: '/explore',
+        name: 'explore',
+        component: { template: '<div>Explore</div>' },
+      },
+      {
         path: '/explore/events/:eventId',
         name: 'explore-event-detail',
         component: { template: '<div>Event</div>' },
@@ -825,6 +830,31 @@ describe('AppointmentListView', () => {
 
     expect(router.currentRoute.value.name).toBe('explore-event-detail')
     expect(router.currentRoute.value.params.eventId).toBe('42')
+  })
+
+  // 탐색 목록의 카드에서 바로 온 경우. 열어 본 적 없는 상세가 아니라 목록으로 돌아간다.
+  it('rewinds to the Explore list when a card sent it here', async () => {
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(2)
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&returnRouteName=explore',
+    })
+    const routerBack = vi.spyOn(router, 'back')
+
+    await wrapper.find('header button').trigger('click')
+
+    expect(routerBack).toHaveBeenCalledOnce()
+    historyLength.mockRestore()
+  })
+
+  it('goes to the Explore list when there is no history to rewind', async () => {
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&returnRouteName=explore',
+    })
+
+    await wrapper.find('header button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('explore')
   })
 
   // 폴링만 가짜 시계에 올린다. flushPromises는 setTimeout·setImmediate를 쓰므로
