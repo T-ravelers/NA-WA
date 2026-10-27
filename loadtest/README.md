@@ -268,6 +268,69 @@ Notion의 20건은 QR 결제부터 리포트까지의 업무 API만 센 값입�
 5분에 실행하면 전체 관측 TPS 상한은 약 **773 TPS**입니다. Grafana에서 업무 API 태그와
 `test-login`·`csrf` 태그를 분리해 595 TPS 목표와 보조 트래픽을 함께 해석합니다.
 
+## 시나리오 4 — 약속 참여자 프로필 조회
+
+약속 참여자 목록에서 프로필을 열 때마다 서버는 그 회원의 출석·후기를 집계합니다(#173).
+이 조회가 **후기 수에 따라 얼마나 느려지는지**를 잽니다(#582). 집계 쿼리를 고친 뒤(#583)
+같은 절차로 다시 재서 비교하고, #173의 전환 기준(같은 VU 단계에서 후기 1만 건 대비
+10만 건의 p95가 20%를 넘게 늘면 회원별 집계 테이블을 논의)을 판정합니다.
+
+후기 데이터는 `REVIEWS`를 준 시드에서만 깔립니다(기본 0). 받는 쪽 회원 풀은 1,000명으로
+고정이라, 후기가 늘면 **회원 한 명이 받은 후기**가 늘어납니다(1만이면 약 10건, 10만이면
+약 100건). VU n은 n번째 후기 약속의 참여자로 들어가고, k6는 그 약속을
+`GET /api/v1/appointments/me?scope=ALL`에서 `COMPLETED`인 것으로 찾습니다. 그래서 새 계약
+값은 없지만, **k6의 `VUS`는 후기 약속 수(`REVIEWS / 30`)를 넘을 수 없습니다.**
+
+VU는 처음 한 번 로그인과 약속 찾기를 하고, 반복마다 참여자 목록과 참여자 6명의 프로필을
+다시 엽니다. 생각 시간이 없어 VU 수가 곧 동시 요청의 상한입니다. 재는 것은 프로필 요청
+(`appointment-profile` 태그, `profile_duration`)입니다.
+
+규모를 바꿀 때는 볼륨을 비우고 다시 시드합니다.
+
+```shell
+set -a && source .env.loadtest && set +a
+compose() {
+  docker compose -p nawa-loadtest -f docker-compose.yml -f docker-compose.ec2-clone.yml "$@"
+}
+
+# 1. 규모마다 한 번 — 볼륨을 비우고 다시 띄운 뒤 후기를 깐다(1만 또는 10만)
+compose down -v
+compose --env-file .env.loadtest up -d --build
+RUNS=1 VUS=8920 REVIEWS=10000 ./loadtest/seed.sh
+
+# 2. 데우기 — JIT·커넥션 풀이 차기 전 값이 섞이지 않게 30초 돌리고 결과는 버린다
+k6 run -e LOADTEST_LOGIN_SECRET="$LOADTEST_LOGIN_SECRET" -e VUS=10 -e DURATION=30s \
+  loadtest/k6/scenario4-member-profile.js
+
+# 3. VU 단계(10·50·100)마다 3회 — 매번 쿼리 통계를 비우고 재고 확인한다
+compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql mysql -uroot \
+  -e "TRUNCATE TABLE performance_schema.events_statements_summary_by_digest"
+k6 run --out influxdb=http://127.0.0.1:8086/k6 \
+  -e LOADTEST_LOGIN_SECRET="$LOADTEST_LOGIN_SECRET" -e VUS=50 -e DURATION=60s \
+  loadtest/k6/scenario4-member-profile.js
+compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
+  mysql -uroot "$MYSQL_DATABASE" < loadtest/verify-member-profile.sql
+```
+
+`profile_unexpected`·`profile_prepare_failed`·`profile_without_reviews`가 하나라도 0이
+아니면 그 실행은 해석하지 않습니다. 각각 프로필 응답 실패(403 `MEMBER-010`이면 VU가 그
+약속 참여자가 아님), 끝난 약속을 못 찾음(`VUS`가 후기 약속 수보다 큼), 후기 없는 회원만
+봄(`REVIEWS`를 안 줌)입니다.
+
+확인 SQL은 시드 건수, 풀 회원 한 명이 받은 후기 수(최소·평균·최대), 그리고 부하 동안
+**집계 쿼리 한 번이 읽은 행 수**(`rows_examined_per_call`)를 보여 줍니다. 마지막 값은
+`EXPLAIN ANALYZE` 대신 실제로 실행된 문장의 통계라, 쿼리를 고쳐도 이 파일은 그대로 씁니다.
+
+기록은 이슈 댓글과 PR 본문에 표로 남깁니다. 칸은 커밋 SHA, 후기 규모, VU 단계, 달성
+TPS, `profile_duration`의 p95·p99, 에러율, `hikaricp_connections_pending`,
+`tomcat_threads_busy / config_max`, GC 정지시간, `rows_examined_per_call`입니다.
+
+| 변수 | 기본값 | 뜻 |
+| --- | --- | --- |
+| `REVIEWS` (시드) | `0` | 깔 후기 수. 30건 단위로 올림한다 |
+| `VUS` | `10` | 동시 VU. 후기 약속 수(`REVIEWS / 30`) 이하 |
+| `DURATION` | `60s` | 한 단계의 측정 시간 |
+
 ## 외부 서비스와 공개 예시값
 
 `-Ploadtest` 빌드는 Stripe 클라이언트를 로컬 스텁으로 교체합니다. PaymentIntent 생성은
