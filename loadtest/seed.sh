@@ -29,7 +29,8 @@ if [[ ! ${runs} =~ ^[0-9]+$ ]] || ((runs < 1 || runs > 20)); then
   echo "RUNS는 1~20 정수여야 합니다: ${runs}" >&2
   exit 1
 fi
-if [[ ! ${review_count} =~ ^[0-9]+$ ]] || ((review_count > 300000)); then
+# 앞자리 0은 bash 산술에서 8진수로 읽혀 상한 검사를 빠져나가므로 받지 않는다.
+if [[ ! ${review_count} =~ ^(0|[1-9][0-9]{0,5})$ ]] || ((review_count > 300000)); then
   echo "REVIEWS는 0~300000 정수여야 합니다: ${review_count}" >&2
   exit 1
 fi
