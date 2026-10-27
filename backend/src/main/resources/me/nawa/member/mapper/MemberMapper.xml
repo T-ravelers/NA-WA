@@ -64,6 +64,30 @@
         LIMIT 1
     </select>
 
+    <!--
+        두 회원이 같은 약속에 함께 ACTIVE로 속해 있는지. 만나기 전에 상대를 확인하는 것이
+        목적이라 모집 중 약속부터 포함하고, 결제 전(PAYMENT_PENDING)과 취소된 약속은 뺀다(#173).
+    -->
+    <select id="existsSharedAppointment" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM appointment_members viewer_am
+            JOIN appointment_members target_am
+              ON target_am.appointment_id = viewer_am.appointment_id
+             AND target_am.member_id = #{memberId}
+             AND target_am.membership_status = 'ACTIVE'
+             AND target_am.deleted_at IS NULL
+            JOIN appointments a
+              ON a.appointment_id = viewer_am.appointment_id
+             AND a.deleted_at IS NULL
+             AND a.appointment_status IN
+                 ('RECRUITING', 'FULL', 'IN_PROGRESS', 'AWAITING_ATTENDANCE', 'COMPLETED')
+            WHERE viewer_am.member_id = #{viewerId}
+              AND viewer_am.membership_status = 'ACTIVE'
+              AND viewer_am.deleted_at IS NULL
+        )
+    </select>
+
     <select id="existsActiveCurrency" resultType="boolean">
         SELECT EXISTS (
             SELECT 1

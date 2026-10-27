@@ -20,6 +20,7 @@ import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.GlobalExceptionHandler;
 import me.nawa.member.domain.MemberProfile;
+import me.nawa.member.dto.MemberAppointmentProfileResponse;
 import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.OnboardingProfileRequest;
 import me.nawa.member.dto.UpdateMemberProfileRequest;
@@ -177,5 +178,38 @@ class MemberControllerTest {
 
         assertFalse(json.path("success").asBoolean());
         assertEquals("MEMBER-002", json.path("error").path("code").asText());
+    }
+
+    @Test
+    void getAppointmentProfile_passesViewer_andOmitsHiddenAttendanceFields() throws Exception {
+        when(memberProfileService.getAppointmentProfile(1L, 2L))
+                .thenReturn(new MemberAppointmentProfileResponse(
+                        2L, "동행자", null, "ja", 80, 1, 4.5, 3).withoutAttendance());
+
+        String body = mockMvc.perform(get("/api/v1/members/2/appointment-profile"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode data = objectMapper.readTree(body).path("data");
+
+        assertEquals(2, data.path("memberId").asInt());
+        assertEquals(3, data.path("reviewCount").asInt());
+        assertFalse(data.has("completionRate"));
+        assertFalse(data.has("noShowCount"));
+    }
+
+    @Test
+    void getAppointmentProfile_returns403WithErrorBody_whenNoSharedAppointment() throws Exception {
+        when(memberProfileService.getAppointmentProfile(1L, 2L))
+                .thenThrow(new BusinessException(MemberErrorCode.APPOINTMENT_PROFILE_FORBIDDEN));
+
+        String body = mockMvc.perform(get("/api/v1/members/2/appointment-profile"))
+                .andExpect(status().isForbidden())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode json = objectMapper.readTree(body);
+
+        assertFalse(json.path("success").asBoolean());
+        assertEquals("MEMBER-010", json.path("error").path("code").asText());
     }
 }

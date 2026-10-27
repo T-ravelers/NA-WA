@@ -389,7 +389,8 @@ class SwaggerConfigTest {
                 }
 
                 @Override
-                public MemberAppointmentProfileResponse getAppointmentProfile(long memberId) {
+                public MemberAppointmentProfileResponse getAppointmentProfile(
+                        long viewerId, long memberId) {
                     throw new UnsupportedOperationException();
                 }
             };

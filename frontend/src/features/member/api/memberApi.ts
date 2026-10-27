@@ -28,14 +28,17 @@ export interface UpdateMemberProfilePayload {
   preferredCurrencyCode?: string
 }
 
-/** Appointment profile response contains only the public member fields below. */
+/**
+ * Appointment profile response contains only the public member fields below.
+ * 출석 지표 두 개는 본인 조회에만 온다. 다른 회원의 응답에는 키 자체가 없다(#580).
+ */
 export interface MemberAppointmentProfile {
   memberId: number
   displayName: string
   profileImageUrl: string | null
   preferredLanguage: string
-  completionRate: number | null
-  noShowCount: number
+  completionRate?: number | null
+  noShowCount?: number
   averageRating: number | null
   reviewCount: number
 }

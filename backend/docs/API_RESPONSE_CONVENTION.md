@@ -214,7 +214,7 @@ me.nawa.wallet.exception.WalletErrorCode
 
 회원 도메인 오류 코드는 다음과 같이 구현할 수 있습니다.
 (`DUPLICATE_EMAIL`/`MEMBER-999`는 형식을 보여주기 위한 예시일 뿐 실제 구현된 코드가
-아닙니다. 실제 코드는 아래 표의 `MEMBER-001`~`MEMBER-008`을 참고하세요.)
+아닙니다. 실제 코드는 아래 표의 `MEMBER-001`~`MEMBER-010`을 참고하세요.)
 
 ```java
 package me.nawa.member.exception;
@@ -261,12 +261,21 @@ public enum MemberErrorCode implements ErrorCode {
 | `INVALID_DISPLAY_NAME`      | `MEMBER-006` |       400 | 표시 이름 형식 오류          |
 | `INVALID_PROFILE_IMAGE_URL` | `MEMBER-007` |       400 | 프로필 이미지 주소 형식 오류 |
 | `ONBOARDING_FIELD_MISSING`  | `MEMBER-008` |       400 | 온보딩 필수 항목 누락        |
+| `ALREADY_MERCHANT`          | `MEMBER-009` |       409 | 이미 가맹점으로 등록된 계정  |
+| `APPOINTMENT_PROFILE_FORBIDDEN` | `MEMBER-010` |   403 | 같은 약속 참여자가 아님      |
 
 `PATCH /api/v1/members/me`가 `displayName`·`profileImageUrl`·`nationalityCode`·
 `preferredLanguage`·`preferredCurrencyCode`를 부분 수정할 때, 그리고
 `PATCH /api/v1/members/me/onboarding`이 온보딩 프로필을 저장·완료할 때 사용합니다.
 언어 allow-list는 `en`, `ja`, `zh-TW`, `vi`이며 이 백엔드 목록이 정본입니다.
 국적은 ISO 3166-1 alpha-2 코드만 받습니다.
+
+`GET /api/v1/members/{memberId}/appointment-profile`은 본인 프로필을 항상 돌려줍니다.
+다른 회원의 프로필은 두 회원이 같은 약속에 `ACTIVE`로 함께 속해 있을 때만 돌려주고,
+아니면 `MEMBER-010`을 돌려줍니다. 결제 전(`PAYMENT_PENDING`)이거나 취소된 약속은 이
+판정에 쓰지 않습니다. 대상이 없거나 활성 회원이 아니면 상태와 관계없이 `MEMBER-001`입니다.
+다른 회원의 응답에는 `completionRate`·`noShowCount` 키가 없습니다(#173, #580).
+요청자 자신이 정지·탈퇴 상태면 본인·타인 조회 모두 `AUTH-016`·`AUTH-017`입니다.
 
 약속 도메인에는 다음 오류 코드가 구현돼 있습니다.
 

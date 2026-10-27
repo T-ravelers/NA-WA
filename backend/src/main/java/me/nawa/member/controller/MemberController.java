@@ -39,8 +39,11 @@ public class MemberController {
 
     @GetMapping("/{memberId}/appointment-profile")
     public ApiResponse<MemberAppointmentProfileResponse> getAppointmentProfile(
+            @AuthenticationPrincipal AuthenticatedMember member,
             @PathVariable Long memberId) {
-        return ApiResponse.success(memberProfileService.getAppointmentProfile(memberId));
+        return ApiResponse.success(
+                memberProfileService.getAppointmentProfile(member.getMemberId(), memberId)
+        );
     }
 
     @PatchMapping("/me")

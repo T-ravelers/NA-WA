@@ -20,5 +20,9 @@ class MemberErrorCodeTest {
 
         assertEquals("MEMBER-004", MemberErrorCode.NO_UPDATABLE_FIELD.getCode());
         assertEquals(HttpStatus.BAD_REQUEST, MemberErrorCode.NO_UPDATABLE_FIELD.getStatus());
+
+        assertEquals("MEMBER-010", MemberErrorCode.APPOINTMENT_PROFILE_FORBIDDEN.getCode());
+        assertEquals(
+                HttpStatus.FORBIDDEN, MemberErrorCode.APPOINTMENT_PROFILE_FORBIDDEN.getStatus());
     }
 }

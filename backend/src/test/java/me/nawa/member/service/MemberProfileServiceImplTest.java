@@ -2,6 +2,7 @@ package me.nawa.member.service;
 
 import me.nawa.common.exception.BusinessException;
 import me.nawa.member.domain.MemberProfile;
+import me.nawa.member.dto.MemberAppointmentProfileResponse;
 import me.nawa.member.dto.MemberProfileResponse;
 import me.nawa.member.dto.MerchantRegisterRequest;
 import me.nawa.member.dto.OnboardingProfileRequest;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -448,5 +450,124 @@ class MemberProfileServiceImplTest {
         );
 
         assertEquals("MEMBER-009", exception.getErrorCode().getCode());
+    }
+
+    private MemberAppointmentProfileResponse appointmentProfile(long memberId) {
+        return new MemberAppointmentProfileResponse(
+                memberId, "여행자", null, "en", 80, 1, 4.5, 3);
+    }
+
+    @Test
+    void getAppointmentProfile_returnsAttendance_whenViewingSelf() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.findAppointmentProfile(1L)).thenReturn(appointmentProfile(1L));
+
+        MemberAppointmentProfileResponse response = service.getAppointmentProfile(1L, 1L);
+
+        assertEquals(80, response.getCompletionRate());
+        assertEquals(1, response.getNoShowCount());
+        verify(memberMapper, never()).existsSharedAppointment(anyLong(), anyLong());
+    }
+
+    @Test
+    void getAppointmentProfile_hidesAttendance_whenViewingAppointmentMate() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.findProfile(2L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.existsSharedAppointment(1L, 2L)).thenReturn(true);
+        when(memberMapper.findAppointmentProfile(2L)).thenReturn(appointmentProfile(2L));
+
+        MemberAppointmentProfileResponse response = service.getAppointmentProfile(1L, 2L);
+
+        assertEquals(2L, response.getMemberId());
+        assertEquals(4.5, response.getAverageRating());
+        assertEquals(3, response.getReviewCount());
+        assertNull(response.getCompletionRate());
+        assertNull(response.getNoShowCount());
+    }
+
+    @Test
+    void getAppointmentProfile_throwsForbidden_whenNoSharedAppointment() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.findProfile(2L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.existsSharedAppointment(1L, 2L)).thenReturn(false);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.getAppointmentProfile(1L, 2L)
+        );
+
+        assertEquals("MEMBER-010", exception.getErrorCode().getCode());
+        verify(memberMapper, never()).findAppointmentProfile(anyLong());
+    }
+
+    /** 인증 필터가 상태를 보지 않으므로, 남은 access token으로 타인을 조회하는 경로를 막는다. */
+    @Test
+    void getAppointmentProfile_throwsViewerStatus_beforeLookingUpOtherMember() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("SUSPENDED", true));
+
+        BusinessException suspended = assertThrows(
+                BusinessException.class,
+                () -> service.getAppointmentProfile(1L, 2L)
+        );
+        assertEquals("AUTH-016", suspended.getErrorCode().getCode());
+
+        when(memberMapper.findProfile(1L)).thenReturn(profile("WITHDRAWN", true));
+
+        BusinessException withdrawn = assertThrows(
+                BusinessException.class,
+                () -> service.getAppointmentProfile(1L, 2L)
+        );
+        assertEquals("AUTH-017", withdrawn.getErrorCode().getCode());
+
+        verify(memberMapper, never()).findProfile(2L);
+        verify(memberMapper, never()).existsSharedAppointment(anyLong(), anyLong());
+        verify(memberMapper, never()).findAppointmentProfile(anyLong());
+    }
+
+    @Test
+    void getAppointmentProfile_throwsNotFound_whenOtherMemberMissing() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.findProfile(2L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.getAppointmentProfile(1L, 2L)
+        );
+
+        assertEquals("MEMBER-001", exception.getErrorCode().getCode());
+    }
+
+    /** 대상 회원의 상태를 요청자의 인증 오류(AUTH-016·017)로 돌려주지 않는다. */
+    @Test
+    void getAppointmentProfile_throwsNotFound_whenOtherMemberNotActive() {
+        String[] inactiveStatuses = {"WITHDRAWN", "SUSPENDED"};
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+
+        for (String status : inactiveStatuses) {
+            when(memberMapper.findProfile(2L)).thenReturn(profile(status, true));
+
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.getAppointmentProfile(1L, 2L)
+            );
+
+            assertEquals("MEMBER-001", exception.getErrorCode().getCode());
+        }
+        verify(memberMapper, never()).existsSharedAppointment(anyLong(), anyLong());
+    }
+
+    @Test
+    void getAppointmentProfile_throwsNotFound_whenOtherMemberSoftDeleted() {
+        MemberProfile deleted = profile("ACTIVE", true);
+        deleted.setDeleted(true);
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.findProfile(2L)).thenReturn(deleted);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.getAppointmentProfile(1L, 2L)
+        );
+
+        assertEquals("MEMBER-001", exception.getErrorCode().getCode());
     }
 }
