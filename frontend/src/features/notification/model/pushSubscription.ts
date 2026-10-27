@@ -108,34 +108,57 @@ function isSubscribedWithKey(subscription: PushSubscription, publicKey: string):
 }
 
 /**
- * 로그아웃이 등록 작업을 기다리다 포기한 횟수. 포기하는 곳은 `dropBrowserPushSubscription`이다.
+ * 진행 중인 등록 작업에 "더는 구독을 만들지 말라"고 알리는 신호의 표식.
  *
- * 로그아웃은 등록 작업이 끝나기를 3초만 기다리고, 넘으면 기다림을 놓은 채 브라우저 구독을 끊고
- * 로그아웃한다. 놓인 작업은 취소되지 않고 계속 돌아서, 구독을 새로 만들어 로그아웃한 계정으로 저장할
- * 수 있다. 그래서 구독을 만드는 작업은 시작할 때 이 값을 기억해 두고, 달라졌으면 만들지 않는다.
- * 시작 때의 값과 비교하므로 로그아웃이 실패해 같은 페이지에 남은 뒤 새로 시작하는 작업은 막지 않는다.
+ * 등록 작업은 취소되지 않고 끝까지 돈다. 그래서 로그아웃이 등록을 기다리다 포기하고 브라우저 구독을
+ * 끊은 뒤(`dropBrowserPushSubscription`)나 사용자가 푸시를 끈 뒤(`disablePush`)에, 놓인 작업이 늦게
+ * 구독을 새로 만들어 저장하면 방금 끊은 자리가 되살아난다. 구독을 만드는 작업은 시작할 때 이 표식을
+ * 기억해 두고, 달라졌으면 만들지 않는다. 시작 때의 표식과 비교하므로 신호를 보낸 뒤 새로 시작하는
+ * 작업(로그아웃이 실패해 남은 페이지에서 다시 켜기 등)은 막지 않는다.
+ *
+ * 브라우저 구독과 로그인은 같은 출처의 모든 탭이 나눠 쓰므로 표식도 탭 사이에서 나눈다. 저장소를 읽거나
+ * 쓸 수 없으면 이 탭 안에서만 취소된다.
  */
-let signOutGiveUps = 0
+const CANCEL_STORAGE_KEY = 'nawa.push.registrationCancel'
+let localCancels = 0
 
-/** 로그아웃이 지금 시작하는 작업을 포기했는지 알려 주는 함수. 작업을 시작할 때 만든다. */
-function watchSignOutGiveUp(): () => boolean {
-  const startedAt = signOutGiveUps
+function cancelMark(): string {
+  try {
+    return `${localCancels}:${localStorage.getItem(CANCEL_STORAGE_KEY) ?? ''}`
+  } catch {
+    return `${localCancels}:`
+  }
+}
 
-  return () => signOutGiveUps !== startedAt
+/** 지금까지 시작한 등록 작업이 더는 구독을 만들지 못하게 한다. 다른 탭의 작업도 포함한다. */
+function cancelPendingRegistrations(): void {
+  localCancels += 1
+  try {
+    localStorage.setItem(CANCEL_STORAGE_KEY, `${Date.now()}.${Math.random()}`)
+  } catch {
+    // 위 설명대로 이 탭의 작업만 취소된다.
+  }
+}
+
+/** 등록 작업을 시작할 때 부른다. 돌려받은 함수는 그 뒤에 취소 신호가 있었는지 알려 준다. */
+function watchCancellation(): () => boolean {
+  const startedAt = cancelMark()
+
+  return () => cancelMark() !== startedAt
 }
 
 /**
  * 공개키로 새 구독을 만든다. 이 앱에서 구독을 만드는 곳은 여기뿐이다.
  *
- * 로그아웃이 작업을 포기했으면 만들지 않고, 만드는 도중에 포기했으면 만든 구독을 도로 끊는다. 두
- * 경우 모두 null이고, 부르는 쪽은 서버에 저장하지 않고 끝낸다.
+ * 작업이 취소됐으면 만들지 않고, 만드는 도중에 취소됐으면 만든 구독을 도로 끊는다. 두 경우 모두
+ * null이고, 부르는 쪽은 서버에 저장하지 않고 끝낸다.
  */
 async function subscribeWithKey(
   registration: ServiceWorkerRegistration,
   publicKey: string,
-  signOutGaveUp: () => boolean,
+  cancelled: () => boolean,
 ): Promise<PushSubscription | null> {
-  if (signOutGaveUp()) {
+  if (cancelled()) {
     return null
   }
 
@@ -144,7 +167,7 @@ async function subscribeWithKey(
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
   })
-  if (!signOutGaveUp()) {
+  if (!cancelled()) {
     return subscription
   }
 
@@ -199,13 +222,53 @@ export async function readPushSubscription(): Promise<PushSubscription | null> {
 }
 
 /**
- * 서버에 구독을 등록하는 작업 가운데 아직 끝나지 않은 것.
+ * 서버에 구독을 등록하는 작업 가운데 이 탭에서 아직 끝나지 않은 것.
  *
  * 로그인·언어 변경의 동기화는 기다리지 않고 시작한다. 이미 인증을 통과해 처리 중인 요청은 로그아웃으로
  * 취소되지 않아서, 그 PUT이 로그아웃의 DELETE보다 늦게 저장되면 지운 구독이 이전 계정 몫으로 되살아난다.
  * 그래서 등록 작업은 끝날 때까지 여기에 담아 두고, 로그아웃의 삭제가 이것이 끝나기를 기다린다.
+ * 다른 탭의 등록은 이 목록에 보이지 않으므로 `withRegistrationLock`이 따로 맡는다.
  */
 const registrationsInFlight = new Set<Promise<unknown>>()
+
+/**
+ * 등록과 로그아웃의 삭제가 탭 사이에서도 순서를 지키게 하는 락(Web Locks)의 이름.
+ *
+ * 등록은 이 락을 공유로 잡아 서로 막지 않고, 삭제는 배타로 잡아 어느 탭에서든 진행 중인 등록이 모두
+ * 끝난 뒤에 실행한다. 배타 요청이 줄을 서 있으면 그 뒤에 온 등록은 삭제가 끝나기를 기다린다. 탭을
+ * 닫으면 그 탭이 쥔 락은 풀린다.
+ */
+const REGISTRATION_LOCK = 'nawa.push.registration'
+
+/**
+ * 락을 잡고 작업을 실행한다.
+ *
+ * 락 API가 없는 브라우저(Chrome 69·Firefox 96·Safari 15.4 이전)나 락을 잡지 못하는 환경(불투명한
+ * 출처 등)에서는 락 없이 실행해, 이 탭의 진행 중 목록만으로 순서를 지킨다. 푸시는 최선 노력이라
+ * 순서 보장을 못 한다고 등록 자체를 막지 않는다. 작업이 던진 오류는 그대로 던진다.
+ */
+async function withRegistrationLock<T>(
+  mode: 'shared' | 'exclusive',
+  task: () => Promise<T>,
+): Promise<T> {
+  if (!('locks' in navigator)) {
+    return task()
+  }
+
+  let started = false
+  try {
+    return await navigator.locks.request(REGISTRATION_LOCK, { mode }, () => {
+      started = true
+      return task()
+    })
+  } catch (error) {
+    if (started) {
+      throw error
+    }
+
+    return task()
+  }
+}
 
 function trackRegistration<T>(task: Promise<T>): Promise<T> {
   registrationsInFlight.add(task)
@@ -235,8 +298,8 @@ export interface EnablePushResult {
  *
  * 기기에 이미 있는 구독이 다른 공개키로 만든 것이면 지우고 새 키로 다시 구독한다.
  *
- * 구독을 만들기 전에 로그아웃이 이 작업을 포기했다면(`dropBrowserPushSubscription`) 구독하지 않고
- * `enabled: false`로 끝난다.
+ * 구독을 만들기 전에 이 작업이 취소됐다면(로그아웃이 기다림을 놓았거나 `disablePush`가 불렸다면)
+ * 구독하지 않고 `enabled: false`로 끝난다.
  */
 export function enablePush(publicKey: string, language: string): Promise<EnablePushResult> {
   // 안쪽 함수를 곧바로 불러, 권한 요청이 클릭과 같은 호출 안에서 시작되게 한다.
@@ -244,26 +307,30 @@ export function enablePush(publicKey: string, language: string): Promise<EnableP
 }
 
 async function requestAndRegister(publicKey: string, language: string): Promise<EnablePushResult> {
-  const signOutGaveUp = watchSignOutGiveUp()
+  const cancelled = watchCancellation()
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') {
     return { permission, enabled: false }
   }
 
   const registration = await navigator.serviceWorker.ready
-  let existing = await registration.pushManager.getSubscription()
-  if (existing !== null && !isSubscribedWithKey(existing, publicKey)) {
-    // 서버가 키를 바꾸기 전에 만든 구독이다. 그대로 등록하면 푸시 서비스가 발송을 계속 거절한다.
-    await discardStaleSubscription(existing)
-    existing = null
-  }
-  const subscription = existing ?? (await subscribeWithKey(registration, publicKey, signOutGaveUp))
-  if (subscription === null) {
-    return { permission, enabled: false }
-  }
-  await register(subscription, language, existing === null)
 
-  return { permission, enabled: true }
+  // 사람이 권한에 답하기를 기다리는 동안은 락을 쥐지 않는다. 로그아웃이 그만큼 붙잡혀서는 안 된다.
+  return withRegistrationLock('shared', async () => {
+    let existing = await registration.pushManager.getSubscription()
+    if (existing !== null && !isSubscribedWithKey(existing, publicKey)) {
+      // 서버가 키를 바꾸기 전에 만든 구독이다. 그대로 등록하면 푸시 서비스가 발송을 계속 거절한다.
+      await discardStaleSubscription(existing)
+      existing = null
+    }
+    const subscription = existing ?? (await subscribeWithKey(registration, publicKey, cancelled))
+    if (subscription === null) {
+      return { permission, enabled: false }
+    }
+    await register(subscription, language, existing === null)
+
+    return { permission, enabled: true }
+  })
 }
 
 /**
@@ -271,8 +338,12 @@ async function requestAndRegister(publicKey: string, language: string): Promise<
  *
  * 서버 쪽이 실패해도 브라우저 구독은 끊는다. 서버에 남은 행은 푸시 서비스가 410으로 끝난
  * 구독이라고 알려 줄 때 서버가 스스로 치운다.
+ *
+ * 끄기는 사용자의 마지막 의사라서, 진행 중인 등록(예: 예전 서버 행의 삭제를 기다리는 키 갱신)이 이
+ * 뒤에 구독을 새로 만들어 되살리지 못하게 먼저 취소한다. 다른 탭의 등록도 포함한다.
  */
 export async function disablePush(): Promise<void> {
+  cancelPendingRegistrations()
   const subscription = await readPushSubscription()
   if (subscription === null) {
     return
@@ -294,15 +365,32 @@ export async function disablePush(): Promise<void> {
  * 거절하므로 이때 새 키로 다시 구독한다. 구독이 없으면 아무것도 하지 않고(권한도 묻지 않는다),
  * 실패해도 던지지 않는다 — 다음에 앱을 열 때 다시 맞춘다.
  *
- * 다시 구독하기 전에 로그아웃이 이 작업을 포기했다면(`dropBrowserPushSubscription`) 구독을 만들지
- * 않고 끝난다.
+ * 다시 구독하기 전에 이 작업이 취소됐다면(로그아웃이 기다림을 놓았거나 `disablePush`가 불렸다면)
+ * 구독을 만들지 않고 끝난다.
+ *
+ * `onPublicKey`는 서버의 지금 공개키를 확인했을 때 그 키를 받는다. 화면이 따로 들고 있는 키를 같은
+ * 것으로 맞추는 데 쓴다 — 갱신은 새 키로 복구했는데 화면의 키가 예전 그대로면, 그 뒤 끄고 켤 때
+ * 예전 키로 다시 구독한다.
  */
-export function syncPushSubscription(language: string): Promise<void> {
-  return trackRegistration(registerExistingSubscription(language))
+export function syncPushSubscription(
+  language: string,
+  onPublicKey?: (publicKey: string) => void,
+): Promise<void> {
+  // 락을 기다리는 동안 온 취소 신호도 놓치지 않도록, 기다리기 전에 표식을 잡는다.
+  const cancelled = watchCancellation()
+
+  return trackRegistration(
+    withRegistrationLock('shared', () =>
+      registerExistingSubscription(language, cancelled, onPublicKey),
+    ),
+  )
 }
 
-async function registerExistingSubscription(language: string): Promise<void> {
-  const signOutGaveUp = watchSignOutGiveUp()
+async function registerExistingSubscription(
+  language: string,
+  cancelled: () => boolean,
+  onPublicKey: ((publicKey: string) => void) | undefined,
+): Promise<void> {
   try {
     if (
       detectPushSupport(browserPushEnvironment()) !== 'supported' ||
@@ -313,7 +401,7 @@ async function registerExistingSubscription(language: string): Promise<void> {
 
     const subscription = await readPushSubscription()
     if (subscription !== null) {
-      const current = await renewIfStale(subscription, signOutGaveUp)
+      const current = await renewIfStale(subscription, cancelled, onPublicKey)
       if (current !== null) {
         await register(current.subscription, language, current.created)
       }
@@ -329,20 +417,26 @@ async function registerExistingSubscription(language: string): Promise<void> {
  * 서버의 키를 알 수 없으면(푸시가 꺼졌거나 조회에 실패) 확인할 수 없으니 그대로 둔다. 다시 구독이
  * 브라우저에서 막혀 실패하면(사용자 동작을 요구하는 환경 등) 구독이 없는 상태로 끝난다. 어차피
  * 쓸 수 없던 구독이라 잃는 것은 없고, 카드가 "켜기"로 돌아가 사용자가 눌러 다시 켤 수 있다.
- * 로그아웃이 이 작업을 포기해 구독을 만들지 못한 경우도 같은 상태로 끝나며, null을 돌려준다.
+ * 작업이 취소돼 구독을 만들지 못한 경우도 같은 상태로 끝나며, null을 돌려준다.
  */
 async function renewIfStale(
   subscription: PushSubscription,
-  signOutGaveUp: () => boolean,
+  cancelled: () => boolean,
+  onPublicKey: ((publicKey: string) => void) | undefined,
 ): Promise<{ subscription: PushSubscription; created: boolean } | null> {
   const publicKey = await fetchPushPublicKey().catch(() => null)
-  if (publicKey === null || isSubscribedWithKey(subscription, publicKey)) {
+  if (publicKey === null) {
+    return { subscription, created: false }
+  }
+
+  onPublicKey?.(publicKey)
+  if (isSubscribedWithKey(subscription, publicKey)) {
     return { subscription, created: false }
   }
 
   await discardStaleSubscription(subscription)
   const registration = await navigator.serviceWorker.ready
-  const renewed = await subscribeWithKey(registration, publicKey, signOutGaveUp)
+  const renewed = await subscribeWithKey(registration, publicKey, cancelled)
 
   return renewed === null ? null : { subscription: renewed, created: true }
 }
@@ -355,7 +449,8 @@ async function renewIfStale(
  * 다시 로그인하면 `syncPushSubscription`이 새 계정으로 등록한다.
  *
  * 진행 중인 등록(로그인·언어 변경의 동기화, 켜기)이 있으면 그것이 끝난 뒤에 지운다. 먼저 지우면
- * 늦게 끝난 등록이 삭제 뒤에 저장되어 이전 계정의 구독이 되살아난다.
+ * 늦게 끝난 등록이 삭제 뒤에 저장되어 이전 계정의 구독이 되살아난다. 다른 탭에서 진행 중인 등록도
+ * 마찬가지라서, 이 탭의 목록을 기다린 뒤 배타 락을 잡고 지운다(`withRegistrationLock`).
  *
  * 실패는 던진다. 로그아웃을 막지 않는 것은 부르는 쪽(`requestSignOut`)의 몫이고, 이 삭제가
  * 끝나지 못했을 때(기다리는 시간 포함)의 대체 정리는 `dropBrowserPushSubscription`이다.
@@ -366,10 +461,12 @@ export async function removePushSubscriptionFromServer(): Promise<void> {
   }
 
   await registrationsSettled()
-  const subscription = await readPushSubscription()
-  if (subscription !== null) {
-    await deletePushSubscription(subscription.endpoint)
-  }
+  await withRegistrationLock('exclusive', async () => {
+    const subscription = await readPushSubscription()
+    if (subscription !== null) {
+      await deletePushSubscription(subscription.endpoint)
+    }
+  })
 }
 
 /**
@@ -383,10 +480,10 @@ export async function removePushSubscriptionFromServer(): Promise<void> {
  *
  * 이 함수가 실행되면 로그아웃이 아직 끝나지 않은 등록 작업을 기다리다 포기한 것이다. 그 작업은 계속
  * 돌지만, 이 뒤에 구독을 새로 만들지는 못한다(`subscribeWithKey`). 그러지 않으면 방금 끊은 자리에
- * 새 구독이 생겨 로그아웃한 계정의 알림이 다시 이 기기로 온다.
+ * 새 구독이 생겨 로그아웃한 계정의 알림이 다시 이 기기로 온다. 다른 탭에서 도는 작업도 같다.
  */
 export async function dropBrowserPushSubscription(): Promise<void> {
-  signOutGiveUps += 1
+  cancelPendingRegistrations()
   if (detectPushSupport(browserPushEnvironment()) !== 'supported') {
     return
   }

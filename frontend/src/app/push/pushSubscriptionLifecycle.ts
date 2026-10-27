@@ -2,12 +2,26 @@ import { watch } from 'vue'
 import type { Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { queryClient } from '@/app/query/client'
+import { pushKeys } from '@/features/notification/model/pushKeys'
 import {
   dropBrowserPushSubscription,
   removePushSubscriptionFromServer,
   syncPushSubscription,
 } from '@/features/notification/model/pushSubscription'
 import { setBeforeSignOutHook } from '@/shared/api/sessionSignOut'
+
+/**
+ * 다시 등록하며 확인한 서버의 공개키를 알림 카드가 쓰는 쿼리 캐시에도 써 둔다.
+ *
+ * 카드는 공개키를 한 번 받으면 다시 받지 않고(`staleTime: Infinity`) 켤 때 그 값으로 구독한다. 앱이
+ * 열려 있는 동안 서버가 키를 바꾸면 카드의 값만 예전 그대로 남아서, 다시 등록이 새 키로 복구한 기기를
+ * 카드에서 끄고 켜는 순간 도로 예전 키에 묶인다. 클릭한 뒤에 키를 다시 받으면 권한 요청이 클릭에서
+ * 멀어지므로(Safari), 클릭 전에 캐시를 맞춰 두는 쪽을 택했다.
+ */
+function rememberPublicKey(publicKey: string): void {
+  queryClient.setQueryData(pushKeys.publicKey(), publicKey)
+}
 
 /**
  * 이 기기의 푸시 구독이 로그인한 계정·현재 언어와 어긋나지 않게 이어 둔다.
@@ -44,7 +58,7 @@ export function registerPushSubscriptionLifecycle(router: Router): () => void {
       return
     }
 
-    void syncPushSubscription(i18n.global.locale.value)
+    void syncPushSubscription(i18n.global.locale.value, rememberPublicKey)
   }
 
   const removeAfterEach = router.afterEach((to) => {

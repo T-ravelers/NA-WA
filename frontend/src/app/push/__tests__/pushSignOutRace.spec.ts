@@ -1,18 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
-import { createMemoryHistory, createRouter, type Router } from 'vue-router'
+import type { Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
+import {
+  ENDPOINT,
+  NEW_ENDPOINT,
+  SERVER_KEY,
+  createFakeLocks,
+  createTestRouter,
+  installBrowserWithSubscription,
+} from './fakePushBrowser'
+
 /**
  * 라이프사이클·구독 모델·로그아웃 함수를 실제로 연결하고, 서버와 httpClient만 흉내 낸다.
- * 언어를 바꿔 시작한 구독 PUT이 끝나기 전에 로그아웃하는 순서를 다룬다.
+ * 구독 PUT이 끝나기 전에 로그아웃하는 순서를 같은 탭과 다른 탭에서 다룬다.
  */
-
-const ENDPOINT = 'https://fcm.googleapis.com/fcm/send/abc'
-const NEW_ENDPOINT = 'https://fcm.googleapis.com/fcm/send/new'
-// 서버의 현재 공개키(base64url `-_8`, 바이트 [251, 255])다.
-const SERVER_KEY = '-_8'
 
 /** 서버에 저장된 이 기기의 구독. PUT이 넣고 DELETE가 지운다. */
 const serverRows = new Set<string>()
@@ -33,60 +37,6 @@ vi.mock('@/shared/api/httpClient', () => ({
 
 const { registerPushSubscriptionLifecycle } = await import('../pushSubscriptionLifecycle')
 const { requestSignOut } = await import('@/shared/api/sessionSignOut')
-
-function createTestRouter(): Router {
-  const page = { template: '<div />' }
-
-  return createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/sign-in', name: 'sign-in', component: page },
-      { path: '/wallet', name: 'wallet', component: page, meta: { requiresAuth: true } },
-    ],
-  })
-}
-
-function fakeSubscription(endpoint: string, usedKey: number[]) {
-  return {
-    endpoint,
-    options: { applicationServerKey: new Uint8Array(usedKey).buffer },
-    toJSON: () => ({ endpoint, keys: { p256dh: 'P256DH', auth: 'AUTH' } }),
-    unsubscribe: vi.fn().mockResolvedValue(true),
-  }
-}
-
-/**
- * 브라우저에 이 기기의 구독이 하나 있다. 로그아웃 뒤에도 남아 있는지 `unsubscribe`로 본다.
- * `staleKey`이면 서버가 키를 바꾸기 전에 만든 구독이라, 해지하면 새 키로 만든 `renewed`가 대신한다.
- */
-function installBrowserWithSubscription(options: { staleKey?: boolean } = {}) {
-  const subscription = fakeSubscription(ENDPOINT, options.staleKey === true ? [1, 2] : [251, 255])
-  const renewed = fakeSubscription(NEW_ENDPOINT, [251, 255])
-  let current: typeof subscription | null = subscription
-  subscription.unsubscribe.mockImplementation(() => {
-    current = null
-    return Promise.resolve(true)
-  })
-  const subscribe = vi.fn(() => {
-    current = renewed
-    return Promise.resolve(renewed)
-  })
-  const registration = {
-    pushManager: { getSubscription: () => Promise.resolve(current), subscribe },
-  }
-
-  vi.stubGlobal('PushManager', class {})
-  vi.stubGlobal('Notification', { permission: 'granted' })
-  Object.defineProperty(navigator, 'serviceWorker', {
-    configurable: true,
-    value: {
-      getRegistration: () => Promise.resolve(registration),
-      ready: Promise.resolve(registration),
-    },
-  })
-
-  return { subscription, renewed, subscribe }
-}
 
 /** 서버에 저장되는 PUT. 호출마다 직접 끝낼 때까지 서버에 닿지 않은 채로 둔다. */
 function holdSaves() {
@@ -135,7 +85,23 @@ afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
   Reflect.deleteProperty(navigator, 'serviceWorker')
+  Reflect.deleteProperty(navigator, 'locks')
 })
+
+/** 같은 출처의 탭들이 락을 나눠 쓰는 브라우저. 한 번 설치하면 모든 탭이 쓴다. */
+function installLocks(): void {
+  Object.defineProperty(navigator, 'locks', { configurable: true, value: createFakeLocks() })
+}
+
+/**
+ * 다른 탭을 연다. 탭마다 모듈 상태(진행 중인 등록 목록)는 따로이고, 브라우저의 구독·락·저장소와
+ * 서버는 같은 것을 쓴다.
+ */
+async function openAnotherTab() {
+  vi.resetModules()
+
+  return import('@/features/notification/model/pushSubscription')
+}
 
 describe('signing out while a language-change sync is still being saved', () => {
   it('leaves no subscription on the server, because the delete waits for the save', async () => {
@@ -277,5 +243,72 @@ describe('signing out while a subscription renewed for a changed server key is b
     expect(savePushSubscription).not.toHaveBeenCalled()
     expect(serverRows.size).toBe(0)
     expect(renewed.unsubscribe).not.toHaveBeenCalled()
+  })
+})
+
+describe('signing out while another tab is still working on a registration', () => {
+  /**
+   * 진행 중인 등록의 목록은 탭마다 따로라서, 다른 탭에서 이미 시작한 PUT은 이 탭의 로그아웃이 볼 수
+   * 없다. 그대로 지우면 그 PUT이 삭제 뒤에 저장되어 로그아웃한 계정의 구독이 되살아난다.
+   */
+  it('deletes only after the other tab has finished saving', async () => {
+    installLocks()
+    const { subscription } = installBrowserWithSubscription()
+    const releases = holdSaves()
+    const router = createTestRouter()
+    stop = registerPushSubscriptionLifecycle(router)
+    await signInAndFinishFirstSync(router, releases)
+
+    const otherTab = await openAnotherTab()
+    void otherTab.syncPushSubscription('ja')
+    await vi.waitFor(() => expect(savePushSubscription).toHaveBeenCalledTimes(2))
+    const signOut = requestSignOut()
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(deletePushSubscription).not.toHaveBeenCalled()
+    expect(post).not.toHaveBeenCalled()
+
+    releases[1]?.()
+    await signOut
+
+    expect(serverRows.size).toBe(0)
+    expect(post).toHaveBeenCalledWith('/api/v1/auth/logout')
+    // 서버 삭제가 성공했으니 브라우저 구독은 그대로 둔다.
+    expect(subscription.unsubscribe).not.toHaveBeenCalled()
+  })
+
+  /**
+   * 이 탭의 로그아웃이 기다림을 놓고 브라우저 구독을 끊었다면, 다른 탭에서 멈춰 있던 갱신도 그 뒤에는
+   * 구독을 새로 만들지 못해야 한다. 취소 신호도 탭 사이에서 공유한다.
+   */
+  it('keeps the other tab from creating a subscription after this tab gave up waiting', async () => {
+    installLocks()
+    const { subscription, subscribe } = installBrowserWithSubscription({ staleKey: true })
+    const otherTab = await openAnotherTab()
+    vi.useFakeTimers()
+    let finishStaleDelete: () => void = () => undefined
+    deletePushSubscription.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishStaleDelete = resolve
+        }),
+    )
+    stop = registerPushSubscriptionLifecycle(createTestRouter())
+
+    void otherTab.syncPushSubscription('ja')
+    await vi.waitFor(() => expect(deletePushSubscription).toHaveBeenCalledWith(ENDPOINT))
+    const signOut = requestSignOut()
+    await vi.advanceTimersByTimeAsync(3_000)
+    await signOut
+
+    expect(post).toHaveBeenCalledWith('/api/v1/auth/logout')
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce()
+
+    // 다른 탭에서 멈춰 있던 삭제가 로그아웃이 끝난 뒤에 응답한다.
+    finishStaleDelete()
+    await vi.runAllTimersAsync()
+
+    expect(subscribe).not.toHaveBeenCalled()
+    expect(savePushSubscription).not.toHaveBeenCalled()
   })
 })

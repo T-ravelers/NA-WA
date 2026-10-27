@@ -55,6 +55,16 @@ function fakeSubscription(options: { endpoint?: string; usedKey?: number[] | nul
   }
 }
 
+/** 직접 끝낼 때까지 끝나지 않는 Promise와 그것을 끝내는 함수. */
+function hold<T>(value: T) {
+  let release: () => void = () => undefined
+  const promise = new Promise<T>((resolve) => {
+    release = () => resolve(value)
+  })
+
+  return { promise, release }
+}
+
 describe('detectPushSupport', () => {
   it('supports a browser with service workers, push and notifications', () => {
     expect(detectPushSupport(environment())).toBe('supported')
@@ -187,6 +197,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   Reflect.deleteProperty(navigator, 'serviceWorker')
+  Reflect.deleteProperty(navigator, 'locks')
 })
 
 describe('readPushSubscription', () => {
@@ -723,16 +734,6 @@ describe('dropBrowserPushSubscription', () => {
    * 그런 등록이 구독을 만들지 않아야 한다.
    */
   describe('for a registration that was still running when it ran', () => {
-    /** 직접 끝낼 때까지 끝나지 않는 Promise와 그것을 끝내는 함수. */
-    function hold<T>(value: T) {
-      let release: () => void = () => undefined
-      const promise = new Promise<T>((resolve) => {
-        release = () => resolve(value)
-      })
-
-      return { promise, release }
-    }
-
     it('lets a renewal that is waiting on the old server row stop before it subscribes', async () => {
       const stale = fakeSubscription({ usedKey: [1, 2] })
       const { pushManager } = installBrowser({ permission: 'granted', existing: stale })
@@ -816,5 +817,240 @@ describe('dropBrowserPushSubscription', () => {
       )
       expect(created.unsubscribe).not.toHaveBeenCalled()
     })
+  })
+})
+
+/**
+ * 갱신은 예전 서버 행의 삭제가 끝나야 새로 구독한다. 그 삭제가 느린 동안 사용자가 푸시를 끄면, 끄기가
+ * 끝난 뒤에 갱신이 새 구독을 만들어 저장해서는 안 된다. 카드는 꺼짐인데 푸시가 계속 오게 된다.
+ */
+describe('disablePush and a registration that was still running', () => {
+  it('lets a renewal that is waiting on the old server row stop before it subscribes', async () => {
+    const { pushManager } = installBrowser({
+      permission: 'granted',
+      existing: fakeSubscription({ usedKey: [1, 2] }),
+    })
+    const deletion = hold(undefined)
+    deletePushSubscription.mockReturnValueOnce(deletion.promise)
+
+    const sync = syncPushSubscription('ja')
+    await vi.waitFor(() => expect(deletePushSubscription).toHaveBeenCalledWith(ENDPOINT))
+    await disablePush()
+    deletion.release()
+    await sync
+
+    expect(pushManager.subscribe).not.toHaveBeenCalled()
+    expect(savePushSubscription).not.toHaveBeenCalled()
+  })
+
+  it('cancels the subscription a renewal finished creating afterwards, without saving it', async () => {
+    const created = fakeSubscription({ endpoint: NEW_ENDPOINT })
+    const { pushManager } = installBrowser({
+      permission: 'granted',
+      existing: fakeSubscription({ usedKey: [1, 2] }),
+      created,
+    })
+    const subscribing = hold(created)
+    pushManager.subscribe.mockReturnValue(subscribing.promise)
+
+    const sync = syncPushSubscription('ja')
+    await vi.waitFor(() => expect(pushManager.subscribe).toHaveBeenCalled())
+    await disablePush()
+    subscribing.release()
+    await sync
+
+    expect(created.unsubscribe).toHaveBeenCalledOnce()
+    expect(savePushSubscription).not.toHaveBeenCalled()
+  })
+
+  /** 탭마다 모듈 상태는 따로이니, 다른 탭에서 끈 것이 이 탭의 갱신까지 닿아야 한다. */
+  it('also stops a renewal that is running in another tab', async () => {
+    const { pushManager } = installBrowser({
+      permission: 'granted',
+      existing: fakeSubscription({ usedKey: [1, 2] }),
+    })
+    const deletion = hold(undefined)
+    deletePushSubscription.mockReturnValueOnce(deletion.promise)
+    const sync = syncPushSubscription('ja')
+    await vi.waitFor(() => expect(deletePushSubscription).toHaveBeenCalledWith(ENDPOINT))
+
+    vi.resetModules()
+    const otherTab = await import('../pushSubscription')
+    await otherTab.disablePush()
+    deletion.release()
+    await sync
+
+    expect(pushManager.subscribe).not.toHaveBeenCalled()
+    expect(savePushSubscription).not.toHaveBeenCalled()
+  })
+
+  /** 끄기가 끝난 뒤 사용자가 다시 켜는 것까지 막으면 안 된다. */
+  it('does not stop turning push on afterwards', async () => {
+    const created = fakeSubscription({ endpoint: NEW_ENDPOINT })
+    installBrowser({ existing: null, created })
+
+    await disablePush()
+    const result = await enablePush(SERVER_KEY, 'en')
+
+    expect(result).toEqual({ permission: 'granted', enabled: true })
+    expect(savePushSubscription).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ endpoint: NEW_ENDPOINT }),
+    )
+  })
+})
+
+/** 갱신이 서버의 지금 키를 확인했다면 카드가 들고 있는 키도 그것이어야 한다. */
+describe('syncPushSubscription and the server key it looked up', () => {
+  it('hands the key to the caller', async () => {
+    installBrowser({ permission: 'granted', existing: fakeSubscription() })
+    const onPublicKey = vi.fn()
+
+    await syncPushSubscription('en', onPublicKey)
+
+    expect(onPublicKey).toHaveBeenCalledExactlyOnceWith(SERVER_KEY)
+  })
+
+  it('hands over the new key when it has to subscribe again too', async () => {
+    installBrowser({
+      permission: 'granted',
+      existing: fakeSubscription({ usedKey: [1, 2] }),
+      created: fakeSubscription({ endpoint: NEW_ENDPOINT }),
+    })
+    const onPublicKey = vi.fn()
+
+    await syncPushSubscription('en', onPublicKey)
+
+    expect(onPublicKey).toHaveBeenCalledExactlyOnceWith(SERVER_KEY)
+  })
+
+  it.each([
+    ['the server has push turned off', () => fetchPushPublicKey.mockResolvedValue(null)],
+    ['the key lookup fails', () => fetchPushPublicKey.mockRejectedValue(new Error('offline'))],
+  ])('hands over nothing when %s', async (_name, arrange) => {
+    installBrowser({ permission: 'granted', existing: fakeSubscription() })
+    arrange()
+    const onPublicKey = vi.fn()
+
+    await syncPushSubscription('en', onPublicKey)
+
+    expect(onPublicKey).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * 등록과 로그아웃의 삭제는 탭 사이에서도 순서를 지켜야 해서 Web Locks를 쓴다. 등록은 공유로 잡아 서로
+ * 막지 않고, 삭제는 배타로 잡아 어느 탭이든 진행 중인 등록이 끝난 뒤에 실행한다.
+ */
+describe('registration locks', () => {
+  /** 락을 잡을 때마다 `calls`에 'lock'을 남기고 곧바로 콜백을 실행하는 락 관리자. */
+  function installLockSpy(calls: string[] = []) {
+    const request = vi.fn(
+      (_name: string, _options: { mode: string }, callback: () => Promise<unknown>) => {
+        calls.push('lock')
+        return callback()
+      },
+    )
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } })
+
+    return request
+  }
+
+  it('saves under a shared lock, so registrations do not hold each other up', async () => {
+    installBrowser({ permission: 'granted', existing: fakeSubscription() })
+    const request = installLockSpy()
+
+    await syncPushSubscription('en')
+
+    expect(request).toHaveBeenCalledExactlyOnceWith(
+      expect.any(String),
+      { mode: 'shared' },
+      expect.any(Function),
+    )
+    expect(savePushSubscription).toHaveBeenCalledOnce()
+  })
+
+  /** 권한 요청은 클릭에서 곧바로 이어져야 해서, 락은 권한 응답을 받은 뒤에 잡는다. */
+  it('turns push on under a shared lock taken after the permission prompt', async () => {
+    const { calls } = installBrowser({ existing: fakeSubscription() })
+    const request = installLockSpy(calls)
+
+    await enablePush(SERVER_KEY, 'en')
+
+    expect(request).toHaveBeenCalledExactlyOnceWith(
+      expect.any(String),
+      { mode: 'shared' },
+      expect.any(Function),
+    )
+    expect(calls).toEqual(['requestPermission', 'ready', 'lock'])
+  })
+
+  it('deletes under an exclusive lock, on the same lock the registrations use', async () => {
+    installBrowser({ permission: 'granted', existing: fakeSubscription() })
+    const request = installLockSpy()
+
+    await syncPushSubscription('en')
+    await removePushSubscriptionFromServer()
+
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(request.mock.calls[1]?.[1]).toEqual({ mode: 'exclusive' })
+    expect(request.mock.calls[1]?.[0]).toBe(request.mock.calls[0]?.[0])
+    expect(deletePushSubscription).toHaveBeenCalledExactlyOnceWith(ENDPOINT)
+  })
+
+  /** 락을 잡지 못하는 환경이어도 푸시는 락 없이 이전처럼 동작해야 한다. */
+  it('still saves when the lock cannot be taken', async () => {
+    installBrowser({ permission: 'granted', existing: fakeSubscription() })
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: vi.fn().mockRejectedValue(new DOMException('opaque origin', 'SecurityError')),
+      },
+    })
+
+    await syncPushSubscription('en')
+
+    expect(savePushSubscription).toHaveBeenCalledOnce()
+  })
+
+  /** 등록 자체가 실패한 것을 락 실패로 오인해 한 번 더 실행하지 않는다. */
+  it('reports a failed registration once, without running it again', async () => {
+    installBrowser({ existing: fakeSubscription() })
+    installLockSpy()
+    savePushSubscription.mockRejectedValue(new Error('503'))
+
+    await expect(enablePush(SERVER_KEY, 'en')).rejects.toThrow('503')
+
+    expect(savePushSubscription).toHaveBeenCalledOnce()
+  })
+
+  /**
+   * 락을 기다리는 동안에도 등록은 이미 시작된 것이다. 그 사이에 푸시를 껐다면, 락을 받고 나서
+   * 시작하는 것처럼 취소를 놓쳐 구독을 새로 만들어서는 안 된다.
+   */
+  it('counts a cancellation that arrives while the registration waits for the lock', async () => {
+    const { pushManager } = installBrowser({
+      permission: 'granted',
+      existing: fakeSubscription({ usedKey: [1, 2] }),
+    })
+    const granted = hold(undefined)
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: vi.fn(
+          async (_name: string, _options: unknown, callback: () => Promise<unknown>) => {
+            await granted.promise
+            return callback()
+          },
+        ),
+      },
+    })
+
+    const sync = syncPushSubscription('ja')
+    await disablePush()
+    granted.release()
+    await sync
+
+    expect(pushManager.subscribe).not.toHaveBeenCalled()
+    expect(savePushSubscription).not.toHaveBeenCalled()
   })
 })
