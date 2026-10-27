@@ -301,7 +301,7 @@ describe('enablePush', () => {
 
   it('cancels the new subscription when the browser gave back no keys', async () => {
     const { created } = installBrowser({
-      created: { ...fakeSubscription(), toJSON: () => ({ endpoint: ENDPOINT }) },
+      created: Object.assign(fakeSubscription(), { toJSON: () => ({ endpoint: ENDPOINT }) }),
     })
 
     await expect(enablePush('-_8', 'en')).rejects.toThrow('missing its endpoint or keys')
