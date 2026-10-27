@@ -17,6 +17,7 @@ const {
   disablePush,
   dropBrowserPushSubscription,
   enablePush,
+  finishSignOutCleanup,
   readPushSubscription,
   removePushSubscriptionFromServer,
   syncPushSubscription,
@@ -1052,5 +1053,86 @@ describe('registration locks', () => {
 
     expect(pushManager.subscribe).not.toHaveBeenCalled()
     expect(savePushSubscription).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * 로그아웃 정리는 지운 뒤에도 배타 락을 로그아웃 요청이 끝날 때까지 쥔다. 응답 전에는 쿠키가 살아 있어서,
+ * 지운 직후 놓으면 그사이 다른 탭에서 시작한 등록이 지운 행을 이전 계정으로 다시 저장한다.
+ */
+describe('the lock the sign-out cleanup holds', () => {
+  /** 락마다 언제 풀렸는지(`settled`) 남기는 락 관리자. 락은 콜백이 끝나면 풀린다. */
+  function installRecordingLocks() {
+    const locks: Array<{ mode: string; settled: boolean }> = []
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: vi.fn(
+          (_name: string, options: { mode: string }, callback: () => Promise<unknown>) => {
+            const lock = { mode: options.mode, settled: false }
+            locks.push(lock)
+            return callback().finally(() => {
+              lock.settled = true
+            })
+          },
+        ),
+      },
+    })
+
+    return locks
+  }
+
+  it('keeps holding the lock after the deletion until the logout request is over', async () => {
+    installBrowser({ permission: 'granted', existing: fakeSubscription() })
+    const locks = installRecordingLocks()
+
+    await removePushSubscriptionFromServer()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(deletePushSubscription).toHaveBeenCalledExactlyOnceWith(ENDPOINT)
+    expect(locks).toEqual([{ mode: 'exclusive', settled: false }])
+
+    finishSignOutCleanup()
+    await vi.waitFor(() => expect(locks[0]?.settled).toBe(true))
+  })
+
+  it('reports a failed deletion and still lets the lock go once the logout request is over', async () => {
+    installBrowser({ permission: 'granted', existing: fakeSubscription() })
+    const locks = installRecordingLocks()
+    deletePushSubscription.mockRejectedValue(new Error('401'))
+
+    await expect(removePushSubscriptionFromServer()).rejects.toThrow('401')
+    expect(locks[0]?.settled).toBe(false)
+
+    finishSignOutCleanup()
+    await vi.waitFor(() => expect(locks[0]?.settled).toBe(true))
+  })
+
+  /**
+   * 기다림을 포기해 로그아웃이 먼저 끝났다면, 늦게 받은 락으로는 지우지 않는다. 인증이 없어 실패할
+   * 뿐이고, 브라우저 구독은 대체 정리가 이미 끊었다.
+   */
+  it('does not delete with a lock granted after the logout request was over', async () => {
+    installBrowser({ permission: 'granted', existing: fakeSubscription() })
+    const granted = hold(undefined)
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: vi.fn(
+          async (_name: string, _options: unknown, callback: () => Promise<unknown>) => {
+            await granted.promise
+            return callback()
+          },
+        ),
+      },
+    })
+
+    const removal = removePushSubscriptionFromServer()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    finishSignOutCleanup()
+    granted.release()
+    await removal
+
+    expect(deletePushSubscription).not.toHaveBeenCalled()
   })
 })

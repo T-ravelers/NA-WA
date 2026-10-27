@@ -6,6 +6,7 @@ import { queryClient } from '@/app/query/client'
 import { pushKeys } from '@/features/notification/model/pushKeys'
 import {
   dropBrowserPushSubscription,
+  finishSignOutCleanup,
   removePushSubscriptionFromServer,
   syncPushSubscription,
 } from '@/features/notification/model/pushSubscription'
@@ -37,6 +38,8 @@ function rememberPublicKey(publicKey: string): void {
  *   보장한다). 다만 서버 삭제가 실패하거나 기다림을 포함해 시간 안에 끝나지 않으면 브라우저
  *   구독을 대신 끊는다. 그러지 않으면 로그아웃한 계정의 알림이 이 기기에 계속 뜬다. 이때 기다림을
  *   놓은 등록은 계속 돌더라도 구독을 새로 만들지 못한다.
+ * - **로그아웃 요청이 끝나면**(성공·실패 모두) 정리를 끝낸다. 삭제 뒤에도 다른 탭의 등록을 막아 두던
+ *   락을 이때 놓는다. 응답이 오기 전에는 쿠키가 살아 있어 그사이의 등록이 삭제를 되돌리기 때문이다.
  *
  * 서버 삭제가 성공했을 때는 브라우저 구독을 지우지 않는다. 같은 기기로 다시 로그인하면 권한을
  * 다시 묻지 않고 새 계정으로 이어진다. 구독이 없거나 푸시를 쓸 수 없는 환경에서는 모두 아무 일도
@@ -77,11 +80,15 @@ export function registerPushSubscriptionLifecycle(router: Router): () => void {
     }
   })
 
-  setBeforeSignOutHook(() => {
-    signingOut = true
+  setBeforeSignOutHook(
+    () => {
+      signingOut = true
 
-    return removePushSubscriptionFromServer()
-  }, dropBrowserPushSubscription)
+      return removePushSubscriptionFromServer()
+    },
+    dropBrowserPushSubscription,
+    finishSignOutCleanup,
+  )
 
   return () => {
     removeAfterEach()

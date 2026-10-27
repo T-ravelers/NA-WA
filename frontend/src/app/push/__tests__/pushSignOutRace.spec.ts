@@ -312,3 +312,95 @@ describe('signing out while another tab is still working on a registration', () 
     expect(savePushSubscription).not.toHaveBeenCalled()
   })
 })
+
+type Tab = Awaited<ReturnType<typeof openAnotherTab>>
+
+/**
+ * 서버는 로그아웃 응답이 오기 전까지 이전 계정의 쿠키로 온 PUT을 그 계정의 구독으로 저장한다. 이 탭이
+ * 서버 행을 지운 뒤 로그아웃 응답이 오기 전에 다른 탭에서 등록이 시작되면, 그 PUT이 지운 행을 되살리고
+ * 브라우저 구독도 남아 로그아웃한 계정의 알림이 이 기기로 온다.
+ */
+describe('another tab starting a registration between the deletion and the logout response', () => {
+  /** 로그아웃 응답은 직접 돌려줄 때까지 붙잡는다. 응답이 오면 쿠키가 지워져 그 뒤의 PUT은 거절된다. */
+  function holdLogout() {
+    let signedIn = true
+    let answer: () => void = () => undefined
+    savePushSubscription.mockImplementation((body: { endpoint: string }) => {
+      if (!signedIn) {
+        return Promise.reject(new Error('401'))
+      }
+      serverRows.add(body.endpoint)
+      return Promise.resolve()
+    })
+    post.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          answer = () => {
+            signedIn = false
+            resolve()
+          }
+        }),
+    )
+
+    return { answerLogout: () => answer() }
+  }
+
+  /**
+   * 로그인 뒤 첫 동기화를 마치고 로그아웃을 시작해, 서버 행은 지워졌고 로그아웃 응답은 오기 전인 상태로
+   * 둔다. 로그아웃의 Promise를 그대로 돌려주면 `await`가 그것까지 기다리므로 객체에 담는다.
+   */
+  async function signInAndStartSigningOut(): Promise<{ signOut: Promise<void> }> {
+    const router = createTestRouter()
+    stop = registerPushSubscriptionLifecycle(router)
+    await router.push('/wallet')
+    await vi.waitFor(() => expect(serverRows.has(ENDPOINT)).toBe(true))
+
+    const signOut = requestSignOut()
+    await vi.waitFor(() => expect(post).toHaveBeenCalledWith('/api/v1/auth/logout'))
+    expect(serverRows.size).toBe(0)
+
+    return { signOut }
+  }
+
+  it.each([
+    ['changes the language', (tab: Tab) => tab.syncPushSubscription('ja')],
+    ['turns push on', (tab: Tab) => tab.enablePush(SERVER_KEY, 'en')],
+  ])('does not save the device again when the other tab %s', async (_name, register) => {
+    installLocks()
+    installBrowserWithSubscription()
+    const server = holdLogout()
+    const otherTab = await openAnotherTab()
+    const { signOut } = await signInAndStartSigningOut()
+
+    const registering = register(otherTab)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    server.answerLogout()
+    await signOut
+    await registering
+
+    expect(serverRows.size).toBe(0)
+    // 이 탭이 로그인한 뒤의 첫 동기화 한 번뿐이다. 다른 탭은 거절될 PUT도 보내지 않는다.
+    expect(savePushSubscription).toHaveBeenCalledOnce()
+  })
+
+  /** 로그아웃 요청이 실패하면 세션이 이어진다. 붙잡아 둔 락이 풀려 그 뒤의 등록은 그대로 저장돼야 한다. */
+  it('lets registrations through again once a failed logout request is over', async () => {
+    installLocks()
+    installBrowserWithSubscription()
+    savePushSubscription.mockImplementation((body: { endpoint: string }) => {
+      serverRows.add(body.endpoint)
+      return Promise.resolve()
+    })
+    post.mockRejectedValue(new Error('network'))
+    const otherTab = await openAnotherTab()
+    const router = createTestRouter()
+    stop = registerPushSubscriptionLifecycle(router)
+    await router.push('/wallet')
+    await vi.waitFor(() => expect(serverRows.has(ENDPOINT)).toBe(true))
+
+    await expect(requestSignOut()).rejects.toThrow('network')
+    await otherTab.syncPushSubscription('ja')
+
+    expect(serverRows.has(ENDPOINT)).toBe(true)
+  })
+})

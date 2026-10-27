@@ -210,4 +210,59 @@ describe('sessionSignOut before-sign-out hook', () => {
 
     expect(post).toHaveBeenCalledOnce()
   })
+
+  /**
+   * 정리가 붙잡아 둔 것(다른 탭이 이전 계정으로 다시 저장하지 못하게 막아 둔 것)은 로그아웃 요청이 끝난
+   * 뒤에 놓는다. 응답 전에는 쿠키가 살아 있어 그사이의 요청이 정리를 되돌린다.
+   */
+  it('runs the after-request callback once the logout request is over', async () => {
+    const order: string[] = []
+    setBeforeSignOutHook(
+      () => {
+        order.push('hook')
+        return Promise.resolve()
+      },
+      undefined,
+      () => {
+        order.push('after')
+      },
+    )
+    post.mockImplementation(() => {
+      order.push('logout')
+      return Promise.resolve()
+    })
+
+    await requestSignOut()
+
+    expect(order).toEqual(['hook', 'logout', 'after'])
+  })
+
+  it('runs the after-request callback when the logout request fails too', async () => {
+    const failure = new Error('network unavailable')
+    const after = vi.fn()
+    setBeforeSignOutHook(() => Promise.resolve(), undefined, after)
+    post.mockRejectedValue(failure)
+
+    await expect(requestSignOut()).rejects.toBe(failure)
+
+    expect(after).toHaveBeenCalledOnce()
+    expect(isSignOutBarrierActive()).toBe(true)
+  })
+
+  it('still finishes signing out when the after-request callback throws', async () => {
+    const onSignedOut = vi.fn()
+    setSignedOutHandler(onSignedOut)
+    setBeforeSignOutHook(
+      () => Promise.resolve(),
+      undefined,
+      () => {
+        throw new Error('broken')
+      },
+    )
+
+    await requestSignOut()
+
+    expect(onSignedOut).toHaveBeenCalledOnce()
+    expect(isSignOutBarrierActive()).toBe(false)
+  })
 })

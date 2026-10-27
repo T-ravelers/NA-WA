@@ -22,6 +22,7 @@ const BEFORE_SIGN_OUT_TIMEOUT_MS = 3_000
 
 let beforeSignOutHook: SignOutCleanup | undefined
 let beforeSignOutFallback: SignOutCleanup | undefined
+let afterSignOutRequest: (() => void) | undefined
 
 /**
  * 로그아웃 요청을 보내기 전에 할 정리를 주입한다.
@@ -32,13 +33,19 @@ let beforeSignOutFallback: SignOutCleanup | undefined
  *
  * `fallback`은 정리가 실패하거나 시간 안에 끝나지 않았을 때만 대신 실행한다. 인증 없이도 되는
  * 더 작은 정리여야 한다(예: 서버를 거치지 않고 브라우저의 푸시 구독만 끊기).
+ *
+ * `after`는 로그아웃 요청이 끝나면(성공·실패 모두) 부른다. 정리가 로그아웃 요청이 끝날 때까지 붙잡아
+ * 둔 것을 놓는 자리다(예: 정리 뒤에 다른 탭이 이전 계정으로 다시 저장하지 못하게 막아 둔 것). 응답이
+ * 오기 전까지는 쿠키가 살아 있어서, 정리를 마친 직후 풀어 주면 그 사이의 요청이 정리를 되돌린다.
  */
 export function setBeforeSignOutHook(
   hook: SignOutCleanup | undefined,
   fallback?: SignOutCleanup,
+  after?: () => void,
 ): void {
   beforeSignOutHook = hook
   beforeSignOutFallback = fallback
+  afterSignOutRequest = after
 }
 
 /** 제한 시간 안에 끝나면 true. 실패하거나 시간이 지나면 false이고, 던지지 않는다. */
@@ -73,6 +80,15 @@ async function runBeforeSignOutHook(): Promise<void> {
   }
 }
 
+/** 정리는 덤이라, 붙잡아 둔 것을 놓다가 실패해도 로그아웃의 결과를 바꾸지 않는다. */
+function runAfterSignOutRequest(): void {
+  try {
+    afterSignOutRequest?.()
+  } catch {
+    // 위 설명대로 무시한다.
+  }
+}
+
 /**
  * 서버가 브라우저 인증 쿠키 만료를 확인한 뒤 앱의 세션 상태를 폐기한다.
  */
@@ -80,7 +96,11 @@ export async function requestSignOut(): Promise<void> {
   // 장벽을 세우기 전에 한다. 장벽이 서면 인증 갱신이 막혀, 만료된 토큰으로는 정리가 실패한다.
   await runBeforeSignOutHook()
   activateSignOutBarrier()
-  await httpClient.post('/api/v1/auth/logout')
+  try {
+    await httpClient.post('/api/v1/auth/logout')
+  } finally {
+    runAfterSignOutRequest()
+  }
   clearSignOutBarrier()
   signedOutHandler?.()
 }

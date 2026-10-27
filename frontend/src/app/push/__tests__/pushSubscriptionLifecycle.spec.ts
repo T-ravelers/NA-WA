@@ -7,16 +7,19 @@ import { i18n } from '@/app/i18n'
 const syncPushSubscription = vi.fn()
 const removePushSubscriptionFromServer = vi.fn()
 const dropBrowserPushSubscription = vi.fn()
+const finishSignOutCleanup = vi.fn()
 const setBeforeSignOutHook = vi.fn()
 
 vi.mock('@/features/notification/model/pushSubscription', () => ({
   syncPushSubscription: (language: string) => syncPushSubscription(language),
   removePushSubscriptionFromServer: () => removePushSubscriptionFromServer(),
   dropBrowserPushSubscription: () => dropBrowserPushSubscription(),
+  finishSignOutCleanup: () => finishSignOutCleanup(),
 }))
 
 vi.mock('@/shared/api/sessionSignOut', () => ({
-  setBeforeSignOutHook: (hook: unknown, fallback?: unknown) => setBeforeSignOutHook(hook, fallback),
+  setBeforeSignOutHook: (hook: unknown, fallback?: unknown, after?: unknown) =>
+    setBeforeSignOutHook(hook, fallback, after),
 }))
 
 const { registerPushSubscriptionLifecycle } = await import('../pushSubscriptionLifecycle')
@@ -45,6 +48,7 @@ beforeEach(() => {
   syncPushSubscription.mockReset()
   removePushSubscriptionFromServer.mockReset()
   dropBrowserPushSubscription.mockReset()
+  finishSignOutCleanup.mockReset()
   setBeforeSignOutHook.mockReset()
   i18n.global.locale.value = 'en'
 })
@@ -115,6 +119,17 @@ describe('registerPushSubscriptionLifecycle', () => {
     expect(removePushSubscriptionFromServer).not.toHaveBeenCalled()
   })
 
+  /** 삭제 뒤에도 다른 탭의 등록을 막아 두던 것은 로그아웃 요청이 끝난 뒤에야 놓는다. */
+  it('finishes the cleanup once the logout request is over', () => {
+    stop = registerPushSubscriptionLifecycle(createTestRouter())
+
+    const after = setBeforeSignOutHook.mock.calls[0]?.[2] as () => void
+    after()
+
+    expect(finishSignOutCleanup).toHaveBeenCalledOnce()
+    expect(removePushSubscriptionFromServer).not.toHaveBeenCalled()
+  })
+
   /**
    * 정리가 진행 중인 등록이 끝나기를 기다리는 동안 새 PUT이 끼어들면 기다림이 끝나지 않고, 삭제 뒤에
    * 저장되면 구독이 되살아난다. 로그아웃 정리가 시작되면 새 동기화를 시작하지 않는다.
@@ -155,6 +170,6 @@ describe('registerPushSubscriptionLifecycle', () => {
     await nextTick()
 
     expect(syncPushSubscription).not.toHaveBeenCalled()
-    expect(setBeforeSignOutHook).toHaveBeenLastCalledWith(undefined, undefined)
+    expect(setBeforeSignOutHook).toHaveBeenLastCalledWith(undefined, undefined, undefined)
   })
 })

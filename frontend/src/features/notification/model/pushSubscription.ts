@@ -298,8 +298,9 @@ export interface EnablePushResult {
  *
  * 기기에 이미 있는 구독이 다른 공개키로 만든 것이면 지우고 새 키로 다시 구독한다.
  *
- * 구독을 만들기 전에 이 작업이 취소됐다면(로그아웃이 기다림을 놓았거나 `disablePush`가 불렸다면)
- * 구독하지 않고 `enabled: false`로 끝난다.
+ * 구독을 만들기 전에 이 작업이 취소됐다면(로그아웃이 기다림을 놓았거나 끝났거나 `disablePush`가
+ * 불렸다면) 구독하지 않고 `enabled: false`로 끝난다. 락을 기다리는 사이에 취소됐다면 서버에 아무것도
+ * 저장하지 않는다.
  */
 export function enablePush(publicKey: string, language: string): Promise<EnablePushResult> {
   // 안쪽 함수를 곧바로 불러, 권한 요청이 클릭과 같은 호출 안에서 시작되게 한다.
@@ -317,6 +318,11 @@ async function requestAndRegister(publicKey: string, language: string): Promise<
 
   // 사람이 권한에 답하기를 기다리는 동안은 락을 쥐지 않는다. 로그아웃이 그만큼 붙잡혀서는 안 된다.
   return withRegistrationLock('shared', async () => {
+    // 로그아웃 정리가 끝날 때까지 락을 기다렸다면 그사이 취소됐다. 이전 계정으로 저장하지 않는다.
+    if (cancelled()) {
+      return { permission, enabled: false }
+    }
+
     let existing = await registration.pushManager.getSubscription()
     if (existing !== null && !isSubscribedWithKey(existing, publicKey)) {
       // 서버가 키를 바꾸기 전에 만든 구독이다. 그대로 등록하면 푸시 서비스가 발송을 계속 거절한다.
@@ -365,8 +371,8 @@ export async function disablePush(): Promise<void> {
  * 거절하므로 이때 새 키로 다시 구독한다. 구독이 없으면 아무것도 하지 않고(권한도 묻지 않는다),
  * 실패해도 던지지 않는다 — 다음에 앱을 열 때 다시 맞춘다.
  *
- * 다시 구독하기 전에 이 작업이 취소됐다면(로그아웃이 기다림을 놓았거나 `disablePush`가 불렸다면)
- * 구독을 만들지 않고 끝난다.
+ * 다시 구독하기 전에 이 작업이 취소됐다면(로그아웃이 기다림을 놓았거나 끝났거나 `disablePush`가
+ * 불렸다면) 구독을 만들지 않고 끝난다. 락을 기다리는 사이에 취소됐다면 서버에 아무것도 저장하지 않는다.
  *
  * `onPublicKey`는 서버의 지금 공개키를 확인했을 때 그 키를 받는다. 화면이 따로 들고 있는 키를 같은
  * 것으로 맞추는 데 쓴다 — 갱신은 새 키로 복구했는데 화면의 키가 예전 그대로면, 그 뒤 끄고 켤 때
@@ -392,7 +398,9 @@ async function registerExistingSubscription(
   onPublicKey: ((publicKey: string) => void) | undefined,
 ): Promise<void> {
   try {
+    // 락을 받은 뒤에 확인한다. 로그아웃 정리가 끝날 때까지 락을 기다렸다면 그사이 취소됐다.
     if (
+      cancelled() ||
       detectPushSupport(browserPushEnvironment()) !== 'supported' ||
       Notification.permission !== 'granted'
     ) {
@@ -441,6 +449,9 @@ async function renewIfStale(
   return renewed === null ? null : { subscription: renewed, created: true }
 }
 
+/** 아직 끝나지 않은 로그아웃 정리를 끝내는 함수들. 로그아웃이 겹쳐도 한 번에 모두 끝낸다. */
+const signOutsInProgress = new Set<() => void>()
+
 /**
  * 로그아웃하기 전에 이 기기의 구독을 서버에서 지운다.
  *
@@ -452,21 +463,65 @@ async function renewIfStale(
  * 늦게 끝난 등록이 삭제 뒤에 저장되어 이전 계정의 구독이 되살아난다. 다른 탭에서 진행 중인 등록도
  * 마찬가지라서, 이 탭의 목록을 기다린 뒤 배타 락을 잡고 지운다(`withRegistrationLock`).
  *
+ * 지운 뒤에도 배타 락은 로그아웃 요청이 끝날 때까지(`finishSignOutCleanup`) 쥐고 있는다. 응답이 오기
+ * 전까지는 쿠키가 살아 있어서, 지운 직후 락을 놓으면 그사이 어느 탭에서든 시작한 등록이 지운 행을
+ * 이전 계정으로 다시 저장한다. 락을 기다린 등록은 끝날 때 보내는 취소 신호를 보고 아무것도 하지
+ * 않는다. 기다림을 포기해 로그아웃이 먼저 끝났다면 늦게 락을 받아도 지우지 않는다 — 인증이 없어
+ * 실패할 뿐이고, 브라우저 구독은 대체 정리가 이미 끊었다.
+ *
  * 실패는 던진다. 로그아웃을 막지 않는 것은 부르는 쪽(`requestSignOut`)의 몫이고, 이 삭제가
- * 끝나지 못했을 때(기다리는 시간 포함)의 대체 정리는 `dropBrowserPushSubscription`이다.
+ * 끝나지 못했을 때(기다리는 시간 포함)의 대체 정리는 `dropBrowserPushSubscription`이다. 이 함수는
+ * 지우기를 마치면 끝나고, 락을 쥐고 있는 동안을 기다리지 않는다.
  */
 export async function removePushSubscriptionFromServer(): Promise<void> {
   if (detectPushSupport(browserPushEnvironment()) !== 'supported') {
     return
   }
 
-  await registrationsSettled()
-  await withRegistrationLock('exclusive', async () => {
-    const subscription = await readPushSubscription()
-    if (subscription !== null) {
-      await deletePushSubscription(subscription.endpoint)
+  let signedOut = false
+  let finish: () => void = () => undefined
+  const untilSignedOut = new Promise<void>((resolve) => {
+    finish = () => {
+      signedOut = true
+      resolve()
     }
   })
+  signOutsInProgress.add(finish)
+
+  await registrationsSettled()
+  // 락은 로그아웃 요청이 끝날 때까지 쥐되 이 함수는 지우기가 끝나면 돌아가야 해서, 락 안에서 시작한
+  // 지우기를 밖으로 넘긴다. Promise를 그대로 넘기면 받는 쪽이 그것까지 기다리므로 객체에 담는다.
+  const { deletion } = await new Promise<{ deletion: Promise<void> }>((granted) => {
+    void withRegistrationLock('exclusive', async () => {
+      const deletion = signedOut ? Promise.resolve() : deleteThisDeviceFromServer()
+      granted({ deletion })
+      await deletion.catch(() => undefined)
+      await untilSignedOut
+    })
+  })
+  await deletion
+}
+
+async function deleteThisDeviceFromServer(): Promise<void> {
+  const subscription = await readPushSubscription()
+  if (subscription !== null) {
+    await deletePushSubscription(subscription.endpoint)
+  }
+}
+
+/**
+ * 로그아웃 요청이 끝났다(성공·실패 모두). `requestSignOut`이 요청을 마친 뒤 부른다.
+ *
+ * 그동안 락을 기다린 등록이 시작되기 전에 취소 신호를 보내고, 로그아웃 정리가 쥔 배타 락을 놓는다.
+ * 로그아웃이 성공했다면 그 등록은 어차피 인증 없이 거절될 요청이다. 실패했다면 세션이 이어지므로 이
+ * 뒤에 새로 시작하는 등록은 그대로 진행된다.
+ */
+export function finishSignOutCleanup(): void {
+  cancelPendingRegistrations()
+  for (const finish of signOutsInProgress) {
+    finish()
+  }
+  signOutsInProgress.clear()
 }
 
 /**
