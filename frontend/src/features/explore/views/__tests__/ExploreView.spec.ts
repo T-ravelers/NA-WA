@@ -957,6 +957,24 @@ describe('ExploreView card round trips through the Explore route guards', () => 
     expect(sessionStorage.getItem('nawa.explore.listScrollBeforeBuddy')).toBeNull()
   })
 
+  // 맨 위 카드에서 떠나는 것이 가장 흔하다. 0을 "없음"으로 버리면 아무도 맨 위로 되돌리지 않는다.
+  it('goes back to the top when the list was left from the top', async () => {
+    const { router } = await mountRoutedView('/explore?eventKinds=FESTIVAL')
+    sessionStorage.setItem('nawa.explore.listScrollBeforeBuddy', '0')
+    scrollToMock.mockReset()
+
+    await router.push({
+      name: 'appointment-list',
+      query: { itemId: '301', itemType: 'EVENT', fromExplore: '1' },
+    })
+    await flushPromises()
+    await router.push('/explore?eventKinds=FESTIVAL')
+    await flushPromises()
+
+    expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+    expect(sessionStorage.getItem('nawa.explore.listScrollBeforeBuddy')).toBeNull()
+  })
+
   it('still starts over when the buddy list was not opened from a card', async () => {
     const { router } = await mountRoutedView('/explore?eventKinds=FESTIVAL')
     sessionStorage.setItem('nawa.explore.listScrollBeforeBuddy', '640')

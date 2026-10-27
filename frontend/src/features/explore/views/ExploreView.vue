@@ -365,13 +365,18 @@ function openAppointmentList(itemId: number, itemType: JourneyAddItemType): void
   })
 }
 
-/** 남겨 둔 스크롤 위치를 한 번 읽고 지운다. 다른 길로 돌아온 진입에 남지 않게 한다. */
+/**
+ * 남겨 둔 스크롤 위치를 한 번 읽고 지운다. 다른 길로 돌아온 진입에 남지 않게 한다.
+ *
+ * 0도 되돌릴 위치다. 맨 위 카드에서 떠나는 것이 가장 흔한데, 카드에서 돌아온 진입은
+ * 맨 위로 올리는 처음부터 보기도 꺼져 있어 0을 버리면 약속 목록의 스크롤이 그대로 남는다.
+ */
 function takeSavedListScroll(): number | null {
   try {
     const saved = sessionStorage.getItem(LIST_SCROLL_STORAGE_KEY)
     sessionStorage.removeItem(LIST_SCROLL_STORAGE_KEY)
     const top = Number(saved)
-    return saved !== null && Number.isFinite(top) && top > 0 ? top : null
+    return saved !== null && Number.isFinite(top) && top >= 0 ? top : null
   } catch {
     return null
   }
