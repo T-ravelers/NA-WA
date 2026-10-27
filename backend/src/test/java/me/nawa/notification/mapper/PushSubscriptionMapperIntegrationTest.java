@@ -210,6 +210,35 @@ class PushSubscriptionMapperIntegrationTest {
         }
     }
 
+    /**
+     * endpoint의 토큰은 대소문자를 구분한다. 대소문자만 다른 두 주소는 서로 다른 기기라서, 한쪽의
+     * 등록이 다른 쪽 행을 덮어쓰거나 한쪽의 해지가 다른 쪽 행을 지우면 안 된다.
+     */
+    @Test
+    void endpoint_isComparedCaseSensitively() {
+        long first = insertMember();
+        long second = insertMember();
+        String token = "aB" + UUID.randomUUID().toString().replace("-", "");
+        String lower = "https://push.example.test/send/" + token.toLowerCase();
+        String upper = "https://push.example.test/send/" + token.toUpperCase();
+        try {
+            mapper.upsert(first, lower, "key-lower", "auth-lower", "en");
+            mapper.upsert(second, upper, "key-upper", "auth-upper", "en");
+
+            assertEquals(1, countByMember(first));
+            assertEquals(1, countByMember(second));
+            assertEquals("key-lower", mapper.findByMemberId(first).get(0).getP256dh());
+
+            assertEquals(0, mapper.deleteByMemberAndEndpoint(first, upper));
+            assertEquals(1, mapper.deleteByEndpoint(lower));
+            assertEquals(1, countByMember(second));
+        } finally {
+            deleteSubscriptions(lower, upper);
+            deleteMember(first);
+            deleteMember(second);
+        }
+    }
+
     private static String endpoint() {
         return "https://push.example.test/send/" + UUID.randomUUID();
     }
