@@ -37,7 +37,8 @@ export const options = {
   },
   thresholds: {
     // 프로필 응답은 모두 200이어야 한다. 403(MEMBER-010)이 나오면 VU가 그 약속의
-    // 참여자가 아니라는 뜻이라 시드가 어긋난 것이다.
+    // 참여자가 아니라는 뜻이라 시드가 어긋난 것이다. 참여자 목록이 실패하거나 조회할
+    // 다른 참여자가 없어 프로필을 재지 못한 반복도 여기서 센다.
     profile_unexpected: ['count==0'],
     // VU가 끝난 약속을 찾지 못하면 프로필 요청 없이 반복만 돈다.
     profile_prepare_failed: ['count==0'],
@@ -103,12 +104,14 @@ export default function () {
     ),
   )
   const self = memberIdFor(__VU)
+  const others = (members || []).filter((member) => member.memberId !== self)
+  if (others.length === 0) {
+    profileUnexpected.add(1)
+    return
+  }
 
-  for (const member of members || []) {
-    if (member.memberId === self) {
-      continue
-    }
-
+  let profilesRead = 0
+  for (const member of others) {
     const response = http.get(
       http.url`${BASE_URL}/api/v1/members/${member.memberId}/appointment-profile`,
       { headers: baseHeaders, jar, tags: { name: 'appointment-profile' } },
@@ -120,9 +123,13 @@ export default function () {
       profileUnexpected.add(1)
       continue
     }
+    profilesRead += 1
     if (!reviewsChecked && !(profile.reviewCount > 0)) {
       profileWithoutReviews.add(1)
     }
   }
-  reviewsChecked = true
+  // 프로필을 하나라도 실제로 읽은 반복에서만 후기 검사를 끝낸 것으로 본다.
+  if (profilesRead > 0) {
+    reviewsChecked = true
+  }
 }
