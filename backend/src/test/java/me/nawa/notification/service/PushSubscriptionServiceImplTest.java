@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.Base64;
 import me.nawa.common.exception.BusinessException;
@@ -105,6 +106,39 @@ class PushSubscriptionServiceImplTest {
 
         assertThrows(BusinessException.class, () -> service().subscribe(1L, request(FCM, "ko")));
         verify(mapper, never()).upsert(any(), any(), any(), any(), any());
+    }
+
+    /**
+     * 허용 도메인 안에서 경로만 바꾸면 endpoint가 계속 달라진다. 상한이 없으면 한 회원이 구독을 끝없이
+     * 늘려 발송 스레드풀을 붙잡을 수 있다.
+     */
+    @Test
+    void subscribe_rejectsANewDeviceOnceTheMemberHasReachedTheLimit() {
+        when(mapper.countByMemberExcludingEndpoint(1L, FCM)).thenReturn(20);
+
+        assertThrows(BusinessException.class, () -> service().subscribe(1L, request(FCM, "en")));
+
+        verify(mapper, never()).upsert(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void subscribe_acceptsTheLastDeviceBelowTheLimit() {
+        when(mapper.countByMemberExcludingEndpoint(1L, FCM)).thenReturn(19);
+
+        service().subscribe(1L, request(FCM, "en"));
+
+        verify(mapper).upsert(1L, FCM, p256dh(), auth(), "en");
+    }
+
+    /**
+     * 이미 등록한 기기를 다시 등록하는 경우(언어 변경, 재로그인)는 새 기기가 아니다. 그래서 개수 조회에
+     * 이 endpoint를 넘겨 제외하고, 상한에 닿은 회원도 기존 기기를 계속 갱신할 수 있다.
+     */
+    @Test
+    void subscribe_countsTheOtherDevicesOnly() {
+        service().subscribe(1L, request(FCM, "en"));
+
+        verify(mapper).countByMemberExcludingEndpoint(1L, FCM);
     }
 
     @Test

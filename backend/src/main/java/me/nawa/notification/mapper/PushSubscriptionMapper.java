@@ -26,6 +26,13 @@ public interface PushSubscriptionMapper {
         @Param("endpoint") String endpoint
     );
 
+    // 이 endpoint를 뺀 회원의 기기 수다. 구독 상한을 볼 때 쓰며, 이미 등록된 기기를 다시 등록하는
+    // 경우(언어 변경·재로그인)는 새 기기가 아니므로 세지 않는다.
+    int countByMemberExcludingEndpoint(
+        @Param("memberId") Long memberId,
+        @Param("endpoint") String endpoint
+    );
+
     // 회원의 모든 기기다. 발송은 알림 하나마다 이것을 한 번 읽는다.
     List<PushSubscription> findByMemberId(@Param("memberId") Long memberId);
 

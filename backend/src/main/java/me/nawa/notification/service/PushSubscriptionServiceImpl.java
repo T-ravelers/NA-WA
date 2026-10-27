@@ -28,6 +28,11 @@ public class PushSubscriptionServiceImpl implements PushSubscriptionService {
     // 브라우저가 주는 키의 길이다. p256dh는 압축하지 않은 P-256 점(0x04 + x + y), auth는 16바이트.
     private static final int P256DH_LENGTH = 65;
     private static final int AUTH_LENGTH = 16;
+    // 한 회원이 가질 수 있는 기기 수다. 발송은 알림 하나마다 회원의 구독 전부에 차례로 POST하므로,
+    // 허용 도메인 안에서 경로만 바꿔 구독을 계속 늘리면 전용 스레드풀을 오래 붙잡고 대기열이 차서
+    // 다른 회원의 푸시가 버려진다. 한 사람이 쓰는 기기로는 넉넉하고, 낡은 구독은 푸시 서비스가
+    // 410으로 답할 때 치워진다.
+    private static final int MAX_SUBSCRIPTIONS_PER_MEMBER = 20;
 
     // 호스트가 이 도메인이거나 그 하위 도메인이면 통과한다.
     private static final List<String> PUSH_SERVICE_DOMAINS = List.of(
@@ -60,6 +65,13 @@ public class PushSubscriptionServiceImpl implements PushSubscriptionService {
             || !isPushServiceEndpoint(request.getEndpoint())
             || !hasDecodedLength(request.getP256dh(), P256DH_LENGTH, (byte) 0x04)
             || !hasDecodedLength(request.getAuth(), AUTH_LENGTH, null)) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        // 같은 endpoint의 재등록은 세지 않으므로 상한에 닿은 회원도 기존 기기를 계속 갱신할 수 있다.
+        // 두 요청이 동시에 이 검사를 통과하면 상한을 조금 넘길 수 있는데, 막으려는 것은 무제한 증가라
+        // 잠금으로 막지 않는다.
+        if (pushSubscriptionMapper.countByMemberExcludingEndpoint(memberId, request.getEndpoint())
+            >= MAX_SUBSCRIPTIONS_PER_MEMBER) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         pushSubscriptionMapper.upsert(

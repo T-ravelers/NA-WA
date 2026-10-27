@@ -184,6 +184,32 @@ class PushSubscriptionMapperIntegrationTest {
         }
     }
 
+    /** 상한 검사가 쓰는 개수다. 이 기기와 다른 회원의 기기는 세지 않는다. */
+    @Test
+    void countByMemberExcludingEndpoint_countsOnlyTheOtherDevicesOfTheMember() {
+        long memberId = insertMember();
+        long otherMemberId = insertMember();
+        String phone = endpoint();
+        String laptop = endpoint();
+        String otherMembersTablet = endpoint();
+        String unregistered = endpoint();
+        try {
+            mapper.upsert(memberId, phone, "p256dh-a", "auth-a", "en");
+            mapper.upsert(memberId, laptop, "p256dh-b", "auth-b", "en");
+            mapper.upsert(otherMemberId, otherMembersTablet, "p256dh-c", "auth-c", "en");
+
+            // 이미 등록한 기기를 다시 등록하는 경우: 나머지 한 대만 센다.
+            assertEquals(1, mapper.countByMemberExcludingEndpoint(memberId, phone));
+            // 새 기기를 등록하는 경우: 가진 기기 둘을 모두 세고, 다른 회원의 기기는 세지 않는다.
+            assertEquals(2, mapper.countByMemberExcludingEndpoint(memberId, unregistered));
+            assertEquals(1, mapper.countByMemberExcludingEndpoint(otherMemberId, unregistered));
+        } finally {
+            deleteSubscriptions(phone, laptop, otherMembersTablet);
+            deleteMember(memberId);
+            deleteMember(otherMemberId);
+        }
+    }
+
     private static String endpoint() {
         return "https://push.example.test/send/" + UUID.randomUUID();
     }
