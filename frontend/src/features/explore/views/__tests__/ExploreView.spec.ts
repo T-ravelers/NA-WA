@@ -1,17 +1,27 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RouterView, createMemoryHistory, createRouter, type RouteRecordRaw } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
 import { useExploreFilterMemoryStore } from '../../model/exploreFilterMemory'
+import {
+  exploreJourneyIntegrationKey,
+  type ExploreJourneyIntegration,
+  type ExploreJourneySummary,
+} from '../../model/journeyIntegration'
 import exploreRoutes from '../../routes'
 
 const fetchEventList = vi.fn()
 const fetchPlaceList = vi.fn()
 const scrollToMock = vi.fn()
+const addJourneyItem = vi.fn()
+const showToast = vi.fn()
+
+vi.mock('@/shared/ui/toast', () => ({ showToast: (message: string) => showToast(message) }))
 
 vi.mock('../../api/exploreApi', () => ({
   fetchEventList: (filters: unknown) => fetchEventList(filters),
@@ -22,6 +32,28 @@ const ExploreView = (await import('../ExploreView.vue')).default
 const { presetDateRange } = await import('../../model/datePresets')
 
 const Stub = { template: '<div />' }
+
+const journeys: ExploreJourneySummary[] = [
+  { tripId: 7, title: 'Seoul weekend', startDate: '2026-08-10', endDate: '2026-08-12' },
+]
+
+/** 목록 화면도 카드에서 담기를 열므로 앱이 주입하는 여정 연동이 있어야 마운트된다. */
+function createJourneyIntegration(): ExploreJourneyIntegration {
+  const query = {
+    data: ref<ExploreJourneySummary[] | undefined>(journeys),
+    isPending: ref(false),
+    isError: ref(false),
+  }
+
+  return {
+    addJourneyItem,
+    parseJourneyRouteQuery: (value) => {
+      const parsed = Number(Array.isArray(value) ? value[0] : value)
+      return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+    },
+    useJourneyListQuery: () => query,
+  }
+}
 
 /** afterEach에서 정리하려고 마지막으로 띄운 화면을 들고 있는다. */
 let routedWrapper: ReturnType<typeof mount> | null = null
@@ -70,6 +102,8 @@ async function mountView(path = '/explore') {
         name: 'explore-place-detail',
         component: { template: '<div>Place detail</div>' },
       },
+      { path: '/journeys/:tripId', name: 'journey-detail', component: Stub },
+      { path: '/appointments', name: 'appointment-list', component: Stub },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -80,6 +114,7 @@ async function mountView(path = '/explore') {
   const wrapper = mount(ExploreView, {
     global: {
       plugins: [i18n, router, createPinia(), [VueQueryPlugin, { queryClient }]],
+      provide: { [exploreJourneyIntegrationKey as symbol]: createJourneyIntegration() },
     },
   })
 
@@ -485,7 +520,10 @@ async function mountRoutedView(path = '/explore') {
   await router.isReady()
 
   const wrapper = mount(RouterView, {
-    global: { plugins: [i18n, router, pinia, [VueQueryPlugin, { queryClient }]] },
+    global: {
+      plugins: [i18n, router, pinia, [VueQueryPlugin, { queryClient }]],
+      provide: { [exploreJourneyIntegrationKey as symbol]: createJourneyIntegration() },
+    },
   })
   routedWrapper = wrapper
 
@@ -654,5 +692,120 @@ describe('ExploreView filter memory across entries', () => {
 
     /* 화면에 없던 조건이 탭을 누르는 순간 걸리면 안 된다. */
     expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
+  })
+})
+
+describe('ExploreView card actions', () => {
+  const event = {
+    itemId: 301,
+    eventKind: 'FESTIVAL',
+    status: 'ONGOING',
+    title: 'DDP Architecture Tour',
+    subtitle: null,
+    thumbnailUrl: null,
+    region1: 'Seoul',
+    region2: null,
+    region3: null,
+    latitude: null,
+    longitude: null,
+    startDate: '2026-08-10',
+    endDate: '2026-08-12',
+    isPermanent: false,
+    saved: false,
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    sessionStorage.clear()
+    vi.stubGlobal('scrollTo', vi.fn())
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
+    addJourneyItem.mockReset()
+    addJourneyItem.mockResolvedValue({})
+    showToast.mockReset()
+    fetchEventList.mockReset()
+    fetchPlaceList.mockReset()
+    fetchEventList.mockResolvedValue({ ...EMPTY_PAGE, content: [event], totalElements: 1 })
+    fetchPlaceList.mockResolvedValue({ ...EMPTY_PAGE, content: [place], totalElements: 1 })
+  })
+
+  async function addFromCard(
+    wrapper: Awaited<ReturnType<typeof mountView>>['wrapper'],
+    label: string,
+  ): Promise<void> {
+    await wrapper.get(`button[aria-label="${label}"]`).trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul weekend'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Add to'))
+      ?.trigger('click')
+    await flushPromises()
+  }
+
+  it('adds an Event from its card and stays on the list with a toast', async () => {
+    const { wrapper, router } = await mountView()
+
+    await addFromCard(wrapper, 'Add DDP Architecture Tour to trip')
+
+    expect(addJourneyItem).toHaveBeenCalledWith(7, {
+      itemId: 301,
+      visitDate: expect.any(String),
+    })
+    expect(router.currentRoute.value.name).toBe('explore')
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/^Added to Seoul weekend on /))
+  })
+
+  it('adds a Place from its card', async () => {
+    const { wrapper } = await mountView('/explore?tab=places')
+
+    await addFromCard(wrapper, 'Add Seongsu Onsil to trip')
+
+    expect(addJourneyItem).toHaveBeenCalledWith(7, {
+      itemId: 42,
+      visitDate: expect.any(String),
+    })
+  })
+
+  // 여정의 그날을 채우러 들어온 진입은 담고 나면 그 여정으로 돌아간다. 상세와 같은 규칙이다.
+  it('returns to the Journey that carried the date after adding from a card', async () => {
+    sessionStorage.setItem(
+      'nawa.explore.returnContext',
+      JSON.stringify({
+        journeyId: 7,
+        visitDate: '2026-08-11',
+        returnTo: { name: 'journey-detail', params: { tripId: '7' } },
+      }),
+    )
+    const { wrapper, router } = await mountView()
+
+    await addFromCard(wrapper, 'Add DDP Architecture Tour to trip')
+
+    expect(addJourneyItem).toHaveBeenCalledWith(7, { itemId: 301, visitDate: '2026-08-11' })
+    expect(router.currentRoute.value.name).toBe('journey-detail')
+    expect(router.currentRoute.value.params.tripId).toBe('7')
+  })
+
+  it.each([
+    ['/explore', 'Find buddy for DDP Architecture Tour', '301', 'EVENT'],
+    ['/explore?tab=places', 'Find buddy for Seongsu Onsil', '42', 'PLACE'],
+  ])('opens the appointment list from a card on %s', async (path, label, itemId, itemType) => {
+    const { wrapper, router } = await mountView(path)
+    // 이 하네스는 화면을 RouterView 밖에 띄워 이동한 뒤에도 남는다. 남은 화면의 필터
+    // 동기화가 도착지 query를 덮으므로 도착한 주소가 아니라 보낸 요청을 본다.
+    const push = vi.spyOn(router, 'push')
+
+    await wrapper.get(`button[aria-label="${label}"]`).trigger('click')
+    await flushPromises()
+
+    expect(push).toHaveBeenCalledWith({ name: 'appointment-list', query: { itemId, itemType } })
   })
 })

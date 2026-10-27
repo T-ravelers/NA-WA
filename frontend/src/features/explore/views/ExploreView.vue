@@ -15,10 +15,13 @@ import EventCard from '../components/EventCard.vue'
 import ExploreFilterBar from '../components/ExploreFilterBar.vue'
 import ExploreFilterSheet from '../components/ExploreFilterSheet.vue'
 import ExploreItemTabs from '../components/ExploreItemTabs.vue'
+import JourneyDateSheet from '../components/JourneyDateSheet.vue'
+import JourneySelectSheet from '../components/JourneySelectSheet.vue'
 import PlaceFilterBar from '../components/PlaceFilterBar.vue'
 import PlaceFilterSheet from '../components/PlaceFilterSheet.vue'
 import PlaceCard from '../components/PlaceCard.vue'
 import { useEventListQuery } from '../composables/useEventListQuery'
+import { useJourneyAddFlow, type JourneyAddItem } from '../composables/useJourneyAddFlow'
 import { usePlaceListQuery } from '../composables/usePlaceListQuery'
 import { presetDateRange } from '../model/datePresets'
 import {
@@ -33,6 +36,7 @@ import {
   SEOUL_REGION1,
   SEOUL_REGION2_OPTIONS,
   VALID_SEOUL_REGION2_VALUES,
+  findExploreRegionLabelKey,
 } from '../model/exploreRegions'
 import {
   EVENT_SECTOR_OPTIONS,
@@ -190,6 +194,79 @@ const eventList = computed(() => eventQuery.data.value?.content ?? [])
 const totalEventElements = computed(() => eventQuery.data.value?.totalElements ?? 0)
 const placeList = computed(() => placeQuery.data.value?.content ?? [])
 const totalPlaceElements = computed(() => placeQuery.data.value?.totalElements ?? 0)
+
+/** 카드에서 담기를 누른 항목. 시트는 이 항목을 담는다. */
+const journeyAddTarget = ref<(JourneyAddItem & { title: string; location: string }) | null>(null)
+const {
+  journeySelectSheetOpen,
+  journeyDateSheetOpen,
+  journeyDate,
+  selectedJourneyId,
+  journeyAddPending,
+  journeyAddError,
+  journeyListQuery,
+  journeys,
+  itemPeriod,
+  journeyDateRange,
+  openJourneySelectSheet,
+  closeJourneySelectSheet,
+  selectJourney,
+  goToCreateJourney,
+  closeJourneyDateSheet,
+  confirmJourneyDate,
+} = useJourneyAddFlow({
+  item: journeyAddTarget,
+  createJourneyReturn: { returnRouteName: 'explore' },
+})
+
+function toRegionLabel(regions: Array<string | null | undefined>): string {
+  return regions
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      const labelKey = findExploreRegionLabelKey(value)
+      return labelKey ? t(labelKey) : value
+    })
+    .join(' · ')
+}
+
+/**
+ * 담을 수 있는 날의 범위는 상세 화면과 같은 규칙으로 정한다. 종료일 미상 이벤트는
+ * 상한이 없고, 장소는 운영 기간이 없어 양쪽 모두 열려 있다.
+ */
+function addEventToTrip(eventId: number): void {
+  const event = eventList.value.find((candidate) => candidate.itemId === eventId)
+  if (!event) return
+
+  journeyAddTarget.value = {
+    itemId: event.itemId,
+    title: event.title,
+    location: toRegionLabel([event.region1, event.region2, event.region3]),
+    startDate: event.startDate ?? null,
+    endDate: event.isPermanent === true ? null : (event.endDate ?? null),
+  }
+  openJourneySelectSheet()
+}
+
+function addPlaceToTrip(placeId: number): void {
+  const place = placeList.value.find((candidate) => candidate.itemId === placeId)
+  if (!place) return
+
+  journeyAddTarget.value = {
+    itemId: place.itemId,
+    title: place.name,
+    location: toRegionLabel([place.region1, place.region2, place.region3]),
+    startDate: null,
+    endDate: null,
+  }
+  openJourneySelectSheet()
+}
+
+function openAppointmentList(itemId: number, itemType: 'EVENT' | 'PLACE'): void {
+  void router.push({
+    name: 'appointment-list',
+    query: { itemId: String(itemId), itemType },
+  })
+}
 const sheetResultCount = computed(
   () => sheetPreviewQuery.data.value?.totalElements ?? totalEventElements.value,
 )
@@ -1105,6 +1182,8 @@ function addQueryList(
           :key="event.itemId"
           :event="event"
           @open="router.push({ name: 'explore-event-detail', params: { eventId: event.itemId } })"
+          @add-to-trip="addEventToTrip"
+          @find-buddy="openAppointmentList($event, 'EVENT')"
         />
       </div>
       <AppPagination
@@ -1166,6 +1245,8 @@ function addQueryList(
           :key="place.itemId"
           :place="place"
           @open="openPlaceDetail"
+          @add-to-trip="addPlaceToTrip"
+          @find-buddy="openAppointmentList($event, 'PLACE')"
         />
       </div>
 
@@ -1199,6 +1280,32 @@ function addQueryList(
       @close="closeSheet"
       @change="previewPlaceSheet"
       @apply="applyPlaceSheet"
+    />
+
+    <JourneyDateSheet
+      v-if="journeyDateSheetOpen && journeyDateRange && journeyAddTarget"
+      :item-title="journeyAddTarget.title"
+      :item-location="journeyAddTarget.location || undefined"
+      :start-date="journeyDateRange.start"
+      :end-date="journeyDateRange.end"
+      :initial-date="journeyDate"
+      :loading="journeyAddPending"
+      :error-message="journeyAddError ? t(journeyAddError) : null"
+      @close="closeJourneyDateSheet"
+      @confirm="confirmJourneyDate"
+    />
+
+    <JourneySelectSheet
+      v-if="journeySelectSheetOpen"
+      :journeys="journeys"
+      :item-start-date="itemPeriod.startDate"
+      :item-end-date="itemPeriod.endDate"
+      :selected-journey-id="selectedJourneyId"
+      :loading="journeyListQuery.isPending.value"
+      :error-message="journeyListQuery.isError.value ? t('explore.journeySelect.error') : null"
+      @close="closeJourneySelectSheet"
+      @select="selectJourney"
+      @create-journey="goToCreateJourney"
     />
   </section>
 </template>
