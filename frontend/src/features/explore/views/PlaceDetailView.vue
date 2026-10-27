@@ -59,7 +59,6 @@ function toggleSaved(): void {
  * 밖까지 열려 확정한 뒤에야 `JOURNEY-007`로 실패했다.
  */
 const {
-  journeyAdded,
   journeySelectSheetOpen,
   journeyDateSheetOpen,
   journeyDate,
@@ -472,11 +471,7 @@ onMounted(resumeAfterJourneyCreate)
             class="whitespace-nowrap text-on-paper"
             @click="openJourneySelectSheet"
           >
-            {{
-              journeyAdded
-                ? t('explore.placeDetail.addedToJourney')
-                : t('explore.placeDetail.addToJourney')
-            }}
+            {{ t('explore.placeDetail.addToJourney') }}
           </AppButton>
         </div>
         <div class="min-w-0 flex-1">

@@ -332,7 +332,7 @@ describe('EventDetailView', () => {
     expect(showToast).toHaveBeenCalledWith('We could not share this event. Please try again.')
   })
 
-  it('adds the Event to the selected journey for the chosen date', async () => {
+  it('stays on the Event and shows a toast after adding from a plain entry', async () => {
     const { wrapper, router } = await mountView()
 
     await wrapper
@@ -359,7 +359,11 @@ describe('EventDetailView', () => {
       itemId: 42,
       visitDate: expect.any(String),
     })
-    expect(router.currentRoute.value.name).toBe('journey-detail')
+    expect(router.currentRoute.value.name).toBe('explore-event-detail')
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/^Added to Seoul weekend on /))
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Add to journey')).toBe(
+      true,
+    )
   })
 
   it('keeps the last journey selection instead of restoring the stale query', async () => {
@@ -423,6 +427,36 @@ describe('EventDetailView', () => {
     expect(addJourneyItem).toHaveBeenCalledWith(7, { itemId: 42, visitDate: CARRIED_DATE })
     expect(router.currentRoute.value.name).toBe('journey-detail')
     expect(router.currentRoute.value.params.tripId).toBe('7')
+  })
+
+  it('stays on the Event when a different journey replaces the carried one', async () => {
+    seedReturnContext()
+    const { wrapper, router } = await mountView('/explore/events/42', [
+      ...journeys,
+      { tripId: 8, title: 'Busan trip', startDate: '2026-08-10', endDate: '2026-08-12' },
+    ])
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add to journey')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Busan trip'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Add to'))
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(addJourneyItem).toHaveBeenCalledWith(8, expect.objectContaining({ itemId: 42 }))
+    expect(router.currentRoute.value.name).toBe('explore-event-detail')
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/^Added to Busan trip on /))
   })
 
   it('spends the carried date once so a later direct entry does not reuse it', async () => {

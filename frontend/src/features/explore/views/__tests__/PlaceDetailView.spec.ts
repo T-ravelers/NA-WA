@@ -336,7 +336,7 @@ describe('PlaceDetailView', () => {
     expect(fetchJourneys).toHaveBeenCalledOnce()
   })
 
-  it('adds the Place to the selected journey for the chosen date', async () => {
+  it('stays on the Place and shows a toast after adding from a plain entry', async () => {
     const { wrapper, router } = await mountView()
 
     await wrapper
@@ -363,7 +363,8 @@ describe('PlaceDetailView', () => {
       itemId: 42,
       visitDate: expect.any(String),
     })
-    expect(router.currentRoute.value.name).toBe('journey-detail')
+    expect(router.currentRoute.value.name).toBe('explore-place-detail')
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/^Added to Seoul weekend on /))
   })
 
   it('keeps the last journey selection instead of restoring the stale query', async () => {

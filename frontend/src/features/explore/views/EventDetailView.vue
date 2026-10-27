@@ -61,7 +61,6 @@ const saved = computed(() => event.value?.saved ?? false)
  * 응답이 무엇을 주든 이 값을 기준으로 삼는다.
  */
 const {
-  journeyAdded,
   journeySelectSheetOpen,
   journeyDateSheetOpen,
   journeyDate,
@@ -521,9 +520,7 @@ function retry(): void {
             class="whitespace-nowrap text-on-paper"
             @click="openJourneySelectSheet"
           >
-            {{
-              journeyAdded ? t('explore.detail.addedToJourney') : t('explore.detail.addToJourney')
-            }}
+            {{ t('explore.detail.addToJourney') }}
           </AppButton>
         </div>
         <div class="min-w-0 flex-1">

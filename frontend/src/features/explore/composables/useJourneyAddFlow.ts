@@ -2,7 +2,9 @@ import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
+import { formatCalendarDate } from '@/shared/lib/datetime'
 import { intersectItemJourneyPeriod } from '@/shared/lib/journeyPeriod'
+import { showToast } from '@/shared/ui/toast'
 
 import { useExploreReturnContextStore } from '../model/exploreReturnContext'
 import { journeyAddErrorMessageKey } from '../model/journeyAddErrors'
@@ -46,7 +48,6 @@ export function useJourneyAddFlow({ item, createJourneyReturn }: JourneyAddFlowO
     useExploreJourneyIntegration()
   const returnContext = useExploreReturnContextStore()
 
-  const journeyAdded = ref(false)
   const journeySelectSheetOpen = ref(false)
   const journeyDateSheetOpen = ref(false)
   const journeyDate = ref<string | null>(null)
@@ -173,15 +174,36 @@ export function useJourneyAddFlow({ item, createJourneyReturn }: JourneyAddFlowO
       })
       returnContext.setJourneyId(journeyId)
       journeyDate.value = date
-      journeyAdded.value = true
       journeyDateSheetOpen.value = false
+      /*
+       * 여정의 그날을 채우러 들어온 사람은 담는 것으로 할 일이 끝나 그 여정으로 돌려보낸다.
+       * 하단 탭으로 들어와 둘러보던 사람은 그 자리에 둔다 — 담을 때마다 여정 상세로 보내면
+       * 여러 곳을 연달아 담으려고 매번 탐색으로 되돌아와야 한다(#584).
+       *
+       * 담겼다는 표시를 버튼에 남기지 않고 토스트로만 알린다. 같은 항목을 다른 여정이나
+       * 다른 날에도 담을 수 있어서, 버튼이 "담김"이 되면 어디에 담겼다는 뜻인지 모호하다.
+       */
       const destination = returnContext.consumeReturn()
-      await router.push(destination ?? { name: 'journey-detail', params: { tripId: journeyId } })
+      if (destination !== null) {
+        await router.push(destination)
+        return
+      }
+      showAddedToast(journeyId, date)
     } catch (error) {
       journeyAddError.value = journeyAddErrorMessageKey(error, hasMessage)
     } finally {
       journeyAddPending.value = false
     }
+  }
+
+  function showAddedToast(journeyId: number, date: string): void {
+    const formattedDate = formatCalendarDate(date, i18n.locale.value)
+    const journey = journeys.value.find((candidate) => candidate.tripId === journeyId)
+    showToast(
+      journey
+        ? i18n.t('explore.journeyDate.added', { journey: journey.title, date: formattedDate })
+        : i18n.t('explore.journeyDate.addedWithoutJourney', { date: formattedDate }),
+    )
   }
 
   /**
@@ -217,7 +239,6 @@ export function useJourneyAddFlow({ item, createJourneyReturn }: JourneyAddFlowO
   }
 
   return {
-    journeyAdded,
     journeySelectSheetOpen,
     journeyDateSheetOpen,
     journeyDate,
