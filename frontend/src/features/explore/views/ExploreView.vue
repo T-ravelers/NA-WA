@@ -31,6 +31,12 @@ import {
   type EventSearchFilters,
   type EventSort,
 } from '../model/eventExplore'
+import {
+  FROM_EXPLORE_KEY,
+  JOURNEY_ADD_ITEM_ID_KEY,
+  JOURNEY_ADD_ITEM_TYPE_KEY,
+  LIST_SCROLL_STORAGE_KEY,
+} from '../model/exploreCardReturn'
 import { resolveExploreFilterEntry } from '../model/exploreFilterEntry'
 import { useExploreFilterMemoryStore } from '../model/exploreFilterMemory'
 import {
@@ -202,13 +208,6 @@ type JourneyAddItemType = 'EVENT' | 'PLACE'
 const journeyAddTarget = ref<
   (JourneyAddItem & { itemType: JourneyAddItemType; title: string; location: string }) | null
 >(null)
-
-/*
- * 여정을 만들러 나갈 때 어느 카드를 담던 중이었는지 주소에 싣는다. 목록에는 카드가 여러
- * 장이라 상세 화면처럼 route param으로 알 수 없다. 돌아오면 읽고 지운다.
- */
-const JOURNEY_ADD_ITEM_ID_KEY = 'journeyAddItemId'
-const JOURNEY_ADD_ITEM_TYPE_KEY = 'journeyAddItemType'
 const {
   journeySelectSheetOpen,
   journeyDateSheetOpen,
@@ -348,13 +347,49 @@ onMounted(() => {
 })
 
 /**
- * 상세를 거치지 않고 약속 목록으로 간다. 돌아올 곳을 함께 실어, 그쪽의 뒤로 가기가 이 목록으로
- * 되감기게 한다. 싣지 않으면 열어 본 적 없는 상세로 간다.
+ * 상세를 거치지 않고 약속 목록으로 간다. 탐색에서 왔다는 표시를 실어, 그쪽의 뒤로 가기가 이
+ * 목록으로 되감기게 한다. 싣지 않으면 열어 본 적 없는 상세로 간다.
+ *
+ * 보던 스크롤 위치도 남긴다. 돌아오면 이 화면이 새로 만들어지고 라우터에 스크롤 복원이 없어
+ * 그대로 두면 다른 화면이 남긴 위치에서 시작한다.
  */
 function openAppointmentList(itemId: number, itemType: JourneyAddItemType): void {
+  try {
+    sessionStorage.setItem(LIST_SCROLL_STORAGE_KEY, String(Math.round(window.scrollY)))
+  } catch {
+    // 저장소를 못 쓰면 스크롤만 이어지지 않는다. 이동은 그대로 한다.
+  }
   void router.push({
     name: 'appointment-list',
-    query: { itemId: String(itemId), itemType, returnRouteName: 'explore' },
+    query: { itemId: String(itemId), itemType, [FROM_EXPLORE_KEY]: '1' },
+  })
+}
+
+/** 남겨 둔 스크롤 위치를 한 번 읽고 지운다. 다른 길로 돌아온 진입에 남지 않게 한다. */
+function takeSavedListScroll(): number | null {
+  try {
+    const saved = sessionStorage.getItem(LIST_SCROLL_STORAGE_KEY)
+    sessionStorage.removeItem(LIST_SCROLL_STORAGE_KEY)
+    const top = Number(saved)
+    return saved !== null && Number.isFinite(top) && top > 0 ? top : null
+  } catch {
+    return null
+  }
+}
+
+/** 지금 탭의 목록이 그려진 뒤에 스크롤을 옮긴다. 먼저 옮기면 짧은 화면에서 맨 위로 잘린다. */
+function restoreListScroll(top: number): void {
+  const isReady = () => !(selectedTab.value === 'places' ? placeQuery : eventQuery).isPending.value
+  const apply = () => void nextTick(() => window.scrollTo({ top, behavior: 'auto' }))
+
+  if (isReady()) {
+    apply()
+    return
+  }
+  const stop = watch(isReady, (ready) => {
+    if (!ready) return
+    stop()
+    apply()
   })
 }
 const sheetResultCount = computed(
@@ -652,7 +687,13 @@ onBeforeRouteUpdate((to) => {
  * `startsOver`가 꺼져 있어 보던 자리에 그대로 남는다.
  */
 onMounted(() => {
-  if (filterMemory.consumeStartsOver()) scrollToListTop('auto')
+  const savedScroll = takeSavedListScroll()
+  if (filterMemory.consumeStartsOver()) {
+    scrollToListTop('auto')
+    return
+  }
+  // 카드에서 연 약속 목록을 보고 돌아온 진입이다(`routes.ts`가 처음부터 보지 않게 둔다).
+  if (savedScroll !== null) restoreListScroll(savedScroll)
 })
 
 watch(

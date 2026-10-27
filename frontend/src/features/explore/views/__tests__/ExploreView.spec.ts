@@ -516,6 +516,8 @@ async function mountRoutedView(path = '/explore') {
         route.name === 'explore' ? route : ({ ...route, component: Stub } as RouteRecordRaw),
       ),
       { path: '/appointments', name: 'appointments', component: Stub },
+      { path: '/appointment-list', name: 'appointment-list', component: Stub },
+      { path: '/journeys/new', name: 'journey-create', component: Stub },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -878,7 +880,94 @@ describe('ExploreView card actions', () => {
 
     expect(push).toHaveBeenCalledWith({
       name: 'appointment-list',
-      query: { itemId, itemType, returnRouteName: 'explore' },
+      query: { itemId, itemType, fromExplore: '1' },
     })
+    // 돌아왔을 때 보던 자리로 옮기려고 떠나기 전 스크롤을 남긴다.
+    expect(sessionStorage.getItem('nawa.explore.listScrollBeforeBuddy')).toBe('0')
+  })
+})
+
+/*
+ * 목록 카드가 다른 feature 화면에 들렀다 돌아오는 진입. 진짜 탐색 라우트 가드를 거쳐야
+ * "밖에서 새로 들어왔다"는 판단이 드러나므로 RouterView로 띄운다(#585 리뷰).
+ */
+describe('ExploreView card round trips through the Explore route guards', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    sessionStorage.clear()
+    scrollToMock.mockReset()
+    vi.stubGlobal('scrollTo', scrollToMock)
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
+    fetchEventList.mockReset()
+    fetchPlaceList.mockReset()
+    fetchEventDetail.mockReset()
+    fetchEventDetail.mockRejectedValue(new Error('not needed here'))
+    fetchEventList.mockResolvedValue(EMPTY_PAGE)
+    fetchPlaceList.mockResolvedValue(EMPTY_PAGE)
+  })
+
+  it('keeps the Journey date when a card comes back from creating a journey', async () => {
+    const { router } = await mountRoutedView(
+      '/explore?journeyId=7&startDate=2026-08-11&endDate=2026-08-11',
+    )
+    /* 필터를 바꾸면 주소에서 journeyId가 빠지고 날짜는 저장된 맥락에만 남는다. */
+    await router.push('/explore?eventKinds=FESTIVAL')
+    await flushPromises()
+
+    const cardMarks = {
+      eventKinds: 'FESTIVAL',
+      journeyAddItemId: '301',
+      journeyAddItemType: 'EVENT',
+      openJourneySelect: '1',
+    }
+    await router.replace({
+      name: 'journey-create',
+      query: { ...cardMarks, returnRouteName: 'explore' },
+    })
+    await flushPromises()
+    /* 여정 생성을 취소하면 규약 key만 빼고 나머지 query를 그대로 돌려준다. */
+    await router.replace({ name: 'explore', query: cardMarks })
+    await flushPromises()
+
+    expect(JSON.parse(sessionStorage.getItem('nawa.explore.returnContext') ?? 'null')).toEqual({
+      journeyId: 7,
+      visitDate: '2026-08-11',
+      returnTo: { name: 'journey-detail', params: { tripId: '7' } },
+    })
+  })
+
+  it('goes back to where the list was when it returns from the buddy list', async () => {
+    const { router } = await mountRoutedView('/explore?eventKinds=FESTIVAL')
+    sessionStorage.setItem('nawa.explore.listScrollBeforeBuddy', '640')
+    scrollToMock.mockReset()
+
+    await router.push({
+      name: 'appointment-list',
+      query: { itemId: '301', itemType: 'EVENT', fromExplore: '1' },
+    })
+    await flushPromises()
+    await router.push('/explore?eventKinds=FESTIVAL')
+    await flushPromises()
+
+    expect(scrollToMock).not.toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+    expect(scrollToMock).toHaveBeenCalledWith({ top: 640, behavior: 'auto' })
+    expect(sessionStorage.getItem('nawa.explore.listScrollBeforeBuddy')).toBeNull()
+  })
+
+  it('still starts over when the buddy list was not opened from a card', async () => {
+    const { router } = await mountRoutedView('/explore?eventKinds=FESTIVAL')
+    sessionStorage.setItem('nawa.explore.listScrollBeforeBuddy', '640')
+    scrollToMock.mockReset()
+
+    await router.push({ name: 'appointment-list', query: { itemId: '301', itemType: 'EVENT' } })
+    await flushPromises()
+    await router.push('/explore?eventKinds=FESTIVAL')
+    await flushPromises()
+
+    expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+    expect(scrollToMock).not.toHaveBeenCalledWith({ top: 640, behavior: 'auto' })
   })
 })

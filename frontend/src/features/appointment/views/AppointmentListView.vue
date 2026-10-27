@@ -3,8 +3,6 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
-import { readReturnParams, readReturnRouteName } from '@/shared/lib/returnRoute'
-
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppPagination from '@/shared/ui/AppPagination.vue'
 import StateEmpty from '@/shared/ui/StateEmpty.vue'
@@ -129,15 +127,14 @@ function goBack(): void {
   /*
    * 탐색 목록의 카드에서 바로 온 경우다. 상세를 열지 않았으니 아래처럼 상세로 보내면 처음
    * 보는 화면이 뜬다. 보낸 쪽이 자리를 지키고 `push`로 보냈으므로 되감아 돌려준다 — 그래야
-   * 보던 탭·필터·스크롤이 그대로다. 되감을 기록이 없을 때(딥링크)만 그 화면으로 보낸다.
+   * 보던 탭·필터가 그대로다. 되감을 기록이 없을 때(딥링크)만 탐색으로 보낸다.
    */
-  const returnTo = returnRouteName.value
-  if (returnTo !== null) {
+  if (cameFromExploreList.value) {
     if (window.history.length > 1) {
       router.back()
       return
     }
-    void router.push({ name: returnTo, params: readReturnParams(route.query) })
+    void router.push({ name: 'explore' })
     return
   }
 
@@ -249,11 +246,17 @@ watch(
  * 주기마다 카드 수만큼 요청이 나간다. 그래서 미리 막지 않고 서버 판정에 맡긴다.
  * 이미 참여한 약속이면 서버가 APPOINTMENT-003으로 돌려보내고 시트가 그 이유를 보여준다.
  */
-const returnRouteName = computed(() => readReturnRouteName(route.query, router))
+/*
+ * 탐색 목록의 카드에서 온 표시. 공용 복귀 키(`returnRouteName`)로 나르면 아래 참여 흐름이
+ * 여정 생성·충전을 다녀올 때 그 키를 이 화면 이름으로 덮어쓰고, 돌아오면 지운다. 그래서 이
+ * 화면이 소유하는 키로 따로 나른다. 탐색은 같은 글자를 `FROM_EXPLORE_KEY`로 쓴다.
+ */
+const FROM_EXPLORE_KEY = 'fromExplore'
+const cameFromExploreList = computed(() => route.query[FROM_EXPLORE_KEY] === '1')
 
 const listQuery = computed(() => ({
-  // 탐색 목록에서 온 표시. 빠지면 참여하러 나갔다 돌아온 뒤 뒤로 가기가 상세로 간다.
-  ...(returnRouteName.value === null ? {} : { returnRouteName: returnRouteName.value }),
+  // 빠지면 참여하러 나갔다 돌아온 뒤 뒤로 가기가 열어 본 적 없는 상세로 간다.
+  ...(cameFromExploreList.value ? { [FROM_EXPLORE_KEY]: '1' } : {}),
   ...(itemId.value === undefined ? {} : { itemId: String(itemId.value) }),
   ...(itemType.value === undefined ? {} : { itemType: itemType.value }),
   // 고르던 카드가 있는 페이지로 돌아와야 한다. 첫 페이지로 오면 그 카드가 보이지 않는다.
