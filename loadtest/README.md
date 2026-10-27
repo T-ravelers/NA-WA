@@ -302,14 +302,18 @@ RUNS=1 VUS=8920 REVIEWS=10000 ./loadtest/seed.sh
 k6 run -e LOADTEST_LOGIN_SECRET="$LOADTEST_LOGIN_SECRET" -e VUS=10 -e DURATION=30s \
   loadtest/k6/scenario4-member-profile.js
 
-# 3. VU 단계(10·50·100)마다 3회 — 매번 쿼리 통계를 비우고 재고 확인한다
+# 3. VU 단계(10·50·100)마다 3회 — 매번 쿼리 통계를 비우고, 재고, 확인하고, 병목 지표를 읽는다
 compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql mysql -uroot \
   -e "TRUNCATE TABLE performance_schema.events_statements_summary_by_digest"
+start=$(date +%s)
 k6 run --out influxdb=http://127.0.0.1:8086/k6 \
   -e LOADTEST_LOGIN_SECRET="$LOADTEST_LOGIN_SECRET" -e VUS=50 -e DURATION=60s \
   loadtest/k6/scenario4-member-profile.js
+end=$(date +%s)
 compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
   mysql -uroot "$MYSQL_DATABASE" < loadtest/verify-member-profile.sql
+sleep 6  # 마지막 스크레이프(5초 주기)가 구간에 들어오게
+./loadtest/bottleneck-metrics.sh "$start" "$end"
 
 # 4. 규모마다 한 번, 부하가 끝난 뒤 — 집계 쿼리의 실제 계획과 읽은 행 수
 ./loadtest/explain-member-profile.sh
@@ -330,6 +334,11 @@ compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
 `actual ... rows=`가 그 단계가 실제로 읽은 행 수입니다. performance_schema의
 `SUM_ROWS_EXAMINED`는 쓰지 않습니다 — 1만 건 측정에서 계획이 같은데도 값이 실행 도중 약
 4만에서 약 1만으로 바뀌었습니다.
+
+**병목 지표는 `bottleneck-metrics.sh`로 읽습니다.** k6 실행 앞뒤에 잰 시각을 넘기면
+Prometheus(위 실행 절차의 4단계 「관측 스택 기동」)에서 그 구간의 값을 꺼냅니다. HikariCP 대기와 Tomcat
+바쁜 스레드는 구간 최댓값이고, GC는 구간 동안의 정지 시간 합과 횟수입니다. 횟수는
+`increase()`가 구간 끝을 외삽해 소수로 나오므로 반올림해 적습니다.
 
 기록은 이슈 댓글과 PR 본문에 표로 남깁니다. 칸은 커밋 SHA, 후기 규모, VU 단계, 달성
 TPS, `profile_duration`의 p95·p99, 에러율, `hikaricp_connections_pending`,
