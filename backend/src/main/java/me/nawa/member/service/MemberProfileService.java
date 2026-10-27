@@ -15,5 +15,6 @@ public interface MemberProfileService {
 
     MemberProfileResponse registerAsMerchant(long memberId, MerchantRegisterRequest request);
 
-    MemberAppointmentProfileResponse getAppointmentProfile(long memberId);
+    /** 본인은 항상, 타인은 같은 약속의 ACTIVE 참여자일 때만 조회한다(#173). */
+    MemberAppointmentProfileResponse getAppointmentProfile(long viewerId, long memberId);
 }

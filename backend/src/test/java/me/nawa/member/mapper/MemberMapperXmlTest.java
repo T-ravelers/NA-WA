@@ -57,6 +57,13 @@ class MemberMapperXmlTest {
     }
 
     @Test
+    void mapperXml_parsesExistsSharedAppointmentStatement() throws Exception {
+        assertTrue(parsedConfiguration().hasStatement(
+                "me.nawa.member.mapper.MemberMapper.existsSharedAppointment"
+        ));
+    }
+
+    @Test
     void mapperXml_parsesUpdateProfileStatement() throws Exception {
         assertTrue(parsedConfiguration().hasStatement(
                 "me.nawa.member.mapper.MemberMapper.updateProfile"

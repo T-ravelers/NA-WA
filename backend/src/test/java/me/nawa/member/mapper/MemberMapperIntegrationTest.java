@@ -6,6 +6,7 @@ import me.nawa.auth.mapper.OAuthAccountMapper;
 import me.nawa.auth.oauth.account.OAuthMemberInsert;
 import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.member.domain.MemberProfile;
+import me.nawa.member.dto.MemberAppointmentProfileResponse;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -235,6 +236,106 @@ class MemberMapperIntegrationTest {
 
             assertEquals(0, memberMapper.markAsMerchant(memberId, "○○ 카페"));
         });
+    }
+
+    @Test
+    void existsSharedAppointment_requiresBothActiveInVisibleAppointment() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long viewer = insertMember("조회하는 회원");
+            long mate = insertMember("같은 약속 회원");
+            long stranger = insertMember("다른 약속 회원");
+            long left = insertMember("나간 회원");
+            long pending = insertMember("결제 전 회원");
+            long itemId = insertVisibleEventItem(viewer);
+
+            long recruiting = insertAppointment(itemId, viewer, "RECRUITING");
+            insertMembership(recruiting, viewer, "ACTIVE");
+            insertMembership(recruiting, mate, "ACTIVE");
+            insertMembership(recruiting, left, "LEFT");
+            insertMembership(recruiting, pending, "PENDING");
+            long other = insertAppointment(itemId, stranger, "RECRUITING");
+            insertMembership(other, stranger, "ACTIVE");
+
+            assertTrue(memberMapper.existsSharedAppointment(viewer, mate));
+            assertTrue(memberMapper.existsSharedAppointment(mate, viewer));
+            assertFalse(memberMapper.existsSharedAppointment(viewer, stranger));
+            assertFalse(memberMapper.existsSharedAppointment(viewer, left));
+            assertFalse(memberMapper.existsSharedAppointment(left, viewer));
+            assertFalse(memberMapper.existsSharedAppointment(viewer, pending));
+        });
+    }
+
+    @Test
+    void existsSharedAppointment_ignoresCancelledAndPaymentPendingAppointments() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long viewer = insertMember("조회하는 회원");
+            long mate = insertMember("같은 약속 회원");
+            long itemId = insertVisibleEventItem(viewer);
+
+            for (String appointmentStatus : new String[] {"CANCELLED", "PAYMENT_PENDING"}) {
+                long appointmentId = insertAppointment(itemId, viewer, appointmentStatus);
+                insertMembership(appointmentId, viewer, "ACTIVE");
+                insertMembership(appointmentId, mate, "ACTIVE");
+            }
+
+            assertFalse(memberMapper.existsSharedAppointment(viewer, mate));
+        });
+    }
+
+    /** 출석 이력이 없는 회원도 noShowCount가 0으로, completionRate가 null로 매핑된다. */
+    @Test
+    void findAppointmentProfile_mapsEmptyAttendance() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long memberId = insertMember("이력 없는 회원");
+
+            MemberAppointmentProfileResponse profile =
+                    memberMapper.findAppointmentProfile(memberId);
+
+            assertEquals(memberId, profile.getMemberId());
+            assertNull(profile.getCompletionRate());
+            assertEquals(0, profile.getNoShowCount());
+            assertNull(profile.getAverageRating());
+            assertEquals(0, profile.getReviewCount());
+        });
+    }
+
+    /** chk_explore_items_review — APPROVED는 검수자·검수 시각이 필수라 함께 넣는다. */
+    private long insertVisibleEventItem(long reviewerId) {
+        jdbcTemplate.update(
+                "INSERT INTO explore_items "
+                        + "(item_type, approval_status, visibility_status, "
+                        + "reviewed_by, reviewed_at) "
+                        + "VALUES ('EVENT', 'APPROVED', 'VISIBLE', ?, CURRENT_TIMESTAMP)",
+                reviewerId);
+        return lastInsertId();
+    }
+
+    private long insertAppointment(long itemId, long hostMemberId, String appointmentStatus) {
+        jdbcTemplate.update(
+                "INSERT INTO appointments "
+                        + "(item_id, host_member_id, language_code, appointment_name, "
+                        + "max_members, deposit_amount, "
+                        + "appointment_status, activity_start_at, activity_end_at) "
+                        + "VALUES (?, ?, 'en', '프로필 통합 테스트 약속', 5, 10000, ?, "
+                        + "'2026-08-10 12:00:00', '2026-08-10 14:00:00')",
+                itemId, hostMemberId, appointmentStatus);
+        return lastInsertId();
+    }
+
+    /** chk_appointment_members_membership — LEFT만 나간 시각이 필수다. */
+    private void insertMembership(long appointmentId, long memberId, String membershipStatus) {
+        jdbcTemplate.update(
+                "INSERT INTO appointment_members "
+                        + "(appointment_id, member_id, membership_status, left_at) "
+                        + "VALUES (?, ?, ?, IF(? = 'LEFT', CURRENT_TIMESTAMP, NULL))",
+                appointmentId, memberId, membershipStatus, membershipStatus);
+    }
+
+    private long lastInsertId() {
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
     private long insertMember(String displayName) {

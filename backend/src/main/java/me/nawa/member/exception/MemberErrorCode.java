@@ -60,6 +60,12 @@ public enum MemberErrorCode implements ErrorCode {
             HttpStatus.CONFLICT,
             "MEMBER-009",
             "이미 가맹점으로 등록된 계정입니다."
+    ),
+
+    APPOINTMENT_PROFILE_FORBIDDEN(
+            HttpStatus.FORBIDDEN,
+            "MEMBER-010",
+            "같은 약속에 참여한 회원의 프로필만 볼 수 있습니다."
     );
 
     private final HttpStatus status;

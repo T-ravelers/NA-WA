@@ -15,6 +15,11 @@ public interface MemberMapper {
 
     MemberAppointmentProfileResponse findAppointmentProfile(@Param("memberId") long memberId);
 
+    boolean existsSharedAppointment(
+            @Param("viewerId") long viewerId,
+            @Param("memberId") long memberId
+    );
+
     boolean existsActiveCurrency(@Param("currencyCode") String currencyCode);
 
     int updateProfile(

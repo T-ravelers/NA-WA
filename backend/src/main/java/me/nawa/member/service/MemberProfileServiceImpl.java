@@ -46,9 +46,22 @@ public class MemberProfileServiceImpl implements MemberProfileService {
 
     @Override
     @Transactional(readOnly = true)
-    public MemberAppointmentProfileResponse getAppointmentProfile(long memberId) {
-        loadActiveProfile(memberId);
-        return memberMapper.findAppointmentProfile(memberId);
+    public MemberAppointmentProfileResponse getAppointmentProfile(long viewerId, long memberId) {
+        if (viewerId == memberId) {
+            loadActiveProfile(memberId);
+            return memberMapper.findAppointmentProfile(memberId);
+        }
+
+        // 대상의 상태는 요청자의 인증 문제가 아니다. AUTH-016·017로 답하면 프론트가
+        // 요청자 자신의 계정 문제로 읽으므로, 보이지 않는 회원은 모두 404로 묶는다.
+        MemberProfile target = memberMapper.findProfile(memberId);
+        if (target == null || target.isDeleted() || !"ACTIVE".equals(target.getMemberStatus())) {
+            throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND);
+        }
+        if (!memberMapper.existsSharedAppointment(viewerId, memberId)) {
+            throw new BusinessException(MemberErrorCode.APPOINTMENT_PROFILE_FORBIDDEN);
+        }
+        return memberMapper.findAppointmentProfile(memberId).withoutAttendance();
     }
 
     @Override
