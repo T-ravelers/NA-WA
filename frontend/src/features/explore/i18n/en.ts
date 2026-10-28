@@ -245,6 +245,7 @@ export default {
     unsavePlace: 'Remove place from saved',
     addItemToTrip: 'Add {name} to trip',
     findBuddyForItem: 'Find buddy for {name}',
+    favoriteCount: '{count} people saved this',
     saveFailed: 'Could not update your saved list. Please try again.',
     saveRequiresLogin: 'Sign in to save items.',
     placeResultCount: '{count} place | {count} places',

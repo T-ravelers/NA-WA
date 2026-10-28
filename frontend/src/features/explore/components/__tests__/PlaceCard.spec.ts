@@ -69,10 +69,45 @@ describe('PlaceCard', () => {
       expect.arrayContaining([
         'transition-transform',
         'motion-reduce:transition-none',
-        'active:scale-[0.98]',
-        'motion-reduce:active:scale-100',
+        'motion-safe:[&:active:not(:has([data-card-action]:active))]:scale-[0.98]',
       ]),
     )
+  })
+
+  /*
+   * 카드 전체가 상세로 가는 자리라 하트와 두 버튼은 클릭이 카드로 올라가지 않게 막고,
+   * 누를 때 카드가 줄어들지 않도록 `data-card-action`으로 표시한다(#584).
+   */
+  it('keeps the heart from opening the detail', async () => {
+    const wrapper = mountCard()
+
+    await wrapper.get('button[aria-pressed]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.emitted('open')).toBeUndefined()
+    expect(wrapper.get('button[aria-pressed]').element.closest('[data-card-action]')).not.toBeNull()
+  })
+
+  it('shows how many people saved the place next to the heart', () => {
+    const wrapper = mountCard({ favoriteCount: 12500 })
+    const heartColumn = wrapper.get('[data-card-action]')
+
+    expect(heartColumn.get('[aria-hidden="true"]:not(svg)').text()).toBe('12.5K')
+    expect(heartColumn.get('.sr-only').text()).toBe('12500 people saved this')
+  })
+
+  it('puts the heart in the photo column and the buttons in the text column', () => {
+    const wrapper = mountCard()
+    const [photoColumn, textColumn] = wrapper.get('[data-testid="place-card-body"]').element
+      .children
+
+    expect(photoColumn?.querySelector('button[aria-pressed]')).not.toBeNull()
+    expect(
+      textColumn?.querySelector('button[aria-label="Add Seongsu Onsil to trip"]'),
+    ).not.toBeNull()
+    expect(
+      textColumn?.querySelector('button[aria-label="Find buddy for Seongsu Onsil"]'),
+    ).not.toBeNull()
   })
 
   // 시안에는 기간 자리에 지역만 있다. 부제와 옵션 배지는 상세에서 본다.

@@ -250,6 +250,7 @@ export default {
     unsavePlace: '取消收藏地點',
     addItemToTrip: '將 {name} 加入旅程',
     findBuddyForItem: '為 {name} 尋找旅伴',
+    favoriteCount: '{count} 人收藏',
     saveFailed: '無法更新您的收藏清單，請再試一次。',
     saveRequiresLogin: '請登入後再收藏。',
     placeResultCount: '{count} 個地點 | {count} 個地點',

@@ -252,6 +252,7 @@ export default {
     unsavePlace: 'Bỏ lưu địa điểm',
     addItemToTrip: 'Thêm {name} vào hành trình',
     findBuddyForItem: 'Tìm bạn đồng hành cho {name}',
+    favoriteCount: '{count} người đã lưu',
     saveFailed: 'Chúng tôi không cập nhật được danh sách đã lưu. Vui lòng thử lại.',
     saveRequiresLogin: 'Đăng nhập để lưu mục này.',
     placeResultCount: '{count} địa điểm | {count} địa điểm',

@@ -251,6 +251,7 @@ export default {
     unsavePlace: 'スポットを保存から削除',
     addItemToTrip: '{name}を旅程に追加',
     findBuddyForItem: '{name}の同行者を探す',
+    favoriteCount: '{count}人が保存',
     saveFailed: '保存リストを更新できませんでした。もう一度お試しください。',
     saveRequiresLogin: '保存するにはログインしてください。',
     placeResultCount: 'スポット{count}件 | スポット{count}件',

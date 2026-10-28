@@ -36,6 +36,7 @@ const savedEvent: EventSummary = {
   startDate: '2026-08-01',
   endDate: '2026-08-31',
   isPermanent: false,
+  favoriteCount: 0,
   saved: true,
 }
 

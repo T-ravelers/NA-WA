@@ -78,6 +78,29 @@ describe('useExploreItemLikeMutation', () => {
     })
   })
 
+  // 하트만 차고 옆 숫자가 그대로면 내 찜이 빠진 것처럼 보인다. 상태가 바뀐 항목만 맞춘다.
+  it('moves the saved count together with the saved state', async () => {
+    unlikeExploreItem.mockResolvedValue({ saved: false })
+    const { queryClient, mutation } = setup()
+    const placeListKey = ['explore', 'places', 'list', { page: 0 }]
+    queryClient.setQueryData(placeListKey, {
+      content: [
+        { itemId: 42, saved: true, favoriteCount: 10 },
+        { itemId: 7, saved: true, favoriteCount: 3 },
+      ],
+    })
+
+    mutation.mutate({ itemId: 42, saved: false })
+    await flushPromises()
+
+    expect(queryClient.getQueryData(placeListKey)).toEqual({
+      content: [
+        { itemId: 42, saved: false, favoriteCount: 9 },
+        { itemId: 7, saved: true, favoriteCount: 3 },
+      ],
+    })
+  })
+
   it('invalidates saved-only lists because their membership changes', async () => {
     unlikeExploreItem.mockResolvedValue({ saved: false })
     const { queryClient, mutation } = setup()
