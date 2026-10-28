@@ -675,6 +675,32 @@ class EventMapperIntegrationTest {
         return request;
     }
 
+    /** 목록 카드의 하트 옆 숫자다(#584). Place 목록처럼 저장된 찜 수를 그대로 싣는다. */
+    @Test
+    void searchEvents_returnsFavoriteCount() {
+        long eventId = insertEvent(
+            "favorite-count",
+            today.minusDays(1),
+            today.plusDays(1),
+            "ONGOING"
+        );
+        jdbcTemplate.update(
+            "UPDATE event SET favorite_count = 1234 WHERE event_id = ?",
+            eventId
+        );
+
+        EventSearchRequest request = new EventSearchRequest();
+        request.setKeyword(marker + "-favorite-count");
+        request.setSize(20);
+
+        List<EventSummaryResponse> results = mapper.searchEvents(
+            request, 0, null, today
+        );
+
+        assertEquals(1, results.size());
+        assertEquals(1234, results.get(0).getFavoriteCount());
+    }
+
     private long insertMember(String displayName) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
