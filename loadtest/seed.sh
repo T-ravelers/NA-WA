@@ -14,15 +14,16 @@ payee_pool_size="${PAYEE_POOL_SIZE:-100}"
 # 회차분을 미리 깔아 둔다. k6는 RUN_INDEX로 자기 회차를 고른다.
 runs="${RUNS:-3}"
 
-if [[ ! ${vu_count} =~ ^[0-9]+$ ]] || ((vu_count < 1 || vu_count > 8920)); then
+# 앞자리 0은 bash 산술에서 8진수로 읽혀 범위 검사를 빠져나가므로 받지 않는다.
+if [[ ! ${vu_count} =~ ^(0|[1-9][0-9]{0,3})$ ]] || ((vu_count < 1 || vu_count > 8920)); then
   echo "VUS는 1~8920 정수여야 합니다: ${vu_count}" >&2
   exit 1
 fi
-if [[ ! ${payee_pool_size} =~ ^[0-9]+$ ]] || ((payee_pool_size < 1 || payee_pool_size > 100)); then
+if [[ ! ${payee_pool_size} =~ ^(0|[1-9][0-9]{0,2})$ ]] || ((payee_pool_size < 1 || payee_pool_size > 100)); then
   echo "PAYEE_POOL_SIZE는 1~100 정수여야 합니다: ${payee_pool_size}" >&2
   exit 1
 fi
-if [[ ! ${runs} =~ ^[0-9]+$ ]] || ((runs < 1 || runs > 20)); then
+if [[ ! ${runs} =~ ^(0|[1-9][0-9]?)$ ]] || ((runs < 1 || runs > 20)); then
   echo "RUNS는 1~20 정수여야 합니다: ${runs}" >&2
   exit 1
 fi
