@@ -109,11 +109,14 @@ function toggleSaved(): void {
     -->
     <article
       data-testid="event-card-body"
-      class="flex cursor-pointer transition-transform motion-reduce:transition-none motion-safe:[&:active:not(:has([data-card-action]:active))]:scale-[0.98]"
+      class="grid cursor-pointer grid-cols-[6rem_minmax(0,1fr)] grid-rows-[auto_auto] gap-y-2 transition-transform motion-reduce:transition-none motion-safe:[&:active:not(:has([data-card-action]:active))]:scale-[0.98]"
       @click="openEvent"
     >
-      <!-- 하트를 버튼 줄과 같은 높이에 두려고 이 칸은 카드 높이만큼 늘이고 하트를 맨 아래로 내린다. -->
-      <div class="flex w-24 shrink-0 flex-col items-start gap-2 p-3">
+      <!--
+        두 묶음은 카드의 윗줄(사진·글자)과 아랫줄(하트·버튼)을 함께 쓴다(subgrid). 좁은 화면에서
+        버튼 글자가 여러 줄로 꺾여 버튼이 커져도 하트가 그 줄의 가운데에 남는다(#585 리뷰).
+      -->
+      <div class="row-span-2 grid grid-rows-subgrid p-3">
         <!--
           `aspect-square`로 못박는다. `size-full`만 두면 높이를 글자 칸이 정해서 카드마다
           사진 비율이 달라지고, 자리표시 갈래(`aspect-square`)와도 모양이 어긋난다.
@@ -141,7 +144,7 @@ function toggleSaved(): void {
         -->
         <div
           data-card-action
-          class="-ml-[7px] mt-auto flex items-center"
+          class="-ml-[7px] flex items-center self-center"
           @click.stop
         >
           <IconOrb
@@ -171,64 +174,68 @@ function toggleSaved(): void {
         </div>
       </div>
 
-      <div class="flex min-w-0 flex-1 flex-col gap-1 py-3 pr-3">
-        <div class="flex min-w-0 items-center gap-2 text-micro">
-          <span class="flex min-w-0 items-center gap-1 truncate uppercase tracking-wide text-ink-2">
-            <CategoryDot :category="categoryKey" />
-            {{ categoryLabel }} · {{ kindLabel }}
-          </span>
-          <span
-            data-testid="event-status"
-            class="flex shrink-0 items-center gap-1.5 font-medium"
-            :class="statusStyle.text"
-          >
+      <div class="row-span-2 grid min-w-0 grid-rows-subgrid py-3 pr-3">
+        <div class="flex min-w-0 flex-col gap-1">
+          <div class="flex min-w-0 items-center gap-2 text-micro">
             <span
-              aria-hidden="true"
-              class="size-1.5 shrink-0 rounded-pill"
-              :class="statusStyle.dot"
-            />
-            {{ statusLabel }}
-          </span>
-        </div>
-        <h2 class="text-title-sm text-ink">
-          <!-- 카드가 이미 클릭을 받으므로 여기서 멈추지 않으면 두 번 연다. -->
-          <button
-            type="button"
-            class="line-clamp-2 text-left"
-            @click.stop="openEvent"
-          >
-            {{ event.title }}
-          </button>
-        </h2>
+              class="flex min-w-0 items-center gap-1 truncate uppercase tracking-wide text-ink-2"
+            >
+              <CategoryDot :category="categoryKey" />
+              {{ categoryLabel }} · {{ kindLabel }}
+            </span>
+            <span
+              data-testid="event-status"
+              class="flex shrink-0 items-center gap-1.5 font-medium"
+              :class="statusStyle.text"
+            >
+              <span
+                aria-hidden="true"
+                class="size-1.5 shrink-0 rounded-pill"
+                :class="statusStyle.dot"
+              />
+              {{ statusLabel }}
+            </span>
+          </div>
+          <h2 class="text-title-sm text-ink">
+            <!-- 카드가 이미 클릭을 받으므로 여기서 멈추지 않으면 두 번 연다. -->
+            <button
+              type="button"
+              class="line-clamp-2 text-left"
+              @click.stop="openEvent"
+            >
+              {{ event.title }}
+            </button>
+          </h2>
 
-        <span
-          v-if="periodLabel"
-          class="text-caption text-ink-3"
-          >{{ periodLabel }}</span
-        >
+          <span
+            v-if="periodLabel"
+            class="text-caption text-ink-3"
+            >{{ periodLabel }}</span
+          >
+        </div>
 
         <div
           data-card-action
-          class="mt-auto flex min-w-0 gap-2 pt-2"
+          class="flex min-w-0 gap-2 self-center"
           @click.stop
         >
-          <div class="min-w-0 flex-1">
+          <div class="flex min-w-0 flex-1">
             <AppButton
               block
               mini
-              class="whitespace-nowrap text-on-paper"
+              class="h-full whitespace-nowrap text-on-paper"
               :aria-label="t('explore.addItemToTrip', { name: event.title })"
               @click="emit('addToTrip', event.itemId)"
             >
               {{ t('explore.detail.addToJourney') }}
             </AppButton>
           </div>
-          <div class="min-w-0 flex-1">
+          <div class="flex min-w-0 flex-1">
             <AppButton
               block
               mini
               variant="secondary"
-              class="whitespace-nowrap border-success text-success"
+              class="h-full whitespace-nowrap border-success text-success"
               :aria-label="t('explore.findBuddyForItem', { name: event.title })"
               @click="emit('findBuddy', event.itemId)"
             >

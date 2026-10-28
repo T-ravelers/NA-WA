@@ -51,8 +51,10 @@ interface Props {
    * 서면 버튼이 내용보다 커 보인다는 시안 판단으로 줄였다(#584). **최소 터치 영역(44px)보다
    * 작다** — 화면의 주 동작에는 쓰지 않는다.
    *
-   * 글자는 더 줄이지 않고, 넘치면 두 줄로 꺾기만 한다. 12px에서 다시 75%로 줄이면 9px가 되어
-   * 읽히지 않는다. 34px 높이에 12px 두 줄이 들어간다.
+   * 글자는 더 줄이지 않고, 넘치면 꺾기만 한다. 12px에서 다시 75%로 줄이면 9px가 되어
+   * 읽히지 않는다. 34px는 **최소** 높이다 — 두 줄까지는 34px 안에 들어가지만, 좁은 화면
+   * (320px 베트남어 3줄, 280px 4줄)에서는 고정 높이면 글자가 버튼 밖으로 튀어나와 위아래
+   * 글자와 겹친다. 그때는 버튼이 줄 수만큼 늘어난다(#585 리뷰).
    * 다른 높이 옵션(`compact`·`dense`)보다 이긴다.
    */
   mini?: boolean
@@ -118,7 +120,7 @@ function handleClick(): void {
     :class="[
       VARIANT_CLASS[variant],
       mini ? 'text-caption font-semibold' : 'text-title-sm',
-      mini ? 'h-[34px]' : dense ? 'h-11' : compact ? 'h-12' : HEIGHT_CLASS[variant],
+      mini ? 'min-h-[34px]' : dense ? 'h-11' : compact ? 'h-12' : HEIGHT_CLASS[variant],
       block ? 'w-full' : '',
       compact || mini ? 'px-3' : 'px-6',
     ]"
