@@ -161,12 +161,12 @@ docker compose down
 
 ### 실행 환경 준비
 
-- Node.js `24.18.0`
+- Node.js `24.22.1`
 - pnpm `12.15.0`
 
 버전은 저장소 루트의 `.node-version`에 고정돼 있습니다. Node 버전 관리자로 fnm을
 사용한다면 아래를 따르세요. 다른 관리자(nvm, Volta)를 쓰거나 Node를 직접 설치했다면
-`24.18.0`이 잡히는지만 확인하면 됩니다.
+`24.22.1`이 잡히는지만 확인하면 됩니다.
 
 #### macOS
 
@@ -219,7 +219,7 @@ fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
 fnm install
 fnm use
 corepack enable pnpm
-node --version   # v24.18.0
+node --version   # v24.22.1
 pnpm --version   # 12.15.0
 ```
 

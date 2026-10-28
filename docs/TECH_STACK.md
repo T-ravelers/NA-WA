@@ -11,7 +11,7 @@
 
 | 영역         | 기술                                  | 책임                                  |
 | ------------ | ------------------------------------- | ------------------------------------- |
-| Runtime      | Node.js `24.18.0`, pnpm `12.15.0`     | pnpm workspace와 프론트엔드 도구 실행 |
+| Runtime      | Node.js `24.22.1`, pnpm `12.15.0`     | pnpm workspace와 프론트엔드 도구 실행 |
 | UI           | Vue `3.5`, TypeScript `6`, Vite `8`   | 모바일 우선 SPA                       |
 | Routing      | Vue Router `5`                        | 클라이언트 라우팅                     |
 | Server state | TanStack Vue Query `5`                | API 조회, 캐시와 mutation 상태        |
