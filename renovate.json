@@ -1,13 +1,16 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
+  "ignorePresets": [":semanticPrefixFixDepsChoreOthers"],
   "enabledManagers": ["npm"],
   "timezone": "Asia/Seoul",
   "schedule": ["before 9am on monday"],
   "minimumReleaseAge": "3 days",
   "dependencyDashboard": true,
   "automerge": false,
-  "commitMessagePrefix": "[Chore]",
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "frontend",
   "packageRules": [
     {
       "description": "Node·pnpm 버전은 AGENTS.md가 고정한다. 사람이 직접 올린다.",

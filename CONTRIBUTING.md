@@ -164,8 +164,9 @@ Renovate가 프론트엔드 의존성(npm) 업데이트를 PR로 올립니다. �
 - Node·pnpm 버전과 `@types/node`의 major는 Renovate가 올리지 않습니다.
   `AGENTS.md`가 고정한 값이라 사람이 직접 올립니다.
 - Renovate PR도 리뷰와 승인을 받은 뒤 병합합니다. automerge는 쓰지 않습니다.
-- PR 제목은 `[Chore] Update ...` 형식의 영어입니다. 5절의 한글 제목 규칙에서 이
-  PR만 예외로 둡니다.
+- 커밋 메시지와 PR 제목은 `chore(frontend): update ...` 형식의 영어입니다. 4절의
+  한글 요약 규칙과 5절의 `[Type] 한글 설명` 제목 규칙에서 이 PR만 예외로 둡니다.
+  커밋이 하나인 PR은 squash 병합 때 이 커밋 메시지가 그대로 `main` 이력에 남습니다.
 - CI가 실패해 코드를 고쳐야 하면 같은 브랜치에 커밋합니다. 그 뒤로 Renovate는 그
   브랜치를 자동으로 갱신하지 않습니다.
 - 지금 받지 않을 업데이트는 PR을 닫습니다. Renovate는 닫힌 업데이트를 다시 올리지
