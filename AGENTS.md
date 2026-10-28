@@ -25,6 +25,10 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
 버전은 `.node-version`과 `backend/build.gradle`에 고정돼 있습니다. 로컬에서 다른 버전이
 잡히면 도구가 원인 불명으로 실패하므로, 코드를 의심하기 전에 버전부터 확인합니다.
 
+`renovate.json`도 Node·pnpm 버전을 올리지 않게 막고 `@types/node`를 Node 24에 맞춰
+`<25`로 묶습니다. Node major를 올릴 때는 이 상한도 함께 고칩니다. 고치지 않으면
+`@types/node`가 옛 major에 조용히 멈춥니다.
+
 ## 작업 전에 반드시 확인할 것
 
 - **`main`에 직접 push하지 않습니다.** 흐름은 `Issue → 작업 브랜치 → main 대상 PR → 리뷰

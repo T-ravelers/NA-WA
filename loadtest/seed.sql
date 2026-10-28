@@ -340,6 +340,117 @@ WHERE am.appointment_id >= @hosted_base
   AND MOD(am.appointment_id - @hosted_base, @run_stride) = am.member_id - 900000
   AND am.member_id BETWEEN 900001 AND 900000 + @vu_count;
 
+-- 시나리오 4(공개 프로필 집계, #582)의 후기 데이터. REVIEWS를 준 시드에서만 깐다.
+--
+-- 다른 시나리오의 DB 크기를 바꾸지 않도록 기본값은 0이다. 두 규모(1만·10만)를
+-- 비교할 때는 볼륨을 초기화하고 REVIEWS만 바꿔 다시 시드한다.
+--
+-- 받는 쪽 회원 풀을 1,000명으로 고정한다. 후기가 늘면 회원 수가 아니라 회원 한
+-- 명이 받은 후기가 는다(1만이면 약 10건, 10만이면 약 100건). 집계 쿼리가 회원별
+-- 후기 수에 따라 얼마나 느려지는지가 #173 전환 기준이 재는 것이기 때문이다.
+--
+-- 회원 ID 계약:
+--   980001 ~ 980000 + @review_pool_size: 후기를 주고받는 회원
+-- 약속 ID 계약:
+--   4000000 + k: k번째 후기 약속. COMPLETED, 풀 회원 6명이 모두 ATTENDED
+SET @review_pool_size = 1000;
+SET @review_members_per_appointment = 6;
+-- 약속 하나에서 서로 쓰는 후기 수. 6명이면 6 × 5 = 30건이다.
+SET @reviews_per_appointment =
+    @review_members_per_appointment * (@review_members_per_appointment - 1);
+SET @review_appointment_count = CEIL(@review_count / @reviews_per_appointment);
+SET @review_base = 4000000;
+
+INSERT INTO members (
+    member_id, preferred_currency_code, display_name, preferred_language,
+    onboarding_completed_at, account_type
+)
+WITH RECURSIVE seq(n) AS (
+    SELECT 1 FROM DUAL WHERE @review_appointment_count > 0
+    UNION ALL SELECT n + 1 FROM seq WHERE n < @review_pool_size
+)
+SELECT 980000 + n, 'KRW', CONCAT('loadtest-reviewed-', n), 'en', CURRENT_TIMESTAMP, 'TRAVELER'
+FROM seq;
+
+-- 정원은 풀 회원 6명 + 프로필을 보는 VU 1명이다.
+INSERT INTO appointments (
+    appointment_id, item_id, host_member_id, language_code, appointment_name,
+    appointment_description, max_members, deposit_amount, appointment_status,
+    meeting_place, activity_start_at, activity_end_at
+)
+WITH RECURSIVE seq(k) AS (
+    SELECT 1 FROM DUAL WHERE @review_appointment_count > 0
+    UNION ALL SELECT k + 1 FROM seq WHERE k < @review_appointment_count
+)
+SELECT @review_base + k, 500000,
+       980001 + MOD((k - 1) * @review_members_per_appointment, @review_pool_size), 'en',
+       CONCAT('loadtest-review-', k), 'Synthetic completed appointment for scenario 4',
+       @review_members_per_appointment + 1, 5000.0000, 'COMPLETED', 'Load-test venue',
+       CURRENT_TIMESTAMP - INTERVAL 3 DAY, CURRENT_TIMESTAMP - INTERVAL 3 DAY + INTERVAL 2 HOUR
+FROM seq;
+
+-- 연속한 6명을 풀에서 돌려 담는다. 풀이 6보다 크므로 한 약속 안에서는 겹치지 않는다.
+-- 후기 작성 조건(ReviewService)대로 작성자와 대상 모두 ACTIVE + ATTENDED다.
+INSERT INTO appointment_members (
+    appointment_id, member_id, trip_id, membership_status, attendance_status,
+    attendance_confirmed_at
+)
+WITH RECURSIVE
+    seq(k) AS (
+        SELECT 1 FROM DUAL WHERE @review_appointment_count > 0
+        UNION ALL SELECT k + 1 FROM seq WHERE k < @review_appointment_count
+    ),
+    slot(s) AS (
+        SELECT 0 UNION ALL SELECT s + 1 FROM slot WHERE s < @review_members_per_appointment - 1
+    )
+SELECT @review_base + k,
+       980001 + MOD((k - 1) * @review_members_per_appointment + s, @review_pool_size),
+       NULL, 'ACTIVE', 'ATTENDED', CURRENT_TIMESTAMP - INTERVAL 3 DAY + INTERVAL 2 HOUR
+FROM seq CROSS JOIN slot;
+
+-- 프로필을 보는 쪽. VU n이 n번째 후기 약속의 7번째 참여자가 된다.
+--
+-- #580 이후 다른 회원의 프로필은 같은 약속 참여자만 볼 수 있다. k6는 이 약속을
+-- 시드 번호로 찾지 않고 `GET /api/v1/appointments/me?scope=ALL`에서 COMPLETED인
+-- 것으로 고른다(#450 — 시드와 k6가 맞출 값을 늘리지 않는다). 그 목록은 trip_id가
+-- 있는 참여만 돌려주므로 VU의 여정을 붙인다. 시나리오 2가 쓰는 기본 목록
+-- (scope=ONGOING)은 IN_PROGRESS·AWAITING_ATTENDANCE만 보므로 여기에 영향받지 않는다.
+INSERT INTO appointment_members (
+    appointment_id, member_id, trip_id, membership_status, attendance_status,
+    attendance_confirmed_at
+)
+WITH RECURSIVE seq(n) AS (
+    SELECT 1 FROM DUAL WHERE @review_appointment_count > 0
+    UNION ALL SELECT n + 1 FROM seq WHERE n < LEAST(@vu_count, @review_appointment_count)
+)
+SELECT @review_base + n, 900000 + n, 600000 + n, 'ACTIVE', 'ATTENDED',
+       CURRENT_TIMESTAMP - INTERVAL 3 DAY + INTERVAL 2 HOUR
+FROM seq;
+
+-- 풀 회원끼리 같은 약속의 다른 모든 참여자에게 한 건씩 쓴다. VU는 쓰지도 받지도 않는다.
+INSERT INTO member_reviews (
+    appointment_id, reviewer_appointment_member_id, reviewed_appointment_member_id
+)
+SELECT reviewer.appointment_id, reviewer.appointment_member_id, reviewed.appointment_member_id
+FROM appointment_members reviewer
+JOIN appointment_members reviewed
+  ON reviewed.appointment_id = reviewer.appointment_id
+ AND reviewed.appointment_member_id <> reviewer.appointment_member_id
+ AND reviewed.member_id BETWEEN 980001 AND 980000 + @review_pool_size
+WHERE reviewer.appointment_id BETWEEN @review_base + 1 AND @review_base + @review_appointment_count
+  AND reviewer.member_id BETWEEN 980001 AND 980000 + @review_pool_size;
+
+-- 후기 작성은 세 항목을 모두 요구한다(ReviewService.validScores). 점수는 1~5에 고르게 퍼뜨린다.
+INSERT INTO member_review_scores (review_id, review_category, rating)
+SELECT mr.review_id, category.name, 1 + MOD(mr.review_id * 7 + category.offset_value, 5)
+FROM member_reviews mr
+CROSS JOIN (
+    SELECT 'PUNCTUALITY' AS name, 0 AS offset_value
+    UNION ALL SELECT 'MANNERS', 1
+    UNION ALL SELECT 'COMMUNICATION', 2
+) category
+WHERE mr.appointment_id BETWEEN @review_base + 1 AND @review_base + @review_appointment_count;
+
 -- 실행 후 계약과 건수를 즉시 확인할 수 있게 요약을 남긴다.
 SELECT 'members' AS seeded, COUNT(*) AS count
 FROM members
@@ -364,4 +475,18 @@ WHERE appointment_id >= @hosted_base
   AND appointment_id < @hosted_base + @run_stride * @runs
 UNION ALL
 SELECT 'reports', COUNT(*) FROM reports
-WHERE report_id BETWEEN 600001 AND 600000 + @vu_count;
+WHERE report_id BETWEEN 600001 AND 600000 + @vu_count
+UNION ALL
+SELECT 'review_appointments', COUNT(*) FROM appointments
+WHERE appointment_id BETWEEN @review_base + 1 AND @review_base + @review_appointment_count
+UNION ALL
+SELECT 'review_viewers', COUNT(*) FROM appointment_members
+WHERE appointment_id BETWEEN @review_base + 1 AND @review_base + @review_appointment_count
+  AND member_id BETWEEN 900001 AND 900000 + @vu_count
+UNION ALL
+SELECT 'reviews', COUNT(*) FROM member_reviews
+WHERE appointment_id BETWEEN @review_base + 1 AND @review_base + @review_appointment_count
+UNION ALL
+SELECT 'review_scores', COUNT(*) FROM member_review_scores rs
+JOIN member_reviews mr ON mr.review_id = rs.review_id
+WHERE mr.appointment_id BETWEEN @review_base + 1 AND @review_base + @review_appointment_count;

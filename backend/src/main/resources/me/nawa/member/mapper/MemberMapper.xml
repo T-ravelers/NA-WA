@@ -33,6 +33,12 @@
         LIMIT 1
     </select>
 
+    <!--
+        조회하는 회원의 행만 읽는다(#583). MySQL은 바깥 조건을 GROUP BY 파생 테이블 안으로
+        밀어 넣지 않으므로 att 안에도 회원 조건을 둔다. 후기 인덱스는 모두 appointment_id로
+        시작하므로 FK와 같은 (appointment_id, reviewed_appointment_member_id)로 조인한다.
+        FK가 이 쌍을 보장해 결과는 같다.
+    -->
     <select id="findAppointmentProfile"
             resultType="me.nawa.member.dto.MemberAppointmentProfileResponse">
         SELECT m.member_id, m.display_name, m.profile_image_url, m.preferred_language,
@@ -49,13 +55,14 @@
                    SUM(am.attendance_status = 'ATTENDED') AS attended_count,
                    SUM(am.attendance_status = 'NO_SHOW') AS no_show_count
             FROM appointment_members am
-            WHERE am.deleted_at IS NULL
+            WHERE am.member_id = #{memberId} AND am.deleted_at IS NULL
             GROUP BY am.member_id
         ) att ON att.member_id = m.member_id
         LEFT JOIN appointment_members reviewed_am
                ON reviewed_am.member_id = m.member_id AND reviewed_am.deleted_at IS NULL
         LEFT JOIN member_reviews mr
-               ON mr.reviewed_appointment_member_id = reviewed_am.appointment_member_id
+               ON mr.appointment_id = reviewed_am.appointment_id
+              AND mr.reviewed_appointment_member_id = reviewed_am.appointment_member_id
               AND mr.deleted_at IS NULL AND mr.visibility_status = 'VISIBLE'
         LEFT JOIN member_review_scores rs ON rs.review_id = mr.review_id
         WHERE m.member_id = #{memberId} AND m.deleted_at IS NULL

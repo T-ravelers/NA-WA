@@ -13,6 +13,9 @@ payee_pool_size="${PAYEE_POOL_SIZE:-100}"
 # 참여한 약속은 재참여가 막히고 출석을 확정한 약속은 COMPLETED가 되므로,
 # 회차분을 미리 깔아 둔다. k6는 RUN_INDEX로 자기 회차를 고른다.
 runs="${RUNS:-3}"
+# 시나리오 4(공개 프로필 집계)용 후기 수. 0이면 후기 데이터를 깔지 않는다.
+# 후기 약속 하나가 30건이라 상한은 재귀 깊이(10,000) × 30이다.
+review_count="${REVIEWS:-0}"
 
 # 앞자리 0은 bash 산술에서 8진수로 읽혀 범위 검사를 빠져나가므로 받지 않는다.
 if [[ ! ${vu_count} =~ ^(0|[1-9][0-9]{0,3})$ ]] || ((vu_count < 1 || vu_count > 8920)); then
@@ -25,6 +28,11 @@ if [[ ! ${payee_pool_size} =~ ^(0|[1-9][0-9]{0,2})$ ]] || ((payee_pool_size < 1 
 fi
 if [[ ! ${runs} =~ ^(0|[1-9][0-9]?)$ ]] || ((runs < 1 || runs > 20)); then
   echo "RUNS는 1~20 정수여야 합니다: ${runs}" >&2
+  exit 1
+fi
+# 앞자리 0은 bash 산술에서 8진수로 읽혀 상한 검사를 빠져나가므로 받지 않는다.
+if [[ ! ${review_count} =~ ^(0|[1-9][0-9]{0,5})$ ]] || ((review_count > 300000)); then
+  echo "REVIEWS는 0~300000 정수여야 합니다: ${review_count}" >&2
   exit 1
 fi
 if [[ ! -f ${ENV_FILE} ]]; then
@@ -66,10 +74,10 @@ if [[ ${existing} != "0" ]]; then
 fi
 
 {
-  printf 'SET @vu_count = %s; SET @payee_pool_size = %s; SET @runs = %s;\n' \
-    "${vu_count}" "${payee_pool_size}" "${runs}"
+  printf 'SET @vu_count = %s; SET @payee_pool_size = %s; SET @runs = %s; SET @review_count = %s;\n' \
+    "${vu_count}" "${payee_pool_size}" "${runs}" "${review_count}"
   sed -e 's/\r$//' "${SCRIPT_DIR}/seed.sql"
 } | docker exec -i -e MYSQL_PWD="${MYSQL_ROOT_PASSWORD}" "${mysql_container}" \
     mysql -uroot "${MYSQL_DATABASE}" --show-warnings
 
-echo "시드 적재 완료: VUS=${vu_count}, PAYEE_POOL_SIZE=${payee_pool_size}, RUNS=${runs}"
+echo "시드 적재 완료: VUS=${vu_count}, PAYEE_POOL_SIZE=${payee_pool_size}, RUNS=${runs}, REVIEWS=${review_count}"
