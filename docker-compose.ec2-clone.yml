@@ -45,10 +45,9 @@ services:
 
   nginx:
     volumes:
-      # 운영 설정은 여기서 그대로 쓸 수 없다. TLS 인증서 파일이 로컬에 없고,
-      # 80으로 온 요청을 308로 https에 넘겨서 k6가 무한히 되돌아온다.
+      # 부하 테스트 전용 nginx 설정을 쓴다. 이유는 loadtest/nginx.conf 머리말에 있다.
       - ./loadtest/nginx.conf:/etc/nginx/nginx.conf:ro
-    # Compose는 기본값으로 base의 80/443 포트와 overlay 포트를 합친다.
+    # Compose는 기본값으로 base의 80 포트와 overlay 포트를 합친다.
     # !override로 운영 포트를 버려야 부하 테스트 로그인 경로가 LAN에 열리지 않는다.
     ports: !override
       - "127.0.0.1:9080:80"

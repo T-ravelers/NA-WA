@@ -36,23 +36,15 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
 - 커밋 메시지에 `Co-Authored-By` 트레일러를 넣지 않습니다. 기존 이력에도 없습니다.
 - 관련 없는 프론트엔드/백엔드 변경을 한 PR에 섞지 않습니다.
 - **API·환경 변수·배포·공통 계약을 바꾸면 같은 PR에서 관련 문서와 이 파일도 고칩니다.**
-- EC2 nginx의 TLS 인증서는 `docker-compose.yml`의 `certbot` 서비스(`profiles: ["ops"]`,
-  평소 `up -d`에는 포함 안 됨)로 다룹니다. 최초 발급은 `docker compose run --rm certbot
-  certonly --webroot ...`로 수동 1회 실행하고, 갱신과 nginx reload는
-  [renew-cert.yml](./.github/workflows/renew-cert.yml)이 매일 스케줄로 담당합니다.
-  이 두 경로 중 하나만 보고 판단하면 발급·갱신 흐름을 놓칩니다.
 - **운영 프론트엔드는 `https://na-wa.cloud`, 백엔드는 `https://api.na-wa.cloud`입니다.**
-  nginx가 443에서 TLS를 종료하고
-  80으로 온 요청은 `308`로 https에 넘깁니다. 우선 `/.well-known/acme-challenge/`는
-  갱신에 필요해 80에서 직접 응답해야 합니다 — 리다이렉트가 이 경로를 삼키면 약 60일
-  뒤 갱신 실패로만 드러나므로 `deploy/deploy.sh`가 배포마다 확인합니다.
-- ALB 도입을 준비하면서 80에 두 갈래가 더 생겼습니다. `X-Forwarded-Proto`가 붙은 요청은
-  ALB를 거쳐 온 것으로 보고 백엔드로 프록시하고, 헬스 체크용 `/alb-health`는 헤더와
-  무관하게 항상 프록시합니다. 헤더가 없는 직접 접속은 위의 `308` 규칙 그대로입니다.
-  이 헤더는 아는 값(`http`, `https`)만 통과시키고 나머지는 실제 수신 프로토콜로
-  되돌립니다 — 그렇지 않으면 클라이언트가 헤더 한 줄로 프로토콜을 위조할 수 있습니다.
-  ALB 전환이 끝나면 이 분기와 certbot 관련 설정을 함께 걷어냅니다.
-- **최상위 `/internal/`은 외부에 열지 않습니다.** nginx가 80·443 양쪽에서 `404`로
+  TLS는 ALB의 ACM 인증서가 443에서 종료하고, nginx는 ALB가 넘기는 평문 80만 받습니다.
+  인증서 발급·갱신은 ACM이 맡아 이 저장소에 certbot·443 설정이 없습니다. EC2는 private
+  서브넷에 있고 보안 그룹이 ALB의 80만 허용하므로 nginx에 직접 닿는 경로가 없습니다.
+  헬스 체크용 `/alb-health`는 항상 백엔드로 프록시하고, `X-Forwarded-Proto`는 아는 값
+  (`http`, `https`)만 통과시켜 나머지는 실제 수신 프로토콜로 되돌립니다 — 그렇지 않으면
+  클라이언트가 헤더 한 줄로 프로토콜을 위조할 수 있습니다. 이 구조에서 certbot이나
+  443 `server` 블록을 되살리면 새 서버에서 인증서 파일이 없어 nginx가 시작하지 못합니다.
+- **최상위 `/internal/`은 외부에 열지 않습니다.** nginx가 80에서 `404`로
   막습니다. 지금은 Micrometer 지표(`/internal/metrics`)가 여기에 있는데, JVM 힙·
   스레드 상태가 인증 없이 공개되면 내부 구조가 그대로 드러납니다. Spring Security
   쪽은 `permitAll`이라 **이 한 줄만 보고 "열려 있다"고 판단하면 안 됩니다** — 수집기가

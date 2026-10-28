@@ -96,17 +96,10 @@ docker compose up
   (`.github/workflows/deploy.yml`이 `docker-compose.yml`, `nginx/nginx.conf`,
   `deploy/deploy.sh`만 전송합니다). 운영에만 필요한 `nginx` 서비스는 로컬에서
   기본적으로 실행되지 않습니다.
-- `certbot` 서비스는 `profiles: ["ops"]`로 묶여 있어 평소 `docker compose up -d`에는
-  포함되지 않습니다. TLS 인증서 최초 발급은 EC2에서
-  `docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d <도메인> ...`로
-  1회 실행하고, 갱신과 nginx reload는 `.github/workflows/renew-cert.yml`이 매일
-  자동으로 수행합니다.
 - 운영 프론트엔드는 `https://na-wa.cloud`, 백엔드는 `https://api.na-wa.cloud`입니다.
-  nginx가 443에서 TLS를 종료하고,
-  80으로 온 요청은 `/.well-known/acme-challenge/`(인증서 갱신용)만 직접 응답한 뒤
-  나머지는 `308`로 https에 넘깁니다. ALB 도입 준비로 `X-Forwarded-Proto`가 붙은
-  요청과 헬스 체크용 `/alb-health`만 `308` 대신 백엔드로 프록시합니다.
-  프론트엔드의 `VITE_API_BASE_URL`도 https
+  TLS는 ALB의 ACM 인증서가 443에서 종료하고, nginx는 ALB가 넘기는 평문 80만 받아
+  백엔드로 프록시합니다. 인증서 발급·갱신은 ACM이 맡아 이 저장소에 관련 설정이
+  없습니다. 프론트엔드의 `VITE_API_BASE_URL`도 https
   주소여야 합니다 — 리다이렉트 응답에는 CORS 헤더가 없어 `http://`로 두면 브라우저가
   API 호출을 차단합니다.
 - 프론트엔드는 `frontend/` 디렉터리를 컨테이너에 바인드 마운트하므로 소스를
