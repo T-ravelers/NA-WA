@@ -93,8 +93,8 @@ docker compose up
 | redis    | localhost:6379           |
 
 - `docker-compose.override.yml`은 로컬 전용이며 EC2로는 배포되지 않습니다
-  (`.github/workflows/deploy.yml`이 `docker-compose.yml`, `nginx/nginx.conf`,
-  `deploy/deploy.sh`만 전송합니다). 운영에만 필요한 `nginx` 서비스는 로컬에서
+  (`.github/workflows/deploy.yml`이 SSM으로 서버가 `docker-compose.yml`,
+  `nginx/nginx.conf`, `deploy/deploy.sh`만 내려받게 합니다). 운영에만 필요한 `nginx` 서비스는 로컬에서
   기본적으로 실행되지 않습니다.
 - `certbot` 서비스는 `profiles: ["ops"]`로 묶여 있어 평소 `docker compose up -d`에는
   포함되지 않습니다. TLS 인증서 최초 발급은 EC2에서

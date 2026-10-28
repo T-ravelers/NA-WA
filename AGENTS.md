@@ -35,6 +35,13 @@ Node `24.18.0` · pnpm `11.17.0` · Java `17`
   → Squash and merge`입니다. 규칙은 [CONTRIBUTING.md](./CONTRIBUTING.md)가 정본입니다.
 - 커밋 메시지에 `Co-Authored-By` 트레일러를 넣지 않습니다. 기존 이력에도 없습니다.
 - 관련 없는 프론트엔드/백엔드 변경을 한 PR에 섞지 않습니다.
+- **백엔드는 SSH가 아니라 SSM으로 배포합니다.** `deploy.yml`이 GitHub OIDC로 AWS 역할을 맡아
+  대상 인스턴스에 SSM Run Command를 보내고, 서버가 커밋 SHA 기준으로 배포 대상 파일 3개를
+  `raw.githubusercontent.com`에서 직접 내려받습니다. 필요한 시크릿은 `AWS_DEPLOY_ROLE_ARN`과
+  `EC2_INSTANCE_ID`이며 `EC2_HOST`·`EC2_USER`·`EC2_SSH_KEY`는 더 이상 쓰지 않습니다. 역할의
+  신뢰 정책이 `main` 브랜치 실행만 허용하므로 **다른 브랜치에서 이 잡을 돌리면 역할을 못 맡아
+  실패하는 것이 정상**입니다. 서버의 `~/nawa/.env`는 배포가 만들지 않으니 최초 1회 직접 둡니다.
+  이 방식은 **저장소가 공개라는 전제**라서 비공개로 바꾸면 파일 전달 경로를 다시 정해야 합니다.
 - **API·환경 변수·배포·공통 계약을 바꾸면 같은 PR에서 관련 문서와 이 파일도 고칩니다.**
 - EC2 nginx의 TLS 인증서는 `docker-compose.yml`의 `certbot` 서비스(`profiles: ["ops"]`,
   평소 `up -d`에는 포함 안 됨)로 다룹니다. 최초 발급은 `docker compose run --rm certbot
