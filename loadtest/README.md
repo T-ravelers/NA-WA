@@ -268,6 +268,89 @@ Notion의 20건은 QR 결제부터 리포트까지의 업무 API만 센 값입�
 5분에 실행하면 전체 관측 TPS 상한은 약 **773 TPS**입니다. Grafana에서 업무 API 태그와
 `test-login`·`csrf` 태그를 분리해 595 TPS 목표와 보조 트래픽을 함께 해석합니다.
 
+## 시나리오 4 — 약속 참여자 프로필 조회
+
+약속 참여자 목록에서 프로필을 열 때마다 서버는 그 회원의 출석·후기를 집계합니다(#173).
+이 조회가 **후기 수에 따라 얼마나 느려지는지**를 잽니다(#582). 집계 쿼리를 고친 뒤(#583)
+같은 절차로 다시 재서 비교하고, #173의 전환 기준(같은 VU 단계에서 후기 1만 건 대비
+10만 건의 p95가 20%를 넘게 늘면 회원별 집계 테이블을 논의)을 판정합니다.
+
+후기 데이터는 `REVIEWS`를 준 시드에서만 깔립니다(기본 0). 받는 쪽 회원 풀은 1,000명으로
+고정이라, 후기가 늘면 **회원 한 명이 받은 후기**가 늘어납니다(1만이면 약 10건, 10만이면
+약 100건). VU n은 n번째 후기 약속의 참여자로 들어가고, k6는 그 약속을
+`GET /api/v1/appointments/me?scope=ALL`에서 `COMPLETED`인 것으로 찾습니다. 그래서 새 계약
+값은 없지만, **k6의 `VUS`는 후기 약속 수(`REVIEWS / 30`)를 넘을 수 없습니다.**
+
+VU는 처음 한 번 로그인과 약속 찾기를 하고, 반복마다 참여자 목록과 참여자 6명의 프로필을
+다시 엽니다. 생각 시간이 없어 VU 수가 곧 동시 요청의 상한입니다. 재는 것은 프로필 요청
+(`appointment-profile` 태그, `profile_duration`)입니다.
+
+규모를 바꿀 때는 볼륨을 비우고 다시 시드합니다.
+
+```shell
+set -a && source .env.loadtest && set +a
+compose() {
+  docker compose -p nawa-loadtest -f docker-compose.yml -f docker-compose.ec2-clone.yml "$@"
+}
+
+# 1. 규모마다 한 번 — 볼륨을 비우고 다시 띄운 뒤 후기를 깐다(1만 또는 10만)
+compose down -v
+compose --env-file .env.loadtest up -d --build
+RUNS=1 VUS=8920 REVIEWS=10000 ./loadtest/seed.sh
+
+# 2. 데우기 — JIT·커넥션 풀이 차기 전 값이 섞이지 않게 30초 돌리고 결과는 버린다
+k6 run -e LOADTEST_LOGIN_SECRET="$LOADTEST_LOGIN_SECRET" -e VUS=10 -e DURATION=30s \
+  loadtest/k6/scenario4-member-profile.js
+
+# 3. VU 단계(10·50·100)마다 3회 — 매번 쿼리 통계를 비우고, 재고, 확인하고, 병목 지표를 읽는다
+compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql mysql -uroot \
+  -e "TRUNCATE TABLE performance_schema.events_statements_summary_by_digest"
+start=$(date +%s)
+k6 run --out influxdb=http://127.0.0.1:8086/k6 \
+  -e LOADTEST_LOGIN_SECRET="$LOADTEST_LOGIN_SECRET" -e VUS=50 -e DURATION=60s \
+  loadtest/k6/scenario4-member-profile.js
+end=$(date +%s)
+compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql \
+  mysql -uroot "$MYSQL_DATABASE" < loadtest/verify-member-profile.sql
+sleep 6  # 마지막 스크레이프(5초 주기)가 구간에 들어오게
+./loadtest/bottleneck-metrics.sh "$start" "$end"
+
+# 4. 규모마다 한 번, 부하가 끝난 뒤 — 집계 쿼리의 실제 계획과 읽은 행 수
+./loadtest/explain-member-profile.sh
+```
+
+`profile_unexpected`·`profile_prepare_failed`·`profile_without_reviews`가 하나라도 0이
+아니면 그 실행은 해석하지 않습니다. 각각 프로필 응답 실패(403 `MEMBER-010`이면 VU가 그
+약속 참여자가 아님)나 참여자 목록 실패·조회할 다른 참여자 없음, 끝난 약속을 못 찾음(`VUS`가 후기 약속 수보다 큼), 후기 없는 회원만
+봄(`REVIEWS`를 안 줌)입니다.
+
+확인 SQL은 시드 건수, 풀 회원 한 명이 받은 후기 수(최소·평균·최대), 그리고 부하 동안
+집계 쿼리가 실행된 횟수와 서버 안에서 걸린 시간을 보여 줍니다. 실행 횟수가 k6의 프로필
+요청 수와 다르면 다른 문장을 보고 있는 것입니다.
+
+**읽은 행 수는 `explain-member-profile.sh`로 잽니다.** 매퍼 XML에서 집계 쿼리를 꺼내 풀
+회원 세 명(980001·980500·981000, 인자로 바꿀 수 있음)에게 `EXPLAIN ANALYZE`를 실행하므로,
+쿼리를 고쳐도(#583) 스크립트는 그대로 씁니다. 계획에서 `Table scan`·`Index scan` 줄의
+`actual ... rows=`가 그 단계가 실제로 읽은 행 수입니다. performance_schema의
+`SUM_ROWS_EXAMINED`는 쓰지 않습니다 — 1만 건 측정에서 계획이 같은데도 값이 실행 도중 약
+4만에서 약 1만으로 바뀌었습니다.
+
+**병목 지표는 `bottleneck-metrics.sh`로 읽습니다.** k6 실행 앞뒤에 잰 시각을 넘기면
+Prometheus(위 실행 절차의 4단계 「관측 스택 기동」)에서 그 구간의 값을 꺼냅니다. HikariCP 대기와 Tomcat
+바쁜 스레드는 구간 최댓값이고, GC는 구간 동안의 정지 시간 합과 횟수입니다. 횟수는
+`increase()`가 구간 끝을 외삽해 소수로 나오므로 반올림해 적습니다.
+
+기록은 이슈 댓글과 PR 본문에 표로 남깁니다. 칸은 커밋 SHA, 후기 규모, VU 단계, 달성
+TPS, `profile_duration`의 p95·p99, 에러율, `hikaricp_connections_pending`,
+`tomcat_threads_busy / config_max`, GC 정지시간이고, 규모마다 `EXPLAIN ANALYZE`의 단계별
+읽은 행 수를 함께 적습니다.
+
+| 변수 | 기본값 | 뜻 |
+| --- | --- | --- |
+| `REVIEWS` (시드) | `0` | 깔 후기 수. 30건 단위로 올림한다 |
+| `VUS` | `10` | 동시 VU. 후기 약속 수(`REVIEWS / 30`) 이하 |
+| `DURATION` | `60s` | 한 단계의 측정 시간 |
+
 ## 외부 서비스와 공개 예시값
 
 `-Ploadtest` 빌드는 Stripe 클라이언트를 로컬 스텁으로 교체합니다. PaymentIntent 생성은
