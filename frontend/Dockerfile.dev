@@ -3,7 +3,7 @@ FROM node:24.18.0-alpine
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@11.17.0 --activate
+RUN corepack enable && corepack prepare pnpm@12.15.0 --activate
 
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY frontend/package.json frontend/package.json
