@@ -158,6 +158,8 @@ Renovate가 프론트엔드 의존성(npm) 업데이트를 PR로 올립니다. �
 `renovate.json`이 정본입니다.
 
 - minor·patch 업데이트는 매주 월요일 오전 9시(KST) 전에 PR 하나로 묶여 올라옵니다.
+- `prettier`는 묶음에서 빠져 따로 PR로 올라옵니다. 포맷 결과가 바뀌면
+  `pnpm format:check`가 실패해 그 주의 묶음 PR 전체가 멈추기 때문입니다.
 - major 업데이트는 PR이 바로 열리지 않습니다. Dependency Dashboard 이슈에서
   체크박스로 승인해야 열립니다. 릴리스 노트를 읽고 패키지마다 따로 승인합니다.
 - 공개된 지 3일이 지나지 않은 버전은 받지 않습니다.

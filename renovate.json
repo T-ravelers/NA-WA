@@ -28,6 +28,11 @@
       "groupName": "frontend non-major dependencies"
     },
     {
+      "description": "prettier는 포맷 결과가 바뀌면 format:check가 묶음 PR 전체를 막으므로 따로 올린다.",
+      "matchPackageNames": ["prettier"],
+      "groupName": null
+    },
+    {
       "description": "major는 Dependency Dashboard에서 승인한 것만 PR로 만든다.",
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true
