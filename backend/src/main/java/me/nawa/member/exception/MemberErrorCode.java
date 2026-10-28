@@ -65,7 +65,7 @@ public enum MemberErrorCode implements ErrorCode {
     APPOINTMENT_PROFILE_FORBIDDEN(
             HttpStatus.FORBIDDEN,
             "MEMBER-010",
-            "같은 약속에 참여한 회원의 프로필만 볼 수 있습니다."
+            "같은 약속의 참여자이거나 모집 중인 약속의 참여자인 회원의 프로필만 볼 수 있습니다."
     );
 
     private final HttpStatus status;

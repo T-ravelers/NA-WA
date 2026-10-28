@@ -340,6 +340,75 @@ class MemberMapperIntegrationTest {
         });
     }
 
+    /** 모집 중 약속의 ACTIVE 참여자만 연다. 상태마다 다른 회원을 써서 서로 가리지 못하게 한다. */
+    @Test
+    void existsRecruitingParticipation_requiresActiveMemberOfRecruitingAppointment() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long host = insertMember("모집 중 약속 방장");
+            long joined = insertMember("모집 중 약속 참여자");
+            long left = insertMember("모집 중 약속에서 나간 회원");
+            long pending = insertMember("모집 중 약속 결제 전 회원");
+            long nobody = insertMember("약속 없는 회원");
+            long recruiting = insertAppointment(insertVisibleEventItem(host), host, "RECRUITING");
+            insertMembership(recruiting, host, "ACTIVE");
+            insertMembership(recruiting, joined, "ACTIVE");
+            insertMembership(recruiting, left, "LEFT");
+            insertMembership(recruiting, pending, "PENDING");
+
+            assertTrue(memberMapper.existsRecruitingParticipation(host));
+            assertTrue(memberMapper.existsRecruitingParticipation(joined));
+            assertFalse(memberMapper.existsRecruitingParticipation(left));
+            assertFalse(memberMapper.existsRecruitingParticipation(pending));
+            assertFalse(memberMapper.existsRecruitingParticipation(nobody));
+
+            String[] closedStatuses = {
+                    "PAYMENT_PENDING", "FULL", "IN_PROGRESS", "AWAITING_ATTENDANCE",
+                    "COMPLETED", "CANCELLED"
+            };
+            for (String appointmentStatus : closedStatuses) {
+                long member = insertMember("약속 회원 " + appointmentStatus);
+                long appointmentId = insertAppointment(
+                        insertVisibleEventItem(member), member, appointmentStatus);
+                insertMembership(appointmentId, member, "ACTIVE");
+
+                assertFalse(
+                        memberMapper.existsRecruitingParticipation(member), appointmentStatus);
+            }
+        });
+    }
+
+    /** 참여 행이나 약속이 soft delete되면 열람 근거가 아니다. */
+    @Test
+    void existsRecruitingParticipation_ignoresSoftDeletedMembershipAndAppointment() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+
+            for (String deleteTarget : new String[] {"membership", "appointment"}) {
+                long member = insertMember("모집 중 약속 회원 " + deleteTarget);
+                long appointmentId = insertAppointment(
+                        insertVisibleEventItem(member), member, "RECRUITING");
+                insertMembership(appointmentId, member, "ACTIVE");
+                assertTrue(memberMapper.existsRecruitingParticipation(member), deleteTarget);
+
+                if ("appointment".equals(deleteTarget)) {
+                    jdbcTemplate.update(
+                            "UPDATE appointments SET deleted_at = CURRENT_TIMESTAMP "
+                                    + "WHERE appointment_id = ?",
+                            appointmentId);
+                } else {
+                    jdbcTemplate.update(
+                            "UPDATE appointment_members SET deleted_at = CURRENT_TIMESTAMP "
+                                    + "WHERE appointment_id = ? AND member_id = ?",
+                            appointmentId, member);
+                }
+
+                sqlSessionTemplate.clearCache();
+                assertFalse(memberMapper.existsRecruitingParticipation(member), deleteTarget);
+            }
+        });
+    }
+
     /** 출석 이력이 없는 회원도 noShowCount가 0으로, completionRate가 null로 매핑된다. */
     @Test
     void findAppointmentProfile_mapsEmptyAttendance() {

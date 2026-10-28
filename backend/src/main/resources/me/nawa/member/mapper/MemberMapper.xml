@@ -88,6 +88,25 @@
         )
     </select>
 
+    <!--
+        회원이 모집 중 약속에 ACTIVE로 속해 있는지. 모집 중 약속의 참여자 목록은 로그인 회원
+        누구나 보므로, 참가하기 전에 그 참여자의 평점을 확인할 수 있게 연다(#592).
+        FULL은 더 참여할 수 없어 뺀다.
+    -->
+    <select id="existsRecruitingParticipation" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM appointment_members am
+            JOIN appointments a
+              ON a.appointment_id = am.appointment_id
+             AND a.deleted_at IS NULL
+             AND a.appointment_status = 'RECRUITING'
+            WHERE am.member_id = #{memberId}
+              AND am.membership_status = 'ACTIVE'
+              AND am.deleted_at IS NULL
+        )
+    </select>
+
     <select id="existsActiveCurrency" resultType="boolean">
         SELECT EXISTS (
             SELECT 1
