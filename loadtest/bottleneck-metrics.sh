@@ -25,10 +25,19 @@ r = json.load(sys.stdin)["data"]["result"]
 print(r[0]["value"][1] if r else "nan")'
 }
 
-echo "window=${window}"
-echo "hikaricp_connections_pending_max=$(query "max(max_over_time(hikaricp_connections_pending[${window}]))")"
-echo "tomcat_threads_busy_max=$(query "max(max_over_time(tomcat_threads_busy[${window}]))")"
-echo "tomcat_threads_config_max=$(query "max(tomcat_threads_config_max)")"
+# echo "$(query ...)"로 쓰면 조회가 실패해도 echo의 0이 남는다. 값을 먼저 받아
+# 조회 실패에서 멈추고, 다섯 값이 모두 모였을 때만 출력한다.
+pending_max=$(query "max(max_over_time(hikaricp_connections_pending[${window}]))")
+busy_max=$(query "max(max_over_time(tomcat_threads_busy[${window}]))")
+config_max=$(query "max(tomcat_threads_config_max)")
 # increase()는 구간 끝을 외삽하므로 횟수가 소수로 나온다. 기록할 때 반올림한다.
-echo "gc_pause_seconds_sum=$(query "sum(increase(jvm_gc_pause_seconds_sum[${window}]))")"
-echo "gc_pause_count=$(query "sum(increase(jvm_gc_pause_seconds_count[${window}]))")"
+gc_sum=$(query "sum(increase(jvm_gc_pause_seconds_sum[${window}]))")
+gc_count=$(query "sum(increase(jvm_gc_pause_seconds_count[${window}]))")
+
+printf '%s\n' \
+  "window=${window}" \
+  "hikaricp_connections_pending_max=${pending_max}" \
+  "tomcat_threads_busy_max=${busy_max}" \
+  "tomcat_threads_config_max=${config_max}" \
+  "gc_pause_seconds_sum=${gc_sum}" \
+  "gc_pause_count=${gc_count}"
