@@ -56,6 +56,15 @@ describe('AppButton', () => {
     expect(mountButton({ dense: true }).get('button').classes()).toContain('h-11')
   })
 
+  // 목록 카드 안의 두 보조 버튼. 높이와 글자를 함께 줄이고 다른 높이 옵션보다 이긴다.
+  it('draws the mini card action smaller than the touch target', () => {
+    const classes = mountButton({ mini: true, dense: true }).get('button').classes()
+
+    expect(classes).toEqual(expect.arrayContaining(['h-[34px]', 'text-caption', 'px-3']))
+    expect(classes).not.toContain('h-11')
+    expect(classes).not.toContain('text-title-sm')
+  })
+
   it('emits click when enabled', async () => {
     const wrapper = mountButton()
 

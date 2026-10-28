@@ -23,6 +23,14 @@ describe('IconOrb', () => {
     expect(wrapper.get('button').classes()).not.toContain('size-11')
   })
 
+  // 목록 카드에서 AppButton `mini`와 한 줄에 놓는 크기다.
+  it('supports the 34px card size next to mini buttons', () => {
+    const wrapper = mount(IconOrb, { props: { label: 'Save', size: 'sm' } })
+
+    expect(wrapper.get('button').classes()).toContain('size-[34px]')
+    expect(wrapper.get('button').classes()).not.toContain('size-11')
+  })
+
   it('exposes pressed state only for toggle buttons', () => {
     const regular = mount(IconOrb, { props: { label: 'Go back' } })
     const toggle = mount(IconOrb, { props: { label: 'Search', pressed: false } })

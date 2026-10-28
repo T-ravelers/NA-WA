@@ -44,6 +44,18 @@ interface Props {
   compact?: boolean
   /** 카드 안의 짧은 동작 버튼에 사용하는 높이. 최소 터치 영역(44px)은 유지한다. */
   dense?: boolean
+  /**
+   * 목록 카드 안에 두 개씩 나란히 놓는 보조 동작 버튼(탐색 카드의 담기·동행 찾기).
+   *
+   * 높이 34px · 글자 12px · 여백 12px. 카드가 목록에 여러 장 쌓여 44px 버튼 두 개가 카드마다
+   * 서면 버튼이 내용보다 커 보인다는 시안 판단으로 줄였다(#584). **최소 터치 영역(44px)보다
+   * 작다** — 화면의 주 동작에는 쓰지 않는다.
+   *
+   * 글자는 더 줄이지 않고, 넘치면 두 줄로 꺾기만 한다. 12px에서 다시 75%로 줄이면 9px가 되어
+   * 읽히지 않는다. 34px 높이에 12px 두 줄이 들어간다.
+   * 다른 높이 옵션(`compact`·`dense`)보다 이긴다.
+   */
+  mini?: boolean
 }
 
 const {
@@ -54,6 +66,7 @@ const {
   type = 'button',
   compact = false,
   dense = false,
+  mini = false,
 } = defineProps<Props>()
 
 const emit = defineEmits<{ click: [] }>()
@@ -101,19 +114,21 @@ function handleClick(): void {
     :type="type"
     :disabled="disabled || loading"
     :aria-busy="loading"
-    class="relative inline-flex shrink-0 items-center justify-center text-title-sm transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
+    class="relative inline-flex shrink-0 items-center justify-center transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
     :class="[
       VARIANT_CLASS[variant],
-      dense ? 'h-11' : compact ? 'h-12' : HEIGHT_CLASS[variant],
+      mini ? 'text-caption font-semibold' : 'text-title-sm',
+      mini ? 'h-[34px]' : dense ? 'h-11' : compact ? 'h-12' : HEIGHT_CLASS[variant],
       block ? 'w-full' : '',
-      compact ? 'px-3' : 'px-6',
+      compact || mini ? 'px-3' : 'px-6',
     ]"
     @click="handleClick"
   >
     <!-- 라벨은 16px에서 12px(75%)까지만 줄인다. 더 작으면 버튼인지 읽히지 않는다.
-         그래도 안 들어가면 말줄임 대신 두 줄로 꺾는다 — 가장 낮은 44px 버튼에도 12px 두 줄이 들어간다. -->
+         그래도 안 들어가면 말줄임 대신 두 줄로 꺾는다 — 가장 낮은 44px 버튼에도 12px 두 줄이 들어간다.
+         `mini`는 이미 12px라 줄이지 않고 바로 꺾는다. -->
     <span
-      v-fit-text.wrap="0.75"
+      v-fit-text.wrap="mini ? 1 : 0.75"
       :class="loading ? 'sr-only' : 'truncate'"
     >
       <slot />
