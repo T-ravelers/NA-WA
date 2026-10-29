@@ -113,7 +113,6 @@ PWA는 필수 기능입니다. 개인정보와 정산 데이터의 안전을 위
 | ------------------- | -------------- | ---------------------------------------------------- |
 | Backend CI          | 구현됨         | `main` PR과 push에서 Gradle 빌드·테스트              |
 | Backend CD          | 구현됨         | CI 성공 후 Docker Hub push와 EC2 Docker Compose 배포 |
-| TLS 인증서 갱신     | 구현됨         | 매일 스케줄로 Let's Encrypt 갱신 후 nginx reload (`.github/workflows/renew-cert.yml`) |
 | Frontend CI         | 구현됨         | `main` PR과 push에서 설치, 품질 검사와 빌드          |
 | Frontend Preview    | 운영 방향 확정 | Vercel PR Preview                                    |
 | Frontend Production | 운영 방향 확정 | Vercel `main` Production                             |
@@ -124,11 +123,10 @@ test와 build를 실행합니다. Vercel은 프론트엔드 배포를 담당하�
 마세요.
 
 운영 프론트엔드는 `https://na-wa.cloud`, 백엔드는 `https://api.na-wa.cloud`입니다.
-백엔드 TLS는 nginx가 443에서 종료합니다.
-인증서는 Let's Encrypt에서 발급받아 `certbot_conf` 볼륨으로 nginx와 공유하며, 80은
-`/.well-known/acme-challenge/`(갱신 검증 경로)만 직접 응답하고 나머지는 `308`로
-https에 넘깁니다. ALB 도입 준비로 `X-Forwarded-Proto`가 붙은 요청과 헬스 체크용
-`/alb-health`만 `308` 대신 백엔드로 프록시합니다. 리다이렉트 응답에는 CORS 헤더가
+백엔드 TLS는 ALB가 ACM 인증서로 443에서 종료하고, ALB의 80은 https로 리다이렉트합니다.
+nginx는 ALB가 넘기는 평문 80만 받아 백엔드로 프록시하며 헬스 체크용 `/alb-health`를
+항상 백엔드까지 통과시킵니다. EC2는 private 서브넷에 있고 보안 그룹이 ALB의 80만
+허용합니다. 인증서 발급·갱신은 ACM이 맡습니다. 리다이렉트 응답에는 CORS 헤더가
 없으므로 프론트엔드의
 `VITE_API_BASE_URL`은 반드시 https 주소여야 합니다.
 
