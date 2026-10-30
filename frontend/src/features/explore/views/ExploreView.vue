@@ -11,14 +11,18 @@ import StateEmpty from '@/shared/ui/StateEmpty.vue'
 import StateLoading from '@/shared/ui/StateLoading.vue'
 import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
+import { fetchEventDetail, fetchPlaceDetail } from '../api/exploreApi'
 import EventCard from '../components/EventCard.vue'
 import ExploreFilterBar from '../components/ExploreFilterBar.vue'
 import ExploreFilterSheet from '../components/ExploreFilterSheet.vue'
 import ExploreItemTabs from '../components/ExploreItemTabs.vue'
+import JourneyDateSheet from '../components/JourneyDateSheet.vue'
+import JourneySelectSheet from '../components/JourneySelectSheet.vue'
 import PlaceFilterBar from '../components/PlaceFilterBar.vue'
 import PlaceFilterSheet from '../components/PlaceFilterSheet.vue'
 import PlaceCard from '../components/PlaceCard.vue'
 import { useEventListQuery } from '../composables/useEventListQuery'
+import { useJourneyAddFlow, type JourneyAddItem } from '../composables/useJourneyAddFlow'
 import { usePlaceListQuery } from '../composables/usePlaceListQuery'
 import { presetDateRange } from '../model/datePresets'
 import {
@@ -27,12 +31,19 @@ import {
   type EventSearchFilters,
   type EventSort,
 } from '../model/eventExplore'
+import {
+  FROM_EXPLORE_KEY,
+  JOURNEY_ADD_ITEM_ID_KEY,
+  JOURNEY_ADD_ITEM_TYPE_KEY,
+  LIST_SCROLL_STORAGE_KEY,
+} from '../model/exploreCardReturn'
 import { resolveExploreFilterEntry } from '../model/exploreFilterEntry'
 import { useExploreFilterMemoryStore } from '../model/exploreFilterMemory'
 import {
   SEOUL_REGION1,
   SEOUL_REGION2_OPTIONS,
   VALID_SEOUL_REGION2_VALUES,
+  findExploreRegionLabelKey,
 } from '../model/exploreRegions'
 import {
   EVENT_SECTOR_OPTIONS,
@@ -190,6 +201,202 @@ const eventList = computed(() => eventQuery.data.value?.content ?? [])
 const totalEventElements = computed(() => eventQuery.data.value?.totalElements ?? 0)
 const placeList = computed(() => placeQuery.data.value?.content ?? [])
 const totalPlaceElements = computed(() => placeQuery.data.value?.totalElements ?? 0)
+
+type JourneyAddItemType = 'EVENT' | 'PLACE'
+
+/** 카드에서 담기를 누른 항목. 시트는 이 항목을 담는다. */
+const journeyAddTarget = ref<
+  (JourneyAddItem & { itemType: JourneyAddItemType; title: string; location: string }) | null
+>(null)
+const {
+  journeySelectSheetOpen,
+  journeyDateSheetOpen,
+  journeyDate,
+  selectedJourneyId,
+  journeyAddPending,
+  journeyAddError,
+  journeyListQuery,
+  journeys,
+  itemPeriod,
+  journeyDateRange,
+  openJourneySelectSheet,
+  closeJourneySelectSheet,
+  selectJourney,
+  goToCreateJourney,
+  closeJourneyDateSheet,
+  confirmJourneyDate,
+  resumeAfterJourneyCreate,
+} = useJourneyAddFlow({
+  item: journeyAddTarget,
+  /*
+   * 규약대로 자기 query(탭·필터)를 그대로 싣는다. 싣지 않으면 돌아왔을 때 보던 목록 대신
+   * 필터가 빠진 첫 목록이 뜬다.
+   */
+  createJourneyReturn: () => ({
+    returnRouteName: 'explore',
+    query: {
+      ...route.query,
+      ...(journeyAddTarget.value
+        ? {
+            [JOURNEY_ADD_ITEM_ID_KEY]: String(journeyAddTarget.value.itemId),
+            [JOURNEY_ADD_ITEM_TYPE_KEY]: journeyAddTarget.value.itemType,
+          }
+        : {}),
+    },
+  }),
+  replaceQuery: (query) => {
+    filterMemory.remember(query)
+    navigateSelf(() => router.replace({ query }))
+  },
+})
+
+function toRegionLabel(regions: Array<string | null | undefined>): string {
+  return regions
+    .filter((value): value is string => Boolean(value))
+    .map((value) => {
+      const labelKey = findExploreRegionLabelKey(value)
+      return labelKey ? t(labelKey) : value
+    })
+    .join(' · ')
+}
+
+/**
+ * 담을 수 있는 날의 범위는 상세 화면과 같은 규칙으로 정한다. 종료일 미상 이벤트는
+ * 상한이 없고, 장소는 운영 기간이 없어 양쪽 모두 열려 있다.
+ */
+function addEventToTrip(eventId: number): void {
+  const event = eventList.value.find((candidate) => candidate.itemId === eventId)
+  if (!event) return
+
+  journeyAddTarget.value = {
+    itemId: event.itemId,
+    itemType: 'EVENT',
+    title: event.title,
+    location: toRegionLabel([event.region1, event.region2, event.region3]),
+    startDate: event.startDate ?? null,
+    endDate: event.isPermanent === true ? null : (event.endDate ?? null),
+  }
+  openJourneySelectSheet()
+}
+
+function addPlaceToTrip(placeId: number): void {
+  const place = placeList.value.find((candidate) => candidate.itemId === placeId)
+  if (!place) return
+
+  journeyAddTarget.value = {
+    itemId: place.itemId,
+    itemType: 'PLACE',
+    title: place.name,
+    location: toRegionLabel([place.region1, place.region2, place.region3]),
+    startDate: null,
+    endDate: null,
+  }
+  openJourneySelectSheet()
+}
+
+/**
+ * 여정을 만들고 돌아온 진입. 담던 항목을 다시 불러와 하던 담기를 잇는다.
+ *
+ * 그 항목이 지금 목록에 있다는 보장이 없어(다른 쪽에 있었거나 그사이 순서가 바뀜) 상세를
+ * 다시 조회한다. 불러오지 못하면 시트를 열지 않고 주소의 표시만 지운다 — 무엇을 담는지
+ * 모르는 시트는 고를 수 없는 여정까지 열어 준다.
+ */
+async function resumeJourneyAddFromCard(): Promise<void> {
+  if (route.query.openJourneySelect !== '1') return
+
+  const extraKeys = [JOURNEY_ADD_ITEM_ID_KEY, JOURNEY_ADD_ITEM_TYPE_KEY]
+  const itemId = Number(route.query[JOURNEY_ADD_ITEM_ID_KEY])
+  const itemType = route.query[JOURNEY_ADD_ITEM_TYPE_KEY]
+
+  try {
+    if (!Number.isSafeInteger(itemId) || itemId <= 0) throw new Error('No item to resume.')
+
+    if (itemType === 'EVENT') {
+      const event = await fetchEventDetail(itemId, locale.value)
+      journeyAddTarget.value = {
+        itemId: event.eventId,
+        itemType: 'EVENT',
+        title: event.title,
+        location: toRegionLabel([event.region1, event.region2, event.region3]),
+        startDate: event.startDate ?? null,
+        endDate: event.isPermanent === true ? null : (event.endDate ?? null),
+      }
+    } else if (itemType === 'PLACE') {
+      const place = await fetchPlaceDetail(itemId, locale.value)
+      journeyAddTarget.value = {
+        itemId: place.itemId,
+        itemType: 'PLACE',
+        title: place.name,
+        location: toRegionLabel([place.region1, place.region2, place.region3]),
+        startDate: null,
+        endDate: null,
+      }
+    } else {
+      throw new Error('Unknown item type to resume.')
+    }
+  } catch {
+    resumeAfterJourneyCreate(extraKeys, { openSheet: false })
+    return
+  }
+
+  resumeAfterJourneyCreate(extraKeys)
+}
+
+onMounted(() => {
+  void resumeJourneyAddFromCard()
+})
+
+/**
+ * 상세를 거치지 않고 약속 목록으로 간다. 탐색에서 왔다는 표시를 실어, 그쪽의 뒤로 가기가 이
+ * 목록으로 되감기게 한다. 싣지 않으면 열어 본 적 없는 상세로 간다.
+ *
+ * 보던 스크롤 위치도 남긴다. 돌아오면 이 화면이 새로 만들어지고 라우터에 스크롤 복원이 없어
+ * 그대로 두면 다른 화면이 남긴 위치에서 시작한다.
+ */
+function openAppointmentList(itemId: number, itemType: JourneyAddItemType): void {
+  try {
+    sessionStorage.setItem(LIST_SCROLL_STORAGE_KEY, String(Math.round(window.scrollY)))
+  } catch {
+    // 저장소를 못 쓰면 스크롤만 이어지지 않는다. 이동은 그대로 한다.
+  }
+  void router.push({
+    name: 'appointment-list',
+    query: { itemId: String(itemId), itemType, [FROM_EXPLORE_KEY]: '1' },
+  })
+}
+
+/**
+ * 남겨 둔 스크롤 위치를 한 번 읽고 지운다. 다른 길로 돌아온 진입에 남지 않게 한다.
+ *
+ * 0도 되돌릴 위치다. 맨 위 카드에서 떠나는 것이 가장 흔한데, 카드에서 돌아온 진입은
+ * 맨 위로 올리는 처음부터 보기도 꺼져 있어 0을 버리면 약속 목록의 스크롤이 그대로 남는다.
+ */
+function takeSavedListScroll(): number | null {
+  try {
+    const saved = sessionStorage.getItem(LIST_SCROLL_STORAGE_KEY)
+    sessionStorage.removeItem(LIST_SCROLL_STORAGE_KEY)
+    const top = Number(saved)
+    return saved !== null && Number.isFinite(top) && top >= 0 ? top : null
+  } catch {
+    return null
+  }
+}
+
+/** 지금 탭의 목록이 그려진 뒤에 스크롤을 옮긴다. 먼저 옮기면 짧은 화면에서 맨 위로 잘린다. */
+function restoreListScroll(top: number): void {
+  const isReady = () => !(selectedTab.value === 'places' ? placeQuery : eventQuery).isPending.value
+  const apply = () => void nextTick(() => window.scrollTo({ top, behavior: 'auto' }))
+
+  if (isReady()) {
+    apply()
+    return
+  }
+  const stop = watch(isReady, (ready) => {
+    if (!ready) return
+    stop()
+    apply()
+  })
+}
 const sheetResultCount = computed(
   () => sheetPreviewQuery.data.value?.totalElements ?? totalEventElements.value,
 )
@@ -485,7 +692,13 @@ onBeforeRouteUpdate((to) => {
  * `startsOver`가 꺼져 있어 보던 자리에 그대로 남는다.
  */
 onMounted(() => {
-  if (filterMemory.consumeStartsOver()) scrollToListTop('auto')
+  const savedScroll = takeSavedListScroll()
+  if (filterMemory.consumeStartsOver()) {
+    scrollToListTop('auto')
+    return
+  }
+  // 카드에서 연 약속 목록을 보고 돌아온 진입이다(`routes.ts`가 처음부터 보지 않게 둔다).
+  if (savedScroll !== null) restoreListScroll(savedScroll)
 })
 
 watch(
@@ -1105,6 +1318,8 @@ function addQueryList(
           :key="event.itemId"
           :event="event"
           @open="router.push({ name: 'explore-event-detail', params: { eventId: event.itemId } })"
+          @add-to-trip="addEventToTrip"
+          @find-buddy="openAppointmentList($event, 'EVENT')"
         />
       </div>
       <AppPagination
@@ -1166,6 +1381,8 @@ function addQueryList(
           :key="place.itemId"
           :place="place"
           @open="openPlaceDetail"
+          @add-to-trip="addPlaceToTrip"
+          @find-buddy="openAppointmentList($event, 'PLACE')"
         />
       </div>
 
@@ -1199,6 +1416,32 @@ function addQueryList(
       @close="closeSheet"
       @change="previewPlaceSheet"
       @apply="applyPlaceSheet"
+    />
+
+    <JourneyDateSheet
+      v-if="journeyDateSheetOpen && journeyDateRange && journeyAddTarget"
+      :item-title="journeyAddTarget.title"
+      :item-location="journeyAddTarget.location || undefined"
+      :start-date="journeyDateRange.start"
+      :end-date="journeyDateRange.end"
+      :initial-date="journeyDate"
+      :loading="journeyAddPending"
+      :error-message="journeyAddError ? t(journeyAddError) : null"
+      @close="closeJourneyDateSheet"
+      @confirm="confirmJourneyDate"
+    />
+
+    <JourneySelectSheet
+      v-if="journeySelectSheetOpen"
+      :journeys="journeys"
+      :item-start-date="itemPeriod.startDate"
+      :item-end-date="itemPeriod.endDate"
+      :selected-journey-id="selectedJourneyId"
+      :loading="journeyListQuery.isPending.value"
+      :error-message="journeyListQuery.isError.value ? t('explore.journeySelect.error') : null"
+      @close="closeJourneySelectSheet"
+      @select="selectJourney"
+      @create-journey="goToCreateJourney"
     />
   </section>
 </template>

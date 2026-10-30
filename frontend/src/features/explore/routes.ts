@@ -1,11 +1,27 @@
-import type { RouteRecordRaw } from 'vue-router'
+import type { RouteLocationNormalized, RouteRecordRaw } from 'vue-router'
 
+import { FROM_EXPLORE_KEY, JOURNEY_ADD_ITEM_ID_KEY } from './model/exploreCardReturn'
 import { resolveExploreFilterEntry } from './model/exploreFilterEntry'
 import { useExploreFilterMemoryStore } from './model/exploreFilterMemory'
 import { useExploreReturnContextStore } from './model/exploreReturnContext'
 
 const EXPLORE_ROUTE_NAMES = new Set(['explore', 'explore-event-detail', 'explore-place-detail'])
 const EXPLORE_DETAIL_ROUTE_NAMES = new Set(['explore-event-detail', 'explore-place-detail'])
+
+/**
+ * Discover 흐름이 이어지는 진입인지. 아래 두 guard가 "밖에서 새로 들어왔다"고 보고 필터
+ * 기억과 날짜 맥락을 버리는 조건의 반대다.
+ *
+ * Discover 안에서 오가는 것 말고도, 목록 카드가 다른 feature 화면에 들렀다 돌아오는 두
+ * 경우가 있다. 둘 다 보내기 전에 표시를 싣는다(`model/exploreCardReturn.ts`).
+ * - 카드에서 여정을 만들러 나갔다 돌아온다. 만들었든 취소했든 담던 카드 표시를 돌려받는다.
+ * - 카드에서 동행 찾기로 연 약속 목록에서 돌아온다. 표시는 떠나는 쪽(약속 목록) 주소에 있다.
+ */
+function continuesExploreFlow(to: RouteLocationNormalized, from: RouteLocationNormalized): boolean {
+  if (EXPLORE_ROUTE_NAMES.has(String(from.name))) return true
+  if (from.name === 'journey-create' && to.query[JOURNEY_ADD_ITEM_ID_KEY] !== undefined) return true
+  return from.name === 'appointment-list' && from.query[FROM_EXPLORE_KEY] === '1'
+}
 
 const routes: RouteRecordRaw[] = [
   {
@@ -36,7 +52,7 @@ const routes: RouteRecordRaw[] = [
        * 목록이 좁은지 알 방법이 없다. 아래 맥락 guard가 일회성 맥락을 버리는 조건과 같다.
        */
       (to, from) => {
-        if (!EXPLORE_ROUTE_NAMES.has(String(from.name))) useExploreFilterMemoryStore().clear()
+        if (!continuesExploreFlow(to, from)) useExploreFilterMemoryStore().clear()
 
         return (
           resolveExploreFilterEntry(to.query, {
@@ -59,7 +75,7 @@ const routes: RouteRecordRaw[] = [
           endDate: to.query.endDate,
         })
 
-        if (!captured && !EXPLORE_ROUTE_NAMES.has(String(from.name))) context.discardReturn()
+        if (!captured && !continuesExploreFlow(to, from)) context.discardReturn()
 
         return true
       },

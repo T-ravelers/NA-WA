@@ -38,6 +38,11 @@ export const eventSummaryResponseSchema = z
     startDate: nullableDateSchema,
     endDate: nullableDateSchema,
     isPermanent: z.boolean(),
+    /*
+     * 백엔드가 #584에서 싣기 시작했다. 프런트(Vercel)가 백엔드(EC2)보다 먼저 배포되는 동안
+     * 이 값이 없는 응답이 오므로 필수로 두면 목록 전체가 검증에 떨어진다. 없으면 0이다.
+     */
+    favoriteCount: z.number().int().nonnegative().default(0),
     saved: z.boolean(),
   })
   .passthrough()

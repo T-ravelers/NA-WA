@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 44×44 또는 48×48 원형 아이콘 버튼.
+ * 원형 아이콘 버튼. 44×44가 기본이다.
  *
  * 시안에서 뒤로가기·더보기·화살표 등에 28회 반복된다. 아이콘만 있고 라벨 텍스트가 없으므로
  * 접근 가능한 이름을 `label`로 반드시 받는다.
@@ -9,12 +9,17 @@
  * 아이콘 자체 크기는 slot에서 정한다.
  */
 type IconOrbVariant = 'plain' | 'overlay' | 'surface'
-type IconOrbSize = 'md' | 'lg'
+type IconOrbSize = 'sm' | 'md' | 'lg'
 
 interface Props {
   /** 스크린 리더에 읽히는 이름. 아이콘만 있는 버튼이라 생략할 수 없다. */
   label: string
-  /** `md` 44px(기본) · `lg` 48px(화면 헤더). */
+  /**
+   * `md` 44px(기본) · `lg` 48px(화면 헤더) · `sm` 34px.
+   *
+   * `sm`은 목록 카드에서 `AppButton`의 `mini`와 한 줄에 놓는 크기다. 높이를 맞추려고 둔
+   * 것이라 **최소 터치 영역(44px)보다 작다** — 화면의 주 동작에는 쓰지 않는다.
+   */
   size?: IconOrbSize
   /** 토글 버튼일 때 현재 눌림 상태. 일반 버튼이면 생략한다. */
   pressed?: boolean | null
@@ -35,6 +40,7 @@ const VARIANT_CLASS: Record<IconOrbVariant, string> = {
 }
 
 const SIZE_CLASS: Record<IconOrbSize, string> = {
+  sm: 'size-[34px]',
   md: 'size-11',
   lg: 'size-12',
 }
