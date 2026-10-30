@@ -17,19 +17,19 @@ runs="${RUNS:-3}"
 # 후기 약속 하나가 30건이라 상한은 재귀 깊이(10,000) × 30이다.
 review_count="${REVIEWS:-0}"
 
-if [[ ! ${vu_count} =~ ^[0-9]+$ ]] || ((vu_count < 1 || vu_count > 8920)); then
+# 앞자리 0은 bash 산술에서 8진수로 읽혀 범위 검사를 빠져나가므로 받지 않는다.
+if [[ ! ${vu_count} =~ ^(0|[1-9][0-9]{0,3})$ ]] || ((vu_count < 1 || vu_count > 8920)); then
   echo "VUS는 1~8920 정수여야 합니다: ${vu_count}" >&2
   exit 1
 fi
-if [[ ! ${payee_pool_size} =~ ^[0-9]+$ ]] || ((payee_pool_size < 1 || payee_pool_size > 100)); then
+if [[ ! ${payee_pool_size} =~ ^(0|[1-9][0-9]{0,2})$ ]] || ((payee_pool_size < 1 || payee_pool_size > 100)); then
   echo "PAYEE_POOL_SIZE는 1~100 정수여야 합니다: ${payee_pool_size}" >&2
   exit 1
 fi
-if [[ ! ${runs} =~ ^[0-9]+$ ]] || ((runs < 1 || runs > 20)); then
+if [[ ! ${runs} =~ ^(0|[1-9][0-9]?)$ ]] || ((runs < 1 || runs > 20)); then
   echo "RUNS는 1~20 정수여야 합니다: ${runs}" >&2
   exit 1
 fi
-# 앞자리 0은 bash 산술에서 8진수로 읽혀 상한 검사를 빠져나가므로 받지 않는다.
 if [[ ! ${review_count} =~ ^(0|[1-9][0-9]{0,5})$ ]] || ((review_count > 300000)); then
   echo "REVIEWS는 0~300000 정수여야 합니다: ${review_count}" >&2
   exit 1
