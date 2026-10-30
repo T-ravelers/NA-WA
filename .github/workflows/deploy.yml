@@ -35,31 +35,81 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    # GitHub OIDC 토큰으로 AWS 역할을 맡는다. 장기 SSH 키·액세스 키를 저장하지 않는다.
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: ap-northeast-2
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      REPO: ${{ github.repository }}
+      INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
     steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+      # 이벤트 값을 셸 명령에 그대로 이어 붙이지 않도록 형식을 먼저 검증한다.
+      - name: 배포 커밋 SHA 검증
+        shell: bash
+        run: |
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "head_sha 형식이 올바르지 않습니다"; exit 1; }
 
-      # SSH 키를 다루는 서드파티 액션이라 버전 태그 대신 commit SHA로 고정
-      - name: 배포 설정 파일 EC2로 전송
-        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1
+      # AWS 자격증명을 다루는 서드파티 액션이라 버전 태그 대신 commit SHA로 고정
+      - name: AWS 역할 맡기 (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml,nginx/nginx.conf,deploy/deploy.sh"
-          target: "~/nawa_sync"
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: 배포 스크립트 실행
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            mkdir -p ~/nawa/nginx
-            cp ~/nawa_sync/docker-compose.yml ~/nawa/docker-compose.yml
-            cp ~/nawa_sync/nginx/nginx.conf ~/nawa/nginx/nginx.conf
-            cp ~/nawa_sync/deploy/deploy.sh ~/nawa/deploy.sh
-            chmod +x ~/nawa/deploy.sh
-            bash ~/nawa/deploy.sh
+      # EC2는 private 서브넷에 있어 SSH로 닿을 수 없다. SSM Run Command로 명령을 전달한다.
+      # SSM은 파일을 올려 주지 못하므로, 서버가 워크플로가 검증한 커밋 SHA 기준으로 배포 대상
+      # 파일 3개를 직접 내려받는다. 저장소가 공개라 토큰이 필요 없다(비공개로 바꾸면 깨진다).
+      - name: SSM으로 배포 실행
+        shell: bash
+        run: |
+          read -r -d '' REMOTE <<'EOS' || true
+          set -euo pipefail
+          BASE="https://raw.githubusercontent.com/${REPO}/${DEPLOY_SHA}"
+          APP_HOME=/home/ec2-user/nawa
+          T=$(mktemp -d)
+          trap 'rm -rf "$T"' EXIT
+          for f in docker-compose.yml nginx/nginx.conf deploy/deploy.sh; do
+            mkdir -p "$T/$(dirname "$f")"
+            curl -fsSL --retry 3 "$BASE/$f" -o "$T/$f"
+          done
+          install -d -o ec2-user -g ec2-user "$APP_HOME/nginx"
+          install -o ec2-user -g ec2-user -m 644 "$T/docker-compose.yml" "$APP_HOME/docker-compose.yml"
+          install -o ec2-user -g ec2-user -m 644 "$T/nginx/nginx.conf" "$APP_HOME/nginx/nginx.conf"
+          install -o ec2-user -g ec2-user -m 755 "$T/deploy/deploy.sh" "$APP_HOME/deploy.sh"
+          sudo -u ec2-user -H bash "$APP_HOME/deploy.sh"
+          EOS
+
+          PARAMS=$(jq -n --arg repo "$REPO" --arg sha "$DEPLOY_SHA" --arg script "$REMOTE" \
+            '{commands: ["REPO=" + $repo, "DEPLOY_SHA=" + $sha, $script]}')
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy ${DEPLOY_SHA:0:7}" \
+            --timeout-seconds 900 \
+            --parameters "$PARAMS" \
+            --query Command.CommandId --output text)
+          echo "SSM command: $COMMAND_ID"
+
+          # 명령을 보낸 직후에는 호출 기록이 아직 없을 수 있어 조회 실패를 Pending으로 본다.
+          status=Pending
+          for _ in $(seq 1 100); do
+            status=$(aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            case "$status" in
+              Success|Failed|Cancelled|TimedOut|Cancelling) break ;;
+            esac
+            sleep 10
+          done
+
+          echo "::group::서버 출력"
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query '[StandardOutputContent, StandardErrorContent]' --output text || true
+          echo "::endgroup::"
+
+          if [ "$status" != "Success" ]; then
+            echo "배포 실패: SSM 상태 $status"
+            exit 1
+          fi
