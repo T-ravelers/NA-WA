@@ -467,6 +467,7 @@ class MemberProfileServiceImplTest {
         assertEquals(80, response.getCompletionRate());
         assertEquals(1, response.getNoShowCount());
         verify(memberMapper, never()).existsSharedAppointment(anyLong(), anyLong());
+        verify(memberMapper, never()).existsRecruitingParticipation(anyLong());
     }
 
     @Test
@@ -485,11 +486,30 @@ class MemberProfileServiceImplTest {
         assertNull(response.getNoShowCount());
     }
 
+    /** 참가 전에 상대를 확인하는 경로다(#592). 출석 지표는 같은 약속 참여자와 똑같이 뺀다. */
     @Test
-    void getAppointmentProfile_throwsForbidden_whenNoSharedAppointment() {
+    void getAppointmentProfile_hidesAttendance_whenTargetInRecruitingAppointment() {
         when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
         when(memberMapper.findProfile(2L)).thenReturn(profile("ACTIVE", true));
         when(memberMapper.existsSharedAppointment(1L, 2L)).thenReturn(false);
+        when(memberMapper.existsRecruitingParticipation(2L)).thenReturn(true);
+        when(memberMapper.findAppointmentProfile(2L)).thenReturn(appointmentProfile(2L));
+
+        MemberAppointmentProfileResponse response = service.getAppointmentProfile(1L, 2L);
+
+        assertEquals(2L, response.getMemberId());
+        assertEquals(4.5, response.getAverageRating());
+        assertEquals(3, response.getReviewCount());
+        assertNull(response.getCompletionRate());
+        assertNull(response.getNoShowCount());
+    }
+
+    @Test
+    void getAppointmentProfile_throwsForbidden_whenNotSharedAndNotRecruiting() {
+        when(memberMapper.findProfile(1L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.findProfile(2L)).thenReturn(profile("ACTIVE", true));
+        when(memberMapper.existsSharedAppointment(1L, 2L)).thenReturn(false);
+        when(memberMapper.existsRecruitingParticipation(2L)).thenReturn(false);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -521,6 +541,7 @@ class MemberProfileServiceImplTest {
 
         verify(memberMapper, never()).findProfile(2L);
         verify(memberMapper, never()).existsSharedAppointment(anyLong(), anyLong());
+        verify(memberMapper, never()).existsRecruitingParticipation(anyLong());
         verify(memberMapper, never()).findAppointmentProfile(anyLong());
     }
 

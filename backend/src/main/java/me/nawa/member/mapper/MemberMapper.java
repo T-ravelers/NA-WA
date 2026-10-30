@@ -20,6 +20,8 @@ public interface MemberMapper {
             @Param("memberId") long memberId
     );
 
+    boolean existsRecruitingParticipation(@Param("memberId") long memberId);
+
     boolean existsActiveCurrency(@Param("currencyCode") String currencyCode);
 
     int updateProfile(
