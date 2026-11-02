@@ -76,13 +76,18 @@ jobs:
           done
           install -d -o ec2-user -g ec2-user "$APP_HOME/nginx"
           install -o ec2-user -g ec2-user -m 644 "$T/docker-compose.yml" "$APP_HOME/docker-compose.yml"
-          install -o ec2-user -g ec2-user -m 644 "$T/nginx/nginx.conf" "$APP_HOME/nginx/nginx.conf"
+          # nginx.conf는 compose가 파일 하나를 bind mount한다. install은 기존 파일을 지우고 새로
+          # 만들어 컨테이너가 옛 inode를 계속 읽게 되므로, 같은 inode에 내용만 덮어쓴다.
+          cat "$T/nginx/nginx.conf" > "$APP_HOME/nginx/nginx.conf"
+          chown ec2-user:ec2-user "$APP_HOME/nginx/nginx.conf"
+          chmod 644 "$APP_HOME/nginx/nginx.conf"
           install -o ec2-user -g ec2-user -m 755 "$T/deploy/deploy.sh" "$APP_HOME/deploy.sh"
           sudo -u ec2-user -H bash "$APP_HOME/deploy.sh"
           EOS
 
+          # executionTimeout이 실제 실행 제한이다. --timeout-seconds는 시작 전 전달 제한일 뿐이다.
           PARAMS=$(jq -n --arg repo "$REPO" --arg sha "$DEPLOY_SHA" --arg script "$REMOTE" \
-            '{commands: ["REPO=" + $repo, "DEPLOY_SHA=" + $sha, $script]}')
+            '{commands: ["REPO=" + $repo, "DEPLOY_SHA=" + $sha, $script], executionTimeout: ["900"]}')
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
@@ -94,15 +99,39 @@ jobs:
           echo "SSM command: $COMMAND_ID"
 
           # 명령을 보낸 직후에는 호출 기록이 아직 없을 수 있어 조회 실패를 Pending으로 본다.
+          get_status() {
+            aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending
+          }
+          is_done() {
+            case "$1" in Success|Failed|Cancelled|TimedOut) return 0 ;; *) return 1 ;; esac
+          }
+
+          # 잡이 취소되거나 대기를 포기하면 원격 명령을 취소하고 끝난 것을 확인한 뒤 종료한다.
+          # 그래야 concurrency 잠금이 풀린 뒤 이전 배포가 뒤늦게 서버를 건드리지 않는다.
+          cancel_and_wait() {
+            aws ssm cancel-command --command-id "$COMMAND_ID" --instance-ids "$INSTANCE_ID" || true
+            for _ in $(seq 1 30); do
+              is_done "$(get_status)" && return 0
+              sleep 10
+            done
+            echo "원격 명령이 종료됐는지 확인하지 못했습니다: $COMMAND_ID"
+          }
+          trap 'echo "잡이 중단되어 원격 명령을 취소합니다"; cancel_and_wait; exit 1' INT TERM
+
+          # 전달 제한(900초) + 실행 제한(900초)을 모두 포함해 최대 2000초 기다린다.
           status=Pending
-          for _ in $(seq 1 100); do
-            status=$(aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
-              --query Status --output text 2>/dev/null || echo Pending)
-            case "$status" in
-              Success|Failed|Cancelled|TimedOut|Cancelling) break ;;
-            esac
+          for _ in $(seq 1 200); do
+            status=$(get_status)
+            is_done "$status" && break
             sleep 10
           done
+
+          if ! is_done "$status"; then
+            echo "대기 시간을 넘겨 원격 명령을 취소합니다 (상태 $status)"
+            cancel_and_wait
+            status=$(get_status)
+          fi
 
           echo "::group::서버 출력"
           aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
