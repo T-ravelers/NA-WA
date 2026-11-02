@@ -262,7 +262,7 @@ public enum MemberErrorCode implements ErrorCode {
 | `INVALID_PROFILE_IMAGE_URL` | `MEMBER-007` |       400 | 프로필 이미지 주소 형식 오류 |
 | `ONBOARDING_FIELD_MISSING`  | `MEMBER-008` |       400 | 온보딩 필수 항목 누락        |
 | `ALREADY_MERCHANT`          | `MEMBER-009` |       409 | 이미 가맹점으로 등록된 계정  |
-| `APPOINTMENT_PROFILE_FORBIDDEN` | `MEMBER-010` |   403 | 같은 약속 참여자가 아님      |
+| `APPOINTMENT_PROFILE_FORBIDDEN` | `MEMBER-010` |   403 | 같은 약속 참여자도, 모집 중 약속 참여자도 아님 |
 
 `PATCH /api/v1/members/me`가 `displayName`·`profileImageUrl`·`nationalityCode`·
 `preferredLanguage`·`preferredCurrencyCode`를 부분 수정할 때, 그리고
@@ -271,9 +271,14 @@ public enum MemberErrorCode implements ErrorCode {
 국적은 ISO 3166-1 alpha-2 코드만 받습니다.
 
 `GET /api/v1/members/{memberId}/appointment-profile`은 본인 프로필을 항상 돌려줍니다.
-다른 회원의 프로필은 두 회원이 같은 약속에 `ACTIVE`로 함께 속해 있을 때만 돌려주고,
-아니면 `MEMBER-010`을 돌려줍니다. 결제 전(`PAYMENT_PENDING`)이거나 취소된 약속은 이
-판정에 쓰지 않습니다. 대상이 없거나 활성 회원이 아니면 상태와 관계없이 `MEMBER-001`입니다.
+다른 회원의 프로필은 다음 둘 중 하나일 때 돌려주고, 아니면 `MEMBER-010`을 돌려줍니다.
+
+- 두 회원이 같은 약속에 `ACTIVE`로 함께 속해 있습니다. 결제 전(`PAYMENT_PENDING`)이거나
+  취소된 약속은 이 판정에 쓰지 않습니다.
+- 대상이 모집 중(`RECRUITING`) 약속에 `ACTIVE`로 속해 있습니다. 참가하기 전에 상대의
+  평가를 확인할 수 있게 엽니다(#592). `FULL`은 더 참여할 수 없어 포함하지 않습니다.
+
+대상이 없거나 활성 회원이 아니면 상태와 관계없이 `MEMBER-001`입니다.
 다른 회원의 응답에는 `completionRate`·`noShowCount` 키가 없습니다(#173, #580).
 요청자 자신이 정지·탈퇴 상태면 본인·타인 조회 모두 `AUTH-016`·`AUTH-017`입니다.
 

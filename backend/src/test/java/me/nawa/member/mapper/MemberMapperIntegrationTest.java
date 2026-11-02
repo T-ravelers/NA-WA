@@ -340,6 +340,75 @@ class MemberMapperIntegrationTest {
         });
     }
 
+    /** 모집 중 약속의 ACTIVE 참여자만 연다. 상태마다 다른 회원을 써서 서로 가리지 못하게 한다. */
+    @Test
+    void existsRecruitingParticipation_requiresActiveMemberOfRecruitingAppointment() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long host = insertMember("모집 중 약속 방장");
+            long joined = insertMember("모집 중 약속 참여자");
+            long left = insertMember("모집 중 약속에서 나간 회원");
+            long pending = insertMember("모집 중 약속 결제 전 회원");
+            long nobody = insertMember("약속 없는 회원");
+            long recruiting = insertAppointment(insertVisibleEventItem(host), host, "RECRUITING");
+            insertMembership(recruiting, host, "ACTIVE");
+            insertMembership(recruiting, joined, "ACTIVE");
+            insertMembership(recruiting, left, "LEFT");
+            insertMembership(recruiting, pending, "PENDING");
+
+            assertTrue(memberMapper.existsRecruitingParticipation(host));
+            assertTrue(memberMapper.existsRecruitingParticipation(joined));
+            assertFalse(memberMapper.existsRecruitingParticipation(left));
+            assertFalse(memberMapper.existsRecruitingParticipation(pending));
+            assertFalse(memberMapper.existsRecruitingParticipation(nobody));
+
+            String[] closedStatuses = {
+                    "PAYMENT_PENDING", "FULL", "IN_PROGRESS", "AWAITING_ATTENDANCE",
+                    "COMPLETED", "CANCELLED"
+            };
+            for (String appointmentStatus : closedStatuses) {
+                long member = insertMember("약속 회원 " + appointmentStatus);
+                long appointmentId = insertAppointment(
+                        insertVisibleEventItem(member), member, appointmentStatus);
+                insertMembership(appointmentId, member, "ACTIVE");
+
+                assertFalse(
+                        memberMapper.existsRecruitingParticipation(member), appointmentStatus);
+            }
+        });
+    }
+
+    /** 참여 행이나 약속이 soft delete되면 열람 근거가 아니다. */
+    @Test
+    void existsRecruitingParticipation_ignoresSoftDeletedMembershipAndAppointment() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+
+            for (String deleteTarget : new String[] {"membership", "appointment"}) {
+                long member = insertMember("모집 중 약속 회원 " + deleteTarget);
+                long appointmentId = insertAppointment(
+                        insertVisibleEventItem(member), member, "RECRUITING");
+                insertMembership(appointmentId, member, "ACTIVE");
+                assertTrue(memberMapper.existsRecruitingParticipation(member), deleteTarget);
+
+                if ("appointment".equals(deleteTarget)) {
+                    jdbcTemplate.update(
+                            "UPDATE appointments SET deleted_at = CURRENT_TIMESTAMP "
+                                    + "WHERE appointment_id = ?",
+                            appointmentId);
+                } else {
+                    jdbcTemplate.update(
+                            "UPDATE appointment_members SET deleted_at = CURRENT_TIMESTAMP "
+                                    + "WHERE appointment_id = ? AND member_id = ?",
+                            appointmentId, member);
+                }
+
+                sqlSessionTemplate.clearCache();
+                assertFalse(memberMapper.existsRecruitingParticipation(member), deleteTarget);
+            }
+        });
+    }
+
     /** 출석 이력이 없는 회원도 noShowCount가 0으로, completionRate가 null로 매핑된다. */
     @Test
     void findAppointmentProfile_mapsEmptyAttendance() {
@@ -355,6 +424,87 @@ class MemberMapperIntegrationTest {
             assertEquals(0, profile.getNoShowCount());
             assertNull(profile.getAverageRating());
             assertEquals(0, profile.getReviewCount());
+        });
+    }
+
+    /**
+     * 집계는 조회한 회원의 참여 행과 그 회원이 받은 후기만 센다(#583).
+     *
+     * 같은 약속에 다른 회원의 출석·후기를 섞어 두고, 두 회원의 값이 서로 새지 않는지 본다.
+     * 빼야 하는 행(삭제된 참여 행과 그 행이 받은 후기, HIDDEN·삭제된 후기, 삭제된 점수)은
+     * 들어가면 값이 달라지도록 1점으로 넣는다.
+     */
+    @Test
+    void findAppointmentProfile_aggregatesOnlyTargetMembersLiveRows() {
+        transactionTemplate.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            long target = insertMember("조회 대상 회원");
+            long mateA = insertMember("후기 쓴 회원 A");
+            long mateB = insertMember("후기 쓴 회원 B");
+            long other = insertMember("같은 약속의 다른 회원");
+            long itemId = insertVisibleEventItem(target);
+
+            // 약속 1: 출석. A의 후기 중 한 점수는 삭제됐다. 다른 회원은 노쇼이고 후기를 받았다.
+            long first = insertAppointment(itemId, target, "COMPLETED");
+            long targetFirst = insertAttendance(first, target, "ATTENDED");
+            long mateAFirst = insertAttendance(first, mateA, "ATTENDED");
+            long otherFirst = insertAttendance(first, other, "NO_SHOW");
+            long scoredReview = insertReview(first, mateAFirst, targetFirst, "VISIBLE", 5, 5, 1);
+            jdbcTemplate.update(
+                    "UPDATE member_review_scores SET deleted_at = CURRENT_TIMESTAMP "
+                            + "WHERE review_id = ? AND review_category = 'COMMUNICATION'",
+                    scoredReview);
+            insertReview(first, targetFirst, mateAFirst, "VISIBLE", 1, 1, 1);
+            insertReview(first, mateAFirst, otherFirst, "VISIBLE", 1, 1, 1);
+
+            // 약속 2: 출석. B의 후기가 그대로 들어간다.
+            long second = insertAppointment(itemId, target, "COMPLETED");
+            long targetSecond = insertAttendance(second, target, "ATTENDED");
+            long mateBSecond = insertAttendance(second, mateB, "ATTENDED");
+            insertReview(second, mateBSecond, targetSecond, "VISIBLE", 3, 4, 4);
+
+            // 약속 3: 노쇼. 숨긴 후기와 삭제된 후기는 빠진다.
+            long third = insertAppointment(itemId, target, "COMPLETED");
+            long targetThird = insertAttendance(third, target, "NO_SHOW");
+            long mateAThird = insertAttendance(third, mateA, "ATTENDED");
+            long mateBThird = insertAttendance(third, mateB, "ATTENDED");
+            insertReview(third, mateAThird, targetThird, "HIDDEN", 1, 1, 1);
+            long deletedReview = insertReview(third, mateBThird, targetThird, "VISIBLE", 1, 1, 1);
+            jdbcTemplate.update(
+                    "UPDATE member_reviews SET deleted_at = CURRENT_TIMESTAMP WHERE review_id = ?",
+                    deletedReview);
+
+            // 약속 4: 출석 미확정이라 출석률 분모에 들어가지 않는다.
+            insertAttendance(insertAppointment(itemId, target, "AWAITING_ATTENDANCE"),
+                    target, "PENDING");
+
+            // 약속 5: 삭제된 참여 행. 출석도, 이 행이 받은 후기도 빠진다.
+            long fifth = insertAppointment(itemId, target, "COMPLETED");
+            long targetFifth = insertAttendance(fifth, target, "ATTENDED");
+            long mateAFifth = insertAttendance(fifth, mateA, "ATTENDED");
+            insertReview(fifth, mateAFifth, targetFifth, "VISIBLE", 1, 1, 1);
+            jdbcTemplate.update(
+                    "UPDATE appointment_members SET deleted_at = CURRENT_TIMESTAMP "
+                            + "WHERE appointment_member_id = ?",
+                    targetFifth);
+
+            MemberAppointmentProfileResponse profile =
+                    memberMapper.findAppointmentProfile(target);
+
+            // 출석 2 / 확정 3(출석 2 + 노쇼 1) = 66.7% → 67
+            assertEquals(67, profile.getCompletionRate());
+            assertEquals(1, profile.getNoShowCount());
+            // 남는 점수는 5, 5(약속 1)와 3, 4, 4(약속 2)다.
+            assertEquals(4.2, profile.getAverageRating(), 1e-9);
+            assertEquals(2, profile.getReviewCount());
+
+            MemberAppointmentProfileResponse otherProfile =
+                    memberMapper.findAppointmentProfile(other);
+
+            assertEquals(0, otherProfile.getCompletionRate());
+            assertEquals(1, otherProfile.getNoShowCount());
+            assertEquals(1.0, otherProfile.getAverageRating(), 1e-9);
+            assertEquals(1, otherProfile.getReviewCount());
         });
     }
 
@@ -388,6 +538,38 @@ class MemberMapperIntegrationTest {
                         + "(appointment_id, member_id, membership_status, left_at) "
                         + "VALUES (?, ?, ?, IF(? = 'LEFT', CURRENT_TIMESTAMP, NULL))",
                 appointmentId, memberId, membershipStatus, membershipStatus);
+    }
+
+    /** chk_appointment_members_attendance — 출석을 확정했으면 확정 시각이 필수다. */
+    private long insertAttendance(long appointmentId, long memberId, String attendanceStatus) {
+        jdbcTemplate.update(
+                "INSERT INTO appointment_members "
+                        + "(appointment_id, member_id, membership_status, "
+                        + "attendance_status, attendance_confirmed_at) "
+                        + "VALUES (?, ?, 'ACTIVE', ?, "
+                        + "IF(? = 'PENDING', NULL, CURRENT_TIMESTAMP))",
+                appointmentId, memberId, attendanceStatus, attendanceStatus);
+        return lastInsertId();
+    }
+
+    /** 세 항목 점수를 순서대로(시간 약속·매너·소통) 함께 넣는다. */
+    private long insertReview(long appointmentId, long reviewerAppointmentMemberId,
+                              long reviewedAppointmentMemberId, String visibilityStatus,
+                              int punctuality, int manners, int communication) {
+        jdbcTemplate.update(
+                "INSERT INTO member_reviews "
+                        + "(appointment_id, reviewer_appointment_member_id, "
+                        + "reviewed_appointment_member_id, visibility_status) "
+                        + "VALUES (?, ?, ?, ?)",
+                appointmentId, reviewerAppointmentMemberId, reviewedAppointmentMemberId,
+                visibilityStatus);
+        long reviewId = lastInsertId();
+        jdbcTemplate.update(
+                "INSERT INTO member_review_scores (review_id, review_category, rating) "
+                        + "VALUES (?, 'PUNCTUALITY', ?), (?, 'MANNERS', ?), "
+                        + "(?, 'COMMUNICATION', ?)",
+                reviewId, punctuality, reviewId, manners, reviewId, communication);
+        return reviewId;
     }
 
     private long lastInsertId() {

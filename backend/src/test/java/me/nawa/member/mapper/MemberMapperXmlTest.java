@@ -64,6 +64,13 @@ class MemberMapperXmlTest {
     }
 
     @Test
+    void mapperXml_parsesExistsRecruitingParticipationStatement() throws Exception {
+        assertTrue(parsedConfiguration().hasStatement(
+                "me.nawa.member.mapper.MemberMapper.existsRecruitingParticipation"
+        ));
+    }
+
+    @Test
     void mapperXml_parsesUpdateProfileStatement() throws Exception {
         assertTrue(parsedConfiguration().hasStatement(
                 "me.nawa.member.mapper.MemberMapper.updateProfile"

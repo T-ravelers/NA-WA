@@ -60,7 +60,9 @@ public class MemberProfileServiceImpl implements MemberProfileService {
         if (target == null || target.isDeleted() || !"ACTIVE".equals(target.getMemberStatus())) {
             throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND);
         }
-        if (!memberMapper.existsSharedAppointment(viewerId, memberId)) {
+        // 같은 약속 참여자끼리는 서로 본다. 모집 중 약속의 참여자는 참가하기 전에도 본다(#592).
+        if (!memberMapper.existsSharedAppointment(viewerId, memberId)
+                && !memberMapper.existsRecruitingParticipation(memberId)) {
             throw new BusinessException(MemberErrorCode.APPOINTMENT_PROFILE_FORBIDDEN);
         }
         return memberMapper.findAppointmentProfile(memberId).withoutAttendance();
