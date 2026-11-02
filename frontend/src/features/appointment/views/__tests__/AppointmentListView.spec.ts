@@ -94,6 +94,11 @@ async function mountView(options: MountOptions = {}) {
         component: { template: '<div>Create</div>' },
       },
       {
+        path: '/explore',
+        name: 'explore',
+        component: { template: '<div>Explore</div>' },
+      },
+      {
         path: '/explore/events/:eventId',
         name: 'explore-event-detail',
         component: { template: '<div>Event</div>' },
@@ -760,6 +765,33 @@ describe('AppointmentListView', () => {
     expect(router.currentRoute.value.query).toMatchObject(FILTERED_RETURN_QUERY)
   })
 
+  // 참여 흐름은 공용 복귀 key를 이 화면 이름으로 덮어쓴다. 탐색 표시는 따로 남아야 한다(#585 리뷰).
+  it('keeps the Explore mark when joining leaves to create a journey', async () => {
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&fromExplore=1',
+      journeys: ref<AppointmentJourneySummary[] | undefined>([]),
+    })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Join')
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text() === 'Create a journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-create')
+    expect(router.currentRoute.value.query).toMatchObject({
+      returnRouteName: 'appointment-list',
+      fromExplore: '1',
+    })
+  })
+
   // 자동으로 넓힌 언어는 사용자가 고른 것이 아니다. 들고 가면 돌아와서 "직접 고른 전체"로 읽힌다.
   it('does not take the automatic language along', async () => {
     fetchAppointments.mockResolvedValueOnce(EMPTY_PAGE)
@@ -825,6 +857,31 @@ describe('AppointmentListView', () => {
 
     expect(router.currentRoute.value.name).toBe('explore-event-detail')
     expect(router.currentRoute.value.params.eventId).toBe('42')
+  })
+
+  // 탐색 목록의 카드에서 바로 온 경우. 열어 본 적 없는 상세가 아니라 목록으로 돌아간다.
+  it('rewinds to the Explore list when a card sent it here', async () => {
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(2)
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&fromExplore=1',
+    })
+    const routerBack = vi.spyOn(router, 'back')
+
+    await wrapper.find('header button').trigger('click')
+
+    expect(routerBack).toHaveBeenCalledOnce()
+    historyLength.mockRestore()
+  })
+
+  it('goes to the Explore list when there is no history to rewind', async () => {
+    const { wrapper, router } = await mountView({
+      path: '/appointments?itemId=42&itemType=EVENT&fromExplore=1',
+    })
+
+    await wrapper.find('header button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('explore')
   })
 
   // 폴링만 가짜 시계에 올린다. flushPromises는 setTimeout·setImmediate를 쓰므로

@@ -210,6 +210,10 @@ Place 쪽 `opening_hours`·`closed_days`의 번역값은 **원문과 같은 JSON
 목록·상세 응답의 `saved`는 요청한 회원이 해당 Event를 찜했는지입니다. 비인증
 요청에서는 항상 `false`입니다.
 
+목록 응답의 `favoriteCount`는 그 Event를 찜한 회원 수입니다(Place 목록과 같습니다).
+목록 카드의 하트 옆에 보입니다. 첫 페이지는 목록 캐시를 거치므로 다른 회원의 찜이
+반영되기까지 캐시 수명(30초)만큼 늦을 수 있습니다.
+
 ## Place 목록
 
 `GET /api/v1/explore/places`

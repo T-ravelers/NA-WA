@@ -44,5 +44,8 @@ public class EventSummaryResponse {
      */
     private Boolean isPermanent;
 
+    /** 이 Event를 찜한 회원 수. 목록 카드의 하트 옆에 보입니다(#584). */
+    private long favoriteCount;
+
     private boolean saved;
 }

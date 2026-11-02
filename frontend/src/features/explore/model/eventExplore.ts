@@ -28,6 +28,8 @@ export interface EventSummary {
    * 카드는 이 값을 "상시"로 옮기지 않고 열린 기간(`From ...`)으로 적는다.
    */
   isPermanent: boolean
+  /** 찜한 회원 수. 카드 하트 옆에 보인다. */
+  favoriteCount: number
   saved: boolean
 }
 

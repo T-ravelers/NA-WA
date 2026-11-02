@@ -1,27 +1,62 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RouterView, createMemoryHistory, createRouter, type RouteRecordRaw } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
 import { useExploreFilterMemoryStore } from '../../model/exploreFilterMemory'
+import {
+  exploreJourneyIntegrationKey,
+  type ExploreJourneyIntegration,
+  type ExploreJourneySummary,
+} from '../../model/journeyIntegration'
 import exploreRoutes from '../../routes'
 
 const fetchEventList = vi.fn()
 const fetchPlaceList = vi.fn()
+const fetchEventDetail = vi.fn()
 const scrollToMock = vi.fn()
+const addJourneyItem = vi.fn()
+const showToast = vi.fn()
+
+vi.mock('@/shared/ui/toast', () => ({ showToast: (message: string) => showToast(message) }))
 
 vi.mock('../../api/exploreApi', () => ({
   fetchEventList: (filters: unknown) => fetchEventList(filters),
   fetchPlaceList: (filters: unknown) => fetchPlaceList(filters),
+  fetchEventDetail: (eventId: unknown, language: unknown) => fetchEventDetail(eventId, language),
+  fetchPlaceDetail: vi.fn(),
 }))
 
 const ExploreView = (await import('../ExploreView.vue')).default
 const { presetDateRange } = await import('../../model/datePresets')
 
 const Stub = { template: '<div />' }
+
+const journeys: ExploreJourneySummary[] = [
+  { tripId: 7, title: 'Seoul weekend', startDate: '2026-08-10', endDate: '2026-08-12' },
+]
+
+/** 목록 화면도 카드에서 담기를 열므로 앱이 주입하는 여정 연동이 있어야 마운트된다. */
+function createJourneyIntegration(): ExploreJourneyIntegration {
+  const query = {
+    data: ref<ExploreJourneySummary[] | undefined>(journeys),
+    isPending: ref(false),
+    isError: ref(false),
+  }
+
+  return {
+    addJourneyItem,
+    parseJourneyRouteQuery: (value) => {
+      const parsed = Number(Array.isArray(value) ? value[0] : value)
+      return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+    },
+    useJourneyListQuery: () => query,
+  }
+}
 
 /** afterEach에서 정리하려고 마지막으로 띄운 화면을 들고 있는다. */
 let routedWrapper: ReturnType<typeof mount> | null = null
@@ -70,6 +105,9 @@ async function mountView(path = '/explore') {
         name: 'explore-place-detail',
         component: { template: '<div>Place detail</div>' },
       },
+      { path: '/journeys/new', name: 'journey-create', component: Stub },
+      { path: '/journeys/:tripId', name: 'journey-detail', component: Stub },
+      { path: '/appointments', name: 'appointment-list', component: Stub },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -80,6 +118,7 @@ async function mountView(path = '/explore') {
   const wrapper = mount(ExploreView, {
     global: {
       plugins: [i18n, router, createPinia(), [VueQueryPlugin, { queryClient }]],
+      provide: { [exploreJourneyIntegrationKey as symbol]: createJourneyIntegration() },
     },
   })
 
@@ -477,6 +516,8 @@ async function mountRoutedView(path = '/explore') {
         route.name === 'explore' ? route : ({ ...route, component: Stub } as RouteRecordRaw),
       ),
       { path: '/appointments', name: 'appointments', component: Stub },
+      { path: '/appointment-list', name: 'appointment-list', component: Stub },
+      { path: '/journeys/new', name: 'journey-create', component: Stub },
     ],
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -485,7 +526,10 @@ async function mountRoutedView(path = '/explore') {
   await router.isReady()
 
   const wrapper = mount(RouterView, {
-    global: { plugins: [i18n, router, pinia, [VueQueryPlugin, { queryClient }]] },
+    global: {
+      plugins: [i18n, router, pinia, [VueQueryPlugin, { queryClient }]],
+      provide: { [exploreJourneyIntegrationKey as symbol]: createJourneyIntegration() },
+    },
   })
   routedWrapper = wrapper
 
@@ -654,5 +698,294 @@ describe('ExploreView filter memory across entries', () => {
 
     /* 화면에 없던 조건이 탭을 누르는 순간 걸리면 안 된다. */
     expect(router.currentRoute.value.query).toEqual({ tab: 'places' })
+  })
+})
+
+describe('ExploreView card actions', () => {
+  const event = {
+    itemId: 301,
+    eventKind: 'FESTIVAL',
+    status: 'ONGOING',
+    title: 'DDP Architecture Tour',
+    subtitle: null,
+    thumbnailUrl: null,
+    region1: 'Seoul',
+    region2: null,
+    region3: null,
+    latitude: null,
+    longitude: null,
+    startDate: '2026-08-10',
+    endDate: '2026-08-12',
+    isPermanent: false,
+    saved: false,
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    sessionStorage.clear()
+    vi.stubGlobal('scrollTo', vi.fn())
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
+    addJourneyItem.mockReset()
+    addJourneyItem.mockResolvedValue({})
+    showToast.mockReset()
+    fetchEventDetail.mockReset()
+    fetchEventList.mockReset()
+    fetchPlaceList.mockReset()
+    fetchEventList.mockResolvedValue({ ...EMPTY_PAGE, content: [event], totalElements: 1 })
+    fetchPlaceList.mockResolvedValue({ ...EMPTY_PAGE, content: [place], totalElements: 1 })
+  })
+
+  async function addFromCard(
+    wrapper: Awaited<ReturnType<typeof mountView>>['wrapper'],
+    label: string,
+  ): Promise<void> {
+    await wrapper.get(`button[aria-label="${label}"]`).trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Seoul weekend'))
+      ?.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Add to'))
+      ?.trigger('click')
+    await flushPromises()
+  }
+
+  it('adds an Event from its card and stays on the list with a toast', async () => {
+    const { wrapper, router } = await mountView()
+
+    await addFromCard(wrapper, 'Add DDP Architecture Tour to trip')
+
+    expect(addJourneyItem).toHaveBeenCalledWith(7, {
+      itemId: 301,
+      visitDate: expect.any(String),
+    })
+    expect(router.currentRoute.value.name).toBe('explore')
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/^Added to Seoul weekend on /))
+  })
+
+  it('adds a Place from its card', async () => {
+    const { wrapper } = await mountView('/explore?tab=places')
+
+    await addFromCard(wrapper, 'Add Seongsu Onsil to trip')
+
+    expect(addJourneyItem).toHaveBeenCalledWith(7, {
+      itemId: 42,
+      visitDate: expect.any(String),
+    })
+  })
+
+  // 여정의 그날을 채우러 들어온 진입은 담고 나면 그 여정으로 돌아간다. 상세와 같은 규칙이다.
+  it('returns to the Journey that carried the date after adding from a card', async () => {
+    sessionStorage.setItem(
+      'nawa.explore.returnContext',
+      JSON.stringify({
+        journeyId: 7,
+        visitDate: '2026-08-11',
+        returnTo: { name: 'journey-detail', params: { tripId: '7' } },
+      }),
+    )
+    const { wrapper, router } = await mountView()
+
+    await addFromCard(wrapper, 'Add DDP Architecture Tour to trip')
+
+    expect(addJourneyItem).toHaveBeenCalledWith(7, { itemId: 301, visitDate: '2026-08-11' })
+    expect(router.currentRoute.value.name).toBe('journey-detail')
+    expect(router.currentRoute.value.params.tripId).toBe('7')
+  })
+
+  // 겹치는 여정이 없어 만들러 나가는 경우. 돌아와서 보던 목록과 담던 카드를 이어야 한다.
+  it('carries the list query and the card being added when leaving to create a journey', async () => {
+    fetchEventList.mockResolvedValue({
+      ...EMPTY_PAGE,
+      content: [{ ...event, startDate: '2026-09-01', endDate: '2026-09-03' }],
+      totalElements: 1,
+    })
+    const { wrapper, router } = await mountView('/explore?eventKinds=FESTIVAL')
+
+    await wrapper.get('button[aria-label="Add DDP Architecture Tour to trip"]').trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[role="dialog"]')
+      .findAll('button')
+      .find((button) => button.text() === 'Create a journey')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('journey-create')
+    expect(router.currentRoute.value.query).toEqual({
+      eventKinds: 'FESTIVAL',
+      returnRouteName: 'explore',
+      journeyAddItemId: '301',
+      journeyAddItemType: 'EVENT',
+      openJourneySelect: '1',
+      itemStartDate: '2026-09-01',
+      itemEndDate: '2026-09-03',
+    })
+  })
+
+  it('reopens the journey selector for the card after creating a journey', async () => {
+    fetchEventDetail.mockResolvedValue({
+      ...event,
+      eventId: 301,
+      region1: 'Seoul',
+      region2: null,
+      region3: null,
+    })
+    const { wrapper, router } = await mountView(
+      '/explore?eventKinds=FESTIVAL&openJourneySelect=1&tripId=7&journeyAddItemId=301&journeyAddItemType=EVENT&itemStartDate=2026-08-10&itemEndDate=2026-08-12',
+    )
+    await flushPromises()
+
+    expect(fetchEventDetail).toHaveBeenCalledWith(301, 'en')
+    expect(
+      wrapper
+        .get('[role="dialog"]')
+        .findAll('button')
+        .find((button) => button.attributes('aria-pressed') === 'true')
+        ?.text(),
+    ).toContain('Seoul weekend')
+    expect(router.currentRoute.value.query).toEqual({ eventKinds: 'FESTIVAL' })
+  })
+
+  it('only clears the resume marks when the card cannot be loaded again', async () => {
+    fetchEventDetail.mockRejectedValue(new Error('gone'))
+    const { wrapper, router } = await mountView(
+      '/explore?openJourneySelect=1&tripId=7&journeyAddItemId=301&journeyAddItemType=EVENT',
+    )
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(router.currentRoute.value.query).toEqual({})
+  })
+
+  it.each([
+    ['/explore', 'Find buddy for DDP Architecture Tour', '301', 'EVENT'],
+    ['/explore?tab=places', 'Find buddy for Seongsu Onsil', '42', 'PLACE'],
+  ])('opens the appointment list from a card on %s', async (path, label, itemId, itemType) => {
+    const { wrapper, router } = await mountView(path)
+    // 이 하네스는 화면을 RouterView 밖에 띄워 이동한 뒤에도 남는다. 남은 화면의 필터
+    // 동기화가 도착지 query를 덮으므로 도착한 주소가 아니라 보낸 요청을 본다.
+    const push = vi.spyOn(router, 'push')
+
+    await wrapper.get(`button[aria-label="${label}"]`).trigger('click')
+    await flushPromises()
+
+    expect(push).toHaveBeenCalledWith({
+      name: 'appointment-list',
+      query: { itemId, itemType, fromExplore: '1' },
+    })
+    // 돌아왔을 때 보던 자리로 옮기려고 떠나기 전 스크롤을 남긴다.
+    expect(sessionStorage.getItem('nawa.explore.listScrollBeforeBuddy')).toBe('0')
+  })
+})
+
+/*
+ * 목록 카드가 다른 feature 화면에 들렀다 돌아오는 진입. 진짜 탐색 라우트 가드를 거쳐야
+ * "밖에서 새로 들어왔다"는 판단이 드러나므로 RouterView로 띄운다(#585 리뷰).
+ */
+describe('ExploreView card round trips through the Explore route guards', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    sessionStorage.clear()
+    scrollToMock.mockReset()
+    vi.stubGlobal('scrollTo', scrollToMock)
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
+    fetchEventList.mockReset()
+    fetchPlaceList.mockReset()
+    fetchEventDetail.mockReset()
+    fetchEventDetail.mockRejectedValue(new Error('not needed here'))
+    fetchEventList.mockResolvedValue(EMPTY_PAGE)
+    fetchPlaceList.mockResolvedValue(EMPTY_PAGE)
+  })
+
+  it('keeps the Journey date when a card comes back from creating a journey', async () => {
+    const { router } = await mountRoutedView(
+      '/explore?journeyId=7&startDate=2026-08-11&endDate=2026-08-11',
+    )
+    /* 필터를 바꾸면 주소에서 journeyId가 빠지고 날짜는 저장된 맥락에만 남는다. */
+    await router.push('/explore?eventKinds=FESTIVAL')
+    await flushPromises()
+
+    const cardMarks = {
+      eventKinds: 'FESTIVAL',
+      journeyAddItemId: '301',
+      journeyAddItemType: 'EVENT',
+      openJourneySelect: '1',
+    }
+    await router.replace({
+      name: 'journey-create',
+      query: { ...cardMarks, returnRouteName: 'explore' },
+    })
+    await flushPromises()
+    /* 여정 생성을 취소하면 규약 key만 빼고 나머지 query를 그대로 돌려준다. */
+    await router.replace({ name: 'explore', query: cardMarks })
+    await flushPromises()
+
+    expect(JSON.parse(sessionStorage.getItem('nawa.explore.returnContext') ?? 'null')).toEqual({
+      journeyId: 7,
+      visitDate: '2026-08-11',
+      returnTo: { name: 'journey-detail', params: { tripId: '7' } },
+    })
+  })
+
+  it('goes back to where the list was when it returns from the buddy list', async () => {
+    const { router } = await mountRoutedView('/explore?eventKinds=FESTIVAL')
+    sessionStorage.setItem('nawa.explore.listScrollBeforeBuddy', '640')
+    scrollToMock.mockReset()
+
+    await router.push({
+      name: 'appointment-list',
+      query: { itemId: '301', itemType: 'EVENT', fromExplore: '1' },
+    })
+    await flushPromises()
+    await router.push('/explore?eventKinds=FESTIVAL')
+    await flushPromises()
+
+    expect(scrollToMock).not.toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+    expect(scrollToMock).toHaveBeenCalledWith({ top: 640, behavior: 'auto' })
+    expect(sessionStorage.getItem('nawa.explore.listScrollBeforeBuddy')).toBeNull()
+  })
+
+  // 맨 위 카드에서 떠나는 것이 가장 흔하다. 0을 "없음"으로 버리면 아무도 맨 위로 되돌리지 않는다.
+  it('goes back to the top when the list was left from the top', async () => {
+    const { router } = await mountRoutedView('/explore?eventKinds=FESTIVAL')
+    sessionStorage.setItem('nawa.explore.listScrollBeforeBuddy', '0')
+    scrollToMock.mockReset()
+
+    await router.push({
+      name: 'appointment-list',
+      query: { itemId: '301', itemType: 'EVENT', fromExplore: '1' },
+    })
+    await flushPromises()
+    await router.push('/explore?eventKinds=FESTIVAL')
+    await flushPromises()
+
+    expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+    expect(sessionStorage.getItem('nawa.explore.listScrollBeforeBuddy')).toBeNull()
+  })
+
+  it('still starts over when the buddy list was not opened from a card', async () => {
+    const { router } = await mountRoutedView('/explore?eventKinds=FESTIVAL')
+    sessionStorage.setItem('nawa.explore.listScrollBeforeBuddy', '640')
+    scrollToMock.mockReset()
+
+    await router.push({ name: 'appointment-list', query: { itemId: '301', itemType: 'EVENT' } })
+    await flushPromises()
+    await router.push('/explore?eventKinds=FESTIVAL')
+    await flushPromises()
+
+    expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+    expect(scrollToMock).not.toHaveBeenCalledWith({ top: 640, behavior: 'auto' })
   })
 })

@@ -49,12 +49,24 @@ function applySavedToCache(data: unknown, itemId: number, saved: boolean): unkno
     return {
       ...data,
       content: data.content.map((item) =>
-        matchesItem(item, itemId) ? { ...(item as object), saved } : item,
+        matchesItem(item, itemId) && isRecord(item) ? withSaved(item, saved) : item,
       ),
     }
   }
 
-  return matchesItem(data, itemId) ? { ...data, saved } : data
+  return matchesItem(data, itemId) ? withSaved(data, saved) : data
+}
+
+/**
+ * 찜 상태와 함께 찜한 사람 수도 맞춘다. 하트만 차고 옆 숫자가 그대로면 내 찜이 빠진 것처럼
+ * 보인다. 상태가 실제로 바뀐 때만 1을 더하거나 빼고, 숫자가 없는 캐시(상세 등)는 건드리지
+ * 않는다. 서버도 상태가 바뀔 때만 수를 바꾼다(`ExploreItemLikeService`).
+ */
+function withSaved(item: Record<string, unknown>, saved: boolean): Record<string, unknown> {
+  const changed = item.saved !== saved
+  if (!changed || typeof item.favoriteCount !== 'number') return { ...item, saved }
+
+  return { ...item, saved, favoriteCount: Math.max(item.favoriteCount + (saved ? 1 : -1), 0) }
 }
 
 // Event 상세는 itemId 대신 eventId를, Place 상세는 placeId를 함께 쓴다.

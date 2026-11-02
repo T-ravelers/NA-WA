@@ -29,6 +29,7 @@ const event = {
   startDate: '2026-08-01',
   endDate: '2026-08-31',
   isPermanent: false,
+  favoriteCount: 0,
   saved: false,
 }
 
@@ -54,22 +55,95 @@ describe('EventCard', () => {
   it('shows press feedback on the clickable card unless reduced motion is requested', () => {
     const wrapper = mountCard()
 
-    expect(wrapper.get('article').classes()).toEqual(
+    expect(wrapper.get('[data-testid="event-card-body"]').classes()).toEqual(
       expect.arrayContaining([
         'transition-transform',
         'motion-reduce:transition-none',
-        'active:scale-[0.98]',
-        'motion-reduce:active:scale-100',
+        'motion-safe:[&:active:not(:has([data-card-action]:active))]:scale-[0.98]',
       ]),
     )
+  })
+
+  /*
+   * 카드 전체가 상세로 가는 자리라 하트와 두 버튼은 클릭이 카드로 올라가지 않게 막고,
+   * 누를 때 카드가 줄어들지 않도록 `data-card-action`으로 표시한다(#584).
+   */
+  it('keeps the heart from opening the detail', async () => {
+    const wrapper = mountCard()
+
+    await wrapper.get('button[aria-pressed]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.emitted('open')).toBeUndefined()
+    expect(wrapper.get('button[aria-pressed]').element.closest('[data-card-action]')).not.toBeNull()
+  })
+
+  // 하트 옆 숫자는 짧게 줄이고(1.2K), 읽는 쪽에는 원래 수를 준다. 0이면 띄우지 않는다.
+  it('shows how many people saved the event next to the heart', () => {
+    const wrapper = mountCard({ favoriteCount: 1234 })
+    const heartColumn = wrapper.get('[data-card-action]')
+
+    expect(heartColumn.get('[aria-hidden="true"]:not(svg)').text()).toBe('1.2K')
+    expect(heartColumn.get('.sr-only').text()).toBe('1234 people saved this')
+  })
+
+  it('shows no count when nobody saved the event', () => {
+    const wrapper = mountCard({ favoriteCount: 0 })
+
+    expect(wrapper.get('[data-card-action]').text()).toBe('')
+  })
+
+  it('puts the heart in the photo column and the buttons in the text column', () => {
+    const wrapper = mountCard()
+    const [photoColumn, textColumn] = wrapper.get('[data-testid="event-card-body"]').element
+      .children
+
+    expect(photoColumn?.querySelector('button[aria-pressed]')).not.toBeNull()
+    expect(
+      textColumn?.querySelector('button[aria-label="Add Sample event to trip"]'),
+    ).not.toBeNull()
+    expect(
+      textColumn?.querySelector('button[aria-label="Find buddy for Sample event"]'),
+    ).not.toBeNull()
   })
 
   it('emits the event id when the card is activated', async () => {
     const wrapper = mountCard()
 
-    await wrapper.get('article').trigger('click')
+    await wrapper.get('[data-testid="event-card-body"]').trigger('click')
 
     expect(wrapper.emitted('open')).toEqual([[42]])
+  })
+
+  // 키보드와 스크린 리더가 쓰는 자리다. 위 영역에도 클릭이 걸려 있어 두 번 나가면 안 된다.
+  it('opens the event once from the title button', async () => {
+    const wrapper = mountCard()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Sample event')
+      ?.trigger('click')
+
+    expect(wrapper.emitted('open')).toEqual([[42]])
+  })
+
+  it.each([
+    ['Add Sample event to trip', 'addToTrip'],
+    ['Find buddy for Sample event', 'findBuddy'],
+  ] as const)('emits %s without opening the detail', async (label, emitted) => {
+    const wrapper = mountCard()
+
+    await wrapper.get(`button[aria-label="${label}"]`).trigger('click')
+
+    expect(wrapper.emitted(emitted)).toEqual([[42]])
+    expect(wrapper.emitted('open')).toBeUndefined()
+  })
+
+  it('keeps only the category, title, period and status from the design', () => {
+    const wrapper = mountCard({ subtitle: 'Sample subtitle' })
+
+    expect(wrapper.text()).not.toContain('Sample subtitle')
+    expect(wrapper.text()).not.toContain('Seoul')
   })
 
   /*

@@ -100,7 +100,7 @@
   --color-danger: #ed3423;
   --color-info: #318cd5;
 
-  /* V2 민트 계열. success-subtle은 면(Attended 배지·Find companions 버튼),
+  /* V2 민트 계열. success-subtle은 면(Attended 배지·Find buddy 버튼),
    * success-2는 보더(bg/boder/success). 지갑의 원시 #91cdbb 부채가 여기로 수렴한다. */
   --color-success-subtle: #8ec4b1;
   --color-success-2: #3a9878;
