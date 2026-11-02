@@ -66,6 +66,12 @@ jobs:
         run: |
           read -r -d '' REMOTE <<'EOS' || true
           set -euo pipefail
+          # 러너가 취소·강제 종료돼도 이전 SSM 명령이 서버에서 계속 실행될 수 있다(CancelCommand는
+          # 종료를 보장하지 않는다). Actions의 concurrency 잠금과 별개로 서버에서 잠금을 잡아,
+          # 이전 배포가 끝나기 전에는 공유 설정 파일 교체와 compose 변경이 시작되지 않게 한다.
+          # fd 9는 아래 runuser 자식 프로세스까지 상속되므로 deploy.sh가 끝날 때까지 유지된다.
+          exec 9>/var/lock/nawa-deploy.lock
+          flock -w 600 9 || { echo "이전 배포가 아직 실행 중입니다(600초 대기 초과). 끝난 뒤 다시 실행하세요."; exit 1; }
           BASE="https://raw.githubusercontent.com/${REPO}/${DEPLOY_SHA}"
           APP_HOME=/home/ec2-user/nawa
           T=$(mktemp -d)
@@ -82,7 +88,8 @@ jobs:
           chown ec2-user:ec2-user "$APP_HOME/nginx/nginx.conf"
           chmod 644 "$APP_HOME/nginx/nginx.conf"
           install -o ec2-user -g ec2-user -m 755 "$T/deploy/deploy.sh" "$APP_HOME/deploy.sh"
-          sudo -u ec2-user -H bash "$APP_HOME/deploy.sh"
+          # sudo는 상속받은 파일 디스크립터를 닫아 잠금이 deploy.sh까지 이어지지 않으므로 runuser를 쓴다.
+          runuser -u ec2-user -- env HOME=/home/ec2-user USER=ec2-user LOGNAME=ec2-user bash "$APP_HOME/deploy.sh"
           EOS
 
           # executionTimeout이 실제 실행 제한이다. --timeout-seconds는 시작 전 전달 제한일 뿐이다.
