@@ -35,31 +35,117 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    # GitHub OIDC 토큰으로 AWS 역할을 맡는다. 장기 SSH 키·액세스 키를 저장하지 않는다.
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: ap-northeast-2
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      REPO: ${{ github.repository }}
+      INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
     steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+      # 이벤트 값을 셸 명령에 그대로 이어 붙이지 않도록 형식을 먼저 검증한다.
+      - name: 배포 커밋 SHA 검증
+        shell: bash
+        run: |
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "head_sha 형식이 올바르지 않습니다"; exit 1; }
 
-      # SSH 키를 다루는 서드파티 액션이라 버전 태그 대신 commit SHA로 고정
-      - name: 배포 설정 파일 EC2로 전송
-        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1
+      # AWS 자격증명을 다루는 서드파티 액션이라 버전 태그 대신 commit SHA로 고정
+      - name: AWS 역할 맡기 (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml,nginx/nginx.conf,deploy/deploy.sh"
-          target: "~/nawa_sync"
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: 배포 스크립트 실행
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            mkdir -p ~/nawa/nginx
-            cp ~/nawa_sync/docker-compose.yml ~/nawa/docker-compose.yml
-            cp ~/nawa_sync/nginx/nginx.conf ~/nawa/nginx/nginx.conf
-            cp ~/nawa_sync/deploy/deploy.sh ~/nawa/deploy.sh
-            chmod +x ~/nawa/deploy.sh
-            bash ~/nawa/deploy.sh
+      # EC2는 private 서브넷에 있어 SSH로 닿을 수 없다. SSM Run Command로 명령을 전달한다.
+      # SSM은 파일을 올려 주지 못하므로, 서버가 워크플로가 검증한 커밋 SHA 기준으로 배포 대상
+      # 파일 3개를 직접 내려받는다. 저장소가 공개라 토큰이 필요 없다(비공개로 바꾸면 깨진다).
+      - name: SSM으로 배포 실행
+        shell: bash
+        run: |
+          read -r -d '' REMOTE <<'EOS' || true
+          set -euo pipefail
+          # 러너가 취소·강제 종료돼도 이전 SSM 명령이 서버에서 계속 실행될 수 있다(CancelCommand는
+          # 종료를 보장하지 않는다). Actions의 concurrency 잠금과 별개로 서버에서 잠금을 잡아,
+          # 이전 배포가 끝나기 전에는 공유 설정 파일 교체와 compose 변경이 시작되지 않게 한다.
+          # fd 9는 아래 runuser 자식 프로세스까지 상속되므로 deploy.sh가 끝날 때까지 유지된다.
+          exec 9>/var/lock/nawa-deploy.lock
+          flock -w 600 9 || { echo "이전 배포가 아직 실행 중입니다(600초 대기 초과). 끝난 뒤 다시 실행하세요."; exit 1; }
+          BASE="https://raw.githubusercontent.com/${REPO}/${DEPLOY_SHA}"
+          APP_HOME=/home/ec2-user/nawa
+          T=$(mktemp -d)
+          trap 'rm -rf "$T"' EXIT
+          for f in docker-compose.yml nginx/nginx.conf deploy/deploy.sh; do
+            mkdir -p "$T/$(dirname "$f")"
+            curl -fsSL --retry 3 "$BASE/$f" -o "$T/$f"
+          done
+          install -d -o ec2-user -g ec2-user "$APP_HOME/nginx"
+          install -o ec2-user -g ec2-user -m 644 "$T/docker-compose.yml" "$APP_HOME/docker-compose.yml"
+          # nginx.conf는 compose가 파일 하나를 bind mount한다. install은 기존 파일을 지우고 새로
+          # 만들어 컨테이너가 옛 inode를 계속 읽게 되므로, 같은 inode에 내용만 덮어쓴다.
+          cat "$T/nginx/nginx.conf" > "$APP_HOME/nginx/nginx.conf"
+          chown ec2-user:ec2-user "$APP_HOME/nginx/nginx.conf"
+          chmod 644 "$APP_HOME/nginx/nginx.conf"
+          install -o ec2-user -g ec2-user -m 755 "$T/deploy/deploy.sh" "$APP_HOME/deploy.sh"
+          # sudo는 상속받은 파일 디스크립터를 닫아 잠금이 deploy.sh까지 이어지지 않으므로 runuser를 쓴다.
+          runuser -u ec2-user -- env HOME=/home/ec2-user USER=ec2-user LOGNAME=ec2-user bash "$APP_HOME/deploy.sh"
+          EOS
+
+          # executionTimeout이 실제 실행 제한이다. --timeout-seconds는 시작 전 전달 제한일 뿐이다.
+          PARAMS=$(jq -n --arg repo "$REPO" --arg sha "$DEPLOY_SHA" --arg script "$REMOTE" \
+            '{commands: ["REPO=" + $repo, "DEPLOY_SHA=" + $sha, $script], executionTimeout: ["900"]}')
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy ${DEPLOY_SHA:0:7}" \
+            --timeout-seconds 900 \
+            --parameters "$PARAMS" \
+            --query Command.CommandId --output text)
+          echo "SSM command: $COMMAND_ID"
+
+          # 명령을 보낸 직후에는 호출 기록이 아직 없을 수 있어 조회 실패를 Pending으로 본다.
+          get_status() {
+            aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending
+          }
+          is_done() {
+            case "$1" in Success|Failed|Cancelled|TimedOut) return 0 ;; *) return 1 ;; esac
+          }
+
+          # 잡이 취소되거나 대기를 포기하면 원격 명령을 취소하고 끝난 것을 확인한 뒤 종료한다.
+          # 그래야 concurrency 잠금이 풀린 뒤 이전 배포가 뒤늦게 서버를 건드리지 않는다.
+          cancel_and_wait() {
+            aws ssm cancel-command --command-id "$COMMAND_ID" --instance-ids "$INSTANCE_ID" || true
+            for _ in $(seq 1 30); do
+              is_done "$(get_status)" && return 0
+              sleep 10
+            done
+            echo "원격 명령이 종료됐는지 확인하지 못했습니다: $COMMAND_ID"
+          }
+          trap 'echo "잡이 중단되어 원격 명령을 취소합니다"; cancel_and_wait; exit 1' INT TERM
+
+          # 전달 제한(900초) + 실행 제한(900초)을 모두 포함해 최대 2000초 기다린다.
+          status=Pending
+          for _ in $(seq 1 200); do
+            status=$(get_status)
+            is_done "$status" && break
+            sleep 10
+          done
+
+          if ! is_done "$status"; then
+            echo "대기 시간을 넘겨 원격 명령을 취소합니다 (상태 $status)"
+            cancel_and_wait
+            status=$(get_status)
+          fi
+
+          echo "::group::서버 출력"
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query '[StandardOutputContent, StandardErrorContent]' --output text || true
+          echo "::endgroup::"
+
+          if [ "$status" != "Success" ]; then
+            echo "배포 실패: SSM 상태 $status"
+            exit 1
+          fi

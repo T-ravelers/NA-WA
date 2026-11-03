@@ -93,8 +93,8 @@ docker compose up
 | redis    | localhost:6379           |
 
 - `docker-compose.override.yml`은 로컬 전용이며 EC2로는 배포되지 않습니다
-  (`.github/workflows/deploy.yml`이 `docker-compose.yml`, `nginx/nginx.conf`,
-  `deploy/deploy.sh`만 전송합니다). 운영에만 필요한 `nginx` 서비스는 로컬에서
+  (`.github/workflows/deploy.yml`이 SSM으로 서버가 `docker-compose.yml`,
+  `nginx/nginx.conf`, `deploy/deploy.sh`만 내려받게 합니다). 운영에만 필요한 `nginx` 서비스는 로컬에서
   기본적으로 실행되지 않습니다.
 - 운영 프론트엔드는 `https://na-wa.cloud`, 백엔드는 `https://api.na-wa.cloud`입니다.
   TLS는 ALB의 ACM 인증서가 443에서 종료하고, nginx는 ALB가 넘기는 평문 80만 받아

@@ -117,6 +117,13 @@ PWA는 필수 기능입니다. 개인정보와 정산 데이터의 안전을 위
 | Frontend Preview    | 운영 방향 확정 | Vercel PR Preview                                    |
 | Frontend Production | 운영 방향 확정 | Vercel `main` Production                             |
 
+Backend CD는 EC2에 SSH로 들어가지 않고 **AWS SSM Run Command**로 배포합니다. GitHub Actions가
+OIDC로 배포용 IAM 역할을 맡아(저장된 SSH 키·액세스 키 없음) 대상 인스턴스에 명령을 보내고,
+서버가 워크플로가 검증한 커밋 SHA 기준으로 `docker-compose.yml`, `nginx/nginx.conf`,
+`deploy/deploy.sh`를 `raw.githubusercontent.com`에서 직접 내려받아 `deploy.sh`를 실행합니다.
+저장소가 공개라서 토큰 없이 받을 수 있고, 비공개로 바꾸면 이 경로를 다시 설계해야 합니다.
+EC2는 private 서브넷에 있어 인바운드 SSH 경로가 없습니다.
+
 Frontend CI는 고정된 잠금 파일로 의존성을 설치한 뒤 format, lint, type-check, unit
 test와 build를 실행합니다. Vercel은 프론트엔드 배포를 담당하고 GitHub Actions는
 품질 검증을 담당합니다. 같은 프론트엔드 배포를 두 시스템에서 중복 실행하지
