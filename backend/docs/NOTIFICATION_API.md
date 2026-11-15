@@ -407,7 +407,7 @@ N일째 첫 실행부터 대상이 된다. 10일 오후 2시에 요청한 정산
 
 ### 처음 배포할 때
 
-`settlement_members`에 `last_reminded_at`·`reminder_count`를 되살린 V23 이전에 쌓인 미납
+`settlement_members`에 `last_reminded_at`·`reminder_count`를 되살린 V24 이전에 쌓인 미납
 구성원은 횟수 0, 마지막 시각 없음으로 시작한다. 요청한 지 3일이 지난 미납 구성원은 **첫 실행에서
 한꺼번에** 첫 리마인더 대상이 된다. 이것은 정책대로의 동작이다. 한 번에 몰리는 것이 부담이면
 배포 전에 오래된 구성원의 `last_reminded_at`을 날짜별로 나눠 채워 두면 간격 규칙이 분산한다.

@@ -171,7 +171,7 @@ erDiagram
 
 ## 미납 리마인더 기록
 
-`settlement_members.last_reminded_at`과 `reminder_count`(V23)는 안 낸 구성원에게 서버가 다시 알린
+`settlement_members.last_reminded_at`과 `reminder_count`(V24)는 안 낸 구성원에게 서버가 다시 알린
 마지막 시각과 횟수다. V1에 있던 열을 V9가 정산 도메인을 줄이면서 지웠고, 리마인더가 생기면서
 되살렸다. `last_reminded_at`이 비어 있으면 한 번도 안 보냈다는 뜻이고, 값은 DB 시계가 아니라 앱이
 넘긴 시각이다. 이 두 열을 바꾸는 곳은 리마인더 실행 하나뿐이다.
@@ -189,7 +189,7 @@ erDiagram
 표시용 데이터라 정산 상태의 정본이 아니다.
 
 `notification_type`은 `SETTLEMENT_REQUESTED`·`SETTLEMENT_PAID`·`SETTLEMENT_COMPLETED`에 더해
-`SETTLEMENT_REMINDER`(V23)를 가진다. ENUM의 끝에 값을 붙인 것이라 기존 행의 저장 값이 밀리지
+`SETTLEMENT_REMINDER`(V24)를 가진다. ENUM의 끝에 값을 붙인 것이라 기존 행의 저장 값이 밀리지
 않는다.
 
 `actor_name`·`gathering_name`·`amount`·`currency_code`는 **알림을 만들 때 복사해 둔 값**이다.

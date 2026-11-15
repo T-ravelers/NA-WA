@@ -46,7 +46,7 @@
         잠그지 않는 키셋 읽기다. 번호 순서로 limit개만 고르고 커서(afterId)를 넘겨 다음 묶음을
         읽는다.
 
-        (request_status, settlement_member_id) 인덱스(V23)가 "미납 행만, 번호 순서로"를 그대로
+        (request_status, settlement_member_id) 인덱스(V24)가 "미납 행만, 번호 순서로"를 그대로
         받쳐 준다. 정산이 끝난 PAID 행이 아무리 쌓여도 읽는 범위는 미납 행으로 좁혀진다.
 
         FORCE INDEX로 그 인덱스를 못 박는다. 기본키 범위를 그냥 훑어도 번호 순서는 나오므로

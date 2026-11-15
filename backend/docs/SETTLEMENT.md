@@ -137,7 +137,7 @@ URL의 경로 변수이고, `transferId`는 생성 요청의 `sourceTransferId`�
 ## 미납 리마인더 기록
 
 `settlement_members`는 구성원마다 마지막으로 리마인더를 적은 시각(`last_reminded_at`)과 횟수
-(`reminder_count`)를 가진다(V23). 아직 안 낸(`PENDING`) 구성원에게 서버가 정해진 시각에 다시
+(`reminder_count`)를 가진다(V24). 아직 안 낸(`PENDING`) 구성원에게 서버가 정해진 시각에 다시
 알리는 기능이 쓰고, 이 두 열을 바꾸는 곳은 리마인더 실행 하나뿐이다. 지급과 완료 흐름은 이
 열을 읽지도 쓰지도 않는다. 정책(첫 발송·간격·상한)과 대상 조건은
 [알림 API 계약](NOTIFICATION_API.md#미납-리마인더)이 정본이다.
