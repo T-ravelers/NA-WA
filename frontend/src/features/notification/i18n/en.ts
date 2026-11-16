@@ -64,6 +64,7 @@ export default {
       SETTLEMENT_REQUESTED: '{actor} asked you for {amount} for {gathering}',
       SETTLEMENT_PAID: '{actor} paid you {amount} for {gathering}',
       SETTLEMENT_COMPLETED: 'Everyone has paid for {gathering}',
+      SETTLEMENT_REMINDER: 'Reminder: {actor} is still waiting for your {amount} for {gathering}',
       UNKNOWN: 'Something happened with {gathering}',
     },
   },

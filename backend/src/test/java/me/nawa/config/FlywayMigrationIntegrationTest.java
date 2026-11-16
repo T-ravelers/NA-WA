@@ -47,6 +47,43 @@ class FlywayMigrationIntegrationTest {
         verifyMemberAccountTypeSchema(flyway);
         verifyDepositPoolWalletSeed(flyway);
         verifySettlementReceiptSchema(flyway);
+        verifySettlementReminderSchema(flyway);
+    }
+
+    private static void verifySettlementReminderSchema(Flyway flyway) {
+        String indexColumns = """
+                SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',')
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'settlement_members'
+                  AND index_name = 'idx_settlement_members_request_status'
+                """;
+
+        try (Connection connection = flyway.getConfiguration()
+                .getDataSource()
+                .getConnection();
+             PreparedStatement statement = connection.prepareStatement(indexColumns);
+             ResultSet resultSet = statement.executeQuery()) {
+            // 시각은 비어 있을 수 있고(아직 안 보냄) 횟수는 0에서 시작해야 한다. 기본값이 빠지면
+            // 이미 쌓인 구성원이 NULL 횟수를 갖게 되어 "횟수 상한 미만" 판정에서 조용히 빠진다.
+            assertEquals("YES", columnMetadata(
+                    connection, "settlement_members", "last_reminded_at", "IS_NULLABLE"));
+            assertEquals("NO", columnMetadata(
+                    connection, "settlement_members", "reminder_count", "IS_NULLABLE"));
+            assertEquals("0", columnDefault(
+                    connection, "settlement_members", "reminder_count"));
+            // ENUM에 값이 없으면 리마인더 INSERT가 통째로 실패한다.
+            assertTrue(columnType(connection, "notifications", "notification_type")
+                    .contains("settlement_reminder"));
+            // 미납 행을 번호 순서로 끊어 읽는 쿼리가 기대는 인덱스다. 열 순서가 바뀌면 안 된다.
+            assertTrue(resultSet.next());
+            assertEquals("request_status,settlement_member_id", resultSet.getString(1));
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                    "Failed to verify settlement reminder migration",
+                    exception
+            );
+        }
     }
 
     private static void verifySettlementReceiptSchema(Flyway flyway) {

@@ -285,15 +285,23 @@
         )
     </select>
 
+    <!--
+        만든 시각은 컬럼 기본값(CURRENT_TIMESTAMP)에 맡기지 않고 애플리케이션이 넘긴 값을
+        적는다. 미납 리마인더가 이 값을 "요청한 지 며칠 됐나"의 기준으로 앱의 날짜와 견주기
+        때문이다. DB 시계에 기대면 DB와 앱의 시간대가 어긋난 만큼 첫 리마인더가 통째로
+        밀린다. 운영 DB는 +09:00으로 맞춰 둬서 이미 쌓인 행은 그대로 둔다.
+
+        값을 안 넘기면 NOT NULL 위반으로 실패한다. 조용히 DB 시계로 떨어지는 쪽보다 낫다.
+    -->
     <insert id="insertSettlement" useGeneratedKeys="true" keyProperty="settlementId">
         INSERT INTO settlements (
             appointment_id, created_by_member_id, payer_member_id, source_transfer_id,
             idempotency_key, request_fingerprint, settlement_status, split_method,
-            total_amount, payer_share_amount, receivable_amount, memo
+            total_amount, payer_share_amount, receivable_amount, memo, created_at
         ) VALUES (
             #{appointmentId}, #{createdByMemberId}, #{payerMemberId}, #{sourceTransferId},
             #{idempotencyKey}, #{requestFingerprint}, #{settlementStatus}, #{splitMethod},
-            #{totalAmount}, #{payerShareAmount}, #{receivableAmount}, #{memo}
+            #{totalAmount}, #{payerShareAmount}, #{receivableAmount}, #{memo}, #{createdAt}
         )
     </insert>
 
@@ -341,13 +349,13 @@
         완료 시각은 애플리케이션이 넘긴 값을 그대로 적는다. DB의 CURRENT_TIMESTAMP를 쓰지
         않는 것은 DB 서버의 시간대 설정이 앱과 다르면 그 시차만큼 시각이 어긋나기 때문이다.
 
-        그래서 같은 정산의 시각 두 개가 서로 다른 시계에서 나온다 — created_at은 DB가 적고
-        (컬럼 기본값), completed_at은 앱이 적는다. 두 값은 한 응답에 나란히 실려 나가므로,
-        받는 쪽이 둘을 같은 기준으로 읽으려면 DB와 앱의 시간대가 맞아 있어야 한다. 운영은
-        맞춰 두었다 — docker-compose.yml의 mysql이 default-time-zone 옵션으로 +09:00을 받고
-        백엔드 컨테이너가 TZ=Asia/Seoul이다. CI는 이 맞춤을 일부러 깨서(MySQL만 UTC) DB 시계에
-        기대는 코드가 드러나게 한다. 자세한 것은 AGENTS.md의 "시간대는 세 곳에서 따로
-        정해집니다"와 docs/TECH_STACK.md.
+        만든 시각(created_at)도 insertSettlement가 앱이 넘긴 값으로 적으므로 새 정산의 두
+        시각은 같은 시계에서 나온다. 다만 이 변경 전에 쌓인 행의 created_at은 DB 시계가 적은
+        값이다. 운영은 DB와 앱의 시간대를 맞춰 두어(docker-compose.yml의 mysql이
+        default-time-zone 옵션으로 +09:00, 백엔드 컨테이너가 TZ=Asia/Seoul) 그 행들도 같은
+        기준으로 읽힌다. CI는 이 맞춤을 일부러 깨서(MySQL만 UTC) DB 시계에 기대는 코드가
+        드러나게 한다. 자세한 것은 AGENTS.md의 "시간대는 세 곳에서 따로 정해집니다"와
+        docs/TECH_STACK.md.
     -->
     <update id="completeSettlementIfNoPendingPayments">
         UPDATE settlements s

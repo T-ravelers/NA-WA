@@ -1,6 +1,8 @@
 package me.nawa.settlement.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -10,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.settlement.domain.Settlement;
@@ -40,14 +43,21 @@ class SettlementItemizedCreationTest {
         when(settlementMapper.findActiveMembers(7L)).thenReturn(activeMembers());
         assignGeneratedIds();
 
+        // 앱은 초 아래를 버리고 적으므로 기준도 같게 자른다.
+        LocalDateTime before = LocalDateTime.now().withNano(0);
         SettlementCreateResponse response = new ItemizedSettlementCreator(settlementMapper)
             .create(1L, validRequest(), source("10.00", 2), "key", "fingerprint");
+        LocalDateTime after = LocalDateTime.now();
 
         assertEquals(91L, response.getId());
         ArgumentCaptor<Settlement> settlement = ArgumentCaptor.forClass(Settlement.class);
         verify(settlementMapper).insertSettlement(settlement.capture());
         assertEquals("REQUESTED", settlement.getValue().getSettlementStatus());
         assertEquals("ITEMIZED", settlement.getValue().getSplitMethod());
+        // 만든 시각은 DB 기본값이 아니라 생성 호출 사이에 앱이 찍은 값이다.
+        LocalDateTime createdAt = settlement.getValue().getCreatedAt();
+        assertNotNull(createdAt);
+        assertFalse(createdAt.isBefore(before) || createdAt.isAfter(after));
         assertEquals(new BigDecimal("2.00"), settlement.getValue().getPayerShareAmount());
         assertEquals(new BigDecimal("8.00"), settlement.getValue().getReceivableAmount());
 

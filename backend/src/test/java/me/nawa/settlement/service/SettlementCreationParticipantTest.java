@@ -1,6 +1,8 @@
 package me.nawa.settlement.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -9,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.settlement.domain.Settlement;
@@ -34,8 +37,11 @@ class SettlementCreationParticipantTest {
         when(settlementMapper.findActiveMembers(7L)).thenReturn(activeMembers());
         assignSettlementId();
 
+        // 앱은 초 아래를 버리고 적으므로 기준도 같게 자른다.
+        LocalDateTime before = LocalDateTime.now().withNano(0);
         new EqualSettlementCreator(settlementMapper, new SettlementAmountAllocator())
             .create(1L, request(List.of(71L, 72L)), source(), "equal-key", "fingerprint");
+        LocalDateTime after = LocalDateTime.now();
 
         ArgumentCaptor<List<SettlementMember>> members = ArgumentCaptor.forClass(List.class);
         verify(settlementMapper).insertSettlementMembers(members.capture());
@@ -51,6 +57,10 @@ class SettlementCreationParticipantTest {
         assertEquals("REQUESTED", settlement.getValue().getSettlementStatus());
         assertEquals(new BigDecimal("50"), settlement.getValue().getPayerShareAmount());
         assertEquals(new BigDecimal("50"), settlement.getValue().getReceivableAmount());
+        // 만든 시각은 DB 기본값이 아니라 생성 호출 사이에 앱이 찍은 값이다.
+        LocalDateTime createdAt = settlement.getValue().getCreatedAt();
+        assertNotNull(createdAt);
+        assertFalse(createdAt.isBefore(before) || createdAt.isAfter(after));
     }
 
     @Test

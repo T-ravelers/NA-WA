@@ -42,6 +42,7 @@ export default {
       SETTLEMENT_REQUESTED: '{actor} 向你請款「{gathering}」的 {amount}',
       SETTLEMENT_PAID: '{actor} 已支付你「{gathering}」的 {amount}',
       SETTLEMENT_COMPLETED: '「{gathering}」的款項大家都付清了',
+      SETTLEMENT_REMINDER: '提醒：{actor} 還在等你支付「{gathering}」的 {amount}',
       UNKNOWN: '「{gathering}」有新的動態',
     },
   },

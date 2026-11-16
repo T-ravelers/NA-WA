@@ -1,6 +1,7 @@
 package me.nawa.settlement.service.creation;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -116,6 +117,11 @@ public class EqualSettlementCreator implements SettlementCreationHandler {
             .totalAmount(source.getAmount())
             .payerShareAmount(payerShare)
             .receivableAmount(source.getAmount().subtract(payerShare))
+            // 만든 시각은 DB 기본값에 맡기지 않고 앱이 적는다. 미납 리마인더가 이 시각을
+            // 앱의 날짜와 견주므로, DB 시계에 기대면 시간대가 어긋난 만큼 첫 발송이 밀린다.
+            // 초 아래는 버린다. 컬럼이 초 단위 DATETIME이라 MySQL이 반올림하면 자정 직전에
+            // 만든 정산이 다음 날로 적혀 첫 리마인더가 하루 늦어진다.
+            .createdAt(LocalDateTime.now().withNano(0))
             .build();
     }
 }

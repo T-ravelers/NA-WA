@@ -9,7 +9,7 @@
 export type ApiAmount = string | number
 
 export type NotificationTypeDto =
-  'SETTLEMENT_REQUESTED' | 'SETTLEMENT_PAID' | 'SETTLEMENT_COMPLETED'
+  'SETTLEMENT_REQUESTED' | 'SETTLEMENT_PAID' | 'SETTLEMENT_COMPLETED' | 'SETTLEMENT_REMINDER'
 
 export interface NotificationDto {
   id: string | number

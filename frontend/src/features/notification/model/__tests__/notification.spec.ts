@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { settlementReturnQuery, toAppNotification, toNotificationKind } from '../notification'
+import {
+  settlementReturnQuery,
+  settlementSideFor,
+  toAppNotification,
+  toNotificationKind,
+} from '../notification'
 
 const dto = {
   id: 1,
@@ -15,14 +20,35 @@ const dto = {
 }
 
 describe('toNotificationKind', () => {
-  it('keeps the three settlement kinds the screen knows', () => {
+  it('keeps the settlement kinds the screen knows', () => {
     expect(toNotificationKind('SETTLEMENT_REQUESTED')).toBe('SETTLEMENT_REQUESTED')
     expect(toNotificationKind('SETTLEMENT_PAID')).toBe('SETTLEMENT_PAID')
     expect(toNotificationKind('SETTLEMENT_COMPLETED')).toBe('SETTLEMENT_COMPLETED')
+    expect(toNotificationKind('SETTLEMENT_REMINDER')).toBe('SETTLEMENT_REMINDER')
   })
 
   it('falls back to UNKNOWN instead of dropping a kind it has not seen', () => {
     expect(toNotificationKind('APPOINTMENT_REMINDER')).toBe('UNKNOWN')
+  })
+})
+
+/*
+ * 정산 상세에서 뒤로 갔을 때 열릴 탭이다. 요청과 리마인더는 둘 다 낼 사람이 받는 알림이라 같은
+ * 쪽이고, 어긋나면 그 정산이 없는 탭이 열린다.
+ */
+describe('settlementSideFor', () => {
+  it('sends a request and its reminder back to the list of splits to pay', () => {
+    expect(settlementSideFor('SETTLEMENT_REQUESTED')).toBe('received')
+    expect(settlementSideFor('SETTLEMENT_REMINDER')).toBe('received')
+  })
+
+  it('sends a payment back to the list of splits to collect', () => {
+    expect(settlementSideFor('SETTLEMENT_PAID')).toBe('sent')
+  })
+
+  it('leaves the side to the settlement detail when it cannot be known', () => {
+    expect(settlementSideFor('SETTLEMENT_COMPLETED')).toBeUndefined()
+    expect(settlementSideFor('UNKNOWN')).toBeUndefined()
   })
 })
 
