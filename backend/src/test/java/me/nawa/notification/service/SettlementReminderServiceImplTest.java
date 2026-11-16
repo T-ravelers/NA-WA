@@ -68,8 +68,9 @@ class SettlementReminderServiceImplTest {
     }
 
     /**
-     * 정책(3일째 첫 발송, 3일 간격, 3회)을 날짜 단위 기준으로 바꾸는 규칙이다. 같은 날이면 몇 시에
-     * 불러도 기준이 같고, 요청한 날의 늦은 밤에 만든 정산도 3일째 첫 실행부터 대상이 된다.
+     * 정책(요청한 날로부터 3일 뒤 첫 발송, 3일 간격, 3회)을 날짜 단위 기준으로 바꾸는 규칙이다.
+     * 같은 날이면 몇 시에 불러도 기준이 같고, 요청한 날의 늦은 밤에 만든 정산도 3일 뒤 첫 실행부터
+     * 대상이 된다.
      */
     @Test
     void criteriaAt_countsInCalendarDaysNotHours() {
@@ -84,7 +85,7 @@ class SettlementReminderServiceImplTest {
         assertEquals(morning.getRemindedBefore(), night.getRemindedBefore());
         assertEquals(3, morning.getMaxCount());
 
-        // 22일 23시 59분에 만든 정산은 25일이 3일째라 대상이고, 23일 0시 정각에 만든 정산은 아니다.
+        // 22일 23시 59분에 만든 정산은 25일이 3일 뒤라 대상이고, 23일 0시 정각에 만든 정산은 아니다.
         assertTrue(LocalDateTime.of(2026, 10, 22, 23, 59).isBefore(morning.getFirstBefore()));
         assertFalse(LocalDateTime.of(2026, 10, 23, 0, 0).isBefore(morning.getFirstBefore()));
     }

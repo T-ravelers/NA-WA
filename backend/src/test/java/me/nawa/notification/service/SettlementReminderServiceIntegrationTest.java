@@ -68,7 +68,7 @@ class SettlementReminderServiceIntegrationTest {
 
     private static final long TIMEOUT_SECONDS = 60L;
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2003, 6, 10, 14, 0);
-    // 정산을 만든 날(10일)의 3일째부터 대상이다.
+    // 정산을 만든 날(10일)로부터 3일 뒤(13일)부터 대상이다.
     private static final LocalDateTime THIRD_DAY = LocalDateTime.of(2003, 6, 13, 10, 0);
 
     private static HikariDataSource dataSource;

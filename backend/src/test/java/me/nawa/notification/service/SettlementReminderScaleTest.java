@@ -126,8 +126,8 @@ class SettlementReminderScaleTest {
     private static final long FRESH_ROW0 = 1_300_000_000L;
     private static final long PAID_ROW0 = 1_400_000_000L;
 
-    // 정산은 2004-06-01에, 새 정산은 06-14에 만들었고 실행 시각은 06-15다. 06-15 기준 3일째는
-    // 06-13 자정 전에 만든 정산부터라서 앞의 것만 대상이다.
+    // 정산은 2004-06-01에, 새 정산은 06-14에 만들었고 실행 시각은 06-15다. 06-15에 첫 리마인더를
+    // 받는 것은 06-13 자정 전(06-12까지)에 만든 정산이라 앞의 것만 대상이다.
     private static final LocalDateTime NOW = LocalDateTime.of(2004, 6, 15, 10, 0);
 
     private static HikariDataSource dataSource;
