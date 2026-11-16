@@ -39,6 +39,12 @@ import org.springframework.stereotype.Service;
  * 대기열을 채우면 실시간 정산 알림 푸시가 버려진다. 다음 묶음을 읽기 전에 대기열이 일정 수준 이하로
  * 내려올 때까지 짧게 기다린다. 오래 걸려도(최대 30초) 푸시를 못 보냈다고 알림 적재를 멈추지는 않는다.
  * 푸시가 꺼져 있으면 대기열이 늘 비어서 기다리지 않는다.
+ *
+ * <p><b>한 실행은 50분을 넘기지 않는다.</b> 묶음마다 푸시 때문에 최대 30초를 기다릴 수 있어서, 대상이
+ * 많은 날 푸시까지 느리면 실행이 몇 시간 이어진다. 그러면 20시 실행이 밤에도 알림을 보내고, 실행
+ * 시작에 고정한 {@code now}가 늦게 적힌 알림의 시각을 실제보다 이르게 남긴다. 50분이 지나면 다음
+ * 묶음을 읽지 않고 멈춘다. 남은 사람은 기록이 없으므로 다음 정각 실행이 이어받고, 20시 실행은
+ * 20시 50분 무렵에 끝난다. 이미 읽은 묶음은 끝까지 처리하므로 그만큼은 넘길 수 있다.
  */
 @Slf4j
 @Service
@@ -57,12 +63,15 @@ public class SettlementReminderServiceImpl implements SettlementReminderService 
     static final int PUSH_QUEUE_LIMIT = PushConfig.QUEUE_CAPACITY - CHUNK_SIZE - REALTIME_PUSH_RESERVE;
     private static final Duration PUSH_WAIT_LIMIT = Duration.ofSeconds(30);
     private static final long PUSH_POLL_MILLIS = 100;
+    // 다음 정각 실행이 시작되기 전에 끝나고, 20시 실행이 21시를 넘지 않는 길이다.
+    private static final Duration RUN_TIME_LIMIT = Duration.ofMinutes(50);
 
     private final SettlementReminderMapper reminderMapper;
     private final SettlementReminderWriter writer;
     private final PushSender pushSender;
     private final ThreadPoolTaskExecutor pushExecutor;
     private final Duration pushWaitLimit;
+    private final Duration runTimeLimit;
 
     @Autowired
     public SettlementReminderServiceImpl(
@@ -71,27 +80,30 @@ public class SettlementReminderServiceImpl implements SettlementReminderService 
         PushSender pushSender,
         @Qualifier("pushExecutor") ThreadPoolTaskExecutor pushExecutor
     ) {
-        this(reminderMapper, writer, pushSender, pushExecutor, PUSH_WAIT_LIMIT);
+        this(reminderMapper, writer, pushSender, pushExecutor, PUSH_WAIT_LIMIT, RUN_TIME_LIMIT);
     }
 
-    /** 기다림 상한을 줄여 볼 수 있게 하려는 테스트용 생성자다. */
+    /** 기다림 상한과 실행 시간 상한을 줄여 볼 수 있게 하려는 테스트용 생성자다. */
     SettlementReminderServiceImpl(
         SettlementReminderMapper reminderMapper,
         SettlementReminderWriter writer,
         PushSender pushSender,
         ThreadPoolTaskExecutor pushExecutor,
-        Duration pushWaitLimit
+        Duration pushWaitLimit,
+        Duration runTimeLimit
     ) {
         this.reminderMapper = reminderMapper;
         this.writer = writer;
         this.pushSender = pushSender;
         this.pushExecutor = pushExecutor;
         this.pushWaitLimit = pushWaitLimit;
+        this.runTimeLimit = runTimeLimit;
     }
 
     @Override
     public SettlementReminderResult sendReminders(LocalDateTime now) {
         long startedAt = System.nanoTime();
+        long deadline = startedAt + runTimeLimit.toNanos();
         SettlementReminderCriteria criteria = criteriaAt(now);
         long cursor = 0;
         int chunks = 0;
@@ -100,6 +112,11 @@ public class SettlementReminderServiceImpl implements SettlementReminderService 
 
         while (!Thread.currentThread().isInterrupted()) {
             awaitPushRoom();
+            if (System.nanoTime() - deadline >= 0) {
+                log.warn("미납 리마인더 실행 시간 상한을 넘겨 멈춥니다. 남은 대상은 다음 실행이 이어받습니다. cursor={}",
+                    cursor);
+                break;
+            }
             List<Long> ids = reminderMapper.findCandidateIds(criteria, cursor, CHUNK_SIZE);
             if (ids.isEmpty()) {
                 break;

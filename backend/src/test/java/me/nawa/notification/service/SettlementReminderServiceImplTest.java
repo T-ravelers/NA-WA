@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -210,7 +212,7 @@ class SettlementReminderServiceImplTest {
         ExecutorService runner = Executors.newSingleThreadExecutor();
         try {
             SettlementReminderServiceImpl service = new SettlementReminderServiceImpl(
-                reminderMapper, writer, pushSender, pushExecutor, Duration.ofMillis(300));
+                reminderMapper, writer, pushSender, pushExecutor, Duration.ofMillis(300), Duration.ofMinutes(50));
 
             Future<SettlementReminderResult> run = runner.submit(() -> service.sendReminders(NOW));
 
@@ -220,6 +222,22 @@ class SettlementReminderServiceImplTest {
             release.countDown();
             runner.shutdownNow();
         }
+    }
+
+    /**
+     * 실행 시간 상한이 지나면 다음 묶음을 읽지 않는다. 20시 실행이 밤까지 이어지지 않게 하는 장치다.
+     * 상한을 0으로 두면 첫 묶음을 읽기 전에 이미 지난 것이라 시각에 기대지 않고 확인된다.
+     */
+    @Test
+    void sendReminders_stopsWithoutReadingOnceTheRunTimeLimitHasPassed() {
+        SettlementReminderServiceImpl service = new SettlementReminderServiceImpl(
+            reminderMapper, writer, pushSender, pushExecutor, Duration.ofSeconds(30), Duration.ZERO);
+
+        SettlementReminderResult result = service.sendReminders(NOW);
+
+        assertEquals(0, result.chunks());
+        verify(reminderMapper, never()).findCandidateIds(any(), anyLong(), anyInt());
+        verify(writer, never()).remind(any(), any());
     }
 
     /** 첫 작업이 스레드를 붙잡고 나머지가 큐에 쌓이게 한다. 래치를 풀면 모두 끝난다. */
