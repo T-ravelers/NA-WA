@@ -86,9 +86,10 @@ Node `24.22.1` · pnpm `12.15.0` · Java `17`
   외래키 검사가 정산 행에 공유 잠금을 요구하는데 지급은 정산 행을 먼저 잡기 때문이고, 재현
   테스트(`SettlementReminderWriterIntegrationTest`)가 막습니다. 후보 읽기의 `STRAIGHT_JOIN`을 빼면
   옵티마이저가 정산 표 전체를 훑고 정렬해(측정에서 10만 건 한 실행이 80.6초) 오류 없이 느려집니다.
-  `FORCE INDEX`를 빼면 이미 낸 행이 10만 건 있어도 기본키 범위를 고릅니다. 이 둘은 일회용 DB 전용
-  `SettlementReminderScaleTest`(`RUN_REMINDER_SCALE_TEST`)의 `EXPLAIN` 단정이 잡으므로 쿼리를
-  고치면 그 테스트를 다시 돌리세요. 자세한 것은
+  `FORCE INDEX`를 빼면 이미 낸 행이 10만 건 있어도 기본키 범위를 고릅니다. 이 둘은 CI의 MySQL 통합
+  테스트(`SettlementReminderMapperIntegrationTest`의 `explain_*`)가 `EXPLAIN`으로 잡아서, 힌트를
+  지우면 CI가 실패합니다. 실행 시간까지 보려면 일회용 DB 전용 `SettlementReminderScaleTest`
+  (`RUN_REMINDER_SCALE_TEST`)를 돌리세요. 자세한 것은
   [알림 API 계약](./backend/docs/NOTIFICATION_API.md#미납-리마인더).
 - 리다이렉트 응답에는 CORS 헤더가 없습니다. 프론트의 `VITE_API_BASE_URL`이 `http://`로
   남아 있으면 브라우저가 preflight 단계에서 차단해 **모든 API 호출이 실패합니다.**
