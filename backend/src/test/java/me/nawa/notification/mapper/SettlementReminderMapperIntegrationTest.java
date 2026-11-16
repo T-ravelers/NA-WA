@@ -1,20 +1,29 @@
 package me.nawa.notification.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.notification.ReminderTestData;
 import me.nawa.notification.ReminderTestData.MemberRow;
 import me.nawa.notification.ReminderTestData.SettlementRow;
 import me.nawa.notification.domain.SettlementReminderCriteria;
 import me.nawa.notification.domain.SettlementReminderTarget;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.mapping.ParameterMapping;
+import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -54,6 +63,7 @@ class SettlementReminderMapperIntegrationTest {
     private static final LocalDateTime DUE_CREATED_AT = BEFORE.minusDays(1);
 
     private static HikariDataSource dataSource;
+    private static SqlSessionFactory sqlSessionFactory;
     private static SettlementReminderMapper mapper;
 
     private ReminderTestData data;
@@ -75,7 +85,7 @@ class SettlementReminderMapperIntegrationTest {
         factoryBean.setMapperLocations(
             new ClassPathResource("me/nawa/notification/mapper/SettlementReminderMapper.xml")
         );
-        SqlSessionFactory sqlSessionFactory = factoryBean.getObject();
+        sqlSessionFactory = factoryBean.getObject();
         if (!sqlSessionFactory.getConfiguration().hasMapper(SettlementReminderMapper.class)) {
             sqlSessionFactory.getConfiguration().addMapper(SettlementReminderMapper.class);
         }
@@ -338,6 +348,89 @@ class SettlementReminderMapperIntegrationTest {
 
         // 넘기지 않은 구성원은 그대로다.
         assertEquals(0, data.reminderCount(untouched));
+    }
+
+    /**
+     * 후보 읽기의 실행 계획을 고정한다. 구성원 표를 미납 인덱스로 번호 순서대로 읽고(정렬·임시 테이블
+     * 없이), 정산·약속 참가·회원은 그 순서대로 기본키로 찾아야 한다.
+     *
+     * 이 계획은 쿼리의 힌트(STRAIGHT_JOIN·FORCE INDEX)가 만든다. 힌트를 지우면 오류 없이 느려지기만
+     * 해서(NOTIFICATION_API.md 「대량 처리 측정」) 기능 테스트로는 드러나지 않는다. 힌트가 순서와
+     * 인덱스를 못 박으므로 행 몇 개로도 계획이 늘 같고, 그래서 CI에서 돌 수 있다. FORCE INDEX를 지우면
+     * 이 테스트가, STRAIGHT_JOIN을 지우면 아래 잠금 읽기 테스트가 실패한다.
+     */
+    @Test
+    void explain_candidateRead_followsTheHintedPlan() throws SQLException {
+        SettlementRow settlement = data.settlement(DUE_CREATED_AT);
+        data.pendingMembers(settlement, 3);
+        data.paidMember(settlement);
+
+        List<Map<String, String>> plan = explain(
+            "findCandidateIds", Map.of("criteria", CRITERIA, "afterId", 0L, "limit", 100));
+
+        assertEquals(List.of("sm", "s", "am", "m"), tables(plan), plan.toString());
+        assertEquals("idx_settlement_members_request_status", plan.get(0).get("key"), plan.toString());
+        for (Map<String, String> row : plan) {
+            String extra = String.valueOf(row.get("Extra"));
+            assertFalse(extra.contains("filesort") || extra.contains("temporary"), plan.toString());
+            if (!"sm".equals(row.get("table"))) {
+                assertEquals("PRIMARY", row.get("key"), plan.toString());
+            }
+        }
+    }
+
+    /** 잠금 읽기는 받은 번호를 기본키로 찾고, 나머지도 모두 기본키로 찾는다. */
+    @Test
+    void explain_lockRead_findsEveryRowByPrimaryKey() throws SQLException {
+        SettlementRow settlement = data.settlement(DUE_CREATED_AT);
+        List<Long> ids = data.pendingMembers(settlement, 3).stream()
+            .map(MemberRow::settlementMemberId)
+            .toList();
+
+        List<Map<String, String>> plan = explain("lockTargets", Map.of("criteria", CRITERIA, "ids", ids));
+
+        assertEquals("sm", plan.get(0).get("table"), plan.toString());
+        for (Map<String, String> row : plan) {
+            assertEquals("PRIMARY", row.get("key"), plan.toString());
+        }
+    }
+
+    /**
+     * 매퍼가 실제로 만드는 SQL 그대로 EXPLAIN한다. 같은 SQL을 테스트에 따로 적으면 쿼리가 바뀌어도
+     * 이 테스트는 옛 쿼리를 본다.
+     */
+    private static List<Map<String, String>> explain(String statementId, Map<String, Object> parameter)
+        throws SQLException {
+        org.apache.ibatis.session.Configuration configuration = sqlSessionFactory.getConfiguration();
+        BoundSql bound = configuration
+            .getMappedStatement(SettlementReminderMapper.class.getName() + "." + statementId)
+            .getBoundSql(parameter);
+        MetaObject meta = configuration.newMetaObject(parameter);
+        List<Map<String, String>> rows = new ArrayList<>();
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement prepared = connection.prepareStatement("EXPLAIN " + bound.getSql())) {
+            int index = 1;
+            for (ParameterMapping mapping : bound.getParameterMappings()) {
+                String property = mapping.getProperty();
+                prepared.setObject(index++, bound.hasAdditionalParameter(property)
+                    ? bound.getAdditionalParameter(property)
+                    : meta.getValue(property));
+            }
+            try (ResultSet resultSet = prepared.executeQuery()) {
+                while (resultSet.next()) {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (String column : List.of("table", "type", "key", "Extra")) {
+                        row.put(column, resultSet.getString(column));
+                    }
+                    rows.add(row);
+                }
+            }
+        }
+        return rows;
+    }
+
+    private static List<String> tables(List<Map<String, String>> plan) {
+        return plan.stream().map(row -> row.get("table")).toList();
     }
 
     private static String requiredEnvironment(String name) {
