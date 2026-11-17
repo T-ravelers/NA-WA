@@ -355,9 +355,9 @@ class SettlementReminderMapperIntegrationTest {
      * 없이), 정산·약속 참가·회원은 그 순서대로 기본키로 찾아야 한다.
      *
      * 이 계획은 쿼리의 힌트(STRAIGHT_JOIN·FORCE INDEX)가 만든다. 힌트를 지우면 오류 없이 느려지기만
-     * 해서(NOTIFICATION_API.md 「대량 처리 측정」) 기능 테스트로는 드러나지 않는다. 힌트가 순서와
-     * 인덱스를 못 박으므로 행 몇 개로도 계획이 늘 같고, 그래서 CI에서 돌 수 있다. FORCE INDEX를 지우면
-     * 이 테스트의 계획 단정이 실패한다.
+     * 해서(NOTIFICATION_API.md 「대량 처리 측정」) 기능 테스트로는 드러나지 않는다. 후보 읽기의 구성원
+     * 인덱스와 두 쿼리의 조인 순서는 힌트가 못 박으므로 행 몇 개로도 그 부분은 늘 같고, 그래서 CI에서
+     * 돌 수 있다. FORCE INDEX를 지우면 이 테스트의 계획 단정이 실패한다.
      *
      * STRAIGHT_JOIN은 행이 적으면 빼도 이 쿼리의 계획이 같게 나와 계획으로는 잡히지 않는다. 잠금 읽기
      * 테스트가 대신 실패하는 것은 두 쿼리가 dueJoins 조각을 함께 쓰기 때문이다. 후보 읽기의 조인을
@@ -395,7 +395,7 @@ class SettlementReminderMapperIntegrationTest {
      * 작은 표에서는 통계에 따라 고르는 쪽이 바뀔 수 있다. 둘 다 받은 번호만 읽으므로 둘 다 허용한다.
      */
     @Test
-    void explain_lockRead_findsEveryRowByPrimaryKey() throws SQLException {
+    void explain_lockRead_joinsByPrimaryKeyAfterMembers() throws SQLException {
         SettlementRow settlement = data.settlement(DUE_CREATED_AT);
         List<Long> ids = data.pendingMembers(settlement, 3).stream()
             .map(MemberRow::settlementMemberId)
