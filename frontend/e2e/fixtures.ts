@@ -19,6 +19,11 @@ import { test as base } from '@playwright/test'
  * 이 catch-all은 컨텍스트 수준이고 스펙보다 먼저 등록된다. Playwright는 나중에
  * 등록된 라우트를 먼저 맞추고 page 수준을 context 수준보다 앞세우므로, 스펙이 건
  * 목킹이 항상 이긴다.
+ *
+ * 끊는 대상은 **경로가 `/api/`로 시작하는 요청**뿐이다. glob `**\/api/**`로 걸면
+ * dev 서버가 내려주는 소스 모듈(`/src/shared/api/httpClient.ts`,
+ * `/src/features/*\/api/*.ts`)까지 끊겨 앱이 아예 뜨지 않는다. CI는 번들 파일을 쓰는
+ * preview 빌드라 이 경로가 없어서 드러나지 않았다(#610).
  */
 export const test = base.extend({
   context: async ({ context }, use) => {
@@ -29,9 +34,12 @@ export const test = base.extend({
       }
     })
 
-    await context.route('**/api/**', async (route) => {
-      await route.abort()
-    })
+    await context.route(
+      (url) => url.pathname.startsWith('/api/'),
+      async (route) => {
+        await route.abort()
+      },
+    )
 
     await use(context)
   },
