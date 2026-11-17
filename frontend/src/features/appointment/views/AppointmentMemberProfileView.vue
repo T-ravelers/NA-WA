@@ -14,6 +14,7 @@ import StateLoading from '@/shared/ui/StateLoading.vue'
 import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import type { AppointmentMember } from '../api/appointmentApi'
+import { useAppointmentMemberStats } from '../model/memberIntegration'
 import { appointmentMembersQueryOptions } from '../model/appointmentQueries'
 
 const route = useRoute()
@@ -38,6 +39,24 @@ const membersQuery = useQuery({
 const member = computed<AppointmentMember | undefined>(() =>
   membersQuery.data.value?.find((value) => value.memberId === memberId.value),
 )
+
+const profileStatsQuery = useAppointmentMemberStats(memberId)
+
+/**
+ * 신뢰 점수 한 줄(#173 「신뢰도 점수」). 평점과 후기 수만 보여 준다.
+ * 출석률·노쇼 수는 공개 범위를 정하지 않아 본인 조회에서도 그리지 않는다.
+ * 조회에 실패하면(열람 범위 밖 403 포함) 줄을 그리지 않는다.
+ */
+const trustLine = computed<string | null>(() => {
+  const stats = profileStatsQuery.data.value
+  if (!stats) return null
+  if (stats.reviewCount === 0 || stats.averageRating === null)
+    return t('appointment.profile.noReviews')
+  return t('appointment.profile.trustLine', {
+    rating: stats.averageRating.toFixed(1),
+    count: stats.reviewCount,
+  })
+})
 
 function goBack(): void {
   if (window.history.length > 1) {
@@ -105,6 +124,13 @@ function goBack(): void {
             </div>
             <p class="mt-1 text-body-sm text-ink-2">
               {{ t(`appointment.languages.${member.preferredLanguage}`) }}
+            </p>
+            <p
+              v-if="trustLine !== null"
+              class="mt-1 text-caption text-ink-3"
+              data-testid="member-trust-line"
+            >
+              {{ trustLine }}
             </p>
           </div>
         </section>
