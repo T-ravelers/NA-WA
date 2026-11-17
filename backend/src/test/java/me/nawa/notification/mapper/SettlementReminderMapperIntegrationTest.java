@@ -1,20 +1,29 @@
 package me.nawa.notification.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import me.nawa.config.MySqlSchemaExtension;
 import me.nawa.notification.ReminderTestData;
 import me.nawa.notification.ReminderTestData.MemberRow;
 import me.nawa.notification.ReminderTestData.SettlementRow;
 import me.nawa.notification.domain.SettlementReminderCriteria;
 import me.nawa.notification.domain.SettlementReminderTarget;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.mapping.ParameterMapping;
+import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -54,6 +63,7 @@ class SettlementReminderMapperIntegrationTest {
     private static final LocalDateTime DUE_CREATED_AT = BEFORE.minusDays(1);
 
     private static HikariDataSource dataSource;
+    private static SqlSessionFactory sqlSessionFactory;
     private static SettlementReminderMapper mapper;
 
     private ReminderTestData data;
@@ -75,7 +85,7 @@ class SettlementReminderMapperIntegrationTest {
         factoryBean.setMapperLocations(
             new ClassPathResource("me/nawa/notification/mapper/SettlementReminderMapper.xml")
         );
-        SqlSessionFactory sqlSessionFactory = factoryBean.getObject();
+        sqlSessionFactory = factoryBean.getObject();
         if (!sqlSessionFactory.getConfiguration().hasMapper(SettlementReminderMapper.class)) {
             sqlSessionFactory.getConfiguration().addMapper(SettlementReminderMapper.class);
         }
@@ -338,6 +348,110 @@ class SettlementReminderMapperIntegrationTest {
 
         // 넘기지 않은 구성원은 그대로다.
         assertEquals(0, data.reminderCount(untouched));
+    }
+
+    /**
+     * 후보 읽기의 실행 계획을 고정한다. 구성원 표를 미납 인덱스로 번호 순서대로 읽고(정렬·임시 테이블
+     * 없이), 정산·약속 참가·회원은 그 순서대로 기본키로 찾아야 한다.
+     *
+     * 이 계획은 쿼리의 힌트(STRAIGHT_JOIN·FORCE INDEX)가 만든다. 힌트를 지우면 오류 없이 느려지기만
+     * 해서(NOTIFICATION_API.md 「대량 처리 측정」) 기능 테스트로는 드러나지 않는다. 후보 읽기의 구성원
+     * 인덱스와 두 쿼리의 조인 순서는 힌트가 못 박으므로 행 몇 개로도 그 부분은 늘 같고, 그래서 CI에서
+     * 돌 수 있다. FORCE INDEX를 지우면 이 테스트의 계획 단정이 실패한다.
+     *
+     * STRAIGHT_JOIN은 행이 적으면 빼도 이 쿼리의 계획이 같게 나와 계획으로는 잡히지 않는다. 잠금 읽기
+     * 테스트가 대신 실패하는 것은 두 쿼리가 dueJoins 조각을 함께 쓰기 때문이다. 후보 읽기의 조인을
+     * 따로 풀어 쓰면 그 보호가 사라지므로, 이 쿼리의 SQL에 STRAIGHT_JOIN이 있는지도 직접 확인한다.
+     */
+    @Test
+    void explain_candidateRead_followsTheHintedPlan() throws SQLException {
+        SettlementRow settlement = data.settlement(DUE_CREATED_AT);
+        data.pendingMembers(settlement, 3);
+        data.paidMember(settlement);
+
+        Map<String, Object> parameter = Map.of("criteria", CRITERIA, "afterId", 0L, "limit", 100);
+        String sql = boundSql("findCandidateIds", parameter).getSql();
+        assertTrue(sql.contains("STRAIGHT_JOIN"), sql);
+
+        List<Map<String, String>> plan = explain("findCandidateIds", parameter);
+
+        assertEquals(List.of("sm", "s", "am", "m"), tables(plan), plan.toString());
+        assertEquals("idx_settlement_members_request_status", plan.get(0).get("key"), plan.toString());
+        for (Map<String, String> row : plan) {
+            String extra = String.valueOf(row.get("Extra"));
+            assertFalse(extra.contains("filesort") || extra.contains("temporary"), plan.toString());
+            if (!"sm".equals(row.get("table"))) {
+                assertEquals("PRIMARY", row.get("key"), plan.toString());
+            }
+        }
+    }
+
+    /**
+     * 잠금 읽기는 구성원부터 읽고, 나머지 테이블은 모두 기본키로 찾는다. STRAIGHT_JOIN을 지우면
+     * 정산 표를 풀 스캔해 여기서 실패한다.
+     *
+     * 이 쿼리에는 FORCE INDEX가 없어서 구성원을 어느 인덱스로 읽을지는 옵티마이저 몫이다. 조건이
+     * "미납이면서 받은 번호"라 기본키로도 미납 인덱스로도 같은 범위가 나오고, 여러 테스트가 같이 쓰는
+     * 작은 표에서는 통계에 따라 고르는 쪽이 바뀔 수 있다. 둘 다 받은 번호만 읽으므로 둘 다 허용한다.
+     */
+    @Test
+    void explain_lockRead_joinsByPrimaryKeyAfterMembers() throws SQLException {
+        SettlementRow settlement = data.settlement(DUE_CREATED_AT);
+        List<Long> ids = data.pendingMembers(settlement, 3).stream()
+            .map(MemberRow::settlementMemberId)
+            .toList();
+
+        List<Map<String, String>> plan = explain("lockTargets", Map.of("criteria", CRITERIA, "ids", ids));
+
+        assertEquals("sm", plan.get(0).get("table"), plan.toString());
+        assertTrue(
+            List.of("PRIMARY", "idx_settlement_members_request_status").contains(plan.get(0).get("key")),
+            plan.toString()
+        );
+        for (Map<String, String> row : plan.subList(1, plan.size())) {
+            assertEquals("PRIMARY", row.get("key"), plan.toString());
+        }
+    }
+
+    /**
+     * 매퍼가 실제로 만드는 SQL 그대로 EXPLAIN한다. 같은 SQL을 테스트에 따로 적으면 쿼리가 바뀌어도
+     * 이 테스트는 옛 쿼리를 본다.
+     */
+    private static List<Map<String, String>> explain(String statementId, Map<String, Object> parameter)
+        throws SQLException {
+        BoundSql bound = boundSql(statementId, parameter);
+        MetaObject meta = sqlSessionFactory.getConfiguration().newMetaObject(parameter);
+        List<Map<String, String>> rows = new ArrayList<>();
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement prepared = connection.prepareStatement("EXPLAIN " + bound.getSql())) {
+            int index = 1;
+            for (ParameterMapping mapping : bound.getParameterMappings()) {
+                String property = mapping.getProperty();
+                prepared.setObject(index++, bound.hasAdditionalParameter(property)
+                    ? bound.getAdditionalParameter(property)
+                    : meta.getValue(property));
+            }
+            try (ResultSet resultSet = prepared.executeQuery()) {
+                while (resultSet.next()) {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (String column : List.of("table", "type", "key", "Extra")) {
+                        row.put(column, resultSet.getString(column));
+                    }
+                    rows.add(row);
+                }
+            }
+        }
+        return rows;
+    }
+
+    private static BoundSql boundSql(String statementId, Map<String, Object> parameter) {
+        return sqlSessionFactory.getConfiguration()
+            .getMappedStatement(SettlementReminderMapper.class.getName() + "." + statementId)
+            .getBoundSql(parameter);
+    }
+
+    private static List<String> tables(List<Map<String, String>> plan) {
+        return plan.stream().map(row -> row.get("table")).toList();
     }
 
     private static String requiredEnvironment(String name) {

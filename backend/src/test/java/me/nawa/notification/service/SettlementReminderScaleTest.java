@@ -1,7 +1,6 @@
 package me.nawa.notification.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,9 +14,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
@@ -38,10 +34,6 @@ import me.nawa.notification.domain.Notification;
 import me.nawa.notification.domain.SettlementReminderCriteria;
 import me.nawa.notification.mapper.NotificationMapper;
 import me.nawa.notification.mapper.SettlementReminderMapper;
-import org.apache.ibatis.mapping.BoundSql;
-import org.apache.ibatis.mapping.MappedStatement;
-import org.apache.ibatis.mapping.ParameterMapping;
-import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -133,7 +125,6 @@ class SettlementReminderScaleTest {
     private static HikariDataSource dataSource;
     private static JdbcTemplate jdbc;
     private static AnnotationConfigApplicationContext applicationContext;
-    private static SqlSessionFactory sqlSessionFactory;
     private static SettlementReminderMapper reminderMapper;
     private static SettlementReminderWriter writer;
     private static ThreadPoolTaskExecutor pushExecutor;
@@ -154,7 +145,6 @@ class SettlementReminderScaleTest {
         dataSource = new HikariDataSource(hikariConfig);
         jdbc = new JdbcTemplate(dataSource);
         applicationContext = new AnnotationConfigApplicationContext(ScaleConfiguration.class);
-        sqlSessionFactory = applicationContext.getBean(SqlSessionFactory.class);
         reminderMapper = applicationContext.getBean(SettlementReminderMapper.class);
         writer = applicationContext.getBean(SettlementReminderWriter.class);
         pushExecutor = new ThreadPoolTaskExecutor();
@@ -203,47 +193,6 @@ class SettlementReminderScaleTest {
             if (dataSource != null) {
                 dataSource.close();
             }
-        }
-    }
-
-    /**
-     * 후보 읽기와 잠금 읽기가 인덱스를 타는지 EXPLAIN으로 본다. 후보 읽기는 이번 마이그레이션이 만든
-     * 인덱스로 "미납 행만, 번호 순서로"를 받쳐야 하고(정렬 단계 없이), 잠금 읽기는 번호 목록을
-     * 기본키로 찾아야 한다. 어느 쪽이든 정산·회원 쪽 조인은 기본키 조회여야 한다.
-     */
-    @Test
-    @Order(1)
-    void explain_candidateReadUsesTheStatusIndexAndLockReadUsesThePrimaryKey() throws Exception {
-        jdbc.execute("ANALYZE TABLE settlement_members, settlements, appointment_members, members");
-        SettlementReminderCriteria criteria = criteria();
-        long middle = DUE_ROW0 + DUE_MEMBERS / 2;
-        List<Long> ids = new ArrayList<>();
-        for (int i = 1; i <= 100; i++) {
-            ids.add(DUE_ROW0 + i);
-        }
-
-        List<Map<String, String>> candidate = explain(
-            "findCandidateIds", Map.of("criteria", criteria, "afterId", middle, "limit", 100));
-        List<Map<String, String>> lock = explain("lockTargets", Map.of("criteria", criteria, "ids", ids));
-        report("## EXPLAIN findCandidateIds (afterId = 중간)");
-        candidate.forEach(row -> report("- " + row));
-        report("## EXPLAIN lockTargets (번호 100개)");
-        lock.forEach(row -> report("- " + row));
-
-        // 미납 행만 번호 순서로 읽고(정렬·임시 테이블 없이), 나머지 테이블은 기본키로 찾는다.
-        Map<String, String> candidateSm = row(candidate, "sm");
-        assertEquals("idx_settlement_members_request_status", candidateSm.get("key"));
-        for (Map<String, String> joined : candidate) {
-            String extra = String.valueOf(joined.get("Extra"));
-            assertFalse(extra.contains("filesort") || extra.contains("temporary"), joined.toString());
-            if (!"sm".equals(joined.get("table"))) {
-                assertEquals("PRIMARY", joined.get("key"), "조인 " + joined.get("table"));
-            }
-        }
-        // 잠금 읽기는 받은 번호를 기본키로 찾고, 나머지는 기본키 조회다.
-        assertEquals("PRIMARY", row(lock, "sm").get("key"));
-        for (Map<String, String> joined : lock) {
-            assertEquals("PRIMARY", joined.get("key"), "조인 " + joined.get("table"));
         }
     }
 
@@ -535,54 +484,6 @@ class SettlementReminderScaleTest {
             APPOINTMENT0 + 1, APPOINTMENT0 + SETTLEMENTS);
         jdbc.update("DELETE FROM explore_items WHERE item_id = ?", ITEM0 + 1);
         jdbc.update("DELETE FROM members WHERE member_id >= ?", PAYER0);
-    }
-
-    // ---- EXPLAIN -------------------------------------------------------------------------
-
-    /**
-     * 매퍼가 실제로 만드는 SQL 그대로 EXPLAIN한다. 같은 SQL을 테스트에 따로 적으면 쿼리가 바뀌어도
-     * 이 측정은 옛 쿼리를 본다.
-     */
-    private static List<Map<String, String>> explain(String statementId, Map<String, Object> parameter)
-        throws SQLException {
-        org.apache.ibatis.session.Configuration configuration = sqlSessionFactory.getConfiguration();
-        MappedStatement statement = configuration.getMappedStatement(
-            SettlementReminderMapper.class.getName() + "." + statementId);
-        BoundSql bound = statement.getBoundSql(parameter);
-        MetaObject meta = configuration.newMetaObject(parameter);
-        List<Map<String, String>> rows = new ArrayList<>();
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement prepared = connection.prepareStatement("EXPLAIN " + bound.getSql())) {
-            int index = 1;
-            for (ParameterMapping mapping : bound.getParameterMappings()) {
-                String property = mapping.getProperty();
-                Object value = bound.hasAdditionalParameter(property)
-                    ? bound.getAdditionalParameter(property)
-                    : meta.getValue(property);
-                prepared.setObject(index++, value);
-            }
-            try (ResultSet resultSet = prepared.executeQuery()) {
-                ResultSetMetaData columns = resultSet.getMetaData();
-                while (resultSet.next()) {
-                    Map<String, String> row = new java.util.LinkedHashMap<>();
-                    for (int i = 1; i <= columns.getColumnCount(); i++) {
-                        String name = columns.getColumnLabel(i);
-                        if (List.of("table", "type", "key", "rows", "Extra").contains(name)) {
-                            row.put(name, resultSet.getString(i));
-                        }
-                    }
-                    rows.add(row);
-                }
-            }
-        }
-        return rows;
-    }
-
-    private static Map<String, String> row(List<Map<String, String>> explain, String table) {
-        return explain.stream()
-            .filter(row -> table.equals(row.get("table")))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("EXPLAIN에 " + table + " 행이 없다: " + explain));
     }
 
     // ---- 보조 ----------------------------------------------------------------------------
