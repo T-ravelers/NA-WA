@@ -164,7 +164,8 @@ Renovate가 프론트엔드 의존성(npm) 업데이트를 PR로 올립니다. �
   체크박스로 승인해야 열립니다. 릴리스 노트를 읽고 패키지마다 따로 승인합니다.
 - 공개된 지 3일이 지나지 않은 버전은 받지 않습니다.
 - Node·pnpm 버전과 `@types/node`의 major는 Renovate가 올리지 않습니다.
-  `AGENTS.md`가 고정한 값이라 사람이 직접 올립니다.
+  `@tsconfig/node24`를 다른 Node 버전의 패키지(`@tsconfig/node26` 등)로 바꾸는 PR도
+  만들지 않습니다. `AGENTS.md`가 고정한 값이라 사람이 직접 올립니다.
 - Renovate PR도 리뷰와 승인을 받은 뒤 병합합니다. automerge는 쓰지 않습니다.
 - 커밋 메시지와 PR 제목은 `chore(frontend): update ...` 형식의 영어입니다. 4절의
   한글 요약 규칙과 5절의 `[Type] 한글 설명` 제목 규칙에서 이 PR만 예외로 둡니다.

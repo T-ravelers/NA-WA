@@ -23,6 +23,12 @@
       "allowedVersions": "<25"
     },
     {
+      "description": "@tsconfig/nodeNN을 다른 Node 버전의 패키지로 바꾸지 않는다. 런타임 Node major를 올릴 때 사람이 함께 바꾼다.",
+      "matchPackageNames": ["@tsconfig/node**"],
+      "matchUpdateTypes": ["replacement"],
+      "enabled": false
+    },
+    {
       "description": "minor·patch는 주 1회 PR 하나로 묶는다.",
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "frontend non-major dependencies"

@@ -27,7 +27,9 @@ Node `24.22.1` · pnpm `12.15.0` · Java `17`
 
 `renovate.json`도 Node·pnpm 버전을 올리지 않게 막고 `@types/node`를 Node 24에 맞춰
 `<25`로 묶습니다. Node major를 올릴 때는 이 상한도 함께 고칩니다. 고치지 않으면
-`@types/node`가 옛 major에 조용히 멈춥니다.
+`@types/node`가 옛 major에 조용히 멈춥니다. 반대로 `@tsconfig/node24`는 Renovate가 새 Node
+버전의 패키지로 바꾸는 PR을 만들지 않게 막아 두었으므로, Node major를 올릴 때 사람이 직접
+바꿉니다.
 
 ## 작업 전에 반드시 확인할 것
 
