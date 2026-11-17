@@ -357,7 +357,11 @@ class SettlementReminderMapperIntegrationTest {
      * 이 계획은 쿼리의 힌트(STRAIGHT_JOIN·FORCE INDEX)가 만든다. 힌트를 지우면 오류 없이 느려지기만
      * 해서(NOTIFICATION_API.md 「대량 처리 측정」) 기능 테스트로는 드러나지 않는다. 힌트가 순서와
      * 인덱스를 못 박으므로 행 몇 개로도 계획이 늘 같고, 그래서 CI에서 돌 수 있다. FORCE INDEX를 지우면
-     * 이 테스트가, STRAIGHT_JOIN을 지우면 아래 잠금 읽기 테스트가 실패한다.
+     * 이 테스트의 계획 단정이 실패한다.
+     *
+     * STRAIGHT_JOIN은 행이 적으면 빼도 이 쿼리의 계획이 같게 나와 계획으로는 잡히지 않는다. 잠금 읽기
+     * 테스트가 대신 실패하는 것은 두 쿼리가 dueJoins 조각을 함께 쓰기 때문이다. 후보 읽기의 조인을
+     * 따로 풀어 쓰면 그 보호가 사라지므로, 이 쿼리의 SQL에 STRAIGHT_JOIN이 있는지도 직접 확인한다.
      */
     @Test
     void explain_candidateRead_followsTheHintedPlan() throws SQLException {
@@ -365,8 +369,11 @@ class SettlementReminderMapperIntegrationTest {
         data.pendingMembers(settlement, 3);
         data.paidMember(settlement);
 
-        List<Map<String, String>> plan = explain(
-            "findCandidateIds", Map.of("criteria", CRITERIA, "afterId", 0L, "limit", 100));
+        Map<String, Object> parameter = Map.of("criteria", CRITERIA, "afterId", 0L, "limit", 100);
+        String sql = boundSql("findCandidateIds", parameter).getSql();
+        assertTrue(sql.contains("STRAIGHT_JOIN"), sql);
+
+        List<Map<String, String>> plan = explain("findCandidateIds", parameter);
 
         assertEquals(List.of("sm", "s", "am", "m"), tables(plan), plan.toString());
         assertEquals("idx_settlement_members_request_status", plan.get(0).get("key"), plan.toString());
@@ -379,7 +386,14 @@ class SettlementReminderMapperIntegrationTest {
         }
     }
 
-    /** 잠금 읽기는 받은 번호를 기본키로 찾고, 나머지도 모두 기본키로 찾는다. */
+    /**
+     * 잠금 읽기는 구성원부터 읽고, 나머지 테이블은 모두 기본키로 찾는다. STRAIGHT_JOIN을 지우면
+     * 정산 표를 풀 스캔해 여기서 실패한다.
+     *
+     * 이 쿼리에는 FORCE INDEX가 없어서 구성원을 어느 인덱스로 읽을지는 옵티마이저 몫이다. 조건이
+     * "미납이면서 받은 번호"라 기본키로도 미납 인덱스로도 같은 범위가 나오고, 여러 테스트가 같이 쓰는
+     * 작은 표에서는 통계에 따라 고르는 쪽이 바뀔 수 있다. 둘 다 받은 번호만 읽으므로 둘 다 허용한다.
+     */
     @Test
     void explain_lockRead_findsEveryRowByPrimaryKey() throws SQLException {
         SettlementRow settlement = data.settlement(DUE_CREATED_AT);
@@ -390,7 +404,11 @@ class SettlementReminderMapperIntegrationTest {
         List<Map<String, String>> plan = explain("lockTargets", Map.of("criteria", CRITERIA, "ids", ids));
 
         assertEquals("sm", plan.get(0).get("table"), plan.toString());
-        for (Map<String, String> row : plan) {
+        assertTrue(
+            List.of("PRIMARY", "idx_settlement_members_request_status").contains(plan.get(0).get("key")),
+            plan.toString()
+        );
+        for (Map<String, String> row : plan.subList(1, plan.size())) {
             assertEquals("PRIMARY", row.get("key"), plan.toString());
         }
     }
@@ -401,11 +419,8 @@ class SettlementReminderMapperIntegrationTest {
      */
     private static List<Map<String, String>> explain(String statementId, Map<String, Object> parameter)
         throws SQLException {
-        org.apache.ibatis.session.Configuration configuration = sqlSessionFactory.getConfiguration();
-        BoundSql bound = configuration
-            .getMappedStatement(SettlementReminderMapper.class.getName() + "." + statementId)
-            .getBoundSql(parameter);
-        MetaObject meta = configuration.newMetaObject(parameter);
+        BoundSql bound = boundSql(statementId, parameter);
+        MetaObject meta = sqlSessionFactory.getConfiguration().newMetaObject(parameter);
         List<Map<String, String>> rows = new ArrayList<>();
         try (Connection connection = dataSource.getConnection();
              PreparedStatement prepared = connection.prepareStatement("EXPLAIN " + bound.getSql())) {
@@ -427,6 +442,12 @@ class SettlementReminderMapperIntegrationTest {
             }
         }
         return rows;
+    }
+
+    private static BoundSql boundSql(String statementId, Map<String, Object> parameter) {
+        return sqlSessionFactory.getConfiguration()
+            .getMappedStatement(SettlementReminderMapper.class.getName() + "." + statementId)
+            .getBoundSql(parameter);
     }
 
     private static List<String> tables(List<Map<String, String>> plan) {
