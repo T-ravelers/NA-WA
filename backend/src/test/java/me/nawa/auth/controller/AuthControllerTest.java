@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.test.web.servlet.MockMvc;
@@ -26,6 +27,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -54,11 +56,16 @@ class AuthControllerTest {
                 "Lax",
                 ""
         );
+        CookieCsrfTokenRepository csrfTokenRepository =
+                new CookieCsrfTokenRepository();
+        csrfTokenRepository.setCookiePath("/");
+        csrfTokenRepository.setCookieHttpOnly(true);
         controller = new AuthController(
                 authTokenService,
                 authCookieManager,
                 oauthAuthorizationService,
-                oauthCallbackService
+                oauthCallbackService,
+                csrfTokenRepository
         );
         AuthExceptionHandler exceptionHandler = new AuthExceptionHandler(
                 authCookieManager
@@ -140,7 +147,19 @@ class AuthControllerTest {
                 "browser-binding-value",
                 oauthCallbackService.browserBinding
         );
-        List<String> setCookies = response.getHeaders(HttpHeaders.SET_COOKIE);
+        List<String> allSetCookies = response.getHeaders(HttpHeaders.SET_COOKIE);
+        // 로그인 전에 받은 CSRF 토큰을 버린다(#449). 다음 쓰기 전에 /csrf로 새로 받는다.
+        List<String> xsrfSetCookies = allSetCookies.stream()
+                .filter(header -> header.startsWith("XSRF-TOKEN="))
+                .collect(Collectors.toList());
+        assertEquals(1, xsrfSetCookies.size());
+        assertTrue(xsrfSetCookies.get(0).startsWith("XSRF-TOKEN=;"));
+        assertTrue(xsrfSetCookies.get(0).contains("Max-Age=0"));
+        assertTrue(xsrfSetCookies.get(0).contains("Path=/"));
+
+        List<String> setCookies = allSetCookies.stream()
+                .filter(header -> !header.startsWith("XSRF-TOKEN="))
+                .collect(Collectors.toList());
         assertEquals(3, setCookies.size());
         assertTrue(setCookies.get(0).contains("access_token=access-value"));
         assertTrue(setCookies.get(1).contains("refresh_token=refresh-value"));

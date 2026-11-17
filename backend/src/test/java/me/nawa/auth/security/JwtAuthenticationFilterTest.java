@@ -1,5 +1,6 @@
 package me.nawa.auth.security;
 
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -24,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -38,6 +40,7 @@ class JwtAuthenticationFilterTest {
 
     private JwtTokenProvider jwtTokenProvider;
     private JwtAuthenticationFilter filter;
+    private RequestAttributeSecurityContextRepository securityContextRepository;
 
     @BeforeEach
     void setUp() {
@@ -51,9 +54,11 @@ class JwtAuthenticationFilterTest {
                 "Lax",
                 ""
         );
+        securityContextRepository = new RequestAttributeSecurityContextRepository();
         filter = new JwtAuthenticationFilter(
                 authCookieManager,
-                jwtTokenProvider
+                jwtTokenProvider,
+                securityContextRepository
         );
     }
 
@@ -66,11 +71,15 @@ class JwtAuthenticationFilterTest {
     void doFilter_validAccessToken_authenticatesMember() throws Exception {
         AccessToken token = jwtTokenProvider.issueAccessToken(42L);
 
-        executeFilter(new Cookie("access_token", token.getValue()));
+        MockHttpServletRequest request = executeFilter(
+                new Cookie("access_token", token.getValue())
+        );
 
         Authentication authentication = SecurityContextHolder.getContext()
                 .getAuthentication();
         assertTrue(authentication.isAuthenticated());
+        // 세션 관리 필터가 이 요청을 새 로그인으로 보지 않게 한다(#449).
+        assertTrue(securityContextRepository.containsContext(request));
         AuthenticatedMember principal =
                 (AuthenticatedMember) authentication.getPrincipal();
         assertEquals(42L, principal.getMemberId());
@@ -87,9 +96,12 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilter_malformedAccessToken_continuesAnonymously() throws Exception {
-        executeFilter(new Cookie("access_token", "malformed"));
+        MockHttpServletRequest request = executeFilter(
+                new Cookie("access_token", "malformed")
+        );
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertFalse(securityContextRepository.containsContext(request));
     }
 
     @Test
@@ -113,7 +125,7 @@ class JwtAuthenticationFilterTest {
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 
-    private void executeFilter(Cookie cookie) throws Exception {
+    private MockHttpServletRequest executeFilter(Cookie cookie) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest();
         if (cookie != null) {
             request.setCookies(cookie);
@@ -128,6 +140,7 @@ class JwtAuthenticationFilterTest {
         );
 
         assertTrue(chainCalled.get());
+        return request;
     }
 
     private String createExpiredToken() {

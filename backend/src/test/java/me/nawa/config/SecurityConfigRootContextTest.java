@@ -1,5 +1,6 @@
 package me.nawa.config;
 
+import org.springframework.security.web.context.SecurityContextRepository;
 import me.nawa.auth.cookie.AuthCookieManager;
 import me.nawa.auth.jwt.JwtTokenProvider;
 import me.nawa.auth.security.AllowedOriginPolicy;
@@ -77,10 +78,12 @@ class SecurityConfigRootContextTest {
         @Bean
         JwtAuthenticationFilter jwtAuthenticationFilter(
                 AuthCookieManager authCookieManager,
-                JwtTokenProvider jwtTokenProvider) {
+                JwtTokenProvider jwtTokenProvider,
+                SecurityContextRepository securityContextRepository) {
             return new JwtAuthenticationFilter(
                     authCookieManager,
-                    jwtTokenProvider
+                    jwtTokenProvider,
+                    securityContextRepository
             );
         }
 

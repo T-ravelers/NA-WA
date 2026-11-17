@@ -442,31 +442,16 @@ k6는 외부 동의 화면을 통과하지 않고 `authorization`의 302까지�
 `test-login`으로 callback의 토큰 발급을 대신합니다. 백엔드 요청 수는 유지하지만 OAuth
 공급자 통신과 callback의 프로필 교환 비용은 재현하지 않습니다.
 
-**브라우저에서는 인증된 쓰기 1건이 실제로 요청 3건입니다.** `SessionCreationPolicy.STATELESS`
-아래서도 Spring Security 5.8의 세션 전략이 남아 있어, 쓰기뿐 아니라 **인증된 모든 요청**
-뒤에 `XSRF-TOKEN` 쿠키가 회전합니다. 이 저장소의 `csrfTokenRepository`는
-`httpOnly`라 브라우저 JS가 쿠키를 못 읽고, 프런트엔드(`shared/api/csrf.ts`)는 발급받은
-토큰을 모듈 변수로 캐시해 뒀다가 403을 받아야만 다시 조회합니다. 둘을 합치면 실제 SPA는
+**브라우저에서도 인증된 쓰기 1건은 요청 1건입니다.** #449 전에는 `SessionCreationPolicy.STATELESS`
+아래서도 Spring Security 5.8의 세션 관리 필터가 인증된 모든 요청 뒤에 `XSRF-TOKEN` 쿠키를
+갈아 끼웠습니다. 프런트엔드(`shared/api/csrf.ts`)는 토큰을 캐시해 두고 403을 받아야만 다시
+조회하므로 쓰기 1건이 「`403 AUTH-005` → `GET /api/v1/auth/csrf` → 재시도」의 요청 3건이
+됐고, k6는 쿠키 자(jar)에서 `httpOnly` 쿠키를 그냥 읽어 이 왕복을 재현하지 않았습니다.
 
-```
-(그 사이 인증된 GET 아무거나) → 쿠키만 새 값으로 갈림, 캐시는 옛 값
-POST  (헤더 옛 값 / 쿠키 새 값)  → 403 AUTH-005
-GET   /api/v1/auth/csrf           → 최신 값 재발급
-POST  (헤더·쿠키 모두 최신 값)   → 200
-```
+지금은 `JwtAuthenticationFilter`가 인증 컨텍스트를 요청 범위 저장소에 남겨 이 회전이 없고,
+토큰은 로그인 콜백에서만 바뀝니다(`backend/docs/AUTHENTICATION.md`). 그래서 이 문서의 목표 수치는
+k6 요청 수와 브라우저 요청 수가 같은 기준입니다. 로그인 뒤 첫 쓰기 전의 CSRF 발급 한 건은 둘 다 보냅니다.
 
-로 흐릅니다. 사용자에게는 자동 재시도라 보이지 않지만 **요청 수는 3배**입니다.
-
-k6는 쿠키 자(jar)에서 `httpOnly` 쿠키를 그냥 읽을 수 있어(브라우저는 못 하는 일입니다)
-이 왕복을 재현하지 않습니다. 그래서 이 문서의 "654 TPS"·"595 TPS" 같은 목표 수치는
-**k6가 실제로 보내는 요청 수 기준**이고, 실제 브라우저 트래픽으로 환산하면
-
-- 시나리오 1: 쓰기 5건 → VU당 실제 요청은 22건이 아니라 **약 32건**
-- 시나리오 2: 쓰기 7건(주 세션 5 + 수취인 1 + 참여자 1) → 26건이 아니라 **약 36건**
-
-이 됩니다. 회전 자체를 없애는 건(예: `JwtAuthenticationFilter`가 공유
-`SecurityContextRepository`에 컨텍스트를 저장해 `SessionManagementFilter`가
-"새로 인증됨"으로 오판하지 않게 하는 방향) 이 PR의 범위를 벗어나 별도 이슈로 다룹니다.
 Grafana에서는 업무 API 태그와 `test-login`·`csrf` 태그를 분리해서 봐야 목표 TPS와
 보조 트래픽이 섞이지 않습니다.
 

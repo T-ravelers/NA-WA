@@ -1,5 +1,6 @@
 package me.nawa.ingest.controller;
 
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import me.nawa.auth.cookie.AuthCookieManager;
@@ -73,7 +74,8 @@ class ServiceTokenToIngestFlowTest {
                 .addFilters(new JwtAuthenticationFilter(
                         new AuthCookieManager("nawa_at", "nawa_rt", "nawa_st",
                                 false, "Lax", ""),
-                        jwtTokenProvider))
+                        jwtTokenProvider,
+                        new RequestAttributeSecurityContextRepository()))
                 .build();
     }
 
