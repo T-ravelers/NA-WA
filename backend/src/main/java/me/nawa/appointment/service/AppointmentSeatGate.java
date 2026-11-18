@@ -59,23 +59,32 @@ public class AppointmentSeatGate {
             Long.class
     );
 
-    // 자리 키가 이미 있으면 다른 요청이 먼저 채운 것이다. 자리 키가 만료된 뒤 남은 예전 집합은 지운다.
+    // 자리 키가 이미 있으면 다른 요청이 먼저 채운 것이다(0). DB를 읽기 전에 기억한 반환 순번이
+    // 바뀌었으면 읽는 사이 취소가 커밋된 것이라 읽은 값이 낡았다(-2). 둘 다 아니면 채운다(1).
+    // 자리 키가 만료된 뒤 남은 예전 집합은 지운다.
     private static final DefaultRedisScript<Long> INIT_SCRIPT = new DefaultRedisScript<>(
             "if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end "
+                    + "local seq = redis.call('GET', KEYS[3]) or '0' "
+                    + "if seq ~= ARGV[1] then return -2 end "
                     + "redis.call('DEL', KEYS[2]) "
-                    + "redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2]) "
-                    + "if #ARGV > 2 then "
-                    + "redis.call('SADD', KEYS[2], unpack(ARGV, 3)) "
-                    + "redis.call('PEXPIRE', KEYS[2], ARGV[2]) "
+                    + "redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[3]) "
+                    + "if #ARGV > 3 then "
+                    + "redis.call('SADD', KEYS[2], unpack(ARGV, 4)) "
+                    + "redis.call('PEXPIRE', KEYS[2], ARGV[3]) "
                     + "end "
                     + "return 1",
             Long.class
     );
 
     // 집합에서 실제로 빠졌을 때만 되돌린다. 같은 회원을 두 번 돌려줘도 한 번만 늘어난다.
-    // 자리 키가 없으면(만료·미초기화) 다음 요청이 DB를 보고 다시 채우므로 아무것도 하지 않는다.
+    // 자리 키가 없으면 돌려줄 곳이 없으므로 반환 순번만 올린다. 그 사이 DB를 읽던 초기화는 순번이
+    // 바뀐 것을 보고 다시 읽는다 — 그러지 않으면 취소 전 인원으로 채워 빈자리가 매진으로 남는다.
     private static final DefaultRedisScript<Long> RELEASE_SCRIPT = new DefaultRedisScript<>(
-            "if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end "
+            "if redis.call('EXISTS', KEYS[1]) == 0 then "
+                    + "redis.call('INCR', KEYS[3]) "
+                    + "redis.call('PEXPIRE', KEYS[3], ARGV[2]) "
+                    + "return 0 "
+                    + "end "
                     + "if redis.call('SREM', KEYS[2], ARGV[1]) == 1 then "
                     + "redis.call('INCR', KEYS[1]) "
                     + "return 1 "
@@ -83,6 +92,12 @@ public class AppointmentSeatGate {
                     + "return 0",
             Long.class
     );
+
+    private static final long INIT_STALE = -2L;
+    // 초기화가 순번 변화로 다시 읽는 횟수. 넘으면 이번 요청은 DB에 맡긴다.
+    private static final int INIT_ATTEMPTS = 3;
+    // 반환 순번은 초기화 한 번이 DB를 읽고 쓰는 사이에만 의미가 있다.
+    private static final Duration RELEASE_SEQ_TTL = Duration.ofHours(1);
 
     private final StringRedisTemplate redisTemplate;
     private final AppointmentMapper appointmentMapper;
@@ -128,7 +143,7 @@ public class AppointmentSeatGate {
         try {
             Long outcome = acquire(appointmentId, memberId);
             if (Objects.equals(outcome, NEEDS_INIT)) {
-                if (!initialize(appointmentId)) {
+                if (!initializeWithRetry(appointmentId)) {
                     return count(SeatAcquireResult.UNAVAILABLE);
                 }
                 outcome = acquire(appointmentId, memberId);
@@ -149,8 +164,9 @@ public class AppointmentSeatGate {
         try {
             redisTemplate.execute(
                     RELEASE_SCRIPT,
-                    List.of(seatsKey(appointmentId), membersKey(appointmentId)),
-                    String.valueOf(memberId)
+                    keys(appointmentId),
+                    String.valueOf(memberId),
+                    String.valueOf(RELEASE_SEQ_TTL.toMillis())
             );
         } catch (RuntimeException exception) {
             log.warn("Failed to release an appointment seat in Redis. appointmentId={}",
@@ -159,48 +175,58 @@ public class AppointmentSeatGate {
     }
 
     private Long acquire(Long appointmentId, Long memberId) {
-        return redisTemplate.execute(
-                ACQUIRE_SCRIPT,
-                List.of(seatsKey(appointmentId), membersKey(appointmentId)),
-                String.valueOf(memberId)
-        );
+        return redisTemplate.execute(ACQUIRE_SCRIPT, keys(appointmentId), String.valueOf(memberId));
+    }
+
+    /** 읽는 사이 취소가 커밋되어 읽은 값이 낡았으면 다시 읽는다. 채웠거나 이미 있으면 true. */
+    private boolean initializeWithRetry(Long appointmentId) {
+        for (int attempt = 0; attempt < INIT_ATTEMPTS; attempt++) {
+            Long outcome = initialize(appointmentId);
+            if (outcome == null) {
+                return false;
+            }
+            if (outcome != INIT_STALE) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
-     * DB를 보고 키를 채운다. 약속이 없거나 활동이 이미 끝났으면 채우지 않는다 — 그 판단은 DB
-     * 처리가 오류 코드와 함께 한다.
+     * DB를 보고 키를 채운다. 약속이 없거나 활동이 이미 끝났으면 채우지 않고 null을 돌려준다 —
+     * 그 판단은 DB 처리가 오류 코드와 함께 한다.
      *
-     * <p>잠그지 않고 읽는다. 읽는 사이 다른 참여가 커밋되면 남은 자리가 실제보다 많게 적힐 수
+     * <p>잠그지 않고 읽는다. 읽기 전에 반환 순번을 기억해 두고, 읽는 사이 취소가 커밋되어 순번이
+     * 바뀌었으면 채우지 않는다. 읽는 사이 다른 참여가 커밋되면 남은 자리가 실제보다 많게 적힐 수
      * 있지만, 참여 트랜잭션이 자리를 다시 확인하므로 정원은 넘지 않는다.
      */
-    private boolean initialize(Long appointmentId) {
+    private Long initialize(Long appointmentId) {
+        String releaseSeq = Objects.requireNonNullElse(
+                redisTemplate.opsForValue().get(releaseSeqKey(appointmentId)), "0"
+        );
         Appointment appointment = appointmentMapper.findAppointmentById(appointmentId);
         if (appointment == null || appointment.getActivityEndAt() == null) {
-            return false;
+            return null;
         }
         // 활동이 끝나면 참여·취소가 없으므로 그때까지만 둔다.
         long ttlMillis = Duration.between(
                 LocalDateTime.now(clock), appointment.getActivityEndAt()
         ).toMillis();
         if (ttlMillis <= 0) {
-            return false;
+            return null;
         }
 
         List<AppointmentMember> activeMembers =
                 appointmentMapper.findActiveMembersByAppointmentId(appointmentId);
         int remaining = Math.max(0, appointment.getMaxMembers() - activeMembers.size());
 
-        List<String> args = new ArrayList<>(activeMembers.size() + 2);
+        List<String> args = new ArrayList<>(activeMembers.size() + 3);
+        args.add(releaseSeq);
         args.add(String.valueOf(remaining));
         args.add(String.valueOf(ttlMillis));
         activeMembers.forEach(member -> args.add(String.valueOf(member.getMemberId())));
 
-        redisTemplate.execute(
-                INIT_SCRIPT,
-                List.of(seatsKey(appointmentId), membersKey(appointmentId)),
-                args.toArray()
-        );
-        return true;
+        return redisTemplate.execute(INIT_SCRIPT, keys(appointmentId), args.toArray());
     }
 
     private static SeatAcquireResult toResult(Long outcome) {
@@ -228,5 +254,17 @@ public class AppointmentSeatGate {
 
     String membersKey(Long appointmentId) {
         return keyPrefix + "{" + appointmentId + "}:members";
+    }
+
+    String releaseSeqKey(Long appointmentId) {
+        return keyPrefix + "{" + appointmentId + "}:release-seq";
+    }
+
+    private List<String> keys(Long appointmentId) {
+        return List.of(
+                seatsKey(appointmentId),
+                membersKey(appointmentId),
+                releaseSeqKey(appointmentId)
+        );
     }
 }

@@ -4,10 +4,12 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import me.nawa.appointment.domain.Appointment;
 import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.mapper.AppointmentMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.RedisScript;
 
 import java.time.Clock;
@@ -35,6 +37,8 @@ class AppointmentSeatGateTest {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 18, 12, 0);
 
     private final StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+    @SuppressWarnings("unchecked")
+    private final ValueOperations<String, String> values = mock(ValueOperations.class);
     private final AppointmentMapper appointmentMapper = mock(AppointmentMapper.class);
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
     private final AppointmentSeatGate gate = new AppointmentSeatGate(
@@ -44,6 +48,11 @@ class AppointmentSeatGateTest {
             "nawa:",
             Clock.fixed(NOW.atZone(SEOUL).toInstant(), SEOUL)
     );
+
+    @BeforeEach
+    void setUp() {
+        when(redisTemplate.opsForValue()).thenReturn(values);
+    }
 
     @Test
     void tryAcquire_fillsFromDatabaseOnce_whenKeysAreMissing() {
@@ -55,13 +64,15 @@ class AppointmentSeatGateTest {
 
         assertEquals(SeatAcquireResult.ACQUIRED, gate.tryAcquire(101L, 7L));
 
-        // 자리 받기 → 채우기 → 자리 받기. 채우기에는 정원 6 − ACTIVE 1 = 남은 자리 5와 방장이 실린다.
+        // 자리 받기 → 채우기 → 자리 받기. 채우기에는 읽기 전 반환 순번, 정원 6 − ACTIVE 1 = 남은
+        // 자리 5, 만료 시간, 방장이 실린다.
         ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
         verify(redisTemplate, times(3)).execute(any(RedisScript.class), anyList(), args.capture());
         Object[] initArgs = args.getAllValues().get(1);
-        assertEquals("5", initArgs[0]);
-        assertEquals(String.valueOf(3 * 60 * 60 * 1000L), initArgs[1]);
-        assertEquals("900", initArgs[2]);
+        assertEquals("0", initArgs[0]);
+        assertEquals("5", initArgs[1]);
+        assertEquals(String.valueOf(3 * 60 * 60 * 1000L), initArgs[2]);
+        assertEquals("900", initArgs[3]);
         assertEquals(1.0, count("acquired"));
     }
 
@@ -83,6 +94,18 @@ class AppointmentSeatGateTest {
 
         assertEquals(SeatAcquireResult.UNAVAILABLE, gate.tryAcquire(101L, 7L));
         verify(redisTemplate, times(1)).execute(any(RedisScript.class), anyList(), any(Object[].class));
+    }
+
+    /** 읽는 사이 취소가 계속 커밋되면 몇 번 다시 읽다가 이번 요청은 DB에 맡긴다. */
+    @Test
+    void tryAcquire_rereadsWhenACancellationLandsDuringInit_andGivesUpAfterRetries() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
+                .thenReturn(-1L, -2L, -2L, -2L);
+        when(appointmentMapper.findAppointmentById(101L)).thenReturn(appointment(6, NOW.plusHours(3)));
+        when(appointmentMapper.findActiveMembersByAppointmentId(101L)).thenReturn(List.of());
+
+        assertEquals(SeatAcquireResult.UNAVAILABLE, gate.tryAcquire(101L, 7L));
+        verify(appointmentMapper, times(3)).findActiveMembersByAppointmentId(101L);
     }
 
     @Test

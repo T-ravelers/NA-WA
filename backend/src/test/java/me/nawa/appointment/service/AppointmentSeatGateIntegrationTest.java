@@ -19,6 +19,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -83,7 +84,10 @@ class AppointmentSeatGateIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        redisTemplate.delete(List.of(gate.seatsKey(appointmentId), gate.membersKey(appointmentId)));
+        redisTemplate.delete(List.of(
+                gate.seatsKey(appointmentId),
+                gate.membersKey(appointmentId),
+                gate.releaseSeqKey(appointmentId)));
     }
 
     @Test
@@ -155,6 +159,33 @@ class AppointmentSeatGateIntegrationTest {
         assertEquals(Boolean.FALSE, redisTemplate.hasKey(gate.seatsKey(appointmentId)));
     }
 
+    /**
+     * 처음 채우려고 DB를 읽은 직후 취소가 커밋되고 자리 반환이 먼저 실행된 경우다. 반환할 키가 아직
+     * 없으므로 반환 순번만 오르고, 초기화는 그것을 보고 다시 읽는다. 취소 전 인원(정원 2·참여 2)으로
+     * 채우면 빈자리가 활동 끝까지 매진으로 남는다.
+     */
+    @Test
+    void tryAcquire_rereads_whenACancellationCommitsWhileInitializing() {
+        when(appointmentMapper.findAppointmentById(appointmentId)).thenReturn(Appointment.builder()
+                .appointmentId(appointmentId)
+                .maxMembers(2)
+                .activityEndAt(LocalDateTime.now().plusHours(3))
+                .build());
+        List<AppointmentMember> beforeCancel = members(900L, 1L);
+        List<AppointmentMember> afterCancel = members(900L);
+        when(appointmentMapper.findActiveMembersByAppointmentId(appointmentId))
+                .thenAnswer(invocation -> {
+                    // 첫 읽기 직후 회원 1의 취소가 커밋되고 반환이 실행된다.
+                    gate.release(appointmentId, 1L);
+                    return beforeCancel;
+                })
+                .thenReturn(afterCancel);
+
+        assertEquals(SeatAcquireResult.ACQUIRED, gate.tryAcquire(appointmentId, 2L));
+        assertEquals("0", redisTemplate.opsForValue().get(gate.seatsKey(appointmentId)));
+        assertEquals(Set.of("900", "2"), members());
+    }
+
     /** 두 키 모두 활동 종료까지만 남는다. 회원이 없어 차감하며 처음 만든 명단도 같다. */
     @Test
     void keys_expireAtActivityEnd() {
@@ -178,6 +209,12 @@ class AppointmentSeatGateIntegrationTest {
                 activeMemberIds.stream()
                         .map(id -> AppointmentMember.builder().memberId(id).build())
                         .toList());
+    }
+
+    private static List<AppointmentMember> members(Long... memberIds) {
+        return Arrays.stream(memberIds)
+                .map(id -> AppointmentMember.builder().memberId(id).build())
+                .toList();
     }
 
     private Set<String> members() {
