@@ -12,6 +12,7 @@ import {
 } from '@tabler/icons-vue'
 
 import { vFitTextGroup } from '@/shared/lib/fitText'
+import { serializeReturnParams } from '@/shared/lib/returnRoute'
 import { shareWithFallback } from '@/shared/lib/share'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
@@ -80,7 +81,7 @@ const {
   item: () => (place.value ? { itemId: place.value.itemId, startDate: null, endDate: null } : null),
   createJourneyReturn: () => ({
     returnRouteName: 'explore-place-detail',
-    returnParams: `placeId:${placeId.value}`,
+    returnParams: serializeReturnParams({ placeId: placeId.value }),
   }),
 })
 

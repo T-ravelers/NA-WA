@@ -14,6 +14,7 @@ import {
 
 import { formatCalendarDateString } from '@/shared/lib/datetime'
 import { vFitTextGroup } from '@/shared/lib/fitText'
+import { serializeReturnParams } from '@/shared/lib/returnRoute'
 import { shareWithFallback } from '@/shared/lib/share'
 import AppBadge from '@/shared/ui/AppBadge.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
@@ -90,7 +91,7 @@ const {
   },
   createJourneyReturn: () => ({
     returnRouteName: 'explore-event-detail',
-    returnParams: `eventId:${eventId.value}`,
+    returnParams: serializeReturnParams({ eventId: eventId.value }),
   }),
 })
 

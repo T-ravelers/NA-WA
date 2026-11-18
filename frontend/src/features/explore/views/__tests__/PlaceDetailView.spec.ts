@@ -6,6 +6,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { readReturnParams, readReturnRouteName } from '@/shared/lib/returnRoute'
 
 const { fetchPlaceDetail, fetchJourneys, addJourneyItem, showToast } = vi.hoisted(() => ({
   fetchPlaceDetail: vi.fn(),
@@ -504,6 +505,10 @@ describe('PlaceDetailView', () => {
       returnParams: 'placeId:42',
       openJourneySelect: '1',
     })
+    // 받는 쪽(JourneyCreateView)과 같은 파서로 되읽어 이 화면으로 돌아올 수 있는지 본다(#413).
+    const sent = router.currentRoute.value.query
+    expect(readReturnRouteName(sent, router)).toBe('explore-place-detail')
+    expect(readReturnParams(sent)).toEqual({ placeId: '42' })
   })
 
   it('여정을 만들고 돌아오면 그 여정이 골라진 채 시트가 열리고 규약 key가 지워진다', async () => {
