@@ -309,6 +309,7 @@ DB 컬럼: `appointments.item_type`
        MembershipStatus: PENDING → ACTIVE
        DepositStatus: PENDING → HELD
        (같은 트랜잭션, 같은 요청 안에서 함께 처리)
+       이 트랜잭션에 들어가기 전에 Redis 입장권으로 자리를 먼저 확인한다(아래).
 
     3. 정원 도달 → AppointmentStatus: RECRUITING → FULL
        (참여 트랜잭션 안에서 즉시 처리. 시간 기반 트리거는 없다)
@@ -328,6 +329,21 @@ DB 컬럼: `appointments.item_type`
 
     7. 후기 작성
        COMPLETED + ACTIVE + ATTENDED 회원끼리 후기 작성 가능
+
+### 참여 전 Redis 입장권
+
+`AppointmentJoinService`가 참여 트랜잭션을 열기 전에 `AppointmentSeatGate`로 남은 자리를
+확인·차감합니다(#612). 자리가 없으면 약속 행 잠금을 기다리지 않고 `APPOINTMENT-002`로
+거절합니다. 정원이 몰린 약속에서 자리 없는 요청이 잠금 줄을 서지 않게 하려는 것입니다.
+
+- **정본은 DB입니다.** 참여 트랜잭션은 지금처럼 약속 행을 잠그고 상태·시각·정원을 다시
+  확인합니다. 그래서 Redis 숫자가 틀려도 정원은 넘지 않고, 최악은 "자리가 있는데 거절"입니다.
+- 키가 없으면 DB의 `max_members − ACTIVE 인원`과 ACTIVE 회원으로 채웁니다. 활동 종료 시각에
+  만료됩니다.
+- 참여 트랜잭션이 롤백되면 이번에 뺀 자리를 돌려주고, 참여 취소는 커밋된 뒤
+  (`AppointmentMemberLeftEvent` → `AppointmentSeatReleaseListener`) 돌려줍니다.
+- Redis를 쓸 수 없으면 입장권 없이 DB만으로 처리합니다.
+- 보증금은 Redis와 무관하게 참여와 같은 트랜잭션에서 예치되므로, 참여가 실패하면 함께 롤백됩니다.
 
 ## 12. 참여 취소 흐름
 
