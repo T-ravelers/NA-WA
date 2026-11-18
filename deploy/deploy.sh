@@ -3,6 +3,12 @@ set -euo pipefail
 
 APP_DIR=~/nawa
 
+# 배포 워크플로가 넘기는 값이다. IMAGE_TAG가 비면 compose가 조용히 latest로 떨어져
+# 이미 밀려난 옛 이미지를 받으므로 시작 전에 막는다.
+: "${IMAGE_TAG:?IMAGE_TAG(배포 커밋 SHA)가 필요합니다}"
+: "${HEALTH_HOST:?HEALTH_HOST(헬스 체크 Host 헤더)가 필요합니다}"
+export IMAGE_TAG
+
 echo "[deploy] $(date '+%Y-%m-%d %H:%M:%S') 배포 시작"
 
 cd "$APP_DIR"
@@ -23,7 +29,7 @@ healthy=false
 for i in $(seq 1 10); do
   # TLS는 ALB가 종료하고 nginx는 평문 80만 받는다. 로컬 nginx를 거쳐 backend까지
   # 통과하는지 평문으로 직접 검사한다.
-  code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: api.na-wa.cloud' http://127.0.0.1/ || true)
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${HEALTH_HOST}" http://127.0.0.1/ || true)
   # 000(무응답)과 5xx(서버 오류)는 실패로 간주 - 2xx/4xx만 정상 응답으로 취급
   if [[ "$code" =~ ^[24][0-9]{2}$ ]]; then
     echo "[deploy] 응답 확인됨 (HTTP $code, ${i}번째 시도)"

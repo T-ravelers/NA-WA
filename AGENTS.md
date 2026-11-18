@@ -39,10 +39,24 @@ Node `24.22.1` · pnpm `12.15.0` · Java `17`
 - 관련 없는 프론트엔드/백엔드 변경을 한 PR에 섞지 않습니다.
 - **백엔드는 SSH가 아니라 SSM으로 배포합니다.** `deploy.yml`이 GitHub OIDC로 AWS 역할을 맡아
   대상 인스턴스에 SSM Run Command를 보내고, 서버가 커밋 SHA 기준으로 배포 대상 파일 3개를
-  `raw.githubusercontent.com`에서 직접 내려받습니다. 필요한 시크릿은 `AWS_DEPLOY_ROLE_ARN`과
-  `EC2_INSTANCE_ID`이며 `EC2_HOST`·`EC2_USER`·`EC2_SSH_KEY`는 더 이상 쓰지 않습니다. 역할의
-  신뢰 정책이 `main` 브랜치 실행만 허용하므로 **다른 브랜치에서 이 잡을 돌리면 역할을 못 맡아
-  실패하는 것이 정상**입니다. 서버의 `~/nawa/.env`는 배포가 만들지 않으니 최초 1회 직접 둡니다.
+  `raw.githubusercontent.com`에서 직접 내려받습니다. `EC2_HOST`·`EC2_USER`·`EC2_SSH_KEY`는
+  더 이상 쓰지 않습니다.
+  **배포는 GitHub Environment(`staging`, `production`)별로 나뉩니다.** `deploy.yml`은 이미지를
+  만들고 `deploy-ssm.yml`을 환경마다 한 번씩 호출합니다. `AWS_DEPLOY_ROLE_ARN`·`EC2_INSTANCE_ID`
+  시크릿과 `HEALTH_HOST` 변수(헬스 체크 `Host` 헤더, 그 환경의 백엔드 도메인)는 **각 Environment에
+  따로** 두고, `DOCKERHUB_*`만 저장소 수준입니다. 스테이징은 `main` 병합 뒤 자동으로, 운영은
+  스테이징이 성공한 뒤 `production` Environment의 승인을 받아 배포합니다. 저장소 변수
+  `PRODUCTION_ENABLED`가 `true`가 아니면 운영 잡은 건너뜁니다. 지금 실제로 도는 환경은 스테이징
+  하나이고, 아래 `na-wa.cloud` 도메인 설명도 그 환경 기준입니다.
+  역할의 신뢰 정책은 `environment:<이름>`을 허용합니다. 잡에 `environment:`를 지정하면 OIDC `sub`가
+  브랜치(`ref:refs/heads/main`)가 아니라 `environment:<이름>`으로 바뀌므로, **신뢰 정책에 이 값이
+  없으면 역할을 못 맡아 실패하는 것이 정상**입니다. 브랜치에서 돌려 보려면 그 Environment의 배포
+  브랜치 규칙도 맞아야 합니다.
+  **이미지는 커밋 SHA 태그로만 배포합니다.** `latest`는 push하지 않습니다. `deploy.sh`는
+  `IMAGE_TAG`(배포 SHA)와 `HEALTH_HOST`가 없으면 시작하지 않고, compose의 기본값 `latest`는 로컬 빌드용입니다.
+  서버에서 `docker compose`를 손으로 실행할 때도 `IMAGE_TAG=<sha>`를 줘야 합니다. 안 주면 이미 밀려난
+  옛 `latest` 이미지로 컨테이너가 다시 만들어집니다.
+  서버의 `~/nawa/.env`는 배포가 만들지 않으니 최초 1회 직접 둡니다.
   러너가 취소돼도 SSM 명령은 서버에서 계속 돌 수 있어서, 서버가 `/var/lock/nawa-deploy.lock`
   `flock`으로 배포를 직렬화합니다. 이 잠금은 `deploy.sh`까지 이어져야 하므로 `sudo`가 아니라
   `runuser`로 실행합니다(`sudo`는 상속한 파일 디스크립터를 닫습니다).
