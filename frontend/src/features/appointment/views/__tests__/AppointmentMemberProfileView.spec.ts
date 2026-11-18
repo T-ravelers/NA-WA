@@ -1,12 +1,15 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 
-import { appointmentMemberIntegrationKey } from '../../model/memberIntegration'
+import {
+  appointmentMemberIntegrationKey,
+  type AppointmentMemberStats,
+} from '../../model/memberIntegration'
 
 const fetchAppointmentMembers = vi.fn()
 
@@ -30,7 +33,12 @@ const members = [
   },
 ]
 
-async function mountView() {
+interface StatsState {
+  data: AppointmentMemberStats | undefined
+  isError?: boolean
+}
+
+async function mountView(stats: StatsState = { data: { averageRating: null, reviewCount: 0 } }) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -48,23 +56,12 @@ async function mountView() {
   const wrapper = mount(AppointmentMemberProfileView, {
     global: {
       plugins: [i18n, router, [VueQueryPlugin, { queryClient }]],
-      /*
-       * 화면은 더는 이 주입을 쓰지 않는다(#483). 그래도 남기는 이유는 둘이다 —
-       * 되살릴 때 그대로 쓰고, **`reviewCount`가 0이 아니어야 아래 뮤테이션이 잡힌다.**
-       * 0으로 두면 후기 수 한 줄을 되돌려도 옛 코드가 `ratingUnavailable` 가지를 타서
-       * `reviews`라는 글자가 아예 안 나온다(실측: 뮤테이션 3건 전부 통과).
-       */
       provide: {
         [appointmentMemberIntegrationKey as symbol]: {
           useMemberStats: () => ({
-            data: ref({
-              completionRate: null,
-              noShowCount: 0,
-              averageRating: null,
-              reviewCount: 3,
-            }),
+            data: ref(stats.data),
             isPending: ref(false),
-            isError: ref(false),
+            isError: ref(stats.isError ?? false),
           }),
         },
       },
@@ -80,22 +77,64 @@ describe('AppointmentMemberProfileView', () => {
     fetchAppointmentMembers.mockResolvedValue(members)
   })
 
-  it('renders the selected participant', async () => {
-    const { wrapper } = await mountView()
+  afterEach(() => {
+    i18n.global.locale.value = 'en'
+  })
+
+  it('renders the selected participant with one trust line', async () => {
+    const { wrapper } = await mountView({ data: { averageRating: 4.666, reviewCount: 6 } })
 
     expect(wrapper.text()).toContain('Participant profile')
     expect(wrapper.text()).toContain('Mina Park')
+    expect(wrapper.get('[data-testid="member-trust-line"]').text()).toBe('★ 4.7 · 6 reviews')
   })
 
-  // 신뢰 지표는 집계가 발표 후 트랙이라 값이 비어 있고, 빈 값을 찍던 자리가
-  // 하드코딩 영어라 네 로케일 모두 영어로 보였다(#483). 화면에서 뺐다.
-  it('does not show trust indicators while the aggregate is unavailable', async () => {
-    const { wrapper } = await mountView()
+  it('uses the singular form for a single review', async () => {
+    const { wrapper } = await mountView({ data: { averageRating: 5, reviewCount: 1 } })
 
-    expect(wrapper.text()).not.toContain('Trust indicators')
-    expect(wrapper.text()).not.toContain('Unavailable')
-    expect(wrapper.text()).not.toContain('No ratings yet')
-    expect(wrapper.text()).not.toContain('reviews')
+    expect(wrapper.get('[data-testid="member-trust-line"]').text()).toBe('★ 5.0 · 1 review')
+  })
+
+  // 평점 소수점은 로케일을 따른다. vi는 쉼표를 쓴다.
+  it.each([
+    ['en', '★ 4.7 · 6 reviews'],
+    ['ja', '★ 4.7 · レビュー 6件'],
+    ['zh-TW', '★ 4.7 · 6 則評價'],
+    ['vi', '★ 4,7 · 6 đánh giá'],
+  ] as const)('formats the rating for %s', async (locale, expected) => {
+    i18n.global.locale.value = locale
+    const { wrapper } = await mountView({ data: { averageRating: 4.666, reviewCount: 6 } })
+
+    expect(wrapper.get('[data-testid="member-trust-line"]').text()).toBe(expected)
+  })
+
+  // 0건을 0점으로 그리면 평가가 나쁜 사람처럼 보인다.
+  it('says there are no reviews yet instead of showing a zero score', async () => {
+    const { wrapper } = await mountView({ data: { averageRating: null, reviewCount: 0 } })
+
+    const line = wrapper.get('[data-testid="member-trust-line"]').text()
+    expect(line).toBe('No reviews yet')
+    expect(line).not.toContain('★')
+  })
+
+  // 출석률·노쇼 수는 공개 범위를 정하지 않았다(#173). 본인 조회 응답에는 값이 와도 그리지 않는다.
+  it('does not show attendance metrics even when the response has them', async () => {
+    const { wrapper } = await mountView({
+      data: { completionRate: 83, noShowCount: 2, averageRating: 4.2, reviewCount: 3 },
+    })
+
+    const text = wrapper.text()
+    expect(text).not.toContain('83')
+    expect(text).not.toMatch(/no-show|completion|trust indicators/i)
+  })
+
+  // 열람 범위 밖이면 서버가 403을 준다. 점수 줄만 빼고 프로필은 그대로 보인다.
+  it('hides the trust line when the score cannot be loaded', async () => {
+    const { wrapper } = await mountView({ data: undefined, isError: true })
+
+    expect(wrapper.text()).toContain('Mina Park')
+    expect(wrapper.find('[data-testid="member-trust-line"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toMatch(/unavailable|no ratings yet/i)
   })
 
   // 후기 보기·신고는 연결할 곳이 없어 비활성으로만 놓여 있었다. 누를 수 없는 버튼은

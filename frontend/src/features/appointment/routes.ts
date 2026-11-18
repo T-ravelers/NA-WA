@@ -26,6 +26,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, hideBottomNav: true },
   },
   {
+    path: '/appointments/:appointmentId/reviews',
+    name: 'appointment-reviews',
+    component: () => import('./views/AppointmentReviewView.vue'),
+    meta: { requiresAuth: true, hideBottomNav: true },
+  },
+  {
     path: '/appointments/:appointmentId',
     name: 'appointment-detail',
     component: () => import('./views/AppointmentDetailView.vue'),
