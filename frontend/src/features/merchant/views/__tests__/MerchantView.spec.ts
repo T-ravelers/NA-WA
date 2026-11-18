@@ -186,6 +186,34 @@ describe('MerchantView', () => {
     expect(registerAsMerchant).not.toHaveBeenCalled()
   })
 
+  // 모달은 닫히면서 포커스를 등록 버튼으로 돌려주는데, 그 버튼은 요청 중 disabled라 포커스가
+  // body로 떨어진다. 결과(오류)가 붙는 입력 칸으로 옮겨야 한다(#615 리뷰).
+  it('moves focus to the store name field while the registration is pending', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('TRAVELER'))
+    vi.mocked(registerAsMerchant).mockReturnValue(new Promise(() => {}))
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const wrapper = mount(MerchantView, {
+      attachTo: document.body,
+      global: { plugins: [i18n, [VueQueryPlugin, { queryClient }]] },
+    })
+    await flushPromises()
+
+    const input = wrapper.get('input[type="text"]')
+    await input.setValue('Blue Bottle Hongdae')
+    const submit = wrapper.get('button[type="submit"]')
+    ;(submit.element as HTMLButtonElement).focus()
+    await wrapper.get('form').trigger('submit')
+    await dialogButton(wrapper, 'Create store').trigger('click')
+    await flushPromises()
+
+    expect(registerAsMerchant).toHaveBeenCalledWith('Blue Bottle Hongdae')
+    expect((submit.element as HTMLButtonElement).disabled).toBe(true)
+    expect(document.activeElement).toBe(input.element)
+
+    wrapper.unmount()
+  })
+
   it.each([
     ['the back button', (wrapper: VueWrapper) => dialogButton(wrapper, 'Go back').trigger('click')],
     [
