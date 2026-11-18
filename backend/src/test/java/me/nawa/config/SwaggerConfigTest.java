@@ -9,6 +9,7 @@ import me.nawa.auth.oauth.callback.OAuthCallbackResult;
 import me.nawa.auth.oauth.callback.OAuthCallbackService;
 import me.nawa.auth.token.AuthTokenService;
 import me.nawa.auth.token.AuthTokens;
+import me.nawa.appointment.service.AppointmentJoinService;
 import me.nawa.appointment.service.AppointmentService;
 import me.nawa.common.exception.ErrorCode;
 import me.nawa.member.dto.MemberProfileResponse;
@@ -457,6 +458,11 @@ class SwaggerConfigTest {
         @Bean
         AppointmentService appointmentService() {
             return new AppointmentService(null, null, null, null, null);
+        }
+
+        @Bean
+        AppointmentJoinService appointmentJoinService() {
+            return new AppointmentJoinService(null, null);
         }
     }
 
