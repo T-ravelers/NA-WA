@@ -193,6 +193,12 @@ public enum WalletErrorCode implements ErrorCode {
         HttpStatus.BAD_REQUEST,
         "WALLET-031",
         "지원하지 않는 소비 카테고리입니다."
+    ),
+
+    PAYMENT_DISABLED(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "WALLET-032",
+        "충전 기능은 아직 준비 중입니다."
     );
 
     private final HttpStatus status;

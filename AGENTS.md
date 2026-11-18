@@ -113,6 +113,14 @@ Node `24.22.1` · pnpm `12.15.0` · Java `17`
   컨텍스트를 `SecurityConfig.securityContextRepository()`에 남기지 않으면 Spring Security 5.8이
   인증된 요청마다 쿠키를 갈아 끼워 **쓰기 1건이 오류 없이 요청 3건이 됩니다**(#449).
   자세한 것은 [인증 문서](./backend/docs/AUTHENTICATION.md#csrf-토큰은-로그인할-때만-바뀝니다).
+- **Stripe 충전은 `PAYMENT_ENABLED`로 끕니다.** 충전은 아직 Stripe sandbox라 실제 운영에서는
+  `false`로 둡니다. 끄면 `STRIPE_SECRET_KEY`·`STRIPE_WEBHOOK_SECRET` 없이도 서버가 뜨고, 충전
+  미리보기·충전 생성·충전 상태 조회·Stripe 웹훅은 `WALLET-032`(503)를 냅니다. 충전 수단 목록
+  (`GET /api/v1/topups/methods`)은 수단을 `enabled=false`로 내려 줘서 화면이 "준비 중"을 판단합니다.
+  안 적으면 `true`라 지금 환경과 같게 동작하고, `true`인데 키가 하나라도 비면 서버가 시작할 때
+  멈춥니다. **충전만 막습니다.** 약속 보증금·정산 이체·QR 결제는 지갑 잔액에서 돈을 빼는데 지갑은
+  잔액 0으로 만들어지고 늘릴 길이 충전뿐이라, 충전을 끈 환경에서는 이 기능들이 잔액 부족
+  (`WALLET-015`)으로 실패합니다. 이 기능들을 별도로 막는 코드는 없습니다.
 - 영수증 이미지 S3 버킷은 **백엔드가 도는 AWS 계정이 아닌 다른 계정**이 소유합니다.
   그래서 EC2 인스턴스 역할로 권한을 얹지 못하고, 버킷 소유 계정이 발급한 IAM 사용자 키를
   `AWS_ACCESS_KEY_ID`·`AWS_SECRET_ACCESS_KEY`로 받아 씁니다. 이 정적 자격증명을 인스턴스
