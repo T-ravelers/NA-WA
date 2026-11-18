@@ -16,6 +16,7 @@ import TextInput from '@/shared/ui/TextInput.vue'
 import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import { createMerchantQr, registerAsMerchant, type MerchantQr } from '../api/merchantApi'
+import MerchantRegisterConfirmSheet from '../components/MerchantRegisterConfirmSheet.vue'
 import {
   calculateTotal,
   createEmptyItem,
@@ -82,7 +83,20 @@ const canRegister = computed(
   () => businessName.value.trim() !== '' && !registerMutation.isPending.value,
 )
 
+/*
+ * 손님 → 가맹점 전환은 되돌릴 수 없어서, 제출은 요청이 아니라 확인 모달을 연다(#340).
+ * 확정한 뒤의 진행·오류 표시는 지금처럼 폼 버튼과 입력 칸이 맡는다.
+ */
+const confirmingRegistration = ref(false)
+
 const submitRegistration = (): void => {
+  if (!canRegister.value) return
+
+  confirmingRegistration.value = true
+}
+
+const confirmRegistration = (): void => {
+  confirmingRegistration.value = false
   if (!canRegister.value) return
 
   registerMutation.mutate(businessName.value.trim())
@@ -338,6 +352,13 @@ const createError = computed(() =>
           </AppButton>
         </form>
       </AppCard>
+
+      <MerchantRegisterConfirmSheet
+        v-if="confirmingRegistration"
+        :business-name="businessName.trim()"
+        @close="confirmingRegistration = false"
+        @confirm="confirmRegistration"
+      />
     </section>
 
     <template v-else>

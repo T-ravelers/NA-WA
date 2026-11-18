@@ -18,6 +18,9 @@ export default {
       irreversible:
         'This cannot be undone. A store account cannot make payments or use traveller features.',
       submit: 'Create store',
+      confirmTitle: 'Create this store?',
+      confirmClose: 'Close store confirmation',
+      confirmCancel: 'Go back',
       error: 'We could not set up your store. Please try again.',
     },
     income: {

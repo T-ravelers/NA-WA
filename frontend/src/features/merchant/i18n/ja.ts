@@ -16,6 +16,9 @@ export default {
       irreversible:
         'この操作は取り消せません。店舗アカウントでは決済や旅行者向け機能を利用できません。',
       submit: '店舗を作成',
+      confirmTitle: 'この店舗を作成しますか？',
+      confirmClose: '店舗作成の確認を閉じる',
+      confirmCancel: '戻る',
       error: '店舗を設定できませんでした。もう一度お試しください。',
     },
     income: {

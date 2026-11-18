@@ -1,5 +1,5 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '@/app/i18n'
@@ -74,6 +74,20 @@ async function mountView() {
   return { wrapper, queryClient }
 }
 
+/** 확인 모달 안의 버튼을 글자로 고른다. 폼에도 같은 글자의 버튼이 있어 모달 안으로 좁힌다. */
+function dialogButton(wrapper: VueWrapper, label: string) {
+  const button = wrapper
+    .get('[role="dialog"]')
+    .findAll('button')
+    .find((candidate) => candidate.text() === label)
+
+  if (button === undefined) {
+    throw new Error(`확인 모달에 「${label}」 버튼이 없다`)
+  }
+
+  return button
+}
+
 describe('MerchantView', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -141,9 +155,11 @@ describe('MerchantView', () => {
 
     await wrapper.find('input[type="text"]').setValue('Blue Bottle Hongdae')
     await wrapper.find('form').trigger('submit')
+    await dialogButton(wrapper, 'Create store').trigger('click')
     await flushPromises()
 
     expect(registerAsMerchant).toHaveBeenCalledWith('Blue Bottle Hongdae')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
 
     // 등록에 성공하면 화면이 곧바로 가맹점 모드로 바뀌어야 한다. 캐시만 비우고 이 화면이
     // 다시 그려지지 않으면 사용자는 등록 폼을 계속 보고, 다시 누르면 MEMBER-009를 받는다.
@@ -153,6 +169,52 @@ describe('MerchantView', () => {
     // guard가 보는 회원 프로필 캐시가 TRAVELER로 남으면 등록 직후 손님 화면으로 나갈 수 있다.
     expect(removed).toHaveBeenCalled()
   })
+
+  // 전환은 되돌릴 수 없다. 제출 한 번으로 확정하지 않고, 상호명과 안내를 다시 보여 준 뒤 묻는다(#340).
+  it('asks for confirmation with the store name before registering', async () => {
+    vi.mocked(fetchMerchantAccount).mockResolvedValue(account('TRAVELER'))
+
+    const { wrapper } = await mountView()
+    await wrapper.find('input[type="text"]').setValue('  Blue Bottle Hongdae  ')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const dialog = wrapper.get('[role="dialog"]')
+    expect(dialog.text()).toContain('Create this store?')
+    expect(dialog.get('[data-testid="merchant-confirm-name"]').text()).toBe('Blue Bottle Hongdae')
+    expect(dialog.text()).toContain('This cannot be undone.')
+    expect(registerAsMerchant).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['the back button', (wrapper: VueWrapper) => dialogButton(wrapper, 'Go back').trigger('click')],
+    [
+      'the close button',
+      (wrapper: VueWrapper) =>
+        wrapper.get('[aria-label="Close store confirmation"]').trigger('click'),
+    ],
+    [
+      'the Escape key',
+      () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      },
+    ],
+  ])(
+    'keeps the account as a traveller when the confirmation is dismissed with %s',
+    async (_, dismiss) => {
+      vi.mocked(fetchMerchantAccount).mockResolvedValue(account('TRAVELER'))
+
+      const { wrapper } = await mountView()
+      await wrapper.find('input[type="text"]').setValue('Blue Bottle Hongdae')
+      await wrapper.find('form').trigger('submit')
+      await dismiss(wrapper)
+      await flushPromises()
+
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(registerAsMerchant).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain('Set up your store')
+    },
+  )
 
   it('shows income and the charge form for a merchant', async () => {
     vi.mocked(fetchMerchantAccount).mockResolvedValue(account('MERCHANT'))
