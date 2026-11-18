@@ -21,6 +21,12 @@ public enum TopupMethodType {
     }
 
     public TopupMethodResponse toResponse(){
-        return new TopupMethodResponse(name(), displayName, testMode, enabled);
+        return toResponse(true);
+    }
+
+    // 충전 기능 전체가 꺼진 환경(payment.enabled=false)에서는 수단 자체가 켜져 있어도 쓸 수 없다.
+    // 수단을 목록에서 빼지 않고 enabled=false로 내려 줘야 화면이 "준비 중"을 판단할 수 있다.
+    public TopupMethodResponse toResponse(boolean paymentEnabled){
+        return new TopupMethodResponse(name(), displayName, testMode, enabled && paymentEnabled);
     }
 }

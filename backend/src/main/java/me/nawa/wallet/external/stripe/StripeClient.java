@@ -26,7 +26,10 @@ public class StripeClient {
     // 빈이 만들어진 직후 한 번만 세팅해준다.
     @PostConstruct
     void init() {
-        Stripe.apiKey = properties.getSecretKey();
+        // 충전이 꺼진 환경에는 키가 없다. 빈 값을 static 필드에 넣지 않는다.
+        if (properties.isEnabled()) {
+            Stripe.apiKey = properties.getSecretKey();
+        }
     }
 
     // 새 충전 건에 대해 Stripe에 PaymentIntent 생성을 요청한다 (우리 서버 -> Stripe).

@@ -21,9 +21,11 @@ class StripeClientLiveTest {
 
     @Test
     void createPaymentIntent가_실제_Stripe_test_모드에_생성된다() throws Exception {
+        // 이 테스트는 웹훅을 쓰지 않지만, 켜진 설정은 웹훅 시크릿도 요구하므로 자리 값을 넣는다.
         StripeProperties properties = new StripeProperties(
+            true,
             System.getenv("STRIPE_SECRET_KEY"),
-            ""
+            "whsec_unused_in_this_test"
         );
         StripeClient stripeClient = new StripeClient(properties);
         stripeClient.init();

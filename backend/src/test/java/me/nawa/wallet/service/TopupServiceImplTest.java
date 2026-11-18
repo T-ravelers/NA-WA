@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,11 +42,13 @@ import me.nawa.wallet.dto.response.TopupPreviewResponse;
 import me.nawa.wallet.exception.WalletErrorCode;
 import me.nawa.wallet.external.stripe.StripeClient;
 import me.nawa.wallet.external.stripe.StripePaymentIntent;
+import me.nawa.wallet.external.stripe.StripeProperties;
 import me.nawa.wallet.mapper.WalletLedgerMapper;
 import me.nawa.wallet.mapper.WalletMapper;
 import me.nawa.wallet.mapper.WalletTopupMapper;
 import me.nawa.wallet.mapper.WalletTransferMapper;
 import me.nawa.wallet.util.TransactionNumberGenerator;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -74,8 +77,17 @@ class TopupServiceImplTest {
     @Mock
     private StripeClient stripeClient;
 
+    @Mock
+    private StripeProperties stripeProperties;
+
     @InjectMocks
     private TopupServiceImpl topupService;
+
+    // 기본은 충전이 켜진 환경이다. 꺼진 환경은 아래 전용 테스트에서 바꾼다.
+    @BeforeEach
+    void setUp() {
+        lenient().when(stripeProperties.isEnabled()).thenReturn(true);
+    }
 
     @Test
     void getAvailableTopupMethods_returnsEnabledMethodsAndGuideMessage() {
@@ -843,5 +855,75 @@ class TopupServiceImplTest {
         assertFalse(response.alreadyProcessed());
         verify(walletTopupMapper).updateProviderStatus(88L, "processing");
         verifyNoInteractions(walletTransferMapper);
+    }
+
+    @Test
+    void getAvailableTopupMethods_marksMethodsDisabled_whenPaymentDisabled() {
+        when(stripeProperties.isEnabled()).thenReturn(false);
+
+        TopupMethodsResponse response = topupService.getAvailableTopupMethods();
+
+        assertEquals(1, response.methods().size());
+        assertEquals("STRIPE_CARD", response.methods().get(0).type());
+        assertFalse(response.methods().get(0).enabled());
+        assertEquals("충전 기능은 아직 준비 중입니다.", response.guideMessage());
+    }
+
+    @Test
+    void previewTopup_throwsPaymentDisabled_whenPaymentDisabled() {
+        when(stripeProperties.isEnabled()).thenReturn(false);
+        TopupPreviewRequest request = new TopupPreviewRequest(BigDecimal.valueOf(10000), "STRIPE_CARD", "KRW");
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.previewTopup(1L, request)
+        );
+
+        assertEquals(WalletErrorCode.PAYMENT_DISABLED, exception.getErrorCode());
+        verifyNoInteractions(walletMapper);
+    }
+
+    @Test
+    void createStripeIntent_throwsPaymentDisabled_withoutTouchingDbOrStripe_whenPaymentDisabled() throws StripeException {
+        when(stripeProperties.isEnabled()).thenReturn(false);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.createStripeIntent(1L, "key-1", new StripeIntentCreateRequest(BigDecimal.valueOf(10000), "KRW"))
+        );
+
+        assertEquals(WalletErrorCode.PAYMENT_DISABLED, exception.getErrorCode());
+        verifyNoInteractions(walletMapper);
+        verifyNoInteractions(walletTopupMapper);
+        verify(stripeClient, never()).createPaymentIntent(any(), any());
+    }
+
+    @Test
+    void getStripeTopupStatus_throwsPaymentDisabled_whenPaymentDisabled() throws StripeException {
+        when(stripeProperties.isEnabled()).thenReturn(false);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.getStripeTopupStatus(1L, 88L)
+        );
+
+        assertEquals(WalletErrorCode.PAYMENT_DISABLED, exception.getErrorCode());
+        verifyNoInteractions(walletMapper);
+        verifyNoInteractions(walletTopupMapper);
+        verify(stripeClient, never()).retrievePaymentIntent(any());
+    }
+
+    @Test
+    void applyStripeWebhookEvent_throwsPaymentDisabled_beforeVerifyingSignature_whenPaymentDisabled() throws SignatureVerificationException {
+        when(stripeProperties.isEnabled()).thenReturn(false);
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> topupService.applyStripeWebhookEvent("payload", "sig")
+        );
+
+        assertEquals(WalletErrorCode.PAYMENT_DISABLED, exception.getErrorCode());
+        verify(stripeClient, never()).constructWebhookEvent(any(), any());
+        verifyNoInteractions(walletTopupMapper);
     }
 }

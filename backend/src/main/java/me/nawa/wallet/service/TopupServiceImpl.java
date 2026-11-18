@@ -29,6 +29,7 @@ import me.nawa.wallet.dto.response.TopupSummaryResponse;
 import me.nawa.wallet.exception.WalletErrorCode;
 import me.nawa.wallet.external.stripe.StripeClient;
 import me.nawa.wallet.external.stripe.StripePaymentIntent;
+import me.nawa.wallet.external.stripe.StripeProperties;
 import me.nawa.wallet.mapper.WalletLedgerMapper;
 import me.nawa.wallet.mapper.WalletMapper;
 import me.nawa.wallet.mapper.WalletTopupMapper;
@@ -43,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Log4j2
 public class TopupServiceImpl implements TopupService {
     private static final String GUIDE_MESSAGE = "테스트 환경에서는 실제 결제가 발생하지 않습니다.";
+    private static final String PAYMENT_DISABLED_GUIDE_MESSAGE = "충전 기능은 아직 준비 중입니다.";
     private static final String KRW = "KRW"; // 현재는 KRW 충전만 지원
     private static final BigDecimal FEE = BigDecimal.ZERO; // 수수료 미도입 상태, 항상 0원
     private static final int DEFAULT_PAGE_SIZE = 20;
@@ -53,23 +55,29 @@ public class TopupServiceImpl implements TopupService {
     private final WalletTransferMapper walletTransferMapper;
     private final WalletLedgerMapper walletLedgerMapper;
     private final StripeClient stripeClient;
+    private final StripeProperties stripeProperties;
     private final TransactionNumberGenerator transactionNumberGenerator;
 
     // GET /api/v1/topups/methods — 활성화된(enabled=true) 충전 수단 목록 + 안내 문구 반환
+    // 충전 기능이 꺼진 환경(payment.enabled=false)에서는 수단을 enabled=false로 내려 준다.
     @Override
     public TopupMethodsResponse getAvailableTopupMethods() {
+        boolean paymentEnabled = stripeProperties.isEnabled();
+
         List<TopupMethodResponse> methods = Arrays.stream(TopupMethodType.values())
             .filter(TopupMethodType::isEnabled)
-            .map(TopupMethodType::toResponse)
+            .map(method -> method.toResponse(paymentEnabled))
             .collect(Collectors.toList());
 
-        return new TopupMethodsResponse(methods, GUIDE_MESSAGE);
+        return new TopupMethodsResponse(methods, paymentEnabled ? GUIDE_MESSAGE : PAYMENT_DISABLED_GUIDE_MESSAGE);
     }
 
     // POST /api/v1/topups/preview — 실제 충전 없이 "충전하면 잔액이 얼마가 될지"만 미리 계산해서 보여준다.
     @Override
     @Transactional(readOnly = true)
     public TopupPreviewResponse previewTopup(Long memberId, TopupPreviewRequest request) {
+        requirePaymentEnabled();
+
         //1. 금액/충전수단/통화 검증 (하나라도 안 맞으면 예외로 바로 중단)
         validateAmount(request.amount());
         validateMethod(request.method());
@@ -135,6 +143,8 @@ public class TopupServiceImpl implements TopupService {
     @Transactional
     public StripeIntentResponse createStripeIntent(long memberId, String idempotencyKdy,
                                                    StripeIntentCreateRequest request) {
+        requirePaymentEnabled();
+
         //1. Idempotency key는 필수 (없으면 재시도 시 중복 생성을 막을 방법이 없음)
         if (idempotencyKdy == null || idempotencyKdy.isBlank()) {
             throw new BusinessException(WalletErrorCode.IDEMPOTENCY_KEY_REQUIRED);
@@ -208,6 +218,8 @@ public class TopupServiceImpl implements TopupService {
     @Override
     @Transactional
     public StripeTopupStatusResponse getStripeTopupStatus(long memberId, Long topupId) {
+        requirePaymentEnabled();
+
         //1. 본인 지갑 조회
         Wallet wallet = walletMapper.findByMemberId(memberId);
         if (wallet == null) {
@@ -253,6 +265,9 @@ public class TopupServiceImpl implements TopupService {
     @Override
     @Transactional
     public StripeWebhookResponse applyStripeWebhookEvent(String payload, String signatureHeader) {
+        // 충전이 꺼진 환경에는 웹훅 서명 비밀이 없어 검증할 수 없다. 서명 검증 전에 막는다.
+        requirePaymentEnabled();
+
         //1. 서명 검증 — Stripe가 보낸 요청이 맞는지 확인 (이게 곧 이 엔드포인트의 인증 역할을 한다)
         Event event;
         try {
@@ -399,6 +414,15 @@ public class TopupServiceImpl implements TopupService {
     }
 
     // 충전 금액은 반드시 0보다 커야 한다
+    // 충전이 꺼진 환경에서는 Stripe를 부르는 경로를 모두 여기서 막는다.
+    // 켜짐 여부는 설정(payment.enabled)을 읽는 StripeProperties로 본다. StripeClient를 거치지 않아야
+    // "꺼진 환경에서 Stripe를 전혀 부르지 않는다"를 테스트에서 verifyNoInteractions로 확인할 수 있다.
+    private void requirePaymentEnabled() {
+        if (!stripeProperties.isEnabled()) {
+            throw new BusinessException(WalletErrorCode.PAYMENT_DISABLED);
+        }
+    }
+
     private void validateAmount(BigDecimal amount){
         if(amount == null || amount.compareTo(BigDecimal.ZERO) <= 0){
             throw new BusinessException(WalletErrorCode.INVALID_TOPUP_AMOUNT);
