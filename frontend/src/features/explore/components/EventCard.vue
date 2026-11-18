@@ -56,7 +56,7 @@ const kindLabel = computed(() => t(`explore.eventKinds.${event.eventKind}`))
 
 const categoryLabel = computed(() => {
   if (event.eventKind === 'POPUP') return t('explore.categories.shopping')
-  if (event.eventKind === 'FESTIVAL') return t('explore.categories.show')
+  if (event.eventKind === 'FESTIVAL') return t('explore.categories.food')
   if (event.eventKind === 'CONCERT' || event.eventKind === 'EXHIBITION')
     return t('explore.categories.show')
   return t('explore.categories.other')

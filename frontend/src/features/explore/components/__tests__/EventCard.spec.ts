@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import { i18n } from '@/app/i18n'
+import CategoryDot from '@/shared/ui/CategoryDot.vue'
 
 const likeExploreItem = vi.fn()
 const unlikeExploreItem = vi.fn()
@@ -51,6 +52,23 @@ describe('EventCard', () => {
     likeExploreItem.mockResolvedValue({ saved: true })
     unlikeExploreItem.mockResolvedValue({ saved: false })
   })
+
+  // 점 색과 라벨은 같은 소비영역을 가리켜야 한다(#544). FESTIVAL은 Journey 칩(#540)과 같은 food다.
+  it.each([
+    ['POPUP', 'shopping', 'Shopping'],
+    ['CONCERT', 'show', 'Shows'],
+    ['EXHIBITION', 'show', 'Shows'],
+    ['FESTIVAL', 'food', 'Food'],
+  ] as const)(
+    'marks %s with the same category in its dot and label',
+    (eventKind, category, label) => {
+      const wrapper = mountCard({ eventKind })
+      const dot = wrapper.findComponent(CategoryDot)
+
+      expect(dot.props('category')).toBe(category)
+      expect(dot.element.parentElement?.textContent).toContain(`${label} ·`)
+    },
+  )
 
   it('shows press feedback on the clickable card unless reduced motion is requested', () => {
     const wrapper = mountCard()
