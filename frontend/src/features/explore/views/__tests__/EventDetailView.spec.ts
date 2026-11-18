@@ -7,6 +7,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
 import { NormalizedApiError } from '@/shared/api/apiError'
+import { readReturnParams, readReturnRouteName } from '@/shared/lib/returnRoute'
 
 import type {
   ExploreJourneyIntegration,
@@ -567,6 +568,10 @@ describe('EventDetailView', () => {
       itemStartDate: '2026-08-10',
       itemEndDate: '2026-08-12',
     })
+    // 받는 쪽(JourneyCreateView)과 같은 파서로 되읽어 이 화면으로 돌아올 수 있는지 본다(#413).
+    const sent = router.currentRoute.value.query
+    expect(readReturnRouteName(sent, router)).toBe('explore-event-detail')
+    expect(readReturnParams(sent)).toEqual({ eventId: '42' })
   })
 
   /*
