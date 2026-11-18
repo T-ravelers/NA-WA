@@ -271,9 +271,10 @@ docker build --build-arg GRADLE_ARGS=-Ploadtest -t nawa-backend:loadtest ./backe
 LOADTEST_LOGIN_SECRET=$(openssl rand -hex 16)
 ```
 
-> **이미지 태그를 운영과 나눠 쓰세요.** 배포는 `nawa-backend:latest` 하나를 봅니다.
-> `-Ploadtest`로 만든 이미지를 그 태그로 push하면 **다음 배포에 그대로 들어갑니다.**
-> 위처럼 `:loadtest` 같은 별도 태그를 쓰고, 절대 `latest`로 push하지 않습니다.
+> **이미지 태그를 운영과 나눠 쓰세요.** 배포는 워크플로가 커밋 SHA 태그로 만든
+> `nawa-backend` 이미지만 받습니다. 위처럼 `:loadtest` 같은 별도 태그를 쓰고,
+> `-Ploadtest`로 만든 이미지를 Docker Hub의 `nawa-backend`에 `latest`나 커밋 SHA
+> 형식 태그로 push하지 않습니다.
 
 부하 테스트 환경 전체 구성은 별도 이슈에서 다룹니다.
 
