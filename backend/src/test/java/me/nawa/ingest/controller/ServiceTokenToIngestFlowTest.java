@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -73,7 +74,8 @@ class ServiceTokenToIngestFlowTest {
                 .addFilters(new JwtAuthenticationFilter(
                         new AuthCookieManager("nawa_at", "nawa_rt", "nawa_st",
                                 false, "Lax", ""),
-                        jwtTokenProvider))
+                        jwtTokenProvider,
+                        new RequestAttributeSecurityContextRepository()))
                 .build();
     }
 

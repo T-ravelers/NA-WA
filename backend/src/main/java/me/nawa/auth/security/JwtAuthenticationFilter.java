@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -27,6 +28,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final AuthCookieManager authCookieManager;
     private final JwtTokenProvider jwtTokenProvider;
+    /**
+     * {@code SecurityConfig.securityContextRepository()}와 같은 요청 속성에 저장하는 저장소여야 한다.
+     * 기본 생성자의 {@code RequestAttributeSecurityContextRepository}는 속성 이름이 상수라서
+     * 인스턴스가 달라도 된다.
+     */
+    private final SecurityContextRepository securityContextRepository;
 
     @Override
     protected void doFilterInternal(
@@ -36,7 +43,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
             authCookieManager.findAccessToken(request.getCookies())
                     .or(() -> findBearerToken(request))
-                    .ifPresent(token -> authenticate(request, token));
+                    .ifPresent(token -> authenticate(request, response, token));
         }
 
         filterChain.doFilter(request, response);
@@ -60,7 +67,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return token.isEmpty() ? Optional.empty() : Optional.of(token);
     }
 
-    private void authenticate(HttpServletRequest request, String token) {
+    private void authenticate(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            String token) {
         try {
             AccessTokenClaims claims = jwtTokenProvider.parseAccessToken(token);
             AuthenticatedMember principal = new AuthenticatedMember(
@@ -76,6 +86,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     new WebAuthenticationDetailsSource().buildDetails(request)
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            // 남기지 않으면 SessionManagementFilter가 이 요청을 새 로그인으로 보고
+            // CSRF 쿠키를 갈아 끼운다(#449).
+            securityContextRepository.saveContext(
+                    SecurityContextHolder.getContext(),
+                    request,
+                    response
+            );
         } catch (JwtException | IllegalArgumentException exception) {
             SecurityContextHolder.clearContext();
         }

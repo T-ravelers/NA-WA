@@ -109,6 +109,10 @@ Node `24.22.1` · pnpm `12.15.0` · Java `17`
   개인정보·원본 오류 객체를 출력하지 않습니다.
 - 로그아웃 응답이 불확실할 때는 브라우저 장벽이 보호 경로와 refresh를 함께 차단합니다.
   장벽은 서버 로그아웃 성공 또는 새 로그인 callback 성공에서만 해제합니다.
+- `XSRF-TOKEN`은 로그인 callback 성공에서만 바뀝니다. `JwtAuthenticationFilter`가 인증
+  컨텍스트를 `SecurityConfig.securityContextRepository()`에 남기지 않으면 Spring Security 5.8이
+  인증된 요청마다 쿠키를 갈아 끼워 **쓰기 1건이 오류 없이 요청 3건이 됩니다**(#449).
+  자세한 것은 [인증 문서](./backend/docs/AUTHENTICATION.md#csrf-토큰은-로그인할-때만-바뀝니다).
 - 영수증 이미지 S3 버킷은 **백엔드가 도는 AWS 계정이 아닌 다른 계정**이 소유합니다.
   그래서 EC2 인스턴스 역할로 권한을 얹지 못하고, 버킷 소유 계정이 발급한 IAM 사용자 키를
   `AWS_ACCESS_KEY_ID`·`AWS_SECRET_ACCESS_KEY`로 받아 씁니다. 이 정적 자격증명을 인스턴스

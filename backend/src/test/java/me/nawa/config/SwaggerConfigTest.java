@@ -66,6 +66,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
@@ -186,6 +188,11 @@ class SwaggerConfigTest {
 
     @Configuration
     static class AuthTestConfig {
+
+        @Bean
+        CsrfTokenRepository csrfTokenRepository() {
+            return new CookieCsrfTokenRepository();
+        }
 
         @Bean
         AuthTokenService authTokenService() {

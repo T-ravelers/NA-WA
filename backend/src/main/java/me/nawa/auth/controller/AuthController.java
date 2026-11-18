@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -37,6 +39,7 @@ public class AuthController {
     private final AuthCookieManager authCookieManager;
     private final OAuthAuthorizationService oauthAuthorizationService;
     private final OAuthCallbackService oauthCallbackService;
+    private final CsrfTokenRepository csrfTokenRepository;
 
     @GetMapping("/oauth2/authorization/{provider}")
     public ResponseEntity<Void> authorize(
@@ -67,7 +70,8 @@ public class AuthController {
             @RequestParam(name = "state", required = false) String state,
             @RequestParam(name = "code", required = false) String code,
             @RequestParam(name = "error", required = false) String error,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            HttpServletResponse response) {
         try {
             OAuthCallbackResult result = oauthCallbackService.handle(
                     provider,
@@ -79,6 +83,10 @@ public class AuthController {
                             .orElse(null)
             );
             AuthTokens tokens = result.getTokens();
+            // 로그인 전에 받은 CSRF 토큰을 로그인 뒤로 가져가지 않는다. 요청마다
+            // 인증하는 체인이라 Spring의 로그인 시 교체가 이 순간을 알지 못한다(#449).
+            // 다음 쓰기 전에 클라이언트가 /csrf로 새 토큰을 받는다.
+            csrfTokenRepository.saveToken(null, request, response);
             return ResponseEntity
                     .status(HttpStatus.FOUND)
                     .location(result.getRedirectUri())

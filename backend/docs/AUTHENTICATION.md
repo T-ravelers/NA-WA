@@ -10,7 +10,7 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 | ----------- | --------------------------------------------------------------- | ---------------------------------------------- |
 | CSRF 준비   | `GET /api/v1/auth/csrf`                                         | CSRF 쿠키와 요청 헤더 이름 반환                |
 | 로그인 시작 | `GET /api/v1/auth/oauth2/authorization/{provider}?returnPath=/` | 상태 쿠키 발급 후 Google 또는 LINE으로 `302` 이동 |
-| 공급자 콜백 | `GET /api/v1/auth/oauth2/callback/{provider}`                   | 자체 토큰 쿠키 발급 후 프런트엔드로 `302` 이동 |
+| 공급자 콜백 | `GET /api/v1/auth/oauth2/callback/{provider}`                   | 자체 토큰 쿠키 발급·CSRF 쿠키 삭제 후 프런트엔드로 `302` 이동 |
 | 로그인 확인 | `GET /api/v1/members/me`                                        | 현재 회원 정보와 `onboardingRequired` 반환     |
 | 토큰 갱신   | `POST /api/v1/auth/refresh`                                     | access·refresh 쿠키 교체                       |
 | 로그아웃    | `POST /api/v1/auth/logout`                                      | 인증 쿠키 삭제와 Redis 세션 폐기 시도          |
@@ -18,6 +18,25 @@ NA-WA 인증은 Google·LINE OpenID Connect 로그인과 HttpOnly 쿠키 기반 
 `provider`는 `google` 또는 `line`만 허용합니다. 성공·실패 리다이렉트 URL에는
 토큰이나 개인정보를 넣지 않습니다. 실패 시에는 프런트엔드가 처리할 안정적인
 `error` 코드만 전달합니다.
+
+### CSRF 토큰은 로그인할 때만 바뀝니다
+
+`XSRF-TOKEN` 쿠키는 `GET /api/v1/auth/csrf`가 만들고, 공급자 콜백이 로그인에 성공하면
+지웁니다. 로그인 전에 받은 토큰을 로그인 뒤에 쓰지 못하게 하려는 것입니다. 프런트엔드는
+콜백 뒤 페이지를 새로 열면서 토큰 캐시가 비므로 첫 쓰기 전에 `/csrf`로 새 토큰을 받습니다.
+콜백이 실패하면 지우지 않습니다. 로그아웃도 이 쿠키를 바꾸지 않으며, 남은 토큰은 다음
+로그인 콜백이 지웁니다.
+
+그 밖의 요청은 이 쿠키를 바꾸지 않습니다. Spring Security 5.8은 `STATELESS` 체인 전체의
+인증 컨텍스트 저장소를 `NullSecurityContextRepository`로 두면서 세션 관리 필터도 둡니다.
+저장소에 인증 컨텍스트가 남지 않으니 세션 관리 필터가 매 요청을 새 로그인으로 보고 쿠키를
+갈아 끼웁니다. 그러면 프런트엔드가 캐시한 토큰이 낡아 쓰기 1건이
+「`403 AUTH-005` → `/csrf` 재조회 → 재시도」의 요청 3건이 됩니다(#449). 그래서
+`JwtAuthenticationFilter`가 인증 컨텍스트를 요청 범위 저장소
+(`SecurityConfig.securityContextRepository()`)에 남깁니다. 이 저장소는 체인 전체가 씁니다. **이 저장을 빼도 오류는 나지 않고
+요청 수만 늘어납니다.** `SecurityConfigTest`의
+`authenticatedGet_keepsXsrfCookie_soCachedTokenStillWorksForNextWrite`가 이 동작을,
+`AuthControllerTest`의 콜백 성공 테스트가 로그인 시 삭제를 고정합니다.
 
 ### 로그인을 시작한 브라우저에서만 콜백을 완료할 수 있습니다
 
