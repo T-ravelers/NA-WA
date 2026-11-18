@@ -225,12 +225,17 @@ public MemberResponse createMember(MemberCreateRequest request) {
 - 수명이 있는 데이터에는 TTL을 설정합니다.
 - 인증, 토큰과 임시 데이터의 Key namespace를 분리합니다.
 
-| 데이터          | Key 예시                                     |
-| --------------- | -------------------------------------------- |
-| Refresh Token   | `auth:refresh:{sessionId}`                   |
-| Token Blacklist | `auth:blacklist:{tokenId}`                   |
-| 인증번호        | `auth:code:{purpose}:{target}`               |
-| 탐색 목록 캐시  | `explore:list:v1:{event\|place}:{조건 해시}` |
+| 데이터              | Key 예시                                     |
+| ------------------- | -------------------------------------------- |
+| Refresh Token       | `auth:refresh:{sessionId}`                   |
+| Token Blacklist     | `auth:blacklist:{tokenId}`                   |
+| 인증번호            | `auth:code:{purpose}:{target}`               |
+| 탐색 목록 캐시      | `explore:list:v1:{event\|place}:{조건 해시}` |
+| 약속 참여 남은 자리 | `appointment:{appointmentId}:seats`          |
+| 약속 참여 자리 명단 | `appointment:{appointmentId}:members`        |
+
+약속 참여 키의 `{appointmentId}`는 실제 중괄호입니다. Redis 클러스터의 해시 태그라서
+같은 약속의 두 키가 같은 슬롯에 놓이고, 둘을 함께 다루는 Lua가 클러스터에서도 동작합니다.
 
 인증 상태와 일반 캐시가 같은 Redis를 사용한다면 eviction이 인증에 미치는 영향을
 검토하세요.

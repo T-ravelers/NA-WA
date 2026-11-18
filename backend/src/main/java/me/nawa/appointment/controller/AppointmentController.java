@@ -11,6 +11,7 @@ import me.nawa.appointment.dto.response.AppointmentListResponse;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.dto.response.AppointmentParticipationResponse;
 import me.nawa.appointment.dto.response.MyOngoingAppointmentResponse;
+import me.nawa.appointment.service.AppointmentJoinService;
 import me.nawa.appointment.service.AppointmentService;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.response.ApiResponse;
@@ -35,6 +36,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AppointmentController {
     private final AppointmentService appointmentService;
+    private final AppointmentJoinService appointmentJoinService;
 
     @GetMapping
     @ApiOperation("약속 목록 조회")
@@ -94,7 +96,8 @@ public class AppointmentController {
             // 캐시된 옛 번들의 참여가 전부 실패한다. 서비스가 이미 tripId 누락을
             // COMMON-001로 거절하므로 그 구간에도 같은 오류로 일관되게 답한다.
             @RequestBody(required = false) AppointmentJoinRequest request) {
-        return ApiResponse.success(appointmentService.joinAppointment(
+        // 자리를 Redis 입장권으로 먼저 확인한 뒤 참여 트랜잭션으로 넘긴다(#612).
+        return ApiResponse.success(appointmentJoinService.join(
                 member.getMemberId(),
                 appointmentId,
                 request

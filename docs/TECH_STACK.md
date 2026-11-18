@@ -45,7 +45,7 @@ Vue Query가 서버 응답을 소유합니다. 서버 응답을 Pinia에 복제�
 | Runtime     | Java `17`, Tomcat `9`                             | WAR 실행                          |
 | Framework   | Spring Framework/MVC `5.3`, Spring Security `5.8` | REST API와 인증·인가              |
 | Persistence | MyBatis `3.5`, MySQL `8.4`                        | 서비스 데이터 영속화              |
-| Cache       | Redis `7`                                         | TTL이 필요한 인증과 캐시 데이터   |
+| Cache       | Redis `7`                                         | TTL이 필요한 인증·캐시 데이터와 약속 참여 자리 수 |
 | Build       | Gradle Wrapper `9.6`, WAR plugin                  | 빌드와 테스트                     |
 | API docs    | Springfox Swagger `2.9`                           | 개발 중 API 확인                  |
 | Web Push    | `web-push` `5.1`, BouncyCastle `jdk18on`, JDK `HttpClient` | VAPID 서명·본문 암호화와 푸시 전송 |

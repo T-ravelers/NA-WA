@@ -11,6 +11,7 @@ import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.dto.response.AppointmentSummaryResponse;
 import me.nawa.appointment.dto.response.MyOngoingAppointmentResponse;
 import me.nawa.appointment.exception.AppointmentErrorCode;
+import me.nawa.appointment.service.AppointmentJoinService;
 import me.nawa.appointment.service.AppointmentService;
 import me.nawa.auth.security.AuthenticatedMember;
 import me.nawa.common.exception.GlobalExceptionHandler;
@@ -49,6 +50,9 @@ class AppointmentControllerTest {
     @Mock
     private AppointmentService appointmentService;
 
+    @Mock
+    private AppointmentJoinService appointmentJoinService;
+
     private MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper()
             .findAndRegisterModules();
@@ -56,7 +60,7 @@ class AppointmentControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AppointmentController(appointmentService))
+                .standaloneSetup(new AppointmentController(appointmentService, appointmentJoinService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver()
