@@ -2,7 +2,7 @@
 import QRCode from 'qrcode'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { IconMinus, IconPlus } from '@tabler/icons-vue'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { NormalizedApiError } from '@/shared/api/apiError'
@@ -16,6 +16,7 @@ import TextInput from '@/shared/ui/TextInput.vue'
 import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
 
 import { createMerchantQr, registerAsMerchant, type MerchantQr } from '../api/merchantApi'
+import MerchantRegisterConfirmSheet from '../components/MerchantRegisterConfirmSheet.vue'
 import {
   calculateTotal,
   createEmptyItem,
@@ -82,10 +83,32 @@ const canRegister = computed(
   () => businessName.value.trim() !== '' && !registerMutation.isPending.value,
 )
 
+/*
+ * 손님 → 가맹점 전환은 되돌릴 수 없어서, 제출은 요청이 아니라 확인 모달을 연다(#340).
+ * 확정한 뒤의 진행·오류 표시는 지금처럼 폼 버튼과 입력 칸이 맡는다.
+ */
+const confirmingRegistration = ref(false)
+const registerForm = useTemplateRef('registerForm')
+
 const submitRegistration = (): void => {
   if (!canRegister.value) return
 
+  confirmingRegistration.value = true
+}
+
+const confirmRegistration = async (): Promise<void> => {
+  confirmingRegistration.value = false
+  if (!canRegister.value) return
+
   registerMutation.mutate(businessName.value.trim())
+
+  /*
+   * 모달은 닫히면서 포커스를 등록 버튼으로 돌려주는데, 그 버튼은 요청 중 loading(disabled)이라
+   * 포커스가 body로 떨어진다. 오류가 붙는 입력 칸으로 옮긴다. 모달이 언마운트되며 돌려주는
+   * 포커스를 덮어써야 하므로 렌더가 끝난 뒤에 옮긴다.
+   */
+  await nextTick()
+  registerForm.value?.querySelector('input')?.focus()
 }
 
 /* --------------------------------- 매출 조회 -------------------------------- */
@@ -319,6 +342,7 @@ const createError = computed(() =>
         </p>
 
         <form
+          ref="registerForm"
           class="mt-5 space-y-4"
           @submit.prevent="submitRegistration"
         >
@@ -338,6 +362,13 @@ const createError = computed(() =>
           </AppButton>
         </form>
       </AppCard>
+
+      <MerchantRegisterConfirmSheet
+        v-if="confirmingRegistration"
+        :business-name="businessName.trim()"
+        @close="confirmingRegistration = false"
+        @confirm="confirmRegistration"
+      />
     </section>
 
     <template v-else>

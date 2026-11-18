@@ -14,6 +14,9 @@ export default {
       businessNamePlaceholder: '例如：Blue Bottle 弘大店',
       irreversible: '此操作無法復原。店家帳號無法進行付款或使用旅客功能。',
       submit: '建立店家',
+      confirmTitle: '要建立這個店家嗎？',
+      confirmClose: '關閉建立店家確認',
+      confirmCancel: '返回',
       error: '無法建立店家，請再試一次。',
     },
     income: {

@@ -15,6 +15,9 @@ export default {
       irreversible:
         'Thao tác này không thể hoàn tác. Tài khoản cửa hàng không thể thanh toán hoặc sử dụng các tính năng dành cho du khách.',
       submit: 'Tạo cửa hàng',
+      confirmTitle: 'Tạo cửa hàng này?',
+      confirmClose: 'Đóng xác nhận tạo cửa hàng',
+      confirmCancel: 'Quay lại',
       error: 'Chúng tôi không thiết lập được cửa hàng của bạn. Vui lòng thử lại.',
     },
     income: {
