@@ -128,7 +128,8 @@ class DepositPayoutBatchProcessorIntegrationTest {
                 depositMapper,
                 depositPayoutBatchMapper,
                 walletTransferService,
-                journeyMapper
+                journeyMapper,
+                event -> { }
         );
         processor = new DepositPayoutBatchProcessor(
                 depositPayoutBatchMapper,

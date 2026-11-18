@@ -457,7 +457,7 @@ class SwaggerConfigTest {
 
         @Bean
         AppointmentService appointmentService() {
-            return new AppointmentService(null, null, null, null, null);
+            return new AppointmentService(null, null, null, null, null, null);
         }
 
         @Bean
