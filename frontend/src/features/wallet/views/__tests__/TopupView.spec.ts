@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { i18n } from '@/app/i18n'
+import { NormalizedApiError } from '@/shared/api/apiError'
 
 import { createStripeIntent, getTopupMethods, previewTopup } from '../../api/topupApi'
 import StripePaymentStep from '../StripePaymentStep.vue'
@@ -158,6 +159,103 @@ describe('TopupView', () => {
     )
     // 비활성 수단 블록은 V2 시안(충전하기/01)대로 55% 투명도로 가라앉는다.
     expect(wrapper.get('.opacity-55 img').attributes('src')).toBe('/payment/paypal-mark.svg')
+  })
+
+  describe('when the server has turned top-up off', () => {
+    const disabledMethodsResponse = {
+      methods: [{ ...methodsResponse.methods[0]!, enabled: false }],
+      guideMessage: null,
+    }
+
+    it('shows the coming-soon state instead of the top-up form', async () => {
+      vi.mocked(getTopupMethods).mockResolvedValue(disabledMethodsResponse)
+
+      const wrapper = await mountTopup()
+      await flushPromises()
+
+      const unavailable = wrapper.get('[data-testid="topup-unavailable"]')
+      expect(unavailable.text()).toContain('Top-up is coming soon')
+      expect(unavailable.text()).toContain('Top-up will open in a later release.')
+      // 금액 입력과 결제 수단 선택, 다음 버튼이 모두 사라진다.
+      expect(wrapper.text()).not.toContain('Top-up amount')
+      expect(wrapper.text()).not.toContain('Payment method')
+      expect(wrapper.findAll('button').some((button) => button.text() === 'Next')).toBe(false)
+      expect(previewTopup).not.toHaveBeenCalled()
+    })
+
+    it('treats an empty method list the same way', async () => {
+      vi.mocked(getTopupMethods).mockResolvedValue({ methods: [], guideMessage: null })
+
+      const wrapper = await mountTopup()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="topup-unavailable"]').exists()).toBe(true)
+    })
+
+    it('does not call it coming soon while the method list is still loading', async () => {
+      // 목록이 오기 전에는 켜진 환경과 구분할 수 없다. 켜진 환경 사용자에게 잠깐이라도
+      // "준비 중"이 번쩍이면 안 된다.
+      vi.mocked(getTopupMethods).mockReturnValue(new Promise(() => {}))
+
+      const wrapper = await mountTopup()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="topup-unavailable"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Loading payment methods...')
+    })
+
+    it('does not call it coming soon when the method list fails to load', async () => {
+      vi.mocked(getTopupMethods).mockRejectedValue(new Error('network'))
+
+      const wrapper = await mountTopup()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="topup-unavailable"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Payment methods are unavailable.')
+    })
+
+    it('switches to the coming-soon state when the preview is refused with WALLET-032', async () => {
+      // 화면을 연 뒤에 서버 설정이 바뀐 경우의 안전망이다.
+      vi.mocked(previewTopup).mockRejectedValue(
+        new NormalizedApiError('WALLET-032', 503, 'Top-up is not available yet.'),
+      )
+
+      const wrapper = await mountTopup()
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === '+30,000 P')
+        ?.trigger('click')
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Next')
+        ?.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="topup-unavailable"]').exists()).toBe(true)
+      expect(wrapper.text()).not.toContain('We could not create a top-up preview')
+    })
+
+    it('keeps the generic preview error for other failures', async () => {
+      vi.mocked(previewTopup).mockRejectedValue(
+        new NormalizedApiError('WALLET-001', 404, 'wallet not found'),
+      )
+
+      const wrapper = await mountTopup()
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === '+30,000 P')
+        ?.trigger('click')
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Next')
+        ?.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="topup-unavailable"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('We could not create a top-up preview')
+    })
   })
 
   it('requests a preview and shows the preview values', async () => {

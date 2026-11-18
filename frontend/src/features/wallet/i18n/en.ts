@@ -85,6 +85,7 @@ export default {
       'WALLET-014': 'This transfer could not be sent. Refresh and try again.',
       'WALLET-015': 'Your wallet balance is too low for this transfer.',
       'WALLET-016': 'A wallet in this transfer cannot be used right now.',
+      'WALLET-032': "Top-up isn't available yet.",
     },
     transactions: {
       title: 'TRANSACTIONS',
@@ -176,6 +177,12 @@ export default {
       currentBalance: 'Current balance {balance}',
       backToWallet: 'Back to wallet',
       backToCaller: 'Continue where you left off',
+      /** 서버가 충전을 꺼 둔 환경(운영)에서 폼 대신 보여 주는 상태. */
+      unavailable: {
+        title: 'Top-up is coming soon',
+        description: "You can't add points just yet. Top-up will open in a later release.",
+        action: 'Back',
+      },
     },
     qr: {
       title: 'QR PAYMENT',
