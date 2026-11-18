@@ -55,8 +55,8 @@ public class SecurityConfig {
     /**
      * 요청 하나 동안만 인증 컨텍스트를 담는 저장소.
      *
-     * <p>{@code STATELESS}만 두면 Spring Security 5.8은 세션 관리에
-     * {@code NullSecurityContextRepository}를 쓴다. 그러면
+     * <p>{@code STATELESS}만 두면 Spring Security 5.8은 체인 전체의 공유 저장소로
+     * {@code NullSecurityContextRepository}를 등록한다. 그러면
      * {@code SessionManagementFilter}가 매 요청을 「방금 로그인했다」로 보고
      * CSRF 쿠키를 갈아 끼운다. 캐시한 토큰으로 보낸 다음 쓰기가 403을 받아
      * 쓰기 1건이 요청 3건이 됐다(#449).
@@ -64,6 +64,14 @@ public class SecurityConfig {
      * <p>{@link JwtAuthenticationFilter}가 인증한 컨텍스트를 여기에 남기므로 세션
      * 관리 필터가 같은 요청을 새 로그인으로 보지 않는다. 세션은 여전히 만들지 않는다.
      * 로그인 순간의 교체는 OAuth 콜백이 직접 한다({@code AuthController}).
+     *
+     * <p>이 빈은 체인 전체의 저장소를 바꾼다. 같은 요청의 ERROR 디스패치처럼 필터를 다시
+     * 지나는 경우에도 인증 컨텍스트가 보인다. 5.8의 {@code AuthorizationFilter}는 기본값으로
+     * ERROR 디스패치를 건너뛰므로 권한 판정은 달라지지 않는다.
+     *
+     * <p>{@code csrf.sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy())}로
+     * CSRF 전략만 꺼도 쿠키 교체는 멈춘다. 그 방법을 쓰지 않은 이유는 세션 관리 필터가
+     * 여전히 매 요청을 새 로그인으로 보기 때문이다. 나중에 더하는 세션 전략도 매 요청 돈다.
      *
      * <p>{@code static}인 이유: 이 설정 클래스가 그 필터를 생성자로 받으므로
      * 인스턴스 메서드로 두면 순환 참조가 된다.

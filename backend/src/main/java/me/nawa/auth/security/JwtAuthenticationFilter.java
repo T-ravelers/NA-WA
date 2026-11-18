@@ -28,7 +28,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final AuthCookieManager authCookieManager;
     private final JwtTokenProvider jwtTokenProvider;
-    /** {@code SecurityConfig.securityContextRepository()}와 같은 인스턴스여야 한다. */
+    /**
+     * {@code SecurityConfig.securityContextRepository()}와 같은 요청 속성에 저장하는 저장소여야 한다.
+     * 기본 생성자의 {@code RequestAttributeSecurityContextRepository}는 속성 이름이 상수라서
+     * 인스턴스가 달라도 된다.
+     */
     private final SecurityContextRepository securityContextRepository;
 
     @Override
