@@ -206,7 +206,6 @@ export default {
       notFoundDescription: '這位成員已不在這個揪團中。',
       trustLine: '★ {rating} · {count} 則評價 | ★ {rating} · {count} 則評價',
       noReviews: '尚無評價',
-      unavailable: '尚無資料',
       // 여기의 Report는 보고서가 아니라 신고다. 報告가 아닌 檢舉를 쓴다.
       loadFailed: '無法載入參加者檔案',
       loadFailedDescription: '請稍後再試一次。',

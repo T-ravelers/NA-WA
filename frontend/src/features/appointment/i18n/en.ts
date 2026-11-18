@@ -217,7 +217,6 @@ export default {
       notFoundDescription: 'This member is no longer part of the appointment.',
       trustLine: '★ {rating} · {count} review | ★ {rating} · {count} reviews',
       noReviews: 'No reviews yet',
-      unavailable: 'Not available yet',
       loadFailed: 'Participant profile could not be loaded',
       loadFailedDescription: 'Please try again in a moment.',
     },

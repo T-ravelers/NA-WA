@@ -210,7 +210,6 @@ export default {
       notFoundDescription: 'このメンバーはもう同行グループに参加していません。',
       trustLine: '★ {rating} · レビュー {count}件 | ★ {rating} · レビュー {count}件',
       noReviews: 'まだレビューがありません',
-      unavailable: 'まだありません',
       loadFailed: '参加者プロフィールを読み込めませんでした',
       loadFailedDescription: 'しばらくしてから、もう一度お試しください。',
     },

@@ -1,6 +1,6 @@
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -77,6 +77,10 @@ describe('AppointmentMemberProfileView', () => {
     fetchAppointmentMembers.mockResolvedValue(members)
   })
 
+  afterEach(() => {
+    i18n.global.locale.value = 'en'
+  })
+
   it('renders the selected participant with one trust line', async () => {
     const { wrapper } = await mountView({ data: { averageRating: 4.666, reviewCount: 6 } })
 
@@ -89,6 +93,19 @@ describe('AppointmentMemberProfileView', () => {
     const { wrapper } = await mountView({ data: { averageRating: 5, reviewCount: 1 } })
 
     expect(wrapper.get('[data-testid="member-trust-line"]').text()).toBe('★ 5.0 · 1 review')
+  })
+
+  // 평점 소수점은 로케일을 따른다. vi는 쉼표를 쓴다.
+  it.each([
+    ['en', '★ 4.7 · 6 reviews'],
+    ['ja', '★ 4.7 · レビュー 6件'],
+    ['zh-TW', '★ 4.7 · 6 則評價'],
+    ['vi', '★ 4,7 · 6 đánh giá'],
+  ] as const)('formats the rating for %s', async (locale, expected) => {
+    i18n.global.locale.value = locale
+    const { wrapper } = await mountView({ data: { averageRating: 4.666, reviewCount: 6 } })
+
+    expect(wrapper.get('[data-testid="member-trust-line"]').text()).toBe(expected)
   })
 
   // 0건을 0점으로 그리면 평가가 나쁜 사람처럼 보인다.

@@ -213,7 +213,6 @@ export default {
       notFoundDescription: 'Thành viên này không còn thuộc cuộc hẹn.',
       trustLine: '★ {rating} · {count} đánh giá | ★ {rating} · {count} đánh giá',
       noReviews: 'Chưa có đánh giá',
-      unavailable: 'Chưa có dữ liệu',
       loadFailed: 'Không tải được hồ sơ người tham gia',
       loadFailedDescription: 'Vui lòng thử lại sau ít phút.',
     },

@@ -19,7 +19,7 @@ import { appointmentMembersQueryOptions } from '../model/appointmentQueries'
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 function routeNumber(name: 'appointmentId' | 'memberId'): number | null {
   const raw = Array.isArray(route.params[name]) ? route.params[name][0] : route.params[name]
@@ -52,8 +52,12 @@ const trustLine = computed<string | null>(() => {
   if (!stats) return null
   if (stats.reviewCount === 0 || stats.averageRating === null)
     return t('appointment.profile.noReviews')
+  const rating = new Intl.NumberFormat(locale.value, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(stats.averageRating)
   return t('appointment.profile.trustLine', {
-    rating: stats.averageRating.toFixed(1),
+    rating,
     count: stats.reviewCount,
   })
 })
