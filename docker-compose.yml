@@ -11,7 +11,9 @@ services:
       - nawa-network
 
   backend:
-    image: ${DOCKERHUB_USERNAME}/nawa-backend:latest
+    # 서버 배포는 deploy.sh가 IMAGE_TAG(커밋 SHA)를 반드시 넘겨 그 커밋의 이미지만 받는다.
+    # 기본값 latest는 `docker compose up --build`로 로컬에서 직접 빌드하는 경로를 위한 것이다.
+    image: ${DOCKERHUB_USERNAME}/nawa-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
