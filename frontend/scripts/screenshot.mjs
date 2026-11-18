@@ -2193,6 +2193,27 @@ const SCREENS = [
     },
   },
   {
+    // 서버가 충전을 꺼 둔 환경(운영). 수단 목록이 enabled=false로 내려오면 폼 대신 이 상태가 뜬다.
+    // 나중에 등록한 route가 먼저 잡히므로 stubWalletApis의 수단 목록 스텁을 덮어쓴다.
+    name: '10-wallet-top-up-unavailable',
+    path: '/wallet/top-up',
+    setup: async (page) => {
+      await stubMemberProfile(page)
+      stubWalletApis(page)
+      await stubJson(page, '/api/v1/topups/methods', {
+        methods: [
+          {
+            type: 'STRIPE_CARD',
+            displayName: 'Stripe',
+            testMode: true,
+            enabled: false,
+          },
+        ],
+        guideMessage: null,
+      })
+    },
+  },
+  {
     name: '11-wallet-transactions',
     path: '/wallet/transactions',
     setup: async (page) => {

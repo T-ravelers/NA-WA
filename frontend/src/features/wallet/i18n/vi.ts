@@ -61,6 +61,7 @@ export default {
       'WALLET-014': 'Không gửi được giao dịch chuyển này. Hãy làm mới và thử lại.',
       'WALLET-015': 'Số dư ví của bạn quá thấp cho giao dịch chuyển này.',
       'WALLET-016': 'Một ví trong giao dịch chuyển này hiện không dùng được.',
+      'WALLET-032': 'Hiện chưa thể nạp điểm.',
     },
     transactions: {
       title: 'GIAO DỊCH',
@@ -152,6 +153,12 @@ export default {
       currentBalance: 'Số dư hiện tại {balance}',
       backToWallet: 'Về ví',
       backToCaller: 'Tiếp tục việc đang làm',
+      /** 서버가 충전을 꺼 둔 환경(운영)에서 폼 대신 보여 주는 상태. */
+      unavailable: {
+        title: 'Tính năng nạp điểm sắp ra mắt',
+        description: 'Hiện chưa thể nạp điểm. Tính năng này sẽ mở trong một bản phát hành sau.',
+        action: 'Quay lại',
+      },
     },
     qr: {
       title: 'THANH TOÁN QR',

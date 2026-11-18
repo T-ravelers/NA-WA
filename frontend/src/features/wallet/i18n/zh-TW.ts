@@ -61,6 +61,7 @@ export default {
       'WALLET-014': '這筆轉帳無法送出，請重新整理後再試一次。',
       'WALLET-015': '您的錢包餘額不足以完成這筆轉帳。',
       'WALLET-016': '這筆轉帳的其中一個錢包目前無法使用。',
+      'WALLET-032': '目前尚無法儲值。',
     },
     transactions: {
       title: '交易紀錄',
@@ -151,6 +152,12 @@ export default {
       currentBalance: '目前餘額 {balance}',
       backToWallet: '返回錢包',
       backToCaller: '回到原本的畫面',
+      /** 서버가 충전을 꺼 둔 환경(운영)에서 폼 대신 보여 주는 상태. */
+      unavailable: {
+        title: '儲值功能準備中',
+        description: '目前還無法儲值點數，之後的版本會開放。',
+        action: '返回',
+      },
     },
     qr: {
       title: 'QR Code 付款',

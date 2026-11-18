@@ -14,12 +14,14 @@ import AmountInput from '@/shared/ui/AmountInput.vue'
 import AppButton from '@/shared/ui/AppButton.vue'
 import AppCard from '@/shared/ui/AppCard.vue'
 import ScreenHeader from '@/shared/ui/ScreenHeader.vue'
+import StateEmpty from '@/shared/ui/StateEmpty.vue'
 
 import { createStripeIntent, getTopupMethods, previewTopup } from '../api/topupApi'
 import {
   DEFAULT_TOPUP_METHOD,
   formatPoints,
   getTopupMethodLabel,
+  isPaymentDisabledError,
   QUICK_TOPUP_AMOUNTS,
   TOPUP_CURRENCY,
   topupKeys,
@@ -109,6 +111,21 @@ const stripeIntentMutation = useMutation({
 
 const enabledMethods = computed(
   () => methodsQuery.data.value?.methods.filter((method) => method.enabled) ?? [],
+)
+
+/**
+ * 서버가 충전을 꺼 둔 환경이다. 수단 목록이 도착했는데 켜진 수단이 하나도 없거나, 서버가
+ * 충전 꺼짐 오류를 낸 경우다. 목록을 아직 받지 못했거나 받기에 실패했을 때는 켜진 환경과
+ * 구분할 수 없으니 "준비 중"으로 단정하지 않는다.
+ *
+ * 환경마다 따로 빌드하는 플래그 대신 서버 응답을 따르므로, 같은 빌드가 스테이징에서는 폼을,
+ * 충전을 끈 운영에서는 이 상태를 보여 준다.
+ */
+const paymentUnavailable = computed(
+  () =>
+    (methodsQuery.isSuccess.value && enabledMethods.value.length === 0) ||
+    isPaymentDisabledError(previewMutation.error.value) ||
+    isPaymentDisabledError(stripeIntentMutation.error.value),
 )
 
 const selectedMethodData = computed<TopupMethod | null>(
@@ -240,7 +257,20 @@ const handlePaymentError = (message: string): void => {
     />
 
     <section
-      v-if="step === 'form'"
+      v-if="step === 'form' && paymentUnavailable"
+      class="mt-5 flex flex-1 flex-col"
+      data-testid="topup-unavailable"
+    >
+      <StateEmpty
+        :title="t('wallet.topUp.unavailable.title')"
+        :description="t('wallet.topUp.unavailable.description')"
+        :action-label="t('wallet.topUp.unavailable.action')"
+        @action="leaveTopup"
+      />
+    </section>
+
+    <section
+      v-else-if="step === 'form'"
       class="mt-5 flex flex-1 flex-col gap-2"
       aria-labelledby="top-up-form-title"
     >

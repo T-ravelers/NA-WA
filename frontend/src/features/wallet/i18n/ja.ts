@@ -61,6 +61,7 @@ export default {
       'WALLET-014': 'この送金を送れませんでした。更新してもう一度お試しください。',
       'WALLET-015': 'この送金に必要なウォレット残高が足りません。',
       'WALLET-016': 'この送金に関わるウォレットが現在利用できません。',
+      'WALLET-032': 'チャージはまだご利用いただけません。',
     },
     transactions: {
       title: '取引履歴',
@@ -153,6 +154,13 @@ export default {
       currentBalance: '現在の残高 {balance}',
       backToWallet: 'ウォレットへ戻る',
       backToCaller: '元の画面へ戻る',
+      /** 서버가 충전을 꺼 둔 환경(운영)에서 폼 대신 보여 주는 상태. */
+      unavailable: {
+        title: 'チャージは準備中です',
+        description:
+          'ポイントのチャージはまだご利用いただけません。今後のリリースで利用できるようになります。',
+        action: '戻る',
+      },
     },
     qr: {
       title: 'QR決済',
