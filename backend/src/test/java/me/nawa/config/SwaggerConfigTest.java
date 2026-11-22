@@ -462,7 +462,7 @@ class SwaggerConfigTest {
 
         @Bean
         AppointmentJoinService appointmentJoinService() {
-            return new AppointmentJoinService(null, null);
+            return new AppointmentJoinService(null, null, null);
         }
     }
 

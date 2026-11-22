@@ -3,7 +3,10 @@ package me.nawa.appointment.service;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import me.nawa.appointment.domain.Appointment;
 import me.nawa.appointment.domain.AppointmentMember;
+import me.nawa.appointment.dto.request.AppointmentJoinRequest;
+import me.nawa.appointment.exception.AppointmentErrorCode;
 import me.nawa.appointment.mapper.AppointmentMapper;
+import me.nawa.common.exception.BusinessException;
 import me.nawa.config.RedisConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,10 +33,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -184,6 +189,40 @@ class AppointmentSeatGateIntegrationTest {
         assertEquals(SeatAcquireResult.ACQUIRED, gate.tryAcquire(appointmentId, 2L));
         assertEquals("0", redisTemplate.opsForValue().get(gate.seatsKey(appointmentId)));
         assertEquals(Set.of("900", "2"), members());
+    }
+
+    /**
+     * 마지막 한 자리에서 같은 회원의 요청 A가 자리를 빼고, 요청 B는 "이미 보유"로 DB에 간다. B가 먼저
+     * 참여를 확정하고 A가 실패해도 그 자리는 B의 것이라 돌려주지 않는다. 돌려주면 정원이 찼는데도
+     * 다음 회원이 입장권을 통과해 DB 잠금을 잡고 실패한다.
+     */
+    @Test
+    void join_doesNotReturnTheSeatTakenByAnotherRequestOfTheSameMember() {
+        AtomicReference<List<AppointmentMember>> active = new AtomicReference<>(members(900L));
+        when(appointmentMapper.findAppointmentById(appointmentId)).thenReturn(Appointment.builder()
+                .appointmentId(appointmentId)
+                .maxMembers(2)
+                .activityEndAt(LocalDateTime.now().plusHours(3))
+                .build());
+        when(appointmentMapper.findActiveMembersByAppointmentId(appointmentId))
+                .thenAnswer(invocation -> active.get());
+
+        AppointmentService appointmentService = mock(AppointmentService.class);
+        AppointmentJoinService joinService =
+                new AppointmentJoinService(gate, appointmentService, appointmentMapper);
+        AppointmentJoinRequest request = new AppointmentJoinRequest();
+        request.setTripId(42L);
+        when(appointmentService.joinAppointment(7L, appointmentId, request)).thenAnswer(invocation -> {
+            // A가 DB 잠금을 기다리는 사이 B가 입장권(이미 보유)을 거쳐 먼저 확정한다.
+            assertEquals(SeatAcquireResult.ALREADY_HOLDING, gate.tryAcquire(appointmentId, 7L));
+            active.set(members(900L, 7L));
+            throw new BusinessException(AppointmentErrorCode.ALREADY_JOINED);
+        });
+
+        assertThrows(BusinessException.class, () -> joinService.join(7L, appointmentId, request));
+
+        assertEquals(SeatAcquireResult.FULL, gate.tryAcquire(appointmentId, 8L));
+        assertEquals("0", redisTemplate.opsForValue().get(gate.seatsKey(appointmentId)));
     }
 
     /** 두 키 모두 활동 종료까지만 남는다. 회원이 없어 차감하며 처음 만든 명단도 같다. */

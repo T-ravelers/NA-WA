@@ -1,8 +1,10 @@
 package me.nawa.appointment.service;
 
+import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.dto.request.AppointmentJoinRequest;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.exception.AppointmentErrorCode;
+import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.common.exception.BusinessException;
 import me.nawa.common.exception.CommonErrorCode;
 import org.junit.jupiter.api.Test;
@@ -10,6 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -36,6 +40,9 @@ class AppointmentJoinServiceTest {
 
     @Mock
     private AppointmentService appointmentService;
+
+    @Mock
+    private AppointmentMapper appointmentMapper;
 
     @InjectMocks
     private AppointmentJoinService joinService;
@@ -74,6 +81,23 @@ class AppointmentJoinServiceTest {
         assertSame(failure, assertThrows(BusinessException.class,
                 () -> joinService.join(MEMBER_ID, APPOINTMENT_ID, request)));
         verify(seatGate).release(APPOINTMENT_ID, MEMBER_ID);
+    }
+
+    /**
+     * 같은 회원이 겹쳐 눌러 다른 요청이 이미 참여를 확정했으면, 자리를 뺀 요청이 실패해도 그 자리는
+     * 확정된 참여의 것이라 돌려주지 않는다.
+     */
+    @Test
+    void join_keepsTheSeat_whenAnotherRequestOfTheSameMemberAlreadyJoined() {
+        when(seatGate.tryAcquire(APPOINTMENT_ID, MEMBER_ID)).thenReturn(SeatAcquireResult.ACQUIRED);
+        when(appointmentService.joinAppointment(MEMBER_ID, APPOINTMENT_ID, request))
+                .thenThrow(new BusinessException(AppointmentErrorCode.ALREADY_JOINED));
+        when(appointmentMapper.findActiveMembersByAppointmentId(APPOINTMENT_ID))
+                .thenReturn(List.of(AppointmentMember.builder().memberId(MEMBER_ID).build()));
+
+        assertThrows(BusinessException.class,
+                () -> joinService.join(MEMBER_ID, APPOINTMENT_ID, request));
+        verify(seatGate, never()).release(any(), any());
     }
 
     /** 이미 가진 자리나 입장권을 쓰지 못한 요청은 이번에 뺀 것이 없어 돌려주지 않는다. */

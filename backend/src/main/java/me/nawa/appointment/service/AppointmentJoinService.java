@@ -1,9 +1,11 @@
 package me.nawa.appointment.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me.nawa.appointment.dto.request.AppointmentJoinRequest;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.exception.AppointmentErrorCode;
+import me.nawa.appointment.mapper.AppointmentMapper;
 import me.nawa.common.exception.BusinessException;
 import org.springframework.stereotype.Service;
 
@@ -17,12 +19,14 @@ import org.springframework.stereotype.Service;
  * <p>입장권은 문지기일 뿐이고 최종 판단은 {@code joinAppointment}가 그대로 한다. 그래서 입장권을
  * 쓸 수 없거나 이미 가진 회원이면 DB에 그대로 맡긴다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AppointmentJoinService {
 
     private final AppointmentSeatGate seatGate;
     private final AppointmentService appointmentService;
+    private final AppointmentMapper appointmentMapper;
 
     public AppointmentMemberResponse join(
             Long memberId,
@@ -44,10 +48,32 @@ public class AppointmentJoinService {
         } catch (RuntimeException exception) {
             // 여기까지 왔으면 joinAppointment의 트랜잭션은 이미 롤백됐다. 이번에 뺀 자리만 돌려준다 —
             // 이미 보유했거나 입장권을 쓰지 못한 요청은 뺀 것이 없다.
-            if (seat == SeatAcquireResult.ACQUIRED) {
+            if (seat == SeatAcquireResult.ACQUIRED && !isActiveMember(appointmentId, memberId)) {
                 seatGate.release(appointmentId, memberId);
             }
             throw exception;
+        }
+    }
+
+    /**
+     * 같은 회원의 다른 요청이 이미 참여를 확정했는지 본다.
+     *
+     * <p>같은 회원이 겹쳐 누르면 한 요청은 자리를 빼고 다른 요청은 "이미 보유"로 함께 DB에 간다.
+     * "이미 보유" 쪽이 먼저 확정하면 자리를 뺀 요청은 실패하는데, 그 자리는 확정된 참여가 쓰고 있어
+     * 돌려주면 안 된다. 실패한 요청은 약속 행 잠금이 풀린 뒤에 실패하므로, 이때 읽으면 먼저 확정된
+     * 참여가 보인다.
+     *
+     * <p>확인하지 못하면 돌려준다. 돌려주지 않아 남는 자리는 활동 끝까지 매진으로 남지만, 잘못
+     * 돌려준 자리는 DB가 정원으로 거절할 뿐이다.
+     */
+    private boolean isActiveMember(Long appointmentId, Long memberId) {
+        try {
+            return appointmentMapper.findActiveMembersByAppointmentId(appointmentId).stream()
+                    .anyMatch(member -> memberId.equals(member.getMemberId()));
+        } catch (RuntimeException exception) {
+            log.warn("Failed to check the membership before releasing a seat. appointmentId={}",
+                    appointmentId, exception);
+            return false;
         }
     }
 
