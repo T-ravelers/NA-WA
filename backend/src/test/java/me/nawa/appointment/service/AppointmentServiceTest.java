@@ -1,6 +1,7 @@
 package me.nawa.appointment.service;
 
 import me.nawa.appointment.domain.Appointment;
+import me.nawa.appointment.event.AppointmentMemberLeftEvent;
 import me.nawa.appointment.domain.AppointmentMember;
 import me.nawa.appointment.domain.AppointmentStatus;
 import me.nawa.appointment.domain.MembershipStatus;
@@ -37,6 +38,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 
 import java.math.BigDecimal;
@@ -75,6 +77,8 @@ class AppointmentServiceTest {
     private WalletTransferService walletTransferService;
     @Mock
     private JourneyMapper journeyMapper;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
     @InjectMocks
     private AppointmentService appointmentService;
 
@@ -1095,6 +1099,8 @@ class AppointmentServiceTest {
         verify(deposit).refund(any());
         verify(depositMapper).markRefunded(eq(40L), any());
         verify(appointmentMapper).markMemberLeft(30L);
+        // 빈자리는 커밋된 뒤 Redis 입장권에 돌려준다(#612).
+        verify(eventPublisher).publishEvent(new AppointmentMemberLeftEvent(10L, 2L));
     }
 
     @Test
@@ -1164,6 +1170,7 @@ class AppointmentServiceTest {
         assertEquals(AppointmentErrorCode.CANCELLATION_NOT_AVAILABLE,
                 exception.getErrorCode());
         verify(appointmentMapper, never()).markMemberLeft(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     // 정원이 차서 FULL이던 약속이라도 활동이 시작된 뒤의 탈퇴는 노쇼로 굳는다.

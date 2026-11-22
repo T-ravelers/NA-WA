@@ -11,6 +11,7 @@ import me.nawa.appointment.dto.request.AppointmentAttendanceRequest;
 import me.nawa.appointment.dto.request.AppointmentSearchRequest;
 import me.nawa.appointment.dto.response.AppointmentDetailResponse;
 import me.nawa.appointment.dto.response.AppointmentListResponse;
+import me.nawa.appointment.event.AppointmentMemberLeftEvent;
 import me.nawa.appointment.dto.response.AppointmentMemberResponse;
 import me.nawa.appointment.dto.response.AppointmentParticipationResponse;
 import me.nawa.appointment.dto.response.AppointmentSummaryResponse;
@@ -33,6 +34,7 @@ import me.nawa.journey.mapper.JourneyMapper;
 import me.nawa.wallet.domain.SystemWalletCode;
 import me.nawa.wallet.domain.enums.TransferType;
 import me.nawa.wallet.service.WalletTransferService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,6 +80,7 @@ public class AppointmentService {
     private final DepositPayoutBatchMapper depositPayoutBatchMapper;
     private final WalletTransferService walletTransferService;
     private final JourneyMapper journeyMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Appointment createAppointment(
@@ -388,6 +391,8 @@ public class AppointmentService {
                     AppointmentStatus.RECRUITING
             );
         }
+        // 빈자리가 생겼다. Redis 입장권 자리는 이 트랜잭션이 커밋된 뒤에 돌려준다(#612).
+        eventPublisher.publishEvent(new AppointmentMemberLeftEvent(appointmentId, memberId));
     }
 
     @Transactional(readOnly = true)

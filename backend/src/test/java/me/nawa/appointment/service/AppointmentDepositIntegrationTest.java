@@ -132,7 +132,8 @@ class AppointmentDepositIntegrationTest {
                 depositMapper,
                 depositPayoutBatchMapper,
                 walletTransferService,
-                journeyMapper
+                journeyMapper,
+                event -> { }
         );
     }
 
